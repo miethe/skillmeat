@@ -29,7 +29,9 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "20260124_1000_add_search_columns_to_catalog_entries"
-down_revision: Union[str, None] = "20260123_1000_add_indexing_enabled_to_marketplace_sources"
+down_revision: Union[str, None] = (
+    "20260123_1000_add_indexing_enabled_to_marketplace_sources"
+)
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

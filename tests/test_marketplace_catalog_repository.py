@@ -386,9 +386,7 @@ class TestSearchOrdering:
 
         # Create entries with same confidence
         entries = [
-            create_catalog_entry(
-                sample_source.id, f"artifact-{i}", confidence_score=80
-            )
+            create_catalog_entry(sample_source.id, f"artifact-{i}", confidence_score=80)
             for i in range(5)
         ]
         catalog_repo.bulk_create(entries)

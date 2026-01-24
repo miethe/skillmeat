@@ -20,8 +20,9 @@ class TestExtractFrontmatterForArtifact:
         """Test that all frontmatter fields are extracted correctly."""
         # Setup mock scanner
         mock_scanner = Mock()
-        mock_scanner.get_file_content = Mock(return_value={
-            "content": """---
+        mock_scanner.get_file_content = Mock(
+            return_value={
+                "content": """---
 title: Canvas Design Skill
 description: A skill for designing visual elements
 tags:
@@ -34,8 +35,9 @@ tags:
 
 This skill helps with designing visual elements.
 """,
-            "is_binary": False,
-        })
+                "is_binary": False,
+            }
+        )
 
         # Setup mock source
         mock_source = Mock()
@@ -74,14 +76,16 @@ This skill helps with designing visual elements.
     def test_uses_name_field_when_title_missing(self):
         """Test that 'name' field is used if 'title' is missing."""
         mock_scanner = Mock()
-        mock_scanner.get_file_content = Mock(return_value={
-            "content": """---
+        mock_scanner.get_file_content = Mock(
+            return_value={
+                "content": """---
 name: My Skill Name
 description: A description
 ---
 """,
-            "is_binary": False,
-        })
+                "is_binary": False,
+            }
+        )
 
         mock_source = Mock()
         mock_source.owner = "owner"
@@ -153,10 +157,12 @@ description: A description
     def test_handles_binary_file_gracefully(self):
         """Test graceful handling when file is binary."""
         mock_scanner = Mock()
-        mock_scanner.get_file_content = Mock(return_value={
-            "content": "binary content",
-            "is_binary": True,
-        })
+        mock_scanner.get_file_content = Mock(
+            return_value={
+                "content": "binary content",
+                "is_binary": True,
+            }
+        )
 
         mock_source = Mock()
         mock_source.owner = "owner"
@@ -178,13 +184,15 @@ description: A description
     def test_handles_no_frontmatter_gracefully(self):
         """Test handling of SKILL.md without frontmatter."""
         mock_scanner = Mock()
-        mock_scanner.get_file_content = Mock(return_value={
-            "content": """# My Skill
+        mock_scanner.get_file_content = Mock(
+            return_value={
+                "content": """# My Skill
 
 This skill has no frontmatter.
 """,
-            "is_binary": False,
-        })
+                "is_binary": False,
+            }
+        )
 
         mock_source = Mock()
         mock_source.owner = "owner"
@@ -209,14 +217,16 @@ This skill has no frontmatter.
     def test_handles_comma_separated_tags(self):
         """Test that comma-separated tags string is parsed correctly."""
         mock_scanner = Mock()
-        mock_scanner.get_file_content = Mock(return_value={
-            "content": """---
+        mock_scanner.get_file_content = Mock(
+            return_value={
+                "content": """---
 title: My Skill
 tags: python, backend, api
 ---
 """,
-            "is_binary": False,
-        })
+                "is_binary": False,
+            }
+        )
 
         mock_source = Mock()
         mock_source.owner = "owner"
@@ -240,13 +250,15 @@ tags: python, backend, api
         long_title = "A" * 300  # Title longer than 200 chars
 
         mock_scanner = Mock()
-        mock_scanner.get_file_content = Mock(return_value={
-            "content": f"""---
+        mock_scanner.get_file_content = Mock(
+            return_value={
+                "content": f"""---
 title: {long_title}
 ---
 """,
-            "is_binary": False,
-        })
+                "is_binary": False,
+            }
+        )
 
         mock_source = Mock()
         mock_source.owner = "owner"
@@ -269,13 +281,15 @@ title: {long_title}
     def test_handles_root_path_artifact(self):
         """Test artifact at root path (no subdirectory)."""
         mock_scanner = Mock()
-        mock_scanner.get_file_content = Mock(return_value={
-            "content": """---
+        mock_scanner.get_file_content = Mock(
+            return_value={
+                "content": """---
 title: Root Skill
 ---
 """,
-            "is_binary": False,
-        })
+                "is_binary": False,
+            }
+        )
 
         mock_source = Mock()
         mock_source.owner = "owner"
