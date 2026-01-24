@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { ArtifactSearchResult } from '@/hooks';
 
@@ -263,18 +264,79 @@ export function ArtifactSearchResults({ results, className }: ArtifactSearchResu
 // Skeleton
 // ============================================================================
 
+/**
+ * Skeleton result card for loading states.
+ */
+function SkeletonResultCard() {
+  return (
+    <Card className="p-4">
+      {/* Header: Icon + Name + Type + Confidence */}
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-4 w-4 flex-shrink-0" />
+            <Skeleton className="h-5 w-48" />
+          </div>
+          <Skeleton className="mt-1 h-4 w-32" />
+        </div>
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <Skeleton className="h-5 w-16" />
+          <Skeleton className="h-5 w-12" />
+        </div>
+      </div>
+
+      {/* Description */}
+      <Skeleton className="mb-2 h-4 w-full" />
+      <Skeleton className="mb-2 h-4 w-3/4" />
+
+      {/* Snippet */}
+      <div className="mt-2 rounded-md bg-muted/50 p-2">
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="mt-1 h-3 w-5/6" />
+      </div>
+
+      {/* Tags */}
+      <div className="mt-2 flex flex-wrap gap-1">
+        <Skeleton className="h-5 w-16" />
+        <Skeleton className="h-5 w-20" />
+        <Skeleton className="h-5 w-14" />
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Skeleton accordion item for loading states.
+ */
+function SkeletonSourceGroup() {
+  return (
+    <div className="border-b last:border-b-0">
+      {/* Accordion trigger skeleton */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <Skeleton className="h-4 w-4" />
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-5 w-8 rounded-full" />
+      </div>
+      {/* Accordion content skeleton - 3 result cards */}
+      <div className="space-y-3 px-4 pb-4">
+        <SkeletonResultCard />
+        <SkeletonResultCard />
+        <SkeletonResultCard />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Loading skeleton for artifact search results.
+ * Shows 3 skeleton accordion items, each with skeleton source name/count and 3 skeleton result cards.
+ */
 export function ArtifactSearchResultsSkeleton() {
   return (
-    <div className="rounded-lg border">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="border-b p-4 last:border-b-0">
-          <div className="flex items-center gap-3">
-            <div className="h-4 w-4 animate-pulse rounded bg-muted" />
-            <div className="h-5 w-40 animate-pulse rounded bg-muted" />
-            <div className="h-5 w-8 animate-pulse rounded-full bg-muted" />
-          </div>
-        </div>
-      ))}
+    <div className="rounded-lg border" role="status" aria-label="Loading search results">
+      <SkeletonSourceGroup />
+      <SkeletonSourceGroup />
+      <SkeletonSourceGroup />
     </div>
   );
 }

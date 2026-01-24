@@ -4,13 +4,17 @@
  * Displays all GitHub repository sources that can be scanned for artifacts.
  * Provides add, rescan, and manage functionality.
  *
+ * Supports two search modes:
+ * - Sources mode: Filter sources client-side by repository name
+ * - Artifacts mode: Search across all catalog entries using FTS5
+ *
  * Filter state is synchronized with URL query parameters for shareability
  * and browser navigation support.
  */
 
 'use client';
 
-import { useMemo, useCallback, Suspense } from 'react';
+import { useMemo, useCallback, Suspense, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Plus,
@@ -21,6 +25,7 @@ import {
   X,
   AlertCircle,
   FilterX,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,7 +39,12 @@ import {
   RescanUpdatesDialog,
   type UpdatedImport,
 } from '@/components/marketplace/rescan-updates-dialog';
-import { useSources, sourceKeys } from '@/hooks';
+import { SearchModeToggle, type SearchMode } from '@/components/marketplace/search-mode-toggle';
+import {
+  ArtifactSearchResults,
+  ArtifactSearchResultsSkeleton,
+} from '@/components/marketplace/artifact-search-results';
+import { useSources, sourceKeys, useArtifactSearch } from '@/hooks';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks';
 import { apiRequest } from '@/lib/api';
@@ -292,9 +302,25 @@ function MarketplaceSourcesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Parse search mode from URL (defaults to 'sources')
+  const searchMode = (searchParams.get('mode') as SearchMode) || 'sources';
+
   // Parse filters from URL
   const filters = useMemo(() => parseFiltersFromUrl(searchParams), [searchParams]);
   const searchQuery = searchParams.get('q') || '';
+
+  // Artifact search hook (only active in artifacts mode)
+  const artifactSearch = useArtifactSearch({
+    debounceMs: 300,
+    minQueryLength: 2,
+  });
+
+  // Sync URL query to artifact search state on mount/mode change
+  useEffect(() => {
+    if (searchMode === 'artifacts' && searchQuery && artifactSearch.query !== searchQuery) {
+      artifactSearch.setQuery(searchQuery);
+    }
+  }, [searchMode, searchQuery, artifactSearch]);
 
   // Compute filter state
   const isFiltered = useMemo(() => hasActiveFilters(filters, searchQuery), [filters, searchQuery]);
@@ -465,15 +491,55 @@ function MarketplaceSourcesPageInner() {
 
   // URL update helper
   const updateUrl = useCallback(
-    (newFilters: FilterState, newSearchQuery: string) => {
+    (newFilters: FilterState, newSearchQuery: string, newMode?: SearchMode) => {
       const params = serializeFiltersToUrl(newFilters, newSearchQuery);
+      // Preserve mode in URL if specified or if already in artifacts mode
+      const modeToUse = newMode ?? searchMode;
+      if (modeToUse === 'artifacts') {
+        params.set('mode', 'artifacts');
+      }
       const search = params.toString();
       // Use replace to avoid polluting history for every keystroke
       router.replace(search ? `?${search}` : '/marketplace/sources', {
         scroll: false,
       });
     },
-    [router]
+    [router, searchMode]
+  );
+
+  // Handler for search mode changes
+  const handleModeChange = useCallback(
+    (newMode: SearchMode) => {
+      const params = new URLSearchParams();
+      if (newMode === 'artifacts') {
+        params.set('mode', 'artifacts');
+        // Keep the search query when switching modes
+        if (searchQuery.trim()) {
+          params.set('q', searchQuery.trim());
+        }
+        // Also sync to artifact search input
+        artifactSearch.setQuery(searchQuery);
+      } else {
+        // Switching to sources mode - keep filters and search
+        if (searchQuery.trim()) {
+          params.set('q', searchQuery.trim());
+        }
+        if (filters.artifact_type) {
+          params.set('artifact_type', filters.artifact_type);
+        }
+        if (filters.trust_level) {
+          params.set('trust_level', filters.trust_level);
+        }
+        if (filters.tags && filters.tags.length > 0) {
+          params.set('tags', filters.tags.join(','));
+        }
+      }
+      const search = params.toString();
+      router.replace(search ? `?${search}` : '/marketplace/sources', {
+        scroll: false,
+      });
+    },
+    [router, searchQuery, filters, artifactSearch]
   );
 
   // Handler for filter changes
@@ -510,10 +576,34 @@ function MarketplaceSourcesPageInner() {
     [filters, searchQuery, updateUrl]
   );
 
+  // Handler for artifact search input changes
+  const handleArtifactSearchChange = useCallback(
+    (newQuery: string) => {
+      artifactSearch.setQuery(newQuery);
+      // Also sync to URL
+      const params = new URLSearchParams();
+      params.set('mode', 'artifacts');
+      if (newQuery.trim()) {
+        params.set('q', newQuery.trim());
+      }
+      const search = params.toString();
+      router.replace(search ? `?${search}` : '/marketplace/sources?mode=artifacts', {
+        scroll: false,
+      });
+    },
+    [router, artifactSearch]
+  );
+
   // Handler for clearing all filters and search
   const handleClearAll = useCallback(() => {
-    router.replace('/marketplace/sources', { scroll: false });
-  }, [router]);
+    // Preserve mode when clearing
+    if (searchMode === 'artifacts') {
+      artifactSearch.setQuery('');
+      router.replace('/marketplace/sources?mode=artifacts', { scroll: false });
+    } else {
+      router.replace('/marketplace/sources', { scroll: false });
+    }
+  }, [router, searchMode, artifactSearch]);
 
   // Handler functions for modals
   const handleEdit = (source: GitHubSource) => {
@@ -556,49 +646,73 @@ function MarketplaceSourcesPageInner() {
         </div>
       </div>
 
-      {/* Search Bar with Clear Button */}
-      <div className="flex items-center gap-2">
-        <div className="relative max-w-md flex-1">
-          <SearchIcon
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <Input
-            placeholder="Search repositories..."
-            value={searchQuery}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-9 pr-9"
-            aria-label="Search repositories by owner or name"
-          />
-          {/* Clear search button inside input */}
-          {searchQuery && (
-            <button
-              onClick={() => handleSearchChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-sm text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              aria-label="Clear search"
+      {/* Search Mode Toggle and Search Bar */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        {/* Search Mode Toggle */}
+        <SearchModeToggle
+          mode={searchMode}
+          onModeChange={handleModeChange}
+          disabled={isLoading}
+        />
+
+        {/* Search Bar - different behavior based on mode */}
+        <div className="flex flex-1 items-center gap-2">
+          <div className="relative max-w-md flex-1">
+            <SearchIcon
+              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            {searchMode === 'sources' ? (
+              <Input
+                placeholder="Search repositories..."
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-9 pr-9"
+                aria-label="Search repositories by owner or name"
+              />
+            ) : (
+              <Input
+                placeholder="Search artifacts across all sources..."
+                value={artifactSearch.query}
+                onChange={(e) => handleArtifactSearchChange(e.target.value)}
+                className="pl-9 pr-9"
+                aria-label="Search artifacts across all marketplace sources"
+              />
+            )}
+            {/* Clear search button inside input */}
+            {(searchMode === 'sources' ? searchQuery : artifactSearch.query) && (
+              <button
+                onClick={() =>
+                  searchMode === 'sources'
+                    ? handleSearchChange('')
+                    : handleArtifactSearchChange('')
+                }
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-sm text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Clear All Filters Button - always visible when filtered (sources mode only) */}
+          {searchMode === 'sources' && isFiltered && (
+            <Button
+              variant="outline"
+              size="default"
+              onClick={handleClearAll}
+              className="gap-2 whitespace-nowrap"
+              aria-label={`Clear all ${activeFilterCount} active filters`}
             >
-              <X className="h-4 w-4" />
-            </button>
+              <FilterX className="h-4 w-4" aria-hidden="true" />
+              Clear Filters
+            </Button>
           )}
         </div>
-
-        {/* Clear All Filters Button - always visible when filtered */}
-        {isFiltered && (
-          <Button
-            variant="outline"
-            size="default"
-            onClick={handleClearAll}
-            className="gap-2 whitespace-nowrap"
-            aria-label={`Clear all ${activeFilterCount} active filters`}
-          >
-            <FilterX className="h-4 w-4" aria-hidden="true" />
-            Clear Filters
-          </Button>
-        )}
       </div>
 
-      {/* Filter Bar */}
-      {availableTags.length > 0 && (
+      {/* Filter Bar - only in sources mode */}
+      {searchMode === 'sources' && availableTags.length > 0 && (
         <SourceFilterBar
           currentFilters={filters}
           onFilterChange={handleFilterChange}
@@ -607,87 +721,191 @@ function MarketplaceSourcesPageInner() {
         />
       )}
 
-      {/* Stats Summary with Clear Filters */}
-      {!isLoading && !error && allSources.length > 0 && (
-        <FilterSummary
-          totalCount={allSources.length}
-          filteredCount={filteredSources.length}
-          artifactCount={filteredSources.reduce((sum, s) => sum + s.artifact_count, 0)}
-          isFiltered={isFiltered}
-          filterCount={activeFilterCount}
-          onClearFilters={handleClearAll}
-        />
-      )}
-
-      {/* Error State */}
-      {error && (
-        <ErrorState
-          error={error instanceof Error ? error : new Error('Unknown error')}
-          onRetry={() => refetch()}
-          isRetrying={isRefetching}
-        />
-      )}
-
-      {/* Loading State */}
-      {isLoading && <LoadingGrid count={6} />}
-
-      {/* Refetching Indicator - shows when refreshing with existing data */}
-      {isRefetching && !isLoading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Refreshing sources...
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!isLoading && !error && filteredSources.length === 0 && (
-        <EmptyState
-          isFiltered={isFiltered}
-          onClearFilters={handleClearAll}
-          onAddSource={() => setAddModalOpen(true)}
-        />
-      )}
-
-      {/* Sources Grid */}
-      {!isLoading && !error && filteredSources.length > 0 && (
+      {/* Conditional content based on search mode */}
+      {searchMode === 'artifacts' ? (
         <>
-          <div
-            className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
-            role="list"
-            aria-label="GitHub source repositories"
-          >
-            {filteredSources.map((source) => (
-              <div key={source.id} role="listitem">
-                <SourceCard
-                  source={source}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onRescan={handleRescan}
-                  isRescanning={rescanningSourceId === source.id}
-                  onTagClick={handleTagClick}
-                />
-              </div>
-            ))}
-          </div>
+          {/* Artifact Search Results */}
+          {artifactSearch.isFetching && !artifactSearch.data && (
+            <ArtifactSearchResultsSkeleton />
+          )}
 
-          {/* Load More */}
-          {hasNextPage && (
-            <div className="flex justify-center pt-6">
-              <Button
-                variant="outline"
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-              >
-                {isFetchingNextPage ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  'Load More'
-                )}
-              </Button>
+          {/* Loading indicator when fetching with existing data */}
+          {artifactSearch.isFetching && artifactSearch.data && (
+            <div
+              className="flex items-center gap-2 text-sm text-muted-foreground"
+              aria-live="polite"
+            >
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Searching...
             </div>
+          )}
+
+          {/* Error state for artifact search */}
+          {artifactSearch.error && (
+            <Alert variant="destructive" className="max-w-2xl" role="alert">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Search failed</AlertTitle>
+              <AlertDescription>
+                {artifactSearch.error.message || 'An error occurred while searching.'}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Prompt to enter search query */}
+          {!artifactSearch.query && !artifactSearch.data && (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <SearchIcon
+                className="mb-4 h-12 w-12 text-muted-foreground/50"
+                aria-hidden="true"
+              />
+              <h3 className="mb-2 text-lg font-medium text-muted-foreground">
+                Search artifacts
+              </h3>
+              <p className="max-w-md text-sm text-muted-foreground/80">
+                Enter a search term to find artifacts across all indexed sources.
+              </p>
+            </div>
+          )}
+
+          {/* Query too short message */}
+          {artifactSearch.query &&
+            artifactSearch.query.length < 2 &&
+            !artifactSearch.isFetching && (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <SearchIcon
+                  className="mb-4 h-12 w-12 text-muted-foreground/50"
+                  aria-hidden="true"
+                />
+                <h3 className="mb-2 text-lg font-medium text-muted-foreground">
+                  Keep typing...
+                </h3>
+                <p className="max-w-md text-sm text-muted-foreground/80">
+                  Enter at least 2 characters to search.
+                </p>
+              </div>
+            )}
+
+          {/* Artifact search results */}
+          {artifactSearch.isSuccess && artifactSearch.data && (
+            <>
+              {artifactSearch.data.items.length > 0 ? (
+                <>
+                  <div className="text-sm text-muted-foreground">
+                    Found {artifactSearch.data.items.length} artifact
+                    {artifactSearch.data.items.length !== 1 ? 's' : ''}
+                  </div>
+                  <ArtifactSearchResults results={artifactSearch.data.items} />
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Info className="mb-4 h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
+                  <h3 className="mb-2 text-lg font-medium text-muted-foreground">
+                    No results found
+                  </h3>
+                  <p className="max-w-md text-sm text-muted-foreground/80">
+                    No artifacts match your search. Artifact search requires indexing to be
+                    enabled on sources. Switch to Sources mode to manage indexing settings.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => handleModeChange('sources')}
+                  >
+                    Switch to Sources
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          {/* Stats Summary with Clear Filters */}
+          {!isLoading && !error && allSources.length > 0 && (
+            <FilterSummary
+              totalCount={allSources.length}
+              filteredCount={filteredSources.length}
+              artifactCount={filteredSources.reduce((sum, s) => sum + s.artifact_count, 0)}
+              isFiltered={isFiltered}
+              filterCount={activeFilterCount}
+              onClearFilters={handleClearAll}
+            />
+          )}
+
+          {/* Error State */}
+          {error && (
+            <ErrorState
+              error={error instanceof Error ? error : new Error('Unknown error')}
+              onRetry={() => refetch()}
+              isRetrying={isRefetching}
+            />
+          )}
+
+          {/* Loading State */}
+          {isLoading && <LoadingGrid count={6} />}
+
+          {/* Refetching Indicator - shows when refreshing with existing data */}
+          {isRefetching && !isLoading && (
+            <div
+              className="flex items-center gap-2 text-sm text-muted-foreground"
+              aria-live="polite"
+            >
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Refreshing sources...
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!isLoading && !error && filteredSources.length === 0 && (
+            <EmptyState
+              isFiltered={isFiltered}
+              onClearFilters={handleClearAll}
+              onAddSource={() => setAddModalOpen(true)}
+            />
+          )}
+
+          {/* Sources Grid */}
+          {!isLoading && !error && filteredSources.length > 0 && (
+            <>
+              <div
+                className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+                role="list"
+                aria-label="GitHub source repositories"
+              >
+                {filteredSources.map((source) => (
+                  <div key={source.id} role="listitem">
+                    <SourceCard
+                      source={source}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onRescan={handleRescan}
+                      isRescanning={rescanningSourceId === source.id}
+                      onTagClick={handleTagClick}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Load More */}
+              {hasNextPage && (
+                <div className="flex justify-center pt-6">
+                  <Button
+                    variant="outline"
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                  >
+                    {isFetchingNextPage ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More'
+                    )}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
