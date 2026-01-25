@@ -564,6 +564,12 @@ class ScanUpdateContext:
                 existing.path = new_entry.path  # Update path for consistency
                 existing.updated_at = now
 
+                # Update search metadata even for preserved entries
+                existing.title = new_entry.title
+                existing.description = new_entry.description
+                existing.search_tags = new_entry.search_tags
+                existing.search_text = new_entry.search_text
+
                 # Preserve: status, import_date, import_id, excluded_at, excluded_reason
                 preserved_count += 1
                 logger.debug(
@@ -585,6 +591,13 @@ class ScanUpdateContext:
                 existing.path_segments = new_entry.path_segments
                 existing.status = "updated" if existing.status != "new" else "new"
                 existing.updated_at = now
+
+                # Update search metadata (frontmatter extraction)
+                existing.title = new_entry.title
+                existing.description = new_entry.description
+                existing.search_tags = new_entry.search_tags
+                existing.search_text = new_entry.search_text
+
                 updated_count += 1
                 logger.debug(f"Updated entry: {existing.id} ({existing.name})")
 
@@ -2714,7 +2727,8 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
 
                 # It's a deep match only if deep content matched but title/desc didn't
                 # This ensures title/description matches rank higher
-                deep_match = deep_has_match and not (title_has_match or desc_has_match)
+                # Use bool() to ensure we get False instead of None when deep_has_match is None
+                deep_match = bool(deep_has_match and not (title_has_match or desc_has_match))
 
                 # Extract first matched file from deep_index_files if available
                 matched_file: Optional[str] = None
