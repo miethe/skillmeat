@@ -1,7 +1,12 @@
 """Unit tests for manifest extractors.
 
-Tests the extract_skill_manifest function including frontmatter parsing,
-fallback to H1 headings, tag extraction, and error handling.
+Tests manifest extraction functions for all artifact types:
+- extract_skill_manifest: SKILL.md with frontmatter
+- extract_command_manifest: command.yaml/yml, COMMAND.md fallback
+- extract_agent_manifest: agent.yaml/yml, AGENT.md fallback
+- extract_hook_manifest: hook.yaml/yml, HOOK.md fallback
+- extract_mcp_manifest: mcp.json, package.json fallback
+- extract_deep_search_text: Full-text indexing
 """
 
 from pathlib import Path
@@ -9,7 +14,14 @@ from unittest.mock import patch
 
 import pytest
 
-from skillmeat.core.manifest_extractors import extract_skill_manifest
+from skillmeat.core.manifest_extractors import (
+    extract_skill_manifest,
+    extract_command_manifest,
+    extract_agent_manifest,
+    extract_hook_manifest,
+    extract_mcp_manifest,
+    extract_manifest,
+)
 
 
 class TestExtractSkillManifest:
@@ -897,3 +909,1056 @@ class TestExtractDeepSearchText:
         assert "col1,col2" not in text
         assert "body { }" not in text
         assert "<html>" not in text
+
+
+class TestExtractCommandManifest:
+    """Test command manifest extraction from command.yaml/yml or COMMAND.md."""
+
+    def test_command_yaml(self, tmp_path: Path) -> None:
+        """Test extraction from valid command.yaml file."""
+        cmd_dir = tmp_path / "my-command"
+        cmd_dir.mkdir()
+
+        (cmd_dir / "command.yaml").write_text(
+            """name: my-command
+description: A useful command
+tools:
+  - Read
+  - Write
+  - Bash
+model: sonnet
+template: |
+  Execute this task:
+  {{ task }}
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_command_manifest(cmd_dir)
+
+        assert result["title"] == "my-command"
+        assert result["description"] == "A useful command"
+        assert result["tags"] == []  # Commands don't have tags
+        assert result["raw_metadata"]["tools"] == ["Read", "Write", "Bash"]
+        assert result["raw_metadata"]["model"] == "sonnet"
+        assert "Execute this task" in result["raw_metadata"]["template"]
+
+    def test_command_yml(self, tmp_path: Path) -> None:
+        """Test extraction from command.yml variant."""
+        cmd_dir = tmp_path / "my-command"
+        cmd_dir.mkdir()
+
+        (cmd_dir / "command.yml").write_text(
+            """name: yml-command
+description: Command with .yml extension
+model: opus
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_command_manifest(cmd_dir)
+
+        assert result["title"] == "yml-command"
+        assert result["description"] == "Command with .yml extension"
+        assert result["raw_metadata"]["model"] == "opus"
+
+    def test_command_yaml_precedence_over_yml(self, tmp_path: Path) -> None:
+        """Test that command.yaml takes precedence over command.yml."""
+        cmd_dir = tmp_path / "my-command"
+        cmd_dir.mkdir()
+
+        (cmd_dir / "command.yaml").write_text(
+            "name: yaml-wins\ndescription: From YAML",
+            encoding="utf-8",
+        )
+        (cmd_dir / "command.yml").write_text(
+            "name: yml-loses\ndescription: From YML",
+            encoding="utf-8",
+        )
+
+        result = extract_command_manifest(cmd_dir)
+
+        assert result["title"] == "yaml-wins"
+        assert result["description"] == "From YAML"
+
+    def test_command_md_fallback(self, tmp_path: Path) -> None:
+        """Test fallback to COMMAND.md when no YAML exists."""
+        cmd_dir = tmp_path / "my-command"
+        cmd_dir.mkdir()
+
+        (cmd_dir / "COMMAND.md").write_text(
+            """---
+name: markdown-command
+description: Defined in markdown frontmatter
+model: haiku
+---
+
+# Command Documentation
+
+This command does something useful.
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_command_manifest(cmd_dir)
+
+        assert result["title"] == "markdown-command"
+        assert result["description"] == "Defined in markdown frontmatter"
+        assert result["raw_metadata"]["model"] == "haiku"
+
+    def test_command_md_lowercase_fallback(self, tmp_path: Path) -> None:
+        """Test fallback to command.md (lowercase)."""
+        cmd_dir = tmp_path / "my-command"
+        cmd_dir.mkdir()
+
+        (cmd_dir / "command.md").write_text(
+            """---
+name: lowercase-md
+description: Lowercase markdown file
+---
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_command_manifest(cmd_dir)
+
+        assert result["title"] == "lowercase-md"
+
+    def test_command_missing_file(self, tmp_path: Path) -> None:
+        """Test handling when no manifest file exists in directory."""
+        cmd_dir = tmp_path / "empty-command"
+        cmd_dir.mkdir()
+
+        result = extract_command_manifest(cmd_dir)
+
+        assert result == {}
+
+    def test_command_nonexistent_directory(self, tmp_path: Path) -> None:
+        """Test handling of nonexistent directory."""
+        nonexistent = tmp_path / "does-not-exist"
+
+        result = extract_command_manifest(nonexistent)
+
+        assert result == {}
+
+    def test_command_file_path_directly(self, tmp_path: Path) -> None:
+        """Test passing file path directly instead of directory."""
+        yaml_file = tmp_path / "command.yaml"
+        yaml_file.write_text(
+            "name: direct-file\ndescription: Direct file path",
+            encoding="utf-8",
+        )
+
+        result = extract_command_manifest(yaml_file)
+
+        assert result["title"] == "direct-file"
+        assert result["description"] == "Direct file path"
+
+    def test_command_malformed_yaml(self, tmp_path: Path) -> None:
+        """Test handling of malformed YAML content."""
+        cmd_dir = tmp_path / "bad-command"
+        cmd_dir.mkdir()
+
+        (cmd_dir / "command.yaml").write_text(
+            """name: valid
+invalid:: yaml:: here
+description: [unclosed bracket
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_command_manifest(cmd_dir)
+
+        # Malformed YAML returns empty dict
+        assert result == {}
+
+    def test_command_yaml_not_dict(self, tmp_path: Path) -> None:
+        """Test handling when YAML parses to non-dict (e.g., list)."""
+        cmd_dir = tmp_path / "list-command"
+        cmd_dir.mkdir()
+
+        (cmd_dir / "command.yaml").write_text(
+            """- item1
+- item2
+- item3
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_command_manifest(cmd_dir)
+
+        assert result == {}
+
+    def test_command_directory_input(self, tmp_path: Path) -> None:
+        """Test that directory path triggers manifest file discovery."""
+        cmd_dir = tmp_path / "discover-command"
+        cmd_dir.mkdir()
+
+        # Create nested structure to ensure we're not reading wrong files
+        (cmd_dir / "command.yaml").write_text(
+            "name: discovered\ndescription: Found via directory",
+            encoding="utf-8",
+        )
+        (cmd_dir / "other.yaml").write_text(
+            "name: ignored\ndescription: Should not be read",
+            encoding="utf-8",
+        )
+
+        result = extract_command_manifest(cmd_dir)
+
+        assert result["title"] == "discovered"
+        assert result["description"] == "Found via directory"
+
+    def test_command_unsupported_extension(self, tmp_path: Path) -> None:
+        """Test handling of unsupported file extension."""
+        txt_file = tmp_path / "command.txt"
+        txt_file.write_text("name: txt-file", encoding="utf-8")
+
+        result = extract_command_manifest(txt_file)
+
+        assert result == {}
+
+    def test_command_uses_title_key_fallback(self, tmp_path: Path) -> None:
+        """Test that 'title' key works as fallback for 'name'."""
+        cmd_dir = tmp_path / "titled-command"
+        cmd_dir.mkdir()
+
+        (cmd_dir / "command.yaml").write_text(
+            "title: title-based-command\ndescription: Uses title instead of name",
+            encoding="utf-8",
+        )
+
+        result = extract_command_manifest(cmd_dir)
+
+        # name is checked first, then title
+        assert result["title"] == "title-based-command"
+
+    def test_command_empty_yaml(self, tmp_path: Path) -> None:
+        """Test handling of empty YAML file."""
+        cmd_dir = tmp_path / "empty-yaml"
+        cmd_dir.mkdir()
+
+        (cmd_dir / "command.yaml").write_text("", encoding="utf-8")
+
+        result = extract_command_manifest(cmd_dir)
+
+        assert result == {}
+
+    def test_command_whitespace_only_yaml(self, tmp_path: Path) -> None:
+        """Test handling of whitespace-only YAML file."""
+        cmd_dir = tmp_path / "whitespace-yaml"
+        cmd_dir.mkdir()
+
+        (cmd_dir / "command.yaml").write_text("   \n\t\n   ", encoding="utf-8")
+
+        result = extract_command_manifest(cmd_dir)
+
+        assert result == {}
+
+
+class TestExtractAgentManifest:
+    """Test agent manifest extraction from agent.yaml/yml or AGENT.md."""
+
+    def test_agent_yaml(self, tmp_path: Path) -> None:
+        """Test extraction from valid agent.yaml file."""
+        agent_dir = tmp_path / "my-agent"
+        agent_dir.mkdir()
+
+        (agent_dir / "agent.yaml").write_text(
+            """name: code-reviewer
+description: Reviews code for quality and best practices
+model: opus
+tools:
+  - Read
+  - Grep
+  - Glob
+system_prompt: |
+  You are an expert code reviewer.
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_agent_manifest(agent_dir)
+
+        assert result["title"] == "code-reviewer"
+        assert result["description"] == "Reviews code for quality and best practices"
+        assert result["tags"] == []  # Agents don't have tags
+        assert result["raw_metadata"]["model"] == "opus"
+        assert result["raw_metadata"]["tools"] == ["Read", "Grep", "Glob"]
+        assert "expert code reviewer" in result["raw_metadata"]["system_prompt"]
+
+    def test_agent_yml(self, tmp_path: Path) -> None:
+        """Test extraction from agent.yml variant."""
+        agent_dir = tmp_path / "my-agent"
+        agent_dir.mkdir()
+
+        (agent_dir / "agent.yml").write_text(
+            """name: yml-agent
+description: Agent defined with .yml extension
+model: sonnet
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_agent_manifest(agent_dir)
+
+        assert result["title"] == "yml-agent"
+        assert result["description"] == "Agent defined with .yml extension"
+        assert result["raw_metadata"]["model"] == "sonnet"
+
+    def test_agent_yaml_precedence_over_yml(self, tmp_path: Path) -> None:
+        """Test that agent.yaml takes precedence over agent.yml."""
+        agent_dir = tmp_path / "my-agent"
+        agent_dir.mkdir()
+
+        (agent_dir / "agent.yaml").write_text(
+            "name: yaml-agent\ndescription: From YAML",
+            encoding="utf-8",
+        )
+        (agent_dir / "agent.yml").write_text(
+            "name: yml-agent\ndescription: From YML",
+            encoding="utf-8",
+        )
+
+        result = extract_agent_manifest(agent_dir)
+
+        assert result["title"] == "yaml-agent"
+
+    def test_agent_md_fallback(self, tmp_path: Path) -> None:
+        """Test fallback to AGENT.md when no YAML exists."""
+        agent_dir = tmp_path / "my-agent"
+        agent_dir.mkdir()
+
+        (agent_dir / "AGENT.md").write_text(
+            """---
+name: markdown-agent
+description: Agent defined in markdown
+model: haiku
+---
+
+# Agent Documentation
+
+This agent helps with tasks.
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_agent_manifest(agent_dir)
+
+        assert result["title"] == "markdown-agent"
+        assert result["description"] == "Agent defined in markdown"
+
+    def test_agent_md_lowercase_fallback(self, tmp_path: Path) -> None:
+        """Test fallback to agent.md (lowercase)."""
+        agent_dir = tmp_path / "my-agent"
+        agent_dir.mkdir()
+
+        (agent_dir / "agent.md").write_text(
+            """---
+name: lowercase-agent
+description: Lowercase markdown
+---
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_agent_manifest(agent_dir)
+
+        assert result["title"] == "lowercase-agent"
+
+    def test_agent_missing_file(self, tmp_path: Path) -> None:
+        """Test handling when no manifest file exists in directory."""
+        agent_dir = tmp_path / "empty-agent"
+        agent_dir.mkdir()
+
+        result = extract_agent_manifest(agent_dir)
+
+        assert result == {}
+
+    def test_agent_nonexistent_directory(self, tmp_path: Path) -> None:
+        """Test handling of nonexistent directory."""
+        nonexistent = tmp_path / "does-not-exist"
+
+        result = extract_agent_manifest(nonexistent)
+
+        assert result == {}
+
+    def test_agent_malformed_yaml(self, tmp_path: Path) -> None:
+        """Test handling of malformed YAML content."""
+        agent_dir = tmp_path / "bad-agent"
+        agent_dir.mkdir()
+
+        (agent_dir / "agent.yaml").write_text(
+            """name: broken
+tools: [Read, Write
+description: unclosed bracket above
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_agent_manifest(agent_dir)
+
+        assert result == {}
+
+    def test_agent_yaml_not_dict(self, tmp_path: Path) -> None:
+        """Test handling when YAML parses to non-dict."""
+        agent_dir = tmp_path / "list-agent"
+        agent_dir.mkdir()
+
+        (agent_dir / "agent.yaml").write_text(
+            "- agent1\n- agent2",
+            encoding="utf-8",
+        )
+
+        result = extract_agent_manifest(agent_dir)
+
+        assert result == {}
+
+    def test_agent_file_path_directly(self, tmp_path: Path) -> None:
+        """Test passing file path directly instead of directory."""
+        yaml_file = tmp_path / "agent.yaml"
+        yaml_file.write_text(
+            "name: direct-agent\ndescription: Direct path",
+            encoding="utf-8",
+        )
+
+        result = extract_agent_manifest(yaml_file)
+
+        assert result["title"] == "direct-agent"
+
+    def test_agent_uses_title_key_fallback(self, tmp_path: Path) -> None:
+        """Test that 'title' key works as fallback for 'name'."""
+        agent_dir = tmp_path / "titled-agent"
+        agent_dir.mkdir()
+
+        (agent_dir / "agent.yaml").write_text(
+            "title: title-agent\ndescription: Uses title key",
+            encoding="utf-8",
+        )
+
+        result = extract_agent_manifest(agent_dir)
+
+        assert result["title"] == "title-agent"
+
+    def test_agent_empty_yaml(self, tmp_path: Path) -> None:
+        """Test handling of empty YAML file."""
+        agent_dir = tmp_path / "empty-agent"
+        agent_dir.mkdir()
+
+        (agent_dir / "agent.yaml").write_text("", encoding="utf-8")
+
+        result = extract_agent_manifest(agent_dir)
+
+        assert result == {}
+
+
+class TestExtractHookManifest:
+    """Test hook manifest extraction from hook.yaml/yml or HOOK.md."""
+
+    def test_hook_yaml(self, tmp_path: Path) -> None:
+        """Test extraction from valid hook.yaml file."""
+        hook_dir = tmp_path / "pre-commit"
+        hook_dir.mkdir()
+
+        (hook_dir / "hook.yaml").write_text(
+            """name: pre-commit
+description: Runs before commits to validate code
+event: pre_commit
+script: ./run-tests.sh
+timeout: 30
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_hook_manifest(hook_dir)
+
+        assert result["title"] == "pre-commit"
+        assert result["description"] == "Runs before commits to validate code"
+        assert result["tags"] == []  # Hooks don't have tags
+        assert result["raw_metadata"]["event"] == "pre_commit"
+        assert result["raw_metadata"]["script"] == "./run-tests.sh"
+        assert result["raw_metadata"]["timeout"] == 30
+
+    def test_hook_yml(self, tmp_path: Path) -> None:
+        """Test extraction from hook.yml variant."""
+        hook_dir = tmp_path / "post-push"
+        hook_dir.mkdir()
+
+        (hook_dir / "hook.yml").write_text(
+            """name: post-push
+description: Hook with .yml extension
+events:
+  - post_push
+  - post_merge
+command: deploy.sh
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_hook_manifest(hook_dir)
+
+        assert result["title"] == "post-push"
+        assert result["description"] == "Hook with .yml extension"
+        assert result["raw_metadata"]["events"] == ["post_push", "post_merge"]
+
+    def test_hook_yaml_precedence_over_yml(self, tmp_path: Path) -> None:
+        """Test that hook.yaml takes precedence over hook.yml."""
+        hook_dir = tmp_path / "my-hook"
+        hook_dir.mkdir()
+
+        (hook_dir / "hook.yaml").write_text(
+            "name: yaml-hook\ndescription: From YAML",
+            encoding="utf-8",
+        )
+        (hook_dir / "hook.yml").write_text(
+            "name: yml-hook\ndescription: From YML",
+            encoding="utf-8",
+        )
+
+        result = extract_hook_manifest(hook_dir)
+
+        assert result["title"] == "yaml-hook"
+
+    def test_hook_md_fallback(self, tmp_path: Path) -> None:
+        """Test fallback to HOOK.md when no YAML exists."""
+        hook_dir = tmp_path / "my-hook"
+        hook_dir.mkdir()
+
+        (hook_dir / "HOOK.md").write_text(
+            """---
+name: markdown-hook
+description: Hook defined in markdown
+event: pre_push
+---
+
+# Hook Documentation
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_hook_manifest(hook_dir)
+
+        assert result["title"] == "markdown-hook"
+        assert result["description"] == "Hook defined in markdown"
+
+    def test_hook_md_lowercase_fallback(self, tmp_path: Path) -> None:
+        """Test fallback to hook.md (lowercase)."""
+        hook_dir = tmp_path / "my-hook"
+        hook_dir.mkdir()
+
+        (hook_dir / "hook.md").write_text(
+            """---
+name: lowercase-hook
+description: Lowercase markdown
+---
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_hook_manifest(hook_dir)
+
+        assert result["title"] == "lowercase-hook"
+
+    def test_hook_missing_file(self, tmp_path: Path) -> None:
+        """Test handling when no manifest file exists in directory."""
+        hook_dir = tmp_path / "empty-hook"
+        hook_dir.mkdir()
+
+        result = extract_hook_manifest(hook_dir)
+
+        assert result == {}
+
+    def test_hook_nonexistent_directory(self, tmp_path: Path) -> None:
+        """Test handling of nonexistent directory."""
+        nonexistent = tmp_path / "does-not-exist"
+
+        result = extract_hook_manifest(nonexistent)
+
+        assert result == {}
+
+    def test_hook_malformed_yaml(self, tmp_path: Path) -> None:
+        """Test handling of malformed YAML content."""
+        hook_dir = tmp_path / "bad-hook"
+        hook_dir.mkdir()
+
+        (hook_dir / "hook.yaml").write_text(
+            """name: broken
+events: [pre_commit, post_commit
+description: unclosed bracket
+invalid:: colons:: here
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_hook_manifest(hook_dir)
+
+        assert result == {}
+
+    def test_hook_yaml_not_dict(self, tmp_path: Path) -> None:
+        """Test handling when YAML parses to non-dict."""
+        hook_dir = tmp_path / "list-hook"
+        hook_dir.mkdir()
+
+        (hook_dir / "hook.yaml").write_text(
+            "- pre_commit\n- post_commit",
+            encoding="utf-8",
+        )
+
+        result = extract_hook_manifest(hook_dir)
+
+        assert result == {}
+
+    def test_hook_file_path_directly(self, tmp_path: Path) -> None:
+        """Test passing file path directly instead of directory."""
+        yaml_file = tmp_path / "hook.yaml"
+        yaml_file.write_text(
+            "name: direct-hook\ndescription: Direct path",
+            encoding="utf-8",
+        )
+
+        result = extract_hook_manifest(yaml_file)
+
+        assert result["title"] == "direct-hook"
+
+    def test_hook_uses_title_key_fallback(self, tmp_path: Path) -> None:
+        """Test that 'title' key works as fallback for 'name'."""
+        hook_dir = tmp_path / "titled-hook"
+        hook_dir.mkdir()
+
+        (hook_dir / "hook.yaml").write_text(
+            "title: title-hook\ndescription: Uses title key",
+            encoding="utf-8",
+        )
+
+        result = extract_hook_manifest(hook_dir)
+
+        assert result["title"] == "title-hook"
+
+    def test_hook_empty_yaml(self, tmp_path: Path) -> None:
+        """Test handling of empty YAML file."""
+        hook_dir = tmp_path / "empty-hook"
+        hook_dir.mkdir()
+
+        (hook_dir / "hook.yaml").write_text("", encoding="utf-8")
+
+        result = extract_hook_manifest(hook_dir)
+
+        assert result == {}
+
+    def test_hook_unsupported_extension(self, tmp_path: Path) -> None:
+        """Test handling of unsupported file extension."""
+        txt_file = tmp_path / "hook.txt"
+        txt_file.write_text("name: txt-hook", encoding="utf-8")
+
+        result = extract_hook_manifest(txt_file)
+
+        assert result == {}
+
+
+class TestExtractMcpManifest:
+    """Test MCP manifest extraction from mcp.json or package.json."""
+
+    def test_mcp_json(self, tmp_path: Path) -> None:
+        """Test extraction from valid mcp.json file."""
+        mcp_dir = tmp_path / "my-mcp-server"
+        mcp_dir.mkdir()
+
+        (mcp_dir / "mcp.json").write_text(
+            """{
+    "name": "my-mcp-server",
+    "description": "Provides context tools for file operations",
+    "version": "1.0.0",
+    "tools": ["read_file", "write_file", "list_directory"],
+    "keywords": ["files", "filesystem", "io"]
+}""",
+            encoding="utf-8",
+        )
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        assert result["title"] == "my-mcp-server"
+        assert result["description"] == "Provides context tools for file operations"
+        assert result["tags"] == ["files", "filesystem", "io"]
+        assert result["raw_metadata"]["version"] == "1.0.0"
+        assert result["raw_metadata"]["tools"] == ["read_file", "write_file", "list_directory"]
+
+    def test_mcp_json_with_tags_key(self, tmp_path: Path) -> None:
+        """Test that 'tags' key also works for tag extraction."""
+        mcp_dir = tmp_path / "tagged-mcp"
+        mcp_dir.mkdir()
+
+        (mcp_dir / "mcp.json").write_text(
+            """{
+    "name": "tagged-server",
+    "description": "Server with tags",
+    "tags": ["database", "sql", "postgres"]
+}""",
+            encoding="utf-8",
+        )
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        assert result["tags"] == ["database", "sql", "postgres"]
+
+    def test_mcp_keywords_precedence_over_tags(self, tmp_path: Path) -> None:
+        """Test that 'keywords' takes precedence over 'tags'."""
+        mcp_dir = tmp_path / "both-mcp"
+        mcp_dir.mkdir()
+
+        (mcp_dir / "mcp.json").write_text(
+            """{
+    "name": "both-server",
+    "keywords": ["keyword1", "keyword2"],
+    "tags": ["tag1", "tag2"]
+}""",
+            encoding="utf-8",
+        )
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        # keywords is checked first in tags_keys
+        assert result["tags"] == ["keyword1", "keyword2"]
+
+    def test_mcp_package_json_fallback(self, tmp_path: Path) -> None:
+        """Test fallback to package.json when no mcp.json exists."""
+        mcp_dir = tmp_path / "npm-mcp"
+        mcp_dir.mkdir()
+
+        (mcp_dir / "package.json").write_text(
+            """{
+    "name": "@company/mcp-server",
+    "version": "2.0.0",
+    "description": "MCP server from npm package",
+    "keywords": ["mcp", "context", "protocol"],
+    "main": "dist/index.js",
+    "scripts": {
+        "build": "tsc"
+    }
+}""",
+            encoding="utf-8",
+        )
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        assert result["title"] == "@company/mcp-server"
+        assert result["description"] == "MCP server from npm package"
+        assert result["tags"] == ["mcp", "context", "protocol"]
+        assert result["raw_metadata"]["version"] == "2.0.0"
+
+    def test_mcp_json_precedence_over_package_json(self, tmp_path: Path) -> None:
+        """Test that mcp.json takes precedence over package.json."""
+        mcp_dir = tmp_path / "both-mcp"
+        mcp_dir.mkdir()
+
+        (mcp_dir / "mcp.json").write_text(
+            '{"name": "mcp-wins", "description": "From mcp.json"}',
+            encoding="utf-8",
+        )
+        (mcp_dir / "package.json").write_text(
+            '{"name": "package-loses", "description": "From package.json"}',
+            encoding="utf-8",
+        )
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        assert result["title"] == "mcp-wins"
+        assert result["description"] == "From mcp.json"
+
+    def test_mcp_missing_file(self, tmp_path: Path) -> None:
+        """Test handling when no manifest file exists in directory."""
+        mcp_dir = tmp_path / "empty-mcp"
+        mcp_dir.mkdir()
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        assert result == {}
+
+    def test_mcp_nonexistent_directory(self, tmp_path: Path) -> None:
+        """Test handling of nonexistent directory."""
+        nonexistent = tmp_path / "does-not-exist"
+
+        result = extract_mcp_manifest(nonexistent)
+
+        assert result == {}
+
+    def test_mcp_malformed_json(self, tmp_path: Path) -> None:
+        """Test handling of malformed JSON content."""
+        mcp_dir = tmp_path / "bad-mcp"
+        mcp_dir.mkdir()
+
+        (mcp_dir / "mcp.json").write_text(
+            '{"name": "broken", "description": "unclosed',
+            encoding="utf-8",
+        )
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        assert result == {}
+
+    def test_mcp_json_not_dict(self, tmp_path: Path) -> None:
+        """Test handling when JSON parses to non-dict (e.g., array)."""
+        mcp_dir = tmp_path / "array-mcp"
+        mcp_dir.mkdir()
+
+        (mcp_dir / "mcp.json").write_text(
+            '["item1", "item2", "item3"]',
+            encoding="utf-8",
+        )
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        assert result == {}
+
+    def test_mcp_file_path_directly(self, tmp_path: Path) -> None:
+        """Test passing file path directly instead of directory."""
+        json_file = tmp_path / "mcp.json"
+        json_file.write_text(
+            '{"name": "direct-mcp", "description": "Direct path"}',
+            encoding="utf-8",
+        )
+
+        result = extract_mcp_manifest(json_file)
+
+        assert result["title"] == "direct-mcp"
+        assert result["description"] == "Direct path"
+
+    def test_mcp_keywords_as_tags(self, tmp_path: Path) -> None:
+        """Test that npm 'keywords' field is extracted as tags."""
+        mcp_dir = tmp_path / "npm-style"
+        mcp_dir.mkdir()
+
+        (mcp_dir / "package.json").write_text(
+            """{
+    "name": "npm-mcp",
+    "description": "NPM style package",
+    "keywords": ["mcp", "server", "tools", "context-protocol"]
+}""",
+            encoding="utf-8",
+        )
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        assert result["tags"] == ["mcp", "server", "tools", "context-protocol"]
+
+    def test_mcp_empty_json(self, tmp_path: Path) -> None:
+        """Test handling of empty JSON file."""
+        mcp_dir = tmp_path / "empty-mcp"
+        mcp_dir.mkdir()
+
+        (mcp_dir / "mcp.json").write_text("", encoding="utf-8")
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        assert result == {}
+
+    def test_mcp_empty_object(self, tmp_path: Path) -> None:
+        """Test handling of empty JSON object."""
+        mcp_dir = tmp_path / "empty-obj"
+        mcp_dir.mkdir()
+
+        (mcp_dir / "mcp.json").write_text("{}", encoding="utf-8")
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        # Returns standardized output with None/empty values
+        assert result["title"] is None
+        assert result["description"] is None
+        assert result["tags"] == []
+        assert result["raw_metadata"] == {}
+
+    def test_mcp_unicode_content(self, tmp_path: Path) -> None:
+        """Test handling of Unicode content in JSON."""
+        mcp_dir = tmp_path / "unicode-mcp"
+        mcp_dir.mkdir()
+
+        (mcp_dir / "mcp.json").write_text(
+            """{
+    "name": "unicode-server",
+    "description": "Handles unicode: cafe, , "
+}""",
+            encoding="utf-8",
+        )
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        assert result["title"] == "unicode-server"
+        assert "cafe" in result["description"]
+
+    def test_mcp_numeric_values(self, tmp_path: Path) -> None:
+        """Test that numeric values are converted to strings."""
+        mcp_dir = tmp_path / "numeric-mcp"
+        mcp_dir.mkdir()
+
+        (mcp_dir / "mcp.json").write_text(
+            '{"name": 123, "description": 456}',
+            encoding="utf-8",
+        )
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        assert result["title"] == "123"
+        assert result["description"] == "456"
+
+    def test_mcp_nested_directory(self, tmp_path: Path) -> None:
+        """Test extraction from nested directory structure."""
+        mcp_dir = tmp_path / "nested" / "mcp-server"
+        mcp_dir.mkdir(parents=True)
+
+        (mcp_dir / "mcp.json").write_text(
+            '{"name": "nested-mcp", "description": "In nested dir"}',
+            encoding="utf-8",
+        )
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        assert result["title"] == "nested-mcp"
+
+    def test_mcp_whitespace_json(self, tmp_path: Path) -> None:
+        """Test handling of whitespace-only JSON file."""
+        mcp_dir = tmp_path / "whitespace-mcp"
+        mcp_dir.mkdir()
+
+        (mcp_dir / "mcp.json").write_text("   \n\t\n   ", encoding="utf-8")
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        assert result == {}
+
+    def test_mcp_package_json_with_full_npm_structure(self, tmp_path: Path) -> None:
+        """Test package.json with full npm structure is handled correctly."""
+        mcp_dir = tmp_path / "full-npm"
+        mcp_dir.mkdir()
+
+        (mcp_dir / "package.json").write_text(
+            """{
+    "name": "@org/mcp-database",
+    "version": "3.1.4",
+    "description": "Database MCP server with PostgreSQL support",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "bin": {
+        "mcp-db": "dist/cli.js"
+    },
+    "scripts": {
+        "build": "tsc",
+        "test": "jest",
+        "start": "node dist/index.js"
+    },
+    "keywords": ["mcp", "database", "postgresql", "sql"],
+    "author": "Developer Name",
+    "license": "MIT",
+    "dependencies": {
+        "pg": "^8.0.0"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0"
+    }
+}""",
+            encoding="utf-8",
+        )
+
+        result = extract_mcp_manifest(mcp_dir)
+
+        assert result["title"] == "@org/mcp-database"
+        assert result["description"] == "Database MCP server with PostgreSQL support"
+        assert result["tags"] == ["mcp", "database", "postgresql", "sql"]
+        # All fields preserved in raw_metadata
+        assert result["raw_metadata"]["version"] == "3.1.4"
+        assert result["raw_metadata"]["author"] == "Developer Name"
+        assert "pg" in result["raw_metadata"]["dependencies"]
+
+
+class TestExtractManifestDispatcher:
+    """Test the extract_manifest dispatcher function."""
+
+    def test_dispatch_to_skill(self, tmp_path: Path) -> None:
+        """Test that 'skill' type dispatches to extract_skill_manifest."""
+        skill_file = tmp_path / "SKILL.md"
+        skill_file.write_text(
+            """---
+title: Dispatched Skill
+description: Via dispatcher
+---
+""",
+            encoding="utf-8",
+        )
+
+        result = extract_manifest("skill", skill_file)
+
+        assert result["title"] == "Dispatched Skill"
+        assert result["description"] == "Via dispatcher"
+
+    def test_dispatch_to_command(self, tmp_path: Path) -> None:
+        """Test that 'command' type dispatches to extract_command_manifest."""
+        cmd_dir = tmp_path / "cmd"
+        cmd_dir.mkdir()
+        (cmd_dir / "command.yaml").write_text(
+            "name: dispatched-cmd\ndescription: Via dispatcher",
+            encoding="utf-8",
+        )
+
+        result = extract_manifest("command", cmd_dir)
+
+        assert result["title"] == "dispatched-cmd"
+
+    def test_dispatch_to_agent(self, tmp_path: Path) -> None:
+        """Test that 'agent' type dispatches to extract_agent_manifest."""
+        agent_dir = tmp_path / "agent"
+        agent_dir.mkdir()
+        (agent_dir / "agent.yaml").write_text(
+            "name: dispatched-agent\ndescription: Via dispatcher",
+            encoding="utf-8",
+        )
+
+        result = extract_manifest("agent", agent_dir)
+
+        assert result["title"] == "dispatched-agent"
+
+    def test_dispatch_to_hook(self, tmp_path: Path) -> None:
+        """Test that 'hook' type dispatches to extract_hook_manifest."""
+        hook_dir = tmp_path / "hook"
+        hook_dir.mkdir()
+        (hook_dir / "hook.yaml").write_text(
+            "name: dispatched-hook\ndescription: Via dispatcher",
+            encoding="utf-8",
+        )
+
+        result = extract_manifest("hook", hook_dir)
+
+        assert result["title"] == "dispatched-hook"
+
+    def test_dispatch_to_mcp(self, tmp_path: Path) -> None:
+        """Test that 'mcp' type dispatches to extract_mcp_manifest."""
+        mcp_dir = tmp_path / "mcp"
+        mcp_dir.mkdir()
+        (mcp_dir / "mcp.json").write_text(
+            '{"name": "dispatched-mcp", "description": "Via dispatcher"}',
+            encoding="utf-8",
+        )
+
+        result = extract_manifest("mcp", mcp_dir)
+
+        assert result["title"] == "dispatched-mcp"
+
+    def test_dispatch_case_insensitive(self, tmp_path: Path) -> None:
+        """Test that artifact type is case-insensitive."""
+        skill_file = tmp_path / "SKILL.md"
+        skill_file.write_text("---\ntitle: Case Test\n---", encoding="utf-8")
+
+        result_upper = extract_manifest("SKILL", skill_file)
+        result_mixed = extract_manifest("Skill", skill_file)
+
+        assert result_upper["title"] == "Case Test"
+        assert result_mixed["title"] == "Case Test"
+
+    def test_dispatch_unknown_type(self, tmp_path: Path) -> None:
+        """Test that unknown artifact type returns empty dict."""
+        result = extract_manifest("unknown", tmp_path)
+
+        assert result == {}
+
+    def test_dispatch_empty_type(self, tmp_path: Path) -> None:
+        """Test that empty artifact type returns empty dict."""
+        result = extract_manifest("", tmp_path)
+
+        assert result == {}
