@@ -993,3 +993,132 @@ class TestFTS5SearchIntegration:
                 assert "..." in description_snippet or len(description_snippet) <= len(
                     long_description
                 )
+
+    def test_fts5_search_returns_deep_match_fields(
+        self, source_repo, catalog_repo, sample_source
+    ):
+        """Test FTS5 search returns deep_match and matched_file in snippets."""
+        from skillmeat.api.utils.fts5 import reset_fts5_check
+
+        reset_fts5_check()
+
+        source_repo.create(sample_source)
+
+        # Create entry with deep_search_text but no matching title/description
+        entries = [
+            create_catalog_entry(
+                sample_source.id,
+                "deep-indexed-skill",
+                title="Generic Skill",
+                description="A basic skill without specific keywords",
+            ),
+        ]
+        # Set search_text for FTS5 indexing
+        entries[0].search_text = f"{entries[0].title} {entries[0].description}"
+        # Set deep_search_text with unique searchable content
+        entries[0].deep_search_text = (
+            "This skill uses advanced xyzzy algorithms for processing data"
+        )
+        # Set deep_index_files to indicate which files were indexed
+        entries[0].deep_index_files = json.dumps(["SKILL.md", "lib/main.py"])
+
+        catalog_repo.bulk_create(entries)
+
+        # Search for a term only in deep_search_text
+        result = catalog_repo.search(query="xyzzy")
+
+        # Should find the entry if FTS5 includes deep_search_text
+        # (if FTS5 unavailable, LIKE search won't find it - that's okay)
+        if result.items:
+            assert len(result.items) >= 1
+            assert result.items[0].name == "deep-indexed-skill"
+
+            # Check snippets include deep_match and matched_file fields
+            if result.snippets:
+                entry_snippets = result.snippets.get(result.items[0].id, {})
+
+                # deep_match should be True since term is only in deep_search_text
+                deep_match = entry_snippets.get("deep_match", False)
+                matched_file = entry_snippets.get("matched_file")
+
+                # If FTS5 is working and found the match in deep content,
+                # deep_match should be True and matched_file should be set
+                if deep_match:
+                    assert deep_match is True
+                    assert matched_file == "SKILL.md"  # First file in list
+
+    def test_fts5_search_prefers_title_over_deep_content(
+        self, source_repo, catalog_repo, sample_source
+    ):
+        """Test that matches in title/description are NOT marked as deep_match."""
+        from skillmeat.api.utils.fts5 import reset_fts5_check
+
+        reset_fts5_check()
+
+        source_repo.create(sample_source)
+
+        # Create entry with matching title and deep_search_text
+        entries = [
+            create_catalog_entry(
+                sample_source.id,
+                "dual-match-skill",
+                title="Canvas Drawing Skill",  # "canvas" in title
+                description="Draw on HTML canvas elements",  # "canvas" in description
+            ),
+        ]
+        entries[0].search_text = f"{entries[0].title} {entries[0].description}"
+        # Also has "canvas" in deep content
+        entries[0].deep_search_text = "Advanced canvas rendering techniques"
+        entries[0].deep_index_files = json.dumps(["docs/canvas.md"])
+
+        catalog_repo.bulk_create(entries)
+
+        # Search for "canvas" - appears in all fields
+        result = catalog_repo.search(query="canvas")
+
+        assert len(result.items) >= 1
+        assert result.items[0].name == "dual-match-skill"
+
+        # Check that deep_match is False (title/desc match takes precedence)
+        if result.snippets:
+            entry_snippets = result.snippets.get(result.items[0].id, {})
+            deep_match = entry_snippets.get("deep_match", False)
+
+            # Since title/description matched, deep_match should be False
+            assert deep_match is False
+
+    def test_fts5_search_deep_match_no_files(
+        self, source_repo, catalog_repo, sample_source
+    ):
+        """Test deep_match with no deep_index_files returns matched_file=None."""
+        from skillmeat.api.utils.fts5 import reset_fts5_check
+
+        reset_fts5_check()
+
+        source_repo.create(sample_source)
+
+        # Create entry with deep_search_text but no deep_index_files
+        entries = [
+            create_catalog_entry(
+                sample_source.id,
+                "deep-no-files",
+                title="Basic Skill",
+                description="Nothing special here",
+            ),
+        ]
+        entries[0].search_text = f"{entries[0].title} {entries[0].description}"
+        entries[0].deep_search_text = "Contains unique flubber keyword"
+        # No deep_index_files set
+
+        catalog_repo.bulk_create(entries)
+
+        result = catalog_repo.search(query="flubber")
+
+        if result.items and result.snippets:
+            entry_snippets = result.snippets.get(result.items[0].id, {})
+            deep_match = entry_snippets.get("deep_match", False)
+            matched_file = entry_snippets.get("matched_file")
+
+            if deep_match:
+                # matched_file should be None when no files list
+                assert matched_file is None

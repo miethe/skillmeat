@@ -50,6 +50,8 @@ def entry_to_search_result(
     entry: MarketplaceCatalogEntry,
     title_snippet: Optional[str] = None,
     description_snippet: Optional[str] = None,
+    deep_match: bool = False,
+    matched_file: Optional[str] = None,
 ) -> CatalogSearchResult:
     """Convert MarketplaceCatalogEntry ORM model to CatalogSearchResult DTO.
 
@@ -59,6 +61,8 @@ def entry_to_search_result(
         entry: MarketplaceCatalogEntry ORM instance with source relationship loaded
         title_snippet: Optional highlighted title snippet from FTS5 search
         description_snippet: Optional highlighted description snippet from FTS5 search
+        deep_match: True if match came from deep-indexed content (not title/description)
+        matched_file: Relative file path where match was found (for deep matches)
 
     Returns:
         CatalogSearchResult DTO for API response
@@ -94,6 +98,8 @@ def entry_to_search_result(
         search_tags=search_tags_list,
         title_snippet=title_snippet,
         description_snippet=description_snippet,
+        deep_match=deep_match,
+        matched_file=matched_file,
     )
 
 
@@ -105,11 +111,16 @@ def entry_to_search_result(
 Search for artifacts across all configured marketplace sources using text matching
 and various filters. Results are ordered by confidence score descending.
 
-**Text Search**: The `q` parameter performs case-insensitive matching against:
+**Text Search**: The `q` parameter performs full-text search (FTS5) against:
 - Artifact name
 - Title (from frontmatter)
 - Description (from frontmatter)
 - Search tags (from frontmatter)
+- Deep-indexed content (full artifact file text, when available)
+
+Matches in title/description rank higher than deep-indexed content matches.
+Results include `deep_match=true` and `matched_file` when a match came from
+deep-indexed content rather than the artifact metadata.
 
 **Filtering Options**:
 - `type`: Filter by artifact type (skill, command, agent, etc.)
@@ -128,7 +139,7 @@ The `cursor` value from a previous response can be used to fetch the next page.
 async def search_catalog(
     q: Optional[str] = Query(
         None,
-        description="Search query for text matching on name, title, description, tags",
+        description="Search query for full-text matching on name, title, description, tags, and deep-indexed content",
         examples=["canvas", "testing", "api"],
     ),
     type: Optional[str] = Query(
@@ -217,12 +228,15 @@ async def search_catalog(
         items = []
         for entry in result.items:
             # Get snippets for this entry if available (FTS5 search returns snippets)
+            # Snippets dict includes: title_snippet, description_snippet, deep_match, matched_file
             snippets = result.snippets.get(entry.id, {}) if result.snippets else {}
             items.append(
                 entry_to_search_result(
                     entry,
                     title_snippet=snippets.get("title_snippet"),
                     description_snippet=snippets.get("description_snippet"),
+                    deep_match=snippets.get("deep_match", False),
+                    matched_file=snippets.get("matched_file"),
                 )
             )
 

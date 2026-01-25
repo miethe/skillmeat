@@ -58,6 +58,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from contextlib import contextmanager
@@ -2666,12 +2667,17 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
             # bm25() returns negative values (higher = better match)
             # We use rank which is already the bm25 score
             # snippet() generates highlighted text around matched terms
-            # Column indices: 0=name, 1=artifact_type, 2=title, 3=description, 4=search_text, 5=tags
+            # Column indices: 0=name, 1=artifact_type, 2=title, 3=description,
+            #                 4=search_text, 5=tags, 6=deep_search_text
+            # We extract snippets from title (2), description (3), and deep_search_text (6)
+            # to determine match source and provide relevant highlighted content
             sql = text(
                 f"""
                 SELECT ce.*, fts.rank AS relevance,
                     snippet(catalog_fts, 2, '<mark>', '</mark>', '...', 32) AS title_snippet,
-                    snippet(catalog_fts, 3, '<mark>', '</mark>', '...', 64) AS description_snippet
+                    snippet(catalog_fts, 3, '<mark>', '</mark>', '...', 64) AS description_snippet,
+                    snippet(catalog_fts, 6, '<mark>', '</mark>', '...', 64) AS deep_snippet,
+                    ce.deep_index_files AS deep_index_files
                 FROM catalog_fts fts
                 JOIN marketplace_catalog_entries ce ON ce.rowid = fts.rowid
                 WHERE catalog_fts MATCH :query
@@ -2690,11 +2696,45 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
                 rows = rows[:limit]
 
             # Extract snippets from rows before re-querying for ORM objects
-            snippets: Dict[str, Dict[str, Optional[str]]] = {}
+            # Determine if match came from deep_search_text vs title/description
+            # A snippet contains '<mark>' if that column matched the search terms
+            snippets: Dict[str, Dict[str, Any]] = {}
             for row in rows:
+                title_snippet = row.title_snippet
+                description_snippet = row.description_snippet
+                deep_snippet = getattr(row, "deep_snippet", None)
+
+                # Determine if this is a deep match:
+                # - Deep match if deep_snippet contains <mark> AND title/desc snippets don't
+                # - Title/desc matches rank higher, so only mark as deep_match
+                #   when the match clearly came from deep content
+                title_has_match = title_snippet and "<mark>" in title_snippet
+                desc_has_match = description_snippet and "<mark>" in description_snippet
+                deep_has_match = deep_snippet and "<mark>" in deep_snippet
+
+                # It's a deep match only if deep content matched but title/desc didn't
+                # This ensures title/description matches rank higher
+                deep_match = deep_has_match and not (title_has_match or desc_has_match)
+
+                # Extract first matched file from deep_index_files if available
+                matched_file: Optional[str] = None
+                if deep_match:
+                    deep_files_json = getattr(row, "deep_index_files", None)
+                    if deep_files_json:
+                        try:
+                            files_list = json.loads(deep_files_json)
+                            if files_list and isinstance(files_list, list):
+                                # Return first file as representative
+                                # Future: could analyze deep_snippet to find exact file
+                                matched_file = files_list[0]
+                        except json.JSONDecodeError:
+                            pass
+
                 snippets[row.id] = {
-                    "title_snippet": row.title_snippet,
-                    "description_snippet": row.description_snippet,
+                    "title_snippet": title_snippet,
+                    "description_snippet": description_snippet,
+                    "deep_match": deep_match,
+                    "matched_file": matched_file,
                 }
 
             # Convert rows to MarketplaceCatalogEntry objects

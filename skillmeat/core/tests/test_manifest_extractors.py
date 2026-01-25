@@ -541,3 +541,359 @@ title: Never Closed
             extract_skill_manifest(skill_file)
 
         assert "closing" in caplog.text.lower() or "delimiter" in caplog.text.lower()
+
+
+class TestExtractDeepSearchText:
+    """Test deep search text extraction from artifact directories."""
+
+    def test_extract_deep_search_text_basic(self, tmp_path: Path) -> None:
+        """Test basic extraction with .md and .py files."""
+        from skillmeat.core.manifest_extractors import extract_deep_search_text
+
+        # Create test artifact directory with various files
+        skill_dir = tmp_path / "test-skill"
+        skill_dir.mkdir()
+
+        # Create markdown file
+        (skill_dir / "README.md").write_text(
+            "# Test Skill\n\nThis is a test skill for deep search.",
+            encoding="utf-8",
+        )
+
+        # Create Python file
+        (skill_dir / "script.py").write_text(
+            'def hello():\n    """Say hello."""\n    print("Hello world")',
+            encoding="utf-8",
+        )
+
+        # Create YAML file
+        (skill_dir / "config.yaml").write_text(
+            "name: test\nversion: 1.0.0",
+            encoding="utf-8",
+        )
+
+        text, files = extract_deep_search_text(skill_dir)
+
+        # Verify all files were indexed
+        assert len(files) == 3
+        assert "README.md" in files
+        assert "script.py" in files
+        assert "config.yaml" in files
+
+        # Verify content was extracted and normalized
+        assert "Test Skill" in text
+        assert "test skill for deep search" in text
+        assert "Say hello" in text
+        assert "Hello world" in text
+        assert "version: 1.0.0" in text
+
+        # Verify whitespace is normalized (no multiple spaces/newlines)
+        assert "\n\n" not in text
+        assert "  " not in text
+
+    def test_extract_deep_search_text_skips_large_files(self, tmp_path: Path) -> None:
+        """Test that files >100KB are skipped."""
+        from skillmeat.core.manifest_extractors import (
+            extract_deep_search_text,
+            MAX_FILE_SIZE_BYTES,
+        )
+
+        skill_dir = tmp_path / "test-skill"
+        skill_dir.mkdir()
+
+        # Create a small file that will be indexed
+        (skill_dir / "small.md").write_text("Small file content", encoding="utf-8")
+
+        # Create a large file that should be skipped
+        large_content = "x" * (MAX_FILE_SIZE_BYTES + 1000)
+        (skill_dir / "large.md").write_text(large_content, encoding="utf-8")
+
+        text, files = extract_deep_search_text(skill_dir)
+
+        # Only small file should be indexed
+        assert len(files) == 1
+        assert "small.md" in files
+        assert "large.md" not in files
+
+        # Only small file content should be in text
+        assert "Small file content" in text
+        assert len(text) < 100  # Much smaller than large file
+
+    def test_extract_deep_search_text_skips_binary(self, tmp_path: Path) -> None:
+        """Test that binary files (with null bytes) are skipped."""
+        from skillmeat.core.manifest_extractors import extract_deep_search_text
+
+        skill_dir = tmp_path / "test-skill"
+        skill_dir.mkdir()
+
+        # Create a text file
+        (skill_dir / "text.txt").write_text("Plain text file", encoding="utf-8")
+
+        # Create a binary file with null bytes
+        binary_file = skill_dir / "binary.bin"
+        with open(binary_file, "wb") as f:
+            f.write(b"Some text\x00\x00\x00binary data")
+
+        # Create another file with .py extension but binary content
+        binary_py = skill_dir / "compiled.py"
+        with open(binary_py, "wb") as f:
+            f.write(b"\x00\x01\x02\x03binary python")
+
+        text, files = extract_deep_search_text(skill_dir)
+
+        # Only text file should be indexed
+        assert len(files) == 1
+        assert "text.txt" in files
+        assert "binary.bin" not in files
+        assert "compiled.py" not in files
+
+        # Only text file content in result
+        assert "Plain text file" in text
+        assert "binary data" not in text
+
+    def test_extract_deep_search_text_truncates_total(self, tmp_path: Path) -> None:
+        """Test that total content is truncated at 1MB with marker."""
+        from skillmeat.core.manifest_extractors import (
+            extract_deep_search_text,
+            MAX_TOTAL_TEXT_BYTES,
+            MAX_FILE_SIZE_BYTES,
+        )
+
+        skill_dir = tmp_path / "test-skill"
+        skill_dir.mkdir()
+
+        # Create multiple files that together exceed 1MB
+        # Each file is 80KB (under MAX_FILE_SIZE_BYTES), so 15 files = 1.2MB total
+        chunk_size = 80_000
+        num_files = 15
+        assert chunk_size < MAX_FILE_SIZE_BYTES  # Ensure files will be indexed
+        assert (
+            chunk_size * num_files > MAX_TOTAL_TEXT_BYTES
+        )  # Ensure total exceeds limit
+
+        for i in range(num_files):
+            content = f"File {i}: " + ("x" * chunk_size)
+            (skill_dir / f"file{i:02d}.txt").write_text(content, encoding="utf-8")
+
+        text, files = extract_deep_search_text(skill_dir)
+
+        # Some files should be indexed (but not all)
+        assert len(files) >= 1  # At least some files indexed
+        assert len(files) < num_files  # Not all files indexed (due to limit)
+
+        # Total text should be at or near the limit
+        text_bytes = len(text.encode("utf-8"))
+        assert text_bytes <= MAX_TOTAL_TEXT_BYTES
+
+        # Should have truncation marker at the end
+        assert text.endswith("...[truncated]")
+
+    def test_extract_deep_search_text_empty_directory(self, tmp_path: Path) -> None:
+        """Test that empty directory returns empty string and empty list."""
+        from skillmeat.core.manifest_extractors import extract_deep_search_text
+
+        skill_dir = tmp_path / "empty-skill"
+        skill_dir.mkdir()
+
+        text, files = extract_deep_search_text(skill_dir)
+
+        assert text == ""
+        assert files == []
+
+    def test_extract_deep_search_text_nested_files(self, tmp_path: Path) -> None:
+        """Test that recursive glob works for nested directory structure."""
+        from skillmeat.core.manifest_extractors import extract_deep_search_text
+
+        skill_dir = tmp_path / "nested-skill"
+        skill_dir.mkdir()
+
+        # Create nested directory structure
+        (skill_dir / "SKILL.md").write_text("# Main Skill", encoding="utf-8")
+
+        subdir = skill_dir / "docs"
+        subdir.mkdir()
+        (subdir / "guide.md").write_text("User guide content", encoding="utf-8")
+
+        deep_dir = subdir / "examples"
+        deep_dir.mkdir()
+        (deep_dir / "example.py").write_text("# Example code", encoding="utf-8")
+
+        text, files = extract_deep_search_text(skill_dir)
+
+        # All nested files should be indexed
+        assert len(files) == 3
+        assert "SKILL.md" in files
+        assert (
+            "docs/guide.md" in files or "docs\\guide.md" in files
+        )  # Handle Windows paths
+        assert (
+            "docs/examples/example.py" in files or "docs\\examples\\example.py" in files
+        )
+
+        # All content should be extracted
+        assert "Main Skill" in text
+        assert "User guide content" in text
+        assert "Example code" in text
+
+    def test_extract_deep_search_text_no_indexable_files(self, tmp_path: Path) -> None:
+        """Test directory with only non-indexable file extensions."""
+        from skillmeat.core.manifest_extractors import extract_deep_search_text
+
+        skill_dir = tmp_path / "test-skill"
+        skill_dir.mkdir()
+
+        # Create files with extensions not in INDEXABLE_PATTERNS
+        (skill_dir / "image.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+        (skill_dir / "data.db").write_bytes(b"SQLite format 3\x00")
+        (skill_dir / "archive.zip").write_bytes(b"PK\x03\x04")
+
+        text, files = extract_deep_search_text(skill_dir)
+
+        assert text == ""
+        assert files == []
+
+    def test_extract_deep_search_text_mixed_encodings(self, tmp_path: Path) -> None:
+        """Test handling of files with encoding errors."""
+        from skillmeat.core.manifest_extractors import extract_deep_search_text
+
+        skill_dir = tmp_path / "test-skill"
+        skill_dir.mkdir()
+
+        # Create a file with valid UTF-8
+        (skill_dir / "valid.txt").write_text("Valid UTF-8 content", encoding="utf-8")
+
+        # Create a file with invalid UTF-8 bytes (but not null bytes, so not binary)
+        invalid_file = skill_dir / "invalid.txt"
+        with open(invalid_file, "wb") as f:
+            # Latin-1 encoded text that's invalid UTF-8
+            f.write(b"Some text \xff\xfe here")
+
+        text, files = extract_deep_search_text(skill_dir)
+
+        # Both files should be indexed (errors='replace' handles invalid UTF-8)
+        assert len(files) == 2
+        assert "valid.txt" in files
+        assert "invalid.txt" in files
+
+        # Valid content should be present
+        assert "Valid UTF-8 content" in text
+
+    def test_extract_deep_search_text_nonexistent_directory(
+        self, tmp_path: Path
+    ) -> None:
+        """Test handling of nonexistent directory."""
+        from skillmeat.core.manifest_extractors import extract_deep_search_text
+
+        nonexistent = tmp_path / "does-not-exist"
+
+        text, files = extract_deep_search_text(nonexistent)
+
+        assert text == ""
+        assert files == []
+
+    def test_extract_deep_search_text_file_not_directory(self, tmp_path: Path) -> None:
+        """Test handling when path is a file instead of directory."""
+        from skillmeat.core.manifest_extractors import extract_deep_search_text
+
+        # Create a file instead of directory
+        file_path = tmp_path / "file.txt"
+        file_path.write_text("Not a directory", encoding="utf-8")
+
+        text, files = extract_deep_search_text(file_path)
+
+        assert text == ""
+        assert files == []
+
+    def test_extract_deep_search_text_whitespace_normalization(
+        self, tmp_path: Path
+    ) -> None:
+        """Test that whitespace normalization works correctly."""
+        from skillmeat.core.manifest_extractors import extract_deep_search_text
+
+        skill_dir = tmp_path / "test-skill"
+        skill_dir.mkdir()
+
+        # Create file with excessive whitespace
+        (skill_dir / "whitespace.md").write_text(
+            "Multiple    spaces\n\n\nMultiple\n\nnewlines\t\ttabs",
+            encoding="utf-8",
+        )
+
+        text, files = extract_deep_search_text(skill_dir)
+
+        # All whitespace should be normalized to single spaces
+        assert "Multiple spaces" in text
+        assert "Multiple newlines tabs" in text
+        assert "    " not in text  # No multiple spaces
+        assert "\n" not in text  # No newlines
+        assert "\t" not in text  # No tabs
+
+    def test_extract_deep_search_text_empty_files_excluded(
+        self, tmp_path: Path
+    ) -> None:
+        """Test that empty or whitespace-only files don't contribute to output."""
+        from skillmeat.core.manifest_extractors import extract_deep_search_text
+
+        skill_dir = tmp_path / "test-skill"
+        skill_dir.mkdir()
+
+        # Create empty file
+        (skill_dir / "empty.txt").write_text("", encoding="utf-8")
+
+        # Create whitespace-only file
+        (skill_dir / "whitespace.md").write_text("   \n\t\n   ", encoding="utf-8")
+
+        # Create file with actual content
+        (skill_dir / "content.py").write_text("print('hello')", encoding="utf-8")
+
+        text, files = extract_deep_search_text(skill_dir)
+
+        # Only the file with content should be indexed
+        assert len(files) == 1
+        assert "content.py" in files
+
+        assert "hello" in text
+        assert len(text) < 50  # Should be short, just the one file
+
+    def test_extract_deep_search_text_respects_indexable_patterns(
+        self, tmp_path: Path
+    ) -> None:
+        """Test that only files matching INDEXABLE_PATTERNS are processed."""
+        from skillmeat.core.manifest_extractors import extract_deep_search_text
+
+        skill_dir = tmp_path / "test-skill"
+        skill_dir.mkdir()
+
+        # Create files with indexable extensions
+        (skill_dir / "doc.md").write_text("Markdown content", encoding="utf-8")
+        (skill_dir / "config.yaml").write_text("yaml: content", encoding="utf-8")
+        (skill_dir / "data.json").write_text('{"key": "value"}', encoding="utf-8")
+        (skill_dir / "readme.txt").write_text("Text file", encoding="utf-8")
+        (skill_dir / "script.py").write_text("# Python", encoding="utf-8")
+        (skill_dir / "app.ts").write_text("// TypeScript", encoding="utf-8")
+        (skill_dir / "app.js").write_text("// JavaScript", encoding="utf-8")
+
+        # Create files with non-indexable extensions
+        (skill_dir / "data.csv").write_text("col1,col2", encoding="utf-8")
+        (skill_dir / "style.css").write_text("body { }", encoding="utf-8")
+        (skill_dir / "page.html").write_text("<html></html>", encoding="utf-8")
+
+        text, files = extract_deep_search_text(skill_dir)
+
+        # Only indexable files should be present
+        indexable_count = 7  # md, yaml, json, txt, py, ts, js
+        assert len(files) == indexable_count
+
+        # Verify indexable content is present
+        assert "Markdown content" in text
+        assert "yaml: content" in text
+        assert '"key": "value"' in text
+        assert "Text file" in text
+        assert "Python" in text
+        assert "TypeScript" in text
+        assert "JavaScript" in text
+
+        # Verify non-indexable content is not present
+        assert "col1,col2" not in text
+        assert "body { }" not in text
+        assert "<html>" not in text
