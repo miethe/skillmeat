@@ -109,6 +109,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.warning(f"GitHub API: Could not check status - {e}")
 
+    # Check git availability for clone-based artifact indexing
+    try:
+        from skillmeat.api.routers.marketplace_sources import check_git_available
+
+        await check_git_available()
+    except Exception as e:
+        logger.warning(f"Git availability check failed - {e}")
+
     # Set service start time for health checks
     from .routers.health import set_service_start_time
 

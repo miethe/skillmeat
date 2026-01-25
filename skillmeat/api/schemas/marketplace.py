@@ -1100,6 +1100,39 @@ class SourceResponse(BaseModel):
         examples=[True, False, None],
     )
 
+    # Clone target summary (optional, null if never indexed)
+    artifacts_root: Optional[str] = Field(
+        default=None,
+        description="Common ancestor directory path of all artifacts in this source. "
+        "None if artifacts are scattered or source has never been indexed.",
+        examples=[".claude/skills", None],
+    )
+    artifact_count_from_cache: Optional[int] = Field(
+        default=None,
+        description="Number of artifacts from last indexing run (cached in clone_target). "
+        "May differ from artifact_count if source has been re-scanned. "
+        "None if source has never been indexed.",
+        examples=[12, None],
+    )
+    indexing_strategy: Optional[
+        Literal["api", "sparse_manifest", "sparse_directory"]
+    ] = Field(
+        default=None,
+        description="Clone/indexing strategy computed for this source. "
+        "'api' = direct GitHub API (small repos), "
+        "'sparse_manifest' = clone manifest files only (medium repos), "
+        "'sparse_directory' = clone artifact directory (large repos). "
+        "None if source has never been indexed.",
+        examples=["sparse_manifest", None],
+    )
+    last_indexed_tree_sha: Optional[str] = Field(
+        default=None,
+        description="Git tree SHA from last successful indexing run. "
+        "Used for cache invalidation - if current tree SHA differs, re-indexing needed. "
+        "None if source has never been indexed.",
+        examples=["abc123def456", None],
+    )
+
     class Config:
         """Pydantic model configuration."""
 
@@ -1130,6 +1163,10 @@ class SourceResponse(BaseModel):
                 "single_artifact_mode": False,
                 "single_artifact_type": None,
                 "indexing_enabled": True,
+                "artifacts_root": ".claude/skills",
+                "artifact_count_from_cache": 12,
+                "indexing_strategy": "sparse_manifest",
+                "last_indexed_tree_sha": "abc123def456",
             }
         }
 

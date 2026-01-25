@@ -42,6 +42,7 @@ Example:
 __version__ = "0.1.0"
 
 from skillmeat.cache.manager import CacheManager
+from skillmeat.cache.marketplace import MarketplaceCache
 from skillmeat.cache.refresh import (
     RefreshEvent,
     RefreshEventType,
@@ -62,6 +63,7 @@ __all__ = [
     "CacheManager",
     "CacheRepository",
     "FileWatcher",
+    "MarketplaceCache",
     "RefreshJob",
     "RefreshEvent",
     "RefreshEventType",

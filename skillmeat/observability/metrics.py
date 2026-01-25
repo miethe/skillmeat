@@ -127,6 +127,30 @@ marketplace_scan_errors_total = Counter(
     ["source_id", "error_type"],
 )
 
+# Clone operation timing
+skillmeat_clone_duration_seconds = Histogram(
+    "skillmeat_clone_duration_seconds",
+    "Duration of git clone operations in seconds",
+    ["strategy"],
+    buckets=[1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0],
+)
+
+# Manifest extraction timing
+skillmeat_extraction_duration_seconds = Histogram(
+    "skillmeat_extraction_duration_seconds",
+    "Duration of manifest extraction operations in seconds",
+    ["artifact_count_bucket"],
+    buckets=[0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0],
+)
+
+# Total scan timing with strategy and status labels
+skillmeat_scan_total_duration_seconds = Histogram(
+    "skillmeat_scan_total_duration_seconds",
+    "Total duration of marketplace source scan including all operations",
+    ["strategy", "status"],
+    buckets=[5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0],
+)
+
 # =============================================================================
 # Bundle Metrics
 # =============================================================================

@@ -44,7 +44,10 @@ import json
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from skillmeat.core.clone_target import CloneTarget
 
 from sqlalchemy import (
     Boolean,
@@ -1206,6 +1209,10 @@ class MarketplaceSource(Base):
         path_tag_config: JSON config for path-based tag extraction rules
         single_artifact_mode: Treat entire repo (or root_hint dir) as single artifact
         single_artifact_type: Artifact type when single_artifact_mode is True
+        clone_target_json: JSON-serialized CloneTarget for rapid re-indexing
+        deep_indexing_enabled: Clone entire artifact directories for enhanced search
+        webhook_secret: Secret for GitHub webhook verification (future use)
+        last_webhook_event_at: Timestamp of last webhook event received
         last_sync_at: Timestamp of last successful scan
         last_error: Last error message if scan failed
         scan_status: Current scan status ("pending", "scanning", "success", "error")
@@ -1302,6 +1309,30 @@ class MarketplaceSource(Base):
         Text,
         nullable=True,
         comment="JSON config for path-based tag extraction rules",
+    )
+
+    # Clone-based artifact indexing fields (Phase 1)
+    clone_target_json: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON-serialized CloneTarget for rapid re-indexing",
+    )
+    deep_indexing_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+        comment="Clone entire artifact directories for enhanced search",
+    )
+    webhook_secret: Mapped[Optional[str]] = mapped_column(
+        String(64),
+        nullable=True,
+        comment="Secret for GitHub webhook verification (future use)",
+    )
+    last_webhook_event_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        comment="Timestamp of last webhook event received",
     )
 
     # Single artifact mode settings
@@ -1410,6 +1441,15 @@ class MarketplaceSource(Base):
             "indexing_enabled": self.indexing_enabled,
             "single_artifact_mode": self.single_artifact_mode,
             "single_artifact_type": self.single_artifact_type,
+            # Clone-based artifact indexing fields
+            "clone_target": self.clone_target.to_dict() if self.clone_target else None,
+            "deep_indexing_enabled": self.deep_indexing_enabled,
+            "webhook_secret": self.webhook_secret,
+            "last_webhook_event_at": (
+                self.last_webhook_event_at.isoformat()
+                if self.last_webhook_event_at
+                else None
+            ),
             "last_sync_at": (
                 self.last_sync_at.isoformat() if self.last_sync_at else None
             ),
@@ -1512,6 +1552,36 @@ class MarketplaceSource(Base):
         """
         self.auto_tags = json.dumps(auto_tags_dict)
 
+    @property
+    def clone_target(self) -> Optional["CloneTarget"]:
+        """Get deserialized CloneTarget from JSON.
+
+        Returns:
+            CloneTarget instance if clone_target_json is set, None otherwise.
+
+        Raises:
+            json.JSONDecodeError: If clone_target_json contains invalid JSON.
+            KeyError: If required CloneTarget fields are missing.
+            ValueError: If CloneTarget strategy is invalid.
+        """
+        if not self.clone_target_json:
+            return None
+        from skillmeat.core.clone_target import CloneTarget
+
+        return CloneTarget.from_json(self.clone_target_json)
+
+    @clone_target.setter
+    def clone_target(self, value: Optional["CloneTarget"]) -> None:
+        """Set CloneTarget, serializing to JSON.
+
+        Args:
+            value: CloneTarget instance to serialize, or None to clear.
+        """
+        if value is None:
+            self.clone_target_json = None
+        else:
+            self.clone_target_json = value.to_json()
+
 
 class MarketplaceCatalogEntry(Base):
     """Detected artifact from marketplace source repository.
@@ -1543,6 +1613,9 @@ class MarketplaceCatalogEntry(Base):
         description: Artifact description from frontmatter for search
         search_tags: JSON array of tags from frontmatter for search filtering
         search_text: Concatenated searchable text (title + description + tags)
+        deep_search_text: Full-text content from deep indexing of artifact files
+        deep_indexed_at: Timestamp of last deep indexing operation
+        deep_index_files: JSON array of files included in deep index
         metadata_json: Additional detection metadata as JSON
         created_at: Timestamp when entry was created
         updated_at: Timestamp when entry was last updated
@@ -1632,6 +1705,23 @@ class MarketplaceCatalogEntry(Base):
         comment="Concatenated searchable text (title + description + tags)",
     )
 
+    # Deep indexing fields (Phase 1 clone-based artifact indexing)
+    deep_search_text: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Full-text content from deep indexing",
+    )
+    deep_indexed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        comment="Timestamp of last deep indexing",
+    )
+    deep_index_files: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON array of files included in deep index",
+    )
+
     # Additional metadata
     metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
@@ -1716,6 +1806,12 @@ class MarketplaceCatalogEntry(Base):
             "description": self.description,
             "search_tags": search_tags_list,
             "search_text": self.search_text,
+            # Deep indexing fields
+            "deep_search_text": self.deep_search_text,
+            "deep_indexed_at": (
+                self.deep_indexed_at.isoformat() if self.deep_indexed_at else None
+            ),
+            "deep_index_files": self.get_deep_index_files_list(),
             "metadata": metadata_dict,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
@@ -1770,6 +1866,34 @@ class MarketplaceCatalogEntry(Base):
             self.search_tags = None
         else:
             self.search_tags = json.dumps(tags)
+
+    def get_deep_index_files_list(self) -> List[str]:
+        """Parse and return deep_index_files as a list.
+
+        Returns:
+            List of file path strings or empty list if invalid/missing
+        """
+        if not self.deep_index_files:
+            return []
+
+        try:
+            files = json.loads(self.deep_index_files)
+            if isinstance(files, list):
+                return files
+            return []
+        except json.JSONDecodeError:
+            return []
+
+    def set_deep_index_files_list(self, files: List[str]) -> None:
+        """Set deep_index_files from a list.
+
+        Args:
+            files: List of file path strings to serialize as JSON
+        """
+        if not files:
+            self.deep_index_files = None
+        else:
+            self.deep_index_files = json.dumps(files)
 
 
 class ProjectTemplate(Base):
