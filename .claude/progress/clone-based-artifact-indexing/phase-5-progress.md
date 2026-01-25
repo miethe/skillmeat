@@ -1,224 +1,239 @@
 ---
 type: progress
-prd: "clone-based-artifact-indexing"
+prd: clone-based-artifact-indexing
 phase: 5
-title: "Testing & Benchmarks"
-status: pending
+title: Testing & Benchmarks
+status: completed
 started: null
-updated: "2026-01-24T00:00:00Z"
+updated: '2026-01-25'
 completion: 0
 total_tasks: 12
-completed_tasks: 0
-
+completed_tasks: 12
 tasks:
-  - id: "TEST-101"
-    title: "Unit tests for CloneTarget serialization"
-    description: "Test CloneTarget dataclass serialization/deserialization, edge cases"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "sonnet"
-    estimated_time: "1h"
-    story_points: 2
-    acceptance_criteria:
-      - "100% code coverage for CloneTarget class"
-      - "Test to_json() and from_json() round-trip"
-      - "Test with all strategy types"
-      - "Test with empty lists, None values"
-      - "Test datetime handling with timezone"
-
-  - id: "TEST-102"
-    title: "Unit tests for compute_clone_metadata()"
-    description: "Test metadata computation with various artifact distributions"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "sonnet"
-    estimated_time: "1h"
-    story_points: 2
-    acceptance_criteria:
-      - "Test empty artifact list"
-      - "Test single artifact"
-      - "Test multiple artifacts with common root"
-      - "Test scattered artifacts (no common root)"
-      - "Test nested paths (.claude/skills/foo/bar)"
-
-  - id: "TEST-103"
-    title: "Unit tests for strategy selection"
-    description: "Test select_indexing_strategy() with various artifact counts and configs"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "sonnet"
-    estimated_time: "1h"
-    story_points: 2
-    acceptance_criteria:
-      - "Test <3 artifacts returns 'api'"
-      - "Test 3-20 artifacts returns 'sparse_manifest'"
-      - "Test >20 artifacts with root returns 'sparse_directory'"
-      - "Test >20 scattered returns 'sparse_manifest'"
-      - "Strategy selection is deterministic"
-
-  - id: "TEST-104"
-    title: "Unit tests for manifest extractors"
-    description: "Test all 5 extractors with real-world manifests and edge cases"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "opus"
-    estimated_time: "2h"
-    story_points: 3
-    acceptance_criteria:
-      - "Test skill extractor with valid/invalid SKILL.md"
-      - "Test command/agent/hook extractors with .yaml and .yml"
-      - "Test MCP extractor with mcp.json and package.json fallback"
-      - "Test missing frontmatter handling"
-      - "Test malformed YAML/JSON handling"
-      - "100% code coverage"
-
-  - id: "TEST-105"
-    title: "Integration tests for sparse_manifest strategy"
-    description: "End-to-end test of sparse_manifest clone and extraction"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "opus"
-    estimated_time: "2h"
-    story_points: 3
-    acceptance_criteria:
-      - "Test with real test repository (can use anthropics/quickstarts)"
-      - "Verify only manifest files are cloned"
-      - "Verify all artifact types extracted correctly"
-      - "Verify temp directory cleaned up"
-      - "Test with GitHub token (authenticated)"
-
-  - id: "TEST-106"
-    title: "Integration tests for sparse_directory strategy"
-    description: "End-to-end test of sparse_directory clone for large repos"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "opus"
-    estimated_time: "2h"
-    story_points: 3
-    acceptance_criteria:
-      - "Test with repository containing >20 artifacts"
-      - "Verify only artifact directories cloned (not full repo)"
-      - "Verify extraction works from cloned directories"
-      - "Measure and log clone/extraction time"
-      - "Verify temp directory cleaned up"
-
-  - id: "TEST-107"
-    title: "Integration tests for API fallback"
-    description: "Test graceful fallback when clone fails or times out"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "sonnet"
-    estimated_time: "1.5h"
-    story_points: 2
-    acceptance_criteria:
-      - "Test fallback when git not available"
-      - "Test fallback on clone timeout"
-      - "Test fallback on clone error (e.g., auth failure)"
-      - "Verify scan still completes via API"
-      - "Verify warning logged on fallback"
-
-  - id: "TEST-108"
-    title: "E2E test for full scan flow"
-    description: "Complete end-to-end test from source creation through scan to search"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "opus"
-    estimated_time: "2h"
-    story_points: 2
-    acceptance_criteria:
-      - "Create source via API"
-      - "Trigger scan"
-      - "Verify artifacts indexed"
-      - "Verify CloneTarget stored"
-      - "Search for indexed artifacts"
-      - "Verify search results correct"
-
-  - id: "TEST-109"
-    title: "Performance benchmark: 100 artifacts in <60s"
-    description: "Benchmark indexing performance with large repository"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "opus"
-    estimated_time: "2h"
-    story_points: 2
-    acceptance_criteria:
-      - "Create or use test repo with 100+ artifacts"
-      - "Full scan completes in <60 seconds"
-      - "Results logged with timing breakdown"
-      - "Benchmark reproducible"
-
-  - id: "TEST-110"
-    title: "Performance benchmark: <10 API calls"
-    description: "Verify API call reduction from O(n) to O(1)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "sonnet"
-    estimated_time: "1h"
-    story_points: 1
-    acceptance_criteria:
-      - "Track API calls during 50+ artifact scan"
-      - "Total API calls <10 (tree fetch + metadata)"
-      - "Compare with baseline (O(n) calls)"
-      - "Document reduction percentage"
-
-  - id: "TEST-111"
-    title: "Deep indexing integration tests"
-    description: "Test deep indexing feature end-to-end"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "sonnet"
-    estimated_time: "1.5h"
-    story_points: 2
-    acceptance_criteria:
-      - "Test with deep_indexing_enabled=true"
-      - "Verify full artifact directories cloned"
-      - "Verify deep_search_text populated"
-      - "Search finds results in deep content"
-      - "Verify deep_match flag set correctly"
-
-  - id: "TEST-112"
-    title: "Stress tests for edge cases"
-    description: "Test with private repos, rate-limited scenarios, very large repos"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "opus"
-    estimated_time: "2h"
-    story_points: 2
-    acceptance_criteria:
-      - "Test with private repo (requires auth)"
-      - "Test behavior when rate limited"
-      - "Test with very large repo (>1GB)"
-      - "Graceful handling (no crashes)"
-      - "Appropriate error messages"
-
+- id: TEST-101
+  title: Unit tests for CloneTarget serialization
+  description: Test CloneTarget dataclass serialization/deserialization, edge cases
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: sonnet
+  estimated_time: 1h
+  story_points: 2
+  acceptance_criteria:
+  - 100% code coverage for CloneTarget class
+  - Test to_json() and from_json() round-trip
+  - Test with all strategy types
+  - Test with empty lists, None values
+  - Test datetime handling with timezone
+- id: TEST-102
+  title: Unit tests for compute_clone_metadata()
+  description: Test metadata computation with various artifact distributions
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: sonnet
+  estimated_time: 1h
+  story_points: 2
+  acceptance_criteria:
+  - Test empty artifact list
+  - Test single artifact
+  - Test multiple artifacts with common root
+  - Test scattered artifacts (no common root)
+  - Test nested paths (.claude/skills/foo/bar)
+- id: TEST-103
+  title: Unit tests for strategy selection
+  description: Test select_indexing_strategy() with various artifact counts and configs
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: sonnet
+  estimated_time: 1h
+  story_points: 2
+  acceptance_criteria:
+  - Test <3 artifacts returns 'api'
+  - Test 3-20 artifacts returns 'sparse_manifest'
+  - Test >20 artifacts with root returns 'sparse_directory'
+  - Test >20 scattered returns 'sparse_manifest'
+  - Strategy selection is deterministic
+- id: TEST-104
+  title: Unit tests for manifest extractors
+  description: Test all 5 extractors with real-world manifests and edge cases
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: opus
+  estimated_time: 2h
+  story_points: 3
+  acceptance_criteria:
+  - Test skill extractor with valid/invalid SKILL.md
+  - Test command/agent/hook extractors with .yaml and .yml
+  - Test MCP extractor with mcp.json and package.json fallback
+  - Test missing frontmatter handling
+  - Test malformed YAML/JSON handling
+  - 100% code coverage
+- id: TEST-105
+  title: Integration tests for sparse_manifest strategy
+  description: End-to-end test of sparse_manifest clone and extraction
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: opus
+  estimated_time: 2h
+  story_points: 3
+  acceptance_criteria:
+  - Test with real test repository (can use anthropics/quickstarts)
+  - Verify only manifest files are cloned
+  - Verify all artifact types extracted correctly
+  - Verify temp directory cleaned up
+  - Test with GitHub token (authenticated)
+- id: TEST-106
+  title: Integration tests for sparse_directory strategy
+  description: End-to-end test of sparse_directory clone for large repos
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: opus
+  estimated_time: 2h
+  story_points: 3
+  acceptance_criteria:
+  - Test with repository containing >20 artifacts
+  - Verify only artifact directories cloned (not full repo)
+  - Verify extraction works from cloned directories
+  - Measure and log clone/extraction time
+  - Verify temp directory cleaned up
+- id: TEST-107
+  title: Integration tests for API fallback
+  description: Test graceful fallback when clone fails or times out
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: sonnet
+  estimated_time: 1.5h
+  story_points: 2
+  acceptance_criteria:
+  - Test fallback when git not available
+  - Test fallback on clone timeout
+  - Test fallback on clone error (e.g., auth failure)
+  - Verify scan still completes via API
+  - Verify warning logged on fallback
+- id: TEST-108
+  title: E2E test for full scan flow
+  description: Complete end-to-end test from source creation through scan to search
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: opus
+  estimated_time: 2h
+  story_points: 2
+  acceptance_criteria:
+  - Create source via API
+  - Trigger scan
+  - Verify artifacts indexed
+  - Verify CloneTarget stored
+  - Search for indexed artifacts
+  - Verify search results correct
+- id: TEST-109
+  title: 'Performance benchmark: 100 artifacts in <60s'
+  description: Benchmark indexing performance with large repository
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: opus
+  estimated_time: 2h
+  story_points: 2
+  acceptance_criteria:
+  - Create or use test repo with 100+ artifacts
+  - Full scan completes in <60 seconds
+  - Results logged with timing breakdown
+  - Benchmark reproducible
+- id: TEST-110
+  title: 'Performance benchmark: <10 API calls'
+  description: Verify API call reduction from O(n) to O(1)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: sonnet
+  estimated_time: 1h
+  story_points: 1
+  acceptance_criteria:
+  - Track API calls during 50+ artifact scan
+  - Total API calls <10 (tree fetch + metadata)
+  - Compare with baseline (O(n) calls)
+  - Document reduction percentage
+- id: TEST-111
+  title: Deep indexing integration tests
+  description: Test deep indexing feature end-to-end
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: sonnet
+  estimated_time: 1.5h
+  story_points: 2
+  acceptance_criteria:
+  - Test with deep_indexing_enabled=true
+  - Verify full artifact directories cloned
+  - Verify deep_search_text populated
+  - Search finds results in deep content
+  - Verify deep_match flag set correctly
+- id: TEST-112
+  title: Stress tests for edge cases
+  description: Test with private repos, rate-limited scenarios, very large repos
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: opus
+  estimated_time: 2h
+  story_points: 2
+  acceptance_criteria:
+  - Test with private repo (requires auth)
+  - Test behavior when rate limited
+  - Test with very large repo (>1GB)
+  - Graceful handling (no crashes)
+  - Appropriate error messages
 parallelization:
-  batch_1: ["TEST-101", "TEST-102", "TEST-103"]
-  batch_2: ["TEST-104", "TEST-105", "TEST-106", "TEST-107"]
-  batch_3: ["TEST-108", "TEST-109", "TEST-110", "TEST-111", "TEST-112"]
-  critical_path: ["TEST-104", "TEST-105", "TEST-109"]
-  estimated_total_time: "18h"
-
+  batch_1:
+  - TEST-101
+  - TEST-102
+  - TEST-103
+  batch_2:
+  - TEST-104
+  - TEST-105
+  - TEST-106
+  - TEST-107
+  batch_3:
+  - TEST-108
+  - TEST-109
+  - TEST-110
+  - TEST-111
+  - TEST-112
+  critical_path:
+  - TEST-104
+  - TEST-105
+  - TEST-109
+  estimated_total_time: 18h
 blockers: []
-
 quality_gates:
-  - "All unit tests pass with >80% code coverage"
-  - "All integration tests pass"
-  - "Benchmarks show <60 second indexing for 100-artifact repo"
-  - "API call reduction verified (minimum 90% reduction from baseline)"
-  - "No crashes or hangs in edge case testing"
-  - "Performance metrics meet or exceed targets"
+- All unit tests pass with >80% code coverage
+- All integration tests pass
+- Benchmarks show <60 second indexing for 100-artifact repo
+- API call reduction verified (minimum 90% reduction from baseline)
+- No crashes or hangs in edge case testing
+- Performance metrics meet or exceed targets
+in_progress_tasks: 0
+blocked_tasks: 0
+progress: 100
 ---
 
 # Phase 5: Testing & Benchmarks
