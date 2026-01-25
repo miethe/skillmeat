@@ -535,6 +535,23 @@ def source_to_response(source: MarketplaceSource) -> SourceResponse:
         repo_readme=source.repo_readme,
         tags=source.get_tags_list() or [],
         counts_by_type=source.get_counts_by_type_dict(),
+        single_artifact_mode=source.single_artifact_mode or False,
+        single_artifact_type=source.single_artifact_type,
+        indexing_enabled=source.indexing_enabled,
+        deep_indexing_enabled=source.deep_indexing_enabled or False,
+        # Clone target summary fields (null if never indexed)
+        artifacts_root=(
+            source.clone_target.artifacts_root if source.clone_target else None
+        ),
+        artifact_count_from_cache=(
+            len(source.clone_target.artifact_paths) if source.clone_target else None
+        ),
+        indexing_strategy=(
+            source.clone_target.strategy if source.clone_target else None
+        ),
+        last_indexed_tree_sha=(
+            source.clone_target.tree_sha if source.clone_target else None
+        ),
     )
 
 
@@ -1462,7 +1479,14 @@ async def _perform_scan(
                     source_in_session.set_counts_by_type_dict(counts_by_type)
 
                 # Determine if frontmatter indexing is enabled for this source
-                indexing_enabled = source.indexing_enabled is True
+                # Get global indexing mode from config and compute effective state
+                from skillmeat.config import ConfigManager
+
+                app_config = ConfigManager()
+                global_mode = app_config.get_indexing_mode()
+                indexing_enabled = get_effective_indexing_state(
+                    source.indexing_enabled, global_mode
+                )
                 if indexing_enabled:
                     logger.info(
                         f"Frontmatter indexing enabled for source {source_id}, "
