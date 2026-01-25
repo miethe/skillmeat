@@ -66,7 +66,7 @@ def upgrade() -> None:
                 title,
                 description,
                 search_text,
-                tags,
+                search_tags,
                 deep_search_text,
                 content='marketplace_catalog_entries',
                 content_rowid='rowid',
@@ -84,7 +84,7 @@ def upgrade() -> None:
             BEGIN
                 INSERT INTO catalog_fts(
                     rowid, name, artifact_type, title, description,
-                    search_text, tags, deep_search_text
+                    search_text, search_tags, deep_search_text
                 )
                 VALUES (
                     NEW.rowid,
@@ -108,7 +108,7 @@ def upgrade() -> None:
             BEGIN
                 INSERT INTO catalog_fts(
                     catalog_fts, rowid, name, artifact_type, title, description,
-                    search_text, tags, deep_search_text
+                    search_text, search_tags, deep_search_text
                 )
                 VALUES (
                     'delete',
@@ -133,7 +133,7 @@ def upgrade() -> None:
             BEGIN
                 INSERT INTO catalog_fts(
                     catalog_fts, rowid, name, artifact_type, title, description,
-                    search_text, tags, deep_search_text
+                    search_text, search_tags, deep_search_text
                 )
                 VALUES (
                     'delete',
@@ -148,7 +148,7 @@ def upgrade() -> None:
                 );
                 INSERT INTO catalog_fts(
                     rowid, name, artifact_type, title, description,
-                    search_text, tags, deep_search_text
+                    search_text, search_tags, deep_search_text
                 )
                 VALUES (
                     NEW.rowid,
@@ -171,7 +171,7 @@ def upgrade() -> None:
             """
             INSERT INTO catalog_fts(
                 rowid, name, artifact_type, title, description,
-                search_text, tags, deep_search_text
+                search_text, search_tags, deep_search_text
             )
             SELECT
                 rowid, name, artifact_type, title, description,
@@ -204,7 +204,7 @@ def downgrade() -> None:
     """Revert FTS5 table to version without deep_search_text.
 
     Recreates the original FTS5 schema from migration 20260124_1200 with only
-    the original 6 columns (name, artifact_type, title, description, search_text, tags).
+    the original 6 columns (name, artifact_type, title, description, search_text, search_tags).
     """
     # Step 1: Drop triggers
     op.execute("DROP TRIGGER IF EXISTS catalog_fts_au")
@@ -223,7 +223,7 @@ def downgrade() -> None:
             title,
             description,
             search_text,
-            tags,
+            search_tags,
             content='marketplace_catalog_entries',
             content_rowid='rowid',
             tokenize='porter unicode61 remove_diacritics 2'
@@ -239,7 +239,7 @@ def downgrade() -> None:
         CREATE TRIGGER IF NOT EXISTS catalog_fts_ai AFTER INSERT ON marketplace_catalog_entries
         BEGIN
             INSERT INTO catalog_fts(
-                rowid, name, artifact_type, title, description, search_text, tags
+                rowid, name, artifact_type, title, description, search_text, search_tags
             )
             VALUES (
                 NEW.rowid,
@@ -260,7 +260,7 @@ def downgrade() -> None:
         CREATE TRIGGER IF NOT EXISTS catalog_fts_ad AFTER DELETE ON marketplace_catalog_entries
         BEGIN
             INSERT INTO catalog_fts(
-                catalog_fts, rowid, name, artifact_type, title, description, search_text, tags
+                catalog_fts, rowid, name, artifact_type, title, description, search_text, search_tags
             )
             VALUES (
                 'delete',
@@ -282,7 +282,7 @@ def downgrade() -> None:
         CREATE TRIGGER IF NOT EXISTS catalog_fts_au AFTER UPDATE ON marketplace_catalog_entries
         BEGIN
             INSERT INTO catalog_fts(
-                catalog_fts, rowid, name, artifact_type, title, description, search_text, tags
+                catalog_fts, rowid, name, artifact_type, title, description, search_text, search_tags
             )
             VALUES (
                 'delete',
@@ -295,7 +295,7 @@ def downgrade() -> None:
                 OLD.search_tags
             );
             INSERT INTO catalog_fts(
-                rowid, name, artifact_type, title, description, search_text, tags
+                rowid, name, artifact_type, title, description, search_text, search_tags
             )
             VALUES (
                 NEW.rowid,
@@ -313,7 +313,7 @@ def downgrade() -> None:
     # Step 5: Rebuild index
     op.execute(
         """
-        INSERT INTO catalog_fts(rowid, name, artifact_type, title, description, search_text, tags)
+        INSERT INTO catalog_fts(rowid, name, artifact_type, title, description, search_text, search_tags)
         SELECT rowid, name, artifact_type, title, description, search_text, search_tags
         FROM marketplace_catalog_entries
         WHERE search_text IS NOT NULL

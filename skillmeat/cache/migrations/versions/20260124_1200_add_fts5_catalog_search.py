@@ -63,7 +63,7 @@ def upgrade() -> None:
                 title,
                 description,
                 search_text,
-                tags,
+                search_tags,
                 content='marketplace_catalog_entries',
                 content_rowid='rowid',
                 tokenize='porter unicode61 remove_diacritics 2'
@@ -77,7 +77,7 @@ def upgrade() -> None:
             CREATE TRIGGER IF NOT EXISTS catalog_fts_ai AFTER INSERT ON marketplace_catalog_entries
             BEGIN
                 INSERT INTO catalog_fts(
-                    rowid, name, artifact_type, title, description, search_text, tags
+                    rowid, name, artifact_type, title, description, search_text, search_tags
                 )
                 VALUES (
                     NEW.rowid,
@@ -99,7 +99,7 @@ def upgrade() -> None:
             CREATE TRIGGER IF NOT EXISTS catalog_fts_ad AFTER DELETE ON marketplace_catalog_entries
             BEGIN
                 INSERT INTO catalog_fts(
-                    catalog_fts, rowid, name, artifact_type, title, description, search_text, tags
+                    catalog_fts, rowid, name, artifact_type, title, description, search_text, search_tags
                 )
                 VALUES (
                     'delete',
@@ -122,7 +122,7 @@ def upgrade() -> None:
             CREATE TRIGGER IF NOT EXISTS catalog_fts_au AFTER UPDATE ON marketplace_catalog_entries
             BEGIN
                 INSERT INTO catalog_fts(
-                    catalog_fts, rowid, name, artifact_type, title, description, search_text, tags
+                    catalog_fts, rowid, name, artifact_type, title, description, search_text, search_tags
                 )
                 VALUES (
                     'delete',
@@ -135,7 +135,7 @@ def upgrade() -> None:
                     OLD.search_tags
                 );
                 INSERT INTO catalog_fts(
-                    rowid, name, artifact_type, title, description, search_text, tags
+                    rowid, name, artifact_type, title, description, search_text, search_tags
                 )
                 VALUES (
                     NEW.rowid,
@@ -154,7 +154,7 @@ def upgrade() -> None:
         # Only populates entries that have search_text (those that have been indexed)
         op.execute(
             """
-            INSERT INTO catalog_fts(rowid, name, artifact_type, title, description, search_text, tags)
+            INSERT INTO catalog_fts(rowid, name, artifact_type, title, description, search_text, search_tags)
             SELECT rowid, name, artifact_type, title, description, search_text, search_tags
             FROM marketplace_catalog_entries
             WHERE search_text IS NOT NULL
