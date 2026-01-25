@@ -558,6 +558,12 @@ class CreateSourceRequest(BaseModel):
         default=None,
         description="Artifact type when single_artifact_mode is enabled (required when mode is True)",
     )
+    deep_indexing_enabled: bool = Field(
+        default=False,
+        description="Enable deep indexing for enhanced full-text search. "
+        "When enabled, clones entire artifact directories instead of just manifest files. "
+        "May significantly increase scan time for large repositories.",
+    )
 
     @model_validator(mode="after")
     def validate_single_artifact_mode(self) -> "CreateSourceRequest":
@@ -696,6 +702,7 @@ class CreateSourceRequest(BaseModel):
                 "tags": ["official", "quickstart", "examples"],
                 "single_artifact_mode": False,
                 "single_artifact_type": None,
+                "deep_indexing_enabled": False,
             }
         }
 
@@ -830,6 +837,12 @@ class UpdateSourceRequest(BaseModel):
     tags: Optional[List[str]] = Field(
         default=None,
         description="Tags to apply to source (max 20)",
+    )
+    deep_indexing_enabled: Optional[bool] = Field(
+        default=None,
+        description="Enable deep indexing for enhanced full-text search. "
+        "When enabled, clones entire artifact directories instead of just manifest files. "
+        "May significantly increase scan time for large repositories.",
     )
 
     @field_validator("tags")
@@ -976,6 +989,7 @@ class UpdateSourceRequest(BaseModel):
                 "import_repo_description": True,
                 "import_repo_readme": False,
                 "tags": ["updated", "production"],
+                "deep_indexing_enabled": True,
             }
         }
 
@@ -1099,6 +1113,12 @@ class SourceResponse(BaseModel):
         "None indicates default indexing behavior (typically enabled).",
         examples=[True, False, None],
     )
+    deep_indexing_enabled: bool = Field(
+        default=False,
+        description="Whether deep indexing is enabled for this source. "
+        "When enabled, clones entire artifact directories instead of just manifest files. "
+        "May significantly increase scan time for large repositories.",
+    )
 
     # Clone target summary (optional, null if never indexed)
     artifacts_root: Optional[str] = Field(
@@ -1163,6 +1183,7 @@ class SourceResponse(BaseModel):
                 "single_artifact_mode": False,
                 "single_artifact_type": None,
                 "indexing_enabled": True,
+                "deep_indexing_enabled": False,
                 "artifacts_root": ".claude/skills",
                 "artifact_count_from_cache": 12,
                 "indexing_strategy": "sparse_manifest",
@@ -2842,6 +2863,16 @@ class CatalogSearchResult(BaseModel):
             "A comprehensive <mark>design</mark> system for building...interfaces"
         ],
     )
+    deep_match: bool = Field(
+        default=False,
+        description="True if this result matched from deep-indexed content rather than "
+        "title/description metadata. Deep matches come from full artifact file content.",
+    )
+    matched_file: Optional[str] = Field(
+        default=None,
+        description="Relative file path where the search match was found. "
+        "Only populated for deep index matches (when deep_match=True).",
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -2863,6 +2894,8 @@ class CatalogSearchResult(BaseModel):
                 "search_tags": ["design", "ui", "components"],
                 "title_snippet": "<mark>Canvas</mark> Design System",
                 "description_snippet": "A comprehensive <mark>design</mark> system for building...interfaces",
+                "deep_match": False,
+                "matched_file": None,
             }
         }
 

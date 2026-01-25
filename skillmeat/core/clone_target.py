@@ -566,6 +566,50 @@ def get_sparse_checkout_patterns(
     return []
 
 
+def get_deep_sparse_patterns(artifacts: List["DetectedArtifact"]) -> List[str]:
+    """Generate patterns for full artifact directory clone (deep indexing).
+
+    Unlike get_sparse_checkout_patterns() which returns only manifest files,
+    this returns patterns that clone entire artifact directories for deep
+    content indexing.
+
+    Args:
+        artifacts: List of detected artifacts with path attribute.
+
+    Returns:
+        List of sparse-checkout patterns like ['{artifact.path}/**' for each artifact].
+        These patterns clone all files in each artifact's directory.
+
+    Example:
+        >>> artifacts = [DetectedArtifact(path=".claude/skills/foo"), ...]
+        >>> get_deep_sparse_patterns(artifacts)
+        ['.claude/skills/foo/**', '.claude/skills/bar/**']
+    """
+    # Handle empty list case
+    if not artifacts:
+        return []
+
+    patterns: List[str] = []
+    seen: set[str] = set()
+
+    for artifact in artifacts:
+        # Normalize path separators to forward slashes (for both Unix and Windows)
+        path = artifact.path.replace("\\", "/").replace(os.sep, "/")
+
+        # Generate directory pattern
+        if not path.endswith("/**"):
+            dir_pattern = f"{path}/**"
+        else:
+            dir_pattern = path
+
+        # Deduplicate patterns
+        if dir_pattern not in seen:
+            patterns.append(dir_pattern)
+            seen.add(dir_pattern)
+
+    return patterns
+
+
 def _generate_manifest_patterns(artifacts: List["DetectedArtifact"]) -> List[str]:
     """Generate sparse-checkout patterns for individual manifest files.
 

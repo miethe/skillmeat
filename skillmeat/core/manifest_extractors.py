@@ -27,6 +27,8 @@ Error Handling:
 from __future__ import annotations
 
 import logging
+import os
+import re
 from pathlib import Path
 from typing import Any, Callable
 
@@ -35,6 +37,11 @@ import yaml
 from skillmeat.core.parsers import parse_markdown_with_frontmatter, extract_title
 
 logger = logging.getLogger(__name__)
+
+# Deep search indexing constants (configurable via environment variables)
+MAX_FILE_SIZE_BYTES = int(os.getenv("DEEP_INDEX_MAX_FILE_SIZE", 100_000))  # 100KB
+MAX_TOTAL_TEXT_BYTES = int(os.getenv("DEEP_INDEX_MAX_TOTAL", 1_000_000))  # 1MB
+INDEXABLE_PATTERNS = ["*.md", "*.yaml", "*.yml", "*.json", "*.txt", "*.py", "*.ts", "*.js"]
 
 
 def _parse_yaml_file(file_path: Path) -> dict[str, Any] | None:
@@ -546,3 +553,144 @@ def extract_manifest(artifact_type: str, file_path: Path) -> dict[str, Any]:
         logger.warning(f"Unknown artifact type: {artifact_type}")
         return {}
     return extractor(file_path)
+
+
+def _is_binary_file(file_path: Path) -> bool:
+    """Check if file appears to be binary by looking for null bytes.
+
+    Reads the first 1KB of a file and checks for null bytes, which
+    typically indicate binary content.
+
+    Args:
+        file_path: Path to the file to check.
+
+    Returns:
+        True if file appears to be binary or cannot be read, False otherwise.
+    """
+    try:
+        with open(file_path, "rb") as f:
+            chunk = f.read(1024)
+            return b"\x00" in chunk
+    except OSError:
+        return True  # Treat unreadable files as binary
+
+
+def extract_deep_search_text(artifact_dir: Path) -> tuple[str, list[str]]:
+    """Extract searchable text from all files in artifact directory.
+
+    Recursively scans the artifact directory for indexable files and extracts
+    their text content for full-text search indexing.
+
+    Indexable file patterns: ['*.md', '*.yaml', '*.yml', '*.json', '*.txt', '*.py', '*.ts', '*.js']
+
+    Args:
+        artifact_dir: Path to the artifact directory to index.
+
+    Returns:
+        Tuple of (concatenated_text, list_of_indexed_files):
+        - concatenated_text: All file contents joined with spaces, normalized
+        - list_of_indexed_files: Relative paths of files that were indexed
+
+    Notes:
+        - Skips files >100KB (MAX_FILE_SIZE_BYTES)
+        - Skips binary files (detected by null bytes in first 1KB)
+        - Normalizes whitespace (collapse multiple spaces/newlines)
+        - Total text capped at 1MB (MAX_TOTAL_TEXT_BYTES)
+
+    Example:
+        >>> text, files = extract_deep_search_text(Path("my-skill"))
+        >>> len(files)
+        3
+        >>> "SKILL.md" in files[0]
+        True
+    """
+    if not artifact_dir.is_dir():
+        logger.warning(f"Artifact directory does not exist: {artifact_dir}")
+        return ("", [])
+
+    indexed_files: list[str] = []
+    text_parts: list[str] = []
+    total_bytes = 0
+
+    # Collect all matching files from all patterns
+    all_files: set[Path] = set()
+    for pattern in INDEXABLE_PATTERNS:
+        all_files.update(artifact_dir.rglob(pattern))
+
+    # Sort for deterministic ordering
+    sorted_files = sorted(all_files)
+
+    for file_path in sorted_files:
+        # Check if we've reached the total size limit
+        if total_bytes >= MAX_TOTAL_TEXT_BYTES:
+            logger.debug(
+                f"Reached total text limit ({MAX_TOTAL_TEXT_BYTES} bytes), "
+                f"stopping indexing at {len(indexed_files)} files"
+            )
+            break
+
+        # Skip files that are too large
+        try:
+            file_size = file_path.stat().st_size
+        except OSError as e:
+            logger.debug(f"Cannot stat file {file_path}: {e}")
+            continue
+
+        if file_size > MAX_FILE_SIZE_BYTES:
+            logger.debug(
+                f"Skipping large file {file_path} ({file_size} bytes > {MAX_FILE_SIZE_BYTES})"
+            )
+            continue
+
+        # Skip binary files
+        if _is_binary_file(file_path):
+            logger.debug(f"Skipping binary file: {file_path}")
+            continue
+
+        # Read and process the file
+        try:
+            content = file_path.read_text(encoding="utf-8", errors="replace")
+        except OSError as e:
+            logger.debug(f"Cannot read file {file_path}: {e}")
+            continue
+
+        # Normalize whitespace: collapse multiple spaces/newlines to single space
+        normalized = re.sub(r"\s+", " ", content).strip()
+
+        if normalized:
+            # Check if adding this content would exceed the limit
+            content_bytes = len(normalized.encode("utf-8"))
+            if total_bytes + content_bytes > MAX_TOTAL_TEXT_BYTES:
+                # Truncate to fit remaining space
+                remaining_bytes = MAX_TOTAL_TEXT_BYTES - total_bytes
+                # Approximate character count (may not be exact for multi-byte chars)
+                truncated = normalized[:remaining_bytes]
+                text_parts.append(truncated)
+                total_bytes += len(truncated.encode("utf-8"))
+                relative_path = str(file_path.relative_to(artifact_dir))
+                indexed_files.append(relative_path)
+                logger.debug(f"Indexed (truncated): {relative_path}")
+                break
+            else:
+                text_parts.append(normalized)
+                total_bytes += content_bytes
+                relative_path = str(file_path.relative_to(artifact_dir))
+                indexed_files.append(relative_path)
+                logger.debug(f"Indexed: {relative_path} ({content_bytes} bytes)")
+
+    # Join all text parts with spaces
+    full_text = " ".join(text_parts)
+
+    # Final truncation check and add marker if truncated
+    if total_bytes >= MAX_TOTAL_TEXT_BYTES:
+        # Ensure we don't exceed and add truncation marker
+        full_text_bytes = full_text.encode("utf-8")
+        if len(full_text_bytes) > MAX_TOTAL_TEXT_BYTES:
+            # Truncate and add marker
+            truncation_marker = "...[truncated]"
+            max_content_bytes = MAX_TOTAL_TEXT_BYTES - len(truncation_marker.encode("utf-8"))
+            # Simple truncation (may break multi-byte chars, but errors='replace' handles it)
+            truncated_bytes = full_text_bytes[:max_content_bytes]
+            full_text = truncated_bytes.decode("utf-8", errors="replace") + truncation_marker
+
+    return (full_text, indexed_files)
