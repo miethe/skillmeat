@@ -22,6 +22,8 @@ API Endpoints:
     GET /marketplace/sources/{id}/artifacts/{path}/files/{file_path} - Get file content
     GET /marketplace/sources/{id}/auto-tags - Get auto-tags from GitHub topics
     PATCH /marketplace/sources/{id}/auto-tags - Approve/reject auto-tags
+    POST /marketplace/sources/{id}/refresh-auto-tags - Refresh auto-tags from GitHub
+    POST /marketplace/sources/bulk-refresh-auto-tags - Bulk refresh auto-tags
 """
 
 import json
@@ -55,8 +57,12 @@ from skillmeat.api.schemas.discovery import (
     BulkSyncResponse,
 )
 from skillmeat.api.schemas.marketplace import (
+    AutoTagRefreshResponse,
     AutoTagSegment,
     AutoTagsResponse,
+    BulkAutoTagRefreshItemResult,
+    BulkAutoTagRefreshRequest,
+    BulkAutoTagRefreshResponse,
     CatalogEntryResponse,
     CatalogListResponse,
     CreateSourceRequest,
@@ -552,6 +558,9 @@ def source_to_response(source: MarketplaceSource) -> SourceResponse:
         last_indexed_tree_sha=(
             source.clone_target.tree_sha if source.clone_target else None
         ),
+        last_indexed_at=(
+            source.clone_target.computed_at if source.clone_target else None
+        ),
     )
 
 
@@ -704,6 +713,34 @@ def get_effective_indexing_state(indexing_enabled: Optional[bool], mode: str) ->
 # Frontmatter Extraction for Search Indexing
 # =============================================================================
 
+# Manifest file candidates by artifact type (tried in order)
+MANIFEST_FILES: Dict[str, List[str]] = {
+    "skill": ["SKILL.md"],
+    "command": ["COMMAND.md", "README.md"],
+    "agent": ["AGENT.md", "README.md"],
+    "mcp_server": ["README.md", "CLAUDE.md"],
+    "mcp": ["README.md", "CLAUDE.md"],
+    "hook": ["HOOK.md", "README.md"],
+}
+
+# All unique manifest filenames for sparse clone patterns
+ALL_MANIFEST_FILES: List[str] = list(
+    {f for files in MANIFEST_FILES.values() for f in files}
+)
+
+
+def _get_manifest_candidates(artifact_type: str) -> List[str]:
+    """Get candidate manifest filenames for an artifact type.
+
+    Args:
+        artifact_type: The artifact type (skill, command, agent, etc.)
+
+    Returns:
+        List of manifest filenames to try, in priority order.
+        Returns ["README.md"] as fallback for unknown types.
+    """
+    return MANIFEST_FILES.get(artifact_type, ["README.md"])
+
 
 def _extract_frontmatter_for_artifact(
     scanner: GitHubScanner,
@@ -712,8 +749,9 @@ def _extract_frontmatter_for_artifact(
 ) -> Dict[str, Any]:
     """Extract frontmatter from artifact's manifest file for search indexing.
 
-    For skill artifacts, fetches SKILL.md and extracts frontmatter fields.
-    Returns empty dict for non-skill artifacts or on failure.
+    Fetches the appropriate manifest file based on artifact type and extracts
+    frontmatter fields. Supports all artifact types with type-specific manifest
+    file lookups.
 
     Args:
         scanner: GitHubScanner instance for fetching file content
@@ -731,31 +769,43 @@ def _extract_frontmatter_for_artifact(
         "search_text": None,
     }
 
-    # Only extract frontmatter for skill artifacts
-    if artifact.artifact_type != "skill":
-        return result
-
-    # Build path to SKILL.md
+    # Get candidate manifest files for this artifact type
+    manifest_candidates = _get_manifest_candidates(artifact.artifact_type)
     artifact_path = artifact.path.rstrip("/")
-    skill_md_path = f"{artifact_path}/SKILL.md" if artifact_path else "SKILL.md"
 
-    try:
-        # Fetch SKILL.md content
-        file_result = scanner.get_file_content(
-            owner=source.owner,
-            repo=source.repo_name,
-            path=skill_md_path,
-            ref=source.ref,
+    # Try each candidate manifest file in order
+    content = None
+    used_manifest = None
+    for manifest_file in manifest_candidates:
+        manifest_path = (
+            f"{artifact_path}/{manifest_file}" if artifact_path else manifest_file
         )
 
-        if not file_result or file_result.get("is_binary"):
-            logger.debug(f"SKILL.md not found or binary: {skill_md_path}")
-            return result
+        try:
+            file_result = scanner.get_file_content(
+                owner=source.owner,
+                repo=source.repo_name,
+                path=manifest_path,
+                ref=source.ref,
+            )
 
-        content = file_result.get("content", "")
-        if not content:
-            return result
+            if file_result and not file_result.get("is_binary"):
+                content = file_result.get("content", "")
+                if content:
+                    used_manifest = manifest_file
+                    break
+        except Exception:
+            # Continue to next candidate
+            continue
 
+    if not content:
+        logger.debug(
+            f"No manifest found for {artifact.artifact_type} artifact at "
+            f"{artifact_path}, tried: {manifest_candidates}"
+        )
+        return result
+
+    try:
         # Extract frontmatter
         frontmatter = extract_frontmatter(content)
         if not frontmatter:
@@ -794,13 +844,15 @@ def _extract_frontmatter_for_artifact(
         result["search_text"] = " ".join(search_parts)
 
         logger.debug(
-            f"Extracted frontmatter for {artifact_path}: "
+            f"Extracted frontmatter for {artifact.artifact_type} artifact at "
+            f"{artifact_path} using {used_manifest}: "
             f"title={result['title']}, tags={result['search_tags']}"
         )
 
     except Exception as e:
         logger.warning(
-            f"Failed to extract frontmatter for {skill_md_path}: {e}",
+            f"Failed to extract frontmatter for {artifact.artifact_type} "
+            f"artifact at {artifact_path}: {e}",
             exc_info=False,
         )
         # Return empty result on failure - non-blocking
@@ -1067,14 +1119,20 @@ def _extract_frontmatter_batch(
 ) -> Dict[str, Dict[str, Any]]:
     """Extract frontmatter for multiple artifacts using git sparse clone.
 
-    Uses a single git clone operation to fetch all SKILL.md files from the
+    Uses a single git clone operation to fetch all manifest files from the
     repository, then reads them from disk. This is much more efficient than
     making individual API calls for each artifact.
+
+    Supports all artifact types with type-specific manifest file lookups:
+    - skill: SKILL.md
+    - command: COMMAND.md, README.md
+    - agent: AGENT.md, README.md
+    - mcp_server/mcp: README.md, CLAUDE.md
+    - hook: HOOK.md, README.md
 
     Args:
         source: MarketplaceSource with owner/repo_name info
         artifacts: List of DetectedArtifacts to extract frontmatter for
-            (should be pre-filtered to skill artifacts only)
 
     Returns:
         Dict mapping artifact name to frontmatter dict with keys:
@@ -1103,17 +1161,24 @@ def _extract_frontmatter_batch(
     extraction_start = time.time()
 
     logger.info(
-        f"Using clone-based frontmatter extraction for {len(artifacts)} skills "
+        f"Using clone-based frontmatter extraction for {len(artifacts)} artifacts "
         f"from {source.owner}/{source.repo_name}"
     )
 
-    # Clone with sparse checkout for SKILL.md files only
+    # Build sparse checkout patterns for all manifest file types
+    # Include both nested (**/) and root-level patterns
+    sparse_patterns = []
+    for manifest_file in ALL_MANIFEST_FILES:
+        sparse_patterns.append(f"**/{manifest_file}")
+        sparse_patterns.append(manifest_file)
+
+    # Clone with sparse checkout for all manifest files
     try:
         clone_path = _clone_repo_sparse(
             owner=source.owner,
             repo=source.repo_name,
             ref=source.ref,
-            patterns=["**/SKILL.md", "SKILL.md"],
+            patterns=sparse_patterns,
         )
     except (CloneTimeoutError, CloneError, InsufficientDiskSpaceError) as e:
         logger.warning(
@@ -1129,23 +1194,37 @@ def _extract_frontmatter_batch(
         return result
 
     try:
-        # Read SKILL.md for each artifact from disk
+        # Read manifest file for each artifact from disk
         for artifact in artifacts:
             artifact_path = artifact.path.rstrip("/")
-            if artifact_path:
-                skill_md_path = clone_path / artifact_path / "SKILL.md"
-            else:
-                skill_md_path = clone_path / "SKILL.md"
+            manifest_candidates = _get_manifest_candidates(artifact.artifact_type)
 
-            if not skill_md_path.exists():
-                logger.debug(f"SKILL.md not found at {skill_md_path}")
+            # Try each candidate manifest file in order
+            content = None
+            used_manifest = None
+            for manifest_file in manifest_candidates:
+                if artifact_path:
+                    manifest_path = clone_path / artifact_path / manifest_file
+                else:
+                    manifest_path = clone_path / manifest_file
+
+                if manifest_path.exists():
+                    try:
+                        content = manifest_path.read_text(encoding="utf-8")
+                        if content:
+                            used_manifest = manifest_file
+                            break
+                    except Exception:
+                        continue
+
+            if not content:
+                logger.debug(
+                    f"No manifest found for {artifact.artifact_type} artifact at "
+                    f"{artifact_path}, tried: {manifest_candidates}"
+                )
                 continue
 
             try:
-                content = skill_md_path.read_text(encoding="utf-8")
-                if not content:
-                    continue
-
                 # Extract frontmatter using existing utility
                 frontmatter = extract_frontmatter(content)
                 if not frontmatter:
@@ -1185,14 +1264,16 @@ def _extract_frontmatter_batch(
                 result[artifact.name]["search_text"] = " ".join(search_parts)
 
                 logger.debug(
-                    f"Extracted frontmatter for {artifact_path}: "
+                    f"Extracted frontmatter for {artifact.artifact_type} artifact at "
+                    f"{artifact_path} using {used_manifest}: "
                     f"title={result[artifact.name]['title']}, "
                     f"tags={result[artifact.name]['search_tags']}"
                 )
 
             except Exception as e:
                 logger.warning(
-                    f"Failed to read SKILL.md for {artifact.path}: {e}",
+                    f"Failed to extract frontmatter for {artifact.artifact_type} "
+                    f"artifact at {artifact.path}: {e}",
                     exc_info=False,
                 )
                 # Continue with next artifact - extraction is non-blocking
@@ -1208,7 +1289,7 @@ def _extract_frontmatter_batch(
             f"Batch frontmatter extraction complete for "
             f"{source.owner}/{source.repo_name}: "
             f"{sum(1 for v in result.values() if v.get('title'))} of "
-            f"{len(artifacts)} skills had frontmatter",
+            f"{len(artifacts)} artifacts had frontmatter",
             extra={
                 "duration_seconds": round(extraction_duration, 2),
                 "artifact_count": len(artifacts),
@@ -1471,12 +1552,15 @@ async def _perform_scan(
                     error_message=None,
                 )
 
-                # Update counts_by_type on source
+                # Update counts_by_type and clone_target on source
                 source_in_session = (
                     ctx.session.query(MarketplaceSource).filter_by(id=source_id).first()
                 )
                 if source_in_session:
                     source_in_session.set_counts_by_type_dict(counts_by_type)
+                    # Persist clone_target if it was computed earlier
+                    if source.clone_target is not None:
+                        source_in_session.clone_target = source.clone_target
 
                 # Determine if frontmatter indexing is enabled for this source
                 # Get global indexing mode from config and compute effective state
@@ -1493,18 +1577,15 @@ async def _perform_scan(
                         f"extracting search metadata from artifacts"
                     )
 
-                # Pre-compute batch frontmatter for skills if above threshold
+                # Pre-compute batch frontmatter for all artifacts if above threshold
                 # This uses a single git clone instead of N API calls
                 batch_frontmatter: Dict[str, Dict[str, Any]] = {}
                 use_batch_extraction = False
                 if indexing_enabled:
-                    skill_artifacts = [
-                        a for a in scan_result.artifacts if a.artifact_type == "skill"
-                    ]
-                    if len(skill_artifacts) >= BATCH_CLONE_THRESHOLD:
+                    if len(scan_result.artifacts) >= BATCH_CLONE_THRESHOLD:
                         use_batch_extraction = True
                         batch_frontmatter = _extract_frontmatter_batch(
-                            source, skill_artifacts
+                            source, scan_result.artifacts
                         )
 
                 # Convert detected artifacts to catalog entries
@@ -1536,12 +1617,8 @@ async def _perform_scan(
                         "search_text": None,
                     }
                     if indexing_enabled:
-                        # Use batch result for skills if available, otherwise per-artifact
-                        if (
-                            use_batch_extraction
-                            and artifact.artifact_type == "skill"
-                            and artifact.name in batch_frontmatter
-                        ):
+                        # Use batch result if available, otherwise per-artifact
+                        if use_batch_extraction and artifact.name in batch_frontmatter:
                             search_metadata = batch_frontmatter[artifact.name]
                         else:
                             search_metadata = _extract_frontmatter_for_artifact(
@@ -5157,3 +5234,308 @@ async def update_source_auto_tag(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update auto-tag: {str(e)}",
         ) from e
+
+
+def _refresh_auto_tags_for_source(
+    source: MarketplaceSource,
+    source_repo: MarketplaceSourceRepository,
+) -> tuple[int, int, int, List[AutoTagSegment]]:
+    """Refresh auto-tags for a single source by fetching GitHub topics.
+
+    Args:
+        source: The marketplace source to refresh
+        source_repo: Repository for persisting changes
+
+    Returns:
+        Tuple of (tags_found, tags_added, tags_updated, segments)
+
+    Raises:
+        GitHubClientError: If GitHub API call fails
+    """
+    from skillmeat.core.github_client import get_github_client
+
+    client = get_github_client()
+    metadata = client.get_repo_metadata(f"{source.owner}/{source.repo_name}")
+    topics = metadata.get("topics", [])
+
+    tags_found = len(topics)
+    tags_added = 0
+    tags_updated = 0
+
+    # Get existing auto-tags to preserve approval status
+    existing_auto_tags = source.get_auto_tags_dict() or {"extracted": []}
+    existing_status = {
+        seg["value"]: seg["status"] for seg in existing_auto_tags.get("extracted", [])
+    }
+    existing_values = set(existing_status.keys())
+
+    # Build new auto-tags data, preserving existing status
+    new_segments = []
+    for topic in topics:
+        status_val = existing_status.get(topic, "pending")
+        if topic in existing_values:
+            tags_updated += 1
+        else:
+            tags_added += 1
+
+        new_segments.append(
+            {
+                "value": topic,
+                "normalized": topic.lower().replace("_", "-"),
+                "status": status_val,
+                "source": "github_topic",
+            }
+        )
+
+    # Update source auto_tags
+    if new_segments:
+        auto_tags_data = {"extracted": new_segments}
+        source.set_auto_tags_dict(auto_tags_data)
+
+    # Commit changes
+    session = source_repo._get_session()
+    session.commit()
+
+    # Build response segments
+    segments = [
+        AutoTagSegment(
+            value=seg["value"],
+            normalized=seg["normalized"],
+            status=seg["status"],
+            source=seg["source"],
+        )
+        for seg in new_segments
+    ]
+
+    return tags_found, tags_added, tags_updated, segments
+
+
+@router.post(
+    "/{source_id}/refresh-auto-tags",
+    response_model=AutoTagRefreshResponse,
+    summary="Refresh auto-tags from GitHub topics",
+    description="""
+    Fetches the current GitHub topics for the source repository and updates
+    the auto_tags field. Existing tag approval status is preserved.
+
+    This is useful for:
+    - Sources created before auto-tags feature was added
+    - Syncing with updated GitHub topics after repository changes
+    """,
+)
+async def refresh_source_auto_tags(
+    source_id: str,
+) -> AutoTagRefreshResponse:
+    """Refresh auto-tags by fetching GitHub topics for the source.
+
+    Args:
+        source_id: Unique source identifier
+
+    Returns:
+        AutoTagRefreshResponse with tags found/added/updated counts
+
+    Raises:
+        HTTPException 404: If source not found
+        HTTPException 503: If GitHub API rate limited
+        HTTPException 500: For other errors
+    """
+    from skillmeat.core.github_client import (
+        GitHubClientError,
+        GitHubNotFoundError,
+        GitHubRateLimitError,
+    )
+
+    source_repo = MarketplaceSourceRepository()
+
+    try:
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found for auto-tags refresh: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        tags_found, tags_added, tags_updated, segments = _refresh_auto_tags_for_source(
+            source, source_repo
+        )
+
+        logger.info(
+            f"Refreshed auto-tags for source {source_id}: "
+            f"found={tags_found}, added={tags_added}, updated={tags_updated}"
+        )
+
+        return AutoTagRefreshResponse(
+            source_id=source_id,
+            tags_found=tags_found,
+            tags_added=tags_added,
+            tags_updated=tags_updated,
+            segments=segments,
+        )
+
+    except HTTPException:
+        raise
+    except GitHubRateLimitError as e:
+        logger.warning(f"Rate limited while refreshing auto-tags for {source_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"GitHub API rate limit exceeded. Reset at: {e.reset_at}",
+        ) from e
+    except GitHubNotFoundError as e:
+        logger.warning(f"Repository not found for {source_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository not found: {source.owner}/{source.repo_name}",
+        ) from e
+    except GitHubClientError as e:
+        logger.error(
+            f"GitHub API error while refreshing auto-tags for {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"GitHub API error: {str(e)}",
+        ) from e
+    except Exception as e:
+        logger.error(
+            f"Failed to refresh auto-tags for source {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to refresh auto-tags: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/bulk-refresh-auto-tags",
+    response_model=BulkAutoTagRefreshResponse,
+    summary="Refresh auto-tags for multiple sources",
+    description="""
+    Fetches GitHub topics for multiple sources in a single request.
+    Each source is processed independently, so failures for one source
+    do not affect others.
+
+    Rate limiting is handled gracefully - if rate limited during bulk
+    operation, remaining sources will be marked as failed with the
+    rate limit error.
+    """,
+)
+async def bulk_refresh_auto_tags(
+    request: BulkAutoTagRefreshRequest,
+) -> BulkAutoTagRefreshResponse:
+    """Refresh auto-tags for multiple sources.
+
+    Args:
+        request: BulkAutoTagRefreshRequest with list of source IDs
+
+    Returns:
+        BulkAutoTagRefreshResponse with individual results and summary
+    """
+    from skillmeat.core.github_client import (
+        GitHubClientError,
+        GitHubRateLimitError,
+    )
+
+    source_repo = MarketplaceSourceRepository()
+    results: List[BulkAutoTagRefreshItemResult] = []
+    total_succeeded = 0
+    total_failed = 0
+    rate_limited = False
+    rate_limit_message: Optional[str] = None
+
+    for source_id in request.source_ids:
+        # If we hit rate limit, fail remaining sources immediately
+        if rate_limited:
+            results.append(
+                BulkAutoTagRefreshItemResult(
+                    source_id=source_id,
+                    success=False,
+                    error=rate_limit_message or "Rate limit exceeded",
+                )
+            )
+            total_failed += 1
+            continue
+
+        try:
+            source = source_repo.get_by_id(source_id)
+            if not source:
+                results.append(
+                    BulkAutoTagRefreshItemResult(
+                        source_id=source_id,
+                        success=False,
+                        error=f"Source not found",
+                    )
+                )
+                total_failed += 1
+                continue
+
+            tags_found, tags_added, tags_updated, _ = _refresh_auto_tags_for_source(
+                source, source_repo
+            )
+
+            results.append(
+                BulkAutoTagRefreshItemResult(
+                    source_id=source_id,
+                    success=True,
+                    tags_found=tags_found,
+                    tags_added=tags_added,
+                    tags_updated=tags_updated,
+                )
+            )
+            total_succeeded += 1
+
+            logger.debug(
+                f"Bulk refresh: {source_id} - found={tags_found}, "
+                f"added={tags_added}, updated={tags_updated}"
+            )
+
+        except GitHubRateLimitError as e:
+            rate_limited = True
+            rate_limit_message = f"Rate limit exceeded. Reset at: {e.reset_at}"
+            results.append(
+                BulkAutoTagRefreshItemResult(
+                    source_id=source_id,
+                    success=False,
+                    error=rate_limit_message,
+                )
+            )
+            total_failed += 1
+            logger.warning(f"Bulk refresh rate limited at source {source_id}: {e}")
+
+        except GitHubClientError as e:
+            results.append(
+                BulkAutoTagRefreshItemResult(
+                    source_id=source_id,
+                    success=False,
+                    error=f"GitHub API error: {str(e)}",
+                )
+            )
+            total_failed += 1
+            logger.warning(f"Bulk refresh GitHub error for {source_id}: {e}")
+
+        except Exception as e:
+            results.append(
+                BulkAutoTagRefreshItemResult(
+                    source_id=source_id,
+                    success=False,
+                    error=str(e),
+                )
+            )
+            total_failed += 1
+            logger.error(
+                f"Bulk refresh error for {source_id}: {e}",
+                exc_info=True,
+            )
+
+    logger.info(
+        f"Bulk auto-tags refresh complete: {total_succeeded} succeeded, "
+        f"{total_failed} failed out of {len(request.source_ids)} requested"
+    )
+
+    return BulkAutoTagRefreshResponse(
+        results=results,
+        total_requested=len(request.source_ids),
+        total_succeeded=total_succeeded,
+        total_failed=total_failed,
+    )

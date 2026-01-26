@@ -1152,6 +1152,12 @@ class SourceResponse(BaseModel):
         "None if source has never been indexed.",
         examples=["abc123def456", None],
     )
+    last_indexed_at: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp of last successful indexing run. "
+        "None if source has never been indexed.",
+        examples=["2025-12-06T10:30:00Z", None],
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -1188,6 +1194,7 @@ class SourceResponse(BaseModel):
                 "artifact_count_from_cache": 12,
                 "indexing_strategy": "sparse_manifest",
                 "last_indexed_tree_sha": "abc123def456",
+                "last_indexed_at": "2025-12-06T10:30:00Z",
             }
         }
 
@@ -2943,6 +2950,195 @@ class CatalogSearchResponse(BaseModel):
                 ],
                 "next_cursor": "95:cat_xyz789",
                 "has_more": True,
+            }
+        }
+
+
+# ============================================================================
+# Auto-Tag Refresh DTOs
+# ============================================================================
+
+
+class AutoTagRefreshResponse(BaseModel):
+    """Response from auto-tag refresh operation.
+
+    Returns statistics about tags found and updated from GitHub topics.
+    """
+
+    source_id: str = Field(
+        description="Marketplace source ID",
+        examples=["src_anthropics_skills"],
+    )
+    tags_found: int = Field(
+        description="Total number of GitHub topics found",
+        ge=0,
+        examples=[5],
+    )
+    tags_added: int = Field(
+        description="Number of new tags added",
+        ge=0,
+        examples=[3],
+    )
+    tags_updated: int = Field(
+        description="Number of existing tags updated (status preserved)",
+        ge=0,
+        examples=[2],
+    )
+    segments: list[AutoTagSegment] = Field(
+        description="All auto-tags after refresh",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "source_id": "src_anthropics_skills",
+                "tags_found": 5,
+                "tags_added": 3,
+                "tags_updated": 2,
+                "segments": [
+                    {
+                        "value": "claude-code",
+                        "normalized": "claude-code",
+                        "status": "approved",
+                        "source": "github_topic",
+                    },
+                    {
+                        "value": "ai-assistant",
+                        "normalized": "ai-assistant",
+                        "status": "pending",
+                        "source": "github_topic",
+                    },
+                ],
+            }
+        }
+
+
+class BulkAutoTagRefreshRequest(BaseModel):
+    """Request to refresh auto-tags for multiple sources.
+
+    Allows batch refresh of GitHub topics for specified sources.
+    """
+
+    source_ids: List[str] = Field(
+        description="List of source IDs to refresh (max 50)",
+        min_length=1,
+        max_length=50,
+        examples=[["src_abc123", "src_def456"]],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "source_ids": ["src_anthropics_skills", "src_user_myrepo"],
+            }
+        }
+
+
+class BulkAutoTagRefreshItemResult(BaseModel):
+    """Result for a single source in bulk refresh operation."""
+
+    source_id: str = Field(
+        description="Marketplace source ID",
+        examples=["src_anthropics_skills"],
+    )
+    success: bool = Field(
+        description="Whether the refresh succeeded",
+        examples=[True],
+    )
+    tags_found: Optional[int] = Field(
+        default=None,
+        description="Number of tags found (None if failed)",
+        ge=0,
+        examples=[5],
+    )
+    tags_added: Optional[int] = Field(
+        default=None,
+        description="Number of new tags added (None if failed)",
+        ge=0,
+        examples=[3],
+    )
+    tags_updated: Optional[int] = Field(
+        default=None,
+        description="Number of existing tags updated (None if failed)",
+        ge=0,
+        examples=[2],
+    )
+    error: Optional[str] = Field(
+        default=None,
+        description="Error message if refresh failed",
+        examples=["Rate limit exceeded"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "source_id": "src_anthropics_skills",
+                "success": True,
+                "tags_found": 5,
+                "tags_added": 3,
+                "tags_updated": 2,
+                "error": None,
+            }
+        }
+
+
+class BulkAutoTagRefreshResponse(BaseModel):
+    """Response from bulk auto-tag refresh operation.
+
+    Returns individual results for each source and summary statistics.
+    """
+
+    results: List[BulkAutoTagRefreshItemResult] = Field(
+        description="Individual results for each source",
+    )
+    total_requested: int = Field(
+        description="Total number of sources requested",
+        ge=0,
+        examples=[5],
+    )
+    total_succeeded: int = Field(
+        description="Number of sources successfully refreshed",
+        ge=0,
+        examples=[4],
+    )
+    total_failed: int = Field(
+        description="Number of sources that failed to refresh",
+        ge=0,
+        examples=[1],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "results": [
+                    {
+                        "source_id": "src_anthropics_skills",
+                        "success": True,
+                        "tags_found": 5,
+                        "tags_added": 3,
+                        "tags_updated": 2,
+                        "error": None,
+                    },
+                    {
+                        "source_id": "src_user_myrepo",
+                        "success": False,
+                        "tags_found": None,
+                        "tags_added": None,
+                        "tags_updated": None,
+                        "error": "Rate limit exceeded",
+                    },
+                ],
+                "total_requested": 2,
+                "total_succeeded": 1,
+                "total_failed": 1,
             }
         }
 
