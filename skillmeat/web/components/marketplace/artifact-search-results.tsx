@@ -51,8 +51,8 @@ function groupResultsBySource(results: ArtifactSearchResult[]): GroupedResults[]
   const groups = new Map<string, GroupedResults>();
 
   for (const result of results) {
-    const sourceId = result.source.id;
-    const sourceName = `${result.source.owner}/${result.source.repo_name}`;
+    const sourceId = result.source_id;
+    const sourceName = `${result.source_owner}/${result.source_repo}`;
 
     if (!groups.has(sourceId)) {
       groups.set(sourceId, {
@@ -95,9 +95,10 @@ function getTypeVariant(type: string): 'default' | 'secondary' | 'outline' {
 
 /**
  * Format confidence score as percentage.
+ * API returns score as 0-100 integer.
  */
 function formatConfidence(score: number): string {
-  return `${Math.round(score * 100)}%`;
+  return `${Math.round(score)}%`;
 }
 
 // ============================================================================
@@ -109,7 +110,9 @@ interface ResultCardProps {
 }
 
 function ResultCard({ result }: ResultCardProps) {
-  const href = `/marketplace/sources/${result.source.id}/catalog/${encodeURIComponent(result.artifact_path)}`;
+  const href = `/marketplace/sources/${result.source_id}/catalog/${encodeURIComponent(result.path)}`;
+  // Combine snippets, preferring title_snippet then description_snippet
+  const snippet = result.title_snippet || result.description_snippet;
 
   return (
     <Link
@@ -150,7 +153,7 @@ function ResultCard({ result }: ResultCardProps) {
         )}
 
         {/* Snippet with FTS5 highlights */}
-        {result.snippet && (
+        {snippet && (
           <div
             className={cn(
               'mt-2 rounded-md bg-muted/50 p-2 text-sm',
@@ -158,7 +161,7 @@ function ResultCard({ result }: ResultCardProps) {
               'dark:[&_mark]:bg-yellow-900/50 dark:[&_mark]:text-yellow-200'
             )}
             // eslint-disable-next-line react/no-danger
-            dangerouslySetInnerHTML={{ __html: result.snippet }}
+            dangerouslySetInnerHTML={{ __html: snippet }}
             aria-label="Search result snippet with highlighted matches"
           />
         )}

@@ -36,18 +36,20 @@ export interface ArtifactSearchResult {
   id: string;
   name: string;
   artifact_type: string;
-  artifact_path: string;
+  path: string;
   confidence_score: number;
   status: string;
   title?: string;
   description?: string;
   search_tags?: string[];
-  snippet?: string; // FTS5 highlight snippet
-  source: {
-    id: string;
-    owner: string;
-    repo_name: string;
-  };
+  title_snippet?: string; // FTS5 highlight snippet for title
+  description_snippet?: string; // FTS5 highlight snippet for description
+  source_id: string;
+  source_owner: string;
+  source_repo: string;
+  upstream_url?: string;
+  deep_match?: boolean;
+  matched_file?: string;
 }
 
 export interface ArtifactSearchResponse {
