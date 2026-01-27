@@ -4,17 +4,25 @@ API endpoints for managing GitHub repository sources in the marketplace.
 
 **Base URL**: `/api/v1/marketplace/sources`
 
+---
+
+updated: 2026-01-27
+
+---
+
 ## Overview
 
-The marketplace sources API allows you to manage GitHub repositories as artifact sources. These repositories are scanned for Claude Code artifacts (skills, commands, agents, etc.) and provide a centralized catalog for discovery and import.
+The marketplace sources API allows you to manage GitHub repositories as artifact sources. These repositories are scanned for Claude Code artifacts (skills, commands, agents, hooks, MCP servers, etc.) and provide a centralized catalog for discovery and import.
 
 **Key Features**:
 - GitHub repository ingestion with automated scanning
+- Search indexing for all artifact types (skills, commands, agents, hooks, MCP servers)
 - Filtering by artifact type, tags, trust level, and text search
 - Manual directory-to-type mappings for custom repository structures
 - Tag management and path-based tag extraction
 - Repository metadata import (description, README)
 - Artifact catalog with confidence scoring
+- On-demand rescan to refresh artifact metadata and search index
 
 ---
 
@@ -353,6 +361,61 @@ Returns the updated source with all fields.
 
 ---
 
+### POST /marketplace/sources/{id}/rescan
+
+Trigger a rescan of a GitHub source to refresh the artifact catalog and search index.
+
+**Path Parameters:**
+
+- `id` (string, required): Source ID
+
+**Request Body:** None required
+
+**Example Request:**
+
+```bash
+# Rescan a specific source
+curl -X POST "http://localhost:8080/api/v1/marketplace/sources/src_abc123/rescan"
+```
+
+**Response** (`SourceResponse` - 200 OK):
+
+Returns the source with `scan_status: "scanning"` indicating rescan has started.
+
+**What happens during rescan:**
+
+1. Repository is re-scanned for artifacts
+2. Artifact metadata is refreshed from frontmatter
+3. Search index is updated for all artifact types (skills, commands, agents, hooks, MCP servers)
+4. Tags are refreshed from artifact frontmatter
+5. `last_sync_at` timestamp is updated on completion
+
+**Use Cases:**
+
+- After upstream repository changes
+- To refresh search indexing after SkillMeat updates
+- To fix stale artifact metadata
+
+**Bulk Rescan (Developer Pattern):**
+
+To rescan all sources programmatically:
+
+```bash
+# Get all source IDs and rescan each
+for id in $(curl -s "http://localhost:8080/api/v1/marketplace/sources" | jq -r '.items[].id'); do
+  curl -X POST "http://localhost:8080/api/v1/marketplace/sources/$id/rescan"
+  sleep 1  # Rate limit between rescans
+done
+```
+
+**Error Responses:**
+
+- **404 Not Found**: Source ID does not exist
+- **409 Conflict**: Source is already scanning
+- **500 Internal Server Error**: GitHub API or database error
+
+---
+
 ## Response Models
 
 ### SourceResponse
@@ -369,7 +432,7 @@ interface SourceResponse {
   visibility: "public" | "private";
   scan_status: "pending" | "scanning" | "success" | "error";
   artifact_count: number;        // Total artifacts detected
-  last_sync_at: string | null;  // ISO 8601 timestamp
+  last_sync_at: string | null;   // ISO 8601 timestamp
   last_error: string | null;     // Last error message
   created_at: string;            // ISO 8601 timestamp
   updated_at: string;            // ISO 8601 timestamp
@@ -381,6 +444,8 @@ interface SourceResponse {
   repo_readme: string | null;       // README content
   tags: string[];                   // Searchable tags
   counts_by_type: Record<string, number>;  // Counts by artifact type
+  indexing_enabled: boolean;     // Whether search indexing is enabled for this source
+  last_indexed_at: string | null;  // When search index was last updated (ISO 8601)
 }
 ```
 

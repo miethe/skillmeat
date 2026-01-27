@@ -106,6 +106,7 @@ from skillmeat.cache.repositories import (
     NotFoundError,
 )
 from skillmeat.core.artifact import ArtifactType
+from skillmeat.core.manifest_extractors import extract_deep_search_text
 from skillmeat.core.marketplace.github_scanner import (
     GitHubScanner,
     RateLimitError,
@@ -1164,6 +1165,8 @@ def _extract_frontmatter_batch(
         - description: Extracted description (str or None)
         - search_tags: List of tags (list or None)
         - search_text: Combined search text (str or None)
+        - deep_search_text: Full content from deep indexing (str or None)
+        - deep_index_files: List of indexed file paths (list or None)
 
         Missing or failed extractions will have None values.
     """
@@ -1176,6 +1179,8 @@ def _extract_frontmatter_batch(
             "description": None,
             "search_tags": None,
             "search_text": None,
+            "deep_search_text": None,
+            "deep_index_files": None,
         }
 
     if not artifacts:
@@ -1192,6 +1197,15 @@ def _extract_frontmatter_batch(
     # Build sparse checkout patterns for all manifest file types
     # Include both nested (**/) and root-level patterns
     sparse_patterns = []
+
+    # Add patterns for file-based artifacts (the artifact path IS the manifest)
+    # e.g., "plugins/web-scripting/agents/ruby-pro.md", "commands/doc-generate.md"
+    for artifact in artifacts:
+        artifact_path = artifact.path.rstrip("/")
+        if artifact_path.endswith((".md", ".yaml", ".yml")):
+            sparse_patterns.append(artifact_path)
+
+    # Add patterns for directory-based artifacts (look for manifest files inside)
     for manifest_file in ALL_MANIFEST_FILES:
         sparse_patterns.append(f"**/{manifest_file}")
         sparse_patterns.append(manifest_file)
@@ -1319,6 +1333,44 @@ def _extract_frontmatter_batch(
                     exc_info=False,
                 )
                 # Continue with next artifact - extraction is non-blocking
+
+        # Deep indexing pass - extract full file contents when enabled
+        if source.deep_indexing_enabled:
+            deep_indexed_count = 0
+            for artifact in artifacts:
+                artifact_path = artifact.path.rstrip("/")
+
+                # Determine artifact directory in the clone
+                # For file-based artifacts, use the parent directory
+                if artifact_path.endswith((".md", ".yaml", ".yml")):
+                    # File-based artifact - get parent directory
+                    artifact_dir = clone_path / Path(artifact_path).parent
+                else:
+                    # Directory-based artifact
+                    artifact_dir = clone_path / artifact_path if artifact_path else clone_path
+
+                if artifact_dir.is_dir():
+                    try:
+                        deep_text, indexed_files = extract_deep_search_text(artifact_dir)
+                        if deep_text and artifact.name in result:
+                            result[artifact.name]["deep_search_text"] = deep_text
+                            result[artifact.name]["deep_index_files"] = indexed_files
+                            deep_indexed_count += 1
+                            logger.debug(
+                                f"Deep indexed {artifact.name}: "
+                                f"{len(indexed_files)} files, {len(deep_text)} chars"
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            f"Deep indexing failed for {artifact.name}: {e}",
+                            exc_info=False,
+                        )
+                        # Continue with next artifact - deep indexing is non-blocking
+
+            logger.info(
+                f"Deep indexing complete for {source.owner}/{source.repo_name}: "
+                f"{deep_indexed_count} of {len(artifacts)} artifacts indexed",
+            )
 
         # Record extraction metrics
         extraction_duration = time.time() - extraction_start
@@ -1657,6 +1709,8 @@ async def _perform_scan(
                         "description": None,
                         "search_tags": None,
                         "search_text": None,
+                        "deep_search_text": None,
+                        "deep_index_files": None,
                     }
                     if indexing_enabled:
                         # Use batch result if available, otherwise per-artifact
@@ -1671,6 +1725,18 @@ async def _perform_scan(
                     search_tags_json = None
                     if search_metadata.get("search_tags"):
                         search_tags_json = json.dumps(search_metadata["search_tags"])
+
+                    # Serialize deep_index_files as JSON if present
+                    deep_index_files_json = None
+                    if search_metadata.get("deep_index_files"):
+                        deep_index_files_json = json.dumps(
+                            search_metadata["deep_index_files"]
+                        )
+
+                    # Set deep_indexed_at timestamp if deep indexing was performed
+                    deep_indexed_at = None
+                    if search_metadata.get("deep_search_text"):
+                        deep_indexed_at = datetime.utcnow()
 
                     entry = MarketplaceCatalogEntry(
                         id=str(uuid.uuid4()),
@@ -1698,6 +1764,10 @@ async def _perform_scan(
                         description=search_metadata.get("description"),
                         search_tags=search_tags_json,
                         search_text=search_metadata.get("search_text"),
+                        # Deep indexing fields (only populated when deep_indexing_enabled)
+                        deep_search_text=search_metadata.get("deep_search_text"),
+                        deep_indexed_at=deep_indexed_at,
+                        deep_index_files=deep_index_files_json,
                     )
                     new_entries.append(entry)
 
