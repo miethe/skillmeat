@@ -58,14 +58,20 @@ Update the cards for sources on the /marketplace/sources page:
 ## Tasks
 
 - [x] Read current badge implementation
-- [ ] Update TrustBadge - icon only with tooltip
-- [ ] Update StatusBadge - icon only with tooltip, add timestamp
-- [ ] Create IndexingBadge component
-- [ ] Update GitHubSource type if needed
-- [ ] Test hover tooltips
-- [ ] Run type check and lint
+- [x] Update TrustBadge - icon only with tooltip
+- [x] Update StatusBadge - icon only with tooltip, add timestamp
+- [x] Create IndexingBadge component
+- [x] Update GitHubSource type
+- [x] Test hover tooltips
+- [x] Run type check and lint
+- [x] Fix bug: clone_target not persisted (IndexingBadge stuck on Pending)
+- [x] Add `last_indexed_at` to API response schema
+- [x] Update user documentation
 
-## Files to Modify
+## Files Modified
 
-1. `skillmeat/web/components/marketplace/source-card.tsx` - Main changes
-2. `skillmeat/web/types/marketplace.ts` - Add `last_indexed_at` field (if available from API)
+1. `skillmeat/web/components/marketplace/source-card.tsx` - Badge components updated
+2. `skillmeat/web/types/marketplace.ts` - Added `last_indexed_at`, `last_indexed_tree_sha` fields
+3. `skillmeat/api/routers/marketplace_sources.py` - Fixed clone_target persistence bug
+4. `skillmeat/api/schemas/marketplace.py` - Added `last_indexed_at` to SourceResponse
+5. `docs/user/guides/marketplace-github-sources.md` - Documented new Source Card Badges section
