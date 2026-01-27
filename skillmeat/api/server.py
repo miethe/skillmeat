@@ -5,6 +5,13 @@ middleware configuration, and route registration. It serves as the entry point
 for the web service layer.
 """
 
+# Load .env file into os.environ BEFORE any other imports
+# This ensures environment variables are available to all modules
+# including GitHubClientWrapper which checks os.environ for tokens
+from dotenv import load_dotenv
+
+load_dotenv()  # Loads .env from current directory or parents
+
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -30,6 +37,7 @@ from .routers import (
     groups,
     health,
     marketplace,
+    marketplace_catalog,
     marketplace_sources,
     match,
     mcp,
@@ -84,6 +92,31 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app_state.initialize(settings)
     logger.info("Application state initialized")
 
+    # Log GitHub API status
+    try:
+        from skillmeat.core.github_client import get_github_client
+
+        github_client = get_github_client()
+        rate_limit = github_client.get_rate_limit()
+        if github_client.is_authenticated():
+            logger.info(
+                f"GitHub API: Token configured ({rate_limit['remaining']}/{rate_limit['limit']} requests remaining)"
+            )
+        else:
+            logger.info(
+                f"GitHub API: No token configured ({rate_limit['limit']} requests/hour limit)"
+            )
+    except Exception as e:
+        logger.warning(f"GitHub API: Could not check status - {e}")
+
+    # Check git availability for clone-based artifact indexing
+    try:
+        from skillmeat.api.routers.marketplace_sources import check_git_available
+
+        await check_git_available()
+    except Exception as e:
+        logger.warning(f"Git availability check failed - {e}")
+
     # Set service start time for health checks
     from .routers.health import set_service_start_time
 
@@ -95,12 +128,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             ensure_default_collection,
             migrate_artifacts_to_default_collection,
         )
+        from skillmeat.api.utils.fts5 import check_fts5_available
         from skillmeat.cache.models import get_session
 
         session = get_session()
         try:
             ensure_default_collection(session)
             logger.info("Default collection verified/created")
+
+            # Check FTS5 availability at startup
+            check_fts5_available(session)
 
             # Migrate existing artifacts to default collection
             if app_state.artifact_manager and app_state.collection_manager:
@@ -296,6 +333,11 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(mcp.router, prefix=settings.api_prefix, tags=["mcp"])
     app.include_router(
         marketplace.router, prefix=settings.api_prefix, tags=["marketplace"]
+    )
+    app.include_router(
+        marketplace_catalog.router,
+        prefix=settings.api_prefix,
+        tags=["marketplace-catalog"],
     )
     app.include_router(
         marketplace_sources.router,

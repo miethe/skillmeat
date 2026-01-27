@@ -167,6 +167,7 @@ async def set_github_token(
     - Whether a token is set
     - Masked token (first 7 characters) if set
     - Associated GitHub username if set
+    - Rate limit information (remaining/limit)
     """,
 )
 async def get_github_token_status(
@@ -178,23 +179,43 @@ async def get_github_token_status(
         config: Configuration manager dependency
 
     Returns:
-        Token status with masked token and username if configured
+        Token status with masked token, username, and rate limit info if configured
     """
     # Check ConfigManager first (ensures CLI-set tokens are visible in web UI)
     token = config.get(GITHUB_TOKEN_CONFIG_KEY)
 
     if not token:
-        return GitHubTokenStatusResponse(
-            is_set=False,
-            masked_token=None,
-            username=None,
-        )
+        # Return unauthenticated rate limit info
+        try:
+            wrapper = GitHubClientWrapper(token=None)
+            rate_limit_info = wrapper.get_rate_limit()
+            return GitHubTokenStatusResponse(
+                is_set=False,
+                masked_token=None,
+                username=None,
+                rate_limit=rate_limit_info.get("limit"),
+                rate_remaining=rate_limit_info.get("remaining"),
+            )
+        except Exception:
+            return GitHubTokenStatusResponse(
+                is_set=False,
+                masked_token=None,
+                username=None,
+                rate_limit=60,  # Default unauthenticated limit
+                rate_remaining=None,
+            )
 
-    # Get username from GitHub API using wrapper
+    # Get username and rate limit from GitHub API using wrapper
     username = None
+    rate_limit = None
+    rate_remaining = None
     try:
         wrapper = GitHubClientWrapper(token=token)
         result = wrapper.validate_token()
+        rate_limit_info = result.get("rate_limit", {})
+        rate_limit = rate_limit_info.get("limit")
+        rate_remaining = rate_limit_info.get("remaining")
+
         if not result.get("valid"):
             # Token exists but is no longer valid
             logger.warning("Stored GitHub token is no longer valid")
@@ -202,6 +223,8 @@ async def get_github_token_status(
                 is_set=True,
                 masked_token=_mask_token(token),
                 username=None,
+                rate_limit=rate_limit,
+                rate_remaining=rate_remaining,
             )
         username = result.get("username")
     except GitHubAuthError:
@@ -211,6 +234,8 @@ async def get_github_token_status(
             is_set=True,
             masked_token=_mask_token(token),
             username=None,
+            rate_limit=None,
+            rate_remaining=None,
         )
     except (GitHubRateLimitError, Exception):
         # API error - still report token exists
@@ -220,6 +245,8 @@ async def get_github_token_status(
         is_set=True,
         masked_token=_mask_token(token),
         username=username,
+        rate_limit=rate_limit,
+        rate_remaining=rate_remaining,
     )
 
 

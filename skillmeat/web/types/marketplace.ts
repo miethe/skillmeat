@@ -140,6 +140,8 @@ export interface GitHubSource {
   single_artifact_mode?: boolean; // Treat entire repo as single artifact
   single_artifact_type?: ArtifactType; // Artifact type when single_artifact_mode is true
   indexing_enabled?: boolean | null; // Whether AI indexing is enabled for this source
+  last_indexed_at?: string; // Timestamp of last successful indexing
+  last_indexed_tree_sha?: string | null; // SHA of last indexed tree
 }
 
 export interface GitHubSourceListResponse {

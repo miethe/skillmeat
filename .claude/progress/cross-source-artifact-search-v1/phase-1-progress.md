@@ -1,135 +1,148 @@
 ---
 type: progress
-prd: "cross-source-artifact-search-v1"
+prd: cross-source-artifact-search-v1
 phase: 1
-title: "Database + Basic Search API"
-status: "pending"
+title: Database + Basic Search API
+status: completed
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 0
+completed_tasks: 8
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["data-layer-expert", "python-backend-engineer"]
+owners:
+- data-layer-expert
+- python-backend-engineer
 contributors: []
-
 tasks:
-  # Database Tasks
-  - id: "DB-001"
-    description: "Add title, description, search_tags, search_text columns to MarketplaceCatalogEntry"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "critical"
-    file: "skillmeat/api/alembic/versions/xxx_add_catalog_search_columns.py"
-
-  - id: "DB-002"
-    description: "Create search indexes on name, (artifact_type, status), confidence_score"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["DB-001"]
-    estimated_effort: "1h"
-    priority: "high"
-    file: "skillmeat/api/alembic/versions/xxx_add_catalog_search_columns.py"
-
-  # Detection Tasks
-  - id: "DET-001"
-    description: "Modify heuristic detector to extract frontmatter during scan"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DB-001"]
-    estimated_effort: "3h"
-    priority: "critical"
-    file: "skillmeat/marketplace/detection/heuristic_detector.py"
-
-  - id: "DET-002"
-    description: "Check source.indexing_enabled before storing search fields"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DET-001"]
-    estimated_effort: "1h"
-    priority: "high"
-    file: "skillmeat/marketplace/detection/heuristic_detector.py"
-
-  # Repository Tasks
-  - id: "REPO-001"
-    description: "Create repository search method with LIKE queries"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DET-002"]
-    estimated_effort: "3h"
-    priority: "critical"
-    file: "skillmeat/cache/repositories/marketplace_catalog_repository.py"
-
-  - id: "REPO-002"
-    description: "Add cursor pagination to search results"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-001"]
-    estimated_effort: "1h"
-    priority: "high"
-    file: "skillmeat/cache/repositories/marketplace_catalog_repository.py"
-
-  # API Tasks
-  - id: "API-001"
-    description: "Create /marketplace/catalog/search endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-002"]
-    estimated_effort: "2h"
-    priority: "critical"
-    file: "skillmeat/api/routers/marketplace_catalog.py"
-
-  - id: "API-002"
-    description: "Create CatalogSearchRequest/Response schemas"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["API-001"]
-    estimated_effort: "1h"
-    priority: "high"
-    file: "skillmeat/api/schemas/marketplace.py"
-
+- id: DB-001
+  description: Add title, description, search_tags, search_text columns to MarketplaceCatalogEntry
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 2h
+  priority: critical
+  file: skillmeat/api/alembic/versions/xxx_add_catalog_search_columns.py
+- id: DB-002
+  description: Create search indexes on name, (artifact_type, status), confidence_score
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DB-001
+  estimated_effort: 1h
+  priority: high
+  file: skillmeat/api/alembic/versions/xxx_add_catalog_search_columns.py
+- id: DET-001
+  description: Modify heuristic detector to extract frontmatter during scan
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DB-001
+  estimated_effort: 3h
+  priority: critical
+  file: skillmeat/marketplace/detection/heuristic_detector.py
+- id: DET-002
+  description: Check source.indexing_enabled before storing search fields
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DET-001
+  estimated_effort: 1h
+  priority: high
+  file: skillmeat/marketplace/detection/heuristic_detector.py
+- id: REPO-001
+  description: Create repository search method with LIKE queries
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DET-002
+  estimated_effort: 3h
+  priority: critical
+  file: skillmeat/cache/repositories/marketplace_catalog_repository.py
+- id: REPO-002
+  description: Add cursor pagination to search results
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-001
+  estimated_effort: 1h
+  priority: high
+  file: skillmeat/cache/repositories/marketplace_catalog_repository.py
+- id: API-001
+  description: Create /marketplace/catalog/search endpoint
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-002
+  estimated_effort: 2h
+  priority: critical
+  file: skillmeat/api/routers/marketplace_catalog.py
+- id: API-002
+  description: Create CatalogSearchRequest/Response schemas
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - API-001
+  estimated_effort: 1h
+  priority: high
+  file: skillmeat/api/schemas/marketplace.py
 parallelization:
-  batch_1: ["DB-001"]
-  batch_2: ["DB-002", "DET-001"]
-  batch_3: ["DET-002"]
-  batch_4: ["REPO-001"]
-  batch_5: ["REPO-002"]
-  batch_6: ["API-001"]
-  batch_7: ["API-002"]
-  critical_path: ["DB-001", "DET-001", "DET-002", "REPO-001", "API-001"]
-  estimated_total_time: "14h"
-
+  batch_1:
+  - DB-001
+  batch_2:
+  - DB-002
+  - DET-001
+  batch_3:
+  - DET-002
+  batch_4:
+  - REPO-001
+  batch_5:
+  - REPO-002
+  batch_6:
+  - API-001
+  batch_7:
+  - API-002
+  critical_path:
+  - DB-001
+  - DET-001
+  - DET-002
+  - REPO-001
+  - API-001
+  estimated_total_time: 14h
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "Migration runs successfully on existing database"
-    status: "pending"
-  - id: "SC-2"
-    description: "Frontmatter extracted for indexed sources during scan"
-    status: "pending"
-  - id: "SC-3"
-    description: "Search API returns matching entries"
-    status: "pending"
-  - id: "SC-4"
-    description: "Response time <100ms at current scale"
-    status: "pending"
-
+- id: SC-1
+  description: Migration runs successfully on existing database
+  status: pending
+- id: SC-2
+  description: Frontmatter extracted for indexed sources during scan
+  status: pending
+- id: SC-3
+  description: Search API returns matching entries
+  status: pending
+- id: SC-4
+  description: Response time <100ms at current scale
+  status: pending
 files_modified:
-  - "skillmeat/cache/models.py"
-  - "skillmeat/api/alembic/versions/"
-  - "skillmeat/marketplace/detection/heuristic_detector.py"
-  - "skillmeat/cache/repositories/marketplace_catalog_repository.py"
-  - "skillmeat/api/routers/marketplace_catalog.py"
-  - "skillmeat/api/schemas/marketplace.py"
+- skillmeat/cache/models.py
+- skillmeat/api/alembic/versions/
+- skillmeat/marketplace/detection/heuristic_detector.py
+- skillmeat/cache/repositories/marketplace_catalog_repository.py
+- skillmeat/api/routers/marketplace_catalog.py
+- skillmeat/api/schemas/marketplace.py
+progress: 100
+updated: '2026-01-24'
 ---
 
 # Phase 1: Database + Basic Search API

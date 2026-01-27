@@ -22,15 +22,23 @@ API Endpoints:
     GET /marketplace/sources/{id}/artifacts/{path}/files/{file_path} - Get file content
     GET /marketplace/sources/{id}/auto-tags - Get auto-tags from GitHub topics
     PATCH /marketplace/sources/{id}/auto-tags - Approve/reject auto-tags
+    POST /marketplace/sources/{id}/refresh-auto-tags - Refresh auto-tags from GitHub
+    POST /marketplace/sources/bulk-refresh-auto-tags - Bulk refresh auto-tags
 """
 
 import json
 import logging
+import os
 import re
+import shutil
+import subprocess
+import tempfile
+import time
 import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import Annotated, Dict, List, Literal, Optional, Set
+from pathlib import Path
+from typing import Annotated, Any, Dict, List, Literal, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
@@ -49,8 +57,12 @@ from skillmeat.api.schemas.discovery import (
     BulkSyncResponse,
 )
 from skillmeat.api.schemas.marketplace import (
+    AutoTagRefreshResponse,
     AutoTagSegment,
     AutoTagsResponse,
+    BulkAutoTagRefreshItemResult,
+    BulkAutoTagRefreshRequest,
+    BulkAutoTagRefreshResponse,
     CatalogEntryResponse,
     CatalogListResponse,
     CreateSourceRequest,
@@ -106,11 +118,139 @@ from skillmeat.core.marketplace.import_coordinator import (
 from skillmeat.core.marketplace.source_manager import SourceManager
 from skillmeat.core.path_tags import PathSegmentExtractor, PathTagConfig
 from skillmeat.core.validation import validate_artifact_name
+from skillmeat.utils.metadata import extract_frontmatter
+from skillmeat.observability.metrics import (
+    github_requests_total,
+    marketplace_scan_artifacts_total,
+    skillmeat_clone_duration_seconds,
+    skillmeat_extraction_duration_seconds,
+    skillmeat_scan_total_duration_seconds,
+)
+from skillmeat.observability.tracing import trace_operation
 
 logger = logging.getLogger(__name__)
 
 # Confidence threshold for hiding low-quality entries
 CONFIDENCE_THRESHOLD = 30
+
+# Clone timeout configuration (default: 5 minutes)
+CLONE_TIMEOUT_SECONDS = int(os.environ.get("SKILLMEAT_CLONE_TIMEOUT", "300"))
+
+# Module-level flag for git availability (cached after first check)
+_git_available: bool | None = None
+
+# Minimum disk space in bytes (default 500MB)
+MIN_CLONE_DISK_SPACE_MB = int(os.environ.get("SKILLMEAT_MIN_CLONE_DISK_MB", "500"))
+MIN_CLONE_DISK_SPACE_BYTES = MIN_CLONE_DISK_SPACE_MB * 1024 * 1024
+
+
+def _get_artifact_count_bucket(count: int) -> str:
+    """Get histogram bucket label for artifact count.
+
+    Args:
+        count: Number of artifacts
+
+    Returns:
+        Bucket label for metrics grouping
+    """
+    if count <= 5:
+        return "0-5"
+    elif count <= 20:
+        return "5-20"
+    elif count <= 50:
+        return "20-50"
+    else:
+        return "50+"
+
+
+class CloneTimeoutError(Exception):
+    """Raised when git clone operation times out."""
+
+    pass
+
+
+class CloneError(Exception):
+    """Raised when git clone operation fails for any reason."""
+
+    pass
+
+
+class InsufficientDiskSpaceError(Exception):
+    """Raised when there is not enough disk space for clone operation."""
+
+    pass
+
+
+async def check_git_available() -> bool:
+    """Check if git binary is available in PATH.
+
+    Performs a one-time check for git binary availability and caches the result
+    in a module-level flag. Subsequent calls return the cached value.
+
+    The check validates both:
+    1. Git binary exists in PATH (using shutil.which)
+    2. Git binary is executable and returns version info
+
+    Returns:
+        True if git is available and working, False otherwise.
+
+    Side Effects:
+        - Caches result in module-level _git_available flag
+        - Logs warning if git not found (with PATH for debugging)
+        - Logs info if git found (with version and path)
+    """
+    global _git_available
+
+    # Return cached result if available
+    if _git_available is not None:
+        return _git_available
+
+    # Check if git binary exists in PATH
+    git_path = shutil.which("git")
+    if not git_path:
+        logger.warning(
+            "Git binary not found in PATH - clone-based indexing disabled",
+            extra={"search_path": os.environ.get("PATH", "")},
+        )
+        _git_available = False
+        return False
+
+    # Validate git binary by running --version
+    try:
+        result = subprocess.run(
+            ["git", "--version"], capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            version = result.stdout.strip()
+            logger.info(
+                "Git available - clone-based indexing enabled",
+                extra={"version": version, "path": git_path},
+            )
+            _git_available = True
+            return True
+    except Exception as e:
+        logger.warning(
+            "Git check failed - clone-based indexing disabled", extra={"error": str(e)}
+        )
+
+    _git_available = False
+    return False
+
+
+def is_git_available() -> bool:
+    """Synchronous check for git availability using cached value.
+
+    Returns the cached git availability status. Must call check_git_available()
+    first (typically at startup) to populate the cache.
+
+    Returns:
+        True if git is available (cached), False if not available or not yet checked.
+
+    Note:
+        Returns False if check_git_available() has never been called.
+        Use this for synchronous contexts where the async check has already run.
+    """
+    return _git_available if _git_available is not None else False
 
 
 # =============================================================================
@@ -164,6 +304,22 @@ router = APIRouter(
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
+
+def _get_github_api_call_count() -> int:
+    """Get total GitHub API calls from prometheus metrics.
+
+    Returns:
+        Total number of GitHub API calls across all operations and statuses.
+    """
+    total = 0
+    try:
+        for sample in github_requests_total.collect()[0].samples:
+            total += int(sample.value)
+    except (IndexError, ValueError, AttributeError):
+        # Metrics not initialized or unavailable - return 0
+        pass
+    return total
 
 
 def validate_file_path(path: str) -> str:
@@ -385,6 +541,26 @@ def source_to_response(source: MarketplaceSource) -> SourceResponse:
         repo_readme=source.repo_readme,
         tags=source.get_tags_list() or [],
         counts_by_type=source.get_counts_by_type_dict(),
+        single_artifact_mode=source.single_artifact_mode or False,
+        single_artifact_type=source.single_artifact_type,
+        indexing_enabled=source.indexing_enabled,
+        deep_indexing_enabled=source.deep_indexing_enabled or False,
+        # Clone target summary fields (null if never indexed)
+        artifacts_root=(
+            source.clone_target.artifacts_root if source.clone_target else None
+        ),
+        artifact_count_from_cache=(
+            len(source.clone_target.artifact_paths) if source.clone_target else None
+        ),
+        indexing_strategy=(
+            source.clone_target.strategy if source.clone_target else None
+        ),
+        last_indexed_tree_sha=(
+            source.clone_target.tree_sha if source.clone_target else None
+        ),
+        last_indexed_at=(
+            source.clone_target.computed_at if source.clone_target else None
+        ),
     )
 
 
@@ -534,6 +710,601 @@ def get_effective_indexing_state(indexing_enabled: Optional[bool], mode: str) ->
 
 
 # =============================================================================
+# Frontmatter Extraction for Search Indexing
+# =============================================================================
+
+# Manifest file candidates by artifact type (tried in order)
+MANIFEST_FILES: Dict[str, List[str]] = {
+    "skill": ["SKILL.md"],
+    "command": ["COMMAND.md", "README.md"],
+    "agent": ["AGENT.md", "README.md"],
+    "mcp_server": ["README.md", "CLAUDE.md"],
+    "mcp": ["README.md", "CLAUDE.md"],
+    "hook": ["HOOK.md", "README.md"],
+}
+
+# All unique manifest filenames for sparse clone patterns
+ALL_MANIFEST_FILES: List[str] = list(
+    {f for files in MANIFEST_FILES.values() for f in files}
+)
+
+
+def _get_manifest_candidates(artifact_type: str) -> List[str]:
+    """Get candidate manifest filenames for an artifact type.
+
+    Args:
+        artifact_type: The artifact type (skill, command, agent, etc.)
+
+    Returns:
+        List of manifest filenames to try, in priority order.
+        Returns ["README.md"] as fallback for unknown types.
+    """
+    return MANIFEST_FILES.get(artifact_type, ["README.md"])
+
+
+def _extract_frontmatter_for_artifact(
+    scanner: GitHubScanner,
+    source: MarketplaceSource,
+    artifact: DetectedArtifact,
+) -> Dict[str, Any]:
+    """Extract frontmatter from artifact's manifest file for search indexing.
+
+    Fetches the appropriate manifest file based on artifact type and extracts
+    frontmatter fields. Supports all artifact types with type-specific manifest
+    file lookups.
+
+    Args:
+        scanner: GitHubScanner instance for fetching file content
+        source: MarketplaceSource with owner/repo_name info
+        artifact: DetectedArtifact with path and type info
+
+    Returns:
+        Dict with keys: title, description, search_tags (list), search_text
+        All values may be None if extraction fails or not applicable.
+    """
+    result: Dict[str, Optional[str]] = {
+        "title": None,
+        "description": None,
+        "search_tags": None,
+        "search_text": None,
+    }
+
+    # Get candidate manifest files for this artifact type
+    manifest_candidates = _get_manifest_candidates(artifact.artifact_type)
+    artifact_path = artifact.path.rstrip("/")
+
+    # Try each candidate manifest file in order
+    content = None
+    used_manifest = None
+    for manifest_file in manifest_candidates:
+        manifest_path = (
+            f"{artifact_path}/{manifest_file}" if artifact_path else manifest_file
+        )
+
+        try:
+            file_result = scanner.get_file_content(
+                owner=source.owner,
+                repo=source.repo_name,
+                path=manifest_path,
+                ref=source.ref,
+            )
+
+            if file_result and not file_result.get("is_binary"):
+                content = file_result.get("content", "")
+                if content:
+                    used_manifest = manifest_file
+                    break
+        except Exception:
+            # Continue to next candidate
+            continue
+
+    if not content:
+        logger.debug(
+            f"No manifest found for {artifact.artifact_type} artifact at "
+            f"{artifact_path}, tried: {manifest_candidates}"
+        )
+        return result
+
+    try:
+        # Extract frontmatter
+        frontmatter = extract_frontmatter(content)
+        if not frontmatter:
+            return result
+
+        # Extract title (try 'title' then 'name')
+        title = frontmatter.get("title") or frontmatter.get("name")
+        if title:
+            # Truncate to 200 chars (model field limit)
+            result["title"] = str(title)[:200]
+
+        # Extract description
+        description = frontmatter.get("description")
+        if description:
+            result["description"] = str(description)
+
+        # Extract tags
+        tags = frontmatter.get("tags", [])
+        if tags:
+            if isinstance(tags, list):
+                result["search_tags"] = [str(t) for t in tags if t]
+            elif isinstance(tags, str):
+                result["search_tags"] = [
+                    t.strip() for t in tags.split(",") if t.strip()
+                ]
+
+        # Build search_text from all fields
+        search_parts = [artifact.name]
+        if result["title"]:
+            search_parts.append(result["title"])
+        if result["description"]:
+            search_parts.append(result["description"])
+        if result["search_tags"]:
+            search_parts.extend(result["search_tags"])
+
+        result["search_text"] = " ".join(search_parts)
+
+        logger.debug(
+            f"Extracted frontmatter for {artifact.artifact_type} artifact at "
+            f"{artifact_path} using {used_manifest}: "
+            f"title={result['title']}, tags={result['search_tags']}"
+        )
+
+    except Exception as e:
+        logger.warning(
+            f"Failed to extract frontmatter for {artifact.artifact_type} "
+            f"artifact at {artifact_path}: {e}",
+            exc_info=False,
+        )
+        # Return empty result on failure - non-blocking
+
+    return result
+
+
+# =============================================================================
+# Clone-Based Batch Frontmatter Extraction
+# =============================================================================
+
+# Minimum number of skill artifacts to use batch clone approach
+BATCH_CLONE_THRESHOLD = 3
+
+
+def check_disk_space_for_clone() -> bool:
+    """
+    Check if there is enough disk space for clone operation.
+    Returns True if space is sufficient, raises InsufficientDiskSpaceError if not.
+    """
+    temp_dir = tempfile.gettempdir()
+    try:
+        usage = shutil.disk_usage(temp_dir)
+        available_mb = usage.free / (1024 * 1024)
+
+        if usage.free < MIN_CLONE_DISK_SPACE_BYTES:
+            logger.warning(
+                "Insufficient disk space for clone",
+                extra={
+                    "available_mb": round(available_mb, 2),
+                    "required_mb": MIN_CLONE_DISK_SPACE_MB,
+                    "temp_dir": temp_dir,
+                },
+            )
+            raise InsufficientDiskSpaceError(
+                f"Insufficient disk space: {available_mb:.1f}MB available, "
+                f"{MIN_CLONE_DISK_SPACE_MB}MB required"
+            )
+
+        logger.debug(
+            "Disk space check passed", extra={"available_mb": round(available_mb, 2)}
+        )
+        return True
+
+    except OSError as e:
+        logger.warning(
+            "Could not check disk space", extra={"error": str(e), "temp_dir": temp_dir}
+        )
+        # If we cannot check, let the clone attempt proceed
+        return True
+
+
+def _clone_repo_sparse(
+    owner: str,
+    repo: str,
+    ref: str,
+    patterns: List[str],
+    timeout: Optional[int] = None,
+) -> Path:
+    """Clone repository with sparse checkout to temp directory.
+
+    Uses git's sparse-checkout and partial clone features to minimize
+    data transfer, fetching only files matching the specified patterns.
+
+    Args:
+        owner: Repository owner (GitHub username or org)
+        repo: Repository name
+        ref: Git ref to checkout (branch, tag, or SHA)
+        patterns: List of sparse-checkout patterns (e.g., ["**/SKILL.md"])
+        timeout: Timeout in seconds for git operations. Defaults to
+            CLONE_TIMEOUT_SECONDS (configurable via SKILLMEAT_CLONE_TIMEOUT env var).
+
+    Returns:
+        Path to temporary directory containing the sparse clone.
+        Caller is responsible for cleanup.
+
+    Raises:
+        CloneTimeoutError: If clone operation times out.
+        CloneError: If clone fails due to git errors or other issues.
+    """
+    # Check disk space before creating temp directory
+    check_disk_space_for_clone()
+
+    # Use module-level default if not specified
+    effective_timeout = timeout if timeout is not None else CLONE_TIMEOUT_SECONDS
+
+    with trace_operation(
+        "marketplace.clone_repository",
+        strategy="sparse_directory",
+        patterns_count=len(patterns),
+        ref=ref,
+        timeout=effective_timeout,
+    ) as span:
+
+        from skillmeat.core.github_client import get_github_client
+
+        client = get_github_client()
+        token = client.token
+
+        # Create temp directory
+        temp_dir = tempfile.mkdtemp(prefix="skillmeat-sparse-")
+        temp_path = Path(temp_dir)
+        start_time = time.monotonic()
+
+        try:
+            # Build authenticated URL if token available
+            if token:
+                repo_url = f"https://oauth2:{token}@github.com/{owner}/{repo}.git"
+            else:
+                repo_url = f"https://github.com/{owner}/{repo}.git"
+
+            # Initialize empty repo with sparse-checkout
+            subprocess.run(
+                ["git", "init"],
+                cwd=temp_path,
+                capture_output=True,
+                text=True,
+                timeout=effective_timeout,
+                check=True,
+            )
+
+            # Configure sparse-checkout
+            subprocess.run(
+                ["git", "config", "core.sparseCheckout", "true"],
+                cwd=temp_path,
+                capture_output=True,
+                text=True,
+                timeout=effective_timeout,
+                check=True,
+            )
+
+            # Configure partial clone filter
+            subprocess.run(
+                ["git", "config", "extensions.partialClone", "origin"],
+                cwd=temp_path,
+                capture_output=True,
+                text=True,
+                timeout=effective_timeout,
+                check=True,
+            )
+
+            # Write sparse-checkout patterns
+            sparse_checkout_file = temp_path / ".git" / "info" / "sparse-checkout"
+            sparse_checkout_file.parent.mkdir(parents=True, exist_ok=True)
+            sparse_checkout_file.write_text("\n".join(patterns) + "\n")
+
+            # Add remote
+            subprocess.run(
+                ["git", "remote", "add", "origin", repo_url],
+                cwd=temp_path,
+                capture_output=True,
+                text=True,
+                timeout=effective_timeout,
+                check=True,
+            )
+
+            # Fetch with blob filter (minimal data transfer)
+            # Use doubled timeout for network operations
+            result = subprocess.run(
+                [
+                    "git",
+                    "fetch",
+                    "--depth=1",
+                    "--filter=blob:none",
+                    "origin",
+                    ref,
+                ],
+                cwd=temp_path,
+                capture_output=True,
+                text=True,
+                timeout=effective_timeout * 2,
+            )
+
+            if result.returncode != 0:
+                shutil.rmtree(temp_path, ignore_errors=True)
+                raise CloneError(
+                    f"Git fetch failed for {owner}/{repo}: {result.stderr}"
+                )
+
+            # Checkout the fetched ref
+            result = subprocess.run(
+                ["git", "checkout", "FETCH_HEAD"],
+                cwd=temp_path,
+                capture_output=True,
+                text=True,
+                timeout=effective_timeout,
+            )
+
+            if result.returncode != 0:
+                shutil.rmtree(temp_path, ignore_errors=True)
+                raise CloneError(
+                    f"Git checkout failed for {owner}/{repo}: {result.stderr}"
+                )
+
+            # Record successful clone in span
+            duration_ms = (time.monotonic() - start_time) * 1000
+            duration_seconds = duration_ms / 1000
+            span.set_attribute("clone_dir", str(temp_path))
+            span.add_event("clone_complete", {"duration_ms": round(duration_ms, 2)})
+
+            # Record metrics
+            skillmeat_clone_duration_seconds.labels(
+                strategy="sparse_directory"
+            ).observe(duration_seconds)
+
+            # Log timing for debugging
+            logger.info(
+                "Clone operation completed",
+                extra={
+                    "duration_seconds": round(duration_seconds, 2),
+                    "strategy": "sparse_directory",
+                    "owner": owner,
+                    "repo": repo,
+                    "ref": ref,
+                },
+            )
+
+            return temp_path
+
+        except subprocess.TimeoutExpired as e:
+            logger.warning(
+                "Clone timed out, falling back to API mode",
+                extra={
+                    "owner": owner,
+                    "repo": repo,
+                    "error": str(e),
+                    "timeout_seconds": effective_timeout,
+                },
+            )
+            shutil.rmtree(temp_path, ignore_errors=True)
+            raise CloneTimeoutError(
+                f"Git operation timed out after {effective_timeout}s for {owner}/{repo}"
+            ) from e
+        except subprocess.CalledProcessError as e:
+            logger.warning(
+                "Clone failed, falling back to API mode",
+                extra={
+                    "owner": owner,
+                    "repo": repo,
+                    "error": str(e),
+                },
+            )
+            shutil.rmtree(temp_path, ignore_errors=True)
+            raise CloneError(f"Git operation failed for {owner}/{repo}: {e}") from e
+        except (CloneTimeoutError, CloneError):
+            # Re-raise our custom exceptions without wrapping
+            raise
+        except Exception as e:
+            logger.warning(
+                f"Unexpected error cloning {owner}/{repo}: {e}",
+                extra={
+                    "owner": owner,
+                    "repo": repo,
+                    "error": str(e),
+                },
+            )
+            shutil.rmtree(temp_path, ignore_errors=True)
+            raise CloneError(f"Unexpected error cloning {owner}/{repo}: {e}") from e
+
+
+def _extract_frontmatter_batch(
+    source: MarketplaceSource,
+    artifacts: List[DetectedArtifact],
+) -> Dict[str, Dict[str, Any]]:
+    """Extract frontmatter for multiple artifacts using git sparse clone.
+
+    Uses a single git clone operation to fetch all manifest files from the
+    repository, then reads them from disk. This is much more efficient than
+    making individual API calls for each artifact.
+
+    Supports all artifact types with type-specific manifest file lookups:
+    - skill: SKILL.md
+    - command: COMMAND.md, README.md
+    - agent: AGENT.md, README.md
+    - mcp_server/mcp: README.md, CLAUDE.md
+    - hook: HOOK.md, README.md
+
+    Args:
+        source: MarketplaceSource with owner/repo_name info
+        artifacts: List of DetectedArtifacts to extract frontmatter for
+
+    Returns:
+        Dict mapping artifact name to frontmatter dict with keys:
+        - title: Extracted title (str or None)
+        - description: Extracted description (str or None)
+        - search_tags: List of tags (list or None)
+        - search_text: Combined search text (str or None)
+
+        Missing or failed extractions will have None values.
+    """
+    result: Dict[str, Dict[str, Any]] = {}
+
+    # Initialize all artifacts with empty results
+    for artifact in artifacts:
+        result[artifact.name] = {
+            "title": None,
+            "description": None,
+            "search_tags": None,
+            "search_text": None,
+        }
+
+    if not artifacts:
+        return result
+
+    # Start timing extraction operation
+    extraction_start = time.time()
+
+    logger.info(
+        f"Using clone-based frontmatter extraction for {len(artifacts)} artifacts "
+        f"from {source.owner}/{source.repo_name}"
+    )
+
+    # Build sparse checkout patterns for all manifest file types
+    # Include both nested (**/) and root-level patterns
+    sparse_patterns = []
+    for manifest_file in ALL_MANIFEST_FILES:
+        sparse_patterns.append(f"**/{manifest_file}")
+        sparse_patterns.append(manifest_file)
+
+    # Clone with sparse checkout for all manifest files
+    try:
+        clone_path = _clone_repo_sparse(
+            owner=source.owner,
+            repo=source.repo_name,
+            ref=source.ref,
+            patterns=sparse_patterns,
+        )
+    except (CloneTimeoutError, CloneError, InsufficientDiskSpaceError) as e:
+        logger.warning(
+            "Clone failed, falling back to API mode",
+            extra={
+                "source_id": source.id,
+                "owner": source.owner,
+                "repo": source.repo_name,
+                "error": str(e),
+                "timeout_seconds": CLONE_TIMEOUT_SECONDS,
+            },
+        )
+        return result
+
+    try:
+        # Read manifest file for each artifact from disk
+        for artifact in artifacts:
+            artifact_path = artifact.path.rstrip("/")
+            manifest_candidates = _get_manifest_candidates(artifact.artifact_type)
+
+            # Try each candidate manifest file in order
+            content = None
+            used_manifest = None
+            for manifest_file in manifest_candidates:
+                if artifact_path:
+                    manifest_path = clone_path / artifact_path / manifest_file
+                else:
+                    manifest_path = clone_path / manifest_file
+
+                if manifest_path.exists():
+                    try:
+                        content = manifest_path.read_text(encoding="utf-8")
+                        if content:
+                            used_manifest = manifest_file
+                            break
+                    except Exception:
+                        continue
+
+            if not content:
+                logger.debug(
+                    f"No manifest found for {artifact.artifact_type} artifact at "
+                    f"{artifact_path}, tried: {manifest_candidates}"
+                )
+                continue
+
+            try:
+                # Extract frontmatter using existing utility
+                frontmatter = extract_frontmatter(content)
+                if not frontmatter:
+                    continue
+
+                # Extract title (try 'title' then 'name')
+                title = frontmatter.get("title") or frontmatter.get("name")
+                if title:
+                    result[artifact.name]["title"] = str(title)[:200]
+
+                # Extract description
+                description = frontmatter.get("description")
+                if description:
+                    result[artifact.name]["description"] = str(description)
+
+                # Extract tags
+                tags = frontmatter.get("tags", [])
+                if tags:
+                    if isinstance(tags, list):
+                        result[artifact.name]["search_tags"] = [
+                            str(t) for t in tags if t
+                        ]
+                    elif isinstance(tags, str):
+                        result[artifact.name]["search_tags"] = [
+                            t.strip() for t in tags.split(",") if t.strip()
+                        ]
+
+                # Build search_text from all fields
+                search_parts = [artifact.name]
+                if result[artifact.name]["title"]:
+                    search_parts.append(result[artifact.name]["title"])
+                if result[artifact.name]["description"]:
+                    search_parts.append(result[artifact.name]["description"])
+                if result[artifact.name]["search_tags"]:
+                    search_parts.extend(result[artifact.name]["search_tags"])
+
+                result[artifact.name]["search_text"] = " ".join(search_parts)
+
+                logger.debug(
+                    f"Extracted frontmatter for {artifact.artifact_type} artifact at "
+                    f"{artifact_path} using {used_manifest}: "
+                    f"title={result[artifact.name]['title']}, "
+                    f"tags={result[artifact.name]['search_tags']}"
+                )
+
+            except Exception as e:
+                logger.warning(
+                    f"Failed to extract frontmatter for {artifact.artifact_type} "
+                    f"artifact at {artifact.path}: {e}",
+                    exc_info=False,
+                )
+                # Continue with next artifact - extraction is non-blocking
+
+        # Record extraction metrics
+        extraction_duration = time.time() - extraction_start
+        artifact_count_bucket = _get_artifact_count_bucket(len(artifacts))
+        skillmeat_extraction_duration_seconds.labels(
+            artifact_count_bucket=artifact_count_bucket
+        ).observe(extraction_duration)
+
+        logger.info(
+            f"Batch frontmatter extraction complete for "
+            f"{source.owner}/{source.repo_name}: "
+            f"{sum(1 for v in result.values() if v.get('title'))} of "
+            f"{len(artifacts)} artifacts had frontmatter",
+            extra={
+                "duration_seconds": round(extraction_duration, 2),
+                "artifact_count": len(artifacts),
+                "artifact_count_bucket": artifact_count_bucket,
+            },
+        )
+
+    finally:
+        # Always clean up the temp directory
+        shutil.rmtree(clone_path, ignore_errors=True)
+
+    return result
+
+
+# =============================================================================
 # Shared Scan Logic
 # =============================================================================
 
@@ -571,6 +1342,13 @@ async def _perform_scan(
     logger.info(f"Scanning repository: {source.repo_url} (ref={source.ref})")
     scanner = GitHubScanner()
 
+    # Track API calls during scan for efficiency metrics
+    api_calls_before = _get_github_api_call_count()
+
+    # Start timing total scan operation
+    scan_start_time = time.time()
+    scan_strategy = "unknown"  # Will be updated based on scan path
+
     # Retrieve manual_map from source for artifact type override
     manual_map = source.get_manual_map_dict()
     if manual_map:
@@ -581,6 +1359,7 @@ async def _perform_scan(
     try:
         # Check for single artifact mode - bypass normal scanning
         if source.single_artifact_mode and source.single_artifact_type:
+            scan_strategy = "single_artifact"
             logger.info(
                 f"Single artifact mode enabled for {source.repo_url}, "
                 f"type={source.single_artifact_type}"
@@ -640,6 +1419,7 @@ async def _perform_scan(
             )
         else:
             # Normal scanning path
+            scan_strategy = "api_scan"  # Default, may be updated if clone is used
             # Get database session for cross-source deduplication
             session = catalog_repo._get_session()
 
@@ -651,6 +1431,91 @@ async def _perform_scan(
                 session=session,
                 manual_mappings=manual_map,
             )
+
+            # === Clone-based artifact indexing integration ===
+            # After scan, compute and persist CloneTarget for future rapid re-indexing
+            if scan_result.artifacts:
+                try:
+                    # Get tree SHA for cache invalidation
+                    from skillmeat.core.github_client import get_github_client
+                    from skillmeat.core.clone_target import (
+                        CloneTarget,
+                        compute_clone_metadata,
+                        select_indexing_strategy,
+                        get_sparse_checkout_patterns,
+                    )
+
+                    client = get_github_client()
+                    tree_sha = client.resolve_version(
+                        f"{source.owner}/{source.repo_name}", source.ref
+                    )
+
+                    # Compute clone metadata (artifacts_root, artifact_paths, patterns)
+                    clone_metadata = compute_clone_metadata(
+                        scan_result.artifacts, tree_sha
+                    )
+
+                    # Select optimal indexing strategy based on artifact count
+                    strategy = select_indexing_strategy(source, scan_result.artifacts)
+
+                    # Determine selection reason for logging
+                    artifact_count = len(scan_result.artifacts)
+                    artifacts_root = clone_metadata.get("artifacts_root")
+
+                    if artifact_count < 3:
+                        selection_reason = "count < 3"
+                    elif artifact_count <= 20:
+                        selection_reason = "count 3-20"
+                    elif artifacts_root:
+                        selection_reason = "count > 20 with common root"
+                    else:
+                        selection_reason = "count > 20 scattered"
+
+                    # Get sparse checkout patterns based on strategy
+                    sparse_patterns = get_sparse_checkout_patterns(
+                        strategy,
+                        scan_result.artifacts,
+                        clone_metadata.get("artifacts_root"),
+                    )
+
+                    logger.info(
+                        "Indexing strategy selected",
+                        extra={
+                            "source_id": source.id,
+                            "repo_url": f"{source.owner}/{source.repo_name}",
+                            "artifact_count": artifact_count,
+                            "artifacts_root": artifacts_root,
+                            "selected_strategy": strategy,
+                            "patterns_count": len(sparse_patterns),
+                            "reason": selection_reason,
+                        },
+                    )
+
+                    # Build and persist CloneTarget
+                    clone_target = CloneTarget(
+                        strategy=strategy,
+                        sparse_patterns=sparse_patterns,
+                        artifacts_root=clone_metadata.get("artifacts_root"),
+                        artifact_paths=clone_metadata.get("artifact_paths", []),
+                        tree_sha=tree_sha,
+                        computed_at=datetime.now(timezone.utc),
+                    )
+
+                    # Persist CloneTarget on source (will be saved in transaction below)
+                    source.clone_target = clone_target
+                    logger.debug(
+                        f"Computed CloneTarget for {source.owner}/{source.repo_name}: "
+                        f"strategy={strategy}, patterns={len(sparse_patterns)}, "
+                        f"tree_sha={tree_sha[:8]}..."
+                    )
+
+                except Exception as clone_target_error:
+                    # CloneTarget computation is non-blocking - log warning and continue
+                    logger.warning(
+                        f"Failed to compute CloneTarget for {source.owner}/{source.repo_name}: "
+                        f"{clone_target_error}",
+                        exc_info=False,
+                    )
 
         # Load path tag config from source (or use defaults)
         config = PathTagConfig.defaults()
@@ -674,85 +1539,169 @@ async def _perform_scan(
             counts_by_type[artifact_type] = counts_by_type.get(artifact_type, 0) + 1
 
         # Update source and catalog atomically
-        with transaction_handler.scan_update_transaction(source_id) as ctx:
-            # Update source status
-            ctx.update_source_status(
-                status="success",
-                artifact_count=scan_result.artifacts_found,
-                error_message=None,
-            )
+        with trace_operation(
+            "marketplace.store_scan_results",
+            source_id=source_id,
+        ) as span:
+            with transaction_handler.scan_update_transaction(source_id) as ctx:
 
-            # Update counts_by_type on source
-            source_in_session = (
-                ctx.session.query(MarketplaceSource).filter_by(id=source_id).first()
-            )
-            if source_in_session:
-                source_in_session.set_counts_by_type_dict(counts_by_type)
-
-            # Convert detected artifacts to catalog entries
-            new_entries = []
-            for artifact in scan_result.artifacts:
-                # Extract path segments if enabled
-                path_segments_json = None
-                if extractor:
-                    try:
-                        segments = extractor.extract(artifact.path)
-                        path_segments_json = json.dumps(
-                            {
-                                "raw_path": artifact.path,
-                                "extracted": [asdict(s) for s in segments],
-                                "extracted_at": datetime.utcnow().isoformat(),
-                            }
-                        )
-                    except Exception as e:
-                        logger.error(
-                            f"Failed to extract path segments for {artifact.path}: {e}"
-                        )
-                        # Continue without path_segments; extraction is non-blocking
-
-                entry = MarketplaceCatalogEntry(
-                    id=str(uuid.uuid4()),
-                    source_id=source_id,
-                    artifact_type=artifact.artifact_type,
-                    name=artifact.name,
-                    path=artifact.path,
-                    upstream_url=artifact.upstream_url,
-                    confidence_score=artifact.confidence_score,
-                    raw_score=artifact.raw_score,
-                    score_breakdown=artifact.score_breakdown,
-                    detected_sha=artifact.detected_sha,
-                    detected_at=datetime.utcnow(),
-                    # Copy exclusion status from deduplication engine
-                    status=artifact.status if artifact.status else "new",
-                    excluded_at=(
-                        datetime.fromisoformat(artifact.excluded_at)
-                        if artifact.excluded_at
-                        else None
-                    ),
-                    excluded_reason=artifact.excluded_reason,
-                    path_segments=path_segments_json,
+                # Update source status
+                ctx.update_source_status(
+                    status="success",
+                    artifact_count=scan_result.artifacts_found,
+                    error_message=None,
                 )
-                new_entries.append(entry)
 
-            # Merge new entries with existing (preserves import metadata)
-            merge_result = ctx.merge_catalog_entries(new_entries)
+                # Update counts_by_type and clone_target on source
+                source_in_session = (
+                    ctx.session.query(MarketplaceSource).filter_by(id=source_id).first()
+                )
+                if source_in_session:
+                    source_in_session.set_counts_by_type_dict(counts_by_type)
+                    # Persist clone_target if it was computed earlier
+                    if source.clone_target is not None:
+                        source_in_session.clone_target = source.clone_target
 
+                # Determine if frontmatter indexing is enabled for this source
+                # Get global indexing mode from config and compute effective state
+                from skillmeat.config import ConfigManager
+
+                app_config = ConfigManager()
+                global_mode = app_config.get_indexing_mode()
+                indexing_enabled = get_effective_indexing_state(
+                    source.indexing_enabled, global_mode
+                )
+                if indexing_enabled:
+                    logger.info(
+                        f"Frontmatter indexing enabled for source {source_id}, "
+                        f"extracting search metadata from artifacts"
+                    )
+
+                # Pre-compute batch frontmatter for all artifacts if above threshold
+                # This uses a single git clone instead of N API calls
+                batch_frontmatter: Dict[str, Dict[str, Any]] = {}
+                use_batch_extraction = False
+                if indexing_enabled:
+                    if len(scan_result.artifacts) >= BATCH_CLONE_THRESHOLD:
+                        use_batch_extraction = True
+                        batch_frontmatter = _extract_frontmatter_batch(
+                            source, scan_result.artifacts
+                        )
+
+                # Convert detected artifacts to catalog entries
+                new_entries = []
+                for artifact in scan_result.artifacts:
+                    # Extract path segments if enabled
+                    path_segments_json = None
+                    if extractor:
+                        try:
+                            segments = extractor.extract(artifact.path)
+                            path_segments_json = json.dumps(
+                                {
+                                    "raw_path": artifact.path,
+                                    "extracted": [asdict(s) for s in segments],
+                                    "extracted_at": datetime.utcnow().isoformat(),
+                                }
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to extract path segments for {artifact.path}: {e}"
+                            )
+                            # Continue without path_segments; extraction is non-blocking
+
+                    # Extract frontmatter for search indexing if enabled
+                    search_metadata: Dict[str, Any] = {
+                        "title": None,
+                        "description": None,
+                        "search_tags": None,
+                        "search_text": None,
+                    }
+                    if indexing_enabled:
+                        # Use batch result if available, otherwise per-artifact
+                        if use_batch_extraction and artifact.name in batch_frontmatter:
+                            search_metadata = batch_frontmatter[artifact.name]
+                        else:
+                            search_metadata = _extract_frontmatter_for_artifact(
+                                scanner, source, artifact
+                            )
+
+                    # Serialize search_tags as JSON if present
+                    search_tags_json = None
+                    if search_metadata.get("search_tags"):
+                        search_tags_json = json.dumps(search_metadata["search_tags"])
+
+                    entry = MarketplaceCatalogEntry(
+                        id=str(uuid.uuid4()),
+                        source_id=source_id,
+                        artifact_type=artifact.artifact_type,
+                        name=artifact.name,
+                        path=artifact.path,
+                        upstream_url=artifact.upstream_url,
+                        confidence_score=artifact.confidence_score,
+                        raw_score=artifact.raw_score,
+                        score_breakdown=artifact.score_breakdown,
+                        detected_sha=artifact.detected_sha,
+                        detected_at=datetime.utcnow(),
+                        # Copy exclusion status from deduplication engine
+                        status=artifact.status if artifact.status else "new",
+                        excluded_at=(
+                            datetime.fromisoformat(artifact.excluded_at)
+                            if artifact.excluded_at
+                            else None
+                        ),
+                        excluded_reason=artifact.excluded_reason,
+                        path_segments=path_segments_json,
+                        # Cross-source search fields from frontmatter
+                        title=search_metadata.get("title"),
+                        description=search_metadata.get("description"),
+                        search_tags=search_tags_json,
+                        search_text=search_metadata.get("search_text"),
+                    )
+                    new_entries.append(entry)
+
+                # Merge new entries with existing (preserves import metadata)
+                merge_result = ctx.merge_catalog_entries(new_entries)
+
+            span.set_attribute("rows_affected", scan_result.artifacts_found)
         # Set source_id in result
         scan_result.source_id = source_id
 
         # Add merge result info to scan result
         scan_result.updated_imports = merge_result.updated_imports
         scan_result.preserved_count = merge_result.preserved_count
+        # Calculate API efficiency metrics
+        api_calls_after = _get_github_api_call_count()
+        api_calls_used = api_calls_after - api_calls_before
+        api_calls_per_artifact = api_calls_used / max(1, scan_result.artifacts_found)
+
+        # Record total scan duration metrics
+        scan_duration = time.time() - scan_start_time
+        skillmeat_scan_total_duration_seconds.labels(
+            strategy=scan_strategy, status="success"
+        ).observe(scan_duration)
 
         logger.info(
             f"Scan completed for {source.repo_url}: "
             f"{scan_result.artifacts_found} artifacts found, "
             f"{merge_result.preserved_count} preserved, "
-            f"{len(merge_result.updated_imports)} imports with upstream changes"
+            f"{len(merge_result.updated_imports)} imports with upstream changes",
+            extra={
+                "api_calls": api_calls_used,
+                "artifact_count": scan_result.artifacts_found,
+                "api_calls_per_artifact": round(api_calls_per_artifact, 2),
+                "scan_duration_seconds": round(scan_duration, 2),
+                "scan_strategy": scan_strategy,
+            },
         )
         return scan_result
 
     except Exception as scan_error:
+        # Record error metrics
+        scan_duration = time.time() - scan_start_time
+        skillmeat_scan_total_duration_seconds.labels(
+            strategy=scan_strategy, status="error"
+        ).observe(scan_duration)
+
         # Mark as error
         with transaction_handler.scan_update_transaction(source_id) as ctx:
             ctx.update_source_status(
@@ -760,7 +1709,14 @@ async def _perform_scan(
                 error_message=str(scan_error),
             )
 
-        logger.error(f"Scan failed for {source.repo_url}: {scan_error}", exc_info=True)
+        logger.error(
+            f"Scan failed for {source.repo_url}: {scan_error}",
+            exc_info=True,
+            extra={
+                "scan_duration_seconds": round(scan_duration, 2),
+                "scan_strategy": scan_strategy,
+            },
+        )
 
         # Return error result (don't raise - let caller decide)
         return ScanResultDTO(
@@ -4278,3 +5234,308 @@ async def update_source_auto_tag(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update auto-tag: {str(e)}",
         ) from e
+
+
+def _refresh_auto_tags_for_source(
+    source: MarketplaceSource,
+    source_repo: MarketplaceSourceRepository,
+) -> tuple[int, int, int, List[AutoTagSegment]]:
+    """Refresh auto-tags for a single source by fetching GitHub topics.
+
+    Args:
+        source: The marketplace source to refresh
+        source_repo: Repository for persisting changes
+
+    Returns:
+        Tuple of (tags_found, tags_added, tags_updated, segments)
+
+    Raises:
+        GitHubClientError: If GitHub API call fails
+    """
+    from skillmeat.core.github_client import get_github_client
+
+    client = get_github_client()
+    metadata = client.get_repo_metadata(f"{source.owner}/{source.repo_name}")
+    topics = metadata.get("topics", [])
+
+    tags_found = len(topics)
+    tags_added = 0
+    tags_updated = 0
+
+    # Get existing auto-tags to preserve approval status
+    existing_auto_tags = source.get_auto_tags_dict() or {"extracted": []}
+    existing_status = {
+        seg["value"]: seg["status"] for seg in existing_auto_tags.get("extracted", [])
+    }
+    existing_values = set(existing_status.keys())
+
+    # Build new auto-tags data, preserving existing status
+    new_segments = []
+    for topic in topics:
+        status_val = existing_status.get(topic, "pending")
+        if topic in existing_values:
+            tags_updated += 1
+        else:
+            tags_added += 1
+
+        new_segments.append(
+            {
+                "value": topic,
+                "normalized": topic.lower().replace("_", "-"),
+                "status": status_val,
+                "source": "github_topic",
+            }
+        )
+
+    # Update source auto_tags
+    if new_segments:
+        auto_tags_data = {"extracted": new_segments}
+        source.set_auto_tags_dict(auto_tags_data)
+
+    # Commit changes
+    session = source_repo._get_session()
+    session.commit()
+
+    # Build response segments
+    segments = [
+        AutoTagSegment(
+            value=seg["value"],
+            normalized=seg["normalized"],
+            status=seg["status"],
+            source=seg["source"],
+        )
+        for seg in new_segments
+    ]
+
+    return tags_found, tags_added, tags_updated, segments
+
+
+@router.post(
+    "/{source_id}/refresh-auto-tags",
+    response_model=AutoTagRefreshResponse,
+    summary="Refresh auto-tags from GitHub topics",
+    description="""
+    Fetches the current GitHub topics for the source repository and updates
+    the auto_tags field. Existing tag approval status is preserved.
+
+    This is useful for:
+    - Sources created before auto-tags feature was added
+    - Syncing with updated GitHub topics after repository changes
+    """,
+)
+async def refresh_source_auto_tags(
+    source_id: str,
+) -> AutoTagRefreshResponse:
+    """Refresh auto-tags by fetching GitHub topics for the source.
+
+    Args:
+        source_id: Unique source identifier
+
+    Returns:
+        AutoTagRefreshResponse with tags found/added/updated counts
+
+    Raises:
+        HTTPException 404: If source not found
+        HTTPException 503: If GitHub API rate limited
+        HTTPException 500: For other errors
+    """
+    from skillmeat.core.github_client import (
+        GitHubClientError,
+        GitHubNotFoundError,
+        GitHubRateLimitError,
+    )
+
+    source_repo = MarketplaceSourceRepository()
+
+    try:
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found for auto-tags refresh: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        tags_found, tags_added, tags_updated, segments = _refresh_auto_tags_for_source(
+            source, source_repo
+        )
+
+        logger.info(
+            f"Refreshed auto-tags for source {source_id}: "
+            f"found={tags_found}, added={tags_added}, updated={tags_updated}"
+        )
+
+        return AutoTagRefreshResponse(
+            source_id=source_id,
+            tags_found=tags_found,
+            tags_added=tags_added,
+            tags_updated=tags_updated,
+            segments=segments,
+        )
+
+    except HTTPException:
+        raise
+    except GitHubRateLimitError as e:
+        logger.warning(f"Rate limited while refreshing auto-tags for {source_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"GitHub API rate limit exceeded. Reset at: {e.reset_at}",
+        ) from e
+    except GitHubNotFoundError as e:
+        logger.warning(f"Repository not found for {source_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository not found: {source.owner}/{source.repo_name}",
+        ) from e
+    except GitHubClientError as e:
+        logger.error(
+            f"GitHub API error while refreshing auto-tags for {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"GitHub API error: {str(e)}",
+        ) from e
+    except Exception as e:
+        logger.error(
+            f"Failed to refresh auto-tags for source {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to refresh auto-tags: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/bulk-refresh-auto-tags",
+    response_model=BulkAutoTagRefreshResponse,
+    summary="Refresh auto-tags for multiple sources",
+    description="""
+    Fetches GitHub topics for multiple sources in a single request.
+    Each source is processed independently, so failures for one source
+    do not affect others.
+
+    Rate limiting is handled gracefully - if rate limited during bulk
+    operation, remaining sources will be marked as failed with the
+    rate limit error.
+    """,
+)
+async def bulk_refresh_auto_tags(
+    request: BulkAutoTagRefreshRequest,
+) -> BulkAutoTagRefreshResponse:
+    """Refresh auto-tags for multiple sources.
+
+    Args:
+        request: BulkAutoTagRefreshRequest with list of source IDs
+
+    Returns:
+        BulkAutoTagRefreshResponse with individual results and summary
+    """
+    from skillmeat.core.github_client import (
+        GitHubClientError,
+        GitHubRateLimitError,
+    )
+
+    source_repo = MarketplaceSourceRepository()
+    results: List[BulkAutoTagRefreshItemResult] = []
+    total_succeeded = 0
+    total_failed = 0
+    rate_limited = False
+    rate_limit_message: Optional[str] = None
+
+    for source_id in request.source_ids:
+        # If we hit rate limit, fail remaining sources immediately
+        if rate_limited:
+            results.append(
+                BulkAutoTagRefreshItemResult(
+                    source_id=source_id,
+                    success=False,
+                    error=rate_limit_message or "Rate limit exceeded",
+                )
+            )
+            total_failed += 1
+            continue
+
+        try:
+            source = source_repo.get_by_id(source_id)
+            if not source:
+                results.append(
+                    BulkAutoTagRefreshItemResult(
+                        source_id=source_id,
+                        success=False,
+                        error=f"Source not found",
+                    )
+                )
+                total_failed += 1
+                continue
+
+            tags_found, tags_added, tags_updated, _ = _refresh_auto_tags_for_source(
+                source, source_repo
+            )
+
+            results.append(
+                BulkAutoTagRefreshItemResult(
+                    source_id=source_id,
+                    success=True,
+                    tags_found=tags_found,
+                    tags_added=tags_added,
+                    tags_updated=tags_updated,
+                )
+            )
+            total_succeeded += 1
+
+            logger.debug(
+                f"Bulk refresh: {source_id} - found={tags_found}, "
+                f"added={tags_added}, updated={tags_updated}"
+            )
+
+        except GitHubRateLimitError as e:
+            rate_limited = True
+            rate_limit_message = f"Rate limit exceeded. Reset at: {e.reset_at}"
+            results.append(
+                BulkAutoTagRefreshItemResult(
+                    source_id=source_id,
+                    success=False,
+                    error=rate_limit_message,
+                )
+            )
+            total_failed += 1
+            logger.warning(f"Bulk refresh rate limited at source {source_id}: {e}")
+
+        except GitHubClientError as e:
+            results.append(
+                BulkAutoTagRefreshItemResult(
+                    source_id=source_id,
+                    success=False,
+                    error=f"GitHub API error: {str(e)}",
+                )
+            )
+            total_failed += 1
+            logger.warning(f"Bulk refresh GitHub error for {source_id}: {e}")
+
+        except Exception as e:
+            results.append(
+                BulkAutoTagRefreshItemResult(
+                    source_id=source_id,
+                    success=False,
+                    error=str(e),
+                )
+            )
+            total_failed += 1
+            logger.error(
+                f"Bulk refresh error for {source_id}: {e}",
+                exc_info=True,
+            )
+
+    logger.info(
+        f"Bulk auto-tags refresh complete: {total_succeeded} succeeded, "
+        f"{total_failed} failed out of {len(request.source_ids)} requested"
+    )
+
+    return BulkAutoTagRefreshResponse(
+        results=results,
+        total_requested=len(request.source_ids),
+        total_succeeded=total_succeeded,
+        total_failed=total_failed,
+    )

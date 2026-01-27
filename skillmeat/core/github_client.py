@@ -150,9 +150,9 @@ class GitHubClient:
         self._github: Optional[Github] = None
 
         if self._token:
-            logger.debug("GitHub client initialized with authentication")
+            logger.info("GitHub client initialized with authentication")
         else:
-            logger.debug(
+            logger.info(
                 "GitHub client initialized without authentication (60 req/hr limit)"
             )
 

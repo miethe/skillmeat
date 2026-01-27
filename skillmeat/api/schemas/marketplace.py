@@ -558,6 +558,12 @@ class CreateSourceRequest(BaseModel):
         default=None,
         description="Artifact type when single_artifact_mode is enabled (required when mode is True)",
     )
+    deep_indexing_enabled: bool = Field(
+        default=False,
+        description="Enable deep indexing for enhanced full-text search. "
+        "When enabled, clones entire artifact directories instead of just manifest files. "
+        "May significantly increase scan time for large repositories.",
+    )
 
     @model_validator(mode="after")
     def validate_single_artifact_mode(self) -> "CreateSourceRequest":
@@ -696,6 +702,7 @@ class CreateSourceRequest(BaseModel):
                 "tags": ["official", "quickstart", "examples"],
                 "single_artifact_mode": False,
                 "single_artifact_type": None,
+                "deep_indexing_enabled": False,
             }
         }
 
@@ -830,6 +837,12 @@ class UpdateSourceRequest(BaseModel):
     tags: Optional[List[str]] = Field(
         default=None,
         description="Tags to apply to source (max 20)",
+    )
+    deep_indexing_enabled: Optional[bool] = Field(
+        default=None,
+        description="Enable deep indexing for enhanced full-text search. "
+        "When enabled, clones entire artifact directories instead of just manifest files. "
+        "May significantly increase scan time for large repositories.",
     )
 
     @field_validator("tags")
@@ -976,6 +989,7 @@ class UpdateSourceRequest(BaseModel):
                 "import_repo_description": True,
                 "import_repo_readme": False,
                 "tags": ["updated", "production"],
+                "deep_indexing_enabled": True,
             }
         }
 
@@ -1099,6 +1113,51 @@ class SourceResponse(BaseModel):
         "None indicates default indexing behavior (typically enabled).",
         examples=[True, False, None],
     )
+    deep_indexing_enabled: bool = Field(
+        default=False,
+        description="Whether deep indexing is enabled for this source. "
+        "When enabled, clones entire artifact directories instead of just manifest files. "
+        "May significantly increase scan time for large repositories.",
+    )
+
+    # Clone target summary (optional, null if never indexed)
+    artifacts_root: Optional[str] = Field(
+        default=None,
+        description="Common ancestor directory path of all artifacts in this source. "
+        "None if artifacts are scattered or source has never been indexed.",
+        examples=[".claude/skills", None],
+    )
+    artifact_count_from_cache: Optional[int] = Field(
+        default=None,
+        description="Number of artifacts from last indexing run (cached in clone_target). "
+        "May differ from artifact_count if source has been re-scanned. "
+        "None if source has never been indexed.",
+        examples=[12, None],
+    )
+    indexing_strategy: Optional[
+        Literal["api", "sparse_manifest", "sparse_directory"]
+    ] = Field(
+        default=None,
+        description="Clone/indexing strategy computed for this source. "
+        "'api' = direct GitHub API (small repos), "
+        "'sparse_manifest' = clone manifest files only (medium repos), "
+        "'sparse_directory' = clone artifact directory (large repos). "
+        "None if source has never been indexed.",
+        examples=["sparse_manifest", None],
+    )
+    last_indexed_tree_sha: Optional[str] = Field(
+        default=None,
+        description="Git tree SHA from last successful indexing run. "
+        "Used for cache invalidation - if current tree SHA differs, re-indexing needed. "
+        "None if source has never been indexed.",
+        examples=["abc123def456", None],
+    )
+    last_indexed_at: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp of last successful indexing run. "
+        "None if source has never been indexed.",
+        examples=["2025-12-06T10:30:00Z", None],
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -1130,6 +1189,12 @@ class SourceResponse(BaseModel):
                 "single_artifact_mode": False,
                 "single_artifact_type": None,
                 "indexing_enabled": True,
+                "deep_indexing_enabled": False,
+                "artifacts_root": ".claude/skills",
+                "artifact_count_from_cache": 12,
+                "indexing_strategy": "sparse_manifest",
+                "last_indexed_tree_sha": "abc123def456",
+                "last_indexed_at": "2025-12-06T10:30:00Z",
             }
         }
 
@@ -1885,6 +1950,23 @@ class DetectedArtifact(BaseModel):
     status: Optional[str] = Field(
         default=None,
         description="Artifact status (e.g., 'new', 'excluded')",
+    )
+    # Cross-source search fields (populated during frontmatter indexing)
+    title: Optional[str] = Field(
+        default=None,
+        description="Artifact title from frontmatter for search display",
+    )
+    frontmatter_description: Optional[str] = Field(
+        default=None,
+        description="Artifact description from frontmatter for search",
+    )
+    search_tags: Optional[List[str]] = Field(
+        default=None,
+        description="Tags from frontmatter for search filtering",
+    )
+    search_text: Optional[str] = Field(
+        default=None,
+        description="Concatenated searchable text (title + description + tags)",
     )
 
     class Config:
@@ -2698,6 +2780,365 @@ class DeduplicationStats(BaseModel):
                 "duplicates_within_source": 3,
                 "cross_source_duplicates": 5,
                 "total_excluded": 8,
+            }
+        }
+
+
+# =============================================================================
+# Catalog Search Schemas (Cross-Source Search)
+# =============================================================================
+
+
+class CatalogSearchResult(BaseModel):
+    """Individual search result from cross-source catalog search.
+
+    Includes artifact metadata and source context (owner/repo) for display
+    and navigation purposes.
+    """
+
+    id: str = Field(
+        description="Unique catalog entry identifier",
+        examples=["cat_abc123"],
+    )
+    name: str = Field(
+        description="Artifact name",
+        examples=["canvas-design"],
+    )
+    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = (
+        Field(
+            description="Type of artifact",
+            examples=["skill"],
+        )
+    )
+    title: Optional[str] = Field(
+        default=None,
+        description="Artifact title from frontmatter",
+        examples=["Canvas Design System"],
+    )
+    description: Optional[str] = Field(
+        default=None,
+        description="Artifact description from frontmatter",
+        examples=["A comprehensive design system for building beautiful interfaces"],
+    )
+    confidence_score: int = Field(
+        ge=0,
+        le=100,
+        description="Confidence score of detection (0-100)",
+        examples=[95],
+    )
+    source_owner: str = Field(
+        description="GitHub repository owner/organization",
+        examples=["anthropics"],
+    )
+    source_repo: str = Field(
+        description="GitHub repository name",
+        examples=["quickstarts"],
+    )
+    source_id: str = Field(
+        description="ID of the source this artifact belongs to",
+        examples=["src_anthropics_quickstarts"],
+    )
+    path: str = Field(
+        description="Path to artifact within repository",
+        examples=["skills/canvas-design"],
+    )
+    upstream_url: Optional[str] = Field(
+        default=None,
+        description="Full URL to artifact in source repository",
+        examples=[
+            "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"
+        ],
+    )
+    status: Literal["new", "updated", "removed", "imported", "excluded"] = Field(
+        description="Lifecycle status of the catalog entry",
+        examples=["new"],
+    )
+    search_tags: Optional[List[str]] = Field(
+        default=None,
+        description="Tags from frontmatter for filtering",
+        examples=[["design", "ui", "components"]],
+    )
+    title_snippet: Optional[str] = Field(
+        default=None,
+        description="Highlighted title snippet with <mark> tags around matched terms (FTS5 search only)",
+        examples=["<mark>Canvas</mark> Design System"],
+    )
+    description_snippet: Optional[str] = Field(
+        default=None,
+        description="Highlighted description snippet with <mark> tags around matched terms (FTS5 search only)",
+        examples=[
+            "A comprehensive <mark>design</mark> system for building...interfaces"
+        ],
+    )
+    deep_match: bool = Field(
+        default=False,
+        description="True if this result matched from deep-indexed content rather than "
+        "title/description metadata. Deep matches come from full artifact file content.",
+    )
+    matched_file: Optional[str] = Field(
+        default=None,
+        description="Relative file path where the search match was found. "
+        "Only populated for deep index matches (when deep_match=True).",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "id": "cat_abc123",
+                "name": "canvas-design",
+                "artifact_type": "skill",
+                "title": "Canvas Design System",
+                "description": "A comprehensive design system for building interfaces",
+                "confidence_score": 95,
+                "source_owner": "anthropics",
+                "source_repo": "quickstarts",
+                "source_id": "src_anthropics_quickstarts",
+                "path": "skills/canvas-design",
+                "upstream_url": "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design",
+                "status": "new",
+                "search_tags": ["design", "ui", "components"],
+                "title_snippet": "<mark>Canvas</mark> Design System",
+                "description_snippet": "A comprehensive <mark>design</mark> system for building...interfaces",
+                "deep_match": False,
+                "matched_file": None,
+            }
+        }
+
+
+class CatalogSearchResponse(BaseModel):
+    """Response model for cross-source catalog search.
+
+    Returns paginated search results with cursor-based pagination support.
+    """
+
+    items: List[CatalogSearchResult] = Field(
+        description="List of matching catalog entries",
+    )
+    next_cursor: Optional[str] = Field(
+        default=None,
+        description="Cursor for fetching next page (None if no more results)",
+        examples=["95:cat_xyz789"],
+    )
+    has_more: bool = Field(
+        description="True if more results exist beyond this page",
+        examples=[True],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "items": [
+                    {
+                        "id": "cat_abc123",
+                        "name": "canvas-design",
+                        "artifact_type": "skill",
+                        "title": "Canvas Design System",
+                        "description": "Design system for interfaces",
+                        "confidence_score": 95,
+                        "source_owner": "anthropics",
+                        "source_repo": "quickstarts",
+                        "source_id": "src_anthropics_quickstarts",
+                        "path": "skills/canvas-design",
+                        "upstream_url": "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design",
+                        "status": "new",
+                        "search_tags": ["design", "ui"],
+                    }
+                ],
+                "next_cursor": "95:cat_xyz789",
+                "has_more": True,
+            }
+        }
+
+
+# ============================================================================
+# Auto-Tag Refresh DTOs
+# ============================================================================
+
+
+class AutoTagRefreshResponse(BaseModel):
+    """Response from auto-tag refresh operation.
+
+    Returns statistics about tags found and updated from GitHub topics.
+    """
+
+    source_id: str = Field(
+        description="Marketplace source ID",
+        examples=["src_anthropics_skills"],
+    )
+    tags_found: int = Field(
+        description="Total number of GitHub topics found",
+        ge=0,
+        examples=[5],
+    )
+    tags_added: int = Field(
+        description="Number of new tags added",
+        ge=0,
+        examples=[3],
+    )
+    tags_updated: int = Field(
+        description="Number of existing tags updated (status preserved)",
+        ge=0,
+        examples=[2],
+    )
+    segments: list[AutoTagSegment] = Field(
+        description="All auto-tags after refresh",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "source_id": "src_anthropics_skills",
+                "tags_found": 5,
+                "tags_added": 3,
+                "tags_updated": 2,
+                "segments": [
+                    {
+                        "value": "claude-code",
+                        "normalized": "claude-code",
+                        "status": "approved",
+                        "source": "github_topic",
+                    },
+                    {
+                        "value": "ai-assistant",
+                        "normalized": "ai-assistant",
+                        "status": "pending",
+                        "source": "github_topic",
+                    },
+                ],
+            }
+        }
+
+
+class BulkAutoTagRefreshRequest(BaseModel):
+    """Request to refresh auto-tags for multiple sources.
+
+    Allows batch refresh of GitHub topics for specified sources.
+    """
+
+    source_ids: List[str] = Field(
+        description="List of source IDs to refresh (max 50)",
+        min_length=1,
+        max_length=50,
+        examples=[["src_abc123", "src_def456"]],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "source_ids": ["src_anthropics_skills", "src_user_myrepo"],
+            }
+        }
+
+
+class BulkAutoTagRefreshItemResult(BaseModel):
+    """Result for a single source in bulk refresh operation."""
+
+    source_id: str = Field(
+        description="Marketplace source ID",
+        examples=["src_anthropics_skills"],
+    )
+    success: bool = Field(
+        description="Whether the refresh succeeded",
+        examples=[True],
+    )
+    tags_found: Optional[int] = Field(
+        default=None,
+        description="Number of tags found (None if failed)",
+        ge=0,
+        examples=[5],
+    )
+    tags_added: Optional[int] = Field(
+        default=None,
+        description="Number of new tags added (None if failed)",
+        ge=0,
+        examples=[3],
+    )
+    tags_updated: Optional[int] = Field(
+        default=None,
+        description="Number of existing tags updated (None if failed)",
+        ge=0,
+        examples=[2],
+    )
+    error: Optional[str] = Field(
+        default=None,
+        description="Error message if refresh failed",
+        examples=["Rate limit exceeded"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "source_id": "src_anthropics_skills",
+                "success": True,
+                "tags_found": 5,
+                "tags_added": 3,
+                "tags_updated": 2,
+                "error": None,
+            }
+        }
+
+
+class BulkAutoTagRefreshResponse(BaseModel):
+    """Response from bulk auto-tag refresh operation.
+
+    Returns individual results for each source and summary statistics.
+    """
+
+    results: List[BulkAutoTagRefreshItemResult] = Field(
+        description="Individual results for each source",
+    )
+    total_requested: int = Field(
+        description="Total number of sources requested",
+        ge=0,
+        examples=[5],
+    )
+    total_succeeded: int = Field(
+        description="Number of sources successfully refreshed",
+        ge=0,
+        examples=[4],
+    )
+    total_failed: int = Field(
+        description="Number of sources that failed to refresh",
+        ge=0,
+        examples=[1],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "results": [
+                    {
+                        "source_id": "src_anthropics_skills",
+                        "success": True,
+                        "tags_found": 5,
+                        "tags_added": 3,
+                        "tags_updated": 2,
+                        "error": None,
+                    },
+                    {
+                        "source_id": "src_user_myrepo",
+                        "success": False,
+                        "tags_found": None,
+                        "tags_added": None,
+                        "tags_updated": None,
+                        "error": "Rate limit exceeded",
+                    },
+                ],
+                "total_requested": 2,
+                "total_succeeded": 1,
+                "total_failed": 1,
             }
         }
 

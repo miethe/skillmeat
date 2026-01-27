@@ -24,9 +24,11 @@ import {
   Loader2,
   Pencil,
   Trash2,
+  Search,
+  SearchCheck,
+  SearchX,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -77,17 +79,19 @@ function TrustBadge({ level }: TrustBadgeProps) {
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge
-            variant="outline"
-            className={cn('gap-1 text-xs', config.className)}
+          <div
+            className={cn(
+              'flex h-6 w-6 items-center justify-center rounded-md border',
+              config.className
+            )}
             aria-label={`Trust level: ${config.label}. ${config.description}`}
           >
-            <Icon className="h-3 w-3" aria-hidden="true" />
-            {config.label}
-          </Badge>
+            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+          </div>
         </TooltipTrigger>
         <TooltipContent>
-          <p>{config.description}</p>
+          <p className="font-medium">Trust: {config.label}</p>
+          <p className="text-xs text-muted-foreground">{config.description}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -97,9 +101,44 @@ function TrustBadge({ level }: TrustBadgeProps) {
 interface StatusBadgeProps {
   status: ScanStatus;
   errorMessage?: string;
+  lastSyncAt?: string;
 }
 
-function StatusBadge({ status, errorMessage }: StatusBadgeProps) {
+/**
+ * Formats a timestamp into a friendly display format.
+ * Returns "Jan 25, 2026 at 2:30 PM" style or relative time for recent dates.
+ */
+function formatTimestamp(timestamp: string | undefined): string {
+  if (!timestamp) return 'Never';
+
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  // Use relative time for recent timestamps (within 24 hours)
+  if (diffHours < 1) {
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    if (diffMinutes < 1) return 'Just now';
+    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+  }
+  if (diffHours < 24) {
+    const hours = Math.floor(diffHours);
+    return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  }
+
+  // Use absolute format for older timestamps
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+function StatusBadge({ status, errorMessage, lastSyncAt }: StatusBadgeProps) {
   const config = {
     pending: {
       icon: Clock,
@@ -138,22 +177,103 @@ function StatusBadge({ status, errorMessage }: StatusBadgeProps) {
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge
-            variant="outline"
-            className={cn('gap-1 text-xs', config.className)}
+          <div
+            className={cn(
+              'flex h-6 w-6 items-center justify-center rounded-md border',
+              config.className
+            )}
             aria-label={ariaLabel}
           >
             <Icon
-              className={cn('h-3 w-3', 'iconClassName' in config && config.iconClassName)}
+              className={cn('h-3.5 w-3.5', 'iconClassName' in config && config.iconClassName)}
               aria-hidden="true"
             />
-            {config.label}
-          </Badge>
+          </div>
         </TooltipTrigger>
         <TooltipContent className="max-w-xs">
-          <p className="text-sm">
+          <p className="font-medium">Sync: {config.label}</p>
+          <p className="text-xs text-muted-foreground">
             {status === 'error' && errorMessage ? errorMessage : config.description}
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Last synced: {formatTimestamp(lastSyncAt)}
+          </p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+interface IndexingBadgeProps {
+  indexingEnabled: boolean | null;
+  lastIndexedTreeSha?: string | null;
+  lastIndexedAt?: string | null;
+}
+
+function IndexingBadge({ indexingEnabled, lastIndexedTreeSha, lastIndexedAt }: IndexingBadgeProps) {
+  // Determine indexing state
+  let state: 'disabled' | 'pending' | 'indexed' | 'default';
+  if (indexingEnabled === false) {
+    state = 'disabled';
+  } else if (indexingEnabled === true && !lastIndexedTreeSha) {
+    state = 'pending';
+  } else if (indexingEnabled === true && lastIndexedTreeSha) {
+    state = 'indexed';
+  } else {
+    state = 'default';
+  }
+
+  const config = {
+    disabled: {
+      icon: SearchX,
+      label: 'Disabled',
+      description: 'Search indexing is disabled for this source',
+      className: 'border-gray-300 text-gray-500 bg-gray-50 dark:bg-gray-900',
+    },
+    pending: {
+      icon: Search,
+      label: 'Pending',
+      description: 'Source has not been indexed yet',
+      className: 'border-yellow-500 text-yellow-700 bg-yellow-50 dark:bg-yellow-950',
+    },
+    indexed: {
+      icon: SearchCheck,
+      label: 'Active',
+      description: 'Search index is active',
+      className: 'border-green-500 text-green-700 bg-green-50 dark:bg-green-950',
+    },
+    default: {
+      icon: Search,
+      label: 'Default',
+      description: 'Using default indexing settings',
+      className: 'border-gray-200 text-gray-400 bg-gray-50/50 dark:bg-gray-900/50',
+    },
+  }[state];
+
+  const Icon = config.icon;
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className={cn(
+              'flex h-6 w-6 items-center justify-center rounded-md border',
+              config.className
+            )}
+            aria-label={`Search Index: ${config.label}. ${config.description}`}
+          >
+            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+          </div>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <p className="font-medium">Search Index: {config.label}</p>
+          <p className="text-xs text-muted-foreground">{config.description}</p>
+          {state === 'indexed' && lastIndexedAt && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Last indexed: {formatTimestamp(lastIndexedAt)}
+            </p>
+          )}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -266,8 +386,17 @@ export function SourceCard({
             </div>
           </div>
           <div className="flex flex-shrink-0 items-center gap-1">
-            <StatusBadge status={source.scan_status} errorMessage={source.last_error} />
+            <StatusBadge
+              status={source.scan_status}
+              errorMessage={source.last_error}
+              lastSyncAt={source.last_sync_at}
+            />
             <TrustBadge level={source.trust_level} />
+            <IndexingBadge
+              indexingEnabled={source.indexing_enabled ?? null}
+              lastIndexedTreeSha={source.last_indexed_tree_sha}
+              lastIndexedAt={source.last_indexed_at}
+            />
           </div>
         </div>
 
@@ -361,8 +490,9 @@ export function SourceCardSkeleton() {
             </div>
           </div>
           <div className="flex gap-1">
-            <Skeleton className="h-5 w-16 rounded-full" />
-            <Skeleton className="h-5 w-16 rounded-full" />
+            <Skeleton className="h-6 w-6 rounded-md" />
+            <Skeleton className="h-6 w-6 rounded-md" />
+            <Skeleton className="h-6 w-6 rounded-md" />
           </div>
         </div>
 

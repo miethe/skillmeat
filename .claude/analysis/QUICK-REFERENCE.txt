@@ -1,0 +1,243 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   ARTIFACT DETECTION & INDEXING QUICK REFERENCE              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+SYSTEM ARCHITECTURE
+═══════════════════════════════════════════════════════════════════════════════
+
+GitHub Repo Tree
+       ↓ (API: get_repo_tree)
+GitHubScanner
+       ↓ (Group files into artifacts)
+HeuristicDetector
+       ├─ Layer 1: Baseline detection (type inference)
+       └─ Layer 2: 8 marketplace signals
+       ↓ (Score 0-100)
+_perform_scan()
+       ├─ Frontmatter extraction
+       │  ├─ Batch: git sparse clone (≥3)
+       │  └─ Per-artifact: GitHub API (<3)
+       ├─ Path segment extraction
+       └─ Create MarketplaceCatalogEntry
+       ↓ (Atomic transaction)
+Database
+       ├─ MarketplaceSource (source metadata)
+       ├─ MarketplaceCatalogEntry (detected artifacts)
+       └─ Search metadata (for FTS)
+       ↓
+FTS5 Virtual Table
+       └─ Cross-source search
+
+
+DETECTION SCORING (8 SIGNALS, MAX = 160)
+═══════════════════════════════════════════════════════════════════════════════
+
+Signal Name              | Weight | Purpose
+─────────────────────────|────────|──────────────────────────────────
+dir_name                 |   10   | Container directory match
+manifest                 |   20   | SKILL.md, COMMAND.md detected
+skill_manifest_bonus     |   40   | Extra bonus for SKILL.md on skills
+extensions               |    5   | Expected file types present
+parent_hint              |   15   | Ancestor paths: "claude", "anthropic"
+frontmatter              |   15   | Documentation file presence
+container_hint           |   25   | Detected type matches parent container
+frontmatter_type         |   30   | Explicit type in YAML frontmatter
+─────────────────────────┴────────┴──────────────────────────────────
+TOTAL MAX SCORE          |  160   | Normalized to 0-100 scale
+
+
+METADATA CAPTURED
+═══════════════════════════════════════════════════════════════════════════════
+
+During Detection:
+  ✓ artifact_type (enum: skill, command, agent, etc.)
+  ✓ confidence_score (0-100)
+  ✓ raw_score (before normalization, 0-160)
+  ✓ score_breakdown (JSON: individual signal scores)
+  ✓ detected_sha (git commit)
+  ✓ detected_version (if available)
+  ✓ status (new/updated/removed/imported/excluded)
+  ✗ detection_reasons (captured but logs only)
+
+During Frontmatter Extraction:
+  ✓ title (from YAML frontmatter)
+  ✓ description (from YAML frontmatter)
+  ✓ search_tags (parsed from YAML tags field)
+  ✓ search_text (concatenated: name + title + description + tags)
+  ✗ aliases (not extracted)
+
+During Path Processing:
+  ✓ path_segments (JSON array with approval status)
+
+
+MARSKETPLACE SOURCE MODEL
+═══════════════════════════════════════════════════════════════════════════════
+
+Key Fields:
+  repo_url (unique)          | Full GitHub URL
+  owner, repo_name           | Parsed from URL
+  ref (default: "main")      | Branch/tag/SHA to scan
+  root_hint (optional)       | Subdirectory with artifacts ← YOUR REQUEST
+  
+  enable_frontmatter_detection | Parse YAML for type hints
+  indexing_enabled           | Tri-state: None=global, True=yes, False=no
+  
+  single_artifact_mode       | Treat entire repo as one artifact
+  single_artifact_type       | Type when single mode enabled
+  
+  scan_status                | "pending" | "scanning" | "success" | "error"
+  last_sync_at               | Last successful scan timestamp
+  artifact_count             | Cached count of discovered
+  counts_by_type             | JSON: {"skill": 5, "command": 2}
+  
+  manual_map                 | JSON: {"path": "skill"} overrides
+
+
+DATABASE SCHEMA
+═══════════════════════════════════════════════════════════════════════════════
+
+marketplace_catalog_entries:
+  id                    | UUID primary key
+  source_id (FK)        | Reference to source
+  artifact_type         | Detected type
+  name, path            | Artifact location
+  confidence_score      | 0-100
+  raw_score, score_breakdown | Detection details
+  
+  status                | "new" | "updated" | "imported" | "excluded"
+  excluded_at, excluded_reason | User exclusion tracking
+  
+  title, description    | From frontmatter
+  search_tags           | JSON array
+  search_text           | Indexed by FTS5 ← SEARCH HAPPENS HERE
+  
+  path_segments         | JSON: {raw_path, extracted[...], extracted_at}
+  metadata_json         | Flexible additional data
+  
+Indexes:
+  PRIMARY: id
+  UNIQUE: upstream_url (per-source deduplication)
+  FK: source_id
+  FTS5: search_text, search_tags, artifact_type, name
+
+
+FRONTMATTER EXTRACTION STRATEGIES
+═══════════════════════════════════════════════════════════════════════════════
+
+Strategy 1: Batch (≥3 artifacts)
+  1. Clone repository with sparse-checkout
+     git init
+     git config core.sparseCheckout true
+     git fetch --depth=1 --filter=blob:none
+     
+  2. Read SKILL.md files from disk
+  3. Extract YAML frontmatter for all
+  4. Parse fields (title, description, tags)
+  
+  Efficiency: ~5s for 5 artifacts vs ~2.5s API calls
+
+Strategy 2: Per-Artifact (<3 artifacts)
+  1. For each artifact, fetch SKILL.md via GitHub API
+  2. Extract YAML frontmatter
+  3. Parse fields
+  
+  Efficiency: ~500ms per API call
+
+
+KEY FILES ANALYZED
+═══════════════════════════════════════════════════════════════════════════════
+
+skillmeat/core/artifact_detection.py (775 lines)
+  → ArtifactType enum, DetectionResult, detect_artifact()
+
+skillmeat/core/marketplace/heuristic_detector.py (600+ lines)
+  → HeuristicDetector class, 8-signal scoring
+
+skillmeat/core/marketplace/github_scanner.py (400+ lines)
+  → GitHubScanner, content hash computation
+
+skillmeat/api/routers/marketplace_sources.py (2500+ lines)
+  → _perform_scan() orchestration, frontmatter extraction
+
+skillmeat/cache/models.py (1900+ lines)
+  → MarketplaceSource, MarketplaceCatalogEntry ORM
+
+skillmeat/cache/repositories.py (800+ lines)
+  → Data access layer, transaction handler
+
+
+CURRENT GAPS (YOUR NEEDS)
+═══════════════════════════════════════════════════════════════════════════════
+
+1. NO AUTOMATIC ARTIFACTS ROOT DETECTION
+   • root_hint is user-provided only
+   • No automatic detection of where artifacts start
+   • No confidence/reasoning stored
+   
+   FIX: Add detected_root field + detection algorithm
+
+2. DETECTION METADATA NOT FULLY PERSISTED
+   • Detection reasons captured but not stored
+   • Individual signal scores not decomposed
+   • Detection mode (strict vs heuristic) lost
+   
+   FIX: Expand score_breakdown to individual signals
+
+3. BATCH THRESHOLD HARD-CODED
+   • BATCH_CLONE_THRESHOLD = 3 (in marketplace_sources.py:652)
+   • No per-source override
+   • No adaptive threshold
+   
+   FIX: Add configurable_batch_threshold to MarketplaceSource
+
+4. NO PER-SOURCE SEARCH CONFIG
+   • All sources use same FTS5 parameters
+   • No custom ranking weights
+   • No field-specific boosting
+   
+   FIX: Add search_config JSON field to MarketplaceSource
+
+
+IMPLEMENTATION READINESS
+═══════════════════════════════════════════════════════════════════════════════
+
+✓ FOR CROSS-SOURCE SEARCH
+  • Database schema designed
+  • FTS5 migration ready
+  • Search metadata captured
+  • Frontmatter extraction implemented
+  ⚠ Per-source ranking needs work
+
+✓ FOR ENHANCED DETECTION
+  • 8-signal scoring implemented
+  • Raw scores captured
+  • Score breakdown stored
+  ⚠ Detection reasons not persisted
+
+✗ FOR ARTIFACTS ROOT DETECTION
+  • Not implemented
+  • root_hint is workaround only
+  • No automatic detection
+
+✗ FOR CONFIGURABLE BATCH THRESHOLD
+  • Hard-coded to 3
+
+
+QUICK LOOK-UP TABLE
+═══════════════════════════════════════════════════════════════════════════════
+
+NEED TO UNDERSTAND...          | SEE THIS DOCUMENT
+─────────────────────────────────────────────────────────────────────────────
+Overall system                 | ANALYSIS-SUMMARY.md
+How detection works            | artifact-detection-system.md § 2
+MarketplaceSource fields       | artifact-detection-system.md § 3
+Indexing flow                  | artifact-detection-system.md § 4
+Database schema                | artifact-detection-system.md § 5
+Code locations                 | detection-code-reference.md § 1-2
+Line-by-line workflow          | detection-code-reference.md § 3
+Data structures                | detection-code-reference.md § 5
+Signal weights                 | detection-code-reference.md § 6
+Error handling                 | detection-code-reference.md § 7
+Performance                    | detection-code-reference.md § 8
+
+═══════════════════════════════════════════════════════════════════════════════

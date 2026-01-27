@@ -4,7 +4,7 @@ description: "Step-by-step guide to discovering, managing, and importing Claude 
 audience: "users"
 tags: ["marketplace", "github", "sources", "artifacts", "ingestion"]
 created: 2025-12-08
-updated: 2026-01-20
+updated: 2026-01-25
 category: "guides"
 status: "published"
 related_documents:
@@ -26,6 +26,7 @@ Discover and import Claude artifacts directly from GitHub repositories. This gui
 - [Single Artifact Mode](#single-artifact-mode)
 - [Importing Artifacts](#importing-artifacts)
 - [Rescanning Sources](#rescanning-sources)
+- [Source Card Badges](#source-card-badges)
 - [Status Chips Explained](#status-chips-explained)
 - [Troubleshooting & FAQ](#troubleshooting--faq)
 
@@ -520,6 +521,25 @@ Updated artifacts: 5
 Removed artifacts: 0
 Unchanged: 15
 ```
+
+## Source Card Badges
+
+Each source card displays three icon badges in the top-right corner indicating sync status, trust level, and search indexing state. Hover over any badge to see detailed information.
+
+### Badge Types
+
+| Badge | Icon | States | Tooltip Shows |
+|-------|------|--------|---------------|
+| **Sync Status** | Clock/Checkmark/Warning | Pending, Scanning, Synced, Error | Status + last sync timestamp |
+| **Trust Level** | Shield/Star | Untrusted, Basic, Verified, Official | Trust level + description |
+| **Search Index** | Search icons | Disabled, Pending, Active, Default | Index status + last indexed timestamp |
+
+### Search Indexing Badge States
+
+- **Disabled** (gray SearchX): Indexing explicitly disabled for this source
+- **Pending** (yellow Search): Indexing enabled but not yet run
+- **Active** (green SearchCheck): Successfully indexed; hover shows last indexed time
+- **Default** (muted Search): Using global indexing settings
 
 ## Status Chips Explained
 
