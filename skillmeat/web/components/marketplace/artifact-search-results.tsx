@@ -9,7 +9,6 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { GitBranch, FileCode, Search } from 'lucide-react';
 import {
   Accordion,
@@ -32,6 +31,8 @@ export interface ArtifactSearchResultsProps {
   results: ArtifactSearchResult[];
   /** Additional CSS classes */
   className?: string;
+  /** Callback when a result card is clicked */
+  onResultClick?: (result: ArtifactSearchResult) => void;
 }
 
 interface GroupedResults {
@@ -107,91 +108,98 @@ function formatConfidence(score: number): string {
 
 interface ResultCardProps {
   result: ArtifactSearchResult;
+  onClick?: () => void;
 }
 
-function ResultCard({ result }: ResultCardProps) {
-  const href = `/marketplace/sources/${result.source_id}/catalog/${encodeURIComponent(result.path)}`;
+function ResultCard({ result, onClick }: ResultCardProps) {
   // Combine snippets, preferring title_snippet then description_snippet
   const snippet = result.title_snippet || result.description_snippet;
 
   return (
-    <Link
-      href={href}
-      className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    <Card
+      className={cn(
+        'p-4 transition-all duration-200 cursor-pointer',
+        'hover:bg-muted/50 hover:shadow-sm',
+        'border-l-2 border-l-transparent hover:border-l-primary',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+      )}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-label={`View details for ${result.name}`}
     >
-      <Card
-        className={cn(
-          'p-4 transition-all duration-200',
-          'hover:bg-muted/50 hover:shadow-sm',
-          'border-l-2 border-l-transparent hover:border-l-primary'
-        )}
-      >
-        {/* Header: Name + Type + Confidence */}
-        <div className="mb-2 flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <FileCode className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-              <h4 className="truncate font-medium">{result.name}</h4>
-            </div>
-            {result.title && result.title !== result.name && (
-              <p className="mt-0.5 truncate text-sm text-muted-foreground">{result.title}</p>
-            )}
+      {/* Header: Name + Type + Confidence */}
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <FileCode className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+            <h4 className="truncate font-medium">{result.name}</h4>
           </div>
-          <div className="flex flex-shrink-0 items-center gap-2">
-            <Badge variant={getTypeVariant(result.artifact_type)} className="text-xs">
-              {formatArtifactType(result.artifact_type)}
-            </Badge>
-            <Badge variant="outline" className="text-xs tabular-nums">
-              {formatConfidence(result.confidence_score)}
-            </Badge>
-          </div>
+          {result.title && result.title !== result.name && (
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">{result.title}</p>
+          )}
         </div>
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <Badge variant={getTypeVariant(result.artifact_type)} className="text-xs">
+            {formatArtifactType(result.artifact_type)}
+          </Badge>
+          <Badge variant="outline" className="text-xs tabular-nums">
+            {formatConfidence(result.confidence_score)}
+          </Badge>
+        </div>
+      </div>
 
-        {/* Description */}
-        {result.description && (
-          <p className="mb-2 line-clamp-2 text-sm text-muted-foreground">{result.description}</p>
-        )}
+      {/* Description */}
+      {result.description && (
+        <p className="mb-2 line-clamp-2 text-sm text-muted-foreground">{result.description}</p>
+      )}
 
-        {/* Snippet with FTS5 highlights */}
-        {snippet && (
-          <div
-            className={cn(
-              'mt-2 rounded-md bg-muted/50 p-2 text-sm',
-              '[&_mark]:rounded [&_mark]:bg-yellow-200 [&_mark]:px-0.5 [&_mark]:text-foreground',
-              'dark:[&_mark]:bg-yellow-900/50 dark:[&_mark]:text-yellow-200'
-            )}
-            // eslint-disable-next-line react/no-danger
-            dangerouslySetInnerHTML={{ __html: snippet }}
-            aria-label="Search result snippet with highlighted matches"
-          />
-        )}
+      {/* Snippet with FTS5 highlights */}
+      {snippet && (
+        <div
+          className={cn(
+            'mt-2 rounded-md bg-muted/50 p-2 text-sm',
+            '[&_mark]:rounded [&_mark]:bg-yellow-200 [&_mark]:px-0.5 [&_mark]:text-foreground',
+            'dark:[&_mark]:bg-yellow-900/50 dark:[&_mark]:text-yellow-200'
+          )}
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: snippet }}
+          aria-label="Search result snippet with highlighted matches"
+        />
+      )}
 
-        {/* Tags */}
-        {result.search_tags && result.search_tags.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {result.search_tags.slice(0, 3).map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-xs">
-                {tag}
-              </Badge>
-            ))}
-            {result.search_tags.length > 3 && (
-              <Badge variant="secondary" className="text-xs">
-                +{result.search_tags.length - 3}
-              </Badge>
-            )}
-          </div>
-        )}
-      </Card>
-    </Link>
+      {/* Tags */}
+      {result.search_tags && result.search_tags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {result.search_tags.slice(0, 3).map((tag) => (
+            <Badge key={tag} variant="secondary" className="text-xs">
+              {tag}
+            </Badge>
+          ))}
+          {result.search_tags.length > 3 && (
+            <Badge variant="secondary" className="text-xs">
+              +{result.search_tags.length - 3}
+            </Badge>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 
 interface SourceGroupProps {
   group: GroupedResults;
   value: string;
+  onResultClick?: (result: ArtifactSearchResult) => void;
 }
 
-function SourceGroup({ group, value }: SourceGroupProps) {
+function SourceGroup({ group, value, onResultClick }: SourceGroupProps) {
   return (
     <AccordionItem value={value} className="border-b last:border-b-0">
       <AccordionTrigger
@@ -211,7 +219,11 @@ function SourceGroup({ group, value }: SourceGroupProps) {
       <AccordionContent className="px-4 pb-4">
         <div className="space-y-3">
           {group.results.map((result) => (
-            <ResultCard key={result.id} result={result} />
+            <ResultCard
+              key={result.id}
+              result={result}
+              onClick={() => onResultClick?.(result)}
+            />
           ))}
         </div>
       </AccordionContent>
@@ -223,7 +235,11 @@ function SourceGroup({ group, value }: SourceGroupProps) {
 // Main Component
 // ============================================================================
 
-export function ArtifactSearchResults({ results, className }: ArtifactSearchResultsProps) {
+export function ArtifactSearchResults({
+  results,
+  className,
+  onResultClick,
+}: ArtifactSearchResultsProps) {
   // Handle empty state
   if (results.length === 0) {
     return (
@@ -257,7 +273,12 @@ export function ArtifactSearchResults({ results, className }: ArtifactSearchResu
       className={cn('rounded-lg border', className)}
     >
       {groupedResults.map((group) => (
-        <SourceGroup key={group.sourceId} group={group} value={group.sourceId} />
+        <SourceGroup
+          key={group.sourceId}
+          group={group}
+          value={group.sourceId}
+          onResultClick={onResultClick}
+        />
       ))}
     </Accordion>
   );
