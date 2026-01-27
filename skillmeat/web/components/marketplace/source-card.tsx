@@ -206,17 +206,47 @@ function StatusBadge({ status, errorMessage, lastSyncAt }: StatusBadgeProps) {
 
 interface IndexingBadgeProps {
   indexingEnabled: boolean | null;
+  deepIndexingEnabled: boolean | null;
   lastIndexedTreeSha?: string | null;
   lastIndexedAt?: string | null;
 }
 
-function IndexingBadge({ indexingEnabled, lastIndexedTreeSha, lastIndexedAt }: IndexingBadgeProps) {
+/**
+ * Custom icon: Search with a plus sign inside the magnifying glass
+ */
+function SearchPlus({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* Magnifying glass circle */}
+      <circle cx="11" cy="11" r="8" />
+      {/* Handle */}
+      <path d="m21 21-4.3-4.3" />
+      {/* Plus sign inside */}
+      <path d="M11 8v6" />
+      <path d="M8 11h6" />
+    </svg>
+  );
+}
+
+function IndexingBadge({ indexingEnabled, deepIndexingEnabled, lastIndexedTreeSha, lastIndexedAt }: IndexingBadgeProps) {
   // Determine indexing state
-  let state: 'disabled' | 'pending' | 'indexed' | 'default';
+  let state: 'disabled' | 'pending' | 'indexed' | 'deep_indexed' | 'default';
   if (indexingEnabled === false) {
     state = 'disabled';
   } else if (indexingEnabled === true && !lastIndexedTreeSha) {
     state = 'pending';
+  } else if (indexingEnabled === true && lastIndexedTreeSha && deepIndexingEnabled === true) {
+    state = 'deep_indexed';
   } else if (indexingEnabled === true && lastIndexedTreeSha) {
     state = 'indexed';
   } else {
@@ -241,6 +271,12 @@ function IndexingBadge({ indexingEnabled, lastIndexedTreeSha, lastIndexedAt }: I
       label: 'Active',
       description: 'Search index is active',
       className: 'border-green-500 text-green-700 bg-green-50 dark:bg-green-950',
+    },
+    deep_indexed: {
+      icon: SearchPlus,
+      label: 'Deep Search',
+      description: 'Deep content indexing is active',
+      className: 'border-purple-500 text-purple-700 bg-purple-50 dark:bg-purple-950',
     },
     default: {
       icon: Search,
@@ -394,6 +430,7 @@ export function SourceCard({
             <TrustBadge level={source.trust_level} />
             <IndexingBadge
               indexingEnabled={source.indexing_enabled ?? null}
+              deepIndexingEnabled={source.deep_indexing_enabled ?? null}
               lastIndexedTreeSha={source.last_indexed_tree_sha}
               lastIndexedAt={source.last_indexed_at}
             />

@@ -537,7 +537,7 @@ Each source card displays three icon-only badges in the top-right corner indicat
 |-------|------|--------|---------------|
 | **Sync Status** | Clock/Checkmark/Warning | Pending, Scanning, Synced, Error | Status + last sync timestamp |
 | **Trust Level** | Shield/Star | Untrusted, Basic, Verified, Official | Trust level + description |
-| **Search Index** | Search icons | Disabled, Pending, Active, Default | Index status + last indexed timestamp |
+| **Search Index** | Search icons | Disabled, Pending, Active, Deep Search, Default | Index status + last indexed timestamp |
 
 The badges are icon-only to keep source cards clean. Simply hover over a badge to see full details.
 
@@ -548,6 +548,7 @@ Search indexing now covers all artifact types (skills, commands, agents, hooks, 
 - **Disabled** (gray SearchX): Indexing explicitly disabled for this source
 - **Pending** (yellow Search): Indexing enabled but not yet run
 - **Active** (green SearchCheck): All artifact types indexed; hover shows last indexed time
+- **Deep Search** (purple Search+): Deep content indexing is active; includes full-text search of artifact contents
 - **Default** (muted Search): Using global indexing settings
 
 ### Search Indexing Levels
