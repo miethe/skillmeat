@@ -2,7 +2,7 @@
 title: "GitHub Source Ingestion User Guide"
 description: "Step-by-step guide to discovering, managing, and importing Claude artifacts from GitHub repositories"
 audience: "users"
-tags: ["marketplace", "github", "sources", "artifacts", "ingestion"]
+tags: ["marketplace", "github", "sources", "artifacts", "ingestion", "search-ranking"]
 created: 2025-12-08
 updated: 2026-01-27
 category: "guides"
@@ -597,6 +597,42 @@ This level is sufficient for finding artifacts by name, purpose, or category. Mo
 
 **Note:** Deep indexing only runs during batch extraction (sources with 3+ artifacts) and requires cloning the repository. Enable it selectively for sources where you need deeper search capabilities.
 
+### Search Results Ranking
+
+When searching for artifacts in the marketplace, results are ranked by **relevance** based on where your search term was found. This ensures the most relevant matches appear first.
+
+#### Ranking Priority
+
+Search results are ordered by match location with the following priority:
+
+| Priority | Field | Description |
+|----------|-------|-------------|
+| 1 (Highest) | **Title** | Matches in artifact titles rank highest |
+| 2 | **Description** | Matches in artifact descriptions |
+| 3 | **Tags** | Matches in search tags |
+| 4 | **Search Text** | Matches in concatenated metadata |
+| 5 (Lowest) | **Deep Content** | Matches in file contents (if deep indexing enabled) |
+
+#### How It Works
+
+- **Title matches first**: If you search for "canvas", artifacts with "canvas" in their title appear before those where "canvas" only appears in the description
+- **Secondary sorting**: When multiple artifacts have the same relevance score, they're sorted by detection confidence score (higher confidence first)
+- **Deep matches last**: Artifacts matched only through deep content indexing appear after metadata matches, helping you distinguish between artifacts "about" something vs. artifacts that merely "mention" it
+
+#### Tips for Effective Searches
+
+- **Be specific**: Searching for "pdf-converter" will rank exact title matches higher than general mentions
+- **Use tags**: Tag-based filtering combined with search narrows results effectively
+- **Check badges**: Look for the "Deep Search" badge on result cards to see if a match came from file content rather than metadata
+
+#### Example
+
+Searching for "authentication":
+1. First: "OAuth Authentication Skill" (title match)
+2. Second: "API Gateway" with description "Handles authentication..." (description match)
+3. Third: Artifacts tagged with "authentication" (tag match)
+4. Last: Artifacts where "authentication" appears only in code comments (deep content match)
+
 ## Status Chips Explained
 
 Each artifact in the catalog displays a status chip (colored badge) indicating its current state.
@@ -914,6 +950,7 @@ Sources also have trust level indicators:
 ## See Also
 
 - [Marketplace Usage Guide](./marketplace-usage-guide.md) - General marketplace features
+- [Searching for Artifacts Guide](./searching.md) - CLI search and duplicate detection
 - [Web UI Guide](./web-ui-guide.md) - Full web interface documentation
 - [Publishing to Marketplace Guide](./publishing-to-marketplace.md) - Share your artifacts
 - [Team Sharing Guide](./team-sharing-guide.md) - Collaborate with teammates

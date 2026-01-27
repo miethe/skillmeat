@@ -9,7 +9,7 @@ tags:
   - cli
   - web-ui
 created: "2024-11-01"
-updated: "2025-12-25"
+updated: "2026-01-27"
 category: user-guides
 status: current
 related_documents:
@@ -524,6 +524,7 @@ skillmeat find-duplicates --threshold 0.90
 - [Updating Artifacts Safely](updating-safely.md) - Update artifacts with confidence
 - [Using Analytics & Insights](using-analytics.md) - Track artifact usage
 - [Syncing Changes](syncing-changes.md) - Keep projects and collections in sync
+- [Marketplace GitHub Sources](marketplace-github-sources.md) - Web UI search with field-weighted ranking
 
 ## See Also
 
