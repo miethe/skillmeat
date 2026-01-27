@@ -436,6 +436,11 @@ export function CatalogEntryModal({
     }
   }, [fileTreeData?.entries, selectedFilePath]);
 
+  // Reset file selection when artifact entry changes
+  useEffect(() => {
+    setSelectedFilePath(null);
+  }, [entry?.id]);
+
   useEffect(() => {
     if (!entry) {
       return;
@@ -447,7 +452,7 @@ export function CatalogEntryModal({
     }
   }, [entry, isEditingName]);
 
-  // Reset selected file when modal closes or entry changes
+  // Reset selected file when modal closes
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
       setSelectedFilePath(null);
