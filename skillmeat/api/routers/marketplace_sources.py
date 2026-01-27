@@ -769,36 +769,60 @@ def _extract_frontmatter_for_artifact(
         "search_text": None,
     }
 
-    # Get candidate manifest files for this artifact type
-    manifest_candidates = _get_manifest_candidates(artifact.artifact_type)
     artifact_path = artifact.path.rstrip("/")
 
-    # Try each candidate manifest file in order
+    # Check if the artifact path itself is a manifest file (file-based artifacts
+    # like commands/doc-generate.md, agents/bar.md, hooks/baz.yaml)
     content = None
     used_manifest = None
-    for manifest_file in manifest_candidates:
-        manifest_path = (
-            f"{artifact_path}/{manifest_file}" if artifact_path else manifest_file
-        )
 
+    if artifact_path.endswith((".md", ".yaml", ".yml")):
+        # File-based artifact: the artifact path IS the manifest
         try:
             file_result = scanner.get_file_content(
                 owner=source.owner,
                 repo=source.repo_name,
-                path=manifest_path,
+                path=artifact_path,
                 ref=source.ref,
             )
 
             if file_result and not file_result.get("is_binary"):
                 content = file_result.get("content", "")
                 if content:
-                    used_manifest = manifest_file
-                    break
+                    used_manifest = artifact_path.split("/")[-1]
         except Exception:
-            # Continue to next candidate
-            continue
+            pass  # Fall through to directory-based lookup
+
+    # If not a file-based artifact (or file read failed), try directory-based lookup
+    if not content:
+        # Get candidate manifest files for this artifact type
+        manifest_candidates = _get_manifest_candidates(artifact.artifact_type)
+
+        # Try each candidate manifest file in order
+        for manifest_file in manifest_candidates:
+            manifest_path = (
+                f"{artifact_path}/{manifest_file}" if artifact_path else manifest_file
+            )
+
+            try:
+                file_result = scanner.get_file_content(
+                    owner=source.owner,
+                    repo=source.repo_name,
+                    path=manifest_path,
+                    ref=source.ref,
+                )
+
+                if file_result and not file_result.get("is_binary"):
+                    content = file_result.get("content", "")
+                    if content:
+                        used_manifest = manifest_file
+                        break
+            except Exception:
+                # Continue to next candidate
+                continue
 
     if not content:
+        manifest_candidates = _get_manifest_candidates(artifact.artifact_type)
         logger.debug(
             f"No manifest found for {artifact.artifact_type} artifact at "
             f"{artifact_path}, tried: {manifest_candidates}"
@@ -1197,27 +1221,45 @@ def _extract_frontmatter_batch(
         # Read manifest file for each artifact from disk
         for artifact in artifacts:
             artifact_path = artifact.path.rstrip("/")
-            manifest_candidates = _get_manifest_candidates(artifact.artifact_type)
 
-            # Try each candidate manifest file in order
+            # Check if the artifact path itself is a manifest file (file-based
+            # artifacts like commands/doc-generate.md, agents/bar.md, hooks/baz.yaml)
             content = None
             used_manifest = None
-            for manifest_file in manifest_candidates:
-                if artifact_path:
-                    manifest_path = clone_path / artifact_path / manifest_file
-                else:
-                    manifest_path = clone_path / manifest_file
 
+            if artifact_path.endswith((".md", ".yaml", ".yml")):
+                # File-based artifact: the artifact path IS the manifest
+                manifest_path = clone_path / artifact_path
                 if manifest_path.exists():
                     try:
                         content = manifest_path.read_text(encoding="utf-8")
                         if content:
-                            used_manifest = manifest_file
-                            break
+                            used_manifest = artifact_path.split("/")[-1]
                     except Exception:
-                        continue
+                        pass  # Fall through to directory-based lookup
+
+            # If not a file-based artifact (or file read failed), try directory-based lookup
+            if not content:
+                manifest_candidates = _get_manifest_candidates(artifact.artifact_type)
+
+                # Try each candidate manifest file in order
+                for manifest_file in manifest_candidates:
+                    if artifact_path:
+                        manifest_path = clone_path / artifact_path / manifest_file
+                    else:
+                        manifest_path = clone_path / manifest_file
+
+                    if manifest_path.exists():
+                        try:
+                            content = manifest_path.read_text(encoding="utf-8")
+                            if content:
+                                used_manifest = manifest_file
+                                break
+                        except Exception:
+                            continue
 
             if not content:
+                manifest_candidates = _get_manifest_candidates(artifact.artifact_type)
                 logger.debug(
                     f"No manifest found for {artifact.artifact_type} artifact at "
                     f"{artifact_path}, tried: {manifest_candidates}"
