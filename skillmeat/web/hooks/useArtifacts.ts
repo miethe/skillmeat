@@ -319,7 +319,7 @@ async function fetchArtifactsFromApi(
 
 async function fetchArtifactFromApi(id: string): Promise<Artifact | null> {
   try {
-    const artifact = await apiRequest<ArtifactResponse>(`/artifacts/${id}`);
+    const artifact = await apiRequest<ArtifactResponse>(`/artifacts/${encodeURIComponent(id)}`);
     return mapApiResponseToArtifact(artifact, 'collection');
   } catch (error) {
     if (USE_MOCKS && error instanceof ApiError && error.status === 404) {
@@ -368,7 +368,7 @@ export function useUpdateArtifact() {
   return useMutation({
     mutationFn: async (artifact: Partial<Artifact> & { id: string }) => {
       try {
-        const response = await apiRequest<ArtifactResponse>(`/artifacts/${artifact.id}`, {
+        const response = await apiRequest<ArtifactResponse>(`/artifacts/${encodeURIComponent(artifact.id)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(artifact),
@@ -398,7 +398,7 @@ export function useDeleteArtifact() {
   return useMutation({
     mutationFn: async (id: string) => {
       try {
-        await apiRequest<void>(`/artifacts/${id}`, {
+        await apiRequest<void>(`/artifacts/${encodeURIComponent(id)}`, {
           method: 'DELETE',
         });
         return id;

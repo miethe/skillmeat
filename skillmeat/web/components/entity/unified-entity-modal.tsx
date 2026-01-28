@@ -540,7 +540,7 @@ export function UnifiedEntityModal({
       }
 
       return await apiRequest<FileContentResponse>(
-        `/artifacts/${entity.id}/files/${encodeURIComponent(selectedPath)}?${params.toString()}`
+        `/artifacts/${encodeURIComponent(entity.id)}/files/${encodeURIComponent(selectedPath)}?${params.toString()}`
       );
     },
     enabled: !!entity?.id && !!selectedPath,
@@ -1067,7 +1067,7 @@ export function UnifiedEntityModal({
       const requestBody: FileUpdateRequest = { content };
 
       await apiRequest<FileContentResponse>(
-        `/artifacts/${entity.id}/files/${encodeURIComponent(selectedPath)}?${params.toString()}`,
+        `/artifacts/${encodeURIComponent(entity.id)}/files/${encodeURIComponent(selectedPath)}?${params.toString()}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -1107,7 +1107,7 @@ export function UnifiedEntityModal({
       const requestBody: FileUpdateRequest = { content: '' };
 
       await apiRequest<FileContentResponse>(
-        `/artifacts/${entity.id}/files/${encodeURIComponent(fileName)}?${params.toString()}`,
+        `/artifacts/${encodeURIComponent(entity.id)}/files/${encodeURIComponent(fileName)}?${params.toString()}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1151,7 +1151,7 @@ export function UnifiedEntityModal({
       }
 
       await apiRequest(
-        `/artifacts/${entity.id}/files/${encodeURIComponent(fileToDelete)}?${params.toString()}`,
+        `/artifacts/${encodeURIComponent(entity.id)}/files/${encodeURIComponent(fileToDelete)}?${params.toString()}`,
         {
           method: 'DELETE',
         }

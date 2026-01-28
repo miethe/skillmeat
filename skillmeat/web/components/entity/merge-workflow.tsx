@@ -270,7 +270,7 @@ export function MergeWorkflow({
     setError(null);
     try {
       const response = await apiRequest<ArtifactDiffResponse>(
-        `/artifacts/${entityId}/diff?project_path=${encodeURIComponent(projectPath)}`
+        `/artifacts/${encodeURIComponent(entityId)}/diff?project_path=${encodeURIComponent(projectPath)}`
       );
       setDiffData(response);
 
@@ -325,7 +325,7 @@ export function MergeWorkflow({
         strategy: determineStrategy(),
       };
 
-      const response = await apiRequest<ArtifactSyncResponse>(`/artifacts/${entityId}/sync`, {
+      const response = await apiRequest<ArtifactSyncResponse>(`/artifacts/${encodeURIComponent(entityId)}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(syncRequest),

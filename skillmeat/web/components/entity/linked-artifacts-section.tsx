@@ -106,7 +106,7 @@ async function deleteLinkedArtifact(
   targetArtifactId: string
 ): Promise<void> {
   const response = await fetch(
-    buildUrl(`/artifacts/${artifactId}/linked-artifacts/${targetArtifactId}`),
+    buildUrl(`/artifacts/${encodeURIComponent(artifactId)}/linked-artifacts/${encodeURIComponent(targetArtifactId)}`),
     {
       method: 'DELETE',
     }

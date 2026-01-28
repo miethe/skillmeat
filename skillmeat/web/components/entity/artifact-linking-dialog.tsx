@@ -151,7 +151,7 @@ export function ArtifactLinkingDialog({
       targetArtifactId: string;
       linkType: LinkType;
     }) => {
-      const response = await fetch(buildUrl(`/artifacts/${artifactId}/linked-artifacts`), {
+      const response = await fetch(buildUrl(`/artifacts/${encodeURIComponent(artifactId)}/linked-artifacts`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

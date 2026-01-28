@@ -351,7 +351,7 @@ export function EntityLifecycleProvider({
 
       await withMockFallback(
         () =>
-          apiRequest<ArtifactResponse>(`/artifacts/${id}`, {
+          apiRequest<ArtifactResponse>(`/artifacts/${encodeURIComponent(id)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request),
@@ -369,7 +369,7 @@ export function EntityLifecycleProvider({
     mutationFn: async (id: string) => {
       await withMockFallback(
         () =>
-          apiRequest<void>(`/artifacts/${id}`, {
+          apiRequest<void>(`/artifacts/${encodeURIComponent(id)}`, {
             method: 'DELETE',
           }),
         undefined,
@@ -389,7 +389,7 @@ export function EntityLifecycleProvider({
 
       await withMockFallback(
         () =>
-          apiRequest(`/artifacts/${id}/deploy`, {
+          apiRequest(`/artifacts/${encodeURIComponent(id)}/deploy`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request),
@@ -413,7 +413,7 @@ export function EntityLifecycleProvider({
 
       await withMockFallback(
         () =>
-          apiRequest(`/artifacts/${id}/sync`, {
+          apiRequest(`/artifacts/${encodeURIComponent(id)}/sync`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request),

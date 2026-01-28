@@ -58,7 +58,7 @@ export function PullToCollectionDialog({
       });
 
       const response = await apiRequest<ArtifactDiffResponse>(
-        `/artifacts/${entity.id}/diff?${params.toString()}`
+        `/artifacts/${encodeURIComponent(entity.id)}/diff?${params.toString()}`
       );
 
       setDiffData(response);
@@ -79,7 +79,7 @@ export function PullToCollectionDialog({
         strategy: 'ours', // Pull from project to collection
       };
 
-      await apiRequest(`/artifacts/${entity.id}/sync`, {
+      await apiRequest(`/artifacts/${encodeURIComponent(entity.id)}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),

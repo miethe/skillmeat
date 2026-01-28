@@ -622,7 +622,7 @@ export function useRemoveArtifactFromGroup(): UseMutationResult<
       artifactId: string;
     }): Promise<void> => {
       try {
-        await apiRequest<void>(`/groups/${groupId}/artifacts/${artifactId}`, {
+        await apiRequest<void>(`/groups/${encodeURIComponent(groupId)}/artifacts/${encodeURIComponent(artifactId)}`, {
           method: 'DELETE',
         });
       } catch (error) {
@@ -754,7 +754,7 @@ export function useMoveArtifactToGroup(): UseMutationResult<
           ...(position !== undefined && { position }),
         };
 
-        await apiRequest<void>(`/groups/${sourceGroupId}/artifacts/${artifactId}/move`, {
+        await apiRequest<void>(`/groups/${encodeURIComponent(sourceGroupId)}/artifacts/${encodeURIComponent(artifactId)}/move`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
