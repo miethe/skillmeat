@@ -84,10 +84,21 @@ import type { ArtifactDeploymentInfo } from '@/types/deployments';
 import type { Deployment } from '@/components/deployments/deployment-card';
 
 interface UnifiedEntityModalProps {
-  entity: Artifact | null;
+  /**
+   * The artifact to display in the modal.
+   * Canonical prop name - use this for new code.
+   */
+  artifact?: Artifact | null;
+  /**
+   * @deprecated Use `artifact` instead. This prop name is maintained for backward compatibility.
+   * Will be removed in a future version.
+   */
+  entity?: Artifact | null;
   open: boolean;
   onClose: () => void;
+  /** Handler to navigate to the artifact's source in the marketplace. Required when artifact has a source. */
   onNavigateToSource?: (sourceId: string, artifactPath: string) => void;
+  /** Handler to navigate to a deployment. Required when artifact has deployments. */
   onNavigateToDeployment?: (projectPath: string, artifactId: string) => void;
 }
 
@@ -280,10 +291,13 @@ function _EntityModalSkeleton() {
 // ============================================================================
 
 /**
- * UnifiedEntityModal - Unified modal for entity management
+ * UnifiedEntityModal - Unified modal for artifact management
  *
  * Consolidated modal component that combines the best of both Sheet and Dialog approaches.
- * Uses Dialog for consistency with collection UI and provides comprehensive entity management.
+ * Uses Dialog for consistency with collection UI and provides comprehensive artifact management.
+ *
+ * Accepts unified Artifact type (Entity type alias is deprecated).
+ * Supports both `artifact` (preferred) and `entity` (deprecated) prop names for backward compatibility.
  *
  * Features:
  * - Overview tab with metadata, status, version, tags, timestamps, location
@@ -299,6 +313,16 @@ function _EntityModalSkeleton() {
  *
  * @example
  * ```tsx
+ * // Preferred usage (new code)
+ * <UnifiedEntityModal
+ *   artifact={selectedArtifact}
+ *   open={isModalOpen}
+ *   onClose={() => setIsModalOpen(false)}
+ *   onNavigateToSource={(sourceId, path) => navigateToSource(sourceId, path)}
+ *   onNavigateToDeployment={(projectPath, artifactId) => navigateToDeployment(projectPath, artifactId)}
+ * />
+ *
+ * // Backward compatible usage (deprecated - migrate to artifact prop)
  * <UnifiedEntityModal
  *   entity={selectedEntity}
  *   open={isModalOpen}
@@ -307,12 +331,17 @@ function _EntityModalSkeleton() {
  * ```
  */
 export function UnifiedEntityModal({
-  entity,
+  artifact,
+  entity: entityProp,
   open,
   onClose,
   onNavigateToSource,
   onNavigateToDeployment,
 }: UnifiedEntityModalProps) {
+  // Backward compatibility: accept both 'artifact' and 'entity' props
+  // 'artifact' takes precedence if both are provided
+  // Internal code uses 'entity' variable for minimal refactoring
+  const entity = artifact ?? entityProp ?? null;
   const [activeTab, setActiveTab] = useState('overview');
   const { deployEntity, syncEntity, refetch } = useEntityLifecycle();
   const [_isDeploying, _setIsDeploying] = useState(false);
@@ -355,6 +384,24 @@ export function UnifiedEntityModal({
   const { mutateAsync: updateParameters } = useEditArtifactParameters();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Runtime warning for missing navigation handlers on artifacts with source
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && entity && open) {
+      if (entity.source && hasValidUpstreamSource(entity.source) && !onNavigateToSource) {
+        console.warn(
+          `[UnifiedEntityModal] Artifact "${entity.name}" has a valid upstream source but onNavigateToSource handler is not provided. ` +
+            `Navigation to source will be unavailable.`
+        );
+      }
+      if (!onNavigateToDeployment) {
+        console.warn(
+          `[UnifiedEntityModal] onNavigateToDeployment handler is not provided for artifact "${entity.name}". ` +
+            `Navigation to deployments will be unavailable.`
+        );
+      }
+    }
+  }, [entity, open, onNavigateToSource, onNavigateToDeployment]);
 
   // Fetch available tags for autocomplete
   const { data: tagsData, isLoading: isTagsLoading } = useTags(100);
