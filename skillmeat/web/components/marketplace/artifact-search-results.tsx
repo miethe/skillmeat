@@ -9,7 +9,7 @@
 'use client';
 
 import * as React from 'react';
-import { GitBranch, FileCode, Search } from 'lucide-react';
+import { GitBranch, FileCode, Search, Package, Terminal, Bot, Server, Webhook } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -17,6 +17,12 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -40,6 +46,25 @@ interface GroupedResults {
   sourceName: string;
   results: ArtifactSearchResult[];
 }
+
+// ============================================================================
+// Type Configuration
+// ============================================================================
+
+const artifactTypeConfig: Record<string, {
+  icon: React.ComponentType<{ className?: string }>;
+  borderColor: string;
+  label: string;
+}> = {
+  skill: { icon: Package, borderColor: 'border-l-blue-500', label: 'Skill' },
+  command: { icon: Terminal, borderColor: 'border-l-purple-500', label: 'Command' },
+  agent: { icon: Bot, borderColor: 'border-l-green-500', label: 'Agent' },
+  mcp: { icon: Server, borderColor: 'border-l-orange-500', label: 'MCP' },
+  mcp_server: { icon: Server, borderColor: 'border-l-orange-500', label: 'MCP Server' },
+  hook: { icon: Webhook, borderColor: 'border-l-pink-500', label: 'Hook' },
+};
+
+const defaultTypeConfig = { icon: FileCode, borderColor: 'border-l-gray-500', label: 'Unknown' };
 
 // ============================================================================
 // Helpers
@@ -81,20 +106,6 @@ function formatArtifactType(type: string): string {
 }
 
 /**
- * Get badge variant based on artifact type.
- */
-function getTypeVariant(type: string): 'default' | 'secondary' | 'outline' {
-  switch (type.toLowerCase()) {
-    case 'skill':
-      return 'default';
-    case 'command':
-      return 'secondary';
-    default:
-      return 'outline';
-  }
-}
-
-/**
  * Format confidence score as percentage.
  * API returns score as 0-100 integer.
  */
@@ -115,12 +126,17 @@ function ResultCard({ result, onClick }: ResultCardProps) {
   // Combine snippets, preferring title_snippet then description_snippet
   const snippet = result.title_snippet || result.description_snippet;
 
+  // Get type-specific configuration
+  const typeConfig = artifactTypeConfig[result.artifact_type.toLowerCase()] ?? defaultTypeConfig;
+  const TypeIcon = typeConfig.icon;
+
   return (
     <Card
       className={cn(
         'p-4 transition-all duration-200 cursor-pointer',
         'hover:bg-muted/50 hover:shadow-sm',
-        'border-l-2 border-l-transparent hover:border-l-primary',
+        'border-l-2',
+        typeConfig.borderColor,
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
       )}
       onClick={onClick}
@@ -138,7 +154,7 @@ function ResultCard({ result, onClick }: ResultCardProps) {
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <FileCode className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+            <TypeIcon className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
             <h4 className="truncate font-medium">{result.name}</h4>
           </div>
           {result.title && result.title !== result.name && (
@@ -146,9 +162,24 @@ function ResultCard({ result, onClick }: ResultCardProps) {
           )}
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
-          <Badge variant={getTypeVariant(result.artifact_type)} className="text-xs">
-            {formatArtifactType(result.artifact_type)}
-          </Badge>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="secondary" className="text-xs px-1.5">
+                  <TypeIcon className="h-3 w-3" aria-hidden="true" />
+                  <span className="sr-only">{formatArtifactType(result.artifact_type)}</span>
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{formatArtifactType(result.artifact_type)}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          {result.status === 'imported' && (
+            <Badge variant="outline" className="text-xs text-muted-foreground">
+              Imported
+            </Badge>
+          )}
           <Badge variant="outline" className="text-xs tabular-nums">
             {formatConfidence(result.confidence_score)}
           </Badge>
