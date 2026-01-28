@@ -334,8 +334,8 @@ export function ArtifactList({
                   <TableCell>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 font-medium">
-                        {artifact.metadata?.title || artifact.name}
-                        {artifact.upstreamStatus.isOutdated && (
+                        {artifact.name}
+                        {artifact.upstream?.updateAvailable && (
                           <AlertCircle
                             className="h-3 w-3 text-yellow-600"
                             data-testid="outdated-indicator"
@@ -343,7 +343,7 @@ export function ArtifactList({
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {artifact.metadata?.description || artifact.name}
+                        {artifact.description || artifact.name}
                       </div>
                     </div>
                   </TableCell>
@@ -355,10 +355,10 @@ export function ArtifactList({
                           className="cursor-pointer hover:bg-accent"
                           onClick={(e) => {
                             e.stopPropagation();
-                            artifact.collection?.id && onCollectionClick?.(artifact.collection.id);
+                            artifact.collection && onCollectionClick?.(artifact.collection);
                           }}
                         >
-                          {artifact.collection?.name}
+                          {artifact.collection}
                         </Badge>
                       ) : (
                         <span className="text-xs text-muted-foreground">-</span>
@@ -373,11 +373,11 @@ export function ArtifactList({
                   </TableCell>
                   <TableCell>
                     <Badge
-                      className={statusColors[artifact.status]}
+                      className={statusColors[artifact.syncStatus]}
                       variant="outline"
                       data-testid="status-badge"
                     >
-                      {artifact.status}
+                      {artifact.syncStatus}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -391,7 +391,7 @@ export function ArtifactList({
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    <div className="text-sm">{artifact.usageStats.totalDeployments}</div>
+                    <div className="text-sm">{artifact.usageStats?.totalDeployments ?? 0}</div>
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
                     <div className="text-sm text-muted-foreground">
@@ -401,7 +401,7 @@ export function ArtifactList({
                   <TableCell>
                     <ArtifactRowActions
                       artifact={artifact}
-                      collectionId={artifact.collection?.id}
+                      collectionId={artifact.collection}
                       onDeploy={() => handleDeploy(artifact)}
                       onMoveToCollection={
                         onMoveToCollection ? () => onMoveToCollection(artifact) : undefined

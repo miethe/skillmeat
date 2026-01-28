@@ -131,10 +131,10 @@ function ArtifactCard({
           className="absolute right-2 top-2 z-10 cursor-pointer bg-background/95 text-xs backdrop-blur hover:bg-accent"
           onClick={(e) => {
             e.stopPropagation();
-            artifact.collection?.id && onCollectionClick?.(artifact.collection.id);
+            artifact.collection && onCollectionClick?.(artifact.collection);
           }}
         >
-          {artifact.collection?.name}
+          {artifact.collection}
         </Badge>
       )}
 
@@ -148,7 +148,7 @@ function ArtifactCard({
       >
         <ArtifactCardActions
           artifact={artifact}
-          collectionId={artifact.collection?.id}
+          collectionId={artifact.collection}
           onDeploy={onDeploy}
           onMoveToCollection={onMoveToCollection}
           onManageGroups={onManageGroups}

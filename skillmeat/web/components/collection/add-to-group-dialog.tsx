@@ -113,12 +113,12 @@ export function AddToGroupDialog({
     if (artifact.collections && artifact.collections.length > 0) {
       return artifact.collections;
     }
-    // Fallback to single collection if available (artifact.collection only has id and name)
+    // Fallback to single collection if available (artifact.collection is a string identifier)
     if (artifact.collection) {
       return [
         {
-          id: artifact.collection.id,
-          name: artifact.collection.name,
+          id: artifact.collection,
+          name: artifact.collection,
           artifact_count: undefined, // Not available on single collection reference
         },
       ];
