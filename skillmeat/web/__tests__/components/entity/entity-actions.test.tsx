@@ -9,8 +9,11 @@ const mockEntity: Entity = {
   id: 'skill:test',
   name: 'test-skill',
   type: 'skill',
+  scope: 'user',
   source: 'github:user/repo/skill',
-  status: 'synced',
+  syncStatus: 'synced',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
 };
 
 describe('EntityActions', () => {
@@ -111,7 +114,7 @@ describe('EntityActions', () => {
   });
 
   it('shows View Diff action when entity is modified', async () => {
-    const modifiedEntity = { ...mockEntity, status: 'modified' as const };
+    const modifiedEntity = { ...mockEntity, syncStatus: 'modified' as const };
     render(<EntityActions entity={modifiedEntity} onViewDiff={jest.fn()} />);
 
     const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -134,7 +137,7 @@ describe('EntityActions', () => {
   });
 
   it('shows Rollback action when entity is modified', async () => {
-    const modifiedEntity = { ...mockEntity, status: 'modified' as const };
+    const modifiedEntity = { ...mockEntity, syncStatus: 'modified' as const };
     render(<EntityActions entity={modifiedEntity} onRollback={jest.fn()} />);
 
     const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -146,7 +149,7 @@ describe('EntityActions', () => {
   });
 
   it('shows Rollback action when entity has conflict', async () => {
-    const conflictEntity = { ...mockEntity, status: 'conflict' as const };
+    const conflictEntity = { ...mockEntity, syncStatus: 'conflict' as const };
     render(<EntityActions entity={conflictEntity} onRollback={jest.fn()} />);
 
     const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -277,7 +280,7 @@ describe('EntityActions', () => {
   });
 
   it('shows rollback confirmation dialog when Rollback is clicked', async () => {
-    const modifiedEntity = { ...mockEntity, status: 'modified' as const };
+    const modifiedEntity = { ...mockEntity, syncStatus: 'modified' as const };
     render(<EntityActions entity={modifiedEntity} onRollback={jest.fn()} />);
 
     const menuButton = screen.getByRole('button', { name: /open menu/i });

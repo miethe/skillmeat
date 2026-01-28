@@ -11,8 +11,11 @@ const mockEntity: Entity = {
   id: 'skill:test',
   name: 'test-skill',
   type: 'skill',
+  scope: 'user',
   source: 'github:user/repo/skill',
-  status: 'synced',
+  syncStatus: 'synced',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
 };
 
 describe('EntityActions Accessibility', () => {
@@ -46,14 +49,14 @@ describe('EntityActions Accessibility', () => {
   });
 
   it('should have no violations with modified entity showing diff option', async () => {
-    const modifiedEntity = { ...mockEntity, status: 'modified' as const };
+    const modifiedEntity = { ...mockEntity, syncStatus: 'modified' as const };
     const { container } = render(<EntityActions entity={modifiedEntity} onViewDiff={jest.fn()} />);
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
 
   it('should have no violations with conflict entity showing rollback', async () => {
-    const conflictEntity = { ...mockEntity, status: 'conflict' as const };
+    const conflictEntity = { ...mockEntity, syncStatus: 'conflict' as const };
     const { container } = render(<EntityActions entity={conflictEntity} onRollback={jest.fn()} />);
     const results = await axe(container);
     expect(results).toHaveNoViolations();

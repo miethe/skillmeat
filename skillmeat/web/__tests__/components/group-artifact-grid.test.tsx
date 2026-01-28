@@ -89,16 +89,13 @@ describe('GroupArtifactGrid', () => {
       name: 'Test Skill 1',
       type: 'skill',
       scope: 'user',
-      status: 'active',
+      syncStatus: 'synced',
       version: '1.0.0',
-      metadata: {
-        title: 'Test Skill 1',
-        description: 'A test skill',
-        tags: ['test'],
-      },
-      upstreamStatus: {
-        hasUpstream: false,
-        isOutdated: false,
+      description: 'A test skill',
+      tags: ['test'],
+      upstream: {
+        enabled: false,
+        updateAvailable: false,
       },
       usageStats: {
         totalDeployments: 0,
@@ -113,16 +110,13 @@ describe('GroupArtifactGrid', () => {
       name: 'Test Command',
       type: 'command',
       scope: 'user',
-      status: 'active',
+      syncStatus: 'synced',
       version: '2.0.0',
-      metadata: {
-        title: 'Test Command',
-        description: 'A test command',
-        tags: ['test', 'command'],
-      },
-      upstreamStatus: {
-        hasUpstream: true,
-        isOutdated: false,
+      description: 'A test command',
+      tags: ['test', 'command'],
+      upstream: {
+        enabled: true,
+        updateAvailable: false,
       },
       usageStats: {
         totalDeployments: 5,
@@ -137,16 +131,13 @@ describe('GroupArtifactGrid', () => {
       name: 'Test Agent',
       type: 'agent',
       scope: 'local',
-      status: 'outdated',
+      syncStatus: 'outdated',
       version: '0.5.0',
-      metadata: {
-        title: 'Test Agent',
-        description: 'A test agent',
-        tags: ['agent'],
-      },
-      upstreamStatus: {
-        hasUpstream: true,
-        isOutdated: true,
+      description: 'A test agent',
+      tags: ['agent'],
+      upstream: {
+        enabled: true,
+        updateAvailable: true,
       },
       usageStats: {
         totalDeployments: 2,

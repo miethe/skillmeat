@@ -11,10 +11,13 @@ const mockEntity: Entity = {
   id: 'skill:test',
   name: 'test-skill',
   type: 'skill',
+  scope: 'user',
   source: 'github:user/repo/skill',
-  status: 'synced',
+  syncStatus: 'synced',
   tags: ['testing', 'example'],
   description: 'A test skill for accessibility testing',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
 };
 
 describe('EntityRow Accessibility', () => {
@@ -67,8 +70,8 @@ describe('EntityRow Accessibility', () => {
       'conflict',
     ];
 
-    for (const status of statuses) {
-      const statusEntity = { ...mockEntity, status };
+    for (const syncStatus of statuses) {
+      const statusEntity = { ...mockEntity, syncStatus };
       const { container } = render(<EntityRow entity={statusEntity} />);
       const results = await axe(container, {
         rules: {

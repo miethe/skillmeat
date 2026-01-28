@@ -2,34 +2,63 @@
  * @jest-environment jsdom
  */
 import { render, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { EntityCard } from '@/components/entity/entity-card';
 import type { Entity } from '@/types/entity';
+
+// Mock useCollectionContext hook
+jest.mock('@/hooks/use-collection-context', () => ({
+  useCollectionContext: () => ({
+    selectedCollectionId: 'default',
+    collections: [],
+  }),
+  CollectionProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// Test wrapper with QueryClientProvider
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+const renderWithProviders = (component: React.ReactElement) => {
+  const queryClient = createTestQueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>{component}</QueryClientProvider>
+  );
+};
 
 const mockEntity: Entity = {
   id: 'skill:test',
   name: 'test-skill',
   type: 'skill',
+  scope: 'user',
   source: 'github:user/repo/skill',
-  status: 'synced',
+  syncStatus: 'synced',
   tags: ['testing', 'example', 'demo', 'extra'],
   description: 'A test skill for unit testing',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
 };
 
 describe('EntityCard', () => {
   it('renders entity name', () => {
-    render(<EntityCard entity={mockEntity} />);
+    renderWithProviders(<EntityCard entity={mockEntity} />);
 
     expect(screen.getByText('test-skill')).toBeInTheDocument();
   });
 
   it('displays entity type badge', () => {
-    render(<EntityCard entity={mockEntity} />);
+    renderWithProviders(<EntityCard entity={mockEntity} />);
 
     expect(screen.getByText('Skill')).toBeInTheDocument();
   });
 
   it('shows description when provided', () => {
-    render(<EntityCard entity={mockEntity} />);
+    renderWithProviders(<EntityCard entity={mockEntity} />);
 
     expect(screen.getByText('A test skill for unit testing')).toBeInTheDocument();
   });
@@ -39,41 +68,41 @@ describe('EntityCard', () => {
       "This is a very long description that should be truncated after 100 characters to ensure the card doesn't become too tall";
     const entityWithLongDesc = { ...mockEntity, description: longDescription };
 
-    render(<EntityCard entity={entityWithLongDesc} />);
+    renderWithProviders(<EntityCard entity={entityWithLongDesc} />);
 
     const description = screen.getByText(/This is a very long description/);
     expect(description.textContent).toContain('...');
   });
 
   it('displays status indicator with correct color', () => {
-    render(<EntityCard entity={mockEntity} />);
+    renderWithProviders(<EntityCard entity={mockEntity} />);
 
     expect(screen.getByText('Synced')).toBeInTheDocument();
   });
 
   it('shows modified status correctly', () => {
-    const modifiedEntity = { ...mockEntity, status: 'modified' as const };
-    render(<EntityCard entity={modifiedEntity} />);
+    const modifiedEntity = { ...mockEntity, syncStatus: 'modified' as const };
+    renderWithProviders(<EntityCard entity={modifiedEntity} />);
 
     expect(screen.getByText('Modified')).toBeInTheDocument();
   });
 
   it('shows outdated status correctly', () => {
-    const outdatedEntity = { ...mockEntity, status: 'outdated' as const };
-    render(<EntityCard entity={outdatedEntity} />);
+    const outdatedEntity = { ...mockEntity, syncStatus: 'outdated' as const };
+    renderWithProviders(<EntityCard entity={outdatedEntity} />);
 
     expect(screen.getByText('Outdated')).toBeInTheDocument();
   });
 
   it('shows conflict status correctly', () => {
-    const conflictEntity = { ...mockEntity, status: 'conflict' as const };
-    render(<EntityCard entity={conflictEntity} />);
+    const conflictEntity = { ...mockEntity, syncStatus: 'conflict' as const };
+    renderWithProviders(<EntityCard entity={conflictEntity} />);
 
     expect(screen.getByText('Conflict')).toBeInTheDocument();
   });
 
   it('displays up to 3 tags', () => {
-    render(<EntityCard entity={mockEntity} />);
+    renderWithProviders(<EntityCard entity={mockEntity} />);
 
     expect(screen.getByText('testing')).toBeInTheDocument();
     expect(screen.getByText('example')).toBeInTheDocument();
@@ -81,21 +110,21 @@ describe('EntityCard', () => {
   });
 
   it('shows +N more badge when more than 3 tags', () => {
-    render(<EntityCard entity={mockEntity} />);
+    renderWithProviders(<EntityCard entity={mockEntity} />);
 
     expect(screen.getByText('+1 more')).toBeInTheDocument();
   });
 
   it('does not show tags section when no tags', () => {
     const noTagsEntity = { ...mockEntity, tags: [] };
-    render(<EntityCard entity={noTagsEntity} />);
+    renderWithProviders(<EntityCard entity={noTagsEntity} />);
 
     expect(screen.queryByText('testing')).not.toBeInTheDocument();
   });
 
   it('calls onClick when card is clicked', () => {
     const handleClick = jest.fn();
-    render(<EntityCard entity={mockEntity} onClick={handleClick} />);
+    renderWithProviders(<EntityCard entity={mockEntity} onClick={handleClick} />);
 
     const card = screen.getByText('test-skill').closest('div');
     if (card?.parentElement) {
@@ -107,7 +136,7 @@ describe('EntityCard', () => {
 
   it('does not trigger onClick when clicking checkbox', () => {
     const handleClick = jest.fn();
-    render(<EntityCard entity={mockEntity} selectable={true} onClick={handleClick} />);
+    renderWithProviders(<EntityCard entity={mockEntity} selectable={true} onClick={handleClick} />);
 
     const checkbox = screen.getByRole('checkbox');
     fireEvent.click(checkbox);
@@ -117,20 +146,20 @@ describe('EntityCard', () => {
   });
 
   it('shows checkbox when selectable is true', () => {
-    render(<EntityCard entity={mockEntity} selectable={true} />);
+    renderWithProviders(<EntityCard entity={mockEntity} selectable={true} />);
 
     expect(screen.getByRole('checkbox')).toBeInTheDocument();
   });
 
   it('does not show checkbox when selectable is false', () => {
-    render(<EntityCard entity={mockEntity} selectable={false} />);
+    renderWithProviders(<EntityCard entity={mockEntity} selectable={false} />);
 
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   });
 
   it('calls onSelect when checkbox is checked', () => {
     const handleSelect = jest.fn();
-    render(<EntityCard entity={mockEntity} selectable={true} onSelect={handleSelect} />);
+    renderWithProviders(<EntityCard entity={mockEntity} selectable={true} onSelect={handleSelect} />);
 
     const checkbox = screen.getByRole('checkbox');
     fireEvent.click(checkbox);
@@ -139,28 +168,28 @@ describe('EntityCard', () => {
   });
 
   it('applies selected styling when selected', () => {
-    const { container } = render(<EntityCard entity={mockEntity} selected={true} />);
+    const { container } = renderWithProviders(<EntityCard entity={mockEntity} selected={true} />);
 
     const card = container.firstChild;
     expect(card).toHaveClass('ring-2', 'ring-primary');
   });
 
   it('applies hover styling', () => {
-    const { container } = render(<EntityCard entity={mockEntity} />);
+    const { container } = renderWithProviders(<EntityCard entity={mockEntity} />);
 
     const card = container.firstChild;
     expect(card).toHaveClass('hover:bg-accent/50');
   });
 
   it('renders entity icon', () => {
-    const { container } = render(<EntityCard entity={mockEntity} />);
+    const { container } = renderWithProviders(<EntityCard entity={mockEntity} />);
 
     const icon = container.querySelector('svg');
     expect(icon).toBeInTheDocument();
   });
 
   it('renders EntityActions component', () => {
-    render(<EntityCard entity={mockEntity} onEdit={jest.fn()} />);
+    renderWithProviders(<EntityCard entity={mockEntity} onEdit={jest.fn()} />);
 
     // EntityActions should render a menu button
     const menuButtons = screen.getAllByRole('button');
@@ -177,7 +206,7 @@ describe('EntityCard', () => {
       onRollback: jest.fn(),
     };
 
-    render(<EntityCard entity={mockEntity} {...handlers} />);
+    renderWithProviders(<EntityCard entity={mockEntity} {...handlers} />);
 
     // All handlers should be passed to EntityActions
     expect(screen.getByText('test-skill')).toBeInTheDocument();
@@ -185,14 +214,14 @@ describe('EntityCard', () => {
 
   it('handles missing description gracefully', () => {
     const noDescEntity = { ...mockEntity, description: undefined };
-    render(<EntityCard entity={noDescEntity} />);
+    renderWithProviders(<EntityCard entity={noDescEntity} />);
 
     expect(screen.queryByText(/test skill/)).not.toBeInTheDocument();
   });
 
   it('handles missing status gracefully', () => {
-    const noStatusEntity = { ...mockEntity, status: undefined };
-    render(<EntityCard entity={noStatusEntity} />);
+    const noStatusEntity = { ...mockEntity, syncStatus: undefined as any };
+    renderWithProviders(<EntityCard entity={noStatusEntity} />);
 
     expect(screen.queryByText('Synced')).not.toBeInTheDocument();
   });
@@ -204,7 +233,7 @@ describe('EntityCard', () => {
       id: 'command:test',
     };
 
-    render(<EntityCard entity={commandEntity} />);
+    renderWithProviders(<EntityCard entity={commandEntity} />);
 
     expect(screen.getByText('Command')).toBeInTheDocument();
   });

@@ -49,8 +49,9 @@ const mockEntity: Entity = {
   id: 'skill:test',
   name: 'test-skill',
   type: 'skill',
+  scope: 'user',
   source: 'github:user/repo/skill',
-  status: 'synced',
+  syncStatus: 'synced',
   description: 'Test skill for accessibility testing',
   tags: ['test', 'a11y'],
   version: 'v1.0.0',
@@ -58,6 +59,8 @@ const mockEntity: Entity = {
   projectPath: '/path/to/project',
   deployedAt: '2024-01-15T10:00:00Z',
   modifiedAt: '2024-01-15T10:00:00Z',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-15T10:00:00Z',
 };
 
 const queryClient = new QueryClient({
@@ -101,8 +104,8 @@ describe('EntityDetailPanel Accessibility', () => {
       'conflict',
     ];
 
-    statuses.forEach((status) => {
-      const entity = { ...mockEntity, status };
+    statuses.forEach((syncStatus) => {
+      const entity = { ...mockEntity, syncStatus };
       const { container } = render(
         <EntityDetailPanel entity={entity} open={true} onClose={jest.fn()} />,
         { wrapper }
@@ -125,8 +128,11 @@ describe('EntityDetailPanel Accessibility', () => {
       id: 'skill:minimal',
       name: 'minimal-skill',
       type: 'skill',
+      scope: 'user',
       source: 'github:user/repo',
-      status: 'synced',
+      syncStatus: 'synced',
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
     };
 
     const { container } = render(
