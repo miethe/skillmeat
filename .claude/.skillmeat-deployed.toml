@@ -1464,6 +1464,9 @@ deployed_at = "2026-01-13T11:45:54.461662"
 artifact_path = "commands/analyze/symbols/symbols-chunk.md"
 content_hash = "bd078db9c15f5744c97f65a7412dc477bf208d35e5e0d3898c3e372344a1dee4"
 local_modifications = false
+version_lineage = [
+    "bd078db9c15f5744c97f65a7412dc477bf208d35e5e0d3898c3e372344a1dee4",
+]
 collection_sha = "bd078db9c15f5744c97f65a7412dc477bf208d35e5e0d3898c3e372344a1dee4"
 
 [[deployed]]
@@ -1474,4 +1477,18 @@ deployed_at = "2026-01-13T11:45:54.461830"
 artifact_path = "commands/analyze/symbols/symbols-query.md"
 content_hash = "7c24d7c8d215c2075e22d0f925b173b825be7ddbfef948c0ca2c06a638a39f81"
 local_modifications = false
+version_lineage = [
+    "7c24d7c8d215c2075e22d0f925b173b825be7ddbfef948c0ca2c06a638a39f81",
+]
 collection_sha = "7c24d7c8d215c2075e22d0f925b173b825be7ddbfef948c0ca2c06a638a39f81"
+
+[[deployed]]
+artifact_name = "crafting-effective-readmes"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2026-01-28T16:43:21.785409"
+artifact_path = "skills/crafting-effective-readmes"
+content_hash = "65e22cd81e06ed5344019427b98a77075c66baf38e0e55b9a3da29c7d4b718ae"
+local_modifications = false
+merge_base_snapshot = "65e22cd81e06ed5344019427b98a77075c66baf38e0e55b9a3da29c7d4b718ae"
+collection_sha = "65e22cd81e06ed5344019427b98a77075c66baf38e0e55b9a3da29c7d4b718ae"
