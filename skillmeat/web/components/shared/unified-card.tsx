@@ -347,7 +347,7 @@ export const UnifiedCard = React.memo(
             }
 
             return await apiRequest<ArtifactDiffResponse>(
-              `/artifacts/${item.id}/diff?${params.toString()}`
+              `/artifacts/${encodeURIComponent(item.id)}/diff?${params.toString()}`
             );
           },
           staleTime: 5 * 60 * 1000, // 5 minutes
