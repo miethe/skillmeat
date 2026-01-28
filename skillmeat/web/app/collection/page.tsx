@@ -175,8 +175,8 @@ function CollectionPageContent() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Modal state - Entity is an alias for Artifact, use Artifact for consistency
-  const [selectedEntity, setSelectedEntity] = useState<Artifact | null>(null);
+  // Modal state
+  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -608,14 +608,13 @@ function CollectionPageContent() {
   ]);
 
   const handleArtifactClick = (artifact: Artifact) => {
-    // Entity = Artifact (type alias), no conversion needed
-    setSelectedEntity(artifact);
+    setSelectedArtifact(artifact);
     setIsDetailOpen(true);
   };
 
   const handleDetailClose = () => {
     setIsDetailOpen(false);
-    setTimeout(() => setSelectedEntity(null), 300);
+    setTimeout(() => setSelectedArtifact(null), 300);
   };
 
   const handleSortChange = (field: string, order: 'asc' | 'desc') => {
@@ -803,19 +802,19 @@ function CollectionPageContent() {
         )}
       </div>
 
-      {/* Entity Detail Modal */}
+      {/* Artifact Detail Modal */}
       <UnifiedEntityModal
-        entity={selectedEntity}
+        artifact={selectedArtifact}
         open={isDetailOpen}
         onClose={handleDetailClose}
         onNavigateToSource={(sourceId, artifactPath) => {
           setIsDetailOpen(false);
-          setSelectedEntity(null);
+          setSelectedArtifact(null);
           router.push(`/marketplace/sources/${sourceId}?artifact=${encodeURIComponent(artifactPath)}`);
         }}
         onNavigateToDeployment={(projectPath, artifactId) => {
           setIsDetailOpen(false);
-          setSelectedEntity(null);
+          setSelectedArtifact(null);
           const encodedPath = btoa(projectPath);
           router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
         }}
