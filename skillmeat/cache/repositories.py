@@ -750,6 +750,7 @@ class ImportContext:
                 .first()
             )
             if entry:
+                entry.import_id = import_id  # Set the actual column
                 entry.status = "imported"
                 entry.import_date = now
                 entry.updated_at = now

@@ -168,7 +168,7 @@ class ImportCoordinator:
             ImportResult with status for each entry
         """
         self.source_ref = source_ref
-        import_id = str(uuid.uuid4())
+        self.import_id = str(uuid.uuid4())
         # Use timezone-aware UTC datetime
         now = (
             datetime.now(timezone.utc)
@@ -176,7 +176,7 @@ class ImportCoordinator:
             else datetime.utcnow()
         )
         result = ImportResult(
-            import_id=import_id,
+            import_id=self.import_id,
             source_id=source_id,
             started_at=now,
         )
@@ -211,7 +211,7 @@ class ImportCoordinator:
         )
 
         logger.info(
-            f"Import {import_id} completed: "
+            f"Import {self.import_id} completed: "
             f"{result.success_count} success, {result.skipped_count} skipped, "
             f"{result.conflict_count} conflicts, {result.error_count} errors"
         )
@@ -411,6 +411,7 @@ class ImportCoordinator:
             last_updated=None,
             tags=artifact_tags,
             origin_source="github",  # Currently all marketplace sources are GitHub-based
+            import_id=self.import_id,  # Track import batch ID
         )
 
         # Add artifact to collection

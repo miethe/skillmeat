@@ -428,7 +428,20 @@ export function CatalogEntryModal({
     const findImportedArtifact = async () => {
       setIsLoadingArtifact(true);
       try {
-        // Search for artifact by name and type
+        // NEW: Try import_id first (for new imports)
+        if (entry.import_id) {
+          const response = await fetchArtifactsPaginated({
+            import_id: entry.import_id,
+            limit: 10,
+          });
+          if (response.items.length > 0) {
+            setImportedArtifact(response.items[0] || null);
+            return;
+          }
+        }
+
+        // DEPRECATED FALLBACK: Search by name (for legacy imports without import_id)
+        console.warn('Using deprecated name-based artifact lookup for legacy import');
         const response = await fetchArtifactsPaginated({
           search: entry.name,
           artifact_type: entry.artifact_type,

@@ -232,6 +232,7 @@ class Artifact:
     discovered_at: Optional[datetime] = None  # When artifact was first discovered or last changed
     tags: List[str] = field(default_factory=list)
     origin_source: Optional[str] = None  # Platform type when origin="marketplace" (e.g., "github", "gitlab", "bitbucket")
+    import_id: Optional[str] = None  # Catalog entry import batch ID
 
     def __post_init__(self):
         """Validate artifact configuration.
@@ -323,6 +324,8 @@ class Artifact:
             result["tags"] = self.tags
         if self.origin_source is not None:
             result["origin_source"] = self.origin_source
+        if self.import_id is not None:
+            result["import_id"] = self.import_id
 
         return result
 
@@ -357,6 +360,7 @@ class Artifact:
             discovered_at=discovered_at,
             tags=data.get("tags", []),
             origin_source=data.get("origin_source"),
+            import_id=data.get("import_id"),
         )
 
 

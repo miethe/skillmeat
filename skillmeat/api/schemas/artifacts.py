@@ -323,6 +323,10 @@ class ArtifactResponse(BaseModel):
     updated: datetime = Field(
         description="Timestamp of last update",
     )
+    import_id: Optional[str] = Field(
+        default=None,
+        description="Marketplace import batch ID if imported from marketplace",
+    )
 
     class Config:
         """Pydantic model configuration."""

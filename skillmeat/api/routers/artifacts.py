@@ -1693,6 +1693,10 @@ async def list_artifacts(
         default=None,
         description="Filter for artifacts with unlinked references (true) or without (false)",
     ),
+    import_id: Optional[str] = Query(
+        default=None,
+        description="Filter by marketplace import batch ID",
+    ),
 ) -> ArtifactListResponse:
     """List all artifacts with filters and pagination.
 
@@ -1710,6 +1714,7 @@ async def list_artifacts(
         check_drift: Whether to check for drift and local modifications
         project_path: Project path for drift detection
         has_unlinked: Filter for artifacts with/without unlinked references
+        import_id: Filter by marketplace import batch ID
 
     Returns:
         Paginated list of artifacts
@@ -1720,7 +1725,8 @@ async def list_artifacts(
     try:
         logger.info(
             f"Listing artifacts (limit={limit}, after={after}, "
-            f"type={artifact_type}, collection={collection}, tags={tags}, tools={tools})"
+            f"type={artifact_type}, collection={collection}, tags={tags}, tools={tools}, "
+            f"import_id={import_id})"
         )
 
         # Parse filters
@@ -1799,6 +1805,12 @@ async def list_artifacts(
                     if not has_unlinked:
                         filtered_artifacts.append(artifact)
             artifacts = filtered_artifacts
+
+        # Filter by import_id if specified
+        if import_id:
+            artifacts = [
+                a for a in artifacts if getattr(a, 'import_id', None) == import_id
+            ]
 
         # Sort artifacts for consistent pagination
         artifacts = sorted(artifacts, key=lambda a: (a.type.value, a.name))
