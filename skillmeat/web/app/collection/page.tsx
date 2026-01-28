@@ -39,21 +39,21 @@ type ViewMode = 'grid' | 'list' | 'grouped';
  *
  * @param summary - Lightweight artifact summary from collection endpoint
  * @param allArtifacts - Full artifact list from catalog
- * @param collectionName - Optional collection name to attach
+ * @param collectionId - Optional collection ID (directory name, e.g., "default") to attach for API calls
  * @returns Full Artifact object or enriched fallback
  */
 function enrichArtifactSummary(
   summary: { name: string; type: string; version?: string | null; source: string },
   allArtifacts: Artifact[],
-  collectionName?: string
+  collectionId?: string
 ): Artifact {
   // Try to find matching full artifact by name and type
   const fullArtifact = allArtifacts.find((a) => a.name === summary.name && a.type === summary.type);
 
   if (fullArtifact) {
     // If we have collection context and the full artifact lacks it, add it
-    if (collectionName && !fullArtifact.collection) {
-      return { ...fullArtifact, collection: collectionName };
+    if (collectionId && !fullArtifact.collection) {
+      return { ...fullArtifact, collection: collectionId };
     }
     return fullArtifact;
   }
@@ -90,7 +90,7 @@ function enrichArtifactSummary(
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     aliases: [],
-    collection: collectionName,
+    collection: collectionId,
   };
 }
 
@@ -371,12 +371,13 @@ function CollectionPageContent() {
         ? infiniteAllArtifactsData.pages.flatMap((page) => page.items.map(mapApiArtifactToArtifact))
         : [];
 
-      // Build collection name from current context to ensure artifacts have collection set
-      const collectionName = currentCollection?.name;
+      // Build collection ID from current context to ensure artifacts have collection set
+      // Use .id (directory name like "default") not .name (display name like "Default Collection")
+      const collectionId = currentCollection?.id;
 
       // Enrich each summary with full data from catalog, including collection context
       artifacts = allSummaries.map((summary) =>
-        enrichArtifactSummary(summary, fullArtifacts, collectionName)
+        enrichArtifactSummary(summary, fullArtifacts, collectionId)
       );
 
       // Deduplicate by ID to prevent React key conflicts
@@ -488,9 +489,10 @@ function CollectionPageContent() {
       const fullArtifacts: Artifact[] = infiniteAllArtifactsData?.pages
         ? infiniteAllArtifactsData.pages.flatMap((page) => page.items.map(mapApiArtifactToArtifact))
         : [];
-      const collectionName = currentCollection?.name;
+      // Use .id (directory name like "default") not .name (display name like "Default Collection")
+      const collectionId = currentCollection?.id;
       allArtifacts = allSummaries.map((summary) =>
-        enrichArtifactSummary(summary, fullArtifacts, collectionName)
+        enrichArtifactSummary(summary, fullArtifacts, collectionId)
       );
     } else if (!isSpecificCollection && infiniteAllArtifactsData?.pages) {
       allArtifacts = infiniteAllArtifactsData.pages.flatMap((page) =>
