@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Plus, Grid3x3, List, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 function ManagePageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const activeEntityType = (searchParams.get('type') as EntityType) || 'skill';
 
@@ -53,6 +54,19 @@ function ManagePageContent() {
   useEffect(() => {
     setTypeFilter(activeEntityType);
   }, [activeEntityType, setTypeFilter]);
+
+  // Handle URL-based artifact selection (auto-open modal when navigating with artifact param)
+  useEffect(() => {
+    const artifactId = searchParams.get('artifact');
+    if (artifactId && entities.length > 0 && !selectedEntity) {
+      // Find the entity matching the artifact ID
+      const entity = entities.find((e) => e.id === artifactId || e.name === artifactId);
+      if (entity) {
+        setSelectedEntity(entity);
+        setDetailPanelOpen(true);
+      }
+    }
+  }, [searchParams, entities, selectedEntity]);
 
   // Filter entities by tags client-side
   const filteredEntities =
@@ -219,6 +233,17 @@ function ManagePageContent() {
         onClose={() => {
           setDetailPanelOpen(false);
           setSelectedEntity(null);
+        }}
+        onNavigateToSource={(sourceId, artifactPath) => {
+          setDetailPanelOpen(false);
+          setSelectedEntity(null);
+          router.push(`/marketplace/sources/${sourceId}?artifact=${encodeURIComponent(artifactPath)}`);
+        }}
+        onNavigateToDeployment={(projectPath, artifactId) => {
+          setDetailPanelOpen(false);
+          setSelectedEntity(null);
+          const encodedPath = encodeURIComponent(projectPath);
+          router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
         }}
       />
 

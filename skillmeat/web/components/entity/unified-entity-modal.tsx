@@ -24,6 +24,7 @@ import {
   Rocket,
   Trash2,
   Link as LinkIcon,
+  ExternalLink,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
@@ -64,6 +65,7 @@ import {
   usePendingContextChanges,
   useTags,
   useUpdateArtifactTags,
+  useSources,
 } from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
@@ -86,6 +88,8 @@ interface UnifiedEntityModalProps {
   entity: Entity | null;
   open: boolean;
   onClose: () => void;
+  onNavigateToSource?: (sourceId: string, artifactPath: string) => void;
+  onNavigateToDeployment?: (projectPath: string, artifactId: string) => void;
 }
 
 interface HistoryEntry {
@@ -303,7 +307,13 @@ function _EntityModalSkeleton() {
  * />
  * ```
  */
-export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModalProps) {
+export function UnifiedEntityModal({
+  entity,
+  open,
+  onClose,
+  onNavigateToSource,
+  onNavigateToDeployment,
+}: UnifiedEntityModalProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const { deployEntity, syncEntity, refetch } = useEntityLifecycle();
   const [_isDeploying, _setIsDeploying] = useState(false);
@@ -336,6 +346,13 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   const [showDeployDialog, setShowDeployDialog] = useState(false);
   // Artifact linking dialog state
   const [showLinkingDialog, setShowLinkingDialog] = useState(false);
+  // Source entry state for Sources tab navigation
+  const [sourceEntry, setSourceEntry] = useState<{
+    sourceId: string;
+    entryPath: string;
+    sourceName: string;
+  } | null>(null);
+  const [isLoadingSource, setIsLoadingSource] = useState(false);
   const { mutateAsync: updateParameters } = useEditArtifactParameters();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -349,6 +366,74 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
   // Tag update mutation
   const { mutate: updateTags, isPending: isUpdatingTags } = useUpdateArtifactTags();
+
+  // Fetch marketplace sources for Sources tab
+  const { data: sourcesData } = useSources(100);
+
+  // Find the source catalog entry for this artifact when Sources tab is active
+  useEffect(() => {
+    if (!entity?.source || !open || activeTab !== 'sources') {
+      return;
+    }
+
+    const findSourceEntry = async () => {
+      setIsLoadingSource(true);
+      try {
+        // Flatten all pages of sources
+        const allSources = sourcesData?.pages?.flatMap((page) => page.items) || [];
+
+        if (allSources.length === 0) {
+          setSourceEntry(null);
+          setIsLoadingSource(false);
+          return;
+        }
+
+        const entitySource = entity.source || '';
+
+        for (const source of allSources) {
+          // Check if entity source contains this repo's owner/repo
+          const repoPattern = `${source.owner}/${source.repo_name}`;
+          if (entitySource.includes(repoPattern) || entitySource.includes(source.repo_url)) {
+            // Found matching source, now find the catalog entry
+            try {
+              const catalogResponse = await apiRequest<{
+                items: Array<{ name: string; artifact_type: string; path: string }>;
+              }>(
+                `/marketplace/sources/${source.id}/artifacts?search=${encodeURIComponent(entity.name)}&limit=10`
+              );
+
+              // Find entry matching this artifact name and type
+              const entry = catalogResponse.items?.find(
+                (e) => e.name === entity.name && e.artifact_type === entity.type
+              );
+
+              if (entry) {
+                setSourceEntry({
+                  sourceId: source.id,
+                  entryPath: entry.path,
+                  sourceName: `${source.owner}/${source.repo_name}`,
+                });
+                setIsLoadingSource(false);
+                return;
+              }
+            } catch {
+              // Continue to next source if catalog fetch fails
+            }
+          }
+        }
+
+        // No match found
+        setSourceEntry(null);
+      } catch (error) {
+        console.error('Failed to find source entry:', error);
+        setSourceEntry(null);
+      } finally {
+        setIsLoadingSource(false);
+      }
+    };
+
+    findSourceEntry();
+  }, [entity, open, activeTab, sourcesData]);
 
   // Generate mock history entries
   const historyEntries = useMemo(() => {
@@ -1626,6 +1711,15 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                 <FolderOpen className="mr-2 h-4 w-4" />
                 Collections
               </TabsTrigger>
+              {entity.source && hasValidUpstreamSource(entity.source) && (
+                <TabsTrigger
+                  value="sources"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                >
+                  <GitBranch className="mr-2 h-4 w-4" />
+                  Source
+                </TabsTrigger>
+              )}
               <TabsTrigger
                 value="deployments"
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
@@ -2046,6 +2140,70 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
               </ScrollArea>
             </TabsContent>
 
+            {/* Sources Tab */}
+            {entity.source && hasValidUpstreamSource(entity.source) && (
+              <TabsContent value="sources" className="mt-0 flex-1">
+                <ScrollArea className="h-[calc(90vh-12rem)]">
+                  <div className="space-y-4 py-4">
+                    <div className="text-sm font-medium text-muted-foreground">
+                      Imported From
+                    </div>
+
+                    {isLoadingSource ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : sourceEntry ? (
+                      <div
+                        onClick={() =>
+                          onNavigateToSource?.(sourceEntry.sourceId, sourceEntry.entryPath)
+                        }
+                        className="cursor-pointer rounded-lg border p-4 transition-colors hover:bg-muted/50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Github className="h-5 w-5 text-muted-foreground" />
+                          <div className="flex-1">
+                            <div className="font-medium">{sourceEntry.sourceName}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {sourceEntry.entryPath}
+                            </div>
+                            {entity.version && (
+                              <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                                <Tag className="h-3 w-3" />
+                                <span>{entity.version}</span>
+                              </div>
+                            )}
+                          </div>
+                          <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </div>
+                    ) : entity?.source ? (
+                      // Fallback: show source info without navigation
+                      <div className="rounded-lg border p-4">
+                        <div className="flex items-center gap-3">
+                          <GitBranch className="h-5 w-5 text-muted-foreground" />
+                          <div className="flex-1">
+                            <div className="font-medium">Source</div>
+                            <div className="text-sm text-muted-foreground">{entity.source}</div>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Unable to find the source entry in marketplace sources.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <GitBranch className="h-12 w-12 text-muted-foreground/50" />
+                        <p className="mt-4 text-sm text-muted-foreground">
+                          No source information available.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+            )}
+
             {/* Deployments Tab */}
             <TabsContent value="deployments" className="mt-0 flex-1">
               <ScrollArea className="h-[calc(90vh-12rem)]">
@@ -2115,25 +2273,35 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                   {!isDeploymentsLoading && !deploymentsError && artifactDeployments.length > 0 && (
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       {artifactDeployments.map((deployment) => (
-                        <DeploymentCard
+                        <div
                           key={deployment.id}
-                          deployment={deployment}
-                          projects={projects}
-                          onUpdate={() => {
-                            // TODO: Implement update handler
-                            toast({
-                              title: 'Update Deployment',
-                              description: 'Deployment update functionality coming soon',
-                            });
-                          }}
-                          onRemove={(removeFiles) =>
-                            handleDeploymentRemove(deployment, removeFiles)
+                          className="cursor-pointer"
+                          onClick={() =>
+                            onNavigateToDeployment?.(
+                              deployment.project_path,
+                              `${deployment.artifact_type}:${deployment.artifact_name}`
+                            )
                           }
-                          onViewSource={() => {
-                            // Close modal - user is already viewing the source
-                            onClose();
-                          }}
-                        />
+                        >
+                          <DeploymentCard
+                            deployment={deployment}
+                            projects={projects}
+                            onUpdate={() => {
+                              // TODO: Implement update handler
+                              toast({
+                                title: 'Update Deployment',
+                                description: 'Deployment update functionality coming soon',
+                              });
+                            }}
+                            onRemove={(removeFiles) =>
+                              handleDeploymentRemove(deployment, removeFiles)
+                            }
+                            onViewSource={() => {
+                              // Close modal - user is already viewing the source
+                              onClose();
+                            }}
+                          />
+                        </div>
                       ))}
                     </div>
                   )}

@@ -65,6 +65,19 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
     setTypeFilter(activeEntityType);
   }, [activeEntityType, setTypeFilter]);
 
+  // Handle URL-based artifact selection (auto-open modal when navigating with artifact param)
+  useEffect(() => {
+    const artifactId = searchParams.get('artifact');
+    if (artifactId && entities.length > 0 && !selectedEntity) {
+      // Find the entity matching the artifact ID
+      const entity = entities.find((e) => e.id === artifactId || e.name === artifactId);
+      if (entity) {
+        setSelectedEntity(entity);
+        setDetailPanelOpen(true);
+      }
+    }
+  }, [searchParams, entities, selectedEntity]);
+
   // Filter entities by tags client-side
   const filteredEntities =
     tagFilter.length > 0
@@ -224,6 +237,26 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
         onClose={() => {
           setDetailPanelOpen(false);
           setSelectedEntity(null);
+        }}
+        onNavigateToSource={(sourceId, artifactPath) => {
+          setDetailPanelOpen(false);
+          setSelectedEntity(null);
+          router.push(`/marketplace/sources/${sourceId}?artifact=${encodeURIComponent(artifactPath)}`);
+        }}
+        onNavigateToDeployment={(targetProjectPath, artifactId) => {
+          // If navigating to same project, just select the artifact
+          if (targetProjectPath === projectPath) {
+            const entity = entities.find((e) => e.id === artifactId || e.name === artifactId);
+            if (entity) {
+              setSelectedEntity(entity);
+              setDetailPanelOpen(true);
+            }
+          } else {
+            setDetailPanelOpen(false);
+            setSelectedEntity(null);
+            const encodedPath = encodeURIComponent(targetProjectPath);
+            router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
+          }
         }}
       />
 
