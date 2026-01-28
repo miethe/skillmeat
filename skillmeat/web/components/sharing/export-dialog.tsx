@@ -245,9 +245,9 @@ export function ExportDialog({ isOpen, onClose, preselectedArtifacts = [] }: Exp
                           />
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium">{artifact.name}</p>
-                            {artifact.metadata.description && (
+                            {artifact.description && (
                               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                                {artifact.metadata.description}
+                                {artifact.description}
                               </p>
                             )}
                             <div className="mt-2 flex items-center gap-2">
