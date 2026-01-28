@@ -23,7 +23,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Entity, ENTITY_TYPES } from '@/types/entity';
+import { Artifact, ARTIFACT_TYPES } from '@/types/artifact';
 import { useEntityLifecycle, useToast } from '@/hooks';
 import { DiffViewer } from '@/components/entity/diff-viewer';
 import { RollbackDialog } from '@/components/entity/rollback-dialog';
@@ -31,7 +31,7 @@ import { apiRequest } from '@/lib/api';
 import type { ArtifactDiffResponse, ArtifactSyncRequest } from '@/sdk';
 
 interface EntityDetailPanelProps {
-  entity: Entity | null;
+  entity: Artifact | null;
   open: boolean;
   onClose: () => void;
 }
@@ -68,7 +68,7 @@ function formatRelativeTime(date: Date): string {
 }
 
 // Generate mock history entries based on entity metadata
-function generateMockHistory(entity: Entity): HistoryEntry[] {
+function generateMockHistory(entity: Artifact): HistoryEntry[] {
   const history: HistoryEntry[] = [];
 
   // Create history entries from available timestamps
@@ -84,7 +84,7 @@ function generateMockHistory(entity: Entity): HistoryEntry[] {
     });
 
     // Add a sync entry a bit before deployment if entity is modified
-    if (entity.status === 'modified' || entity.status === 'outdated') {
+    if (entity.syncStatus === 'modified' || entity.syncStatus === 'outdated') {
       const syncDate = new Date(deployedDate.getTime() - 2 * 60 * 60 * 1000); // 2 hours before
       history.push({
         id: `sync-${syncDate.toISOString()}`,
@@ -110,7 +110,7 @@ function generateMockHistory(entity: Entity): HistoryEntry[] {
   }
 
   // Add a rollback entry for conflict status
-  if (entity.status === 'conflict' && entity.modifiedAt) {
+  if (entity.syncStatus === 'conflict' && entity.modifiedAt) {
     const rollbackDate = new Date(new Date(entity.modifiedAt).getTime() + 1 * 60 * 60 * 1000); // 1 hour after modification
     history.push({
       id: `rollback-${rollbackDate.toISOString()}`,
@@ -145,7 +145,7 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
   const shouldFetchDiff = !!(
     activeTab === 'sync' &&
     entity &&
-    (entity.status === 'modified' || entity.status === 'outdated') &&
+    (entity.syncStatus === 'modified' || entity.syncStatus === 'outdated') &&
     entity.projectPath
   );
 
@@ -181,7 +181,7 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
     return null;
   }
 
-  const config = ENTITY_TYPES[entity.type];
+  const config = ARTIFACT_TYPES[entity.type];
   const IconComponent = (LucideIcons as any)[config.icon] as LucideIcon;
 
   const handleDeploy = async () => {
@@ -264,7 +264,7 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
   };
 
   const getStatusIcon = () => {
-    switch (entity.status) {
+    switch (entity.syncStatus) {
       case 'synced':
         return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       case 'modified':
@@ -279,7 +279,7 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
   };
 
   const getStatusLabel = () => {
-    switch (entity.status) {
+    switch (entity.syncStatus) {
       case 'synced':
         return 'Synced';
       case 'modified':
@@ -354,7 +354,7 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
                     Status
                   </h3>
                   <div className="flex items-center gap-2">
-                    <Badge variant={entity.status === 'synced' ? 'default' : 'secondary'}>
+                    <Badge variant={entity.syncStatus === 'synced' ? 'default' : 'secondary'}>
                       {getStatusLabel()}
                     </Badge>
                   </div>
@@ -496,7 +496,7 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
                 </div>
 
                 {/* Diff Viewer */}
-                {(entity.status === 'modified' || entity.status === 'outdated') &&
+                {(entity.syncStatus === 'modified' || entity.syncStatus === 'outdated') &&
                   entity.projectPath && (
                     <div>
                       <h3 className="mb-2 text-sm font-medium">Changes</h3>
@@ -535,7 +535,7 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
                     </div>
                   )}
 
-                {entity.status === 'outdated' && (
+                {entity.syncStatus === 'outdated' && (
                   <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-4">
                     <p className="text-sm text-blue-700 dark:text-blue-400">
                       A newer version is available upstream. Click "Sync with Upstream" to update.
@@ -543,7 +543,7 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
                   </div>
                 )}
 
-                {entity.status === 'conflict' && (
+                {entity.syncStatus === 'conflict' && (
                   <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4">
                     <p className="text-sm text-red-700 dark:text-red-400">
                       There are conflicting changes between local and upstream versions. Manual
@@ -560,7 +560,7 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
             <ScrollArea className="h-full pr-4">
               <div className="space-y-4">
                 {/* Rollback Section */}
-                {(entity.status === 'modified' || entity.status === 'conflict') &&
+                {(entity.syncStatus === 'modified' || entity.syncStatus === 'conflict') &&
                   entity.projectPath && (
                     <div className="rounded-lg border bg-muted/20 p-4">
                       <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">

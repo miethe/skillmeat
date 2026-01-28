@@ -15,7 +15,12 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Entity, EntityType, ENTITY_TYPES, getAllEntityTypes } from '@/types/entity';
+import {
+  Artifact,
+  ArtifactType,
+  ARTIFACT_TYPES,
+  getAllArtifactTypes,
+} from '@/types/artifact';
 import { apiRequest } from '@/lib/api';
 import { ArtifactListResponse, DeployRequest } from '@/sdk';
 import { Search, Loader2, Package, CheckCircle2 } from 'lucide-react';
@@ -39,10 +44,10 @@ export function DeployFromCollectionDialog({
 }: DeployFromCollectionDialogProps) {
   const [selectedEntities, setSelectedEntities] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<EntityType>('skill');
+  const [activeTab, setActiveTab] = useState<ArtifactType>('skill');
   const [isLoading, setIsLoading] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
-  const [entities, setEntities] = useState<Entity[]>([]);
+  const [entities, setEntities] = useState<Artifact[]>([]);
 
   // Fetch collection entities
   useEffect(() => {
@@ -51,7 +56,7 @@ export function DeployFromCollectionDialog({
     }
   }, [open, activeTab]);
 
-  const fetchEntities = async (type: EntityType) => {
+  const fetchEntities = async (type: ArtifactType) => {
     setIsLoading(true);
     try {
       const params = new URLSearchParams({
@@ -62,17 +67,20 @@ export function DeployFromCollectionDialog({
       const response = await apiRequest<ArtifactListResponse>(`/artifacts?${params.toString()}`);
 
       const collectionId = collection_id || 'default';
-      const mappedEntities: Entity[] = response.items.map((item) => ({
+      const mappedEntities: Artifact[] = response.items.map((item) => ({
         id: item.id,
         name: item.name,
-        type: item.type as EntityType,
+        type: item.type as ArtifactType,
         collection: collectionId,
-        status: 'synced',
+        syncStatus: 'synced',
+        scope: 'user',
         tags: item.metadata?.tags || [],
         description: item.metadata?.description || undefined,
         version: item.version || item.metadata?.version || undefined,
         source: item.source,
         deployedAt: item.added,
+        createdAt: item.added || new Date().toISOString(),
+        updatedAt: item.updated || new Date().toISOString(),
         modifiedAt: item.updated,
       }));
 
@@ -145,7 +153,7 @@ export function DeployFromCollectionDialog({
     }
   };
 
-  const entityTypes = getAllEntityTypes();
+  const entityTypes = getAllArtifactTypes();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -170,10 +178,10 @@ export function DeployFromCollectionDialog({
           </div>
 
           {/* Entity Type Tabs */}
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as EntityType)}>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ArtifactType)}>
             <TabsList className="mb-4 grid w-full grid-cols-5">
               {entityTypes.map((type) => {
-                const config = ENTITY_TYPES[type];
+                const config = ARTIFACT_TYPES[type];
                 const IconComponent = (LucideIcons as any)[config.icon] as LucideIcon;
 
                 return (
@@ -196,12 +204,12 @@ export function DeployFromCollectionDialog({
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <Package className="mb-4 h-12 w-12 text-muted-foreground" />
                     <h3 className="mb-2 text-lg font-semibold">
-                      No {ENTITY_TYPES[type].pluralLabel} Found
+                      No {ARTIFACT_TYPES[type].pluralLabel} Found
                     </h3>
                     <p className="text-sm text-muted-foreground">
                       {searchQuery
                         ? 'No entities match your search.'
-                        : `Add ${ENTITY_TYPES[type].pluralLabel.toLowerCase()} to your collection first.`}
+                        : `Add ${ARTIFACT_TYPES[type].pluralLabel.toLowerCase()} to your collection first.`}
                     </p>
                   </div>
                 ) : (
