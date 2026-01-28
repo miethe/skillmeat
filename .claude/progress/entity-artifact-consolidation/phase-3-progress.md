@@ -1,81 +1,104 @@
 ---
 type: progress
-prd: "entity-artifact-consolidation"
-phase: "3"
-status: pending
-progress: 0
-last_updated: "2026-01-28"
-
+prd: entity-artifact-consolidation
+phase: '3'
+status: completed
+progress: 100
+last_updated: '2026-01-28'
 tasks:
-  - id: "P3-T1"
-    name: "Create mapApiResponseToArtifact() function"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect"]
-    dependencies: ["P2-T4"]
-    model: "opus"
-    effort: 4
-    files: ["skillmeat/web/lib/api/mappers.ts"]
-
-  - id: "P3-T2"
-    name: "Implement unit tests for mapper"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect"]
-    dependencies: ["P3-T1"]
-    model: "opus"
-    effort: 3
-    files: ["skillmeat/web/lib/api/mappers.test.ts"]
-
-  - id: "P3-T3"
-    name: "Update useArtifacts hook"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect"]
-    dependencies: ["P3-T1"]
-    model: "opus"
-    effort: 2
-    files: ["skillmeat/web/hooks/useArtifacts.ts"]
-
-  - id: "P3-T4"
-    name: "Update useEntityLifecycle hook"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect"]
-    dependencies: ["P3-T1"]
-    model: "opus"
-    effort: 2
-    files: ["skillmeat/web/hooks/useEntityLifecycle.tsx"]
-
-  - id: "P3-T5"
-    name: "Remove conversion functions from pages"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect"]
-    dependencies: ["P3-T3", "P3-T4"]
-    model: "opus"
-    effort: 2
-    files: ["skillmeat/web/app/collection/page.tsx", "skillmeat/web/components/sync-status/sync-status-tab.tsx"]
-
-  - id: "P3-T6"
-    name: "Integration testing and validation"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect"]
-    dependencies: ["P3-T5"]
-    model: "opus"
-    effort: 3
-    files: ["skillmeat/web/hooks/useArtifacts.integration.test.ts"]
-
+- id: P3-T1
+  name: Create mapApiResponseToArtifact() function
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  dependencies:
+  - P2-T4
+  model: opus
+  effort: 4
+  files:
+  - skillmeat/web/lib/api/mappers.ts
+- id: P3-T2
+  name: Implement unit tests for mapper
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  dependencies:
+  - P3-T1
+  model: opus
+  effort: 3
+  files:
+  - skillmeat/web/lib/api/mappers.test.ts
+- id: P3-T3
+  name: Update useArtifacts hook
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  dependencies:
+  - P3-T1
+  model: opus
+  effort: 2
+  files:
+  - skillmeat/web/hooks/useArtifacts.ts
+- id: P3-T4
+  name: Update useEntityLifecycle hook
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  dependencies:
+  - P3-T1
+  model: opus
+  effort: 2
+  files:
+  - skillmeat/web/hooks/useEntityLifecycle.tsx
+- id: P3-T5
+  name: Remove conversion functions from pages
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  dependencies:
+  - P3-T3
+  - P3-T4
+  model: opus
+  effort: 2
+  files:
+  - skillmeat/web/app/collection/page.tsx
+  - skillmeat/web/components/sync-status/sync-status-tab.tsx
+- id: P3-T6
+  name: Integration testing and validation
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  dependencies:
+  - P3-T5
+  model: opus
+  effort: 3
+  files:
+  - skillmeat/web/hooks/useArtifacts.integration.test.ts
 parallelization:
-  batch_1: ["P3-T1"]
-  batch_2: ["P3-T2", "P3-T3", "P3-T4"]
-  batch_3: ["P3-T5"]
-  batch_4: ["P3-T6"]
-
+  batch_1:
+  - P3-T1
+  batch_2:
+  - P3-T2
+  - P3-T3
+  - P3-T4
+  batch_3:
+  - P3-T5
+  batch_4:
+  - P3-T6
 quality_gates:
-  - "mapApiResponseToArtifact() handles all 25+ properties"
-  - "determineSyncStatus() handles all 5 status values"
-  - "All 4 old conversion functions removed"
-  - "Unit tests >85% coverage for mappers.ts"
-  - "Integration tests pass"
-  - "Collections tab populated on /manage (bug fix verified)"
-  - "Source tab appears on /collection (bug fix verified)"
-  - "No data loss in conversion"
+- mapApiResponseToArtifact() handles all 25+ properties
+- determineSyncStatus() handles all 5 status values
+- All 4 old conversion functions removed
+- Unit tests >85% coverage for mappers.ts
+- Integration tests pass
+- Collections tab populated on /manage (bug fix verified)
+- Source tab appears on /collection (bug fix verified)
+- No data loss in conversion
+total_tasks: 6
+completed_tasks: 6
+in_progress_tasks: 0
+blocked_tasks: 0
+updated: '2026-01-28'
 ---
 
 # Phase 3: API Mapper Centralization
