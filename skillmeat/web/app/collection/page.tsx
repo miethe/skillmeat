@@ -840,7 +840,22 @@ function CollectionPageContent() {
       </div>
 
       {/* Entity Detail Modal */}
-      <UnifiedEntityModal entity={selectedEntity} open={isDetailOpen} onClose={handleDetailClose} />
+      <UnifiedEntityModal
+        entity={selectedEntity}
+        open={isDetailOpen}
+        onClose={handleDetailClose}
+        onNavigateToSource={(sourceId, artifactPath) => {
+          setIsDetailOpen(false);
+          setSelectedEntity(null);
+          router.push(`/marketplace/sources/${sourceId}?artifact=${encodeURIComponent(artifactPath)}`);
+        }}
+        onNavigateToDeployment={(projectPath, artifactId) => {
+          setIsDetailOpen(false);
+          setSelectedEntity(null);
+          const encodedPath = encodeURIComponent(projectPath);
+          router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
+        }}
+      />
 
       {/* Edit Collection Dialog */}
       {currentCollection && (
