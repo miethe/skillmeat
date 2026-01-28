@@ -11,11 +11,13 @@ import type {
   ArtifactFilters,
   ArtifactSort,
   ArtifactsResponse,
-  ArtifactScope,
-  ArtifactType,
 } from '@/types/artifact';
 import { ApiError, apiConfig, apiRequest } from '@/lib/api';
 import { fetchArtifactsPaginated, type ArtifactsPaginatedResponse } from '@/lib/api/artifacts';
+import {
+  mapApiResponseToArtifact,
+  type ArtifactResponse,
+} from '@/lib/api/mappers';
 
 const USE_MOCKS = apiConfig.useMocks;
 
@@ -27,78 +29,33 @@ interface ApiPageInfo {
   total_count: number;
 }
 
-interface ApiArtifactMetadata {
-  title?: string;
-  description?: string;
-  license?: string;
-  author?: string;
-  version?: string;
-  tags?: string[];
-}
-
-interface ApiArtifactUpstream {
-  tracking_enabled: boolean;
-  current_sha?: string;
-  upstream_sha?: string;
-  update_available: boolean;
-  has_local_modifications: boolean;
-}
-
-interface ApiArtifact {
-  id: string;
-  name: string;
-  type: ArtifactType;
-  source: string;
-  origin?: string;
-  origin_source?: string | null;
-  version?: string;
-  tags?: string[];
-  aliases?: string[];
-  metadata?: ApiArtifactMetadata;
-  upstream?: ApiArtifactUpstream;
-  added: string;
-  updated: string;
-  collection?: {
-    id: string;
-    name: string;
-  };
-  collections?: {
-    id: string;
-    name: string;
-    artifact_count?: number;
-  }[];
-}
-
 interface ApiArtifactListResponse {
-  items: ApiArtifact[];
+  items: ArtifactResponse[];
   page_info: ApiPageInfo;
 }
 
-// Mock data generator for development
+// Mock data generator for development (uses unified Artifact schema)
 const generateMockArtifacts = (): Artifact[] => {
   return [
     {
-      id: '1',
+      id: 'skill:canvas-design',
       name: 'canvas-design',
       type: 'skill',
       scope: 'user',
-      status: 'active',
+      syncStatus: 'synced',
       version: 'v2.1.0',
       source: 'anthropics/skills/canvas-design',
-      metadata: {
-        title: 'Canvas Design',
-        description: 'Create and edit visual designs with an interactive canvas',
-        license: 'MIT',
-        author: 'Anthropic',
-        version: '2.1.0',
-        tags: ['design', 'visual', 'canvas'],
-      },
-      upstreamStatus: {
-        hasUpstream: true,
-        upstreamUrl: 'https://github.com/anthropics/skills/canvas-design',
-        upstreamVersion: 'v2.1.0',
-        currentVersion: 'v2.1.0',
-        isOutdated: false,
+      description: 'Create and edit visual designs with an interactive canvas',
+      license: 'MIT',
+      author: 'Anthropic',
+      tags: ['design', 'visual', 'canvas'],
+      upstream: {
+        enabled: true,
+        url: 'https://github.com/anthropics/skills/canvas-design',
+        version: 'v2.1.0',
+        currentSha: 'abc123',
+        upstreamSha: 'abc123',
+        updateAvailable: false,
         lastChecked: new Date().toISOString(),
       },
       usageStats: {
@@ -110,50 +67,32 @@ const generateMockArtifacts = (): Artifact[] => {
       createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
       aliases: ['design', 'canvas'],
-      collection: {
-        id: 'design-tools',
-        name: 'Design Tools',
-      },
+      collection: 'Design Tools',
       collections: [
-        {
-          id: 'design-tools',
-          name: 'Design Tools',
-          artifact_count: 12,
-        },
-        {
-          id: 'ai-tools',
-          name: 'AI Tools',
-          artifact_count: 25,
-        },
-        {
-          id: 'productivity',
-          name: 'Productivity',
-          artifact_count: 8,
-        },
+        { id: 'design-tools', name: 'Design Tools', artifact_count: 12 },
+        { id: 'ai-tools', name: 'AI Tools', artifact_count: 25 },
+        { id: 'productivity', name: 'Productivity', artifact_count: 8 },
       ],
     },
     {
-      id: '2',
+      id: 'skill:docx-processor',
       name: 'docx-processor',
       type: 'skill',
       scope: 'user',
-      status: 'outdated',
+      syncStatus: 'outdated',
       version: 'v1.5.0',
       source: 'anthropics/skills/document-skills/docx',
-      metadata: {
-        title: 'DOCX Processor',
-        description: 'Read and process Microsoft Word documents',
-        license: 'Apache-2.0',
-        author: 'Anthropic',
-        version: '1.5.0',
-        tags: ['document', 'docx', 'word'],
-      },
-      upstreamStatus: {
-        hasUpstream: true,
-        upstreamUrl: 'https://github.com/anthropics/skills/document-skills/docx',
-        upstreamVersion: 'v1.8.0',
-        currentVersion: 'v1.5.0',
-        isOutdated: true,
+      description: 'Read and process Microsoft Word documents',
+      license: 'Apache-2.0',
+      author: 'Anthropic',
+      tags: ['document', 'docx', 'word'],
+      upstream: {
+        enabled: true,
+        url: 'https://github.com/anthropics/skills/document-skills/docx',
+        version: 'v1.8.0',
+        currentSha: 'def456',
+        upstreamSha: 'ghi789',
+        updateAvailable: true,
         lastChecked: new Date().toISOString(),
       },
       usageStats: {
@@ -164,37 +103,23 @@ const generateMockArtifacts = (): Artifact[] => {
       },
       createdAt: new Date(Date.now() - 60 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 45 * 86400000).toISOString(),
-      collection: {
-        id: 'document-processing',
-        name: 'Document Processing',
-      },
+      collection: 'Document Processing',
       collections: [
-        {
-          id: 'document-processing',
-          name: 'Document Processing',
-          artifact_count: 6,
-        },
+        { id: 'document-processing', name: 'Document Processing', artifact_count: 6 },
       ],
     },
     {
-      id: '3',
+      id: 'command:git-helper',
       name: 'git-helper',
       type: 'command',
       scope: 'user',
-      status: 'active',
+      syncStatus: 'synced',
       version: 'v1.0.0',
       source: 'local',
-      metadata: {
-        title: 'Git Helper',
-        description: 'Custom git workflow commands',
-        author: 'Local User',
-        version: '1.0.0',
-        tags: ['git', 'vcs', 'workflow'],
-      },
-      upstreamStatus: {
-        hasUpstream: false,
-        isOutdated: false,
-      },
+      origin: 'local',
+      description: 'Custom git workflow commands',
+      author: 'Local User',
+      tags: ['git', 'vcs', 'workflow'],
       usageStats: {
         totalDeployments: 8,
         activeProjects: 8,
@@ -204,33 +129,28 @@ const generateMockArtifacts = (): Artifact[] => {
       createdAt: new Date(Date.now() - 90 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 7 * 86400000).toISOString(),
       aliases: ['git'],
-      collection: {
-        id: 'developer-tools',
-        name: 'Developer Tools',
-      },
+      collection: 'Developer Tools',
     },
     {
-      id: '4',
+      id: 'agent:code-reviewer',
       name: 'code-reviewer',
       type: 'agent',
       scope: 'local',
-      status: 'active',
+      syncStatus: 'synced',
       version: 'v0.5.0',
       source: 'github.com/example/code-reviewer',
-      metadata: {
-        title: 'Code Reviewer Agent',
-        description: 'Automated code review assistant',
-        license: 'MIT',
-        author: 'Example User',
-        version: '0.5.0',
-        tags: ['code-review', 'agent', 'quality'],
-      },
-      upstreamStatus: {
-        hasUpstream: true,
-        upstreamUrl: 'https://github.com/example/code-reviewer',
-        upstreamVersion: 'v0.5.0',
-        currentVersion: 'v0.5.0',
-        isOutdated: false,
+      origin: 'github',
+      description: 'Automated code review assistant',
+      license: 'MIT',
+      author: 'Example User',
+      tags: ['code-review', 'agent', 'quality'],
+      upstream: {
+        enabled: true,
+        url: 'https://github.com/example/code-reviewer',
+        version: 'v0.5.0',
+        currentSha: 'jkl012',
+        upstreamSha: 'jkl012',
+        updateAvailable: false,
         lastChecked: new Date().toISOString(),
       },
       usageStats: {
@@ -241,33 +161,28 @@ const generateMockArtifacts = (): Artifact[] => {
       },
       createdAt: new Date(Date.now() - 14 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 5 * 86400000).toISOString(),
-      collection: {
-        id: 'developer-tools',
-        name: 'Developer Tools',
-      },
+      collection: 'Developer Tools',
     },
     {
-      id: '5',
+      id: 'mcp:database-mcp',
       name: 'database-mcp',
       type: 'mcp',
       scope: 'user',
-      status: 'active',
+      syncStatus: 'synced',
       version: 'v2.0.1',
       source: 'anthropics/mcp-servers/database',
-      metadata: {
-        title: 'Database MCP Server',
-        description: 'MCP server for database operations',
-        license: 'MIT',
-        author: 'Anthropic',
-        version: '2.0.1',
-        tags: ['mcp', 'database', 'sql'],
-      },
-      upstreamStatus: {
-        hasUpstream: true,
-        upstreamUrl: 'https://github.com/anthropics/mcp-servers/database',
-        upstreamVersion: 'v2.0.1',
-        currentVersion: 'v2.0.1',
-        isOutdated: false,
+      origin: 'github',
+      description: 'MCP server for database operations',
+      license: 'MIT',
+      author: 'Anthropic',
+      tags: ['mcp', 'database', 'sql'],
+      upstream: {
+        enabled: true,
+        url: 'https://github.com/anthropics/mcp-servers/database',
+        version: 'v2.0.1',
+        currentSha: 'mno345',
+        upstreamSha: 'mno345',
+        updateAvailable: false,
         lastChecked: new Date().toISOString(),
       },
       usageStats: {
@@ -278,78 +193,12 @@ const generateMockArtifacts = (): Artifact[] => {
       },
       createdAt: new Date(Date.now() - 20 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
-      collection: {
-        id: 'infrastructure',
-        name: 'Infrastructure',
-      },
+      collection: 'Infrastructure',
     },
   ];
 };
 
 const DEFAULT_ARTIFACT_LIMIT = 100;
-
-const mapApiArtifact = (artifact: ApiArtifact): Artifact => {
-  const metadata = artifact.metadata || {};
-  const artifactTags = artifact.tags || [];
-  const metadataTags = metadata.tags || [];
-  const mergedTags: string[] = [];
-  const seenTags = new Set<string>();
-
-  for (const tag of [...artifactTags, ...metadataTags]) {
-    const normalized = tag?.trim();
-    if (!normalized || seenTags.has(normalized)) {
-      continue;
-    }
-    seenTags.add(normalized);
-    mergedTags.push(normalized);
-  }
-  const upstream = artifact.upstream;
-  const updatedAt = artifact.updated || artifact.added;
-  const isOutdated = upstream?.update_available ?? false;
-  const scope: ArtifactScope = artifact.source === 'local' ? 'local' : 'user';
-
-  return {
-    id: artifact.id,
-    name: artifact.name,
-    type: artifact.type,
-    scope,
-    status: isOutdated ? 'outdated' : 'active',
-    version: artifact.version || metadata.version,
-    source: artifact.source,
-    origin: artifact.origin,
-    origin_source: artifact.origin_source || undefined,
-    metadata: {
-      title: metadata.title || artifact.name,
-      description: metadata.description || '',
-      license: metadata.license,
-      author: metadata.author,
-      version: metadata.version || artifact.version,
-      tags: mergedTags,
-    },
-    upstreamStatus: {
-      hasUpstream: Boolean(upstream?.tracking_enabled),
-      upstreamUrl:
-        artifact.source?.startsWith('http') || artifact.source?.includes('github.com')
-          ? artifact.source
-          : undefined,
-      upstreamVersion: upstream?.upstream_sha,
-      currentVersion: upstream?.current_sha || artifact.version,
-      isOutdated,
-      lastChecked: updatedAt,
-    },
-    usageStats: {
-      totalDeployments: 0,
-      activeProjects: 0,
-      lastUsed: updatedAt,
-      usageCount: 0,
-    },
-    createdAt: artifact.added,
-    updatedAt,
-    aliases: artifact.aliases || [],
-    collection: artifact.collection,
-    collections: artifact.collections,
-  };
-};
 
 // Filter and sort artifacts
 const filterAndSortArtifacts = (
@@ -364,9 +213,9 @@ const filterAndSortArtifacts = (
     filtered = filtered.filter((a) => a.type === filters.type);
   }
 
-  // Apply status filter
+  // Apply status filter (uses syncStatus in unified Artifact type)
   if (filters.status && filters.status !== 'all') {
-    filtered = filtered.filter((a) => a.status === filters.status);
+    filtered = filtered.filter((a) => a.syncStatus === filters.status);
   }
 
   // Apply scope filter
@@ -374,22 +223,21 @@ const filterAndSortArtifacts = (
     filtered = filtered.filter((a) => a.scope === filters.scope);
   }
 
-  // Apply search filter
+  // Apply search filter (uses flattened metadata fields)
   if (filters.search) {
     const searchLower = filters.search.toLowerCase();
     filtered = filtered.filter(
       (a) =>
         a.name.toLowerCase().includes(searchLower) ||
-        a.metadata.title?.toLowerCase().includes(searchLower) ||
-        a.metadata.description?.toLowerCase().includes(searchLower) ||
-        a.metadata.tags?.some((tag) => tag.toLowerCase().includes(searchLower))
+        a.description?.toLowerCase().includes(searchLower) ||
+        a.tags?.some((tag) => tag.toLowerCase().includes(searchLower))
     );
   }
 
   // Apply sorting
   filtered.sort((a, b) => {
-    let aValue: any;
-    let bValue: any;
+    let aValue: string | number;
+    let bValue: string | number;
 
     switch (sort.field) {
       case 'name':
@@ -401,8 +249,8 @@ const filterAndSortArtifacts = (
         bValue = new Date(b.updatedAt).getTime();
         break;
       case 'usageCount':
-        aValue = a.usageStats.usageCount;
-        bValue = b.usageStats.usageCount;
+        aValue = a.usageStats?.usageCount ?? 0;
+        bValue = b.usageStats?.usageCount ?? 0;
         break;
       default:
         return 0;
@@ -441,7 +289,10 @@ async function fetchArtifactsFromApi(
   try {
     const response = await apiRequest<ApiArtifactListResponse>(`/artifacts?${params.toString()}`);
 
-    const mappedArtifacts = response.items.map(mapApiArtifact);
+    // Map API responses to unified Artifact type using centralized mapper
+    const mappedArtifacts = response.items.map((item) =>
+      mapApiResponseToArtifact(item, 'collection')
+    );
     const filtered = filterAndSortArtifacts(mappedArtifacts, filters, sort);
 
     return {
@@ -468,8 +319,8 @@ async function fetchArtifactsFromApi(
 
 async function fetchArtifactFromApi(id: string): Promise<Artifact | null> {
   try {
-    const artifact = await apiRequest<ApiArtifact>(`/artifacts/${id}`);
-    return mapApiArtifact(artifact);
+    const artifact = await apiRequest<ArtifactResponse>(`/artifacts/${id}`);
+    return mapApiResponseToArtifact(artifact, 'collection');
   } catch (error) {
     if (USE_MOCKS && error instanceof ApiError && error.status === 404) {
       return null;
@@ -517,12 +368,12 @@ export function useUpdateArtifact() {
   return useMutation({
     mutationFn: async (artifact: Partial<Artifact> & { id: string }) => {
       try {
-        const response = await apiRequest<ApiArtifact>(`/artifacts/${artifact.id}`, {
+        const response = await apiRequest<ArtifactResponse>(`/artifacts/${artifact.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(artifact),
         });
-        return mapApiArtifact(response);
+        return mapApiResponseToArtifact(response, 'collection');
       } catch (error) {
         if (USE_MOCKS) {
           console.warn('[artifacts] Update API failed, falling back to mock', error);
@@ -604,13 +455,13 @@ export function useUpdateArtifactTags() {
       const queryString = params.toString();
       const url = `/artifacts/${encodeURIComponent(artifactId)}/tags${queryString ? `?${queryString}` : ''}`;
 
-      const response = await apiRequest<ApiArtifact>(url, {
+      const response = await apiRequest<ArtifactResponse>(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tags }),
       });
 
-      return mapApiArtifact(response);
+      return mapApiResponseToArtifact(response, 'collection');
     },
     onSuccess: (_, { artifactId }) => {
       // Invalidate all artifact queries to refresh data

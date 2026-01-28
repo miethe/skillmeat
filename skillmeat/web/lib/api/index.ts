@@ -14,3 +14,4 @@ export * from './merge';
 export * from './tags';
 export * from './marketplace';
 export * from './settings';
+export * from './mappers';
