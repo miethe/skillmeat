@@ -3,7 +3,7 @@ type: progress
 prd: entity-artifact-consolidation
 phase: 4-5
 status: pending
-progress: 75
+progress: 83
 last_updated: '2026-01-28'
 tasks:
 - id: P4-T1
@@ -102,7 +102,7 @@ tasks:
   - skillmeat/web/types/entity.ts
 - id: P5-T2
   name: Create migration guide
-  status: pending
+  status: completed
   assigned_to:
   - documentation-writer
   dependencies:
@@ -175,7 +175,7 @@ quality_gates:
 - Deprecation notices in place
 - Code review approval
 total_tasks: 12
-completed_tasks: 9
+completed_tasks: 10
 in_progress_tasks: 0
 blocked_tasks: 0
 updated: '2026-01-28'
