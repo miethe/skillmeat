@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import type { Entity } from '@/types/entity';
+import type { Artifact } from '@/types/artifact';
 
 /**
  * Props for RollbackDialog component
@@ -27,8 +27,8 @@ import type { Entity } from '@/types/entity';
  * Controls dialog state and rollback confirmation behavior.
  */
 export interface RollbackDialogProps {
-  /** The entity to rollback */
-  entity: Entity;
+  /** The artifact to rollback (entity is deprecated alias) */
+  entity: Artifact;
   /** Whether the dialog is open */
   open: boolean;
   /** Callback to change dialog open state */

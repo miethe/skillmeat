@@ -5,10 +5,10 @@ import { Github, Layers, Folder, ArrowRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { Entity } from '@/types/entity';
+import type { Artifact } from '@/types/artifact';
 
 export interface ArtifactFlowBannerProps {
-  entity: Entity;
+  artifact: Artifact;
   sourceInfo: {
     version: string;
     sha: string;
@@ -49,7 +49,7 @@ export interface ArtifactFlowBannerProps {
  * @example
  * ```tsx
  * <ArtifactFlowBanner
- *   entity={entity}
+ *   artifact={artifact}
  *   sourceInfo={{ version: "1.0.0", sha: "abc1234", hasUpdate: true, source: "user/repo" }}
  *   collectionInfo={{ version: "0.9.0", sha: "def5678" }}
  *   projectInfo={{ version: "0.9.0", sha: "def5678", isModified: true, projectPath: "/path" }}
@@ -63,7 +63,7 @@ export interface ArtifactFlowBannerProps {
  * ```
  */
 export function ArtifactFlowBanner({
-  entity,
+  artifact: _artifact, // Unused but kept for API consistency
   sourceInfo,
   collectionInfo,
   projectInfo,

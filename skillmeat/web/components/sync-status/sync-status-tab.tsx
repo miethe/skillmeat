@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
-import type { Entity } from '@/types/entity';
+import type { Artifact } from '@/types/artifact';
 import type { ArtifactDiffResponse } from '@/sdk/models/ArtifactDiffResponse';
 import type { ArtifactUpstreamDiffResponse } from '@/sdk/models/ArtifactUpstreamDiffResponse';
 import type { FileDiff } from '@/sdk/models/FileDiff';
@@ -27,7 +27,7 @@ import { SyncDialog } from '@/components/collection/sync-dialog';
 // ============================================================================
 
 export interface SyncStatusTabProps {
-  entity: Entity;
+  entity: Artifact;
   mode: 'collection' | 'project';
   projectPath?: string;
   onClose: () => void;
@@ -457,7 +457,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   // ============================================================================
 
   const bannerProps = {
-    entity,
+    artifact: entity,
     sourceInfo: upstreamDiff
       ? {
           version: upstreamDiff.upstream_version,

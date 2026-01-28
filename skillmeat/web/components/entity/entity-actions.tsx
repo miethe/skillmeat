@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { RollbackDialog } from './rollback-dialog';
 import { ArtifactDeletionDialog } from './artifact-deletion-dialog';
-import type { Entity } from '@/types/entity';
+import type { Artifact } from '@/types/artifact';
 
 /**
  * Props for EntityActions component
@@ -27,8 +27,8 @@ import type { Entity } from '@/types/entity';
  * Controls which actions are available and callbacks for each action.
  */
 export interface EntityActionsProps {
-  /** The entity this action menu is for */
-  entity: Entity;
+  /** The artifact this action menu is for (entity is deprecated alias) */
+  entity: Artifact;
   /** Callback for edit action */
   onEdit?: () => void;
   /** Callback for delete action - shows confirmation dialog */
