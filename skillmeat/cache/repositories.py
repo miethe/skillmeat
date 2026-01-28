@@ -90,6 +90,21 @@ T = TypeVar("T", bound=Base)
 
 
 # =============================================================================
+# FTS5 Search Weights
+# =============================================================================
+
+# FTS5 bm25 column weights for search ranking
+# Column indices in catalog_fts: 0=name(unindexed), 1=type(unindexed), 2=title,
+#                                3=description, 4=search_text, 5=tags, 6=deep
+# Higher weight = higher importance when ranking search results
+SEARCH_WEIGHT_TITLE = 10.0
+SEARCH_WEIGHT_DESCRIPTION = 5.0
+SEARCH_WEIGHT_SEARCH_TEXT = 2.0
+SEARCH_WEIGHT_TAGS = 3.0
+SEARCH_WEIGHT_DEEP = 1.0
+
+
+# =============================================================================
 # Merge Result
 # =============================================================================
 
@@ -735,6 +750,7 @@ class ImportContext:
                 .first()
             )
             if entry:
+                entry.import_id = import_id  # Set the actual column
                 entry.status = "imported"
                 entry.import_date = now
                 entry.updated_at = now
@@ -2660,33 +2676,89 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
                 filters.append(f"({' OR '.join(tag_conditions)})")
 
             # Apply cursor-based pagination
+            # Cursor format: "{relevance}:{confidence_score}:{entry_id}"
+            # Where relevance is the bm25 score (negative float, closer to 0 = better)
+            # Note: We need to apply cursor filter AFTER the FTS5 join since relevance
+            # comes from bm25(). We'll use a subquery or CTE approach instead.
+            cursor_relevance: Optional[float] = None
+            cursor_confidence: Optional[int] = None
+            cursor_id: Optional[str] = None
             if cursor:
                 try:
-                    cursor_score_str, cursor_id = cursor.split(":", 1)
-                    cursor_score = int(cursor_score_str)
-                    # Items after cursor: lower score, or same score with higher ID
-                    filters.append(
-                        "(ce.confidence_score < :cursor_score OR "
-                        "(ce.confidence_score = :cursor_score AND ce.id > :cursor_id))"
-                    )
-                    params["cursor_score"] = cursor_score
-                    params["cursor_id"] = cursor_id
-                except (ValueError, AttributeError):
+                    parts = cursor.split(":", 2)
+                    if len(parts) == 3:
+                        cursor_relevance = float(parts[0])
+                        cursor_confidence = int(parts[1])
+                        cursor_id = parts[2]
+                    else:
+                        # Legacy format: "{confidence_score}:{entry_id}"
+                        # Fall back for backwards compatibility
+                        cursor_confidence = int(parts[0])
+                        cursor_id = parts[1]
+                        logger.debug(f"Using legacy cursor format: {cursor}")
+                except (ValueError, AttributeError, IndexError):
                     logger.warning(f"Invalid cursor format: {cursor}")
 
             where_clause = " AND ".join(filters)
 
             # FTS5 query using external content table
-            # bm25() returns negative values (higher = better match)
-            # We use rank which is already the bm25 score
+            # bm25() returns negative values (closer to 0 = better match)
+            # We use bm25() with column weights to rank results by match location:
+            #   - Title matches rank highest (weight 10.0)
+            #   - Description matches next (weight 5.0)
+            #   - Tag matches (weight 3.0)
+            #   - Search text (weight 2.0)
+            #   - Deep content matches lowest (weight 1.0)
             # snippet() generates highlighted text around matched terms
-            # Column indices: 0=name, 1=artifact_type, 2=title, 3=description,
-            #                 4=search_text, 5=tags, 6=deep_search_text
+            # Column indices: 0=name(unindexed), 1=artifact_type(unindexed), 2=title,
+            #                 3=description, 4=search_text, 5=tags, 6=deep_search_text
             # We extract snippets from title (2), description (3), and deep_search_text (6)
             # to determine match source and provide relevant highlighted content
+            #
+            # bm25 weights: columns 0,1 are unindexed (weight 0), then title, desc,
+            #               search_text, tags, deep in order
+            bm25_weights = (
+                f"0, 0, {SEARCH_WEIGHT_TITLE}, {SEARCH_WEIGHT_DESCRIPTION}, "
+                f"{SEARCH_WEIGHT_SEARCH_TEXT}, {SEARCH_WEIGHT_TAGS}, {SEARCH_WEIGHT_DEEP}"
+            )
+
+            # Build cursor filter for pagination
+            # Since bm25() is computed at query time, we need to filter using the
+            # same bm25() expression in the WHERE clause
+            cursor_filter = ""
+            if cursor_relevance is not None and cursor_confidence is not None and cursor_id:
+                # Full 3-field cursor: relevance:confidence:id
+                # ORDER BY relevance ASC, confidence_score DESC, id ASC
+                # So "after cursor" means:
+                #   - relevance > cursor_relevance (worse match), OR
+                #   - relevance = cursor_relevance AND confidence_score < cursor_confidence, OR
+                #   - relevance = cursor_relevance AND confidence_score = cursor_confidence AND id > cursor_id
+                cursor_filter = f"""
+                AND (
+                    bm25(catalog_fts, {bm25_weights}) > :cursor_relevance
+                    OR (bm25(catalog_fts, {bm25_weights}) = :cursor_relevance AND ce.confidence_score < :cursor_confidence)
+                    OR (bm25(catalog_fts, {bm25_weights}) = :cursor_relevance AND ce.confidence_score = :cursor_confidence AND ce.id > :cursor_id)
+                )
+                """
+                params["cursor_relevance"] = cursor_relevance
+                params["cursor_confidence"] = cursor_confidence
+                params["cursor_id"] = cursor_id
+            elif cursor_confidence is not None and cursor_id:
+                # Legacy 2-field cursor: confidence:id (no relevance)
+                # For backwards compatibility, filter by confidence and id only
+                cursor_filter = """
+                AND (
+                    ce.confidence_score < :cursor_confidence
+                    OR (ce.confidence_score = :cursor_confidence AND ce.id > :cursor_id)
+                )
+                """
+                params["cursor_confidence"] = cursor_confidence
+                params["cursor_id"] = cursor_id
+
             sql = text(
                 f"""
-                SELECT ce.*, fts.rank AS relevance,
+                SELECT ce.*,
+                    bm25(catalog_fts, {bm25_weights}) AS relevance,
                     snippet(catalog_fts, 2, '<mark>', '</mark>', '...', 32) AS title_snippet,
                     snippet(catalog_fts, 3, '<mark>', '</mark>', '...', 64) AS description_snippet,
                     snippet(catalog_fts, 6, '<mark>', '</mark>', '...', 64) AS deep_snippet,
@@ -2695,7 +2767,8 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
                 JOIN marketplace_catalog_entries ce ON ce.rowid = fts.rowid
                 WHERE catalog_fts MATCH :query
                 AND {where_clause}
-                ORDER BY ce.confidence_score DESC, ce.id ASC
+                {cursor_filter}
+                ORDER BY relevance ASC, ce.confidence_score DESC, ce.id ASC
                 LIMIT :limit
                 """
             )
@@ -2708,14 +2781,18 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
             if has_more:
                 rows = rows[:limit]
 
-            # Extract snippets from rows before re-querying for ORM objects
+            # Extract snippets and relevance from rows before re-querying for ORM objects
             # Determine if match came from deep_search_text vs title/description
             # A snippet contains '<mark>' if that column matched the search terms
+            # Also store relevance scores for cursor generation
             snippets: Dict[str, Dict[str, Any]] = {}
+            relevance_scores: Dict[str, float] = {}
             for row in rows:
                 title_snippet = row.title_snippet
                 description_snippet = row.description_snippet
                 deep_snippet = getattr(row, "deep_snippet", None)
+                # Store relevance score for cursor generation
+                relevance_scores[row.id] = row.relevance
 
                 # Determine if this is a deep match:
                 # - Deep match if deep_snippet contains <mark> AND title/desc snippets don't
@@ -2767,10 +2844,13 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
                 items = []
 
             # Generate next cursor from last item
+            # Cursor format: "{relevance}:{confidence_score}:{entry_id}"
+            # Where relevance is the bm25 score (negative float, closer to 0 = better)
             next_cursor = None
             if items and has_more:
                 last_item = items[-1]
-                next_cursor = f"{last_item.confidence_score}:{last_item.id}"
+                last_relevance = relevance_scores.get(last_item.id, 0.0)
+                next_cursor = f"{last_relevance}:{last_item.confidence_score}:{last_item.id}"
 
             logger.debug(
                 f"FTS5 search returned {len(items)} entries "

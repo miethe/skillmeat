@@ -714,3 +714,68 @@ if artifact_path == ".":
 **Commit**: 880f232
 
 **Status**: RESOLVED
+
+---
+
+## Cross-Modal Navigation Race Condition
+
+**Date Fixed**: 2026-01-28
+**Severity**: medium
+**Component**: web/manage
+
+**Issue**: When clicking a Collection card in the marketplace CatalogEntryModal to navigate to the collection view (`/manage`), the artifact modal fails to open on first click. The navigation succeeds (URL updates correctly with `?collection=default&artifact=agent%3Aapple-platform-architect`), but the modal doesn't open. Works on second click after navigating back.
+
+**Root Cause**: Race condition in `manage/page.tsx` between URL params and entity loading. The `useEffect` that handles URL-based artifact selection has this condition:
+
+```typescript
+if (artifactId && entities.length > 0 && !selectedEntity) {
+```
+
+When navigating from marketplace:
+1. URL params are set immediately (artifactId available)
+2. `entities` array is empty while TanStack Query fetches data
+3. Effect runs, sees `entities.length === 0`, condition fails
+4. Entities eventually load, but effect re-runs before proper alignment
+5. Modal never opens on first click
+
+**Fix**: Used a `useRef` to persist the pending artifact ID across effect re-runs:
+
+```typescript
+const pendingArtifactRef = useRef<string | null>(null);
+
+useEffect(() => {
+  const artifactId = searchParams.get('artifact');
+
+  // Store pending selection when we have an artifact param that's new
+  if (artifactId && artifactId !== pendingArtifactRef.current) {
+    pendingArtifactRef.current = artifactId;
+  }
+
+  // Clear pending if URL no longer has artifact param
+  if (!artifactId) {
+    pendingArtifactRef.current = null;
+    return;
+  }
+
+  // Attempt to select when we have entities AND a pending selection AND no current selection
+  if (pendingArtifactRef.current && entities.length > 0 && !selectedEntity) {
+    const entity = entities.find(
+      (e) => e.id === pendingArtifactRef.current || e.name === pendingArtifactRef.current
+    );
+    if (entity) {
+      setSelectedEntity(entity);
+      setDetailPanelOpen(true);
+      pendingArtifactRef.current = null; // Clear pending after successful selection
+    }
+  }
+}, [searchParams, entities, selectedEntity]);
+```
+
+This ensures the selection succeeds once entities become available, rather than requiring both URL param and entities to be present simultaneously in the same effect run.
+
+**Files Modified**:
+- `skillmeat/web/app/manage/page.tsx` - Added useRef for pending artifact tracking, updated useEffect logic
+
+**Commit**: 9389f3de
+
+**Status**: RESOLVED

@@ -51,6 +51,8 @@ import {
   Tag,
   Pencil,
   MoreVertical,
+  FolderOpen,
+  Rocket,
 } from 'lucide-react';
 import { HeuristicScoreBreakdown } from '@/components/HeuristicScoreBreakdown';
 import { FileTree, type FileNode } from '@/components/entity/file-tree';
@@ -60,7 +62,9 @@ import {
   useCatalogFileContent,
   useUpdateCatalogEntryName,
   useReimportCatalogEntry,
+  useDeployments,
 } from '@/hooks';
+import { fetchArtifactsPaginated, type ArtifactsPaginatedResponse } from '@/lib/api/artifacts';
 import type { FileTreeEntry } from '@/lib/api/catalog';
 import type { CatalogEntry, ArtifactType, CatalogStatus } from '@/types/marketplace';
 import { PathTagReview } from '@/components/marketplace/path-tag-review';
@@ -75,6 +79,8 @@ interface CatalogEntryModalProps {
   onImport?: (entry: CatalogEntry) => void;
   isImporting?: boolean;
   onEntryUpdated?: (entry: CatalogEntry) => void;
+  onNavigateToCollection?: (collectionId: string, artifactId: string) => void;
+  onNavigateToDeployment?: (projectPath: string, artifactId: string) => void;
 }
 
 /**
@@ -328,8 +334,12 @@ export function CatalogEntryModal({
   onImport,
   isImporting = false,
   onEntryUpdated,
+  onNavigateToCollection,
+  onNavigateToDeployment,
 }: CatalogEntryModalProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'contents' | 'tags'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'contents' | 'tags' | 'collections' | 'deployments'
+  >('overview');
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -402,6 +412,76 @@ export function CatalogEntryModal({
     return frontmatter;
   }, [frontmatterContent?.content]);
 
+  // State for imported artifact data (collections tab)
+  const [importedArtifact, setImportedArtifact] = useState<
+    ArtifactsPaginatedResponse['items'][0] | null
+  >(null);
+  const [isLoadingArtifact, setIsLoadingArtifact] = useState(false);
+
+  // Fetch imported artifact when collections tab is active and entry is imported
+  // Search by name and type since import_id lookup may not be available
+  useEffect(() => {
+    if (!entry || entry.status !== 'imported' || activeTab !== 'collections') {
+      return;
+    }
+
+    const findImportedArtifact = async () => {
+      setIsLoadingArtifact(true);
+      try {
+        // NEW: Try import_id first (for new imports)
+        if (entry.import_id) {
+          const response = await fetchArtifactsPaginated({
+            import_id: entry.import_id,
+            limit: 10,
+          });
+          if (response.items.length > 0) {
+            setImportedArtifact(response.items[0] || null);
+            return;
+          }
+        }
+
+        // DEPRECATED FALLBACK: Search by name (for legacy imports without import_id)
+        console.warn('Using deprecated name-based artifact lookup for legacy import');
+        const response = await fetchArtifactsPaginated({
+          search: entry.name,
+          artifact_type: entry.artifact_type,
+          limit: 50,
+        });
+
+        // Find exact match by name and type
+        const matchingArtifact = response.items.find(
+          (a) => a.name === entry.name && a.type === entry.artifact_type
+        );
+
+        setImportedArtifact(matchingArtifact || null);
+      } catch (error) {
+        console.error('Failed to find imported artifact:', error);
+        setImportedArtifact(null);
+      } finally {
+        setIsLoadingArtifact(false);
+      }
+    };
+
+    findImportedArtifact();
+  }, [entry, activeTab]);
+
+  // Fetch deployments for the deployments tab
+  const { data: deploymentsData, isLoading: isLoadingDeployments } = useDeployments({
+    // Only fetch when tab is active and entry is imported
+  });
+
+  // Filter deployments to match this artifact
+  const artifactDeployments = useMemo(() => {
+    if (!deploymentsData || !entry) return [];
+    return deploymentsData.filter(
+      (d) => d.artifact_name === entry.name && d.artifact_type === entry.artifact_type
+    );
+  }, [deploymentsData, entry]);
+
+  // Get collections count from imported artifact
+  const collectionsCount = importedArtifact?.collections?.length ?? 0;
+  const deploymentsCount = artifactDeployments.length;
+
   // Transform flat file list to hierarchical structure for FileTree component
   const fileStructure = fileTreeData?.entries ? buildFileStructure(fileTreeData.entries) : [];
 
@@ -436,6 +516,12 @@ export function CatalogEntryModal({
     }
   }, [fileTreeData?.entries, selectedFilePath]);
 
+  // Reset file selection and imported artifact when artifact entry changes
+  useEffect(() => {
+    setSelectedFilePath(null);
+    setImportedArtifact(null);
+  }, [entry?.id]);
+
   useEffect(() => {
     if (!entry) {
       return;
@@ -447,7 +533,7 @@ export function CatalogEntryModal({
     }
   }, [entry, isEditingName]);
 
-  // Reset selected file when modal closes or entry changes
+  // Reset selected file when modal closes
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
       setSelectedFilePath(null);
@@ -456,6 +542,7 @@ export function CatalogEntryModal({
       setNameError(null);
       setShowReimportDialog(false);
       setKeepDeployments(false);
+      setImportedArtifact(null);
     }
     onOpenChange(newOpen);
   };
@@ -565,7 +652,11 @@ export function CatalogEntryModal({
         {/* Tabs Section */}
         <Tabs
           value={activeTab}
-          onValueChange={(value) => setActiveTab(value as 'overview' | 'contents' | 'tags')}
+          onValueChange={(value) =>
+            setActiveTab(
+              value as 'overview' | 'contents' | 'tags' | 'collections' | 'deployments'
+            )
+          }
           className="flex h-full min-h-0 flex-1 flex-col px-6"
         >
           <TabsList className="h-auto w-full justify-start rounded-none border-b bg-transparent p-0">
@@ -590,6 +681,34 @@ export function CatalogEntryModal({
               <Tag className="mr-2 h-4 w-4" aria-hidden="true" />
               Suggested Tags
             </TabsTrigger>
+            {entry.status === 'imported' && (
+              <>
+                <TabsTrigger
+                  value="collections"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                >
+                  <FolderOpen className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Collections
+                  {collectionsCount > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {collectionsCount}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="deployments"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                >
+                  <Rocket className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Deployments
+                  {deploymentsCount > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {deploymentsCount}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
 
           {/* Overview Tab */}
@@ -918,6 +1037,151 @@ export function CatalogEntryModal({
               <PathTagReview sourceId={entry.source_id} entryId={entry.id} />
             </div>
           </TabsContent>
+
+          {/* Collections Tab - only rendered for imported artifacts */}
+          {entry.status === 'imported' && (
+            <TabsContent value="collections" className="mt-0 min-h-0 flex-1 overflow-y-auto py-4">
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium">Collections</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Collections this artifact belongs to in your library.
+                  </p>
+                </div>
+
+                {isLoadingArtifact ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-sm text-muted-foreground">
+                      Loading collections...
+                    </span>
+                  </div>
+                ) : importedArtifact?.collections && importedArtifact.collections.length > 0 ? (
+                  <div className="grid gap-3">
+                    {importedArtifact.collections.map((collection) => (
+                      <button
+                        key={collection.id}
+                        type="button"
+                        onClick={() =>
+                          onNavigateToCollection?.(collection.id, importedArtifact.id)
+                        }
+                        className="flex items-center gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-muted/50"
+                      >
+                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+                          <FolderOpen className="h-5 w-5 text-primary" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{collection.name}</p>
+                          {collection.artifact_count !== undefined && (
+                            <p className="text-xs text-muted-foreground">
+                              {collection.artifact_count} artifact
+                              {collection.artifact_count !== 1 ? 's' : ''}
+                            </p>
+                          )}
+                        </div>
+                        <ExternalLink
+                          className="h-4 w-4 flex-shrink-0 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <FolderOpen
+                      className="mb-2 h-10 w-10 text-muted-foreground/50"
+                      aria-hidden="true"
+                    />
+                    <p className="text-sm font-medium text-muted-foreground">
+                      No collections
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground/70">
+                      This artifact is not in any collections yet.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          )}
+
+          {/* Deployments Tab - only rendered for imported artifacts */}
+          {entry.status === 'imported' && (
+            <TabsContent value="deployments" className="mt-0 min-h-0 flex-1 overflow-y-auto py-4">
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium">Deployments</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Projects where this artifact is deployed.
+                  </p>
+                </div>
+
+                {isLoadingDeployments ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-sm text-muted-foreground">
+                      Loading deployments...
+                    </span>
+                  </div>
+                ) : artifactDeployments.length > 0 ? (
+                  <div className="grid gap-3">
+                    {artifactDeployments.map((deployment, index) => (
+                      <button
+                        key={`${deployment.project_path}-${deployment.artifact_name}-${index}`}
+                        type="button"
+                        onClick={() =>
+                          onNavigateToDeployment?.(
+                            deployment.project_path,
+                            entry.import_id || entry.id
+                          )
+                        }
+                        className="flex items-center gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-muted/50"
+                      >
+                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-green-500/10">
+                          <Rocket className="h-5 w-5 text-green-600" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{deployment.artifact_name}</p>
+                          <p
+                            className="truncate text-xs text-muted-foreground"
+                            title={deployment.project_path}
+                          >
+                            {deployment.project_path}
+                          </p>
+                          <p className="text-xs text-muted-foreground/70">
+                            Deployed {formatDate(deployment.deployed_at)}
+                          </p>
+                        </div>
+                        <div className="flex flex-shrink-0 items-center gap-2">
+                          {deployment.local_modifications && (
+                            <Badge variant="outline" className="border-yellow-500 text-yellow-600">
+                              Modified
+                            </Badge>
+                          )}
+                          <ExternalLink
+                            className="h-4 w-4 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <Rocket
+                      className="mb-2 h-10 w-10 text-muted-foreground/50"
+                      aria-hidden="true"
+                    />
+                    <p className="text-sm font-medium text-muted-foreground">
+                      No deployments
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground/70">
+                      This artifact has not been deployed to any projects.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
 
         {/* Action Buttons */}

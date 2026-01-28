@@ -93,12 +93,14 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
     // Default based on mode: on → true, opt_in → false
     return indexingMode === 'on' ? true : false;
   });
+  const [deepIndexingEnabled, setDeepIndexingEnabled] = useState<boolean>(false);
 
   // Reset indexing enabled state when modal opens or indexing mode changes
   useEffect(() => {
     if (open) {
       // Reset based on current mode when modal opens
       setIndexingEnabled(indexingMode === 'on' ? true : false);
+      setDeepIndexingEnabled(false);
     }
   }, [open, indexingMode]);
 
@@ -217,6 +219,7 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
         single_artifact_type: singleArtifactMode ? singleArtifactType : undefined,
         tags: tags.length > 0 ? tags : undefined,
         indexing_enabled: showToggle ? indexingEnabled : undefined,
+        deep_indexing_enabled: showToggle && indexingEnabled ? deepIndexingEnabled : undefined,
       });
 
       // Reset form
@@ -243,6 +246,7 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
         single_artifact_type: singleArtifactMode ? singleArtifactType : undefined,
         tags: tags.length > 0 ? tags : undefined,
         indexing_enabled: showToggle ? indexingEnabled : undefined,
+        deep_indexing_enabled: showToggle && indexingEnabled ? deepIndexingEnabled : undefined,
       });
 
       // Reset form
@@ -270,6 +274,7 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
     setInferError(null);
     // Reset indexing state based on current mode
     setIndexingEnabled(indexingMode === 'on' ? true : false);
+    setDeepIndexingEnabled(false);
   };
 
   const isValidUrl = repoUrl.match(/^https:\/\/github\.com\/[^/]+\/[^/]+$/);
@@ -558,13 +563,13 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
                       </div>
                     )}
 
-                    {/* Search Indexing Toggle (shown when mode is "on" or "opt_in") */}
+                    {/* Metadata Search Indexing Toggle (shown when mode is "on" or "opt_in") */}
                     {showToggle && (
                       <div className="flex flex-row items-center justify-between rounded-lg border p-4">
                         <div className="flex-1 space-y-0.5">
                           <div className="flex items-center gap-2">
                             <Label htmlFor="indexing-enabled" className="text-sm">
-                              Enable artifact search indexing
+                              Enable metadata search indexing
                             </Label>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -572,22 +577,69 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-xs">
                                 <p>
-                                  Index artifacts for cross-source search. Adds approximately 850
-                                  bytes per artifact to enable fast full-text search across all your
-                                  sources.
+                                  Indexes artifact metadata (name, title, description, and tags from
+                                  frontmatter) for cross-source search. This is lightweight and
+                                  recommended for most users.
                                 </p>
                               </TooltipContent>
                             </Tooltip>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            Enable full-text search across artifacts from this source
+                            Index artifact titles, descriptions, and tags for search
                           </p>
                         </div>
                         <Switch
                           id="indexing-enabled"
                           checked={indexingEnabled ?? false}
-                          onCheckedChange={setIndexingEnabled}
-                          aria-label="Enable artifact search indexing"
+                          onCheckedChange={(checked) => {
+                            setIndexingEnabled(checked);
+                            // Reset deep indexing when metadata indexing is disabled
+                            if (!checked) {
+                              setDeepIndexingEnabled(false);
+                            }
+                          }}
+                          aria-label="Enable metadata search indexing"
+                        />
+                      </div>
+                    )}
+
+                    {/* Deep Content Indexing Toggle - only shown when metadata indexing is enabled */}
+                    {showToggle && indexingEnabled && (
+                      <div className="flex flex-row items-center justify-between rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900 dark:bg-amber-950/20">
+                        <div className="flex-1 space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor="deep-indexing-enabled" className="text-sm">
+                              Enable deep content indexing
+                            </Label>
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] font-normal text-amber-600 dark:text-amber-400"
+                            >
+                              Advanced
+                            </Badge>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p>
+                                  Indexes the full text content of artifact files (code,
+                                  documentation, etc.) for deeper search capabilities. This uses more
+                                  storage and processing time. Only enable if you need to search
+                                  within artifact file contents.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Index full artifact file contents for code and documentation search
+                          </p>
+                        </div>
+                        <Switch
+                          id="deep-indexing-enabled"
+                          checked={deepIndexingEnabled}
+                          onCheckedChange={setDeepIndexingEnabled}
+                          aria-label="Enable deep content indexing"
                         />
                       </div>
                     )}

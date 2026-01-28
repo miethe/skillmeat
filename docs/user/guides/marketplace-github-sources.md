@@ -2,9 +2,9 @@
 title: "GitHub Source Ingestion User Guide"
 description: "Step-by-step guide to discovering, managing, and importing Claude artifacts from GitHub repositories"
 audience: "users"
-tags: ["marketplace", "github", "sources", "artifacts", "ingestion"]
+tags: ["marketplace", "github", "sources", "artifacts", "ingestion", "search-ranking"]
 created: 2025-12-08
-updated: 2026-01-25
+updated: 2026-01-27
 category: "guides"
 status: "published"
 related_documents:
@@ -36,6 +36,8 @@ Discover and import Claude artifacts directly from GitHub repositories. This gui
 
 GitHub source ingestion lets you automatically discover Claude artifacts (skills, commands, agents, MCP servers, and hooks) from any GitHub repository. Instead of manually tracking artifacts across different repositories, SkillMeat scans your GitHub sources and catalogs them in one place.
 
+All artifact types are fully indexed for search, allowing you to quickly find skills, commands, agents, hooks, and MCP servers across your entire catalog.
+
 This is especially useful for:
 - **Team repositories**: Centrally manage all Claude artifacts your team creates
 - **Public collections**: Import artifacts from open-source projects
@@ -54,12 +56,14 @@ This is especially useful for:
 
 ### Supported Artifact Types
 
-The ingestion feature currently detects:
+The ingestion feature detects and indexes all artifact types for search:
 - **Skills**: Claude skills and domain-specific functionality
 - **Commands**: CLI-style commands and utilities
 - **Agents**: Complex multi-step agents and workflows
 - **MCP Servers**: Model Context Protocol servers for extended capabilities
 - **Hooks**: Lifecycle hooks and event handlers
+
+All artifact types support both directory-based (e.g., `skills/canvas/` with `SKILL.md` inside) and file-based (e.g., `commands/doc-generate.md`) patterns.
 
 ## Getting Started
 
@@ -489,9 +493,10 @@ GitHub repositories change over time. Rescan your sources periodically to discov
 ### What Happens During Rescan
 
 1. **Scan initiated**: Source status changes to "scanning"
-2. **Repository scanned**: Searches for artifacts again
-3. **Differences detected**: Compares with previous results
-4. **Results updated**: Displays new/updated/removed counts
+2. **Repository scanned**: Searches for artifacts again (all artifact types)
+3. **Search index refreshed**: Frontmatter and tags updated automatically for all artifacts
+4. **Differences detected**: Compares with previous results
+5. **Results updated**: Displays new/updated/removed counts
 
 ### Interpreting Rescan Results
 
@@ -524,7 +529,7 @@ Unchanged: 15
 
 ## Source Card Badges
 
-Each source card displays three icon badges in the top-right corner indicating sync status, trust level, and search indexing state. Hover over any badge to see detailed information.
+Each source card displays three icon-only badges in the top-right corner indicating sync status, trust level, and search indexing state. Hover over any badge to see a tooltip with detailed information about that status.
 
 ### Badge Types
 
@@ -532,14 +537,101 @@ Each source card displays three icon badges in the top-right corner indicating s
 |-------|------|--------|---------------|
 | **Sync Status** | Clock/Checkmark/Warning | Pending, Scanning, Synced, Error | Status + last sync timestamp |
 | **Trust Level** | Shield/Star | Untrusted, Basic, Verified, Official | Trust level + description |
-| **Search Index** | Search icons | Disabled, Pending, Active, Default | Index status + last indexed timestamp |
+| **Search Index** | Search icons | Disabled, Pending, Active, Deep Search, Default | Index status + last indexed timestamp |
+
+The badges are icon-only to keep source cards clean. Simply hover over a badge to see full details.
 
 ### Search Indexing Badge States
 
+Search indexing now covers all artifact types (skills, commands, agents, hooks, MCP servers). When a source is scanned or rescanned, SkillMeat automatically extracts frontmatter metadata from all artifact types and refreshes tags to ensure search results stay current.
+
 - **Disabled** (gray SearchX): Indexing explicitly disabled for this source
 - **Pending** (yellow Search): Indexing enabled but not yet run
-- **Active** (green SearchCheck): Successfully indexed; hover shows last indexed time
+- **Active** (green SearchCheck): All artifact types indexed; hover shows last indexed time
+- **Deep Search** (purple Search+): Deep content indexing is active; includes full-text search of artifact contents
 - **Default** (muted Search): Using global indexing settings
+
+### Search Indexing Levels
+
+SkillMeat offers two levels of search indexing, giving you control over the trade-off between search depth and resource usage:
+
+#### Metadata Search Indexing (Recommended)
+
+**What it indexes:**
+- Artifact name (derived from file/directory path)
+- Title (from YAML frontmatter)
+- Description (from YAML frontmatter)
+- Tags (from YAML frontmatter)
+
+**Characteristics:**
+- Lightweight (~850 bytes per artifact)
+- Fast indexing during scans
+- Covers most search use cases
+- Enabled by default when indexing is turned on
+
+This level is sufficient for finding artifacts by name, purpose, or category. Most users should use only this level.
+
+#### Deep Content Indexing (Advanced)
+
+**What it indexes:**
+- Everything from metadata indexing, plus:
+- Full text content of artifact files (`.md`, `.yaml`, `.json`, `.py`, `.ts`, `.js`, `.txt`)
+- Code, documentation, and configuration within artifacts
+
+**Characteristics:**
+- Higher storage requirements (varies by artifact size)
+- Longer indexing time during scans
+- Enables searching within artifact code and documentation
+- Disabled by default
+
+**When to use deep indexing:**
+- You need to search for specific code patterns or function names
+- You want to find artifacts based on implementation details
+- Your workflow involves searching documentation content
+
+**How to enable:**
+1. When adding or editing a source, first enable "Metadata search indexing"
+2. A second toggle appears: "Enable deep content indexing" (marked as Advanced)
+3. Enable this toggle to index full file contents
+4. Save and rescan the source
+
+**Note:** Deep indexing only runs during batch extraction (sources with 3+ artifacts) and requires cloning the repository. Enable it selectively for sources where you need deeper search capabilities.
+
+### Search Results Ranking
+
+When searching for artifacts in the marketplace, results are ranked by **relevance** based on where your search term was found. This ensures the most relevant matches appear first.
+
+#### Ranking Priority
+
+Search results are ordered by match location with the following priority:
+
+| Priority | Field | Description |
+|----------|-------|-------------|
+| 1 (Highest) | **Title** | Matches in artifact titles rank highest |
+| 2 | **Description** | Matches in artifact descriptions |
+| 3 | **Tags** | Matches in search tags |
+| 4 | **Search Text** | Matches in concatenated metadata |
+| 5 (Lowest) | **Deep Content** | Matches in file contents (if deep indexing enabled) |
+
+#### How It Works
+
+- **Title matches first**: If you search for "canvas", artifacts with "canvas" in their title appear before those where "canvas" only appears in the description
+- **Secondary sorting**: When multiple artifacts have the same relevance score, they're sorted by detection confidence score (higher confidence first)
+- **Deep matches last**: Artifacts matched only through deep content indexing appear after metadata matches, helping you distinguish between artifacts "about" something vs. artifacts that merely "mention" it
+
+#### Tips for Effective Searches
+
+- **Be specific**: Searching for "pdf-converter" will rank exact title matches higher than general mentions
+- **Use tags**: Tag-based filtering combined with search narrows results effectively
+- **Check badges**: Look for the "Deep Search" badge on result cards to see if a match came from file content rather than metadata
+
+#### Example
+
+Searching for "authentication":
+1. First: "OAuth Authentication Skill" (title match)
+2. Second: "API Gateway" with description "Handles authentication..." (description match)
+3. Third: Artifacts tagged with "authentication" (tag match)
+4. Last: Artifacts where "authentication" appears only in code comments (deep content match)
 
 ## Status Chips Explained
 
@@ -858,6 +950,7 @@ Sources also have trust level indicators:
 ## See Also
 
 - [Marketplace Usage Guide](./marketplace-usage-guide.md) - General marketplace features
+- [Searching for Artifacts Guide](./searching.md) - CLI search and duplicate detection
 - [Web UI Guide](./web-ui-guide.md) - Full web interface documentation
 - [Publishing to Marketplace Guide](./publishing-to-marketplace.md) - Share your artifacts
 - [Team Sharing Guide](./team-sharing-guide.md) - Collaborate with teammates

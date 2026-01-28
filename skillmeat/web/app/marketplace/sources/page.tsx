@@ -44,11 +44,12 @@ import {
   ArtifactSearchResults,
   ArtifactSearchResultsSkeleton,
 } from '@/components/marketplace/artifact-search-results';
-import { useSources, sourceKeys, useArtifactSearch } from '@/hooks';
+import { CatalogEntryModal } from '@/components/CatalogEntryModal';
+import { useSources, sourceKeys, useArtifactSearch, type ArtifactSearchResult } from '@/hooks';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks';
 import { apiRequest } from '@/lib/api';
-import type { ScanResult, CatalogListResponse, GitHubSource } from '@/types/marketplace';
+import type { ScanResult, CatalogListResponse, GitHubSource, CatalogEntry, ArtifactType, CatalogStatus } from '@/types/marketplace';
 import { useState } from 'react';
 
 // ============================================================================
@@ -342,6 +343,11 @@ function MarketplaceSourcesPageInner() {
     updates: UpdatedImport[];
   } | null>(null);
 
+  // Catalog entry modal state for artifact search results
+  const [catalogModalOpen, setCatalogModalOpen] = useState(false);
+  const [selectedSearchResult, setSelectedSearchResult] = useState<CatalogEntry | null>(null);
+  const [isImportingFromSearch, setIsImportingFromSearch] = useState(false);
+
   // Fetch sources
   const {
     data,
@@ -622,6 +628,59 @@ function MarketplaceSourcesPageInner() {
     rescanMutation.mutate({ sourceId });
   };
 
+  // Handler to convert search result to CatalogEntry and open modal
+  const handleSearchResultClick = (result: ArtifactSearchResult) => {
+    // Convert ArtifactSearchResult to CatalogEntry format
+    const catalogEntry: CatalogEntry = {
+      id: result.id,
+      source_id: result.source_id,
+      artifact_type: result.artifact_type as ArtifactType,
+      name: result.name,
+      path: result.path,
+      upstream_url:
+        result.upstream_url ||
+        `https://github.com/${result.source_owner}/${result.source_repo}/tree/HEAD/${result.path}`,
+      detected_at: new Date().toISOString(), // Not available in search result
+      confidence_score: result.confidence_score,
+      status: result.status as CatalogStatus,
+    };
+    setSelectedSearchResult(catalogEntry);
+    setCatalogModalOpen(true);
+  };
+
+  // Handler to import artifact from search result modal
+  const handleImportFromSearch = async (entry: CatalogEntry) => {
+    setIsImportingFromSearch(true);
+    try {
+      await apiRequest(`/marketplace/sources/${entry.source_id}/import`, {
+        method: 'POST',
+        body: JSON.stringify({
+          entry_ids: [entry.id],
+          conflict_strategy: 'skip',
+        }),
+      });
+      toast({
+        title: 'Import successful',
+        description: `Imported ${entry.name} to your collection`,
+      });
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: sourceKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: sourceKeys.catalogs() });
+      // Update the entry status in the modal
+      setSelectedSearchResult((prev) =>
+        prev ? { ...prev, status: 'imported' as CatalogStatus } : null
+      );
+    } catch (error) {
+      toast({
+        title: 'Import failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsImportingFromSearch(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -794,7 +853,10 @@ function MarketplaceSourcesPageInner() {
                     Found {artifactSearch.data.items.length} artifact
                     {artifactSearch.data.items.length !== 1 ? 's' : ''}
                   </div>
-                  <ArtifactSearchResults results={artifactSearch.data.items} />
+                  <ArtifactSearchResults
+                    results={artifactSearch.data.items}
+                    onResultClick={handleSearchResultClick}
+                  />
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -961,6 +1023,15 @@ function MarketplaceSourcesPageInner() {
           }}
         />
       )}
+
+      {/* Catalog Entry Modal for Search Results */}
+      <CatalogEntryModal
+        entry={selectedSearchResult}
+        open={catalogModalOpen}
+        onOpenChange={setCatalogModalOpen}
+        onImport={handleImportFromSearch}
+        isImporting={isImportingFromSearch}
+      />
     </div>
   );
 }

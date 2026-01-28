@@ -251,6 +251,11 @@ function mapApiArtifactToEntity(
     author: metadata.author || undefined,
     license: metadata.license || undefined,
     dependencies: metadata.dependencies || [],
+    collections: artifact.collections?.map((c) => ({
+      id: c.id,
+      name: c.name,
+      artifact_count: c.artifact_count ?? 0,
+    })) || [],
   };
 }
 

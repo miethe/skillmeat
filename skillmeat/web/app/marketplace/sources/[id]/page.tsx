@@ -565,6 +565,19 @@ export default function SourceDetailPage() {
       });
   }, [catalogData]);
 
+  // Handle URL-based artifact selection (auto-open modal when navigating with artifact param)
+  useEffect(() => {
+    const artifactPath = searchParams.get('artifact');
+    if (artifactPath && allEntries.length > 0 && !selectedEntry) {
+      // Find the entry matching the path
+      const entry = allEntries.find((e) => e.path === artifactPath || e.id === artifactPath);
+      if (entry) {
+        setSelectedEntry(entry);
+        setModalOpen(true);
+      }
+    }
+  }, [searchParams, allEntries, selectedEntry]);
+
   // Filter by search (client-side for UI convenience)
   // Data comes pre-sorted from server
   const filteredEntries = useMemo(() => {
@@ -1456,6 +1469,17 @@ export default function SourceDetailPage() {
         onImport={(entry) => handleImportSingle(entry.id)}
         isImporting={importMutation.isPending}
         onEntryUpdated={(updatedEntry) => setSelectedEntry(updatedEntry)}
+        onNavigateToCollection={(collectionId, artifactId) => {
+          setModalOpen(false);
+          setSelectedEntry(null);
+          router.push(`/manage?collection=${collectionId}&artifact=${encodeURIComponent(artifactId)}`);
+        }}
+        onNavigateToDeployment={(projectPath, artifactId) => {
+          setModalOpen(false);
+          setSelectedEntry(null);
+          const encodedPath = btoa(projectPath);
+          router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
+        }}
       />
 
       {/* Directory Map Modal */}

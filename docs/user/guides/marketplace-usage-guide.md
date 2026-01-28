@@ -12,6 +12,7 @@ Complete guide to discovering, installing, and managing artifacts from the Skill
 - [Installing Bundles](#installing-bundles)
 - [Managing Marketplace Artifacts](#managing-marketplace-artifacts)
   - [Re-importing Artifacts](#re-importing-artifacts)
+  - [Cross-Modal Navigation](#cross-modal-navigation)
 - [Publishing Your Own Bundles](#publishing-your-own-bundles)
 - [Marketplace Best Practices](#marketplace-best-practices)
 - [Troubleshooting](#troubleshooting)
@@ -577,6 +578,38 @@ If you need to refresh an imported artifact from its upstream source (e.g., to g
 - The catalog shows "imported" but the artifact was deleted
 
 > **Note:** When you delete an imported artifact from your collection, the catalog entry status is automatically reset to "new", allowing you to re-import it normally. The Force Re-import feature is for updating artifacts that still exist in your collection.
+
+### Cross-Modal Navigation
+
+When you import an artifact from a marketplace source, SkillMeat creates a direct link between the catalog entry and the imported artifact in your collection. This enables seamless navigation between the marketplace view and your collection.
+
+**Navigating from Catalog to Collection:**
+
+1. Open a marketplace source containing imported artifacts
+2. Click on an imported catalog entry (shown with "Imported" badge)
+3. Click the **Collections** tab to see which collections contain this artifact
+4. Click any collection card to navigate directly to that artifact in your collection
+
+**How It Works:**
+
+Each import operation generates a unique `import_id` that links the catalog entry to the artifact in your collection. This enables:
+
+- **Precise matching** - Direct lookup by import ID rather than fuzzy name matching
+- **Reliable navigation** - Works even when multiple artifacts share similar names
+- **Batch tracking** - All artifacts imported in a single operation share the same import ID
+
+**Legacy Imports:**
+
+Artifacts imported before this feature was introduced use fallback name-based matching:
+- Search matches by artifact name and type
+- Limited to top 50 results
+- May require manual verification if names are ambiguous
+
+> **Note:** Re-importing an artifact will generate a new import_id, enabling direct navigation for previously imported artifacts.
+
+**Viewing Import Information:**
+
+The import_id is visible in the artifact's metadata when viewing details in your collection. Use this to verify the link between a catalog entry and its imported artifact.
 
 ### Tracking Installed Bundles
 
