@@ -852,7 +852,7 @@ function CollectionPageContent() {
         onNavigateToDeployment={(projectPath, artifactId) => {
           setIsDetailOpen(false);
           setSelectedEntity(null);
-          const encodedPath = encodeURIComponent(projectPath);
+          const encodedPath = btoa(projectPath);
           router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
         }}
       />

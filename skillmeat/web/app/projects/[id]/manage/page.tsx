@@ -254,7 +254,7 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
           } else {
             setDetailPanelOpen(false);
             setSelectedEntity(null);
-            const encodedPath = encodeURIComponent(targetProjectPath);
+            const encodedPath = btoa(targetProjectPath);
             router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
           }
         }}
