@@ -56,10 +56,9 @@ export function useExportBundle({
                 name: `artifact-${id}`,
                 type: 'skill',
                 scope: 'user',
-                status: 'active',
+                syncStatus: 'synced',
                 version: '1.0.0',
-                metadata: {},
-                upstreamStatus: { hasUpstream: false, isOutdated: false },
+                upstream: { enabled: false, updateAvailable: false },
                 usageStats: {
                   totalDeployments: 0,
                   activeProjects: 0,
