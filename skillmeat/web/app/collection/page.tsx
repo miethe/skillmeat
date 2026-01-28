@@ -26,7 +26,6 @@ import {
 } from '@/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Artifact, ArtifactFilters } from '@/types/artifact';
-import type { Entity } from '@/types/entity';
 import type { ArtifactParameters } from '@/types/discovery';
 
 type ViewMode = 'grid' | 'list' | 'grouped';
@@ -93,57 +92,6 @@ function enrichArtifactSummary(
     updatedAt: new Date().toISOString(),
     aliases: [],
     collection: collectionInfo,
-  };
-}
-
-// Helper function to convert Artifact to Entity for the modal
-function artifactToEntity(artifact: Artifact): Entity {
-  const statusMap: Record<string, Entity['status']> = {
-    active: 'synced',
-    outdated: 'outdated',
-    conflict: 'conflict',
-    error: 'conflict',
-  };
-
-  // Use artifact's collection ID, or 'default' if not available
-  // Note: 'discovered' is only for marketplace artifacts on /marketplace page
-  // On /collection page, artifacts should always have a collection context
-  const collectionId = artifact.collection?.id || 'default';
-
-  return {
-    id: artifact.id,
-    name: artifact.name,
-    type: artifact.type,
-    collection: collectionId,
-    status: statusMap[artifact.status] || 'synced',
-    tags: artifact.metadata?.tags || [],
-    description: artifact.metadata?.description,
-    version: artifact.version || artifact.metadata?.version,
-    source: artifact.source || 'unknown',
-    origin: artifact.origin,
-    origin_source: artifact.origin_source,
-    deployedAt: artifact.createdAt,
-    modifiedAt: artifact.updatedAt,
-    aliases: artifact.aliases || [],
-    // Collections array for the Collections tab in unified entity modal
-    // Priority: artifact.collections (array) > artifact.collection (single) > empty array
-    // TODO: Backend needs to populate artifact.collections with ALL collections the artifact belongs to
-    collections:
-      artifact.collections && artifact.collections.length > 0
-        ? artifact.collections.map((collection) => ({
-            id: collection.id,
-            name: collection.name,
-            artifact_count: collection.artifact_count || 0,
-          }))
-        : artifact.collection
-          ? [
-              {
-                id: artifact.collection.id,
-                name: artifact.collection.name,
-                artifact_count: 0, // Not available in artifact context
-              },
-            ]
-          : [],
   };
 }
 
@@ -227,8 +175,8 @@ function CollectionPageContent() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Modal state
-  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
+  // Modal state - Entity is an alias for Artifact, use Artifact for consistency
+  const [selectedEntity, setSelectedEntity] = useState<Artifact | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -544,6 +492,21 @@ function CollectionPageContent() {
       });
     }
 
+    // Type filter
+    if (filters.type && filters.type !== 'all') {
+      artifacts = artifacts.filter((artifact) => artifact.type === filters.type);
+    }
+
+    // Status filter
+    if (filters.status && filters.status !== 'all') {
+      artifacts = artifacts.filter((artifact) => artifact.status === filters.status);
+    }
+
+    // Scope filter
+    if (filters.scope && filters.scope !== 'all') {
+      artifacts = artifacts.filter((artifact) => artifact.scope === filters.scope);
+    }
+
     // Search
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -594,6 +557,7 @@ function CollectionPageContent() {
     infiniteCollectionData,
     infiniteAllArtifactsData,
     currentCollection,
+    filters,
     searchQuery,
     selectedTags,
     sortField,
@@ -644,8 +608,8 @@ function CollectionPageContent() {
   ]);
 
   const handleArtifactClick = (artifact: Artifact) => {
-    // Artifact is now always a full Artifact object due to enrichment in filteredArtifacts
-    setSelectedEntity(artifactToEntity(artifact));
+    // Entity = Artifact (type alias), no conversion needed
+    setSelectedEntity(artifact);
     setIsDetailOpen(true);
   };
 
