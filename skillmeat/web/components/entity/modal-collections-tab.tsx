@@ -18,11 +18,19 @@ import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
 import { AddToGroupDialog } from '@/components/collection/add-to-group-dialog';
 import { GroupsDisplay } from './groups-display';
-import type { Entity } from '@/types/entity';
 import type { Artifact } from '@/types/artifact';
 
 interface ModalCollectionsTabProps {
-  entity: Entity;
+  /**
+   * The artifact to display collections for.
+   * Canonical prop name - use this for new code.
+   */
+  artifact?: Artifact;
+  /**
+   * @deprecated Use `artifact` instead. This prop name is maintained for backward compatibility.
+   * Will be removed in a future version.
+   */
+  entity?: Artifact;
 }
 
 /**
@@ -41,10 +49,13 @@ interface ModalCollectionsTabProps {
  *
  * @example
  * ```tsx
- * <ModalCollectionsTab entity={entity} />
+ * <ModalCollectionsTab artifact={artifact} />
  * ```
  */
-export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
+export function ModalCollectionsTab({ artifact, entity }: ModalCollectionsTabProps) {
+  // Support both 'artifact' (canonical) and 'entity' (deprecated) prop names
+  const resolvedArtifact = artifact ?? entity;
+
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
@@ -53,56 +64,30 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Convert Entity to Artifact format for MoveCopyDialog
-  const artifactForDialog: Artifact = {
-    id: entity.id,
-    name: entity.name,
-    type: entity.type,
-    scope: 'user', // Entities are typically user-scoped
-    status: 'active',
-    version: entity.version,
-    source: entity.source,
-    metadata: {
-      description: entity.description,
-      version: entity.version,
-      tags: entity.tags,
-    },
-    upstreamStatus: {
-      hasUpstream: !!entity.source,
-      isOutdated: entity.status === 'outdated',
-    },
-    usageStats: {
-      totalDeployments: 0,
-      activeProjects: entity.projectPath ? 1 : 0,
-      usageCount: 0,
-    },
-    createdAt: entity.deployedAt || new Date().toISOString(),
-    updatedAt: entity.modifiedAt || new Date().toISOString(),
-    aliases: entity.aliases,
-    collection: entity.collection
-      ? {
-          id: entity.collection,
-          name: entity.collection,
-        }
-      : undefined,
-  };
+  // Early return if no artifact provided
+  if (!resolvedArtifact) {
+    return null;
+  }
 
-  // Use entity's collections array directly (populated by artifactToEntity)
-  const artifactCollections = entity.collections || [];
+  // Artifact type now has flattened metadata - no conversion needed
+  // The artifact is already in the correct format for child dialogs
+
+  // Use artifact's collections array directly (already populated in Artifact type)
+  const artifactCollections = resolvedArtifact.collections || [];
 
   const handleRemoveFromCollection = async (collectionId: string) => {
     try {
       await removeFromCollection.mutateAsync({
         collectionId,
-        artifactId: entity.id,
+        artifactId: resolvedArtifact.id,
       });
 
-      // Invalidate artifacts queries to refresh entity.collections
+      // Invalidate artifacts queries to refresh artifact.collections
       queryClient.invalidateQueries({ queryKey: ['artifacts'] });
 
       toast({
         title: 'Removed from Collection',
-        description: `${entity.name} has been removed from the collection.`,
+        description: `${resolvedArtifact.name} has been removed from the collection.`,
       });
     } catch (error) {
       console.error('Failed to remove from collection:', error);
@@ -202,7 +187,7 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
                   <div className="mt-2">
                     <GroupsDisplay
                       collectionId={collection.id}
-                      artifactId={entity.id}
+                      artifactId={resolvedArtifact.id}
                       maxBadges={3}
                     />
                   </div>
@@ -217,15 +202,15 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
       <MoveCopyDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
-        artifacts={[artifactForDialog]}
-        sourceCollectionId={entity.collection}
+        artifacts={[resolvedArtifact]}
+        sourceCollectionId={resolvedArtifact.collection}
         onSuccess={() => {
           setShowAddDialog(false);
-          // Invalidate artifacts queries to refresh entity.collections
+          // Invalidate artifacts queries to refresh artifact.collections
           queryClient.invalidateQueries({ queryKey: ['artifacts'] });
           toast({
             title: 'Added to Collection',
-            description: `${entity.name} has been added to the collection.`,
+            description: `${resolvedArtifact.name} has been added to the collection.`,
           });
         }}
       />
@@ -237,14 +222,14 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
       <AddToGroupDialog
         open={showGroupDialog}
         onOpenChange={setShowGroupDialog}
-        artifact={artifactForDialog}
+        artifact={resolvedArtifact}
         onSuccess={() => {
           setShowGroupDialog(false);
-          // Invalidate artifacts queries to refresh entity.collections
+          // Invalidate artifacts queries to refresh artifact.collections
           queryClient.invalidateQueries({ queryKey: ['artifacts'] });
           toast({
             title: 'Added to Group',
-            description: `${entity.name} has been added to the group.`,
+            description: `${resolvedArtifact.name} has been added to the group.`,
           });
         }}
       />
