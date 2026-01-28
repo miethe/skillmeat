@@ -170,16 +170,19 @@ function ProjectDetailPageContent() {
         id: `${matchingArtifact.type}:${matchingArtifact.name}`,
         name: matchingArtifact.name,
         type: matchingArtifact.type,
-        description: matchingArtifact.metadata?.description,
+        description: matchingArtifact.description,
         source: matchingArtifact.source,
         version: matchingArtifact.version,
-        tags: matchingArtifact.metadata?.tags,
+        tags: matchingArtifact.tags,
         aliases: matchingArtifact.aliases,
-        status: deployedArtifact.local_modifications ? 'modified' : 'synced',
+        syncStatus: deployedArtifact.local_modifications ? 'modified' : 'synced',
+        scope: matchingArtifact.scope,
         collection: deployedArtifact.from_collection,
         projectPath: project?.path, // Set project path for project-level operations
         deployedAt: deployedArtifact.deployed_at,
         modifiedAt: deployedArtifact.local_modifications ? new Date().toISOString() : undefined,
+        createdAt: matchingArtifact.createdAt,
+        updatedAt: matchingArtifact.updatedAt,
       };
 
       setSelectedEntity(entity);
@@ -262,9 +265,12 @@ function ProjectDetailPageContent() {
       description: artifact.description,
       source: artifact.source,
       tags: artifact.tags,
-      status: 'synced', // Default status for discovered artifacts
+      syncStatus: 'synced', // Default status for discovered artifacts
+      scope: (artifact.scope as 'user' | 'local') || 'user',
       collection: 'discovered',
       projectPath: project?.path,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     setSelectedEntity(entity);
     setIsDetailOpen(true);

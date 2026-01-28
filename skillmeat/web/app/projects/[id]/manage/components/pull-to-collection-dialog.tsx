@@ -115,7 +115,7 @@ export function PullToCollectionDialog({
           {/* Status Badge */}
           <div className="mb-4 flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Status:</span>
-            {entity.status === 'modified' && (
+            {entity.syncStatus === 'modified' && (
               <Badge
                 variant="outline"
                 className="border-yellow-500/20 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400"
@@ -124,7 +124,7 @@ export function PullToCollectionDialog({
                 Modified
               </Badge>
             )}
-            {entity.status === 'synced' && (
+            {entity.syncStatus === 'synced' && (
               <Badge
                 variant="outline"
                 className="border-green-500/20 bg-green-500/10 text-green-700 dark:text-green-400"
@@ -132,7 +132,7 @@ export function PullToCollectionDialog({
                 Synced
               </Badge>
             )}
-            {entity.status === 'outdated' && (
+            {entity.syncStatus === 'outdated' && (
               <Badge
                 variant="outline"
                 className="border-orange-500/20 bg-orange-500/10 text-orange-700 dark:text-orange-400"
