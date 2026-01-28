@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Plus, Grid3x3, List, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -55,15 +55,34 @@ function ManagePageContent() {
     setTypeFilter(activeEntityType);
   }, [activeEntityType, setTypeFilter]);
 
+  // Track pending artifact selection from URL to handle race condition
+  // where entities may not be loaded when URL param is first read
+  const pendingArtifactRef = useRef<string | null>(null);
+
   // Handle URL-based artifact selection (auto-open modal when navigating with artifact param)
   useEffect(() => {
     const artifactId = searchParams.get('artifact');
-    if (artifactId && entities.length > 0 && !selectedEntity) {
-      // Find the entity matching the artifact ID
-      const entity = entities.find((e) => e.id === artifactId || e.name === artifactId);
+
+    // Store pending selection when we have an artifact param that's new
+    if (artifactId && artifactId !== pendingArtifactRef.current) {
+      pendingArtifactRef.current = artifactId;
+    }
+
+    // Clear pending if URL no longer has artifact param
+    if (!artifactId) {
+      pendingArtifactRef.current = null;
+      return;
+    }
+
+    // Attempt to select when we have entities AND a pending selection AND no current selection
+    if (pendingArtifactRef.current && entities.length > 0 && !selectedEntity) {
+      const entity = entities.find(
+        (e) => e.id === pendingArtifactRef.current || e.name === pendingArtifactRef.current
+      );
       if (entity) {
         setSelectedEntity(entity);
         setDetailPanelOpen(true);
+        pendingArtifactRef.current = null; // Clear pending after successful selection
       }
     }
   }, [searchParams, entities, selectedEntity]);
