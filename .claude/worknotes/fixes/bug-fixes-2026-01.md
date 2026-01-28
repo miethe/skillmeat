@@ -779,3 +779,60 @@ This ensures the selection succeeds once entities become available, rather than 
 **Commit**: 9389f3de
 
 **Status**: RESOLVED
+
+---
+
+## Deploy from Collection Modal Returns 404 "Not Found in Collection"
+
+**Date Fixed**: 2026-01-28
+**Severity**: high
+**Component**: web/deploy-dialog
+
+**Issue**: When deploying an artifact from the Deployments tab in the unified entity modal (accessed via `/manage` or `/collection`), the deployment fails with:
+```
+[API] Warning: Artifact 'crafting-effective-readmes' not found, skipping
+Request completed: POST /api/v1/deploy - 404
+```
+
+The artifact exists in the collection (verified via CLI and direct Python), but the API returns 404.
+
+**Root Cause**: The `DeployDialog` component wasn't sending `collection_name` in the deploy request. When omitted, the API's `deploy_artifacts()` method defaults to the **active collection** (retrieved via `CollectionManager.get_active_collection_name()`), which may differ from the collection the artifact was loaded from.
+
+In this case:
+- Artifact existed in "default" collection
+- Active collection was set to "personal"
+- API looked up artifact in "personal" → not found → 404
+
+**Investigation Steps**:
+1. Verified artifact exists via `skillmeat list` and direct Python API
+2. Traced API request flow: `/api/v1/deploy` → `deployment_mgr.deploy_artifacts()` → `collection.find_artifact()`
+3. Tested API directly:
+   - Without `collection_name`: 404 "not found"
+   - With `collection_name: "default"`: Success
+4. Confirmed `CollectionManager.get_active_collection_name()` returns "personal" (not "default")
+
+**Fix**: Added `collection_name` to the deploy mutation payload in `deploy-dialog.tsx`:
+
+```typescript
+await deployMutation.mutateAsync({
+  artifact_id: `${artifact.type}:${artifact.name}`,
+  artifact_name: artifact.name,
+  artifact_type: artifact.type,
+  project_path: effectivePath || undefined,
+  overwrite: overwriteEnabled,
+  dest_path: computedDestPath,
+  // NEW: Include collection name to ensure correct collection lookup
+  collection_name: artifact.collection || 'default',
+});
+```
+
+The `Artifact` type already includes a `collection?: string` field, and `ArtifactDeployRequest` already supports `collection_name?: string`.
+
+**Files Modified**:
+- `skillmeat/web/components/collection/deploy-dialog.tsx` - Added `collection_name` to mutation payload
+
+**Verification**:
+- Manual test via browser at localhost:3011/manage
+- API test with explicit collection_name succeeds
+
+**Status**: RESOLVED

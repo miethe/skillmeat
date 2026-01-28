@@ -269,6 +269,9 @@ export function DeployDialog({
         overwrite: overwriteEnabled,
         // Include custom destination path if enabled and valid
         dest_path: computedDestPath,
+        // Include collection name to ensure correct collection lookup
+        // Falls back to 'default' if not specified on the artifact
+        collection_name: artifact.collection || 'default',
       });
       // Deployment successful
       handleComplete(true);
