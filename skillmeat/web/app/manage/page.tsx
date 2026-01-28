@@ -15,7 +15,7 @@ import { EntityTabs } from './components/entity-tabs';
 import { EntityFilters } from './components/entity-filters';
 import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
 import { AddEntityDialog } from './components/add-entity-dialog';
-import { Entity, EntityType } from '@/types/entity';
+import type { Artifact, ArtifactType } from '@/types';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,7 +27,7 @@ import {
 function ManagePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeEntityType = (searchParams.get('type') as EntityType) || 'skill';
+  const activeEntityType = (searchParams.get('type') as ArtifactType) || 'skill';
 
   const {
     entities,
@@ -44,10 +44,10 @@ function ManagePageContent() {
 
   // Local state
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
+  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
+  const [editingArtifact, setEditingArtifact] = useState<Artifact | null>(null);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
 
   // Update type filter when tab changes
@@ -75,17 +75,17 @@ function ManagePageContent() {
     }
 
     // Attempt to select when we have entities AND a pending selection AND no current selection
-    if (pendingArtifactRef.current && entities.length > 0 && !selectedEntity) {
-      const entity = entities.find(
+    if (pendingArtifactRef.current && entities.length > 0 && !selectedArtifact) {
+      const artifact = entities.find(
         (e) => e.id === pendingArtifactRef.current || e.name === pendingArtifactRef.current
       );
-      if (entity) {
-        setSelectedEntity(entity);
+      if (artifact) {
+        setSelectedArtifact(artifact);
         setDetailPanelOpen(true);
         pendingArtifactRef.current = null; // Clear pending after successful selection
       }
     }
-  }, [searchParams, entities, selectedEntity]);
+  }, [searchParams, entities, selectedArtifact]);
 
   // Filter entities by tags client-side
   const filteredEntities =
@@ -94,50 +94,50 @@ function ManagePageContent() {
       : entities;
 
   // Memoize event handlers to prevent EntityList re-renders
-  const handleEntityClick = useCallback((entity: Entity) => {
-    setSelectedEntity(entity);
+  const handleArtifactClick = useCallback((artifact: Artifact) => {
+    setSelectedArtifact(artifact);
     setDetailPanelOpen(true);
   }, []);
 
-  const handleEdit = useCallback((entity: Entity) => {
-    setEditingEntity(entity);
+  const handleEdit = useCallback((artifact: Artifact) => {
+    setEditingArtifact(artifact);
   }, []);
 
   const handleDelete = useCallback(
-    async (entity: Entity) => {
-      if (confirm(`Are you sure you want to delete ${entity.name}?`)) {
+    async (artifact: Artifact) => {
+      if (confirm(`Are you sure you want to delete ${artifact.name}?`)) {
         try {
-          await deleteEntity(entity.id);
+          await deleteEntity(artifact.id);
         } catch (error) {
           console.error('Delete failed:', error);
-          alert('Failed to delete entity');
+          alert('Failed to delete artifact');
         }
       }
     },
     [deleteEntity]
   );
 
-  const handleDeploy = useCallback((entity: Entity) => {
-    // Open entity modal to sync tab for deployment
-    setSelectedEntity(entity);
+  const handleDeploy = useCallback((artifact: Artifact) => {
+    // Open artifact modal to sync tab for deployment
+    setSelectedArtifact(artifact);
     setDetailPanelOpen(true);
   }, []);
 
-  const handleSync = useCallback((entity: Entity) => {
-    // Open entity modal to sync tab for sync operations
-    setSelectedEntity(entity);
+  const handleSync = useCallback((artifact: Artifact) => {
+    // Open artifact modal to sync tab for sync operations
+    setSelectedArtifact(artifact);
     setDetailPanelOpen(true);
   }, []);
 
-  const handleViewDiff = useCallback((entity: Entity) => {
-    // Open entity modal to sync tab which shows diff viewer
-    setSelectedEntity(entity);
+  const handleViewDiff = useCallback((artifact: Artifact) => {
+    // Open artifact modal to sync tab which shows diff viewer
+    setSelectedArtifact(artifact);
     setDetailPanelOpen(true);
   }, []);
 
-  const handleRollback = useCallback((entity: Entity) => {
-    // Open entity modal to history tab for rollback
-    setSelectedEntity(entity);
+  const handleRollback = useCallback((artifact: Artifact) => {
+    // Open artifact modal to history tab for rollback
+    setSelectedArtifact(artifact);
     setDetailPanelOpen(true);
   }, []);
 
@@ -202,7 +202,7 @@ function ManagePageContent() {
 
         {/* Tabs */}
         <EntityTabs>
-          {(entityType) => (
+          {(_entityType) => (
             <div className="flex h-full flex-col">
               {/* Filters */}
               <EntityFilters
@@ -231,7 +231,7 @@ function ManagePageContent() {
                 <EntityList
                   viewMode={viewMode}
                   entities={filteredEntities}
-                  onEntityClick={handleEntityClick}
+                  onEntityClick={handleArtifactClick}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onDeploy={handleDeploy}
@@ -245,22 +245,22 @@ function ManagePageContent() {
         </EntityTabs>
       </div>
 
-      {/* Entity Detail Modal */}
+      {/* Artifact Detail Modal */}
       <UnifiedEntityModal
-        entity={selectedEntity}
+        artifact={selectedArtifact}
         open={detailPanelOpen}
         onClose={() => {
           setDetailPanelOpen(false);
-          setSelectedEntity(null);
+          setSelectedArtifact(null);
         }}
         onNavigateToSource={(sourceId, artifactPath) => {
           setDetailPanelOpen(false);
-          setSelectedEntity(null);
+          setSelectedArtifact(null);
           router.push(`/marketplace/sources/${sourceId}?artifact=${encodeURIComponent(artifactPath)}`);
         }}
         onNavigateToDeployment={(projectPath, artifactId) => {
           setDetailPanelOpen(false);
-          setSelectedEntity(null);
+          setSelectedArtifact(null);
           const encodedPath = btoa(projectPath);
           router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
         }}
@@ -274,14 +274,14 @@ function ManagePageContent() {
       />
 
       {/* Edit Dialog */}
-      {editingEntity && (
+      {editingArtifact && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-background p-6 shadow-lg">
             <EntityForm
               mode="edit"
-              entity={editingEntity}
-              onSuccess={() => setEditingEntity(null)}
-              onCancel={() => setEditingEntity(null)}
+              entity={editingArtifact}
+              onSuccess={() => setEditingArtifact(null)}
+              onCancel={() => setEditingArtifact(null)}
             />
           </div>
         </div>
