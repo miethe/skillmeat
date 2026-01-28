@@ -23,9 +23,37 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { apiRequest } from '@/lib/api';
-import type { Entity, EntityType } from '@/types/entity';
-import type { Artifact, ArtifactType } from '@/types/artifact';
-import { getEntityTypeConfig } from '@/types/entity';
+import type { Artifact, ArtifactType, SyncStatus } from '@/types/artifact';
+import { getArtifactTypeConfig } from '@/types/artifact';
+
+// Entity is now an alias for Artifact - use Artifact directly
+type Entity = Artifact;
+type EntityType = ArtifactType;
+
+// Legacy Artifact interface for backward compatibility with old API responses
+interface LegacyArtifact {
+  id: string;
+  name: string;
+  type: ArtifactType;
+  version?: string;
+  source?: string;
+  status?: string;
+  updatedAt?: string;
+  metadata: {
+    title?: string;
+    description?: string;
+    tags?: string[];
+  };
+  usageStats: {
+    usageCount: number;
+  };
+  upstreamStatus: {
+    isOutdated: boolean;
+  };
+  score?: {
+    confidence?: number;
+  };
+}
 import { EntityActions } from '@/components/entity/entity-actions';
 import type { ArtifactDiffResponse } from '@/sdk';
 import { ScoreBadge, ScoreBadgeSkeleton } from '@/components/ScoreBadge';
@@ -34,17 +62,25 @@ import { GroupBadgeRow, type GroupInfo } from './group-badge-row';
 import { useCollectionContext } from '@/hooks';
 
 /**
- * Type guard to check if item is an Entity
+ * Type guard to check if item is a new unified Artifact (flat structure)
  */
-function isEntity(item: Entity | Artifact): item is Entity {
-  return 'projectPath' in item || !('metadata' in item);
+function isUnifiedArtifact(item: Artifact | LegacyArtifact): item is Artifact {
+  // New unified artifacts have syncStatus instead of nested metadata
+  return 'syncStatus' in item;
 }
 
 /**
- * Type guard to check if item is an Artifact
+ * Type guard to check if item is an Entity (legacy alias, now same as Artifact)
  */
-function isArtifact(item: Entity | Artifact): item is Artifact {
-  return 'metadata' in item && 'usageStats' in item;
+function isEntity(item: Artifact | LegacyArtifact): item is Artifact {
+  return isUnifiedArtifact(item);
+}
+
+/**
+ * Type guard to check if item is a legacy Artifact with nested metadata
+ */
+function isLegacyArtifact(item: Artifact | LegacyArtifact): item is LegacyArtifact {
+  return 'metadata' in item && 'usageStats' in item && !('syncStatus' in item);
 }
 
 /**
@@ -57,7 +93,7 @@ interface NormalizedCardData {
   title?: string;
   description?: string;
   tags?: string[];
-  status?: string;
+  status?: SyncStatus;
   version?: string;
   source?: string;
   updatedAt?: string;
@@ -69,11 +105,11 @@ interface NormalizedCardData {
 }
 
 /**
- * Extract normalized data from Entity or Artifact
+ * Extract normalized data from Entity or Artifact (supports both unified and legacy formats)
  */
-function normalizeCardData(item: Entity | Artifact): NormalizedCardData {
-  if (isArtifact(item)) {
-    // Artifact has nested metadata
+function normalizeCardData(item: Artifact | LegacyArtifact): NormalizedCardData {
+  if (isLegacyArtifact(item)) {
+    // Legacy Artifact has nested metadata
     return {
       id: item.id,
       name: item.name,
@@ -81,7 +117,7 @@ function normalizeCardData(item: Entity | Artifact): NormalizedCardData {
       title: item.metadata.title,
       description: item.metadata.description,
       tags: item.metadata.tags,
-      status: item.status,
+      status: item.status as SyncStatus | undefined,
       version: item.version,
       source: item.source,
       updatedAt: item.updatedAt,
@@ -90,21 +126,23 @@ function normalizeCardData(item: Entity | Artifact): NormalizedCardData {
       confidence: item.score?.confidence,
     };
   } else {
-    // Entity has flat properties
+    // Unified Artifact has flat properties
     return {
       id: item.id,
       name: item.name,
       type: item.type,
-      title: undefined, // Entities don't have separate title
+      title: undefined, // Unified artifacts don't have separate title
       description: item.description,
       tags: item.tags,
-      status: item.status,
+      status: item.syncStatus,
       version: item.version,
       source: item.source,
-      updatedAt: item.modifiedAt,
+      updatedAt: item.updatedAt || item.modifiedAt,
       projectPath: item.projectPath,
       collection: item.collection,
-      confidence: undefined, // Entities don't have scores yet
+      usageCount: item.usageStats?.usageCount,
+      isOutdated: item.upstream?.updateAvailable,
+      confidence: item.score?.confidence,
     };
   }
 }
@@ -113,8 +151,8 @@ function normalizeCardData(item: Entity | Artifact): NormalizedCardData {
  * Props for UnifiedCard component
  */
 export interface UnifiedCardProps {
-  /** The item to display (Entity or Artifact) */
-  item: Entity | Artifact;
+  /** The item to display (Artifact - Entity is now an alias for Artifact) */
+  item: Artifact | LegacyArtifact;
   /** Whether the card is currently selected (when selectable is true) */
   selected?: boolean;
   /** Whether the item can be selected (shows checkbox) */
@@ -219,7 +257,7 @@ export const UnifiedCard = React.memo(
     const queryClient = useQueryClient();
     const { selectedCollectionId } = useCollectionContext();
     const data = normalizeCardData(item);
-    const config = getEntityTypeConfig(data.type as EntityType);
+    const config = getArtifactTypeConfig(data.type as ArtifactType);
 
     // Determine if we're in "All Collections" view (null or 'all')
     const isAllCollectionsView = !selectedCollectionId || selectedCollectionId === 'all';
@@ -230,7 +268,7 @@ export const UnifiedCard = React.memo(
       if (!isAllCollectionsView) return [];
 
       // Check if item has collections array
-      const collectionsArray = (item as Entity | Artifact).collections;
+      const collectionsArray = (item as Artifact).collections;
       if (!collectionsArray || !Array.isArray(collectionsArray)) return [];
 
       return collectionsArray.map((c) => ({
@@ -249,7 +287,7 @@ export const UnifiedCard = React.memo(
 
       // Check if item has groups array (populated when include_groups=true from backend)
       // Groups may exist on artifact responses when viewing a specific collection
-      const itemWithGroups = item as (Entity | Artifact) & {
+      const itemWithGroups = item as Artifact & {
         groups?: { id: string; name: string }[];
       };
       const groupsArray = itemWithGroups.groups;
@@ -294,7 +332,7 @@ export const UnifiedCard = React.memo(
     const handleMouseEnter = () => {
       if (
         isEntity(item) &&
-        (item.status === 'modified' || item.status === 'outdated') &&
+        (item.syncStatus === 'modified' || item.syncStatus === 'outdated') &&
         item.projectPath
       ) {
         queryClient.prefetchQuery({

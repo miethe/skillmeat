@@ -37,8 +37,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Entity, ENTITY_TYPES } from '@/types/entity';
-import type { Artifact } from '@/types/artifact';
+import { ARTIFACT_TYPES, type Artifact } from '@/types/artifact';
 import { useEntityLifecycle } from '@/hooks';
 import { DiffViewer } from '@/components/entity/diff-viewer';
 import { RollbackDialog } from '@/components/entity/rollback-dialog';
@@ -85,7 +84,7 @@ import type { ArtifactDeploymentInfo } from '@/types/deployments';
 import type { Deployment } from '@/components/deployments/deployment-card';
 
 interface UnifiedEntityModalProps {
-  entity: Entity | null;
+  entity: Artifact | null;
   open: boolean;
   onClose: () => void;
   onNavigateToSource?: (sourceId: string, artifactPath: string) => void;
@@ -113,7 +112,7 @@ interface LinkedArtifactsResponse {
 /**
  * Check if entity is a context entity (based on type or name pattern)
  */
-function isContextEntity(entity: Entity | null): boolean {
+function isContextEntity(entity: Artifact | null): boolean {
   if (!entity) return false;
 
   // Check if entity has 'context' in its type (for future context entity type support)
@@ -185,7 +184,7 @@ function formatRelativeTime(date: Date): string {
 /**
  * Generate mock history entries based on entity metadata
  */
-function generateMockHistory(entity: Entity): HistoryEntry[] {
+function generateMockHistory(entity: Artifact): HistoryEntry[] {
   const history: HistoryEntry[] = [];
 
   // Create history entries from available timestamps
@@ -201,7 +200,7 @@ function generateMockHistory(entity: Entity): HistoryEntry[] {
     });
 
     // Add a sync entry a bit before deployment if entity is modified
-    if (entity.status === 'modified' || entity.status === 'outdated') {
+    if (entity.syncStatus === 'modified' || entity.syncStatus === 'outdated') {
       const syncDate = new Date(deployedDate.getTime() - 2 * 60 * 60 * 1000); // 2 hours before
       history.push({
         id: `sync-${syncDate.toISOString()}`,
@@ -227,7 +226,7 @@ function generateMockHistory(entity: Entity): HistoryEntry[] {
   }
 
   // Add a rollback entry for conflict status
-  if (entity.status === 'conflict' && entity.modifiedAt) {
+  if (entity.syncStatus === 'conflict' && entity.modifiedAt) {
     const rollbackDate = new Date(new Date(entity.modifiedAt).getTime() + 1 * 60 * 60 * 1000); // 1 hour after modification
     history.push({
       id: `rollback-${rollbackDate.toISOString()}`,
@@ -718,40 +717,31 @@ export function UnifiedEntityModal({
     return projectPaths.size;
   }, [artifactDeployments]);
 
-  // Convert Entity to Artifact format for DeployDialog
-  const artifactForDeploy = useMemo(() => {
+  // Entity is now unified with Artifact, so we can pass it directly to DeployDialog
+  // Just need to ensure all required fields are present
+  const artifactForDeploy = useMemo((): Artifact | null => {
     if (!entity) return null;
     return {
-      id: entity.id,
-      name: entity.name,
-      type: entity.type,
-      scope: 'user' as const,
-      status: 'active' as const,
-      version: entity.version,
-      source: entity.source,
-      metadata: {
-        description: entity.description,
-        version: entity.version,
-        tags: entity.tags,
-      },
-      upstreamStatus: {
-        hasUpstream: !!entity.source,
-        isOutdated: entity.status === 'outdated',
-      },
-      usageStats: {
+      ...entity,
+      // Ensure required fields are present with defaults
+      scope: entity.scope || 'user',
+      syncStatus: entity.syncStatus || 'synced',
+      createdAt: entity.createdAt || entity.deployedAt || new Date().toISOString(),
+      updatedAt: entity.updatedAt || entity.modifiedAt || new Date().toISOString(),
+      // Add usage stats if not present
+      usageStats: entity.usageStats || {
         totalDeployments: artifactDeployments.length,
         activeProjects: deploymentProjectCount,
         usageCount: 0,
       },
-      createdAt: entity.deployedAt || new Date().toISOString(),
-      updatedAt: entity.modifiedAt || new Date().toISOString(),
-      aliases: entity.aliases,
-      collection: entity.collection
+      // Add upstream info if not present
+      upstream: entity.upstream || (entity.source
         ? {
-            id: entity.collection,
-            name: entity.collection,
+            enabled: true,
+            url: entity.source,
+            updateAvailable: entity.syncStatus === 'outdated',
           }
-        : undefined,
+        : undefined),
     };
   }, [entity, artifactDeployments.length, deploymentProjectCount]);
 
@@ -851,7 +841,7 @@ export function UnifiedEntityModal({
     return null;
   }
 
-  const config = ENTITY_TYPES[entity.type];
+  const config = ARTIFACT_TYPES[entity.type];
 
   // Fallback UI for unsupported entity types (e.g., context entities)
   if (!config) {
@@ -1303,7 +1293,7 @@ export function UnifiedEntityModal({
   // ============================================================================
 
   const getStatusIcon = () => {
-    switch (entity.status) {
+    switch (entity.syncStatus) {
       case 'synced':
         return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       case 'modified':
@@ -1318,7 +1308,7 @@ export function UnifiedEntityModal({
   };
 
   const getStatusLabel = () => {
-    switch (entity.status) {
+    switch (entity.syncStatus) {
       case 'synced':
         return 'Synced';
       case 'modified':
@@ -1653,8 +1643,8 @@ export function UnifiedEntityModal({
                 <Badge variant="outline" className="gap-1">
                   {config.label}
                 </Badge>
-                {entity.status && (
-                  <Badge variant={entity.status === 'synced' ? 'default' : 'secondary'}>
+                {entity.syncStatus && (
+                  <Badge variant={entity.syncStatus === 'synced' ? 'default' : 'secondary'}>
                     {getStatusLabel()}
                   </Badge>
                 )}
@@ -1766,14 +1756,14 @@ export function UnifiedEntityModal({
                     </Button>
                   </div>
                   {/* Status */}
-                  {entity.status && (
+                  {entity.syncStatus && (
                     <div>
                       <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
                         {getStatusIcon()}
                         Status
                       </h3>
                       <div className="flex items-center gap-2">
-                        <Badge variant={entity.status === 'synced' ? 'default' : 'secondary'}>
+                        <Badge variant={entity.syncStatus === 'synced' ? 'default' : 'secondary'}>
                           {getStatusLabel()}
                         </Badge>
                       </div>
@@ -2030,7 +2020,7 @@ export function UnifiedEntityModal({
               <ScrollArea className="h-[calc(90vh-12rem)]">
                 <div className="space-y-4 py-4">
                   {/* Rollback Section */}
-                  {(entity.status === 'modified' || entity.status === 'conflict') &&
+                  {(entity.syncStatus === 'modified' || entity.syncStatus === 'conflict') &&
                     entity.projectPath && (
                       <div className="rounded-lg border bg-muted/20 p-4">
                         <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">

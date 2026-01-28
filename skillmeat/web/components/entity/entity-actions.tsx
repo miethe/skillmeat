@@ -88,8 +88,8 @@ export function EntityActions({
     await onRollback();
   };
 
-  const showViewDiff = entity.status === 'modified' && onViewDiff;
-  const showRollback = (entity.status === 'modified' || entity.status === 'conflict') && onRollback;
+  const showViewDiff = entity.syncStatus === 'modified' && onViewDiff;
+  const showRollback = (entity.syncStatus === 'modified' || entity.syncStatus === 'conflict') && onRollback;
 
   return (
     <>

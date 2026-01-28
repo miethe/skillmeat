@@ -3,7 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Loader2, X, CheckCircle2 } from 'lucide-react';
-import { EntityType, EntityFormField, ENTITY_TYPES, Entity } from '@/types/entity';
+import {
+  ArtifactType,
+  ArtifactFormField,
+  ARTIFACT_TYPES,
+  Artifact,
+} from '@/types/artifact';
 import {
   useEntityLifecycle,
   useGitHubMetadata,
@@ -37,9 +42,9 @@ interface EntityFormProps {
   /** Mode: 'create' for new entities, 'edit' for existing entities */
   mode: 'create' | 'edit';
   /** Entity type configuration - required for create mode, determines available form fields */
-  entityType?: EntityType;
+  entityType?: ArtifactType;
   /** Existing entity data - required for edit mode to populate form values */
-  entity?: Entity;
+  entity?: Artifact;
   /** Callback function called after successful form submission */
   onSuccess?: () => void;
   /** Callback function called when user clicks cancel */
@@ -119,9 +124,9 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
 
   // Determine the entity type config
   const typeConfig = entityType
-    ? ENTITY_TYPES[entityType]
+    ? ARTIFACT_TYPES[entityType]
     : entity
-      ? ENTITY_TYPES[entity.type]
+      ? ARTIFACT_TYPES[entity.type]
       : null;
 
   const {
@@ -195,7 +200,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
   }, 500);
 
   // Get editable fields based on mode
-  const getFields = (): EntityFormField[] => {
+  const getFields = (): ArtifactFormField[] => {
     if (!typeConfig) return [];
 
     if (mode === 'edit') {
@@ -282,7 +287,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
   };
 
   // Render field based on type
-  const renderField = (field: EntityFormField) => {
+  const renderField = (field: ArtifactFormField) => {
     const fieldId = `field-${field.name}`;
 
     // Skip source field if we're rendering it separately
