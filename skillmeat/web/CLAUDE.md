@@ -71,6 +71,80 @@ NEXT_PUBLIC_API_VERSION=v1
 
 ---
 
+## Type System
+
+### Artifact Type (Unified)
+
+The `Artifact` type is the canonical representation for skills, commands, agents, MCP servers, and hooks throughout the web interface.
+
+```typescript
+interface Artifact {
+  id: string;
+  name: string;
+  type: ArtifactType;      // 'skill' | 'command' | 'agent' | 'mcp' | 'hook'
+  scope: ArtifactScope;    // 'user' | 'local'
+  syncStatus: SyncStatus;  // 'synced' | 'modified' | 'outdated' | 'conflict' | 'error'
+
+  // Flattened metadata (at top level)
+  description?: string;
+  author?: string;
+  license?: string;
+  tags?: string[];
+
+  // Version information
+  version?: string;
+  sourceUrl?: string;
+
+  // Timestamps
+  createdAt: string;      // ISO 8601 format
+  updatedAt: string;      // ISO 8601 format
+}
+```
+
+**Key Features**:
+- **Flattened Structure**: Metadata fields (`description`, `author`, `tags`, `license`) are at the top level, not nested under a `metadata` object
+- **Type Safety**: Use `ArtifactType` enum for artifact types
+- **Sync Tracking**: `SyncStatus` enum tracks synchronization state with upstream sources
+- **Unified Model**: Single type for all artifact categories eliminates type sprawl
+
+**SyncStatus Values**:
+- `synced` - Local copy matches upstream
+- `modified` - Local changes not yet synced
+- `outdated` - Upstream has newer version
+- `conflict` - Both local and upstream modified
+- `error` - Sync failure or validation error
+
+**Deprecation Note**: The legacy `Entity` type is maintained as a type alias to `Artifact` for backward compatibility through Q3 2026. All new code should use `Artifact`. See the migration guide in `.claude/progress/entity-artifact-consolidation/migration-guide.md` for update instructions.
+
+**Usage Examples**:
+
+```typescript
+// Component props with Artifact type
+interface ArtifactCardProps {
+  artifact: Artifact;
+  onUpdate?: (artifact: Artifact) => void;
+}
+
+export function ArtifactCard({ artifact, onUpdate }: ArtifactCardProps) {
+  return (
+    <div className="p-4 border rounded-lg">
+      <h3 className="font-semibold">{artifact.name}</h3>
+      {artifact.description && (
+        <p className="text-sm text-muted-foreground">{artifact.description}</p>
+      )}
+      <div className="flex gap-2 mt-2">
+        <Badge variant="outline">{artifact.type}</Badge>
+        <Badge variant={artifact.syncStatus === 'synced' ? 'default' : 'secondary'}>
+          {artifact.syncStatus}
+        </Badge>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
 ## Path-Specific Rules
 
 Rules in `.claude/rules/web/` auto-load when editing:

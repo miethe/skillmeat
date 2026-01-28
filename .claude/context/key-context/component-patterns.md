@@ -47,13 +47,15 @@ components/
 ```typescript
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
+import type { Artifact } from '@/types/artifact';
 
-interface ComponentNameProps {
+interface ArtifactListProps {
   // Required props
   title: string;
-  items: Array<{ id: string; name: string }>;
-  onAction: (id: string) => void;
+  artifacts: Artifact[];
+  onSelect: (id: string) => void;
 
   // Optional props with defaults
   description?: string;
@@ -68,19 +70,19 @@ interface ComponentNameProps {
   children?: React.ReactNode;
 }
 
-export function ComponentName({
+export function ArtifactList({
   title,
-  items,
-  onAction,
+  artifacts,
+  onSelect,
   description,
   variant = 'default',
   loading = false,
   disabled = false,
   className,
   children,
-}: ComponentNameProps) {
+}: ArtifactListProps) {
   // Conditional logic
-  const isEmpty = items.length === 0;
+  const isEmpty = artifacts.length === 0;
   const isInteractive = !loading && !disabled;
 
   return (
@@ -119,27 +121,46 @@ export function ComponentName({
       {/* Empty state */}
       {!loading && isEmpty && (
         <div className="py-8 text-center">
-          <p className="text-sm text-muted-foreground">No items found</p>
+          <p className="text-sm text-muted-foreground">No artifacts found</p>
         </div>
       )}
 
-      {/* Content */}
+      {/* Content - demonstrates flattened Artifact type */}
       {!loading && !isEmpty && (
         <div className="mt-4 space-y-2">
-          {items.map((item) => (
+          {artifacts.map((artifact) => (
             <div
-              key={item.id}
+              key={artifact.id}
               className="flex items-center justify-between rounded-md border p-3"
             >
-              <span className="text-sm font-medium">{item.name}</span>
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{artifact.name}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {artifact.type}
+                  </Badge>
+                  <Badge
+                    variant={artifact.syncStatus === 'synced' ? 'default' : 'secondary'}
+                    className="text-xs"
+                  >
+                    {artifact.syncStatus}
+                  </Badge>
+                </div>
+                {/* Flattened metadata access - no artifact.metadata?.description */}
+                {artifact.description && (
+                  <p className="text-xs text-muted-foreground">
+                    {artifact.description}
+                  </p>
+                )}
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
                 disabled={!isInteractive}
-                onClick={() => onAction(item.id)}
-                aria-label={`Action for ${item.name}`}
+                onClick={() => onSelect(artifact.id)}
+                aria-label={`Select ${artifact.name}`}
               >
-                Action
+                Select
               </Button>
             </div>
           ))}
