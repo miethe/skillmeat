@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Marketplace Search & Navigation Enhancements (2026-01-28)
+
+**BM25 Weighted Search Ranking**
+- Implemented BM25 algorithm for marketplace search with improved relevance scoring
+- Exact name matches prioritized (10x weight boost)
+- Description and tag matches weighted appropriately for better results
+- Search results now ranked by relevance rather than insertion order
+
+**Two-Tier Search Indexing**
+- Added deep content indexing option for comprehensive artifact discovery
+- Basic tier: Indexes artifact name, description, and metadata (fast, default)
+- Deep tier: Indexes file contents including SKILL.md, commands, and code files
+- Per-source "Deep Search" toggle in source cards and edit dialogs
+- Deep Search badge displayed on source cards with deep indexing enabled
+- Support for file-based artifacts in search indexing
+
+**Cross-Modal Navigation**
+- Added navigation tabs in artifact modals for seamless movement between views
+- Navigate between Collection, Catalog, and Project contexts for the same artifact
+- Tabs show which views are available based on artifact presence
+- Added `import_id` linking to connect catalog entries with imported artifacts
+- Base64 encoding for project navigation URLs to handle special characters
+
+**Search Results UI Enhancements**
+- Type-specific icons and colors in artifact search results
+- Visual distinction between skills, commands, agents, MCP servers, and hooks
+- Improved card layout with better metadata display
+
 #### Collections & Groups UX Enhancement (Phases 0-5, 2026-01-20)
 
 **API Contract Alignment (Phase 0)**
@@ -317,6 +345,15 @@ No breaking changes. New fields are optional and have sensible defaults:
 - Artifact import workflow streamlined with bulk operations support
 
 ### Fixed
+
+#### Marketplace Search & Navigation (2026-01-28)
+
+- Fixed artifact modal opening 404 page instead of CatalogEntryModal from search results
+- Fixed `selectedFilePath` not resetting when artifact entry changes in modal
+- Fixed race condition in cross-modal artifact navigation causing stale data display
+- Fixed artifact modal data loading issues (wrong artifact displayed, missing file tree, navigation failures)
+- Fixed project navigation URLs breaking with special characters (now uses base64 encoding)
+- Fixed file-based artifacts not being indexed in marketplace search
 
 #### Unified Artifact Detection System (feat/artifact-detection-standardization)
 
