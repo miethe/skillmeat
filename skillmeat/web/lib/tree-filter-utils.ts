@@ -11,8 +11,9 @@ import type { FolderTree, FolderNode } from './tree-builder';
  * Root-level folders to exclude (depth 1)
  * These are too high-level to be useful for navigation
  */
-// Note: 'skills' intentionally excluded - it's a meaningful folder that should be shown
-const ROOT_EXCLUSIONS = ['plugins', 'src', 'lib', 'packages', 'apps', 'examples'];
+// Note: 'skills' and 'plugins' intentionally excluded from exclusion list - they're meaningful
+// folders that should be shown as they often contain the main artifact structure
+const ROOT_EXCLUSIONS = ['src', 'lib', 'packages', 'apps', 'examples'];
 
 /**
  * Leaf container folders to exclude (any depth)
@@ -77,12 +78,13 @@ export function filterSemanticTree(tree: FolderTree, depth: number = 1): FolderT
       hasSubfolders: Object.keys(filteredChildren).length > 0,
     };
 
-    // Only include node if it has children or direct artifacts
-    // This prevents including empty intermediate folders
+    // Only include node if it has children or any artifacts in its subtree
+    // Use totalArtifactCount (not directArtifacts) to include artifacts in leaf containers
+    // e.g., skills/commands/my-cmd - "skills" has artifacts via "commands" even if commands is filtered
     const hasChildren = Object.keys(filteredNode.children).length > 0;
-    const hasArtifacts = filteredNode.directArtifacts && filteredNode.directArtifacts.length > 0;
+    const hasArtifactsInSubtree = node.totalArtifactCount > 0;
 
-    if (hasChildren || hasArtifacts) {
+    if (hasChildren || hasArtifactsInSubtree) {
       filtered[path] = filteredNode;
     }
   }
