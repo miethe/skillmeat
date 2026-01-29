@@ -8,12 +8,17 @@
 import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, apiConfig } from '@/lib/api';
+import {
+  mapApiResponsesToArtifacts,
+  type ArtifactResponse as MapperArtifactResponse,
+} from '@/lib/api/mappers';
+import type { Artifact, SyncStatus } from '@/types/artifact';
 import type { Entity, EntityType, EntityStatus } from '@/types/entity';
 import type {
   ArtifactCreateRequest,
   ArtifactCreateResponse,
-  ArtifactResponse,
   ArtifactListResponse,
+  ArtifactResponse,
   ArtifactUpdateRequest,
   ArtifactDeployRequest,
   ArtifactSyncRequest,
@@ -188,78 +193,6 @@ export interface UpdateEntityInput {
 const EntityLifecycleContext = createContext<EntityLifecycleContextValue | null>(null);
 
 // ============================================================================
-// API Mapping Functions
-// ============================================================================
-
-function mapApiArtifactToEntity(
-  artifact: ArtifactResponse,
-  mode: 'collection' | 'project',
-  projectPath?: string,
-  collectionId?: string
-): Entity {
-  const metadata = artifact.metadata || {};
-  const artifactTags = artifact.tags || [];
-  const metadataTags = metadata.tags || [];
-  const mergedTags: string[] = [];
-  const seenTags = new Set<string>();
-
-  for (const tag of [...artifactTags, ...metadataTags]) {
-    const normalized = tag?.trim();
-    if (!normalized || seenTags.has(normalized)) {
-      continue;
-    }
-    seenTags.add(normalized);
-    mergedTags.push(normalized);
-  }
-  const upstream = artifact.upstream;
-  const isOutdated = upstream?.update_available ?? false;
-  const hasLocalMods = upstream?.has_local_modifications ?? false;
-  const driftStatus = upstream?.drift_status;
-
-  // Determine entity status based on drift detection
-  // Priority: conflict > modified > outdated > synced
-  let status: EntityStatus = 'synced';
-  if (driftStatus === 'conflict') {
-    // Three-way conflict: both collection and project changed
-    status = 'conflict';
-  } else if (hasLocalMods || driftStatus === 'modified') {
-    // Local modifications only (project changed, collection unchanged)
-    status = 'modified';
-  } else if (isOutdated || driftStatus === 'outdated') {
-    // Upstream changes only (collection changed, project unchanged)
-    status = 'outdated';
-  }
-
-  const effectiveCollection = collectionId || 'default';
-
-  return {
-    id: artifact.id,
-    name: artifact.name,
-    type: artifact.type as EntityType,
-    collection: mode === 'collection' ? effectiveCollection : undefined,
-    projectPath: mode === 'project' ? projectPath : undefined,
-    status,
-    tags: mergedTags,
-    description: metadata.description || undefined,
-    version: artifact.version || metadata.version || undefined,
-    source: artifact.source,
-    deployedAt: artifact.added,
-    modifiedAt: artifact.updated,
-    aliases: artifact.aliases || [],
-    origin: artifact.origin,
-    origin_source: artifact.origin_source || undefined,
-    author: metadata.author || undefined,
-    license: metadata.license || undefined,
-    dependencies: metadata.dependencies || [],
-    collections: artifact.collections?.map((c) => ({
-      id: c.id,
-      name: c.name,
-      artifact_count: c.artifact_count ?? 0,
-    })) || [],
-  };
-}
-
-// ============================================================================
 // Provider Component
 // ============================================================================
 
@@ -353,10 +286,10 @@ export function EntityLifecycleProvider({
     gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache
   });
 
-  // Apply status filter client-side
+  // Apply status filter client-side (Entity.syncStatus maps to EntityStatus)
   const filteredEntities = useMemo(() => {
     if (!statusFilter) return entities;
-    return entities.filter((e: Entity) => e.status === statusFilter);
+    return entities.filter((e: Entity) => e.syncStatus === statusFilter);
   }, [entities, statusFilter]);
 
   // ============================================================================
@@ -418,7 +351,7 @@ export function EntityLifecycleProvider({
 
       await withMockFallback(
         () =>
-          apiRequest<ArtifactResponse>(`/artifacts/${id}`, {
+          apiRequest<ArtifactResponse>(`/artifacts/${encodeURIComponent(id)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request),
@@ -436,7 +369,7 @@ export function EntityLifecycleProvider({
     mutationFn: async (id: string) => {
       await withMockFallback(
         () =>
-          apiRequest<void>(`/artifacts/${id}`, {
+          apiRequest<void>(`/artifacts/${encodeURIComponent(id)}`, {
             method: 'DELETE',
           }),
         undefined,
@@ -456,7 +389,7 @@ export function EntityLifecycleProvider({
 
       await withMockFallback(
         () =>
-          apiRequest(`/artifacts/${id}/deploy`, {
+          apiRequest(`/artifacts/${encodeURIComponent(id)}/deploy`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request),
@@ -480,7 +413,7 @@ export function EntityLifecycleProvider({
 
       await withMockFallback(
         () =>
-          apiRequest(`/artifacts/${id}/sync`, {
+          apiRequest(`/artifacts/${encodeURIComponent(id)}/sync`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request),
@@ -644,9 +577,18 @@ async function fetchCollectionEntities(
   }
 
   const processResponse = (response: ArtifactListResponse): Entity[] => {
-    const entities = response.items.map((item) =>
-      mapApiArtifactToEntity(item, 'collection', undefined, collectionId)
+    // Use centralized mapper with 'collection' context
+    // Cast SDK ArtifactResponse[] to mapper's ArtifactResponse[] (compatible structure)
+    const artifacts: Artifact[] = mapApiResponsesToArtifacts(
+      response.items as MapperArtifactResponse[],
+      'collection'
     );
+
+    // Attach collection info if provided (mapper doesn't have access to external collectionId)
+    const entities: Entity[] = artifacts.map((artifact) => ({
+      ...artifact,
+      collection: collectionId || artifact.collection || 'default',
+    }));
 
     // Apply search filter client-side
     if (searchQuery) {
@@ -680,16 +622,20 @@ async function fetchProjectEntities(
   const processResponse = (response: ProjectDetail): Entity[] => {
     // Map deployments to entities
     const deployments = response.deployments || [];
+    const now = new Date().toISOString();
     const entities: Entity[] = deployments.map((deployment) => ({
       id: `${deployment.artifact_type}:${deployment.artifact_name}`,
       name: deployment.artifact_name,
       type: deployment.artifact_type as EntityType,
+      scope: 'local' as const,
       projectPath,
-      status: (deployment.local_modifications ? 'modified' : 'synced') as EntityStatus,
+      syncStatus: (deployment.local_modifications ? 'modified' : 'synced') as SyncStatus,
       version: deployment.version || undefined,
       source: deployment.artifact_path,
       deployedAt: deployment.deployed_at,
       modifiedAt: deployment.deployed_at,
+      createdAt: deployment.deployed_at || now,
+      updatedAt: deployment.deployed_at || now,
     }));
 
     // Apply type filter
@@ -733,12 +679,15 @@ function generateMockCollectionEntities(
       id: 'skill:canvas-design',
       name: 'canvas-design',
       type: 'skill',
+      scope: 'user',
       collection: effectiveCollection,
-      status: 'synced',
+      syncStatus: 'synced',
       tags: ['design', 'visual'],
       description: 'Create and edit visual designs with an interactive canvas',
       version: 'v2.1.0',
       source: 'anthropics/skills/canvas-design',
+      createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
+      updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
       deployedAt: new Date(Date.now() - 30 * 86400000).toISOString(),
       modifiedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
     },
@@ -746,12 +695,15 @@ function generateMockCollectionEntities(
       id: 'skill:docx-processor',
       name: 'docx-processor',
       type: 'skill',
+      scope: 'user',
       collection: effectiveCollection,
-      status: 'outdated',
+      syncStatus: 'outdated',
       tags: ['document', 'docx'],
       description: 'Read and process Microsoft Word documents',
       version: 'v1.5.0',
       source: 'anthropics/skills/document-skills/docx',
+      createdAt: new Date(Date.now() - 60 * 86400000).toISOString(),
+      updatedAt: new Date(Date.now() - 45 * 86400000).toISOString(),
       deployedAt: new Date(Date.now() - 60 * 86400000).toISOString(),
       modifiedAt: new Date(Date.now() - 45 * 86400000).toISOString(),
     },
@@ -759,12 +711,15 @@ function generateMockCollectionEntities(
       id: 'command:git-helper',
       name: 'git-helper',
       type: 'command',
+      scope: 'user',
       collection: effectiveCollection,
-      status: 'synced',
+      syncStatus: 'synced',
       tags: ['git', 'vcs'],
       description: 'Custom git workflow commands',
       version: 'v1.0.0',
       source: 'local',
+      createdAt: new Date(Date.now() - 90 * 86400000).toISOString(),
+      updatedAt: new Date(Date.now() - 7 * 86400000).toISOString(),
       deployedAt: new Date(Date.now() - 90 * 86400000).toISOString(),
       modifiedAt: new Date(Date.now() - 7 * 86400000).toISOString(),
     },
@@ -796,10 +751,13 @@ function generateMockProjectEntities(
       id: 'skill:canvas-design',
       name: 'canvas-design',
       type: 'skill',
+      scope: 'local',
       projectPath,
-      status: 'synced',
+      syncStatus: 'synced',
       version: 'v2.1.0',
       source: 'skills/canvas-design',
+      createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+      updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
       deployedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
       modifiedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
     },
@@ -807,10 +765,13 @@ function generateMockProjectEntities(
       id: 'skill:docx-processor',
       name: 'docx-processor',
       type: 'skill',
+      scope: 'local',
       projectPath,
-      status: 'modified',
+      syncStatus: 'modified',
       version: 'v1.5.0',
       source: 'skills/docx-processor',
+      createdAt: new Date(Date.now() - 5 * 86400000).toISOString(),
+      updatedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
       deployedAt: new Date(Date.now() - 5 * 86400000).toISOString(),
       modifiedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
     },

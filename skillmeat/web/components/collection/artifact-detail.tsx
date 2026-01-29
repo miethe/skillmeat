@@ -64,14 +64,16 @@ const artifactTypeLabels: Record<ArtifactType, string> = {
 };
 
 const statusIcons: Record<string, React.ComponentType<{ className?: string }>> = {
-  active: CheckCircle,
+  synced: CheckCircle,
+  modified: AlertCircle,
   outdated: AlertCircle,
   conflict: AlertCircle,
   error: XCircle,
 };
 
 const statusColors: Record<string, string> = {
-  active: 'text-green-600',
+  synced: 'text-green-600',
+  modified: 'text-blue-600',
   outdated: 'text-yellow-600',
   conflict: 'text-orange-600',
   error: 'text-red-600',
@@ -142,11 +144,11 @@ export function ArtifactDetail({
   const { data: versionGraph, isLoading: isVersionGraphLoading } = useVersionGraph(artifactId);
 
   // Fetch tags for the artifact
-  const { data: tags, isLoading: tagsLoading } = useArtifactTags(artifact?.id);
+  const { data: tags } = useArtifactTags(artifact?.id);
 
   const Icon = artifact ? artifactTypeIcons[artifact.type] : Package;
   const StatusIcon = (
-    artifact ? statusIcons[artifact.status] : CheckCircle
+    artifact ? statusIcons[artifact.syncStatus] : CheckCircle
   ) as React.ComponentType<{ className?: string }>;
 
   return (
@@ -168,15 +170,15 @@ export function ArtifactDetail({
                     </div>
                     <div className="min-w-0 flex-1 space-y-2">
                       <DialogTitle className="text-2xl">
-                        {artifact.metadata.title || artifact.name}
+                        {artifact.name}
                       </DialogTitle>
                       <DialogDescription>
                         {artifactTypeLabels[artifact.type]} · {artifact.name}
                       </DialogDescription>
                       <div className="flex items-center gap-2 pt-1">
-                        <StatusIcon className={`h-4 w-4 ${statusColors[artifact.status]}`} />
+                        <StatusIcon className={`h-4 w-4 ${statusColors[artifact.syncStatus]}`} />
                         <Badge variant="outline" className="capitalize">
-                          {artifact.status}
+                          {artifact.syncStatus}
                         </Badge>
                         <Badge variant="secondary" className="capitalize">
                           {artifact.scope}
@@ -208,10 +210,10 @@ export function ArtifactDetail({
                   <ScrollArea className="h-full">
                     <div className="space-y-6 py-4">
                       {/* Description */}
-                      {artifact.metadata.description && (
+                      {artifact.description && (
                         <div>
                           <p className="text-sm leading-relaxed text-muted-foreground">
-                            {artifact.metadata.description}
+                            {artifact.description}
                           </p>
                         </div>
                       )}
@@ -228,12 +230,12 @@ export function ArtifactDetail({
                           <MetadataItem
                             icon={<User className="h-4 w-4" />}
                             label="Author"
-                            value={artifact.metadata.author || 'Unknown'}
+                            value={artifact.author || 'Unknown'}
                           />
                           <MetadataItem
                             icon={<FileText className="h-4 w-4" />}
                             label="License"
-                            value={artifact.metadata.license || 'N/A'}
+                            value={artifact.license || 'N/A'}
                           />
                           <MetadataItem
                             icon={<Calendar className="h-4 w-4" />}
@@ -268,15 +270,15 @@ export function ArtifactDetail({
 
                       {/* Legacy tags from metadata (fallback) */}
                       {(!tags || tags.length === 0) &&
-                        artifact.metadata.tags &&
-                        artifact.metadata.tags.length > 0 && (
+                        artifact.tags &&
+                        artifact.tags.length > 0 && (
                           <div className="space-y-3">
                             <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                               <Tag className="h-4 w-4" />
                               Tags
                             </h3>
                             <div className="flex flex-wrap gap-2">
-                              {artifact.metadata.tags.map((tag) => (
+                              {artifact.tags.map((tag) => (
                                 <Badge key={tag} variant="secondary">
                                   {tag}
                                 </Badge>
@@ -289,13 +291,13 @@ export function ArtifactDetail({
                       <div className="space-y-4">
                         <h3 className="text-sm font-semibold text-foreground">Upstream Status</h3>
                         <div className="space-y-3 rounded-lg border bg-muted/50 p-4">
-                          {artifact.upstreamStatus.hasUpstream ? (
+                          {artifact.upstream?.enabled ? (
                             <>
                               <div className="flex items-center justify-between gap-4">
                                 <span className="text-sm text-muted-foreground">Source</span>
                                 {artifact.source && (
                                   <a
-                                    href={artifact.upstreamStatus.upstreamUrl}
+                                    href={artifact.upstream.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
@@ -310,26 +312,26 @@ export function ArtifactDetail({
                                   Current Version
                                 </span>
                                 <code className="rounded border bg-background px-2 py-1 text-xs">
-                                  {artifact.upstreamStatus.currentVersion || 'N/A'}
+                                  {artifact.version || 'N/A'}
                                 </code>
                               </div>
-                              {artifact.upstreamStatus.isOutdated && (
+                              {artifact.upstream.updateAvailable && (
                                 <div className="flex items-center justify-between gap-4">
                                   <span className="text-sm text-muted-foreground">
                                     Latest Version
                                   </span>
                                   <code className="rounded border border-yellow-500/20 bg-yellow-500/10 px-2 py-1 text-xs text-yellow-600">
-                                    {artifact.upstreamStatus.upstreamVersion}
+                                    {artifact.upstream.version}
                                   </code>
                                 </div>
                               )}
-                              {artifact.upstreamStatus.lastChecked && (
+                              {artifact.upstream.lastChecked && (
                                 <div className="flex items-center justify-between gap-4">
                                   <span className="text-sm text-muted-foreground">
                                     Last Checked
                                   </span>
                                   <span className="text-sm font-medium">
-                                    {formatRelativeTime(artifact.upstreamStatus.lastChecked)}
+                                    {formatRelativeTime(artifact.upstream.lastChecked)}
                                   </span>
                                 </div>
                               )}
@@ -343,31 +345,33 @@ export function ArtifactDetail({
                       </div>
 
                       {/* Usage Stats */}
-                      <div className="space-y-4">
-                        <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                          <TrendingUp className="h-4 w-4" />
-                          Usage Statistics
-                        </h3>
-                        <div className="grid grid-cols-2 gap-3">
-                          <StatCard
-                            label="Total Deployments"
-                            value={artifact.usageStats.totalDeployments}
-                          />
-                          <StatCard
-                            label="Active Projects"
-                            value={artifact.usageStats.activeProjects}
-                          />
-                          <StatCard label="Usage Count" value={artifact.usageStats.usageCount} />
-                          <StatCard
-                            label="Last Used"
-                            value={
-                              artifact.usageStats.lastUsed
-                                ? formatRelativeTime(artifact.usageStats.lastUsed)
-                                : 'Never'
-                            }
-                          />
+                      {artifact.usageStats && (
+                        <div className="space-y-4">
+                          <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                            <TrendingUp className="h-4 w-4" />
+                            Usage Statistics
+                          </h3>
+                          <div className="grid grid-cols-2 gap-3">
+                            <StatCard
+                              label="Total Deployments"
+                              value={artifact.usageStats.totalDeployments}
+                            />
+                            <StatCard
+                              label="Active Projects"
+                              value={artifact.usageStats.activeProjects}
+                            />
+                            <StatCard label="Usage Count" value={artifact.usageStats.usageCount} />
+                            <StatCard
+                              label="Last Used"
+                              value={
+                                artifact.usageStats.lastUsed
+                                  ? formatRelativeTime(artifact.usageStats.lastUsed)
+                                  : 'Never'
+                              }
+                            />
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* Aliases */}
                       {artifact.aliases && artifact.aliases.length > 0 && (
@@ -414,14 +418,14 @@ export function ArtifactDetail({
                     </Button>
 
                     {/* Sync Button */}
-                    {artifact.upstreamStatus.hasUpstream && (
+                    {artifact.upstream?.enabled && (
                       <Button
-                        variant={artifact.upstreamStatus.isOutdated ? 'default' : 'outline'}
+                        variant={artifact.upstream.updateAvailable ? 'default' : 'outline'}
                         className="justify-start"
                         onClick={() => setIsSyncDialogOpen(true)}
                       >
                         <RefreshCw className="mr-2 h-4 w-4" />
-                        {artifact.upstreamStatus.isOutdated ? 'Update' : 'Sync'}
+                        {artifact.upstream.updateAvailable ? 'Update' : 'Sync'}
                       </Button>
                     )}
 

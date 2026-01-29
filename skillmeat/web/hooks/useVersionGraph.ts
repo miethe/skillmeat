@@ -26,7 +26,7 @@ async function fetchVersionGraph(artifactId: string, collection?: string): Promi
   }
 
   const queryString = params.toString();
-  const path = `/artifacts/${artifactId}/version-graph${queryString ? `?${queryString}` : ''}`;
+  const path = `/artifacts/${encodeURIComponent(artifactId)}/version-graph${queryString ? `?${queryString}` : ''}`;
 
   return apiRequest<VersionGraph>(path);
 }

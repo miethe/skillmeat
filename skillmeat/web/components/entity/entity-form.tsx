@@ -2,8 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { Loader2, X, CheckCircle2 } from 'lucide-react';
-import { EntityType, EntityFormField, ENTITY_TYPES, Entity } from '@/types/entity';
+import { Loader2, CheckCircle2 } from 'lucide-react';
+import {
+  ArtifactType,
+  ArtifactFormField,
+  ARTIFACT_TYPES,
+  Artifact,
+} from '@/types/artifact';
 import {
   useEntityLifecycle,
   useGitHubMetadata,
@@ -11,7 +16,6 @@ import {
   useArtifactTags,
   useAddTagToArtifact,
   useRemoveTagFromArtifact,
-  useCreateTag,
 } from '@/hooks';
 import { useDebouncedCallback } from 'use-debounce';
 import { Button } from '@/components/ui/button';
@@ -31,15 +35,17 @@ import { TagInput, type Tag } from '@/components/ui/tag-input';
 /**
  * Props for EntityForm component
  *
- * Controls form mode (create vs edit), entity data, and submission callbacks.
+ * Controls form mode (create vs edit), artifact data, and submission callbacks.
+ * Accepts the unified Artifact type with flattened properties (no nested metadata).
  */
 interface EntityFormProps {
-  /** Mode: 'create' for new entities, 'edit' for existing entities */
+  /** Mode: 'create' for new artifacts, 'edit' for existing artifacts */
   mode: 'create' | 'edit';
-  /** Entity type configuration - required for create mode, determines available form fields */
-  entityType?: EntityType;
-  /** Existing entity data - required for edit mode to populate form values */
-  entity?: Entity;
+  /** Artifact type configuration - required for create mode, determines available form fields */
+  entityType?: ArtifactType;
+  /** Existing artifact data - required for edit mode to populate form values.
+   *  Uses flattened Artifact type: description, tags, author are top-level properties. */
+  entity?: Artifact;
   /** Callback function called after successful form submission */
   onSuccess?: () => void;
   /** Callback function called when user clicks cancel */
@@ -56,12 +62,17 @@ interface FormData {
 }
 
 /**
- * EntityForm - Create or edit entity form
+ * EntityForm - Create or edit artifact form
  *
- * Renders a dynamic form for creating new entities or editing existing ones.
- * In create mode, shows all fields from the entity type schema plus source type selection (GitHub/Local).
+ * Renders a dynamic form for creating new artifacts or editing existing ones.
+ * In create mode, shows all fields from the artifact type schema plus source type selection (GitHub/Local).
  * In edit mode, only shows editable fields (tags and description).
- * Supports dynamic field rendering based on entity type (text, textarea, select, tags, boolean).
+ * Supports dynamic field rendering based on artifact type (text, textarea, select, tags, boolean).
+ *
+ * Form fields bind directly to flattened Artifact properties:
+ * - artifact.description (not artifact.metadata?.description)
+ * - artifact.tags (not artifact.metadata?.tags)
+ * - artifact.author (not artifact.metadata?.author)
  *
  * @example
  * ```tsx
@@ -73,17 +84,17 @@ interface FormData {
  *   onCancel={() => closeDialog()}
  * />
  *
- * // Edit mode
+ * // Edit mode with flattened Artifact type
  * <EntityForm
  *   mode="edit"
- *   entity={existingSkill}
+ *   entity={existingArtifact} // { name, type, description, tags, ... }
  *   onSuccess={() => refetchData()}
  *   onCancel={() => closeDialog()}
  * />
  * ```
  *
  * @param props - EntityFormProps configuration
- * @returns Form component for creating or editing entities
+ * @returns Form component for creating or editing artifacts
  */
 export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: EntityFormProps) {
   const { createEntity, updateEntity } = useEntityLifecycle();
@@ -106,7 +117,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
   // Tag mutations
   const addTag = useAddTagToArtifact();
   const removeTag = useRemoveTagFromArtifact();
-  const createTag = useCreateTag();
+  // Note: createTag is available via useCreateTag() if we need inline tag creation
 
   // Transform tags for TagInput
   const tagSuggestions: Tag[] =
@@ -119,9 +130,9 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
 
   // Determine the entity type config
   const typeConfig = entityType
-    ? ENTITY_TYPES[entityType]
+    ? ARTIFACT_TYPES[entityType]
     : entity
-      ? ENTITY_TYPES[entity.type]
+      ? ARTIFACT_TYPES[entity.type]
       : null;
 
   const {
@@ -195,7 +206,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
   }, 500);
 
   // Get editable fields based on mode
-  const getFields = (): EntityFormField[] => {
+  const getFields = (): ArtifactFormField[] => {
     if (!typeConfig) return [];
 
     if (mode === 'edit') {
@@ -282,7 +293,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
   };
 
   // Render field based on type
-  const renderField = (field: EntityFormField) => {
+  const renderField = (field: ArtifactFormField) => {
     const fieldId = `field-${field.name}`;
 
     // Skip source field if we're rendering it separately

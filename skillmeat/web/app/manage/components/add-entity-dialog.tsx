@@ -8,16 +8,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { EntityForm } from '@/components/entity/entity-form';
-import { EntityType, ENTITY_TYPES } from '@/types/entity';
+import { ArtifactType, ARTIFACT_TYPES } from '@/types/artifact';
 
 interface AddEntityDialogProps {
-  entityType: EntityType;
+  entityType: ArtifactType;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function AddEntityDialog({ entityType, open, onOpenChange }: AddEntityDialogProps) {
-  const config = ENTITY_TYPES[entityType];
+  const config = ARTIFACT_TYPES[entityType];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

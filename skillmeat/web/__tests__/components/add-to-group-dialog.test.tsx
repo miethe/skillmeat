@@ -48,16 +48,13 @@ describe('AddToGroupDialog', () => {
     name: 'Test Artifact',
     type: 'skill',
     scope: 'user',
-    status: 'active',
+    syncStatus: 'synced',
     source: 'github.com/test/repo',
-    metadata: {
-      title: 'Test Artifact',
-      description: 'A test artifact',
-      tags: ['test'],
-    },
-    upstreamStatus: {
-      hasUpstream: false,
-      isOutdated: false,
+    description: 'A test artifact',
+    tags: ['test'],
+    upstream: {
+      enabled: false,
+      updateAvailable: false,
     },
     usageStats: {
       totalDeployments: 0,

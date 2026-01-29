@@ -9,10 +9,13 @@ const mockEntity: Entity = {
   id: 'skill:test',
   name: 'test-skill',
   type: 'skill',
+  scope: 'user',
   source: 'github:user/repo/skill',
-  status: 'synced',
+  syncStatus: 'synced',
   tags: ['testing', 'example', 'demo'],
   description: 'A test skill for unit testing',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
 };
 
 describe('EntityRow', () => {
@@ -61,14 +64,14 @@ describe('EntityRow', () => {
   });
 
   it('shows modified status correctly', () => {
-    const modifiedEntity = { ...mockEntity, status: 'modified' as const };
+    const modifiedEntity = { ...mockEntity, syncStatus: 'modified' as const };
     render(<EntityRow entity={modifiedEntity} />);
 
     expect(screen.getByText('Modified')).toBeInTheDocument();
   });
 
   it('shows dash when no status', () => {
-    const noStatusEntity = { ...mockEntity, status: undefined };
+    const noStatusEntity = { ...mockEntity, syncStatus: undefined as any };
     render(<EntityRow entity={noStatusEntity} />);
 
     const statusCells = screen.getAllByText('-');

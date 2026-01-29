@@ -12,9 +12,9 @@ import * as LucideIcons from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-import type { Entity } from '@/types/entity';
-import { getEntityTypeConfig } from '@/types/entity';
-import { EntityActions } from './entity-actions';
+import type { Artifact } from '@/types/artifact';
+import { getArtifactTypeConfig } from '@/types/artifact';
+import { UnifiedCardActions } from '@/components/shared/unified-card-actions';
 
 /**
  * Props for EntityRow component
@@ -23,7 +23,7 @@ import { EntityActions } from './entity-actions';
  */
 export interface EntityRowProps {
   /** The entity to display in the row */
-  entity: Entity;
+  entity: Artifact;
   /** Whether the row is currently selected */
   selected?: boolean;
   /** Whether the entity can be selected (shows checkbox) */
@@ -83,25 +83,27 @@ export const EntityRow = React.memo(
     onViewDiff,
     onRollback,
   }: EntityRowProps) {
-    const config = getEntityTypeConfig(entity.type);
+    const config = getArtifactTypeConfig(entity.type);
     // Type-safe icon lookup with fallback
     const IconComponent = (LucideIcons as any)[config.icon] as
       | React.ComponentType<{ className?: string }>
       | undefined;
     const Icon = IconComponent || LucideIcons.FileText;
 
-    const statusColors = {
+    const statusColors: Record<string, string> = {
       synced: 'text-green-500',
       modified: 'text-yellow-500',
       outdated: 'text-orange-500',
       conflict: 'text-red-500',
+      error: 'text-red-500',
     };
 
-    const statusLabels = {
+    const statusLabels: Record<string, string> = {
       synced: 'Synced',
       modified: 'Modified',
       outdated: 'Outdated',
       conflict: 'Conflict',
+      error: 'Error',
     };
 
     const handleRowClick = (e: React.MouseEvent) => {
@@ -185,12 +187,12 @@ export const EntityRow = React.memo(
 
         {/* Status */}
         <div className="w-24 flex-shrink-0">
-          {entity.status ? (
+          {entity.syncStatus ? (
             <div className="flex items-center gap-2">
               <span
-                className={cn('inline-block h-2 w-2 rounded-full', statusColors[entity.status])}
+                className={cn('inline-block h-2 w-2 rounded-full', statusColors[entity.syncStatus])}
               />
-              <span className="text-sm text-muted-foreground">{statusLabels[entity.status]}</span>
+              <span className="text-sm text-muted-foreground">{statusLabels[entity.syncStatus]}</span>
             </div>
           ) : (
             <span className="text-sm text-muted-foreground">-</span>
@@ -199,8 +201,9 @@ export const EntityRow = React.memo(
 
         {/* Actions */}
         <div className="flex-shrink-0">
-          <EntityActions
-            entity={entity}
+          <UnifiedCardActions
+            artifact={entity}
+            alwaysVisible={true}
             onEdit={onEdit}
             onDelete={onDelete}
             onDeploy={onDeploy}
@@ -218,7 +221,7 @@ export const EntityRow = React.memo(
     return (
       prevProps.entity.id === nextProps.entity.id &&
       prevProps.entity.name === nextProps.entity.name &&
-      prevProps.entity.status === nextProps.entity.status &&
+      prevProps.entity.syncStatus === nextProps.entity.syncStatus &&
       prevProps.entity.description === nextProps.entity.description &&
       prevProps.entity.tags?.join(',') === nextProps.entity.tags?.join(',') &&
       prevProps.selected === nextProps.selected &&

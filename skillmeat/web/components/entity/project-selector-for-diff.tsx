@@ -17,13 +17,13 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { apiRequest } from '@/lib/api';
-import type { EntityType, EntityStatus } from '@/types/entity';
+import type { ArtifactType, SyncStatus } from '@/types/artifact';
 import type { ArtifactResponse, DeploymentStatistics } from '@/sdk';
 
 interface ProjectSelectorForDiffProps {
   entityId: string;
   entityName: string;
-  entityType: EntityType;
+  entityType: ArtifactType;
   collection: string;
   onProjectSelected: (projectPath: string) => void;
 }
@@ -31,7 +31,7 @@ interface ProjectSelectorForDiffProps {
 interface ProjectDeploymentItem {
   projectName: string;
   projectPath: string;
-  status: EntityStatus;
+  status: SyncStatus;
   deployedAt: string;
   isModified: boolean;
 }
@@ -61,10 +61,10 @@ function formatRelativeTime(date: Date): string {
 }
 
 /**
- * Get status badge variant based on entity status
+ * Get status badge variant based on sync status
  */
 function getStatusVariant(
-  status: EntityStatus
+  status: SyncStatus
 ): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (status) {
     case 'synced':
@@ -83,7 +83,7 @@ function getStatusVariant(
 /**
  * Get status icon component
  */
-function getStatusIcon(status: EntityStatus) {
+function getStatusIcon(status: SyncStatus) {
   switch (status) {
     case 'synced':
       return <CheckCircle2 className="h-4 w-4 text-green-500" />;
@@ -101,7 +101,7 @@ function getStatusIcon(status: EntityStatus) {
 /**
  * Get status label text
  */
-function getStatusLabel(status: EntityStatus): string {
+function getStatusLabel(status: SyncStatus): string {
   switch (status) {
     case 'synced':
       return 'Synced';
@@ -170,7 +170,7 @@ export function ProjectSelectorForDiff({
     artifactData?.deployment_stats?.projects?.map((project) => {
       // Derive status from is_modified flag
       // In a real implementation, you might want to fetch full sync status
-      const status: EntityStatus = project.is_modified ? 'modified' : 'synced';
+      const status: SyncStatus = project.is_modified ? 'modified' : 'synced';
 
       return {
         projectName: project.project_name,

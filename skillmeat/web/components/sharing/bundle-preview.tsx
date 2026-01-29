@@ -156,9 +156,9 @@ export function BundlePreview({ preview, className }: BundlePreviewProps) {
                               {item.artifact.type}
                             </Badge>
                           </div>
-                          {item.artifact.metadata.description && (
+                          {item.artifact.description && (
                             <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                              {item.artifact.metadata.description}
+                              {item.artifact.description}
                             </p>
                           )}
                         </div>

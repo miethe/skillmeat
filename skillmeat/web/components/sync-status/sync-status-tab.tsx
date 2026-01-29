@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
-import type { Entity } from '@/types/entity';
+import type { Artifact } from '@/types/artifact';
 import type { ArtifactDiffResponse } from '@/sdk/models/ArtifactDiffResponse';
 import type { ArtifactUpstreamDiffResponse } from '@/sdk/models/ArtifactUpstreamDiffResponse';
 import type { FileDiff } from '@/sdk/models/FileDiff';
@@ -21,14 +21,13 @@ import { SyncActionsFooter } from './sync-actions-footer';
 // Existing components
 import { DiffViewer } from '@/components/entity/diff-viewer';
 import { SyncDialog } from '@/components/collection/sync-dialog';
-import type { Artifact } from '@/types/artifact';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface SyncStatusTabProps {
-  entity: Entity;
+  entity: Artifact;
   mode: 'collection' | 'project';
   projectPath?: string;
   onClose: () => void;
@@ -43,41 +42,6 @@ interface PendingAction {
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/**
- * Convert Entity + upstream diff data to Artifact for SyncDialog compatibility
- */
-function entityToArtifact(entity: Entity, upstreamDiff?: ArtifactUpstreamDiffResponse): Artifact {
-  return {
-    id: entity.id,
-    name: entity.name,
-    type: entity.type,
-    scope: 'user', // Default scope
-    status: entity.status === 'conflict' ? 'conflict' : 'active',
-    version: entity.version,
-    source: entity.source,
-    metadata: {
-      description: entity.description,
-      tags: entity.tags,
-    },
-    upstreamStatus: {
-      hasUpstream: !!entity.source && entity.source !== 'local',
-      upstreamUrl: entity.source,
-      upstreamVersion: upstreamDiff?.upstream_version,
-      currentVersion: entity.version,
-      isOutdated: upstreamDiff?.has_changes ?? false,
-      lastChecked: new Date().toISOString(),
-    },
-    usageStats: {
-      totalDeployments: 0,
-      activeProjects: 0,
-      usageCount: 0,
-    },
-    createdAt: entity.deployedAt || new Date().toISOString(),
-    updatedAt: entity.modifiedAt || new Date().toISOString(),
-    aliases: entity.aliases,
-  };
-}
 
 /**
  * Compute drift status from diff data
@@ -493,7 +457,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   // ============================================================================
 
   const bannerProps = {
-    entity,
+    artifact: entity,
     sourceInfo: upstreamDiff
       ? {
           version: upstreamDiff.upstream_version,
@@ -631,8 +595,8 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   // Render
   // ============================================================================
 
-  // Convert Entity to Artifact for SyncDialog compatibility
-  const artifactForSync = entityToArtifact(entity, upstreamDiff);
+  // Entity is an alias for Artifact - no conversion needed
+  // SyncDialog accepts Artifact which Entity now satisfies directly
 
   return (
     <>
@@ -663,7 +627,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
 
       {/* Sync Dialog for merge operations */}
       <SyncDialog
-        artifact={artifactForSync}
+        artifact={entity}
         isOpen={showSyncDialog}
         onClose={() => setShowSyncDialog(false)}
         onSuccess={() => {

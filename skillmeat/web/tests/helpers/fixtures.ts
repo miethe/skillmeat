@@ -15,23 +15,22 @@ export const mockArtifacts: Artifact[] = [
     name: 'canvas-design',
     type: 'skill',
     scope: 'user',
-    status: 'active',
+    syncStatus: 'synced',
     version: '1.2.0',
     source: 'anthropics/skills/canvas-design',
-    metadata: {
-      title: 'Canvas Design',
-      description: 'A skill for designing canvas layouts',
-      author: 'Anthropic',
-      license: 'MIT',
+    // Flattened metadata fields
+    description: 'A skill for designing canvas layouts',
+    author: 'Anthropic',
+    license: 'MIT',
+    tags: ['design', 'canvas'],
+    // New upstream structure
+    upstream: {
+      enabled: true,
+      url: 'https://github.com/anthropics/skills',
       version: '1.2.0',
-      tags: ['design', 'canvas'],
-    },
-    upstreamStatus: {
-      hasUpstream: true,
-      upstreamUrl: 'https://github.com/anthropics/skills',
-      upstreamVersion: '1.2.0',
-      currentVersion: '1.2.0',
-      isOutdated: false,
+      currentSha: 'abc123',
+      upstreamSha: 'abc123',
+      updateAvailable: false,
       lastChecked: '2024-11-16T00:00:00Z',
     },
     usageStats: {
@@ -49,23 +48,22 @@ export const mockArtifacts: Artifact[] = [
     name: 'data-analysis',
     type: 'skill',
     scope: 'user',
-    status: 'outdated',
+    syncStatus: 'outdated',
     version: '2.0.1',
     source: 'anthropics/skills/data-analysis',
-    metadata: {
-      title: 'Data Analysis',
-      description: 'Advanced data analysis and visualization',
-      author: 'Anthropic',
-      license: 'Apache-2.0',
-      version: '2.0.1',
-      tags: ['data', 'analytics', 'visualization'],
-    },
-    upstreamStatus: {
-      hasUpstream: true,
-      upstreamUrl: 'https://github.com/anthropics/skills',
-      upstreamVersion: '2.1.0',
-      currentVersion: '2.0.1',
-      isOutdated: true,
+    // Flattened metadata fields
+    description: 'Advanced data analysis and visualization',
+    author: 'Anthropic',
+    license: 'Apache-2.0',
+    tags: ['data', 'analytics', 'visualization'],
+    // New upstream structure
+    upstream: {
+      enabled: true,
+      url: 'https://github.com/anthropics/skills',
+      version: '2.1.0',
+      currentSha: 'def456',
+      upstreamSha: 'ghi789',
+      updateAvailable: true,
       lastChecked: '2024-11-15T00:00:00Z',
     },
     usageStats: {
@@ -82,20 +80,18 @@ export const mockArtifacts: Artifact[] = [
     name: 'code-review',
     type: 'command',
     scope: 'local',
-    status: 'active',
+    syncStatus: 'synced',
     version: '1.0.0',
     source: 'community/commands/code-review',
-    metadata: {
-      title: 'Code Review',
-      description: 'Automated code review assistant',
-      author: 'Community',
-      license: 'MIT',
-      version: '1.0.0',
-      tags: ['code', 'review'],
-    },
-    upstreamStatus: {
-      hasUpstream: false,
-      isOutdated: false,
+    // Flattened metadata fields
+    description: 'Automated code review assistant',
+    author: 'Community',
+    license: 'MIT',
+    tags: ['code', 'review'],
+    // New upstream structure (no upstream tracking)
+    upstream: {
+      enabled: false,
+      updateAvailable: false,
     },
     usageStats: {
       totalDeployments: 0,

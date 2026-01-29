@@ -116,13 +116,16 @@ const mockEntity: Entity = {
   id: 'skill:test-skill',
   name: 'test-skill',
   type: 'skill',
+  scope: 'user',
   source: 'test/repo/skill',
   version: 'v1.0.0',
-  status: 'synced',
+  syncStatus: 'synced',
   collection: 'default',
   tags: ['test'],
   aliases: [],
   description: 'A test skill',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
 };
 
 // Mock Artifact (for ArtifactDeletionDialog)
@@ -130,10 +133,14 @@ const mockArtifact: Artifact = {
   id: 'skill:test-skill',
   name: 'test-skill',
   type: 'skill',
+  scope: 'user',
   source: 'test/repo/skill',
   version: 'v1.0.0',
+  syncStatus: 'synced',
   tags: ['test'],
   aliases: [],
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
 };
 
 describe('Artifact Deletion Integration Tests', () => {

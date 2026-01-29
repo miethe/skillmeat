@@ -2,19 +2,19 @@
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ENTITY_TYPES, EntityType, getAllEntityTypes } from '@/types/entity';
+import { ARTIFACT_TYPES, ArtifactType, getAllArtifactTypes } from '@/types/artifact';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
 interface EntityTabsProps {
-  children: (entityType: EntityType) => React.ReactNode;
+  children: (entityType: ArtifactType) => React.ReactNode;
 }
 
 export function EntityTabs({ children }: EntityTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const activeTab = (searchParams.get('type') as EntityType) || 'skill';
+  const activeTab = (searchParams.get('type') as ArtifactType) || 'skill';
 
   const handleTabChange = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -23,13 +23,13 @@ export function EntityTabs({ children }: EntityTabsProps) {
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  const entityTypes = getAllEntityTypes();
+  const entityTypes = getAllArtifactTypes();
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       <TabsList className="grid w-full grid-cols-5">
         {entityTypes.map((type) => {
-          const config = ENTITY_TYPES[type];
+          const config = ARTIFACT_TYPES[type];
           const IconComponent = (LucideIcons as any)[config.icon] as LucideIcon;
 
           return (

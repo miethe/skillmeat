@@ -23,7 +23,7 @@ function buildUrl(path: string): string {
  * @throws Error if deletion fails
  */
 export async function deleteArtifactFromCollection(artifactId: string): Promise<void> {
-  const response = await fetch(buildUrl(`/artifacts/${artifactId}`), {
+  const response = await fetch(buildUrl(`/artifacts/${encodeURIComponent(artifactId)}`), {
     method: 'DELETE',
   });
 

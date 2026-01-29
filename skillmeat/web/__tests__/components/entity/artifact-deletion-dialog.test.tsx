@@ -39,16 +39,12 @@ const mockArtifact: Artifact = {
   type: 'skill',
   description: 'A test skill',
   scope: 'user',
-  status: 'active',
+  syncStatus: 'synced',
   version: '1.0.0',
   source: 'user/repo/skill',
-  metadata: {
-    title: 'Test Skill',
-    description: 'A test skill',
-  },
-  upstreamStatus: {
-    hasUpstream: true,
-    isOutdated: false,
+  upstream: {
+    enabled: true,
+    updateAvailable: false,
   },
   usageStats: {
     totalDeployments: 2,

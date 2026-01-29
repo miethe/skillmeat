@@ -11,10 +11,13 @@ const mockEntity: Entity = {
   id: 'skill:test',
   name: 'test-skill',
   type: 'skill',
+  scope: 'user',
   source: 'github:user/repo/skill',
-  status: 'modified',
+  syncStatus: 'modified',
   version: 'v1.2.3',
   projectPath: '/path/to/project',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
 };
 
 describe('RollbackDialog Accessibility', () => {

@@ -21,16 +21,13 @@ const mockArtifacts: Artifact[] = [
     name: 'test-skill',
     type: 'skill',
     scope: 'user',
-    status: 'active',
+    syncStatus: 'synced',
     version: '1.0.0',
-    metadata: {
-      title: 'Test Skill',
-      description: 'A test skill',
-      tags: ['test'],
-    },
-    upstreamStatus: {
-      hasUpstream: false,
-      isOutdated: false,
+    description: 'A test skill',
+    tags: ['test'],
+    upstream: {
+      enabled: false,
+      updateAvailable: false,
     },
     usageStats: {
       totalDeployments: 0,

@@ -1,112 +1,144 @@
 ---
 type: progress
-prd: "entity-artifact-consolidation"
-phase: "1-2"
-status: pending
-progress: 0
-last_updated: "2026-01-28"
-
+prd: entity-artifact-consolidation
+phase: 1-2
+status: completed
+progress: 100
+last_updated: '2026-01-28'
 tasks:
-  # Phase 1: Type Definition & Backward Compatibility
-  - id: "P1-T1"
-    name: "Create unified Artifact interface"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect"]
-    dependencies: []
-    model: "opus"
-    effort: 5
-    files: ["skillmeat/web/types/artifact.ts"]
-
-  - id: "P1-T2"
-    name: "Define SyncStatus enum"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect"]
-    dependencies: ["P1-T1"]
-    model: "opus"
-    effort: 2
-    files: ["skillmeat/web/types/artifact.ts"]
-
-  - id: "P1-T3"
-    name: "Create backward compatibility aliases"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect"]
-    dependencies: ["P1-T1", "P1-T2"]
-    model: "opus"
-    effort: 2
-    files: ["skillmeat/web/types/artifact.ts"]
-
-  - id: "P1-T4"
-    name: "Update types/entity.ts with deprecation notice"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect"]
-    dependencies: ["P1-T3"]
-    model: "opus"
-    effort: 1
-    files: ["skillmeat/web/types/entity.ts"]
-
-  - id: "P1-T5"
-    name: "TypeScript compilation and testing"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect"]
-    dependencies: ["P1-T4"]
-    model: "opus"
-    effort: 1
-    files: ["skillmeat/web/types/artifact.ts", "skillmeat/web/types/entity.ts", "skillmeat/web/types/index.ts"]
-
-  # Phase 2: Registry Consolidation
-  - id: "P2-T1"
-    name: "Create ARTIFACT_TYPES registry"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect"]
-    dependencies: ["P1-T5"]
-    model: "opus"
-    effort: 3
-    files: ["skillmeat/web/types/artifact.ts"]
-
-  - id: "P2-T2"
-    name: "Create ENTITY_TYPES deprecation alias"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect"]
-    dependencies: ["P2-T1"]
-    model: "sonnet"
-    effort: 1
-    files: ["skillmeat/web/types/entity.ts"]
-
-  - id: "P2-T3"
-    name: "Update all imports to use ARTIFACT_TYPES"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect", "codebase-explorer"]
-    dependencies: ["P2-T2"]
-    model: "opus"
-    effort: 4
-    files: ["skillmeat/web/components/entity/*.tsx", "skillmeat/web/app/collection/page.tsx", "skillmeat/web/app/manage/page.tsx"]
-
-  - id: "P2-T4"
-    name: "Validation and testing"
-    status: "pending"
-    assigned_to: ["backend-typescript-architect"]
-    dependencies: ["P2-T3"]
-    model: "opus"
-    effort: 2
-    files: []
-
+- id: P1-T1
+  name: Create unified Artifact interface
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  dependencies: []
+  model: opus
+  effort: 5
+  files:
+  - skillmeat/web/types/artifact.ts
+- id: P1-T2
+  name: Define SyncStatus enum
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  dependencies:
+  - P1-T1
+  model: opus
+  effort: 2
+  files:
+  - skillmeat/web/types/artifact.ts
+- id: P1-T3
+  name: Create backward compatibility aliases
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  dependencies:
+  - P1-T1
+  - P1-T2
+  model: opus
+  effort: 2
+  files:
+  - skillmeat/web/types/artifact.ts
+- id: P1-T4
+  name: Update types/entity.ts with deprecation notice
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  dependencies:
+  - P1-T3
+  model: opus
+  effort: 1
+  files:
+  - skillmeat/web/types/entity.ts
+- id: P1-T5
+  name: TypeScript compilation and testing
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  dependencies:
+  - P1-T4
+  model: opus
+  effort: 1
+  files:
+  - skillmeat/web/types/artifact.ts
+  - skillmeat/web/types/entity.ts
+  - skillmeat/web/types/index.ts
+- id: P2-T1
+  name: Create ARTIFACT_TYPES registry
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  dependencies:
+  - P1-T5
+  model: opus
+  effort: 3
+  files:
+  - skillmeat/web/types/artifact.ts
+- id: P2-T2
+  name: Create ENTITY_TYPES deprecation alias
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  dependencies:
+  - P2-T1
+  model: sonnet
+  effort: 1
+  files:
+  - skillmeat/web/types/entity.ts
+- id: P2-T3
+  name: Update all imports to use ARTIFACT_TYPES
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  - codebase-explorer
+  dependencies:
+  - P2-T2
+  model: opus
+  effort: 4
+  files:
+  - skillmeat/web/components/entity/*.tsx
+  - skillmeat/web/app/collection/page.tsx
+  - skillmeat/web/app/manage/page.tsx
+- id: P2-T4
+  name: Validation and testing
+  status: completed
+  assigned_to:
+  - backend-typescript-architect
+  dependencies:
+  - P2-T3
+  model: opus
+  effort: 2
+  files: []
 parallelization:
-  batch_1: ["P1-T1"]
-  batch_2: ["P1-T2"]
-  batch_3: ["P1-T3"]
-  batch_4: ["P1-T4", "P1-T5"]
-  batch_5: ["P2-T1"]
-  batch_6: ["P2-T2"]
-  batch_7: ["P2-T3"]
-  batch_8: ["P2-T4"]
-
+  batch_1:
+  - P1-T1
+  batch_2:
+  - P1-T2
+  batch_3:
+  - P1-T3
+  batch_4:
+  - P1-T4
+  - P1-T5
+  batch_5:
+  - P2-T1
+  batch_6:
+  - P2-T2
+  batch_7:
+  - P2-T3
+  batch_8:
+  - P2-T4
 quality_gates:
-  - "TypeScript strict mode: zero errors"
-  - "All existing tests pass"
-  - "Old imports still resolve (backward compat)"
-  - "IDE shows deprecation warnings for old type names"
-  - "No visual or behavioral changes"
-  - "Code review approval from 2+ team members"
+- 'TypeScript strict mode: zero errors'
+- All existing tests pass
+- Old imports still resolve (backward compat)
+- IDE shows deprecation warnings for old type names
+- No visual or behavioral changes
+- Code review approval from 2+ team members
+total_tasks: 9
+completed_tasks: 9
+in_progress_tasks: 0
+blocked_tasks: 0
+updated: '2026-01-28'
 ---
 
 # Phase 1-2: Type Definition & Registry Consolidation

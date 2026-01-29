@@ -269,6 +269,9 @@ export function DeployDialog({
         overwrite: overwriteEnabled,
         // Include custom destination path if enabled and valid
         dest_path: computedDestPath,
+        // Include collection name to ensure correct collection lookup
+        // Falls back to 'default' if not specified on the artifact
+        collection_name: artifact.collection || 'default',
       });
       // Deployment successful
       handleComplete(true);
@@ -570,7 +573,7 @@ export function DeployDialog({
                 </div>
 
                 {/* Existing Deployments Info */}
-                {artifact.usageStats.totalDeployments > 0 && (
+                {artifact.usageStats?.totalDeployments && artifact.usageStats.totalDeployments > 0 && (
                   <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3">
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-600" />
@@ -580,7 +583,7 @@ export function DeployDialog({
                         </p>
                         <p className="mt-1 text-xs text-yellow-800 dark:text-yellow-200">
                           This artifact is already deployed to{' '}
-                          {artifact.usageStats.totalDeployments} project(s). If the target project
+                          {artifact.usageStats?.totalDeployments ?? 0} project(s). If the target project
                           already has this artifact, it will be overwritten.
                         </p>
                       </div>

@@ -26,8 +26,8 @@ import {
 } from '@/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Artifact, ArtifactFilters } from '@/types/artifact';
-import type { Entity } from '@/types/entity';
 import type { ArtifactParameters } from '@/types/discovery';
+import { mapApiResponseToArtifact, type ArtifactResponse } from '@/lib/api/mappers';
 
 type ViewMode = 'grid' | 'list' | 'grouped';
 
@@ -39,21 +39,21 @@ type ViewMode = 'grid' | 'list' | 'grouped';
  *
  * @param summary - Lightweight artifact summary from collection endpoint
  * @param allArtifacts - Full artifact list from catalog
- * @param collectionInfo - Optional collection context to attach
+ * @param collectionId - Optional collection ID (directory name, e.g., "default") to attach for API calls
  * @returns Full Artifact object or enriched fallback
  */
 function enrichArtifactSummary(
   summary: { name: string; type: string; version?: string | null; source: string },
   allArtifacts: Artifact[],
-  collectionInfo?: { id: string; name: string }
+  collectionId?: string
 ): Artifact {
   // Try to find matching full artifact by name and type
   const fullArtifact = allArtifacts.find((a) => a.name === summary.name && a.type === summary.type);
 
   if (fullArtifact) {
     // If we have collection context and the full artifact lacks it, add it
-    if (collectionInfo && !fullArtifact.collection) {
-      return { ...fullArtifact, collection: collectionInfo };
+    if (collectionId && !fullArtifact.collection) {
+      return { ...fullArtifact, collection: collectionId };
     }
     return fullArtifact;
   }
@@ -71,18 +71,16 @@ function enrichArtifactSummary(
     name: summary.name,
     type: summary.type as any,
     scope: 'user',
-    status: 'active',
+    syncStatus: 'synced',
     version: summary.version || undefined,
     // If source looks like the ID format, don't use it - prefer undefined
     source: isSourceMissingOrSynthetic ? undefined : summary.source,
-    metadata: {
-      title: summary.name,
-      description: '',
-      tags: [],
-    },
-    upstreamStatus: {
-      hasUpstream: false,
-      isOutdated: false,
+    // Flattened metadata fields
+    description: '',
+    tags: [],
+    upstream: {
+      enabled: false,
+      updateAvailable: false,
     },
     usageStats: {
       totalDeployments: 0,
@@ -92,58 +90,7 @@ function enrichArtifactSummary(
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     aliases: [],
-    collection: collectionInfo,
-  };
-}
-
-// Helper function to convert Artifact to Entity for the modal
-function artifactToEntity(artifact: Artifact): Entity {
-  const statusMap: Record<string, Entity['status']> = {
-    active: 'synced',
-    outdated: 'outdated',
-    conflict: 'conflict',
-    error: 'conflict',
-  };
-
-  // Use artifact's collection ID, or 'default' if not available
-  // Note: 'discovered' is only for marketplace artifacts on /marketplace page
-  // On /collection page, artifacts should always have a collection context
-  const collectionId = artifact.collection?.id || 'default';
-
-  return {
-    id: artifact.id,
-    name: artifact.name,
-    type: artifact.type,
     collection: collectionId,
-    status: statusMap[artifact.status] || 'synced',
-    tags: artifact.metadata?.tags || [],
-    description: artifact.metadata?.description,
-    version: artifact.version || artifact.metadata?.version,
-    source: artifact.source || 'unknown',
-    origin: artifact.origin,
-    origin_source: artifact.origin_source,
-    deployedAt: artifact.createdAt,
-    modifiedAt: artifact.updatedAt,
-    aliases: artifact.aliases || [],
-    // Collections array for the Collections tab in unified entity modal
-    // Priority: artifact.collections (array) > artifact.collection (single) > empty array
-    // TODO: Backend needs to populate artifact.collections with ALL collections the artifact belongs to
-    collections:
-      artifact.collections && artifact.collections.length > 0
-        ? artifact.collections.map((collection) => ({
-            id: collection.id,
-            name: collection.name,
-            artifact_count: collection.artifact_count || 0,
-          }))
-        : artifact.collection
-          ? [
-              {
-                id: artifact.collection.id,
-                name: artifact.collection.name,
-                artifact_count: 0, // Not available in artifact context
-              },
-            ]
-          : [],
   };
 }
 
@@ -228,7 +175,7 @@ function CollectionPageContent() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Modal state
-  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
+  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -403,93 +350,9 @@ function CollectionPageContent() {
   };
 
   // Helper function to map API artifact response to Artifact type
-  const mapApiArtifactToArtifact = (apiArtifact: {
-    id: string;
-    name: string;
-    type: string;
-    source: string;
-    version?: string;
-    tags?: string[];
-    aliases?: string[];
-    origin?: string;
-    origin_source?: string | null;
-    metadata?: {
-      title?: string;
-      description?: string;
-      license?: string;
-      author?: string;
-      version?: string;
-      tags?: string[];
-    };
-    upstream?: {
-      tracking_enabled: boolean;
-      current_sha?: string;
-      upstream_sha?: string;
-      update_available: boolean;
-      has_local_modifications: boolean;
-    };
-    added: string;
-    updated: string;
-    collection?: { id: string; name: string };
-    collections?: Array<{ id: string; name: string; artifact_count?: number }>;
-  }): Artifact => {
-    const metadata = apiArtifact.metadata || {};
-    const upstream = apiArtifact.upstream;
-    const isOutdated = upstream?.update_available ?? false;
-
-    // Merge tags from artifact level and metadata level
-    const artifactTags = apiArtifact.tags || [];
-    const metadataTags = metadata.tags || [];
-    const mergedTags: string[] = [];
-    const seenTags = new Set<string>();
-    for (const tag of [...artifactTags, ...metadataTags]) {
-      const normalized = tag?.trim();
-      if (!normalized || seenTags.has(normalized)) continue;
-      seenTags.add(normalized);
-      mergedTags.push(normalized);
-    }
-
-    return {
-      id: apiArtifact.id,
-      name: apiArtifact.name,
-      type: apiArtifact.type as any,
-      scope: apiArtifact.source === 'local' ? 'local' : 'user',
-      status: isOutdated ? 'outdated' : 'active',
-      version: apiArtifact.version || metadata.version,
-      source: apiArtifact.source,
-      origin: apiArtifact.origin,
-      origin_source: apiArtifact.origin_source || undefined,
-      metadata: {
-        title: metadata.title || apiArtifact.name,
-        description: metadata.description || '',
-        license: metadata.license,
-        author: metadata.author,
-        version: metadata.version || apiArtifact.version,
-        tags: mergedTags,
-      },
-      upstreamStatus: {
-        hasUpstream: Boolean(upstream?.tracking_enabled),
-        upstreamUrl:
-          apiArtifact.source?.startsWith('http') || apiArtifact.source?.includes('github.com')
-            ? apiArtifact.source
-            : undefined,
-        upstreamVersion: upstream?.upstream_sha,
-        currentVersion: upstream?.current_sha || apiArtifact.version,
-        isOutdated,
-        lastChecked: apiArtifact.updated,
-      },
-      usageStats: {
-        totalDeployments: 0,
-        activeProjects: 0,
-        lastUsed: apiArtifact.updated,
-        usageCount: 0,
-      },
-      createdAt: apiArtifact.added,
-      updatedAt: apiArtifact.updated,
-      aliases: apiArtifact.aliases || [],
-      collection: apiArtifact.collection,
-      collections: apiArtifact.collections,
-    };
+  // Uses the centralized mapper from @/lib/api/mappers
+  const mapApiArtifactToArtifact = (apiArtifact: ArtifactResponse): Artifact => {
+    return mapApiResponseToArtifact(apiArtifact, 'collection');
   };
 
   // Apply client-side search, tag filter, and sort
@@ -508,14 +371,13 @@ function CollectionPageContent() {
         ? infiniteAllArtifactsData.pages.flatMap((page) => page.items.map(mapApiArtifactToArtifact))
         : [];
 
-      // Build collection info from current context to ensure artifacts have collection set
-      const collectionInfo = currentCollection
-        ? { id: currentCollection.id, name: currentCollection.name }
-        : undefined;
+      // Build collection ID from current context to ensure artifacts have collection set
+      // Use .id (directory name like "default") not .name (display name like "Default Collection")
+      const collectionId = currentCollection?.id;
 
       // Enrich each summary with full data from catalog, including collection context
       artifacts = allSummaries.map((summary) =>
-        enrichArtifactSummary(summary, fullArtifacts, collectionInfo)
+        enrichArtifactSummary(summary, fullArtifacts, collectionId)
       );
 
       // Deduplicate by ID to prevent React key conflicts
@@ -544,13 +406,28 @@ function CollectionPageContent() {
       });
     }
 
+    // Type filter
+    if (filters.type && filters.type !== 'all') {
+      artifacts = artifacts.filter((artifact) => artifact.type === filters.type);
+    }
+
+    // Status filter (uses syncStatus)
+    if (filters.status && filters.status !== 'all') {
+      artifacts = artifacts.filter((artifact) => artifact.syncStatus === filters.status);
+    }
+
+    // Scope filter
+    if (filters.scope && filters.scope !== 'all') {
+      artifacts = artifacts.filter((artifact) => artifact.scope === filters.scope);
+    }
+
     // Search
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       artifacts = artifacts.filter((a) => {
         const nameMatch = a.name.toLowerCase().includes(query);
-        const descMatch = a.metadata?.description?.toLowerCase().includes(query);
-        const tagMatch = a.metadata?.tags?.some((tag: string) => tag.toLowerCase().includes(query));
+        const descMatch = a.description?.toLowerCase().includes(query);
+        const tagMatch = a.tags?.some((tag: string) => tag.toLowerCase().includes(query));
         return nameMatch || descMatch || tagMatch;
       });
     }
@@ -558,7 +435,7 @@ function CollectionPageContent() {
     // Tag filter
     if (selectedTags.length > 0) {
       artifacts = artifacts.filter((artifact) => {
-        return artifact.metadata?.tags?.some((tag: string) => selectedTags.includes(tag)) ?? false;
+        return artifact.tags?.some((tag: string) => selectedTags.includes(tag)) ?? false;
       });
     }
 
@@ -594,6 +471,7 @@ function CollectionPageContent() {
     infiniteCollectionData,
     infiniteAllArtifactsData,
     currentCollection,
+    filters,
     searchQuery,
     selectedTags,
     sortField,
@@ -611,11 +489,10 @@ function CollectionPageContent() {
       const fullArtifacts: Artifact[] = infiniteAllArtifactsData?.pages
         ? infiniteAllArtifactsData.pages.flatMap((page) => page.items.map(mapApiArtifactToArtifact))
         : [];
-      const collectionInfo = currentCollection
-        ? { id: currentCollection.id, name: currentCollection.name }
-        : undefined;
+      // Use .id (directory name like "default") not .name (display name like "Default Collection")
+      const collectionId = currentCollection?.id;
       allArtifacts = allSummaries.map((summary) =>
-        enrichArtifactSummary(summary, fullArtifacts, collectionInfo)
+        enrichArtifactSummary(summary, fullArtifacts, collectionId)
       );
     } else if (!isSpecificCollection && infiniteAllArtifactsData?.pages) {
       allArtifacts = infiniteAllArtifactsData.pages.flatMap((page) =>
@@ -623,10 +500,10 @@ function CollectionPageContent() {
       );
     }
 
-    // Count tags across all artifacts
+    // Count tags across all artifacts (using flattened tags property)
     const tagCounts = new Map<string, number>();
     allArtifacts.forEach((artifact) => {
-      const tags = artifact.metadata?.tags || [];
+      const tags = artifact.tags || [];
       tags.forEach((tag: string) => {
         tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
       });
@@ -644,14 +521,13 @@ function CollectionPageContent() {
   ]);
 
   const handleArtifactClick = (artifact: Artifact) => {
-    // Artifact is now always a full Artifact object due to enrichment in filteredArtifacts
-    setSelectedEntity(artifactToEntity(artifact));
+    setSelectedArtifact(artifact);
     setIsDetailOpen(true);
   };
 
   const handleDetailClose = () => {
     setIsDetailOpen(false);
-    setTimeout(() => setSelectedEntity(null), 300);
+    setTimeout(() => setSelectedArtifact(null), 300);
   };
 
   const handleSortChange = (field: string, order: 'asc' | 'desc') => {
@@ -839,19 +715,19 @@ function CollectionPageContent() {
         )}
       </div>
 
-      {/* Entity Detail Modal */}
+      {/* Artifact Detail Modal */}
       <UnifiedEntityModal
-        entity={selectedEntity}
+        artifact={selectedArtifact}
         open={isDetailOpen}
         onClose={handleDetailClose}
         onNavigateToSource={(sourceId, artifactPath) => {
           setIsDetailOpen(false);
-          setSelectedEntity(null);
+          setSelectedArtifact(null);
           router.push(`/marketplace/sources/${sourceId}?artifact=${encodeURIComponent(artifactPath)}`);
         }}
         onNavigateToDeployment={(projectPath, artifactId) => {
           setIsDetailOpen(false);
-          setSelectedEntity(null);
+          setSelectedArtifact(null);
           const encodedPath = btoa(projectPath);
           router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
         }}
@@ -880,7 +756,7 @@ function CollectionPageContent() {
             source: artifactToEdit.source,
             version: artifactToEdit.version,
             scope: artifactToEdit.scope,
-            tags: artifactToEdit.metadata?.tags,
+            tags: artifactToEdit.tags,
             aliases: artifactToEdit.aliases,
           }}
           open={showParameterEditor}
@@ -918,7 +794,9 @@ function CollectionPageContent() {
             if (!open) setArtifactForCollection(null);
           }}
           artifacts={[artifactForCollection]}
-          sourceCollectionId={artifactForCollection.collection?.id}
+          sourceCollectionId={
+            artifactForCollection.collections?.[0]?.id || selectedCollectionId || undefined
+          }
           onSuccess={() => refetch()}
         />
       )}

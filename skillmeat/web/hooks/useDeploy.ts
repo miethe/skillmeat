@@ -51,7 +51,7 @@ export function useDeploy(options: UseDeployOptions = {}) {
       const artifactId = `${request.artifactType}:${request.artifactName}`;
 
       // Call backend API
-      const response = await apiRequest<DeployResponse>(`/artifacts/${artifactId}/deploy`, {
+      const response = await apiRequest<DeployResponse>(`/artifacts/${encodeURIComponent(artifactId)}/deploy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -135,7 +135,7 @@ export function useUndeploy(options: UseDeployOptions = {}) {
       }
 
       // Call backend API
-      const response = await apiRequest<DeployResponse>(`/artifacts/${artifactId}/undeploy`, {
+      const response = await apiRequest<DeployResponse>(`/artifacts/${encodeURIComponent(artifactId)}/undeploy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

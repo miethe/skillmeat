@@ -11,9 +11,10 @@ describe('Confidence Sorting', () => {
       name: 'artifact-a',
       type: 'skill',
       scope: 'user',
-      status: 'active',
-      metadata: { title: 'Artifact A', description: '', tags: [] },
-      upstreamStatus: { hasUpstream: false, isOutdated: false },
+      syncStatus: 'synced',
+      description: 'Artifact A',
+      tags: [],
+      upstream: { enabled: false, updateAvailable: false },
       usageStats: { totalDeployments: 0, activeProjects: 0, usageCount: 0 },
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z',
@@ -24,9 +25,10 @@ describe('Confidence Sorting', () => {
       name: 'artifact-b',
       type: 'skill',
       scope: 'user',
-      status: 'active',
-      metadata: { title: 'Artifact B', description: '', tags: [] },
-      upstreamStatus: { hasUpstream: false, isOutdated: false },
+      syncStatus: 'synced',
+      description: 'Artifact B',
+      tags: [],
+      upstream: { enabled: false, updateAvailable: false },
       usageStats: { totalDeployments: 0, activeProjects: 0, usageCount: 0 },
       createdAt: '2024-01-02T00:00:00Z',
       updatedAt: '2024-01-02T00:00:00Z',
@@ -37,9 +39,10 @@ describe('Confidence Sorting', () => {
       name: 'artifact-c',
       type: 'skill',
       scope: 'user',
-      status: 'active',
-      metadata: { title: 'Artifact C', description: '', tags: [] },
-      upstreamStatus: { hasUpstream: false, isOutdated: false },
+      syncStatus: 'synced',
+      description: 'Artifact C',
+      tags: [],
+      upstream: { enabled: false, updateAvailable: false },
       usageStats: { totalDeployments: 0, activeProjects: 0, usageCount: 0 },
       createdAt: '2024-01-03T00:00:00Z',
       updatedAt: '2024-01-03T00:00:00Z',
@@ -50,9 +53,10 @@ describe('Confidence Sorting', () => {
       name: 'artifact-d',
       type: 'skill',
       scope: 'user',
-      status: 'active',
-      metadata: { title: 'Artifact D', description: '', tags: [] },
-      upstreamStatus: { hasUpstream: false, isOutdated: false },
+      syncStatus: 'synced',
+      description: 'Artifact D',
+      tags: [],
+      upstream: { enabled: false, updateAvailable: false },
       usageStats: { totalDeployments: 0, activeProjects: 0, usageCount: 0 },
       createdAt: '2024-01-04T00:00:00Z',
       updatedAt: '2024-01-04T00:00:00Z',
@@ -155,10 +159,10 @@ describe('Confidence Sorting', () => {
       return bUsage - aUsage;
     });
 
-    expect(sorted[0].usageStats.usageCount).toBe(40);
-    expect(sorted[1].usageStats.usageCount).toBe(30);
-    expect(sorted[2].usageStats.usageCount).toBe(20);
-    expect(sorted[3].usageStats.usageCount).toBe(10);
+    expect(sorted[0].usageStats?.usageCount).toBe(40);
+    expect(sorted[1].usageStats?.usageCount).toBe(30);
+    expect(sorted[2].usageStats?.usageCount).toBe(20);
+    expect(sorted[3].usageStats?.usageCount).toBe(10);
   });
 });
 

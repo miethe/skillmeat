@@ -11,7 +11,7 @@
 'use client';
 
 import * as React from 'react';
-import type { Entity } from '@/types/entity';
+import type { Artifact } from '@/types/artifact';
 import { UnifiedCard, UnifiedCardSkeleton } from '@/components/shared/unified-card';
 
 /**
@@ -20,8 +20,8 @@ import { UnifiedCard, UnifiedCardSkeleton } from '@/components/shared/unified-ca
  * Controls the card display, selection state, and action callbacks.
  */
 export interface EntityCardProps {
-  /** The entity to display in the card */
-  entity: Entity;
+  /** The artifact to display in the card (entity is deprecated alias) */
+  entity: Artifact;
   /** Whether the card is currently selected */
   selected?: boolean;
   /** Whether the entity can be selected (shows checkbox) */

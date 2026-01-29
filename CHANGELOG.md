@@ -37,6 +37,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Visual distinction between skills, commands, agents, MCP servers, and hooks
 - Improved card layout with better metadata display
 
+#### Entity-Artifact Type System Consolidation (Phases 1-5, 2026-01-28)
+
+**Type System Unification**
+- Unified `Entity` and `Artifact` types into single `Artifact` type with flattened metadata structure
+- Consolidated 4 API conversion functions into single `mapApiResponseToArtifact()` mapper
+- All entity components now accept unified `Artifact` type (UnifiedCard, UnifiedArtifactModal)
+- Replaced `EntityStatus` with `SyncStatus` enum (added `error` state)
+
+**Component Improvements**
+- Collections tab now properly populated on /manage page modal
+- Source tab appears correctly on /collection page without prior navigation
+- Navigation handlers consistently provided across both pages
+
+**Migration Support**
+- `Entity` type maintained as alias to `Artifact` for backward compatibility (removal planned Q3 2026)
+- All deprecated types include JSDoc deprecation notices with migration instructions
+- Comprehensive migration guide: `.claude/guides/entity-to-artifact-migration.md`
+
+**Technical Details**
+- Deprecated: `Entity` type, `EntityStatus` type, `ENTITY_TYPES` registry, `getEntityTypeConfig()`
+- Replaced with: `Artifact` type, `SyncStatus` enum, `ARTIFACT_TYPES` registry, `getArtifactTypeConfig()`
+- Updated `skillmeat/web/CLAUDE.md` with Type System section documenting consolidation
+
 #### Collections & Groups UX Enhancement (Phases 0-5, 2026-01-20)
 
 **API Contract Alignment (Phase 0)**
@@ -124,6 +147,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rescan button and last sync time visibility improved
 
 ### Changed
+
+#### Entity-Artifact Type System Consolidation (2026-01-28)
+
+- **Type System**: Unified `Entity` and `Artifact` types into single `Artifact` type with flattened metadata structure
+- **API Mapping**: Consolidated 4 conversion functions (`convertEntitiesToArtifacts`, `convertArtifactsToEntities`, etc.) into single `mapApiResponseToArtifact()` mapper
+- **Components**: All entity components now accept unified `Artifact` type instead of separate entity types
+- **Status Enum**: Replaced `EntityStatus` with `SyncStatus` enum (added `error` state)
 
 - `SourceResponse` schema extended with: `repo_description`, `repo_readme`, `tags`, `counts_by_type`
 - `CreateSourceRequest` accepts: `import_repo_description`, `import_repo_readme`, `tags`
@@ -346,6 +376,12 @@ No breaking changes. New fields are optional and have sensible defaults:
 
 ### Fixed
 
+#### Entity-Artifact Type System Consolidation (2026-01-28)
+
+- Collections tab now properly populated on /manage page modal
+- Source tab appears correctly on /collection page without prior navigation
+- Navigation handlers consistently provided across both pages
+
 #### Marketplace Search & Navigation (2026-01-28)
 
 - Fixed artifact modal opening 404 page instead of CatalogEntryModal from search results
@@ -384,6 +420,25 @@ No breaking changes. New fields are optional and have sensible defaults:
 - **API Issues**:
   - Fixed status parameter shadowing in `marketplace_sources.py` (renamed to `status_filter` with alias)
   - Resolved variable shadowing causing 500 errors in exception handlers
+
+### Deprecated
+
+#### Entity-Artifact Type System Consolidation (2026-01-28)
+
+- `Entity` type (alias to `Artifact`) - use `Artifact` instead, removal planned Q3 2026
+- `EntityStatus` type - use `SyncStatus` instead
+- `ENTITY_TYPES` registry - use `ARTIFACT_TYPES` instead
+- `getEntityTypeConfig()` - use `getArtifactTypeConfig()` instead
+
+**Migration Path**: All deprecated types include JSDoc deprecation notices with migration instructions. See `.claude/guides/entity-to-artifact-migration.md` for complete migration guide.
+
+### Documentation
+
+#### Entity-Artifact Type System Consolidation (2026-01-28)
+
+- Added migration guide: `.claude/guides/entity-to-artifact-migration.md`
+- Updated `skillmeat/web/CLAUDE.md` with Type System section
+- All deprecated types include JSDoc deprecation notices with migration instructions
 
 ### Technical Details
 

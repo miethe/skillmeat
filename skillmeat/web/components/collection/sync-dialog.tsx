@@ -135,15 +135,15 @@ export function SyncDialog({ artifact, isOpen, onClose, onSuccess }: SyncDialogP
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Current Version</span>
                   <code className="rounded bg-muted px-2 py-1 text-xs">
-                    {artifact.upstreamStatus.currentVersion || artifact.version || 'N/A'}
+                    {artifact.version || 'N/A'}
                   </code>
                 </div>
-                {artifact.upstreamStatus.hasUpstream && (
+                {artifact.upstream?.enabled && (
                   <>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Upstream Version</span>
                       <code className="rounded bg-muted px-2 py-1 text-xs">
-                        {artifact.upstreamStatus.upstreamVersion || 'Unknown'}
+                        {artifact.upstream.version || 'Unknown'}
                       </code>
                     </div>
                     <div className="flex items-center justify-between text-sm">
@@ -157,7 +157,7 @@ export function SyncDialog({ artifact, isOpen, onClose, onSuccess }: SyncDialogP
               </div>
 
               {/* Update Status */}
-              {artifact.upstreamStatus.isOutdated ? (
+              {artifact.upstream?.updateAvailable ? (
                 <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3">
                   <div className="flex items-start gap-2">
                     <TrendingUp className="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-600" />
@@ -189,7 +189,7 @@ export function SyncDialog({ artifact, isOpen, onClose, onSuccess }: SyncDialogP
               )}
 
               {/* Warning for local modifications */}
-              {artifact.status === 'conflict' && (
+              {artifact.syncStatus === 'conflict' && (
                 <div className="rounded-lg border border-orange-500/50 bg-orange-500/10 p-3">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-orange-600" />
@@ -239,7 +239,7 @@ export function SyncDialog({ artifact, isOpen, onClose, onSuccess }: SyncDialogP
             </Button>
             <Button
               onClick={() => handleSync()}
-              disabled={syncMutation.isPending || !artifact.upstreamStatus.hasUpstream}
+              disabled={syncMutation.isPending || !artifact.upstream?.enabled}
             >
               {syncMutation.isPending ? 'Syncing...' : 'Sync Now'}
             </Button>

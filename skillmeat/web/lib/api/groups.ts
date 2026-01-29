@@ -110,7 +110,7 @@ export async function addArtifactToGroup(
  * Remove artifact from group
  */
 export async function removeArtifactFromGroup(groupId: string, artifactId: string): Promise<void> {
-  const response = await fetch(buildUrl(`/groups/${groupId}/artifacts/${artifactId}`), {
+  const response = await fetch(buildUrl(`/groups/${encodeURIComponent(groupId)}/artifacts/${encodeURIComponent(artifactId)}`), {
     method: 'DELETE',
   });
   if (!response.ok) {
@@ -151,7 +151,7 @@ export async function moveArtifactToGroup(
   targetGroupId: string,
   position?: number
 ): Promise<GroupArtifact> {
-  const response = await fetch(buildUrl(`/groups/${sourceGroupId}/artifacts/${artifactId}/move`), {
+  const response = await fetch(buildUrl(`/groups/${encodeURIComponent(sourceGroupId)}/artifacts/${encodeURIComponent(artifactId)}/move`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ target_group_id: targetGroupId, position }),

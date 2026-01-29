@@ -8,13 +8,7 @@ import {
   Server,
   Webhook,
   AlertCircle,
-  MoreHorizontal,
-  FolderPlus,
-  Layers,
-  Edit,
-  Trash2,
   HelpCircle,
-  Rocket,
 } from 'lucide-react';
 import {
   Table,
@@ -27,14 +21,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -45,6 +31,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { DeployDialog } from '@/components/collection/deploy-dialog';
+import { UnifiedCardActions } from '@/components/shared/unified-card-actions';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 
 interface ArtifactListProps {
@@ -109,67 +96,6 @@ const statusColors: Record<string, string> = {
   error: 'bg-red-500/10 text-red-600 border-red-500/20',
 };
 
-interface ArtifactRowActionsProps {
-  artifact: Artifact;
-  collectionId?: string;
-  onMoveToCollection?: () => void;
-  onManageGroups?: () => void;
-  onEdit?: () => void;
-  onDelete?: () => void;
-  onDeploy?: () => void;
-}
-
-function ArtifactRowActions({
-  artifact,
-  collectionId,
-  onMoveToCollection,
-  onManageGroups,
-  onEdit,
-  onDelete,
-  onDeploy,
-}: ArtifactRowActionsProps) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={(e) => e.stopPropagation()}
-          aria-label={`Actions for ${artifact.name}`}
-        >
-          <MoreHorizontal className="h-4 w-4" />
-          <span className="sr-only">Open menu</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-        <DropdownMenuItem onClick={onDeploy}>
-          <Rocket className="mr-2 h-4 w-4" />
-          Deploy to Project
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onMoveToCollection}>
-          <FolderPlus className="mr-2 h-4 w-4" />
-          {collectionId ? 'Move to Collection' : 'Add to Collection'}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onManageGroups}>
-          <Layers className="mr-2 h-4 w-4" />
-          Add to Group
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onEdit}>
-          <Edit className="mr-2 h-4 w-4" />
-          Edit
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
-          <Trash2 className="mr-2 h-4 w-4" />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
 
 function ArtifactListSkeleton({ showCollectionColumn }: { showCollectionColumn?: boolean }) {
   return (
@@ -334,8 +260,8 @@ export function ArtifactList({
                   <TableCell>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 font-medium">
-                        {artifact.metadata?.title || artifact.name}
-                        {artifact.upstreamStatus.isOutdated && (
+                        {artifact.name}
+                        {artifact.upstream?.updateAvailable && (
                           <AlertCircle
                             className="h-3 w-3 text-yellow-600"
                             data-testid="outdated-indicator"
@@ -343,7 +269,7 @@ export function ArtifactList({
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {artifact.metadata?.description || artifact.name}
+                        {artifact.description || artifact.name}
                       </div>
                     </div>
                   </TableCell>
@@ -355,10 +281,10 @@ export function ArtifactList({
                           className="cursor-pointer hover:bg-accent"
                           onClick={(e) => {
                             e.stopPropagation();
-                            artifact.collection?.id && onCollectionClick?.(artifact.collection.id);
+                            artifact.collection && onCollectionClick?.(artifact.collection);
                           }}
                         >
-                          {artifact.collection?.name}
+                          {artifact.collection}
                         </Badge>
                       ) : (
                         <span className="text-xs text-muted-foreground">-</span>
@@ -373,11 +299,11 @@ export function ArtifactList({
                   </TableCell>
                   <TableCell>
                     <Badge
-                      className={statusColors[artifact.status]}
+                      className={statusColors[artifact.syncStatus]}
                       variant="outline"
                       data-testid="status-badge"
                     >
-                      {artifact.status}
+                      {artifact.syncStatus}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -391,7 +317,7 @@ export function ArtifactList({
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    <div className="text-sm">{artifact.usageStats.totalDeployments}</div>
+                    <div className="text-sm">{artifact.usageStats?.totalDeployments ?? 0}</div>
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
                     <div className="text-sm text-muted-foreground">
@@ -399,14 +325,14 @@ export function ArtifactList({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <ArtifactRowActions
+                    <UnifiedCardActions
                       artifact={artifact}
-                      collectionId={artifact.collection?.id}
+                      alwaysVisible={true}
                       onDeploy={() => handleDeploy(artifact)}
                       onMoveToCollection={
                         onMoveToCollection ? () => onMoveToCollection(artifact) : undefined
                       }
-                      onManageGroups={onManageGroups ? () => onManageGroups(artifact) : undefined}
+                      onAddToGroup={onManageGroups ? () => onManageGroups(artifact) : undefined}
                       onEdit={onEdit ? () => onEdit(artifact) : undefined}
                       onDelete={handleDelete ? () => handleDelete(artifact) : undefined}
                     />

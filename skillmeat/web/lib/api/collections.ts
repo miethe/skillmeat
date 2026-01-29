@@ -127,7 +127,7 @@ export async function removeArtifactFromCollection(
   artifactId: string
 ): Promise<void> {
   const response = await fetch(
-    buildUrl(`/user-collections/${collectionId}/artifacts/${artifactId}`),
+    buildUrl(`/user-collections/${encodeURIComponent(collectionId)}/artifacts/${encodeURIComponent(artifactId)}`),
     {
       method: 'DELETE',
     }

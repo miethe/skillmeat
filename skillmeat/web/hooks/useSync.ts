@@ -56,7 +56,7 @@ export function useSync(options: UseSyncOptions = {}) {
 
   return useMutation({
     mutationFn: async (request: SyncRequest): Promise<SyncResponse> => {
-      const response = await fetch(`/api/v1/artifacts/${request.artifactId}/sync`, {
+      const response = await fetch(`/api/v1/artifacts/${encodeURIComponent(request.artifactId)}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -10,7 +10,7 @@
 import * as React from 'react';
 import { FileQuestion } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import type { Entity } from '@/types/entity';
+import type { Artifact } from '@/types/artifact';
 import { EntityCard, EntityCardSkeleton } from './entity-card';
 import { EntityRow } from './entity-row';
 import { useEntityLifecycle } from '@/hooks';
@@ -25,24 +25,24 @@ const { useCallback } = React;
 export interface EntityListProps {
   /** Display mode: "grid" for card layout, "list" for table layout */
   viewMode: 'grid' | 'list';
-  /** Optional array of entities to display. If not provided, uses context. */
-  entities?: Entity[];
-  /** Callback when an entity is clicked (outside of action menu) */
-  onEntityClick?: (entity: Entity) => void;
-  /** Whether entities can be selected via checkbox */
+  /** Optional array of artifacts to display. If not provided, uses context. */
+  entities?: Artifact[];
+  /** Callback when an artifact is clicked (outside of action menu) */
+  onEntityClick?: (artifact: Artifact) => void;
+  /** Whether artifacts can be selected via checkbox */
   selectable?: boolean;
-  /** Callback for edit action on entity */
-  onEdit?: (entity: Entity) => void;
-  /** Callback for delete action on entity */
-  onDelete?: (entity: Entity) => void;
-  /** Callback for deploy action on entity */
-  onDeploy?: (entity: Entity) => void;
-  /** Callback for sync action on entity */
-  onSync?: (entity: Entity) => void;
-  /** Callback to view diff for entity */
-  onViewDiff?: (entity: Entity) => void;
-  /** Callback to rollback entity */
-  onRollback?: (entity: Entity) => void;
+  /** Callback for edit action on artifact */
+  onEdit?: (artifact: Artifact) => void;
+  /** Callback for delete action on artifact */
+  onDelete?: (artifact: Artifact) => void;
+  /** Callback for deploy action on artifact */
+  onDeploy?: (artifact: Artifact) => void;
+  /** Callback for sync action on artifact */
+  onSync?: (artifact: Artifact) => void;
+  /** Callback to view diff for artifact */
+  onViewDiff?: (artifact: Artifact) => void;
+  /** Callback to rollback artifact */
+  onRollback?: (artifact: Artifact) => void;
 }
 
 /**
@@ -87,18 +87,18 @@ export function EntityList({
 
   // Memoize handlers to prevent EntityCard/EntityRow re-renders
   const handleEntityClick = useCallback(
-    (entity: Entity) => {
-      onEntityClick?.(entity);
+    (artifact: Artifact) => {
+      onEntityClick?.(artifact);
     },
     [onEntityClick]
   );
 
   const handleSelect = useCallback(
-    (entity: Entity, selected: boolean) => {
+    (artifact: Artifact, selected: boolean) => {
       if (selected) {
-        selectEntity(entity.id);
+        selectEntity(artifact.id);
       } else {
-        deselectEntity(entity.id);
+        deselectEntity(artifact.id);
       }
     },
     [selectEntity, deselectEntity]
@@ -107,21 +107,21 @@ export function EntityList({
   // ALL useCallback hooks must be defined BEFORE any early returns
   // to comply with React's Rules of Hooks (same order on every render)
   const renderEntityCard = useCallback(
-    (entity: Entity) => {
+    (artifact: Artifact) => {
       return (
         <EntityCard
-          key={entity.id}
-          entity={entity}
-          selected={selectedEntities.includes(entity.id)}
+          key={artifact.id}
+          entity={artifact}
+          selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}
-          onSelect={(selected) => handleSelect(entity, selected)}
-          onClick={() => handleEntityClick(entity)}
-          onEdit={onEdit ? () => onEdit(entity) : undefined}
-          onDelete={onDelete ? () => onDelete(entity) : undefined}
-          onDeploy={onDeploy ? () => onDeploy(entity) : undefined}
-          onSync={onSync ? () => onSync(entity) : undefined}
-          onViewDiff={onViewDiff ? () => onViewDiff(entity) : undefined}
-          onRollback={onRollback ? () => onRollback(entity) : undefined}
+          onSelect={(selected) => handleSelect(artifact, selected)}
+          onClick={() => handleEntityClick(artifact)}
+          onEdit={onEdit ? () => onEdit(artifact) : undefined}
+          onDelete={onDelete ? () => onDelete(artifact) : undefined}
+          onDeploy={onDeploy ? () => onDeploy(artifact) : undefined}
+          onSync={onSync ? () => onSync(artifact) : undefined}
+          onViewDiff={onViewDiff ? () => onViewDiff(artifact) : undefined}
+          onRollback={onRollback ? () => onRollback(artifact) : undefined}
         />
       );
     },
@@ -140,21 +140,21 @@ export function EntityList({
   );
 
   const renderEntityRow = useCallback(
-    (entity: Entity) => {
+    (artifact: Artifact) => {
       return (
         <EntityRow
-          key={entity.id}
-          entity={entity}
-          selected={selectedEntities.includes(entity.id)}
+          key={artifact.id}
+          entity={artifact}
+          selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}
-          onSelect={(selected) => handleSelect(entity, selected)}
-          onClick={() => handleEntityClick(entity)}
-          onEdit={onEdit ? () => onEdit(entity) : undefined}
-          onDelete={onDelete ? () => onDelete(entity) : undefined}
-          onDeploy={onDeploy ? () => onDeploy(entity) : undefined}
-          onSync={onSync ? () => onSync(entity) : undefined}
-          onViewDiff={onViewDiff ? () => onViewDiff(entity) : undefined}
-          onRollback={onRollback ? () => onRollback(entity) : undefined}
+          onSelect={(selected) => handleSelect(artifact, selected)}
+          onClick={() => handleEntityClick(artifact)}
+          onEdit={onEdit ? () => onEdit(artifact) : undefined}
+          onDelete={onDelete ? () => onDelete(artifact) : undefined}
+          onDeploy={onDeploy ? () => onDeploy(artifact) : undefined}
+          onSync={onSync ? () => onSync(artifact) : undefined}
+          onViewDiff={onViewDiff ? () => onViewDiff(artifact) : undefined}
+          onRollback={onRollback ? () => onRollback(artifact) : undefined}
         />
       );
     },

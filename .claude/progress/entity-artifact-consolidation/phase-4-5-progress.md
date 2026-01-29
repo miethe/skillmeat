@@ -1,141 +1,184 @@
 ---
 type: progress
-prd: "entity-artifact-consolidation"
-phase: "4-5"
-status: pending
-progress: 0
-last_updated: "2026-01-28"
-
+prd: entity-artifact-consolidation
+phase: 4-5
+status: completed
+progress: 100
+last_updated: '2026-01-28'
 tasks:
-  # Phase 4: Component Type Unification
-  - id: "P4-T1"
-    name: "Update UnifiedEntityModal props"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P3-T6"]
-    model: "opus"
-    effort: 2
-    files: ["skillmeat/web/components/entity/unified-entity-modal.tsx"]
-
-  - id: "P4-T2"
-    name: "Update modal tab components"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4-T1"]
-    model: "opus"
-    effort: 3
-    files: ["skillmeat/web/components/entity/modal-collections-tab.tsx", "skillmeat/web/components/entity/modal-sources-tab.tsx", "skillmeat/web/components/entity/modal-upstream-tab.tsx", "skillmeat/web/components/entity/modal-basic-info-tab.tsx"]
-
-  - id: "P4-T3"
-    name: "Update entity form component"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4-T1"]
-    model: "opus"
-    effort: 2
-    files: ["skillmeat/web/components/entity/entity-form.tsx"]
-
-  - id: "P4-T4"
-    name: "Refactor /collection page"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4-T2"]
-    model: "opus"
-    effort: 2
-    files: ["skillmeat/web/app/collection/page.tsx"]
-
-  - id: "P4-T5"
-    name: "Refactor /manage page"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4-T2", "P4-T3"]
-    model: "opus"
-    effort: 2
-    files: ["skillmeat/web/app/manage/page.tsx"]
-
-  - id: "P4-T6"
-    name: "Update additional components"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4-T1"]
-    model: "opus"
-    effort: 3
-    files: ["skillmeat/web/components/entity/*.tsx", "skillmeat/web/components/sync-status/*.tsx"]
-
-  - id: "P4-T7"
-    name: "Component integration testing"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4-T4", "P4-T5", "P4-T6"]
-    model: "opus"
-    effort: 3
-    files: []
-
-  # Phase 5: Deprecation & Cleanup
-  - id: "P5-T1"
-    name: "Add deprecation notices"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["P4-T7"]
-    model: "haiku"
-    effort: 1
-    files: ["skillmeat/web/types/entity.ts"]
-
-  - id: "P5-T2"
-    name: "Create migration guide"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["P5-T1"]
-    model: "sonnet"
-    effort: 2
-    files: [".claude/guides/entity-to-artifact-migration.md"]
-
-  - id: "P5-T3"
-    name: "Update architecture documentation"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["P5-T1"]
-    model: "sonnet"
-    effort: 2
-    files: ["skillmeat/web/CLAUDE.md", ".claude/context/key-context/component-patterns.md"]
-
-  - id: "P5-T4"
-    name: "Code audit and cleanup"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["P5-T2", "P5-T3"]
-    model: "haiku"
-    effort: 1
-    files: []
-
-  - id: "P5-T5"
-    name: "Final validation and sign-off"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["P5-T4"]
-    model: "opus"
-    effort: 2
-    files: []
-
+- id: P4-T1
+  name: Update UnifiedEntityModal props
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P3-T6
+  model: opus
+  effort: 2
+  files:
+  - skillmeat/web/components/entity/unified-entity-modal.tsx
+- id: P4-T2
+  name: Update modal tab components
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4-T1
+  model: opus
+  effort: 3
+  files:
+  - skillmeat/web/components/entity/modal-collections-tab.tsx
+  - skillmeat/web/components/entity/modal-sources-tab.tsx
+  - skillmeat/web/components/entity/modal-upstream-tab.tsx
+  - skillmeat/web/components/entity/modal-basic-info-tab.tsx
+- id: P4-T3
+  name: Update entity form component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4-T1
+  model: opus
+  effort: 2
+  files:
+  - skillmeat/web/components/entity/entity-form.tsx
+- id: P4-T4
+  name: Refactor /collection page
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4-T2
+  model: opus
+  effort: 2
+  files:
+  - skillmeat/web/app/collection/page.tsx
+- id: P4-T5
+  name: Refactor /manage page
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4-T2
+  - P4-T3
+  model: opus
+  effort: 2
+  files:
+  - skillmeat/web/app/manage/page.tsx
+- id: P4-T6
+  name: Update additional components
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4-T1
+  model: opus
+  effort: 3
+  files:
+  - skillmeat/web/components/entity/*.tsx
+  - skillmeat/web/components/sync-status/*.tsx
+- id: P4-T7
+  name: Component integration testing
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4-T4
+  - P4-T5
+  - P4-T6
+  model: opus
+  effort: 3
+  files: []
+- id: P5-T1
+  name: Add deprecation notices
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - P4-T7
+  model: haiku
+  effort: 1
+  files:
+  - skillmeat/web/types/entity.ts
+- id: P5-T2
+  name: Create migration guide
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - P5-T1
+  model: sonnet
+  effort: 2
+  files:
+  - .claude/guides/entity-to-artifact-migration.md
+- id: P5-T3
+  name: Update architecture documentation
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - P5-T1
+  model: sonnet
+  effort: 2
+  files:
+  - skillmeat/web/CLAUDE.md
+  - .claude/context/key-context/component-patterns.md
+- id: P5-T4
+  name: Code audit and cleanup
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - P5-T2
+  - P5-T3
+  model: haiku
+  effort: 1
+  files: []
+- id: P5-T5
+  name: Final validation and sign-off
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - P5-T4
+  model: opus
+  effort: 2
+  files: []
 parallelization:
-  batch_1: ["P4-T1"]
-  batch_2: ["P4-T2", "P4-T3"]
-  batch_3: ["P4-T4", "P4-T5", "P4-T6"]
-  batch_4: ["P4-T7"]
-  batch_5: ["P5-T1"]
-  batch_6: ["P5-T2", "P5-T3"]
-  batch_7: ["P5-T4"]
-  batch_8: ["P5-T5"]
-
+  batch_1:
+  - P4-T1
+  batch_2:
+  - P4-T2
+  - P4-T3
+  batch_3:
+  - P4-T4
+  - P4-T5
+  - P4-T6
+  batch_4:
+  - P4-T7
+  batch_5:
+  - P5-T1
+  batch_6:
+  - P5-T2
+  - P5-T3
+  batch_7:
+  - P5-T4
+  batch_8:
+  - P5-T5
 quality_gates:
-  - "All components accept Artifact type"
-  - "Modal displays complete data from both pages"
-  - "Form CRUD operations work with new type"
-  - "Component tests >80% coverage"
-  - "No visual regressions"
-  - "Migration guide published"
-  - "Deprecation notices in place"
-  - "Code review approval"
+- All components accept Artifact type
+- Modal displays complete data from both pages
+- Form CRUD operations work with new type
+- Component tests >80% coverage
+- No visual regressions
+- Migration guide published
+- Deprecation notices in place
+- Code review approval
+total_tasks: 12
+completed_tasks: 12
+in_progress_tasks: 0
+blocked_tasks: 0
+updated: '2026-01-28'
 ---
 
 # Phase 4-5: Component Unification & Deprecation

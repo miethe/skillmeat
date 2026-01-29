@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import type { ArtifactDeploymentInfo, ArtifactSyncStatus } from '@/types/deployments';
 import type { ArtifactType } from '@/types/artifact';
 import type { ProjectSummary } from '@/types/project';
-import { getEntityTypeConfig } from '@/types/entity';
+import { getArtifactTypeConfig } from '@/types/artifact';
 import { DeploymentActions } from './deployment-actions';
 
 /**
@@ -131,7 +131,7 @@ export function DeploymentCard({
   onViewDiff,
 }: DeploymentCardProps) {
   void _projectPath; // Reserved for future use
-  const config = getEntityTypeConfig(deployment.artifact_type as ArtifactType);
+  const config = getArtifactTypeConfig(deployment.artifact_type as ArtifactType);
 
   // Find which project this deployment belongs to
   const projectMatch = useMemo(() => {
