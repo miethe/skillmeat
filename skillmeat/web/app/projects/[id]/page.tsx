@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { EntityLifecycleProvider } from '@/components/entity/EntityLifecycleProvider';
-import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
+import { ProjectArtifactModal } from '@/components/shared/ProjectArtifactModal';
 import { useProject, useArtifacts, useProjectDiscovery, useToast } from '@/hooks';
 import { DiscoveryBanner } from '@/components/discovery/DiscoveryBanner';
 import { DiscoveryTab } from '@/components/discovery/DiscoveryTab';
@@ -550,22 +550,11 @@ function ProjectDetailPageContent() {
         </Tabs>
 
         {/* Entity Detail Modal - Project Mode */}
-        <UnifiedEntityModal
-          entity={selectedEntity}
+        <ProjectArtifactModal
+          artifact={selectedEntity}
           open={isDetailOpen}
           onClose={handleDetailClose}
-          onNavigateToSource={(sourceId, artifactPath) => {
-            setIsDetailOpen(false);
-            setSelectedEntity(null);
-            router.push(`/marketplace/sources/${sourceId}?artifact=${encodeURIComponent(artifactPath)}`);
-          }}
-          onNavigateToDeployment={(projectPath, artifactId) => {
-            // When already on project page, close modal and navigate to manage page
-            setIsDetailOpen(false);
-            setSelectedEntity(null);
-            const encodedPath = btoa(projectPath);
-            router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
-          }}
+          currentProjectPath={project?.path}
         />
 
         {/* Bulk Import Modal - only show new artifacts (not already in collection) */}
