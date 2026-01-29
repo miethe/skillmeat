@@ -54,7 +54,7 @@ interface LegacyArtifact {
     confidence?: number;
   };
 }
-import { EntityActions } from '@/components/entity/entity-actions';
+import { UnifiedCardActions } from './unified-card-actions';
 import type { ArtifactDiffResponse } from '@/sdk';
 import { ScoreBadge, ScoreBadgeSkeleton } from '@/components/ScoreBadge';
 import { CollectionBadgeStack, type CollectionInfo } from './collection-badge-stack';
@@ -449,8 +449,8 @@ export const UnifiedCard = React.memo(
                 </Badge>
               )}
               {isEntity(item) && (
-                <EntityActions
-                  entity={item}
+                <UnifiedCardActions
+                  artifact={item}
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onDeploy={onDeploy}

@@ -14,7 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import type { Artifact } from '@/types/artifact';
 import { getArtifactTypeConfig } from '@/types/artifact';
-import { EntityActions } from './entity-actions';
+import { UnifiedCardActions } from '@/components/shared/unified-card-actions';
 
 /**
  * Props for EntityRow component
@@ -201,8 +201,9 @@ export const EntityRow = React.memo(
 
         {/* Actions */}
         <div className="flex-shrink-0">
-          <EntityActions
-            entity={entity}
+          <UnifiedCardActions
+            artifact={entity}
+            alwaysVisible={true}
             onEdit={onEdit}
             onDelete={onDelete}
             onDeploy={onDeploy}

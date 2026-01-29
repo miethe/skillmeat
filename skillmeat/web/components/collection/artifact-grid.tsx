@@ -1,18 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Package, MoreHorizontal, FolderPlus, Layers, Edit, Trash2, Rocket } from 'lucide-react';
+import { Package } from 'lucide-react';
 import type { Artifact } from '@/types/artifact';
 import { UnifiedCard, UnifiedCardSkeleton } from '@/components/shared/unified-card';
+import { UnifiedCardActions } from '@/components/shared/unified-card-actions';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,68 +28,6 @@ interface ArtifactGridProps {
   onManageGroups?: (artifact: Artifact) => void;
   onEdit?: (artifact: Artifact) => void;
   onDelete?: (artifact: Artifact) => void;
-}
-
-interface ArtifactCardActionsProps {
-  artifact: Artifact;
-  collectionId?: string;
-  onMoveToCollection?: () => void;
-  onManageGroups?: () => void;
-  onEdit?: () => void;
-  onDelete?: () => void;
-  onDeploy?: () => void;
-}
-
-function ArtifactCardActions({
-  artifact,
-  collectionId,
-  onMoveToCollection,
-  onManageGroups,
-  onEdit,
-  onDelete,
-  onDeploy,
-}: ArtifactCardActionsProps) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="touch:opacity-100 h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100 md:opacity-0"
-          onClick={(e) => e.stopPropagation()}
-          aria-label={`Actions for ${artifact.name}`}
-        >
-          <MoreHorizontal className="h-4 w-4" />
-          <span className="sr-only">Open menu</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-        <DropdownMenuItem onClick={onDeploy}>
-          <Rocket className="mr-2 h-4 w-4" />
-          Deploy to Project
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onMoveToCollection}>
-          <FolderPlus className="mr-2 h-4 w-4" />
-          {collectionId ? 'Move to Collection' : 'Add to Collection'}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onManageGroups}>
-          <Layers className="mr-2 h-4 w-4" />
-          Add to Group
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onEdit}>
-          <Edit className="mr-2 h-4 w-4" />
-          Edit
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
-          <Trash2 className="mr-2 h-4 w-4" />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
 }
 
 function ArtifactCard({
@@ -146,12 +77,11 @@ function ArtifactCard({
             : 'absolute right-2 top-2'
         }
       >
-        <ArtifactCardActions
+        <UnifiedCardActions
           artifact={artifact}
-          collectionId={artifact.collection}
           onDeploy={onDeploy}
           onMoveToCollection={onMoveToCollection}
-          onManageGroups={onManageGroups}
+          onAddToGroup={onManageGroups}
           onEdit={onEdit}
           onDelete={onDelete}
         />

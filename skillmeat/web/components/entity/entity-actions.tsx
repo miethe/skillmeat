@@ -3,12 +3,16 @@
  *
  * Dropdown menu with entity lifecycle actions (edit, delete, deploy, sync, view diff).
  * Handles confirmation dialogs for destructive operations.
+ *
+ * @deprecated Use UnifiedCardActions from '@/components/shared/unified-card-actions' for new code.
+ * This component is maintained for backward compatibility and adds dialog handling for
+ * delete and rollback operations.
  */
 
 'use client';
 
 import * as React from 'react';
-import { MoreVertical, Pencil, Trash2, Rocket, RefreshCw, FileText, RotateCcw } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, Rocket, RefreshCw, FileText, RotateCcw } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { RollbackDialog } from './rollback-dialog';
 import { ArtifactDeletionDialog } from './artifact-deletion-dialog';
 import type { Artifact } from '@/types/artifact';
@@ -29,6 +34,10 @@ import type { Artifact } from '@/types/artifact';
 export interface EntityActionsProps {
   /** The artifact this action menu is for (entity is deprecated alias) */
   entity: Artifact;
+  /** Additional CSS classes for the trigger button */
+  className?: string;
+  /** Whether to always show the button (default: hidden until hover) */
+  alwaysVisible?: boolean;
   /** Callback for edit action */
   onEdit?: () => void;
   /** Callback for delete action - shows confirmation dialog */
@@ -57,6 +66,11 @@ export interface EntityActionsProps {
  *
  * Includes confirmation dialogs for destructive operations (delete, rollback).
  *
+ * Features:
+ * - Meatballs icon (MoreHorizontal) for modern UI consistency
+ * - Hover visibility: hidden by default, shown on hover/touch
+ * - Integrated confirmation dialogs for delete and rollback
+ *
  * @example
  * ```tsx
  * <EntityActions
@@ -73,6 +87,8 @@ export interface EntityActionsProps {
  */
 export function EntityActions({
   entity,
+  className,
+  alwaysVisible = false,
   onEdit,
   onDelete,
   onDeploy,
@@ -91,23 +107,42 @@ export function EntityActions({
   const showViewDiff = entity.syncStatus === 'modified' && onViewDiff;
   const showRollback = (entity.syncStatus === 'modified' || entity.syncStatus === 'conflict') && onRollback;
 
+  // Determine which actions are available to show
+  const hasPrimaryActions = onDeploy || onSync;
+  const hasEditAction = onEdit;
+  const hasStatusActions = showViewDiff || showRollback;
+  const hasDeleteAction = onDelete;
+  const hasAnyAction = hasPrimaryActions || hasEditAction || hasStatusActions || hasDeleteAction;
+
+  // Don't render if no actions
+  if (!hasAnyAction) {
+    return null;
+  }
+
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <MoreVertical className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'h-8 w-8 transition-opacity',
+              // Hover visibility: hidden by default on desktop, always visible on touch
+              !alwaysVisible && 'opacity-0 group-hover:opacity-100 md:opacity-0',
+              // Touch devices should always show
+              !alwaysVisible && 'touch:opacity-100',
+              className
+            )}
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Actions for ${entity.name}`}
+          >
+            <MoreHorizontal className="h-4 w-4" />
             <span className="sr-only">Open menu</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {onEdit && (
-            <DropdownMenuItem onClick={onEdit}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit
-            </DropdownMenuItem>
-          )}
-
+        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+          {/* Primary actions: Deploy, Sync */}
           {onDeploy && (
             <DropdownMenuItem onClick={onDeploy}>
               <Rocket className="mr-2 h-4 w-4" />
@@ -122,6 +157,20 @@ export function EntityActions({
             </DropdownMenuItem>
           )}
 
+          {/* Separator after primary actions */}
+          {hasPrimaryActions && (hasEditAction || hasStatusActions || hasDeleteAction) && (
+            <DropdownMenuSeparator />
+          )}
+
+          {/* Edit action */}
+          {onEdit && (
+            <DropdownMenuItem onClick={onEdit}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </DropdownMenuItem>
+          )}
+
+          {/* Status-dependent actions: View Diff, Rollback */}
           {showViewDiff && (
             <DropdownMenuItem onClick={onViewDiff}>
               <FileText className="mr-2 h-4 w-4" />
@@ -136,17 +185,20 @@ export function EntityActions({
             </DropdownMenuItem>
           )}
 
+          {/* Separator before delete */}
+          {hasDeleteAction && (hasPrimaryActions || hasEditAction || hasStatusActions) && (
+            <DropdownMenuSeparator />
+          )}
+
+          {/* Delete action (destructive) */}
           {onDelete && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => setShowDeletionDialog(true)}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </>
+            <DropdownMenuItem
+              onClick={() => setShowDeletionDialog(true)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
