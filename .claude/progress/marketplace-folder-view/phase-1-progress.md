@@ -1,160 +1,192 @@
 ---
 type: progress
-prd: "marketplace-folder-view"
+prd: marketplace-folder-view
 phase: 1
-title: "Two-Pane Layout & Semantic Tree"
-status: not_started
+title: Two-Pane Layout & Semantic Tree
+status: pending
 started: null
 completed: null
-
-progress: 0
-completion_estimate: "on-track"
-
+progress: 70
+completion_estimate: on-track
 total_tasks: 10
-completed_tasks: 0
+completed_tasks: 7
 in_progress_tasks: 0
 blocked_tasks: 0
-
-owners: ["ui-engineer-enhanced", "frontend-developer"]
+owners:
+- ui-engineer-enhanced
+- frontend-developer
 contributors: []
-
 blockers: []
-
 success_criteria:
-  - id: "SC-1.1"
-    description: "Tree builder + semantic filtering utilities tested (>80% coverage)"
-    status: pending
-  - id: "SC-1.2"
-    description: "Two-pane layout renders correctly with proper proportions (25% left, 75% right)"
-    status: pending
-  - id: "SC-1.3"
-    description: "Semantic tree displays only intermediate folders (roots/leafs excluded)"
-    status: pending
-  - id: "SC-1.4"
-    description: "Folder view button appears in toolbar and toggles layout correctly"
-    status: pending
-  - id: "SC-1.5"
-    description: "First folder auto-selects on folder view toggle; right pane populates"
-    status: pending
-  - id: "SC-1.6"
-    description: "Folder selection works; tree node selection state visual feedback"
-    status: pending
-  - id: "SC-1.7"
-    description: "No console errors; malformed paths handled gracefully"
-    status: pending
-  - id: "SC-1.8"
-    description: "Performance baseline: tree renders for 500 items in <300ms"
-    status: pending
-  - id: "SC-1.9"
-    description: "Mixed-content folders show direct count badge (N) and total count on hover [M]"
-    status: pending
-
+- id: SC-1.1
+  description: Tree builder + semantic filtering utilities tested (>80% coverage)
+  status: pending
+- id: SC-1.2
+  description: Two-pane layout renders correctly with proper proportions (25% left,
+    75% right)
+  status: pending
+- id: SC-1.3
+  description: Semantic tree displays only intermediate folders (roots/leafs excluded)
+  status: pending
+- id: SC-1.4
+  description: Folder view button appears in toolbar and toggles layout correctly
+  status: pending
+- id: SC-1.5
+  description: First folder auto-selects on folder view toggle; right pane populates
+  status: pending
+- id: SC-1.6
+  description: Folder selection works; tree node selection state visual feedback
+  status: pending
+- id: SC-1.7
+  description: No console errors; malformed paths handled gracefully
+  status: pending
+- id: SC-1.8
+  description: 'Performance baseline: tree renders for 500 items in <300ms'
+  status: pending
+- id: SC-1.9
+  description: Mixed-content folders show direct count badge (N) and total count on
+    hover [M]
+  status: pending
 tasks:
-  - id: "MFV-1.1"
-    title: "Tree builder utilities"
-    status: pending
-    assigned_to: ["frontend-developer"]
-    model: sonnet
-    effort: 3
-    priority: critical
-    dependencies: []
-    description: "Create buildFolderTree() function to convert flat CatalogEntry[] to nested tree structure with maxDepth parameter; includes directArtifacts vs children separation, directCount, totalArtifactCount, hasSubfolders, hasDirectArtifacts flags"
-
-  - id: "MFV-1.2"
-    title: "Semantic filtering utilities"
-    status: pending
-    assigned_to: ["frontend-developer"]
-    model: sonnet
-    effort: 2
-    priority: critical
-    dependencies: []
-    description: "Create isSemanticFolder() to exclude root folders (plugins/, src/, skills/) and leaf containers (commands/, agents/, mcp_servers/); implement smart tree filtering"
-
-  - id: "MFV-1.3"
-    title: "useFolderSelection hook"
-    status: pending
-    assigned_to: ["frontend-developer"]
-    model: sonnet
-    effort: 2
-    priority: high
-    dependencies: ["MFV-1.1"]
-    description: "Create React hook managing folder selection state (selected folder path, expanded folders); return selection + setSelected() callback"
-
-  - id: "MFV-1.4"
-    title: "Two-pane layout component"
-    status: pending
-    assigned_to: ["ui-engineer-enhanced"]
-    model: opus
-    effort: 3
-    priority: high
-    dependencies: []
-    description: "Create two-pane container layout with left pane (25%, semantic tree) and right pane (75%, folder detail). Manage layout, responsive behavior"
-
-  - id: "MFV-1.5"
-    title: "Semantic tree component"
-    status: pending
-    assigned_to: ["ui-engineer-enhanced"]
-    model: opus
-    effort: 3
-    priority: high
-    dependencies: ["MFV-1.2", "MFV-1.3"]
-    description: "Create left pane semantic navigation tree; render folders filtered by semantic rules; support expand/collapse; integrate folder selection"
-
-  - id: "MFV-1.6"
-    title: "Tree node component"
-    status: pending
-    assigned_to: ["ui-engineer-enhanced"]
-    model: sonnet
-    effort: 3
-    priority: high
-    dependencies: []
-    description: "Create individual tree folder item with: folder icon, folder name, expand/collapse chevron, direct count badge '(N)', total count on hover '[M]', mixed-folder indicator icon/dot; integrate with selection state"
-
-  - id: "MFV-1.7"
-    title: "Toolbar folder toggle"
-    status: pending
-    assigned_to: ["ui-engineer-enhanced"]
-    model: sonnet
-    effort: 1
-    priority: medium
-    dependencies: []
-    description: "Add 'Folder' button to view mode toggle in SourceToolbar; button toggles between grid/list/folder modes"
-
-  - id: "MFV-1.8"
-    title: "Page integration"
-    status: pending
-    assigned_to: ["ui-engineer-enhanced"]
-    model: sonnet
-    effort: 2
-    priority: medium
-    dependencies: ["MFV-1.4", "MFV-1.5"]
-    description: "Integrate two-pane layout into source detail page with view mode switching"
-
-  - id: "MFV-1.9"
-    title: "First folder auto-selection"
-    status: pending
-    assigned_to: ["frontend-developer"]
-    model: sonnet
-    effort: 2
-    priority: medium
-    dependencies: ["MFV-1.3", "MFV-1.5"]
-    description: "Implement auto-selection of first semantic folder on folder view load; ensure right pane populates immediately"
-
-  - id: "MFV-1.10"
-    title: "Unit tests"
-    status: pending
-    assigned_to: ["frontend-developer"]
-    model: sonnet
-    effort: 3
-    priority: medium
-    dependencies: ["MFV-1.1", "MFV-1.2"]
-    description: "Test buildFolderTree(), isSemanticFolder(), and filtering logic; cover edge cases (roots, leafs, special chars, deep nesting); includes mixed-content edge cases, count calculations, indicator logic"
-
+- id: MFV-1.1
+  title: Tree builder utilities
+  status: completed
+  assigned_to:
+  - frontend-developer
+  model: sonnet
+  effort: 3
+  priority: critical
+  dependencies: []
+  description: Create buildFolderTree() function to convert flat CatalogEntry[] to
+    nested tree structure with maxDepth parameter; includes directArtifacts vs children
+    separation, directCount, totalArtifactCount, hasSubfolders, hasDirectArtifacts
+    flags
+- id: MFV-1.2
+  title: Semantic filtering utilities
+  status: completed
+  assigned_to:
+  - frontend-developer
+  model: sonnet
+  effort: 2
+  priority: critical
+  dependencies: []
+  description: Create isSemanticFolder() to exclude root folders (plugins/, src/,
+    skills/) and leaf containers (commands/, agents/, mcp_servers/); implement smart
+    tree filtering
+- id: MFV-1.3
+  title: useFolderSelection hook
+  status: completed
+  assigned_to:
+  - frontend-developer
+  model: sonnet
+  effort: 2
+  priority: high
+  dependencies:
+  - MFV-1.1
+  description: Create React hook managing folder selection state (selected folder
+    path, expanded folders); return selection + setSelected() callback
+- id: MFV-1.4
+  title: Two-pane layout component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: opus
+  effort: 3
+  priority: high
+  dependencies: []
+  description: Create two-pane container layout with left pane (25%, semantic tree)
+    and right pane (75%, folder detail). Manage layout, responsive behavior
+- id: MFV-1.5
+  title: Semantic tree component
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  model: opus
+  effort: 3
+  priority: high
+  dependencies:
+  - MFV-1.2
+  - MFV-1.3
+  description: Create left pane semantic navigation tree; render folders filtered
+    by semantic rules; support expand/collapse; integrate folder selection
+- id: MFV-1.6
+  title: Tree node component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: sonnet
+  effort: 3
+  priority: high
+  dependencies: []
+  description: 'Create individual tree folder item with: folder icon, folder name,
+    expand/collapse chevron, direct count badge ''(N)'', total count on hover ''[M]'',
+    mixed-folder indicator icon/dot; integrate with selection state'
+- id: MFV-1.7
+  title: Toolbar folder toggle
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: sonnet
+  effort: 1
+  priority: medium
+  dependencies: []
+  description: Add 'Folder' button to view mode toggle in SourceToolbar; button toggles
+    between grid/list/folder modes
+- id: MFV-1.8
+  title: Page integration
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  model: sonnet
+  effort: 2
+  priority: medium
+  dependencies:
+  - MFV-1.4
+  - MFV-1.5
+  description: Integrate two-pane layout into source detail page with view mode switching
+- id: MFV-1.9
+  title: First folder auto-selection
+  status: pending
+  assigned_to:
+  - frontend-developer
+  model: sonnet
+  effort: 2
+  priority: medium
+  dependencies:
+  - MFV-1.3
+  - MFV-1.5
+  description: Implement auto-selection of first semantic folder on folder view load;
+    ensure right pane populates immediately
+- id: MFV-1.10
+  title: Unit tests
+  status: completed
+  assigned_to:
+  - frontend-developer
+  model: sonnet
+  effort: 3
+  priority: medium
+  dependencies:
+  - MFV-1.1
+  - MFV-1.2
+  description: Test buildFolderTree(), isSemanticFolder(), and filtering logic; cover
+    edge cases (roots, leafs, special chars, deep nesting); includes mixed-content
+    edge cases, count calculations, indicator logic
 parallelization:
-  batch_1: ["MFV-1.1", "MFV-1.2", "MFV-1.4", "MFV-1.6", "MFV-1.7"]
-  batch_2: ["MFV-1.3", "MFV-1.10"]
-  batch_3: ["MFV-1.5"]
-  batch_4: ["MFV-1.8", "MFV-1.9"]
+  batch_1:
+  - MFV-1.1
+  - MFV-1.2
+  - MFV-1.4
+  - MFV-1.6
+  - MFV-1.7
+  batch_2:
+  - MFV-1.3
+  - MFV-1.10
+  batch_3:
+  - MFV-1.5
+  batch_4:
+  - MFV-1.8
+  - MFV-1.9
+updated: '2026-01-29'
 ---
 
 # Phase 1: Two-Pane Layout & Semantic Tree
