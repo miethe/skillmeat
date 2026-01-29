@@ -6,14 +6,20 @@
  * Right pane (75% width) container that displays selected folder metadata and artifacts.
  * Integrates with the semantic tree for folder selection and displays:
  * 1. Folder header with metadata
- * 2. Artifact type sections (grouped by type)
- * 3. Subfolders section
+ * 2. Artifact type sections (grouped by type, filtered)
+ * 3. Subfolders section (NOT filtered)
+ *
+ * Applies all filters (type, confidence, search, status) to displayed artifacts.
+ * Subfolders section is NOT affected by filters and always shows all subfolders.
  */
 
 import { Folder } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { applyFiltersToEntries, hasActiveFilters, groupByType } from '@/lib/folder-filter-utils';
+import { ArtifactTypeSection } from './artifact-type-section';
+import { SubfoldersSection } from './subfolders-section';
 import type { FolderNode } from '@/lib/tree-builder';
-import type { CatalogEntry, CatalogFilters } from '@/types/marketplace';
+import type { CatalogEntry, CatalogFilters, ArtifactType } from '@/types/marketplace';
 
 // ============================================================================
 // Types
@@ -50,6 +56,9 @@ export interface FolderDetailPaneProps {
  * a folder is selected from the semantic tree. Displays an empty state
  * when no folder is selected.
  *
+ * Filters are applied to artifacts displayed in type sections. Subfolders
+ * are not affected by filters and always show all children.
+ *
  * @example
  * ```tsx
  * <FolderDetailPane
@@ -66,19 +75,15 @@ export interface FolderDetailPaneProps {
 export function FolderDetailPane({
   folder,
   catalog,
-  filters: _filters,
-  onImport: _onImport,
-  onExclude: _onExclude,
+  filters,
+  onImport,
+  onExclude,
   onImportAll: _onImportAll,
-  onSelectSubfolder: _onSelectSubfolder,
+  onSelectSubfolder,
 }: FolderDetailPaneProps) {
-  // Note: Prefixed props are intentionally unused in this placeholder.
-  // They will be wired up when child components (FolderDetailHeader, etc.) are integrated.
-  void _filters;
-  void _onImport;
-  void _onExclude;
+  // Note: onImportAll is intentionally unused in this implementation.
+  // It will be wired up when batch import functionality is integrated.
   void _onImportAll;
-  void _onSelectSubfolder;
 
   // Empty state: no folder selected
   if (!folder) {
@@ -99,103 +104,121 @@ export function FolderDetailPane({
     return entryDir === folder.fullPath;
   });
 
-  // Group artifacts by type for placeholder display
-  const artifactsByType = folderArtifacts.reduce(
-    (acc, entry) => {
-      if (!acc[entry.artifact_type]) {
-        acc[entry.artifact_type] = [];
-      }
-      acc[entry.artifact_type]!.push(entry);
-      return acc;
-    },
-    {} as Record<string, CatalogEntry[]>
-  );
+  // Apply filters to artifacts
+  const filteredArtifacts = applyFiltersToEntries(folderArtifacts, filters);
 
-  // Get subfolders from the folder node
+  // Group filtered artifacts by type
+  const artifactsByType = groupByType(filteredArtifacts);
+
+  // Get subfolders from the folder node (NOT affected by filters)
   const subfolders = Object.values(folder.children);
+
+  // Determine if we're showing filtered results
+  const isFiltered = hasActiveFilters(filters);
+  const unfilteredCount = folderArtifacts.length;
+
+  // Empty state: no artifacts match filters
+  if (filteredArtifacts.length === 0 && folder.hasDirectArtifacts) {
+    return (
+      <div className={cn('h-full overflow-y-auto p-6')}>
+        <div className="space-y-6">
+          {/* Folder header */}
+          <div className="space-y-2">
+            <h2 className="text-2xl font-semibold">{folder.name}</h2>
+            <p className="text-sm text-muted-foreground">{folder.fullPath}</p>
+          </div>
+
+          {/* No matches empty state */}
+          <div className="flex min-h-[300px] items-center justify-center">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <Folder className="h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-medium">No artifacts match current filters</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {unfilteredCount} artifact{unfilteredCount !== 1 ? 's' : ''} in this folder (
+                  {isFiltered ? 'filtered out' : 'hidden'})
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Show subfolders even when artifacts are filtered */}
+          {folder.hasSubfolders && (
+            <SubfoldersSection subfolders={subfolders} onSelectFolder={onSelectSubfolder} />
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn('h-full overflow-y-auto p-6')}>
       <div className="space-y-6">
-        {/* FolderDetailHeader slot - placeholder */}
+        {/* Folder header with metadata */}
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold">{folder.name}</h2>
           <p className="text-sm text-muted-foreground">{folder.fullPath}</p>
           <div className="flex items-center gap-4 text-sm">
             <span>
-              <span className="font-medium">{folder.directCount}</span> direct artifact
-              {folder.directCount !== 1 ? 's' : ''}
+              <span className="font-medium">
+                {isFiltered ? filteredArtifacts.length : folder.directCount}
+              </span>{' '}
+              {isFiltered ? 'matching' : 'direct'} artifact
+              {(isFiltered ? filteredArtifacts.length : folder.directCount) !== 1 ? 's' : ''}
             </span>
-            <span className="text-muted-foreground">•</span>
-            <span>
-              <span className="font-medium">{folder.totalArtifactCount}</span> total artifact
-              {folder.totalArtifactCount !== 1 ? 's' : ''}
-            </span>
+            {isFiltered && unfilteredCount !== filteredArtifacts.length && (
+              <>
+                <span className="text-muted-foreground">•</span>
+                <span className="text-muted-foreground">
+                  {unfilteredCount} total in folder
+                </span>
+              </>
+            )}
+            {!isFiltered && (
+              <>
+                <span className="text-muted-foreground">•</span>
+                <span>
+                  <span className="font-medium">{folder.totalArtifactCount}</span> total artifact
+                  {folder.totalArtifactCount !== 1 ? 's' : ''}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* ArtifactTypeSections slot - placeholder */}
-        {folder.hasDirectArtifacts && (
+        {/* Artifact type sections */}
+        {folder.hasDirectArtifacts && filteredArtifacts.length > 0 && (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Artifacts</h3>
-            {Object.entries(artifactsByType).map(([type, entries]) => (
-              <div key={type} className="space-y-2">
-                <h4 className="text-sm font-medium text-muted-foreground">
-                  {type} ({entries.length})
-                </h4>
-                <div className="space-y-2">
-                  {entries.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="flex items-center justify-between rounded-md border p-3"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium">{entry.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{entry.path}</p>
-                      </div>
-                      <div className="ml-4">
-                        <span className="text-xs text-muted-foreground">
-                          {entry.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+            <div className="space-y-3">
+              {(Object.keys(artifactsByType) as ArtifactType[])
+                .sort()
+                .map((type) => {
+                  const entries = artifactsByType[type] || [];
+                  return (
+                    <ArtifactTypeSection
+                      key={type}
+                      type={type}
+                      artifacts={entries}
+                      defaultExpanded={true}
+                      onImport={onImport}
+                      onExclude={onExclude}
+                    />
+                  );
+                })}
+            </div>
           </div>
         )}
 
-        {/* SubfoldersSection slot - placeholder */}
+        {/* SubfoldersSection - integrated with navigation (NOT affected by filters) */}
         {folder.hasSubfolders && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Subfolders ({subfolders.length})</h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {subfolders.map((subfolder) => (
-                <div
-                  key={subfolder.fullPath}
-                  className="flex items-center gap-3 rounded-md border p-3"
-                >
-                  <Folder className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{subfolder.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {subfolder.totalArtifactCount} artifact
-                      {subfolder.totalArtifactCount !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <SubfoldersSection subfolders={subfolders} onSelectFolder={onSelectSubfolder} />
         )}
 
         {/* Empty state for folder with no artifacts or subfolders */}
         {!folder.hasDirectArtifacts && !folder.hasSubfolders && (
           <div className="flex min-h-[200px] items-center justify-center">
-            <p className="text-sm text-muted-foreground">
-              This folder is empty
-            </p>
+            <p className="text-sm text-muted-foreground">This folder is empty</p>
           </div>
         )}
       </div>

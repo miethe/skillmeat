@@ -11,45 +11,12 @@
 
 import { cn } from '@/lib/utils';
 import type { CatalogEntry, CatalogFilters } from '@/types/marketplace';
+import type { FolderNode, FolderTree } from '@/lib/tree-builder';
+import { FolderDetailPane } from './folder-detail-pane';
 
 // ============================================================================
 // Types
 // ============================================================================
-
-/**
- * Folder tree node structure.
- * Note: This type will be moved to @/lib/tree-builder when that module is created.
- */
-export interface FolderNode {
-  /** Folder name (last segment of path) */
-  name: string;
-  /** Full path from repository root */
-  path: string;
-  /** Child folders */
-  children: FolderNode[];
-  /** Artifacts directly in this folder (not in subfolders) */
-  directArtifacts: CatalogEntry[];
-  /** Number of artifacts directly in this folder */
-  directCount: number;
-  /** Total artifact count including all descendants */
-  totalArtifactCount: number;
-  /** Whether this folder has child folders */
-  hasSubfolders: boolean;
-  /** Whether this folder has direct artifacts */
-  hasDirectArtifacts: boolean;
-}
-
-/**
- * Root folder tree structure.
- */
-export interface FolderTree {
-  /** Root-level folder nodes */
-  roots: FolderNode[];
-  /** Total number of folders in tree */
-  totalFolders: number;
-  /** Maximum depth of tree */
-  maxDepth: number;
-}
 
 /**
  * Filter state for folder view.
@@ -79,6 +46,12 @@ export interface SourceFolderLayoutProps {
   onImport: (entry: CatalogEntry) => void;
   /** Callback when exclude is requested for an entry */
   onExclude: (entry: CatalogEntry) => void;
+  /**
+   * Navigate to a folder by path (optional, for subfolder navigation).
+   * If provided, enables smooth subfolder card navigation with automatic tree expansion.
+   * If not provided, falls back to separate onSelectFolder + expandPath calls.
+   */
+  onNavigateToFolder?: (path: string) => void;
 }
 
 // ============================================================================
@@ -98,6 +71,7 @@ export interface SourceFolderLayoutProps {
  *   tree={folderTree}
  *   selectedFolder={selectedPath}
  *   onSelectFolder={handleSelectFolder}
+ *   onNavigateToFolder={handleNavigateToFolder}
  *   expanded={expandedFolders}
  *   onToggleExpand={handleToggleExpand}
  *   catalog={catalogEntries}
@@ -114,24 +88,36 @@ export function SourceFolderLayout({
   expanded,
   onToggleExpand: _onToggleExpand,
   catalog,
-  filters: _filters,
+  filters,
   onImport,
   onExclude: _onExclude,
+  onNavigateToFolder,
 }: SourceFolderLayoutProps) {
   // Note: Prefixed props are intentionally unused in this placeholder.
-  // They will be wired up when SemanticTree and FolderDetailPane are integrated.
+  // They will be wired up when SemanticTree is integrated.
   void _onSelectFolder;
   void _onToggleExpand;
-  void _filters;
   void _onExclude;
-  // Get artifacts for the selected folder
-  const selectedFolderArtifacts = selectedFolder
-    ? catalog.filter((entry) => {
-        // Match entries where path starts with selected folder
-        const entryDir = entry.path.substring(0, entry.path.lastIndexOf('/'));
-        return entryDir === selectedFolder || entry.path.startsWith(selectedFolder + '/');
-      })
-    : [];
+
+  // Convert FolderTree (Record<string, FolderNode>) to array of root nodes
+  const rootNodes = Object.values(tree);
+
+  // Get the selected folder node from the tree
+  const selectedFolderNode = selectedFolder
+    ? findFolderByPath(rootNodes, selectedFolder)
+    : null;
+
+  /**
+   * Handle subfolder selection - navigate to folder with tree expansion.
+   * Uses onNavigateToFolder if provided, otherwise falls back to onSelectFolder.
+   */
+  const handleSubfolderSelect = (path: string) => {
+    if (onNavigateToFolder) {
+      onNavigateToFolder(path);
+    } else {
+      _onSelectFolder(path);
+    }
+  };
 
   return (
     <div
@@ -159,12 +145,12 @@ export function SourceFolderLayout({
           </h3>
           {/* SemanticTree placeholder - will be replaced with actual component */}
           <div className="space-y-1 text-sm">
-            {tree.roots.length === 0 ? (
+            {rootNodes.length === 0 ? (
               <p className="py-4 text-center text-muted-foreground">No folders found</p>
             ) : (
               <div className="space-y-1">
                 <p className="text-muted-foreground">
-                  Tree: {tree.totalFolders} folder{tree.totalFolders !== 1 ? 's' : ''}
+                  Tree: {rootNodes.length} folder{rootNodes.length !== 1 ? 's' : ''}
                 </p>
                 {selectedFolder && (
                   <p className="truncate font-medium">Selected: {selectedFolder}</p>
@@ -181,66 +167,53 @@ export function SourceFolderLayout({
       {/* Right Pane - Folder Detail (75% width on desktop) */}
       <main
         className={cn(
-          'flex-1 overflow-y-auto',
-          // Padding for content
-          'p-4'
+          'flex-1 overflow-y-auto'
+          // No padding here - FolderDetailPane has its own padding
         )}
       >
-        {/* FolderDetailPane placeholder - will be replaced with actual component */}
-        {selectedFolder ? (
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold">{selectedFolder}</h2>
-              <p className="text-sm text-muted-foreground">
-                {selectedFolderArtifacts.length} artifact
-                {selectedFolderArtifacts.length !== 1 ? 's' : ''} in this folder
-              </p>
-            </div>
-
-            {/* Placeholder artifact list */}
-            {selectedFolderArtifacts.length > 0 ? (
-              <div className="space-y-2">
-                {selectedFolderArtifacts.slice(0, 5).map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="flex items-center justify-between rounded-md border p-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{entry.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">{entry.path}</p>
-                    </div>
-                    <div className="ml-4 flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{entry.artifact_type}</span>
-                      {entry.status !== 'imported' && entry.status !== 'excluded' && (
-                        <button
-                          type="button"
-                          onClick={() => onImport(entry)}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          Import
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {selectedFolderArtifacts.length > 5 && (
-                  <p className="text-center text-sm text-muted-foreground">
-                    ... and {selectedFolderArtifacts.length - 5} more
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="py-8 text-center text-muted-foreground">
-                No artifacts in this folder
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-muted-foreground">Select a folder to view its contents</p>
-          </div>
-        )}
+        <FolderDetailPane
+          folder={selectedFolderNode}
+          catalog={catalog}
+          filters={filters}
+          onImport={onImport}
+          onExclude={() => {
+            // Exclude is handled within the detail pane via ExcludeArtifactDialog
+          }}
+          onImportAll={(entries) => {
+            // Import all entries from folder
+            entries.forEach((entry) => onImport(entry));
+          }}
+          onSelectSubfolder={handleSubfolderSelect}
+        />
       </main>
     </div>
   );
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Find a folder node by its full path in the tree.
+ *
+ * @param roots - Root folder nodes to search
+ * @param path - Full path to search for
+ * @returns Folder node if found, null otherwise
+ */
+function findFolderByPath(roots: FolderNode[], path: string): FolderNode | null {
+  for (const root of roots) {
+    if (root.fullPath === path) {
+      return root;
+    }
+
+    // Recursively search children
+    const childrenArray = Object.values(root.children);
+    const found = findFolderByPath(childrenArray, path);
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
 }

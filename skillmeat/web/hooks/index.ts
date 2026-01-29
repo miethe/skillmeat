@@ -227,6 +227,13 @@ export {
   type UseFolderSelectionReturn,
 } from '../lib/hooks/use-folder-selection';
 
+// Bulk import for folder view
+export {
+  useBulkImport,
+  type UseBulkImportOptions,
+  type UseBulkImportResult,
+} from '../lib/hooks/use-bulk-import';
+
 // ============================================================================
 // MCP (9 hooks)
 // ============================================================================

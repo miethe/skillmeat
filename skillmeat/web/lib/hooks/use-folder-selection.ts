@@ -13,12 +13,18 @@
  *   expanded,
  *   toggleExpand,
  *   expandPath,
+ *   navigateToFolder,
  * } = useFolderSelection(tree);
  *
  * // Auto-expands ancestors when selecting a folder
  * const handleSelect = (path: string) => {
  *   expandPath(path);
  *   setSelectedFolder(path);
+ * };
+ *
+ * // Navigate to folder (expands ancestors + selects in one operation)
+ * const handleNavigate = (path: string) => {
+ *   navigateToFolder(path);
  * };
  * ```
  */
@@ -62,6 +68,24 @@ export interface UseFolderSelectionReturn {
    * Expand all folders in the tree
    */
   expandAll: () => void;
+
+  /**
+   * Navigate to a folder by path, expanding all parent folders and selecting it.
+   * This is a combined operation that expands the tree path and selects the folder
+   * in a single smooth state update.
+   *
+   * @param path - Full path of the folder to navigate to (e.g., "plugins/dev-tools/linter")
+   *
+   * @example
+   * ```tsx
+   * // Navigate to subfolder when clicked
+   * <SubfolderCard
+   *   folder={subfolder}
+   *   onSelect={(path) => navigateToFolder(path)}
+   * />
+   * ```
+   */
+  navigateToFolder: (path: string) => void;
 }
 
 /**
@@ -210,6 +234,47 @@ export function useFolderSelection(tree: FolderTree): UseFolderSelectionReturn {
     setExpanded(new Set(allFolderPaths));
   }, [allFolderPaths]);
 
+  /**
+   * Navigate to a folder by path, expanding all parent folders and selecting it.
+   *
+   * This performs a combined operation in a single smooth state update:
+   * 1. Parse the path to get all parent folder paths
+   * 2. Add all parent paths to the expanded set
+   * 3. Set the selected folder to the target path
+   *
+   * Example: navigating to "plugins/dev-tools/linter"
+   * - Expands: ["plugins", "plugins/dev-tools", "plugins/dev-tools/linter"]
+   * - Selects: "plugins/dev-tools/linter"
+   */
+  const navigateToFolder = useCallback((path: string) => {
+    if (!path) return;
+
+    // Mark user interaction
+    hasUserInteracted.current = true;
+
+    // Build all ancestor paths (including target)
+    const segments = path.split('/').filter(Boolean);
+    const pathsToExpand: string[] = [];
+    let currentPath = '';
+
+    for (const segment of segments) {
+      currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+      pathsToExpand.push(currentPath);
+    }
+
+    // Update both expanded and selected in separate state updates
+    // (React will batch these automatically)
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      for (const pathToExpand of pathsToExpand) {
+        next.add(pathToExpand);
+      }
+      return next;
+    });
+
+    setSelectedFolderInternal(path);
+  }, []);
+
   return {
     selectedFolder,
     setSelectedFolder,
@@ -218,5 +283,6 @@ export function useFolderSelection(tree: FolderTree): UseFolderSelectionReturn {
     expandPath,
     collapseAll,
     expandAll,
+    navigateToFolder,
   };
 }

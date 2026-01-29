@@ -619,6 +619,7 @@ export default function SourceDetailPage() {
 
   // Folder selection state (MFV-1.8)
   const {
+    navigateToFolder,
     selectedFolder,
     setSelectedFolder,
     expanded,
@@ -1381,36 +1382,13 @@ export default function SourceDetailPage() {
               </div>
             ) : viewMode === 'folder' ? (
               <SourceFolderLayout
-                tree={{
-                  roots: Object.values(folderTree).map((node) => ({
-                    name: node.name,
-                    path: node.fullPath,
-                    children: Object.values(node.children).map(function mapChildren(child): any {
-                      return {
-                        name: child.name,
-                        path: child.fullPath,
-                        children: Object.values(child.children).map(mapChildren),
-                        directArtifacts: child.directArtifacts,
-                        directCount: child.directCount,
-                        totalArtifactCount: child.totalArtifactCount,
-                        hasSubfolders: child.hasSubfolders,
-                        hasDirectArtifacts: child.hasDirectArtifacts,
-                      };
-                    }),
-                    directArtifacts: node.directArtifacts,
-                    directCount: node.directCount,
-                    totalArtifactCount: node.totalArtifactCount,
-                    hasSubfolders: node.hasSubfolders,
-                    hasDirectArtifacts: node.hasDirectArtifacts,
-                  })),
-                  totalFolders: Object.keys(folderTree).length,
-                  maxDepth: 0,
-                }}
+                tree={folderTree}
                 selectedFolder={selectedFolder}
                 onSelectFolder={(path) => {
                   expandPath(path);
                   setSelectedFolder(path);
                 }}
+                onNavigateToFolder={navigateToFolder}
                 expanded={expanded}
                 onToggleExpand={toggleExpand}
                 catalog={filteredEntries}
