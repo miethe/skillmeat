@@ -129,6 +129,7 @@ export function SourceFolderLayout({
     >
       {/* Left Pane - Semantic Tree (25% width on desktop) */}
       <aside
+        aria-label="Folder navigation"
         className={cn(
           'border-b bg-muted/20 md:border-b-0 md:border-r',
           // Width: 100% on mobile, 25% on desktop with min-width
@@ -140,7 +141,10 @@ export function SourceFolderLayout({
         )}
       >
         <div className="p-3">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <h3
+            id="folder-nav-heading"
+            className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+          >
             Folders
           </h3>
           {/* SemanticTree placeholder - will be replaced with actual component */}
@@ -166,6 +170,7 @@ export function SourceFolderLayout({
 
       {/* Right Pane - Folder Detail (75% width on desktop) */}
       <main
+        aria-label="Folder contents"
         className={cn(
           'flex-1 overflow-y-auto'
           // No padding here - FolderDetailPane has its own padding

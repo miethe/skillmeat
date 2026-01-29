@@ -88,12 +88,16 @@ export function FolderDetailPane({
   // Empty state: no folder selected
   if (!folder) {
     return (
-      <div className="flex h-full min-h-[400px] items-center justify-center">
+      <section
+        role="region"
+        aria-label="Folder details"
+        className="flex h-full min-h-[400px] items-center justify-center"
+      >
         <div className="flex flex-col items-center gap-3 text-center">
           <Folder className="h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
           <p className="text-sm text-muted-foreground">Select a folder to view its contents</p>
         </div>
-      </div>
+      </section>
     );
   }
 
@@ -120,13 +124,20 @@ export function FolderDetailPane({
   // Empty state: no artifacts match filters
   if (filteredArtifacts.length === 0 && folder.hasDirectArtifacts) {
     return (
-      <div className={cn('h-full overflow-y-auto p-6')}>
+      <section
+        role="region"
+        aria-label={`${folder.name} folder details`}
+        aria-live="polite"
+        className={cn('h-full overflow-y-auto p-6')}
+      >
         <div className="space-y-6">
           {/* Folder header */}
-          <div className="space-y-2">
-            <h2 className="text-2xl font-semibold">{folder.name}</h2>
+          <header className="space-y-2">
+            <h2 id="folder-detail-heading" className="text-2xl font-semibold">
+              {folder.name}
+            </h2>
             <p className="text-sm text-muted-foreground">{folder.fullPath}</p>
-          </div>
+          </header>
 
           {/* No matches empty state */}
           <div className="flex min-h-[300px] items-center justify-center">
@@ -147,16 +158,23 @@ export function FolderDetailPane({
             <SubfoldersSection subfolders={subfolders} onSelectFolder={onSelectSubfolder} />
           )}
         </div>
-      </div>
+      </section>
     );
   }
 
   return (
-    <div className={cn('h-full overflow-y-auto p-6')}>
+    <section
+      role="region"
+      aria-label={`${folder.name} folder details`}
+      aria-live="polite"
+      className={cn('h-full overflow-y-auto p-6')}
+    >
       <div className="space-y-6">
         {/* Folder header with metadata */}
-        <div className="space-y-2">
-          <h2 className="text-2xl font-semibold">{folder.name}</h2>
+        <header className="space-y-2">
+          <h2 id="folder-detail-heading" className="text-2xl font-semibold">
+            {folder.name}
+          </h2>
           <p className="text-sm text-muted-foreground">{folder.fullPath}</p>
           <div className="flex items-center gap-4 text-sm">
             <span>
@@ -184,7 +202,7 @@ export function FolderDetailPane({
               </>
             )}
           </div>
-        </div>
+        </header>
 
         {/* Artifact type sections */}
         {folder.hasDirectArtifacts && filteredArtifacts.length > 0 && (
@@ -222,6 +240,6 @@ export function FolderDetailPane({
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }

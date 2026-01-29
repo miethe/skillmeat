@@ -1,137 +1,166 @@
 ---
 type: progress
-prd: "marketplace-folder-view"
+prd: marketplace-folder-view
 phase: 3
-title: "Accessibility & Performance Optimization"
-status: not_started
+title: Accessibility & Performance Optimization
+status: pending
 started: null
 completed: null
-
-progress: 0
-completion_estimate: "on-track"
-
+progress: 37
+completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 0
+completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
-
-owners: ["web-accessibility-checker", "react-performance-optimizer"]
-contributors: ["frontend-developer", "documentation-writer"]
-
+owners:
+- web-accessibility-checker
+- react-performance-optimizer
+contributors:
+- frontend-developer
+- documentation-writer
 blockers: []
-
 success_criteria:
-  - id: "SC-3.1"
-    description: "Full keyboard navigation working (tree + panes, all keys tested)"
-    status: pending
-  - id: "SC-3.2"
-    description: "Screen reader announces folder structure, selection, artifact counts (tested on 2+ readers)"
-    status: pending
-  - id: "SC-3.3"
-    description: "Focus indicators visible; focus management correct between panes"
-    status: pending
-  - id: "SC-3.4"
-    description: "Accessibility audit passes WCAG 2.1 AA (automated + manual)"
-    status: pending
-  - id: "SC-3.5"
-    description: "Tree renders 1000 items in <200ms"
-    status: pending
-  - id: "SC-3.6"
-    description: "Lazy rendering reduces initial DOM nodes 60-80%"
-    status: pending
-  - id: "SC-3.7"
-    description: "No performance regression on filter changes or folder selection"
-    status: pending
-  - id: "SC-3.8"
-    description: "Memoization prevents unnecessary re-renders"
-    status: pending
-
+- id: SC-3.1
+  description: Full keyboard navigation working (tree + panes, all keys tested)
+  status: pending
+- id: SC-3.2
+  description: Screen reader announces folder structure, selection, artifact counts
+    (tested on 2+ readers)
+  status: pending
+- id: SC-3.3
+  description: Focus indicators visible; focus management correct between panes
+  status: pending
+- id: SC-3.4
+  description: Accessibility audit passes WCAG 2.1 AA (automated + manual)
+  status: pending
+- id: SC-3.5
+  description: Tree renders 1000 items in <200ms
+  status: pending
+- id: SC-3.6
+  description: Lazy rendering reduces initial DOM nodes 60-80%
+  status: pending
+- id: SC-3.7
+  description: No performance regression on filter changes or folder selection
+  status: pending
+- id: SC-3.8
+  description: Memoization prevents unnecessary re-renders
+  status: pending
 tasks:
-  - id: "MFV-3.1"
-    title: "Keyboard navigation"
-    status: pending
-    assigned_to: ["web-accessibility-checker"]
-    model: opus
-    effort: 3
-    priority: critical
-    dependencies: []
-    description: "Implement: Up/Down arrows navigate tree siblings, Left/Right expand/collapse folders, Enter/Space to select, Tab to move between left pane/right pane, Home/End for first/last"
-
-  - id: "MFV-3.2"
-    title: "ARIA labels and roles"
-    status: pending
-    assigned_to: ["web-accessibility-checker"]
-    model: opus
-    effort: 2
-    priority: critical
-    dependencies: []
-    description: "Add semantic roles/labels: left pane as role='tree', folders as role='treeitem', right pane as main content region; announce folder counts, artifact types"
-
-  - id: "MFV-3.3"
-    title: "Focus management between panes"
-    status: pending
-    assigned_to: ["web-accessibility-checker"]
-    model: opus
-    effort: 2
-    priority: critical
-    dependencies: ["MFV-3.1"]
-    description: "Implement roving tabindex in tree; manage focus when selecting folders; visible focus indicators (2px ring); focus transitions between panes smooth"
-
-  - id: "MFV-3.4"
-    title: "Screen reader testing"
-    status: pending
-    assigned_to: ["web-accessibility-checker"]
-    model: opus
-    effort: 2
-    priority: high
-    dependencies: ["MFV-3.2"]
-    description: "Test with NVDA (Windows), JAWS (Windows), VoiceOver (macOS); verify tree structure, folder selection, right pane content all announced correctly"
-
-  - id: "MFV-3.5"
-    title: "Lazy rendering"
-    status: pending
-    assigned_to: ["react-performance-optimizer"]
-    model: opus
-    effort: 2
-    priority: critical
-    dependencies: []
-    description: "Prevent DOM explosion: collapsed folders don't render children initially; render on demand when expanded; measure DOM node count before/after"
-
-  - id: "MFV-3.6"
-    title: "Performance profiling"
-    status: pending
-    assigned_to: ["react-performance-optimizer"]
-    model: sonnet
-    effort: 2
-    priority: high
-    dependencies: ["MFV-3.5"]
-    description: "Profile tree rendering with DevTools; measure render time for 500/1000 item trees; optimize hot paths; target <200ms for 1000 items"
-
-  - id: "MFV-3.7"
-    title: "Memoization optimization"
-    status: pending
-    assigned_to: ["react-performance-optimizer"]
-    model: sonnet
-    effort: 1
-    priority: high
-    dependencies: ["MFV-3.6"]
-    description: "Add React.memo() to tree nodes and detail pane components; memoize tree/filtering functions; prevent unnecessary re-renders"
-
-  - id: "MFV-3.8"
-    title: "Documentation update"
-    status: pending
-    assigned_to: ["documentation-writer"]
-    model: haiku
-    effort: 2
-    priority: low
-    dependencies: ["MFV-3.1", "MFV-3.2", "MFV-3.3", "MFV-3.4", "MFV-3.5", "MFV-3.6", "MFV-3.7"]
-    description: "Document keyboard navigation, ARIA patterns, focus management, performance optimizations"
-
+- id: MFV-3.1
+  title: Keyboard navigation
+  status: completed
+  assigned_to:
+  - web-accessibility-checker
+  model: opus
+  effort: 3
+  priority: critical
+  dependencies: []
+  description: 'Implement: Up/Down arrows navigate tree siblings, Left/Right expand/collapse
+    folders, Enter/Space to select, Tab to move between left pane/right pane, Home/End
+    for first/last'
+- id: MFV-3.2
+  title: ARIA labels and roles
+  status: completed
+  assigned_to:
+  - web-accessibility-checker
+  model: opus
+  effort: 2
+  priority: critical
+  dependencies: []
+  description: 'Add semantic roles/labels: left pane as role=''tree'', folders as
+    role=''treeitem'', right pane as main content region; announce folder counts,
+    artifact types'
+- id: MFV-3.3
+  title: Focus management between panes
+  status: pending
+  assigned_to:
+  - web-accessibility-checker
+  model: opus
+  effort: 2
+  priority: critical
+  dependencies:
+  - MFV-3.1
+  description: Implement roving tabindex in tree; manage focus when selecting folders;
+    visible focus indicators (2px ring); focus transitions between panes smooth
+- id: MFV-3.4
+  title: Screen reader testing
+  status: pending
+  assigned_to:
+  - web-accessibility-checker
+  model: opus
+  effort: 2
+  priority: high
+  dependencies:
+  - MFV-3.2
+  description: Test with NVDA (Windows), JAWS (Windows), VoiceOver (macOS); verify
+    tree structure, folder selection, right pane content all announced correctly
+- id: MFV-3.5
+  title: Lazy rendering
+  status: completed
+  assigned_to:
+  - react-performance-optimizer
+  model: opus
+  effort: 2
+  priority: critical
+  dependencies: []
+  description: 'Prevent DOM explosion: collapsed folders don''t render children initially;
+    render on demand when expanded; measure DOM node count before/after'
+- id: MFV-3.6
+  title: Performance profiling
+  status: pending
+  assigned_to:
+  - react-performance-optimizer
+  model: sonnet
+  effort: 2
+  priority: high
+  dependencies:
+  - MFV-3.5
+  description: Profile tree rendering with DevTools; measure render time for 500/1000
+    item trees; optimize hot paths; target <200ms for 1000 items
+- id: MFV-3.7
+  title: Memoization optimization
+  status: pending
+  assigned_to:
+  - react-performance-optimizer
+  model: sonnet
+  effort: 1
+  priority: high
+  dependencies:
+  - MFV-3.6
+  description: Add React.memo() to tree nodes and detail pane components; memoize
+    tree/filtering functions; prevent unnecessary re-renders
+- id: MFV-3.8
+  title: Documentation update
+  status: pending
+  assigned_to:
+  - documentation-writer
+  model: haiku
+  effort: 2
+  priority: low
+  dependencies:
+  - MFV-3.1
+  - MFV-3.2
+  - MFV-3.3
+  - MFV-3.4
+  - MFV-3.5
+  - MFV-3.6
+  - MFV-3.7
+  description: Document keyboard navigation, ARIA patterns, focus management, performance
+    optimizations
 parallelization:
-  batch_1: ["MFV-3.1", "MFV-3.2", "MFV-3.5"]
-  batch_2: ["MFV-3.3", "MFV-3.4", "MFV-3.6"]
-  batch_3: ["MFV-3.7"]
-  batch_4: ["MFV-3.8"]
+  batch_1:
+  - MFV-3.1
+  - MFV-3.2
+  - MFV-3.5
+  batch_2:
+  - MFV-3.3
+  - MFV-3.4
+  - MFV-3.6
+  batch_3:
+  - MFV-3.7
+  batch_4:
+  - MFV-3.8
+updated: '2026-01-29'
 ---
 
 # Phase 3: Accessibility & Performance Optimization

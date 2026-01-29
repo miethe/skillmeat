@@ -40,22 +40,32 @@ export function SubfoldersSection({ subfolders, onSelectFolder }: SubfoldersSect
   }
 
   return (
-    <section className="mt-8 border-t border-border pt-6">
+    <section
+      role="region"
+      aria-label={`Subfolders, ${subfolders.length} ${subfolders.length === 1 ? 'folder' : 'folders'}`}
+      className="mt-8 border-t border-border pt-6"
+    >
       {/* Section Header */}
       <div className="mb-4 flex items-center gap-2">
         <FolderTree className="h-5 w-5" aria-hidden="true" />
-        <h3 className="text-lg font-semibold">Subfolders</h3>
-        <span className="text-sm font-normal text-muted-foreground">({subfolders.length})</span>
+        <h3 id="subfolders-heading" className="text-lg font-semibold">
+          Subfolders
+        </h3>
+        <span className="text-sm font-normal text-muted-foreground" aria-hidden="true">
+          ({subfolders.length})
+        </span>
       </div>
 
       {/* Responsive Cards Grid */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div
+        role="list"
+        aria-labelledby="subfolders-heading"
+        className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+      >
         {subfolders.map((subfolder) => (
-          <SubfolderCard
-            key={subfolder.fullPath}
-            folder={subfolder}
-            onSelect={onSelectFolder}
-          />
+          <div key={subfolder.fullPath} role="listitem">
+            <SubfolderCard folder={subfolder} onSelect={onSelectFolder} />
+          </div>
         ))}
       </div>
     </section>
