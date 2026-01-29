@@ -1,5 +1,6 @@
 'use client';
 
+import { memo, useCallback } from 'react';
 import { FolderTree } from 'lucide-react';
 import type { FolderNode } from '@/lib/tree-builder';
 import { SubfolderCard } from './subfolder-card';
@@ -25,6 +26,9 @@ interface SubfoldersSectionProps {
  * - Tablet (md): 2 columns
  * - Desktop (lg): 3 columns
  *
+ * PERFORMANCE: Wrapped with React.memo to prevent re-renders when
+ * sibling components update without affecting subfolders list.
+ *
  * @example
  * ```tsx
  * <SubfoldersSection
@@ -33,8 +37,17 @@ interface SubfoldersSectionProps {
  * />
  * ```
  */
-export function SubfoldersSection({ subfolders, onSelectFolder }: SubfoldersSectionProps) {
-  // Return null if no subfolders (conditional rendering)
+function SubfoldersSectionComponent({ subfolders, onSelectFolder }: SubfoldersSectionProps) {
+  // Memoize the select handler to provide stable reference to SubfolderCard
+  // Must be called unconditionally (Rules of Hooks)
+  const handleSelect = useCallback(
+    (path: string) => {
+      onSelectFolder(path);
+    },
+    [onSelectFolder]
+  );
+
+  // Return null if no subfolders (after hooks)
   if (subfolders.length === 0) {
     return null;
   }
@@ -64,10 +77,12 @@ export function SubfoldersSection({ subfolders, onSelectFolder }: SubfoldersSect
       >
         {subfolders.map((subfolder) => (
           <div key={subfolder.fullPath} role="listitem">
-            <SubfolderCard folder={subfolder} onSelect={onSelectFolder} />
+            <SubfolderCard folder={subfolder} onSelect={handleSelect} />
           </div>
         ))}
       </div>
     </section>
   );
 }
+
+export const SubfoldersSection = memo(SubfoldersSectionComponent);

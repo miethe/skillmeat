@@ -40,7 +40,7 @@
  * - Focus is retained when selecting folders via Enter/Space
  */
 
-import { useMemo, useCallback, useRef, useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useMemo, useCallback, useRef, useState, useEffect, useImperativeHandle, forwardRef, memo } from 'react';
 import type { FolderTree } from '@/lib/tree-builder';
 import { filterSemanticTree } from '@/lib/tree-filter-utils';
 import { TreeNode } from './tree-node';
@@ -173,8 +173,12 @@ interface TreeBranchProps {
  * LAZY RENDERING: Children are only rendered when isExpanded is true.
  * When a folder is collapsed, its children are removed from the DOM entirely.
  * This prevents DOM explosion for large trees with many nested folders.
+ *
+ * PERFORMANCE: Wrapped with React.memo to prevent re-renders when
+ * sibling branches update. Combined with lazy rendering, this ensures
+ * only affected branches re-render during tree interactions.
  */
-function TreeBranch({
+const TreeBranch = memo(function TreeBranch({
   nodes,
   depth,
   selectedFolder,
@@ -256,7 +260,7 @@ function TreeBranch({
       })}
     </ul>
   );
-}
+});
 
 // ============================================================================
 // Main Component

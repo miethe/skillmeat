@@ -1,5 +1,6 @@
 'use client';
 
+import { memo, useCallback } from 'react';
 import { Folder, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -21,6 +22,9 @@ interface SubfolderCardProps {
  * Shows folder name, artifact count, and click-to-navigate affordance.
  * Entire card is interactive and keyboard accessible.
  *
+ * PERFORMANCE: Wrapped with React.memo to prevent re-renders when
+ * sibling cards update. Event handlers are memoized with useCallback.
+ *
  * @example
  * ```tsx
  * <SubfolderCard
@@ -29,23 +33,28 @@ interface SubfolderCardProps {
  * />
  * ```
  */
-export function SubfolderCard({ folder, onSelect }: SubfolderCardProps) {
+function SubfolderCardComponent({ folder, onSelect }: SubfolderCardProps) {
   /**
    * Handle card click - navigate to folder.
+   * Memoized to provide stable reference for Card onClick.
    */
-  const handleClick = () => {
+  const handleClick = useCallback(() => {
     onSelect(folder.fullPath);
-  };
+  }, [onSelect, folder.fullPath]);
 
   /**
    * Handle keyboard navigation (Enter/Space).
+   * Memoized to provide stable reference for Card onKeyDown.
    */
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onSelect(folder.fullPath);
-    }
-  };
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onSelect(folder.fullPath);
+      }
+    },
+    [onSelect, folder.fullPath]
+  );
 
   // Format artifact count with correct singular/plural
   const artifactCountText =
@@ -86,3 +95,5 @@ export function SubfolderCard({ folder, onSelect }: SubfolderCardProps) {
     </Card>
   );
 }
+
+export const SubfolderCard = memo(SubfolderCardComponent);

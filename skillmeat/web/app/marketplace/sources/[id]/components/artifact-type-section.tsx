@@ -7,7 +7,7 @@
 
 'use client';
 
-import * as React from 'react';
+import { useState, useCallback, memo } from 'react';
 import { ChevronRight, Sparkles, Terminal, Bot, Server, Anchor, Download, EyeOff } from 'lucide-react';
 import {
   Collapsible,
@@ -68,8 +68,9 @@ interface ArtifactRowProps {
 
 /**
  * Individual artifact row with name, description, and action buttons.
+ * Memoized to prevent re-renders when sibling artifacts change.
  */
-function ArtifactRow({ entry, onImport, onExclude }: ArtifactRowProps) {
+const ArtifactRow = memo(function ArtifactRow({ entry, onImport, onExclude }: ArtifactRowProps) {
   // Determine if actions should be disabled based on status
   const isImported = entry.status === 'imported';
   const isExcluded = entry.status === 'excluded';
@@ -127,7 +128,7 @@ function ArtifactRow({ entry, onImport, onExclude }: ArtifactRowProps) {
       </div>
     </div>
   );
-}
+});
 
 // ============================================================================
 // Main Component
@@ -139,20 +140,37 @@ function ArtifactRow({ entry, onImport, onExclude }: ArtifactRowProps) {
  * Section header shows type icon, name (plural), count badge, and chevron.
  * Content area displays artifact rows with import/exclude actions.
  * Returns null if no artifacts are provided.
+ *
+ * PERFORMANCE: Wrapped with React.memo to prevent re-renders when
+ * sibling sections or parent state changes without affecting this section.
  */
-export function ArtifactTypeSection({
+function ArtifactTypeSectionComponent({
   type,
   artifacts,
   defaultExpanded = false,
   onImport,
   onExclude,
 }: ArtifactTypeSectionProps) {
-  // Don't render if no artifacts
+  // Hooks must be called unconditionally (Rules of Hooks)
+  const [isOpen, setIsOpen] = useState(defaultExpanded);
+
+  // Memoize import handler factory to provide stable callbacks to ArtifactRow
+  const handleImport = useCallback(
+    (entry: CatalogEntry) => () => onImport(entry),
+    [onImport]
+  );
+
+  // Memoize exclude handler factory to provide stable callbacks to ArtifactRow
+  const handleExclude = useCallback(
+    (entry: CatalogEntry) => () => onExclude(entry),
+    [onExclude]
+  );
+
+  // Don't render if no artifacts (after hooks)
   if (artifacts.length === 0) {
     return null;
   }
 
-  const [isOpen, setIsOpen] = React.useState(defaultExpanded);
   const config = typeConfig[type];
   const TypeIcon = config.icon;
 
@@ -196,8 +214,8 @@ export function ArtifactTypeSection({
             <ArtifactRow
               key={entry.id}
               entry={entry}
-              onImport={() => onImport(entry)}
-              onExclude={() => onExclude(entry)}
+              onImport={handleImport(entry)}
+              onExclude={handleExclude(entry)}
             />
           ))}
         </div>
@@ -205,3 +223,5 @@ export function ArtifactTypeSection({
     </Collapsible>
   );
 }
+
+export const ArtifactTypeSection = memo(ArtifactTypeSectionComponent);

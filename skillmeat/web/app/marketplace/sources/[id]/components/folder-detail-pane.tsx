@@ -11,8 +11,14 @@
  *
  * Applies all filters (type, confidence, search, status) to displayed artifacts.
  * Subfolders section is NOT affected by filters and always shows all subfolders.
+ *
+ * PERFORMANCE OPTIMIZATIONS:
+ * - useMemo for expensive filtering and grouping operations
+ * - useCallback for event handlers passed to child components
+ * - Child components (ArtifactTypeSection, SubfoldersSection) are memoized
  */
 
+import { useMemo, useCallback } from 'react';
 import { Folder } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { applyFiltersToEntries, hasActiveFilters, groupByType } from '@/lib/folder-filter-utils';
@@ -85,7 +91,62 @@ export function FolderDetailPane({
   // It will be wired up when batch import functionality is integrated.
   void _onImportAll;
 
-  // Empty state: no folder selected
+  // PERFORMANCE: All hooks must be called unconditionally (Rules of Hooks)
+  // Memoize folder artifacts filtering - handles null folder safely
+  const folderArtifacts = useMemo(() => {
+    if (!folder) return [];
+    return catalog.filter((entry) => {
+      // Match entries where path matches the folder's fullPath
+      const entryDir = entry.path.substring(0, entry.path.lastIndexOf('/'));
+      return entryDir === folder.fullPath;
+    });
+  }, [catalog, folder]);
+
+  // PERFORMANCE: Memoize filtered artifacts calculation
+  // Applies type, confidence, search, and status filters
+  const filteredArtifacts = useMemo(() => {
+    return applyFiltersToEntries(folderArtifacts, filters);
+  }, [folderArtifacts, filters]);
+
+  // PERFORMANCE: Memoize artifact grouping by type
+  // Groups filtered artifacts into type buckets for section display
+  const artifactsByType = useMemo(() => {
+    return groupByType(filteredArtifacts);
+  }, [filteredArtifacts]);
+
+  // PERFORMANCE: Memoize subfolders array - handles null folder safely
+  const subfolders = useMemo(() => {
+    if (!folder) return [];
+    return Object.values(folder.children);
+  }, [folder]);
+
+  // Determine if we're showing filtered results
+  const isFiltered = hasActiveFilters(filters);
+  const unfilteredCount = folderArtifacts.length;
+
+  // PERFORMANCE: Memoize handlers passed to child components
+  const handleImport = useCallback(
+    (entry: CatalogEntry) => {
+      onImport(entry);
+    },
+    [onImport]
+  );
+
+  const handleExclude = useCallback(
+    (entry: CatalogEntry) => {
+      onExclude(entry);
+    },
+    [onExclude]
+  );
+
+  const handleSelectSubfolder = useCallback(
+    (path: string) => {
+      onSelectSubfolder(path);
+    },
+    [onSelectSubfolder]
+  );
+
+  // Empty state: no folder selected (after all hooks)
   if (!folder) {
     return (
       <section
@@ -100,26 +161,6 @@ export function FolderDetailPane({
       </section>
     );
   }
-
-  // Get artifacts for the selected folder (direct artifacts only)
-  const folderArtifacts = catalog.filter((entry) => {
-    // Match entries where path matches the folder's fullPath
-    const entryDir = entry.path.substring(0, entry.path.lastIndexOf('/'));
-    return entryDir === folder.fullPath;
-  });
-
-  // Apply filters to artifacts
-  const filteredArtifacts = applyFiltersToEntries(folderArtifacts, filters);
-
-  // Group filtered artifacts by type
-  const artifactsByType = groupByType(filteredArtifacts);
-
-  // Get subfolders from the folder node (NOT affected by filters)
-  const subfolders = Object.values(folder.children);
-
-  // Determine if we're showing filtered results
-  const isFiltered = hasActiveFilters(filters);
-  const unfilteredCount = folderArtifacts.length;
 
   // Empty state: no artifacts match filters
   if (filteredArtifacts.length === 0 && folder.hasDirectArtifacts) {
@@ -155,7 +196,7 @@ export function FolderDetailPane({
 
           {/* Show subfolders even when artifacts are filtered */}
           {folder.hasSubfolders && (
-            <SubfoldersSection subfolders={subfolders} onSelectFolder={onSelectSubfolder} />
+            <SubfoldersSection subfolders={subfolders} onSelectFolder={handleSelectSubfolder} />
           )}
         </div>
       </section>
@@ -219,8 +260,8 @@ export function FolderDetailPane({
                       type={type}
                       artifacts={entries}
                       defaultExpanded={true}
-                      onImport={onImport}
-                      onExclude={onExclude}
+                      onImport={handleImport}
+                      onExclude={handleExclude}
                     />
                   );
                 })}
@@ -230,7 +271,7 @@ export function FolderDetailPane({
 
         {/* SubfoldersSection - integrated with navigation (NOT affected by filters) */}
         {folder.hasSubfolders && (
-          <SubfoldersSection subfolders={subfolders} onSelectFolder={onSelectSubfolder} />
+          <SubfoldersSection subfolders={subfolders} onSelectFolder={handleSelectSubfolder} />
         )}
 
         {/* Empty state for folder with no artifacts or subfolders */}
