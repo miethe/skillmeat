@@ -7,12 +7,21 @@
  * - Left pane (25%): Semantic navigation tree
  * - Right pane (75%): Folder detail with artifacts
  * - Responsive: stacks vertically on mobile (<768px)
+ *
+ * Focus Management:
+ * - Tree pane is a single tab stop (roving tabindex)
+ * - Tab from tree moves to first focusable element in detail pane
+ * - Shift+Tab from detail pane returns to tree
+ * - Clicking subfolder card in detail pane moves focus to that tree node
+ * - Enter/Space on tree item selects folder but keeps focus on tree
  */
 
+import { useRef } from 'react';
 import { cn } from '@/lib/utils';
 import type { CatalogEntry, CatalogFilters } from '@/types/marketplace';
 import type { FolderNode, FolderTree } from '@/lib/tree-builder';
 import { FolderDetailPane } from './folder-detail-pane';
+import { SemanticTree, type SemanticTreeHandle } from './semantic-tree';
 
 // ============================================================================
 // Types
@@ -84,20 +93,17 @@ export interface SourceFolderLayoutProps {
 export function SourceFolderLayout({
   tree,
   selectedFolder,
-  onSelectFolder: _onSelectFolder,
+  onSelectFolder,
   expanded,
-  onToggleExpand: _onToggleExpand,
+  onToggleExpand,
   catalog,
   filters,
   onImport,
-  onExclude: _onExclude,
+  onExclude,
   onNavigateToFolder,
 }: SourceFolderLayoutProps) {
-  // Note: Prefixed props are intentionally unused in this placeholder.
-  // They will be wired up when SemanticTree is integrated.
-  void _onSelectFolder;
-  void _onToggleExpand;
-  void _onExclude;
+  // Ref for programmatic focus control of the tree
+  const treeRef = useRef<SemanticTreeHandle>(null);
 
   // Convert FolderTree (Record<string, FolderNode>) to array of root nodes
   const rootNodes = Object.values(tree);
@@ -108,15 +114,22 @@ export function SourceFolderLayout({
     : null;
 
   /**
-   * Handle subfolder selection - navigate to folder with tree expansion.
+   * Handle subfolder selection - navigate to folder with tree expansion,
+   * then move focus to the newly selected tree node.
    * Uses onNavigateToFolder if provided, otherwise falls back to onSelectFolder.
    */
   const handleSubfolderSelect = (path: string) => {
     if (onNavigateToFolder) {
       onNavigateToFolder(path);
     } else {
-      _onSelectFolder(path);
+      onSelectFolder(path);
     }
+
+    // After React re-renders with the new selection, focus the tree node
+    // requestAnimationFrame ensures the DOM has updated with new expanded state
+    requestAnimationFrame(() => {
+      treeRef.current?.focusNode(path);
+    });
   };
 
   return (
@@ -147,24 +160,18 @@ export function SourceFolderLayout({
           >
             Folders
           </h3>
-          {/* SemanticTree placeholder - will be replaced with actual component */}
-          <div className="space-y-1 text-sm">
-            {rootNodes.length === 0 ? (
-              <p className="py-4 text-center text-muted-foreground">No folders found</p>
-            ) : (
-              <div className="space-y-1">
-                <p className="text-muted-foreground">
-                  Tree: {rootNodes.length} folder{rootNodes.length !== 1 ? 's' : ''}
-                </p>
-                {selectedFolder && (
-                  <p className="truncate font-medium">Selected: {selectedFolder}</p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Expanded: {expanded.size} folder{expanded.size !== 1 ? 's' : ''}
-                </p>
-              </div>
-            )}
-          </div>
+          {rootNodes.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">No folders found</p>
+          ) : (
+            <SemanticTree
+              ref={treeRef}
+              tree={tree}
+              selectedFolder={selectedFolder}
+              expanded={expanded}
+              onSelectFolder={onSelectFolder}
+              onToggleExpand={onToggleExpand}
+            />
+          )}
         </div>
       </aside>
 
@@ -181,9 +188,7 @@ export function SourceFolderLayout({
           catalog={catalog}
           filters={filters}
           onImport={onImport}
-          onExclude={() => {
-            // Exclude is handled within the detail pane via ExcludeArtifactDialog
-          }}
+          onExclude={onExclude}
           onImportAll={(entries) => {
             // Import all entries from folder
             entries.forEach((entry) => onImport(entry));

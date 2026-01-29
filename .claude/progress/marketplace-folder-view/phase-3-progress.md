@@ -6,10 +6,10 @@ title: Accessibility & Performance Optimization
 status: pending
 started: null
 completed: null
-progress: 37
+progress: 75
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 3
+completed_tasks: 6
 in_progress_tasks: 0
 blocked_tasks: 0
 owners:
@@ -72,7 +72,7 @@ tasks:
     artifact types'
 - id: MFV-3.3
   title: Focus management between panes
-  status: pending
+  status: completed
   assigned_to:
   - web-accessibility-checker
   model: opus
@@ -84,7 +84,7 @@ tasks:
     visible focus indicators (2px ring); focus transitions between panes smooth
 - id: MFV-3.4
   title: Screen reader testing
-  status: pending
+  status: completed
   assigned_to:
   - web-accessibility-checker
   model: opus
@@ -107,7 +107,7 @@ tasks:
     render on demand when expanded; measure DOM node count before/after'
 - id: MFV-3.6
   title: Performance profiling
-  status: pending
+  status: completed
   assigned_to:
   - react-performance-optimizer
   model: sonnet

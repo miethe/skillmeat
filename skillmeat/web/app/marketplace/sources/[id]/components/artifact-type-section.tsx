@@ -167,7 +167,7 @@ export function ArtifactTypeSection({
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
           )}
           aria-expanded={isOpen}
-          aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${config.pluralLabel} section`}
+          aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${config.pluralLabel} section, ${artifacts.length} ${artifacts.length === 1 ? 'item' : 'items'}`}
         >
           {/* Chevron */}
           <ChevronRight
@@ -184,8 +184,8 @@ export function ArtifactTypeSection({
           {/* Type Name (Plural) */}
           <span className="text-sm font-medium">{config.pluralLabel}</span>
 
-          {/* Count Badge */}
-          <span className="text-sm text-muted-foreground">({artifacts.length})</span>
+          {/* Count Badge - aria-hidden since count is in aria-label */}
+          <span className="text-sm text-muted-foreground" aria-hidden="true">({artifacts.length})</span>
         </button>
       </CollapsibleTrigger>
 
