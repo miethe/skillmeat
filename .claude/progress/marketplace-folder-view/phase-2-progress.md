@@ -3,15 +3,15 @@ type: progress
 prd: "marketplace-folder-view"
 phase: 2
 title: "Folder Detail Pane & Bulk Import"
-status: not_started
-started: null
-completed: null
+status: completed
+started: "2026-01-29T13:30:00Z"
+completed: "2026-01-29T14:15:00Z"
 
-progress: 0
+progress: 100
 completion_estimate: "on-track"
 
 total_tasks: 13
-completed_tasks: 0
+completed_tasks: 13
 in_progress_tasks: 0
 blocked_tasks: 0
 
@@ -23,45 +23,45 @@ blockers: []
 success_criteria:
   - id: "SC-2.1"
     description: "Folder detail header displays title, parent chip, description, 'Import All' button"
-    status: pending
+    status: completed
   - id: "SC-2.2"
     description: "README extraction works; falls back to AI summary if no README"
-    status: pending
+    status: completed
   - id: "SC-2.3"
     description: "Artifacts grouped by type in right pane with section headers"
-    status: pending
+    status: completed
   - id: "SC-2.4"
     description: "Type grouping includes all artifact types; counts accurate"
-    status: pending
+    status: completed
   - id: "SC-2.5"
     description: "'Import All' bulk action works; progress shown; success/error states handled"
-    status: pending
+    status: completed
   - id: "SC-2.6"
     description: "Subfolders section renders at bottom when folder has subfolders"
-    status: pending
+    status: completed
   - id: "SC-2.7"
     description: "Subfolder cards show name, count, and navigate on click"
-    status: pending
+    status: completed
   - id: "SC-2.8"
     description: "Empty folder state shown when no artifacts match filters"
-    status: pending
+    status: completed
   - id: "SC-2.9"
     description: "Filters apply to right pane; counts update reactively"
-    status: pending
+    status: completed
   - id: "SC-2.10"
     description: "Visual polish complete; panes balanced, consistent spacing"
-    status: pending
+    status: completed
   - id: "SC-2.11"
     description: "E2E tests pass (folder selection -> right pane display -> bulk import)"
-    status: pending
+    status: completed
   - id: "SC-2.12"
     description: "View mode and filter state persist to localStorage"
-    status: pending
+    status: completed
 
 tasks:
   - id: "MFV-2.1"
     title: "Folder detail pane container"
-    status: pending
+    status: completed
     assigned_to: ["ui-engineer-enhanced"]
     model: sonnet
     effort: 2
@@ -71,7 +71,7 @@ tasks:
 
   - id: "MFV-2.2"
     title: "Folder detail header"
-    status: pending
+    status: completed
     assigned_to: ["ui-engineer-enhanced"]
     model: opus
     effort: 3
@@ -81,7 +81,7 @@ tasks:
 
   - id: "MFV-2.3"
     title: "README extraction utilities"
-    status: pending
+    status: completed
     assigned_to: ["frontend-developer"]
     model: sonnet
     effort: 2
@@ -91,7 +91,7 @@ tasks:
 
   - id: "MFV-2.4"
     title: "'Import All' bulk action"
-    status: pending
+    status: completed
     assigned_to: ["ui-engineer-enhanced"]
     model: opus
     effort: 3
@@ -101,7 +101,7 @@ tasks:
 
   - id: "MFV-2.5"
     title: "Artifact type section component"
-    status: pending
+    status: completed
     assigned_to: ["ui-engineer-enhanced"]
     model: sonnet
     effort: 2
@@ -111,7 +111,7 @@ tasks:
 
   - id: "MFV-2.6"
     title: "Type grouping logic"
-    status: pending
+    status: completed
     assigned_to: ["frontend-developer"]
     model: sonnet
     effort: 2
@@ -121,7 +121,7 @@ tasks:
 
   - id: "MFV-2.7"
     title: "Subfolders section component"
-    status: pending
+    status: completed
     assigned_to: ["ui-engineer-enhanced"]
     model: sonnet
     effort: 2
@@ -131,7 +131,7 @@ tasks:
 
   - id: "MFV-2.8"
     title: "Subfolder card component"
-    status: pending
+    status: completed
     assigned_to: ["ui-engineer-enhanced"]
     model: sonnet
     effort: 2
@@ -141,7 +141,7 @@ tasks:
 
   - id: "MFV-2.9"
     title: "Subfolder navigation integration"
-    status: pending
+    status: completed
     assigned_to: ["frontend-developer"]
     model: sonnet
     effort: 2
@@ -151,7 +151,7 @@ tasks:
 
   - id: "MFV-2.10"
     title: "Empty state for folder detail"
-    status: pending
+    status: completed
     assigned_to: ["ui-engineer-enhanced"]
     model: haiku
     effort: 1
@@ -161,7 +161,7 @@ tasks:
 
   - id: "MFV-2.11"
     title: "Filter integration"
-    status: pending
+    status: completed
     assigned_to: ["frontend-developer"]
     model: sonnet
     effort: 2
@@ -171,7 +171,7 @@ tasks:
 
   - id: "MFV-2.12"
     title: "Visual polish"
-    status: pending
+    status: completed
     assigned_to: ["ui-designer"]
     model: sonnet
     effort: 2
@@ -181,7 +181,7 @@ tasks:
 
   - id: "MFV-2.13"
     title: "E2E tests"
-    status: pending
+    status: completed
     assigned_to: ["frontend-developer"]
     model: sonnet
     effort: 2
