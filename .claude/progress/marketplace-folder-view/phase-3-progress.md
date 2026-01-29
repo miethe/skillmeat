@@ -3,13 +3,13 @@ type: progress
 prd: marketplace-folder-view
 phase: 3
 title: Accessibility & Performance Optimization
-status: pending
+status: completed
 started: null
 completed: null
-progress: 87
+progress: 100
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 7
+completed_tasks: 8
 in_progress_tasks: 0
 blocked_tasks: 0
 owners:
@@ -131,7 +131,7 @@ tasks:
     tree/filtering functions; prevent unnecessary re-renders
 - id: MFV-3.8
   title: Documentation update
-  status: pending
+  status: completed
   assigned_to:
   - documentation-writer
   model: haiku
