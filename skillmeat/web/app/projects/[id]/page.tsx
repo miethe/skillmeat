@@ -554,6 +554,18 @@ function ProjectDetailPageContent() {
           entity={selectedEntity}
           open={isDetailOpen}
           onClose={handleDetailClose}
+          onNavigateToSource={(sourceId, artifactPath) => {
+            setIsDetailOpen(false);
+            setSelectedEntity(null);
+            router.push(`/marketplace/sources/${sourceId}?artifact=${encodeURIComponent(artifactPath)}`);
+          }}
+          onNavigateToDeployment={(projectPath, artifactId) => {
+            // When already on project page, close modal and navigate to manage page
+            setIsDetailOpen(false);
+            setSelectedEntity(null);
+            const encodedPath = btoa(projectPath);
+            router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
+          }}
         />
 
         {/* Bulk Import Modal - only show new artifacts (not already in collection) */}

@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Grid3x3, List, Loader2, ArrowLeft, Package, RefreshCw } from 'lucide-react';
+import { Grid3x3, List, Loader2, ArrowLeft, Package, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -16,7 +16,7 @@ import { EntityFilters } from '@/app/manage/components/entity-filters';
 import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
 import { DeployFromCollectionDialog } from './components/deploy-from-collection-dialog';
 import { PullToCollectionDialog } from './components/pull-to-collection-dialog';
-import { Entity, EntityType, EntityStatus } from '@/types/entity';
+import { Entity, EntityType } from '@/types/entity';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,8 +47,6 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
     searchQuery,
     statusFilter,
     deleteEntity,
-    updateEntity,
-    syncEntity,
   } = useEntityLifecycle();
 
   // Local state
@@ -187,7 +185,7 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
         {/* Tabs */}
         <div className="mt-4">
           <EntityTabs>
-            {(entityType) => (
+            {() => (
               <div className="flex h-full flex-col">
                 {/* Filters */}
                 <EntityFilters
