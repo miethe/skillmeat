@@ -2,7 +2,7 @@
 type: progress
 prd: "marketplace-folder-view"
 phase: 1
-title: "Core Folder View Component & Tree Building"
+title: "Two-Pane Layout & Semantic Tree"
 status: not_started
 started: null
 completed: null
@@ -22,21 +22,27 @@ blockers: []
 
 success_criteria:
   - id: "SC-1.1"
-    description: "Tree builder utilities tested and verified (>80% coverage)"
+    description: "Tree builder + semantic filtering utilities tested (>80% coverage)"
     status: pending
   - id: "SC-1.2"
-    description: "All components render in Storybook with correct styling"
+    description: "Two-pane layout renders correctly with proper proportions (25% left, 75% right)"
     status: pending
   - id: "SC-1.3"
-    description: "Folder view button appears in toolbar and toggles correctly"
+    description: "Semantic tree displays only intermediate folders (roots/leafs excluded)"
     status: pending
   - id: "SC-1.4"
-    description: "Filters apply to tree; filtered items removed; re-rendering works"
+    description: "Folder view button appears in toolbar and toggles layout correctly"
     status: pending
   - id: "SC-1.5"
-    description: "No console errors; malformed paths handled gracefully"
+    description: "First folder auto-selects on folder view toggle; right pane populates"
     status: pending
   - id: "SC-1.6"
+    description: "Folder selection works; tree node selection state visual feedback"
+    status: pending
+  - id: "SC-1.7"
+    description: "No console errors; malformed paths handled gracefully"
+    status: pending
+  - id: "SC-1.8"
     description: "Performance baseline: tree renders for 500 items in <300ms"
     status: pending
 
@@ -52,64 +58,64 @@ tasks:
     description: "Create buildFolderTree() function to convert flat CatalogEntry[] to nested tree structure with maxDepth parameter"
 
   - id: "MFV-1.2"
-    title: "Depth calculator"
+    title: "Semantic filtering utilities"
     status: pending
     assigned_to: ["frontend-developer"]
     model: sonnet
     effort: 2
     priority: critical
     dependencies: []
-    description: "Create calculateAutoDepth() function; detect optimal depth from root_hint or scan first 50 entries"
+    description: "Create isSemanticFolder() to exclude root folders (plugins/, src/, skills/) and leaf containers (commands/, agents/, mcp_servers/); implement smart tree filtering"
 
   - id: "MFV-1.3"
-    title: "useFolderTree hook"
+    title: "useFolderSelection hook"
     status: pending
     assigned_to: ["frontend-developer"]
     model: sonnet
-    effort: 3
+    effort: 2
     priority: high
-    dependencies: ["MFV-1.1", "MFV-1.2"]
-    description: "Create React hook managing tree state (expanded folders, depth setting, filtered items)"
+    dependencies: ["MFV-1.1"]
+    description: "Create React hook managing folder selection state (selected folder path, expanded folders); return selection + setSelected() callback"
 
   - id: "MFV-1.4"
-    title: "ArtifactRowFolder component"
+    title: "Two-pane layout component"
     status: pending
     assigned_to: ["ui-engineer-enhanced"]
     model: opus
     effort: 3
     priority: high
     dependencies: []
-    description: "Create artifact row component with type icon, name, confidence badge, status indicator, actions"
+    description: "Create two-pane container layout with left pane (25%, semantic tree) and right pane (75%, folder detail). Manage layout, responsive behavior"
 
   - id: "MFV-1.5"
-    title: "DirectoryNode component"
+    title: "Semantic tree component"
     status: pending
     assigned_to: ["ui-engineer-enhanced"]
     model: opus
     effort: 3
     priority: high
-    dependencies: ["MFV-1.3"]
-    description: "Create collapsible folder node using Radix Collapsible with chevron, folder icon, name, count badge"
+    dependencies: ["MFV-1.2", "MFV-1.3"]
+    description: "Create left pane semantic navigation tree; render folders filtered by semantic rules; support expand/collapse; integrate folder selection"
 
   - id: "MFV-1.6"
-    title: "CatalogFolder container"
-    status: pending
-    assigned_to: ["ui-engineer-enhanced"]
-    model: opus
-    effort: 3
-    priority: high
-    dependencies: ["MFV-1.4", "MFV-1.5"]
-    description: "Create main tree view component; recursively renders DirectoryNode and ArtifactRowFolder"
-
-  - id: "MFV-1.7"
-    title: "Folder view toolbar button"
+    title: "Tree node component"
     status: pending
     assigned_to: ["ui-engineer-enhanced"]
     model: sonnet
     effort: 2
+    priority: high
+    dependencies: []
+    description: "Create individual tree folder item with: folder icon, folder name, expand/collapse chevron, count badge; integrate with selection state"
+
+  - id: "MFV-1.7"
+    title: "Toolbar folder toggle"
+    status: pending
+    assigned_to: ["ui-engineer-enhanced"]
+    model: sonnet
+    effort: 1
     priority: medium
-    dependencies: ["MFV-1.6"]
-    description: "Add 'Folder' button to view mode toggle in SourceToolbar"
+    dependencies: []
+    description: "Add 'Folder' button to view mode toggle in SourceToolbar; button toggles between grid/list/folder modes"
 
   - id: "MFV-1.8"
     title: "Page integration"
@@ -118,47 +124,46 @@ tasks:
     model: sonnet
     effort: 2
     priority: medium
-    dependencies: ["MFV-1.6"]
-    description: "Integrate CatalogFolder into source detail page with view mode switching"
+    dependencies: ["MFV-1.4", "MFV-1.5"]
+    description: "Integrate two-pane layout into source detail page with view mode switching"
 
   - id: "MFV-1.9"
-    title: "Filter integration"
+    title: "First folder auto-selection"
     status: pending
     assigned_to: ["frontend-developer"]
     model: sonnet
     effort: 2
     priority: medium
-    dependencies: ["MFV-1.6"]
-    description: "Verify all filters (type, confidence, search, status) work with folder view"
+    dependencies: ["MFV-1.3", "MFV-1.5"]
+    description: "Implement auto-selection of first semantic folder on folder view load; ensure right pane populates immediately"
 
   - id: "MFV-1.10"
-    title: "Unit tests + Storybook"
+    title: "Unit tests"
     status: pending
     assigned_to: ["frontend-developer"]
     model: sonnet
     effort: 2
     priority: medium
-    dependencies: ["MFV-1.1", "MFV-1.2", "MFV-1.4", "MFV-1.5", "MFV-1.6"]
-    description: "Test buildFolderTree() and calculateAutoDepth(); create Storybook stories for all components"
+    dependencies: ["MFV-1.1", "MFV-1.2"]
+    description: "Test buildFolderTree(), isSemanticFolder(), and filtering logic; cover edge cases (roots, leafs, special chars, deep nesting)"
 
 parallelization:
-  batch_1: ["MFV-1.1", "MFV-1.2"]
-  batch_2: ["MFV-1.3"]
-  batch_3: ["MFV-1.4"]
-  batch_4: ["MFV-1.5", "MFV-1.6"]
-  batch_5: ["MFV-1.7", "MFV-1.8", "MFV-1.9"]
-  batch_6: ["MFV-1.10"]
+  batch_1: ["MFV-1.1", "MFV-1.2", "MFV-1.4", "MFV-1.6", "MFV-1.7"]
+  batch_2: ["MFV-1.3", "MFV-1.10"]
+  batch_3: ["MFV-1.5"]
+  batch_4: ["MFV-1.8", "MFV-1.9"]
 ---
 
-# Phase 1: Core Folder View Component & Tree Building
+# Phase 1: Two-Pane Layout & Semantic Tree
 
 ## Overview
 
-Phase 1 delivers the foundational tree-building utilities and UI components for folder-based artifact navigation. This phase focuses on core functionality: parsing paths into tree structures, rendering collapsible folders with Radix, and integrating with existing filters. By end of Phase 1, users can toggle to folder view, expand/collapse folders, and see filtered artifacts organized hierarchically.
+Phase 1 delivers the two-pane master-detail layout with semantic navigation tree (left pane) and folder detail pane container (right pane). This phase builds tree utilities with smart semantic filtering (excluding root folders like `plugins/`, `src/` and leaf artifact containers like `commands/`, `agents/`), renders the semantic tree component with collapsible folders, implements the folder detail pane container, and integrates the layout into the source detail page. By end of Phase 1, users can toggle to folder view, see the two-pane layout, select folders from the semantic tree, and see the folder detail pane populate on the right.
 
 **Duration**: 4 days
-**Total Effort**: 24 story points
+**Total Effort**: 21 story points
 **Dependencies**: None (frontend-only, no API changes)
+**Design Reference**: Aligns with Gemini design spec for two-pane layout
 
 ## Tasks
 
@@ -180,11 +185,11 @@ Phase 1 delivers the foundational tree-building utilities and UI components for 
 - No console errors on malformed paths
 
 **Files to Create**:
-- `skillmeat/web/lib/folder-tree.ts`
+- `skillmeat/web/lib/tree-builder.ts`
 
 ---
 
-### MFV-1.2: Depth calculator
+### MFV-1.2: Semantic filtering utilities
 
 **Status**: `pending`
 **Assigned**: frontend-developer
@@ -192,45 +197,45 @@ Phase 1 delivers the foundational tree-building utilities and UI components for 
 **Effort**: 2 pts
 **Priority**: critical
 
-**Description**: Create `calculateAutoDepth()` function; detect optimal depth from `root_hint` or scan first 50 entries; implement depth options (Auto/TopLevel/1-3 levels).
+**Description**: Create `isSemanticFolder()` to exclude root folders (plugins/, src/, skills/, etc.) and leaf containers (commands/, agents/, mcp_servers/, etc.); implement smart tree filtering.
 
 **Acceptance Criteria**:
-- Function returns auto-detected depth
-- Respects `root_hint` when provided
-- Provides consistent results across similar catalogs
-- Handles edge cases (empty catalog, single item)
+- Filters exclude designated roots and leafs
+- Intermediate folders shown
+- Function handles edge cases
+- Filters produce clean navigation tree
 
 **Files to Create**:
-- `skillmeat/web/lib/folder-tree.ts` (extend)
+- `skillmeat/web/lib/tree-filter-utils.ts`
 
 ---
 
-### MFV-1.3: useFolderTree hook
+### MFV-1.3: useFolderSelection hook
 
 **Status**: `pending`
 **Assigned**: frontend-developer
 **Model**: sonnet
-**Effort**: 3 pts
+**Effort**: 2 pts
 **Priority**: high
 
-**Description**: Create React hook `useFolderTree()` managing tree state (expanded folders, depth setting, filtered items); return tree data + setExpanded() callback.
+**Description**: Create React hook `useFolderSelection()` managing folder selection state (selected folder path, expanded folders); return selection + setSelected() callback.
 
 **Acceptance Criteria**:
-- Hook returns tree structure and management functions
-- Tracks expanded state per folder path
-- Re-builds tree on filter/depth change
-- Memoized to prevent unnecessary rebuilds
+- Hook tracks selected folder
+- Tracks expanded state
+- Updates on user interaction
+- Memoized
+- Integrates with semantic filtering
 
 **Files to Create**:
-- `skillmeat/web/lib/hooks/use-folder-tree.ts`
+- `skillmeat/web/lib/hooks/use-folder-selection.ts`
 
 **Dependencies**:
 - MFV-1.1: Tree builder functions
-- MFV-1.2: Depth calculator functions
 
 ---
 
-### MFV-1.4: ArtifactRowFolder component
+### MFV-1.4: Two-pane layout component
 
 **Status**: `pending`
 **Assigned**: ui-engineer-enhanced
@@ -238,21 +243,20 @@ Phase 1 delivers the foundational tree-building utilities and UI components for 
 **Effort**: 3 pts
 **Priority**: high
 
-**Description**: Create artifact row component displaying: type icon, artifact name, confidence badge, status indicator, import/exclude actions (reuse CatalogRow pattern).
+**Description**: Create two-pane container layout with left pane (25%, semantic tree) and right pane (75%, folder detail). Manage layout, responsive behavior, splitter.
 
 **Acceptance Criteria**:
-- Row renders in folder context with proper indentation
-- Shows all artifact metadata (type, name, confidence, status)
-- Actions work (import/exclude buttons)
-- Matches grid/list row styling
-- TypeScript fully typed
+- Layout renders two panes side-by-side
+- Proportions correct (25% left, 75% right)
+- Responsive on smaller screens (stacked layout)
+- Smooth splitter (optional)
 
 **Files to Create**:
-- `skillmeat/web/app/marketplace/sources/[id]/components/artifact-row-folder.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/source-folder-layout.tsx`
 
 ---
 
-### MFV-1.5: DirectoryNode component
+### MFV-1.5: Semantic tree component
 
 **Status**: `pending`
 **Assigned**: ui-engineer-enhanced
@@ -260,70 +264,64 @@ Phase 1 delivers the foundational tree-building utilities and UI components for 
 **Effort**: 3 pts
 **Priority**: high
 
-**Description**: Create collapsible folder node using Radix Collapsible: chevron icon, folder icon, folder name, artifact count badge; integrate with `useFolderTree` expanded state.
+**Description**: Create left pane semantic navigation tree; render folders filtered by semantic rules; support expand/collapse; integrate folder selection.
 
 **Acceptance Criteria**:
-- Folder expands/collapses on click
-- Chevron rotates on expand/collapse
-- Shows artifact count badge
-- Lazy-renders children (collapsed folders have no child DOM)
-- Matches folder icon from Lucide
-- Keyboard-accessible (Enter/Space to toggle)
+- Tree renders only semantic folders
+- Expand/collapse works
+- Selection tracking
+- Shows folder hierarchy
+- No root/leaf containers
 
 **Files to Create**:
-- `skillmeat/web/app/marketplace/sources/[id]/components/directory-node.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx`
 
 **Dependencies**:
-- MFV-1.3: useFolderTree hook for expanded state
+- MFV-1.2: Semantic filtering utilities
+- MFV-1.3: useFolderSelection hook
 
 ---
 
-### MFV-1.6: CatalogFolder container
-
-**Status**: `pending`
-**Assigned**: ui-engineer-enhanced
-**Model**: opus
-**Effort**: 3 pts
-**Priority**: high
-
-**Description**: Create main tree view component; recursively renders DirectoryNode and ArtifactRowFolder; integrates with `useSourceCatalog` and filter state.
-
-**Acceptance Criteria**:
-- Tree renders correctly from root
-- All filters (type/confidence/search) applied to tree items
-- Empty state shown for filtered results
-- Scrolls smoothly with large trees
-
-**Files to Create**:
-- `skillmeat/web/app/marketplace/sources/[id]/components/catalog-folder.tsx`
-
-**Dependencies**:
-- MFV-1.4: ArtifactRowFolder component
-- MFV-1.5: DirectoryNode component
-
----
-
-### MFV-1.7: Folder view toolbar button
+### MFV-1.6: Tree node component
 
 **Status**: `pending`
 **Assigned**: ui-engineer-enhanced
 **Model**: sonnet
 **Effort**: 2 pts
+**Priority**: high
+
+**Description**: Create individual tree folder item with: folder icon, folder name, expand/collapse chevron, count badge; integrate with selection state.
+
+**Acceptance Criteria**:
+- Folder node renders with proper styling
+- Chevron rotates on expand
+- Count shows
+- Keyboard-accessible
+- Consistent with design system
+
+**Files to Create**:
+- `skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx`
+
+---
+
+### MFV-1.7: Toolbar folder toggle
+
+**Status**: `pending`
+**Assigned**: ui-engineer-enhanced
+**Model**: sonnet
+**Effort**: 1 pt
 **Priority**: medium
 
 **Description**: Add "Folder" button to view mode toggle in SourceToolbar; button toggles between grid/list/folder modes; uses existing view mode pattern.
 
 **Acceptance Criteria**:
-- Button appears in toolbar alongside grid/list
+- Button appears in toolbar
 - Clicking switches to folder view
-- Other buttons still work
-- View toggle styling consistent
+- View mode persists in state
+- Styling consistent
 
 **Files to Modify**:
 - `skillmeat/web/app/marketplace/sources/[id]/components/source-toolbar.tsx`
-
-**Dependencies**:
-- MFV-1.6: CatalogFolder component exists
 
 ---
 
@@ -335,7 +333,7 @@ Phase 1 delivers the foundational tree-building utilities and UI components for 
 **Effort**: 2 pts
 **Priority**: medium
 
-**Description**: Integrate CatalogFolder into source detail page with conditional rendering based on view mode.
+**Description**: Integrate two-pane layout into source detail page with conditional rendering based on view mode.
 
 **Acceptance Criteria**:
 - Folder view renders when view mode is "folder"
@@ -346,11 +344,12 @@ Phase 1 delivers the foundational tree-building utilities and UI components for 
 - `skillmeat/web/app/marketplace/sources/[id]/page.tsx`
 
 **Dependencies**:
-- MFV-1.6: CatalogFolder component exists
+- MFV-1.4: Two-pane layout component
+- MFV-1.5: Semantic tree component
 
 ---
 
-### MFV-1.9: Filter integration
+### MFV-1.9: First folder auto-selection
 
 **Status**: `pending`
 **Assigned**: frontend-developer
@@ -358,23 +357,24 @@ Phase 1 delivers the foundational tree-building utilities and UI components for 
 **Effort**: 2 pts
 **Priority**: medium
 
-**Description**: Verify all filters (type, confidence, search, status) work with folder view; tree re-renders on filter change; filtered items removed from tree.
+**Description**: Implement auto-selection of first semantic folder on folder view load; ensure right pane populates immediately.
 
 **Acceptance Criteria**:
-- Filters applied to tree items
-- Empty folders show "(No importable artifacts)" message
-- Tree updates reactively on filter change
-- No performance lag on filter change
+- On folder view toggle, first folder auto-selected
+- Folder detail pane shows data immediately
+- Smooth UX transition
 
 **Files to Modify**:
-- `skillmeat/web/app/marketplace/sources/[id]/components/catalog-folder.tsx`
+- `skillmeat/web/lib/hooks/use-folder-selection.ts`
+- `skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx`
 
 **Dependencies**:
-- MFV-1.6: CatalogFolder component exists
+- MFV-1.3: useFolderSelection hook
+- MFV-1.5: Semantic tree component
 
 ---
 
-### MFV-1.10: Unit tests + Storybook
+### MFV-1.10: Unit tests
 
 **Status**: `pending`
 **Assigned**: frontend-developer
@@ -382,46 +382,48 @@ Phase 1 delivers the foundational tree-building utilities and UI components for 
 **Effort**: 2 pts
 **Priority**: medium
 
-**Description**: Test `buildFolderTree()` and `calculateAutoDepth()` functions; cover path parsing edge cases; create Storybook stories for all components.
+**Description**: Test `buildFolderTree()`, `isSemanticFolder()`, and filtering logic; cover edge cases (roots, leafs, special chars, deep nesting).
 
 **Acceptance Criteria**:
 - >80% coverage for utility functions
+- Semantic filtering works correctly
 - Tests pass for 1000+ item sets
-- Edge cases handled gracefully (special chars, deep nesting)
-- Stories render all component states (expanded/collapsed, loading, empty, filtered)
-- Interactions work in Storybook
 
 **Files to Create**:
-- `skillmeat/web/__tests__/lib/folder-tree.test.ts`
-- `skillmeat/web/stories/marketplace/folder-view.stories.tsx`
+- `skillmeat/web/__tests__/lib/tree-builder.test.ts`
+- `skillmeat/web/__tests__/lib/tree-filter-utils.test.ts`
 
 **Dependencies**:
-- MFV-1.1, MFV-1.2: Utilities to test
-- MFV-1.4, MFV-1.5, MFV-1.6: Components to story
+- MFV-1.1: Tree builder utilities
+- MFV-1.2: Semantic filtering utilities
 
 ---
 
 ## Quality Gates
 
-- [ ] Tree builder utilities tested and verified (>80% coverage)
-- [ ] All components render in Storybook with correct styling
-- [ ] Folder view button appears in toolbar and toggles correctly
-- [ ] Filters apply to tree; filtered items removed; re-rendering works
+- [ ] Tree builder + semantic filtering utilities tested (>80% coverage)
+- [ ] Two-pane layout renders correctly with proper proportions (25% left, 75% right)
+- [ ] Semantic tree displays only intermediate folders (roots/leafs excluded)
+- [ ] Folder view button appears in toolbar and toggles layout correctly
+- [ ] First folder auto-selects on folder view toggle; right pane populates
+- [ ] Folder selection works; tree node selection state visual feedback
 - [ ] No console errors; malformed paths handled gracefully
 - [ ] Performance baseline: tree renders for 500 items in <300ms (initial, not optimized)
-- [ ] Manual testing: expand/collapse folders, apply filters, toggle between view modes
+- [ ] Manual testing: toggle folder view, expand/collapse folders in left pane, folder detail shows on right
 
 ---
 
 ## Key Files
 
 ### New Files
-- `skillmeat/web/lib/folder-tree.ts`
-- `skillmeat/web/lib/hooks/use-folder-tree.ts`
-- `skillmeat/web/app/marketplace/sources/[id]/components/catalog-folder.tsx`
-- `skillmeat/web/app/marketplace/sources/[id]/components/directory-node.tsx`
-- `skillmeat/web/app/marketplace/sources/[id]/components/artifact-row-folder.tsx`
-- `skillmeat/web/__tests__/lib/folder-tree.test.ts`
+- `skillmeat/web/lib/tree-builder.ts`
+- `skillmeat/web/lib/tree-filter-utils.ts`
+- `skillmeat/web/lib/hooks/use-folder-selection.ts`
+- `skillmeat/web/app/marketplace/sources/[id]/components/source-folder-layout.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx`
+- `skillmeat/web/__tests__/lib/tree-builder.test.ts`
+- `skillmeat/web/__tests__/lib/tree-filter-utils.test.ts`
 
 ### Modified Files
 - `skillmeat/web/app/marketplace/sources/[id]/page.tsx`
@@ -431,4 +433,4 @@ Phase 1 delivers the foundational tree-building utilities and UI components for 
 
 ## Notes
 
-Phase 1 is frontend-only with no API changes. All tree building happens client-side using existing `CatalogEntry.path` field. Focus on getting core functionality working before polish.
+Phase 1 is frontend-only with no API changes. All tree building happens client-side using existing `CatalogEntry.path` field. This phase implements a two-pane master-detail layout aligning with Gemini design spec. Focus on getting core layout and semantic tree working before Phase 2 folder detail pane features.

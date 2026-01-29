@@ -10,7 +10,7 @@ completed: null
 progress: 0
 completion_estimate: "on-track"
 
-total_tasks: 10
+total_tasks: 8
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
@@ -22,13 +22,13 @@ blockers: []
 
 success_criteria:
   - id: "SC-3.1"
-    description: "Full keyboard navigation working (all keys tested)"
+    description: "Full keyboard navigation working (tree + panes, all keys tested)"
     status: pending
   - id: "SC-3.2"
-    description: "Screen reader announces folder/artifact correctly (tested on 2+ readers)"
+    description: "Screen reader announces folder structure, selection, artifact counts (tested on 2+ readers)"
     status: pending
   - id: "SC-3.3"
-    description: "Focus indicators visible and focus management correct"
+    description: "Focus indicators visible; focus management correct between panes"
     status: pending
   - id: "SC-3.4"
     description: "Accessibility audit passes WCAG 2.1 AA (automated + manual)"
@@ -40,13 +40,10 @@ success_criteria:
     description: "Lazy rendering reduces initial DOM nodes 60-80%"
     status: pending
   - id: "SC-3.7"
-    description: "No performance regression on filter changes"
+    description: "No performance regression on filter changes or folder selection"
     status: pending
   - id: "SC-3.8"
-    description: "Performance E2E tests pass"
-    status: pending
-  - id: "SC-3.9"
-    description: "Accessibility documentation complete"
+    description: "Memoization prevents unnecessary re-renders"
     status: pending
 
 tasks:
@@ -58,27 +55,27 @@ tasks:
     effort: 3
     priority: critical
     dependencies: []
-    description: "Implement full keyboard support: Up/Down navigate siblings, Left/Right expand/collapse, Enter/Space toggle"
+    description: "Implement: Up/Down arrows navigate tree siblings, Left/Right expand/collapse folders, Enter/Space to select, Tab to move between left pane/right pane, Home/End for first/last"
 
   - id: "MFV-3.2"
-    title: "ARIA labels & roles"
+    title: "ARIA labels and roles"
     status: pending
     assigned_to: ["web-accessibility-checker"]
     model: opus
     effort: 2
     priority: critical
     dependencies: []
-    description: "Add semantic roles and labels: folders as role=treeitem, announce expanded/collapsed state"
+    description: "Add semantic roles/labels: left pane as role='tree', folders as role='treeitem', right pane as main content region; announce folder counts, artifact types"
 
   - id: "MFV-3.3"
-    title: "Focus management"
+    title: "Focus management between panes"
     status: pending
     assigned_to: ["web-accessibility-checker"]
     model: opus
     effort: 2
     priority: critical
     dependencies: ["MFV-3.1"]
-    description: "Implement roving tabindex pattern; focus indicators visible (2px ring); no focus traps"
+    description: "Implement roving tabindex in tree; manage focus when selecting folders; visible focus indicators (2px ring); focus transitions between panes smooth"
 
   - id: "MFV-3.4"
     title: "Screen reader testing"
@@ -88,85 +85,63 @@ tasks:
     effort: 2
     priority: high
     dependencies: ["MFV-3.2"]
-    description: "Test with NVDA, JAWS, VoiceOver; verify folder structure announced correctly"
+    description: "Test with NVDA (Windows), JAWS (Windows), VoiceOver (macOS); verify tree structure, folder selection, right pane content all announced correctly"
 
   - id: "MFV-3.5"
-    title: "Lazy rendering implementation"
+    title: "Lazy rendering"
     status: pending
     assigned_to: ["react-performance-optimizer"]
     model: opus
-    effort: 3
+    effort: 2
     priority: critical
     dependencies: []
-    description: "Collapsed folders don't render children; render on demand when expanded"
+    description: "Prevent DOM explosion: collapsed folders don't render children initially; render on demand when expanded; measure DOM node count before/after"
 
   - id: "MFV-3.6"
     title: "Performance profiling"
     status: pending
     assigned_to: ["react-performance-optimizer"]
-    model: opus
+    model: sonnet
     effort: 2
     priority: high
-    dependencies: []
-    description: "Profile tree rendering with DevTools; measure render time for 500/1000 item trees"
+    dependencies: ["MFV-3.5"]
+    description: "Profile tree rendering with DevTools; measure render time for 500/1000 item trees; optimize hot paths; target <200ms for 1000 items"
 
   - id: "MFV-3.7"
     title: "Memoization optimization"
     status: pending
     assigned_to: ["react-performance-optimizer"]
     model: sonnet
-    effort: 2
+    effort: 1
     priority: high
-    dependencies: ["MFV-3.5", "MFV-3.6"]
-    description: "Add React.memo() to components; memoize tree calculation functions"
+    dependencies: ["MFV-3.6"]
+    description: "Add React.memo() to tree nodes and detail pane components; memoize tree/filtering functions; prevent unnecessary re-renders"
 
   - id: "MFV-3.8"
-    title: "Accessibility audit fixes"
-    status: pending
-    assigned_to: ["web-accessibility-checker"]
-    model: opus
-    effort: 2
-    priority: high
-    dependencies: ["MFV-3.2", "MFV-3.4"]
-    description: "Run automated WCAG audit (axe); fix any critical/serious issues; verify color contrast"
-
-  - id: "MFV-3.9"
-    title: "Performance E2E tests"
-    status: pending
-    assigned_to: ["frontend-developer"]
-    model: sonnet
-    effort: 2
-    priority: medium
-    dependencies: ["MFV-3.6"]
-    description: "Write Playwright tests measuring render time; benchmark tree loading for 500/1000 items"
-
-  - id: "MFV-3.10"
     title: "Documentation update"
     status: pending
     assigned_to: ["documentation-writer"]
     model: haiku
-    effort: 1
+    effort: 2
     priority: low
-    dependencies: ["MFV-3.1", "MFV-3.2"]
-    description: "Document keyboard navigation, ARIA patterns, screen reader behavior"
+    dependencies: ["MFV-3.1", "MFV-3.2", "MFV-3.3", "MFV-3.4", "MFV-3.5", "MFV-3.6", "MFV-3.7"]
+    description: "Document keyboard navigation, ARIA patterns, focus management, performance optimizations"
 
 parallelization:
-  batch_1: ["MFV-3.1", "MFV-3.2", "MFV-3.3"]
-  batch_2: ["MFV-3.4"]
-  batch_3: ["MFV-3.5", "MFV-3.6"]
-  batch_4: ["MFV-3.7"]
-  batch_5: ["MFV-3.8", "MFV-3.9"]
-  batch_6: ["MFV-3.10"]
+  batch_1: ["MFV-3.1", "MFV-3.2", "MFV-3.5"]
+  batch_2: ["MFV-3.3", "MFV-3.4", "MFV-3.6"]
+  batch_3: ["MFV-3.7"]
+  batch_4: ["MFV-3.8"]
 ---
 
 # Phase 3: Accessibility & Performance Optimization
 
 ## Overview
 
-Phase 3 ensures accessibility compliance (WCAG 2.1 AA), full keyboard navigation, and performance optimization. Users can navigate the entire tree using arrow keys, Enter/Space to expand/collapse, and Tab between controls. Screen readers announce folder state, item counts, and artifact types. Performance is optimized: collapsed folders don't render children initially, tree renders 1000+ artifacts within 200ms budget. Final validation includes accessibility audit and performance profiling.
+Phase 3 ensures accessibility compliance (WCAG 2.1 AA) and performance optimization. Users can navigate the left pane tree using arrow keys, enter/space to expand/collapse, and Tab between panes. Screen readers announce folder state, item counts, and artifact types. Performance is optimized: collapsed folders don't render children initially, tree renders 1000+ artifacts within 200ms budget. Final validation includes accessibility audit and performance profiling.
 
-**Duration**: 3 days
-**Total Effort**: 21 story points
+**Duration**: 2 days
+**Total Effort**: 16 story points
 **Dependencies**: Phase 2 complete
 
 ## Tasks
@@ -179,24 +154,23 @@ Phase 3 ensures accessibility compliance (WCAG 2.1 AA), full keyboard navigation
 **Effort**: 3 pts
 **Priority**: critical
 
-**Description**: Implement full keyboard support: Up/Down arrows navigate siblings, Left/Right expand/collapse folders, Enter/Space to toggle, Tab to next control, Home/End for first/last.
+**Description**: Implement: Up/Down arrows navigate tree siblings, Left/Right expand/collapse folders, Enter/Space to select, Tab to move between left pane/right pane, Home/End for first/last.
 
 **Acceptance Criteria**:
-- Up/Down moves between tree items (folders and artifacts)
-- Left collapses current folder or moves to parent
-- Right expands current folder or moves to first child
-- Enter/Space toggles folder expand/collapse
-- Tab moves to next control outside tree
-- Home/End jump to first/last tree item
-- Focus stays within tree during arrow navigation
+- Up/Down moves between tree items
+- Left collapses, Right expands
+- Enter selects folder
+- Tab moves pane focus
+- No focus traps
 
 **Files to Modify**:
-- `skillmeat/web/app/marketplace/sources/[id]/components/catalog-folder.tsx`
-- `skillmeat/web/app/marketplace/sources/[id]/components/directory-node.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/source-folder-layout.tsx`
 
 ---
 
-### MFV-3.2: ARIA labels & roles
+### MFV-3.2: ARIA labels and roles
 
 **Status**: `pending`
 **Assigned**: web-accessibility-checker
@@ -204,24 +178,21 @@ Phase 3 ensures accessibility compliance (WCAG 2.1 AA), full keyboard navigation
 **Effort**: 2 pts
 **Priority**: critical
 
-**Description**: Add semantic roles and labels: folders as `role="treeitem"`, announce expanded/collapsed state, item counts, artifact types; roving tabindex pattern.
+**Description**: Add semantic roles/labels: left pane as `role="tree"`, folders as `role="treeitem"`, right pane as main content region; announce folder counts, artifact types.
 
 **Acceptance Criteria**:
-- Tree container has `role="tree"`
-- Folders have `role="treeitem"` with `aria-expanded`
-- Artifacts have `role="treeitem"` (leaf nodes)
+- Screen reader announces: "Folder tree region"
 - Screen reader announces: "Folder: skills, 42 artifacts, expanded"
-- Screen reader announces: "Artifact: my-skill, type: skill, confidence: high"
-- Groups have `role="group"` for proper nesting
+- Artifact types and counts in right pane announced
 
 **Files to Modify**:
-- `skillmeat/web/app/marketplace/sources/[id]/components/catalog-folder.tsx`
-- `skillmeat/web/app/marketplace/sources/[id]/components/directory-node.tsx`
-- `skillmeat/web/app/marketplace/sources/[id]/components/artifact-row-folder.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/folder-detail-pane.tsx`
 
 ---
 
-### MFV-3.3: Focus management
+### MFV-3.3: Focus management between panes
 
 **Status**: `pending`
 **Assigned**: web-accessibility-checker
@@ -229,21 +200,22 @@ Phase 3 ensures accessibility compliance (WCAG 2.1 AA), full keyboard navigation
 **Effort**: 2 pts
 **Priority**: critical
 
-**Description**: Implement roving tabindex pattern; manage focus when expanding/collapsing; focus indicators visible (2px ring); focus trap not created.
+**Description**: Implement roving tabindex in tree; manage focus when selecting folders; visible focus indicators (2px ring); focus transitions between panes smooth.
 
 **Acceptance Criteria**:
-- Only one tree item is in tab order at a time (roving tabindex)
-- Focus moves with keyboard navigation
-- Focus indicator visible on keyboard nav (2px ring, high contrast)
-- Expanding folder doesn't move focus away from current item
-- No focus traps created; Tab moves outside tree
+- Focus moves with tree navigation
+- Visible on keyboard nav
+- Selecting folder doesn't lose focus
+- Tab cycles between panes
+- No traps
 
 **Files to Modify**:
-- `skillmeat/web/app/marketplace/sources/[id]/components/catalog-folder.tsx`
-- `skillmeat/web/app/marketplace/sources/[id]/components/directory-node.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/source-folder-layout.tsx`
 
 **Dependencies**:
-- MFV-3.1: Keyboard navigation complete
+- MFV-3.1: Keyboard navigation
 
 ---
 
@@ -255,39 +227,37 @@ Phase 3 ensures accessibility compliance (WCAG 2.1 AA), full keyboard navigation
 **Effort**: 2 pts
 **Priority**: high
 
-**Description**: Test with NVDA (Windows), JAWS (Windows), VoiceOver (macOS); verify folder structure announced correctly; test expand/collapse announcements.
+**Description**: Test with NVDA (Windows), JAWS (Windows), VoiceOver (macOS); verify tree structure, folder selection, right pane content all announced correctly.
 
 **Acceptance Criteria**:
-- Tested on at least 2 screen readers
-- Folder/artifact structure announced clearly
-- Expand/collapse state announced
-- No confusion or missing context
-- Navigation works correctly with screen reader
+- Tested on 2+ screen readers
+- Tree navigation clear
+- Folder selection announced
+- Right pane content accessible
 
 **Dependencies**:
-- MFV-3.2: ARIA labels complete
+- MFV-3.2: ARIA labels and roles
 
 ---
 
-### MFV-3.5: Lazy rendering implementation
+### MFV-3.5: Lazy rendering
 
 **Status**: `pending`
 **Assigned**: react-performance-optimizer
 **Model**: opus
-**Effort**: 3 pts
+**Effort**: 2 pts
 **Priority**: critical
 
 **Description**: Prevent DOM explosion: collapsed folders don't render children initially; render on demand when expanded; measure DOM node count before/after.
 
 **Acceptance Criteria**:
 - Collapsed folders have no child DOM nodes
-- Expanding folder renders children on-demand
+- Expanding loads children on-demand
 - DOM node count reduced 60-80% with mostly collapsed tree
-- Smooth expansion animation (no jank on render)
 
 **Files to Modify**:
-- `skillmeat/web/app/marketplace/sources/[id]/components/directory-node.tsx`
-- `skillmeat/web/app/marketplace/sources/[id]/components/catalog-folder.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx`
 
 ---
 
@@ -295,7 +265,7 @@ Phase 3 ensures accessibility compliance (WCAG 2.1 AA), full keyboard navigation
 
 **Status**: `pending`
 **Assigned**: react-performance-optimizer
-**Model**: opus
+**Model**: sonnet
 **Effort**: 2 pts
 **Priority**: high
 
@@ -305,13 +275,16 @@ Phase 3 ensures accessibility compliance (WCAG 2.1 AA), full keyboard navigation
 - Tree renders 1000 artifacts in <200ms
 - Filter changes apply in <100ms
 - No jank on expand/collapse
-- DevTools timeline shows smooth frames (no long tasks)
-- Hot paths identified and documented
+- Smooth frames in DevTools
 
 **Files to Analyze**:
-- `skillmeat/web/lib/folder-tree.ts`
-- `skillmeat/web/lib/hooks/use-folder-tree.ts`
-- `skillmeat/web/app/marketplace/sources/[id]/components/catalog-folder.tsx`
+- `skillmeat/web/lib/tree-builder.ts`
+- `skillmeat/web/lib/tree-filter-utils.ts`
+- `skillmeat/web/lib/hooks/use-folder-selection.ts`
+- `skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx`
+
+**Dependencies**:
+- MFV-3.5: Lazy rendering
 
 ---
 
@@ -320,130 +293,76 @@ Phase 3 ensures accessibility compliance (WCAG 2.1 AA), full keyboard navigation
 **Status**: `pending`
 **Assigned**: react-performance-optimizer
 **Model**: sonnet
-**Effort**: 2 pts
+**Effort**: 1 pt
 **Priority**: high
 
-**Description**: Add React.memo() to components; memoize tree calculation functions; prevent unnecessary re-renders on leaf changes.
+**Description**: Add React.memo() to tree nodes and detail pane components; memoize tree/filtering functions; prevent unnecessary re-renders.
 
 **Acceptance Criteria**:
-- Leaf components wrapped with React.memo
-- Tree calculation functions memoized with useMemo
+- Components wrapped with React.memo
+- Functions memoized with useMemo
 - Re-render count reduced in DevTools profiler
-- No unnecessary re-renders on unrelated state changes
 
 **Files to Modify**:
-- `skillmeat/web/app/marketplace/sources/[id]/components/directory-node.tsx`
-- `skillmeat/web/app/marketplace/sources/[id]/components/artifact-row-folder.tsx`
-- `skillmeat/web/lib/hooks/use-folder-tree.ts`
+- `skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/artifact-type-section.tsx`
+- `skillmeat/web/lib/hooks/use-folder-selection.ts`
 
 **Dependencies**:
-- MFV-3.5: Lazy rendering complete
-- MFV-3.6: Performance profiling complete (know what to optimize)
+- MFV-3.6: Performance profiling
 
 ---
 
-### MFV-3.8: Accessibility audit fixes
-
-**Status**: `pending`
-**Assigned**: web-accessibility-checker
-**Model**: opus
-**Effort**: 2 pts
-**Priority**: high
-
-**Description**: Run automated WCAG audit (axe); manual testing of all interactions; verify focus indicators, color contrast, label associations.
-
-**Acceptance Criteria**:
-- Automated audit passes (zero critical/serious issues)
-- Manual keyboard navigation complete
-- Color contrast >4.5:1 for text
-- All interactive elements have accessible names
-- No WCAG 2.1 AA violations
-
-**Dependencies**:
-- MFV-3.2: ARIA labels complete
-- MFV-3.4: Screen reader testing complete
-
----
-
-### MFV-3.9: Performance E2E tests
-
-**Status**: `pending`
-**Assigned**: frontend-developer
-**Model**: sonnet
-**Effort**: 2 pts
-**Priority**: medium
-
-**Description**: Write Playwright tests measuring render time; benchmark tree loading for 500/1000 items; create performance regression test.
-
-**Acceptance Criteria**:
-- E2E tests verify render time <200ms for 1000 items
-- Performance baseline established
-- Tests run in CI to catch regressions
-- Clear failure message if performance degrades
-
-**Files to Create**:
-- `skillmeat/web/tests/marketplace/folder-view-performance.spec.ts`
-
-**Dependencies**:
-- MFV-3.6: Performance profiling complete
-
----
-
-### MFV-3.10: Documentation update
+### MFV-3.8: Documentation update
 
 **Status**: `pending`
 **Assigned**: documentation-writer
 **Model**: haiku
-**Effort**: 1 pt
+**Effort**: 2 pts
 **Priority**: low
 
-**Description**: Document keyboard navigation, ARIA patterns, screen reader behavior in `.claude/context/` or CLAUDE.md; include implementation notes.
+**Description**: Document keyboard navigation, ARIA patterns, focus management, performance optimizations in CLAUDE.md or dedicated doc.
 
 **Acceptance Criteria**:
 - Developer guide explains keyboard nav (all key bindings)
 - ARIA labels pattern documented
 - Roving tabindex implementation explained
-- Includes code examples and patterns
-- Screen reader behavior documented
+- Performance optimizations documented
 
 **Files to Create/Modify**:
 - `skillmeat/web/CLAUDE.md` (add section)
-- `skillmeat/web/app/marketplace/sources/[id]/components/README.md` (optional)
 
 **Dependencies**:
-- MFV-3.1: Keyboard navigation complete
-- MFV-3.2: ARIA labels complete
+- MFV-3.1 through MFV-3.7
 
 ---
 
 ## Quality Gates
 
-- [ ] Full keyboard navigation working (all keys tested)
-- [ ] Screen reader announces folder/artifact correctly (tested on 2+ readers)
-- [ ] Focus indicators visible and focus management correct
+- [ ] Full keyboard navigation working (tree + panes, all keys tested)
+- [ ] Screen reader announces folder structure, selection, artifact counts (tested on 2+ readers)
+- [ ] Focus indicators visible; focus management correct between panes
 - [ ] Accessibility audit passes WCAG 2.1 AA (automated + manual)
 - [ ] Tree renders 1000 items in <200ms
 - [ ] Lazy rendering reduces initial DOM nodes 60-80%
-- [ ] No performance regression on filter changes
-- [ ] Performance E2E tests pass
-- [ ] Accessibility documentation complete
+- [ ] No performance regression on filter changes or folder selection
+- [ ] Memoization prevents unnecessary re-renders
 
 ---
 
 ## Key Files
 
-### New Files
-- `skillmeat/web/tests/marketplace/folder-view-performance.spec.ts`
-
 ### Modified Files
-- `skillmeat/web/app/marketplace/sources/[id]/components/catalog-folder.tsx`
-- `skillmeat/web/app/marketplace/sources/[id]/components/directory-node.tsx`
-- `skillmeat/web/app/marketplace/sources/[id]/components/artifact-row-folder.tsx`
-- `skillmeat/web/lib/hooks/use-folder-tree.ts`
+- `skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/source-folder-layout.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/folder-detail-pane.tsx`
+- `skillmeat/web/app/marketplace/sources/[id]/components/artifact-type-section.tsx`
+- `skillmeat/web/lib/hooks/use-folder-selection.ts`
 - `skillmeat/web/CLAUDE.md`
 
 ---
 
 ## Notes
 
-Phase 3 can be parallelized: accessibility work (MFV-3.1-3.4, 3.8) and performance work (MFV-3.5-3.7, 3.9) are largely independent. Documentation (MFV-3.10) can happen concurrently with audit fixes. Target WCAG 2.1 AA compliance and <200ms render for 1000 items.
+Phase 3 can be parallelized: accessibility work (MFV-3.1-3.4) and performance work (MFV-3.5-3.7) are largely independent. Documentation (MFV-3.8) depends on all other tasks completing. Target WCAG 2.1 AA compliance and <200ms render for 1000 items.

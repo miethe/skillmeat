@@ -21,18 +21,20 @@ related:
 - **Progress Tracking**: `.claude/progress/marketplace-folder-view-v1/all-phases-progress.md`
 
 **Complexity**: Medium (M)
-**Total Estimated Effort**: 28 story points
-**Target Timeline**: 10 days (4 days Phase 1 + 3 days Phase 2 + 3 days Phase 3)
+**Total Estimated Effort**: 29 story points
+**Target Timeline**: 9 days (4 days Phase 1 + 3 days Phase 2 + 2 days Phase 3)
 
 ---
 
 ## Executive Summary
 
-This plan delivers a hierarchical tree-based Folder View for marketplace source detail pages, enabling users to navigate 100+ artifact repositories by directory structure instead of flat lists. The implementation follows MeatyPrompts frontend-first architecture: build tree utilities first (no UI dependencies), then leaf components, then containers, then integration. Three phases deliver core functionality (Phase 1), configuration and polish (Phase 2), and accessibility/performance optimization (Phase 3). No API changes required; all tree building happens client-side using existing `CatalogEntry.path` field.
+This plan delivers a two-pane master-detail Folder View for marketplace source detail pages with semantic navigation tree and rich folder detail pane. The left pane (25%) shows a smart semantic navigation tree (excluding root and leaf artifact containers), while the right pane (75%) displays folder metadata, description, and all artifacts in that folder with type-based grouping. The implementation follows MeatyPrompts frontend-first architecture: build tree and filtering utilities first, then semantic tree component, then folder detail pane, then integration. Three phases deliver core layout with semantic tree (Phase 1), folder detail pane with bulk import (Phase 2), and accessibility/performance optimization (Phase 3). No API changes required; all tree building happens client-side using existing `CatalogEntry.path` field.
 
 **Key Outcomes:**
-- Users discover related artifacts 2-3x faster in large repositories
-- Folder view integrates seamlessly alongside existing grid/list modes
+- Users discover related artifacts 2-3x faster with two-pane layout
+- Semantic filtering eliminates root/leaf containers for cleaner navigation
+- Folder detail pane shows rich metadata and "Import All" bulk action
+- Artifacts grouped by type within each folder for clarity
 - Full WCAG 2.1 AA accessibility compliance with keyboard navigation
 - Tree renders 1000+ artifacts within 200ms budget via lazy rendering
 
@@ -44,39 +46,44 @@ This plan delivers a hierarchical tree-based Folder View for marketplace source 
 
 Since this is a frontend feature with no backend changes, we follow a **Component-First Build Order**:
 
-1. **Utilities Layer** (no dependencies) - Tree builder, depth calculator functions
-2. **Hook Layer** (depends on utilities) - `use-folder-tree` state management hook
-3. **Leaf Components** (depends on hooks) - `ArtifactRowFolder`, `DirectoryNode`
-4. **Container Component** (depends on leaves) - `CatalogFolder` main tree view
-5. **Integration Layer** (depends on container) - Toolbar modifications, page integration
-6. **Testing Layer** - Unit tests (utilities), component tests, E2E tests
-7. **Documentation Layer** - Component docs, accessibility guide, JSDoc comments
-8. **Optimization Layer** - Performance profiling, lazy rendering, accessibility audit
+1. **Utilities Layer** (no dependencies) - Tree builder, semantic filtering, folder description extraction
+2. **Hook Layer** (depends on utilities) - `use-folder-selection` state management hook
+3. **Semantic Tree Component** (depends on hooks) - Left pane tree with smart filtering
+4. **Tree Node Component** (depends on hooks) - Individual folder items in tree
+5. **Folder Detail Pane** (depends on utilities) - Right pane container showing folder metadata
+6. **Folder Detail Header** (depends on utilities) - Title, parent chip, description, "Import All" button
+7. **Artifact Type Section** (depends on utilities) - Type grouping component for right pane
+8. **Layout Container** (depends on all above) - Two-pane master-detail layout
+9. **Integration Layer** (depends on layout) - Toolbar modifications, page integration
+10. **Testing Layer** - Unit tests (utilities), component tests, E2E tests
+11. **Documentation & Optimization** - Accessibility audit, performance profiling, lazy rendering
 
 ### Parallel Work Opportunities
 
-- **Phase 1A (Days 1-2)**: Tree utilities + depth calculator (no UI dependency)
-- **Phase 1B (Days 1-2)**: Leaf components design in Storybook (visual design, mockups)
-- **Merge Point (Day 3)**: Integrate utilities into leaf components
-- **Phase 2**: Depth controls, count badges, UI polish (sequential)
-- **Phase 3A (Day 8)**: Accessibility audit + keyboard nav (can start while Phase 2 finishes)
-- **Phase 3B (Day 9)**: Performance profiling + lazy rendering (concurrent with A11y work)
-- **Validation (Day 10)**: Final testing, E2E validation, docs
+- **Phase 1A (Days 1-2)**: Tree utilities + semantic filtering + folder description extraction (no UI dependency)
+- **Phase 1B (Days 1-2)**: Two-pane layout design + tree node component design (visual design, mockups)
+- **Merge Point (Day 3)**: Integrate utilities into semantic tree component
+- **Phase 1 Finalization (Day 4)**: Layout container + page integration + first folder auto-selection
+- **Phase 2**: Folder detail pane, bulk import, type grouping, filter integration (sequential)
+- **Phase 3A (Day 8)**: Accessibility audit + keyboard nav (can parallelize with Phase 2 finish)
+- **Phase 3B (Day 8)**: Performance profiling + memoization (concurrent with A11y work)
+- **Validation (Day 9)**: Final testing, E2E validation, docs
 
 ### Critical Path
 
-1. **Blocking**: Tree builder utilities must be solid before component integration
-2. **Blocking**: Leaf components (DirectoryNode, ArtifactRow) must work before CatalogFolder
-3. **Critical**: Filter propagation logic must be tested early (Day 2) to avoid rework
-4. **Can Parallelize**: Accessibility and performance work can happen concurrently in Phase 3
+1. **Blocking**: Tree builder + semantic filtering utilities must complete before semantic tree component (Day 2)
+2. **Blocking**: Semantic tree component must work before folder detail pane (Day 4)
+3. **Blocking**: Two-pane layout container must integrate semantic tree + folder detail pane (Day 4)
+4. **Critical**: Folder detail pane must implement before type grouping and bulk import (Day 5)
+5. **Can Parallelize**: Accessibility and performance work in Phase 3 (concurrent execution)
 
-**Critical Path Duration**: 10 days (all phases sequential with some parallelization in Phase 3)
+**Critical Path Duration**: 9 days (all critical phases sequential, Phase 3 parallelizable)
 
 ---
 
 ## Phase Breakdown
 
-### Phase 1: Core Folder View Component & Tree Building (4 Days)
+### Phase 1: Two-Pane Layout & Semantic Tree (4 Days)
 
 **Duration**: 4 days
 **Dependencies**: None
@@ -85,38 +92,40 @@ Since this is a frontend feature with no backend changes, we follow a **Componen
 
 #### Overview
 
-Phase 1 delivers the foundational tree-building utilities and UI components needed to render folder-based artifact navigation. This phase focuses on core functionality: parsing paths into tree structures, rendering collapsible folders with Radix, and integrating with existing filters. By end of Phase 1, users can toggle to folder view, expand/collapse folders, and see filtered artifacts organized hierarchically.
+Phase 1 delivers the two-pane master-detail layout with semantic navigation tree (left pane) and folder detail pane container (right pane). This phase builds tree utilities with smart semantic filtering (excluding root folders like `plugins/`, `src/` and leaf artifact containers like `commands/`, `agents/`), renders the semantic tree component with collapsible folders, implements the folder detail pane container, and integrates the layout into the source detail page. By end of Phase 1, users can toggle to folder view, see the two-pane layout, select folders from the semantic tree, and see the folder detail pane populate on the right.
 
 #### Task Breakdown
 
 | Task ID | Task Name | Description | Acceptance Criteria | Est. | Subagent(s) | Dependencies |
 |---------|-----------|-------------|-------------------|------|-------------|--------------|
 | **MFV-1.1** | **Tree builder utilities** | Create `buildFolderTree()` function to convert flat CatalogEntry[] to nested tree structure; handle depth filtering with `maxDepth` parameter | Tree converts flat paths into nested object structure; handles 1000+ items; filters by depth; returns proper type; no console errors on malformed paths | 2 pts | frontend-developer | None |
-| **MFV-1.2** | **Depth calculator** | Create `calculateAutoDepth()` function; detect optimal depth from `root_hint` or scan first 50 entries; implement depth options (Auto/TopLevel/1-3 levels) | Function returns auto-detected depth; respects `root_hint`; provides consistent results; handles edge cases (empty catalog, single item) | 2 pts | frontend-developer | None |
-| **MFV-1.3** | **Use-folder-tree hook** | Create React hook `useFolderTree()` managing tree state (expanded folders, depth setting, filtered items); return tree data + setExpanded() callback | Hook returns tree structure and management functions; tracks expanded state; re-builds tree on filter/depth change; memoized to prevent unnecessary rebuilds | 3 pts | frontend-developer | MFV-1.1, MFV-1.2 |
-| **MFV-1.4** | **ArtifactRowFolder component** | Create artifact row component displaying: type icon, artifact name, confidence badge, status indicator, import/exclude actions (reuse CatalogRow pattern) | Row renders in folder context; shows all artifact metadata; actions work (import/exclude); matches grid/list row styling; TypeScript fully typed | 3 pts | ui-engineer-enhanced | None |
-| **MFV-1.5** | **DirectoryNode component** | Create collapsible folder node using Radix Collapsible: chevron icon, folder icon, folder name, artifact count badge; integrate with `useFolderTree` expanded state | Folder expands/collapses on click; chevron rotates; shows artifact count; lazy-renders children; matches folder icon from Lucide; keyboard-accessible | 3 pts | ui-engineer-enhanced | MFV-1.3 |
-| **MFV-1.6** | **CatalogFolder container** | Create main tree view component; recursively renders DirectoryNode and ArtifactRowFolder; integrates with `useSourceCatalog` and filter state | Tree renders correctly from root; all filters (type/confidence/search) applied to tree items; empty state shown for filtered results; scrolls smoothly | 3 pts | ui-engineer-enhanced | MFV-1.4, MFV-1.5 |
-| **MFV-1.7** | **Folder view toolbar button** | Add "Folder" button to view mode toggle in SourceToolbar; button toggles between grid/list/folder modes; uses existing view mode pattern | Button appears in toolbar; clicking switches to folder view; other buttons still work; view toggle styling consistent | 2 pts | frontend-developer | MFV-1.6 |
-| **MFV-1.8** | **Filter integration** | Verify all filters (type, confidence, search, status) work with folder view; tree re-renders on filter change; filtered items removed from tree | Filters applied to tree items; empty folders show "(No importable artifacts)" message; tree updates reactively; no performance lag | 2 pts | frontend-developer | MFV-1.6 |
-| **MFV-1.9** | **Unit tests: tree builder** | Test `buildFolderTree()` and `calculateAutoDepth()` functions; cover path parsing edge cases (special chars, deep nesting, malformed paths) | >80% coverage for utility functions; tests pass for 1000+ item sets; edge cases handled gracefully | 2 pts | frontend-developer | MFV-1.1, MFV-1.2 |
-| **MFV-1.10** | **Storybook stories** | Create Storybook stories for DirectoryNode, ArtifactRowFolder, CatalogFolder showing all states (expanded/collapsed, loading, empty, filtered) | Stories render all component states; interactions work in Storybook; visual consistency with existing design system | 2 pts | ui-engineer-enhanced | MFV-1.4, MFV-1.5, MFV-1.6 |
+| **MFV-1.2** | **Semantic filtering utilities** | Create `isSemanticFolder()` to exclude root folders (plugins/, src/, skills/, etc.) and leaf containers (commands/, agents/, mcp_servers/, etc.); implement smart tree filtering | Filters exclude designated roots and leafs; intermediate folders shown; function handles edge cases; filters produce clean navigation tree | 2 pts | frontend-developer | None |
+| **MFV-1.3** | **Use-folder-selection hook** | Create React hook `useFolderSelection()` managing folder selection state (selected folder path, expanded folders); return selection + setSelected() callback | Hook tracks selected folder; tracks expanded state; updates on user interaction; memoized; integrates with semantic filtering | 2 pts | frontend-developer | MFV-1.1, MFV-1.2 |
+| **MFV-1.4** | **Source-folder-layout component** | Create two-pane container layout with left pane (25%, semantic tree) and right pane (75%, folder detail). Manage layout, responsive behavior, splitter | Layout renders two panes side-by-side; proportions correct; responsive on smaller screens (stacked layout); smooth splitter (optional) | 3 pts | ui-engineer-enhanced | None |
+| **MFV-1.5** | **Semantic-tree component** | Create left pane semantic navigation tree; render folders filtered by semantic rules; support expand/collapse; integrate folder selection | Tree renders only semantic folders; expand/collapse works; selection tracking; shows folder hierarchy; no root/leaf containers | 3 pts | ui-engineer-enhanced | MFV-1.2, MFV-1.3 |
+| **MFV-1.6** | **Tree-node component** | Create individual tree folder item with: folder icon, folder name, expand/collapse chevron, count badge; integrate with selection state | Folder node renders with proper styling; chevron rotates on expand; count shows; keyboard-accessible; consistent with design system | 2 pts | ui-engineer-enhanced | MFV-1.3 |
+| **MFV-1.7** | **Folder-detail-pane container** | Create right pane container accepting selected folder; renders folder detail header + artifact list; prepare for child components in Phase 2 | Pane renders with selected folder data; shows placeholder content; integrated with layout; accepts folder selection from left pane | 2 pts | ui-engineer-enhanced | MFV-1.4, MFV-1.5 |
+| **MFV-1.8** | **Toolbar folder toggle integration** | Add "Folder" button to view mode toggle in SourceToolbar; button toggles between grid/list/folder modes; uses existing view mode pattern | Button appears in toolbar; clicking switches to folder view; view mode persists in state; styling consistent | 2 pts | frontend-developer | MFV-1.4 |
+| **MFV-1.9** | **First folder auto-selection** | Implement auto-selection of first semantic folder on folder view load; ensure right pane populates immediately | On folder view toggle, first folder auto-selected; folder detail pane shows data immediately; smooth UX transition | 1 pt | frontend-developer | MFV-1.3, MFV-1.7 |
+| **MFV-1.10** | **Unit tests: tree building & filtering** | Test `buildFolderTree()`, `isSemanticFolder()`, and filtering logic; cover edge cases (roots, leafs, special chars, deep nesting) | >80% coverage for utility functions; semantic filtering works correctly; tests pass for 1000+ item sets | 2 pts | frontend-developer | MFV-1.1, MFV-1.2 |
 
-**Phase 1 Total**: 24 story points
+**Phase 1 Total**: 21 story points
 
 #### Phase 1 Quality Gates
 
-- [ ] Tree builder utilities tested and verified (>80% coverage)
-- [ ] All components render in Storybook with correct styling
-- [ ] Folder view button appears in toolbar and toggles correctly
-- [ ] Filters apply to tree; filtered items removed; re-rendering works
+- [ ] Tree builder + semantic filtering utilities tested (>80% coverage)
+- [ ] Two-pane layout renders correctly with proper proportions (25% left, 75% right)
+- [ ] Semantic tree displays only intermediate folders (roots/leafs excluded)
+- [ ] Folder view button appears in toolbar and toggles layout correctly
+- [ ] First folder auto-selects on folder view toggle; right pane populates
+- [ ] Folder selection works; tree node selection state visual feedback
 - [ ] No console errors; malformed paths handled gracefully
 - [ ] Performance baseline: tree renders for 500 items in <300ms (initial, not optimized)
-- [ ] Manual testing: expand/collapse folders, apply filters, toggle between view modes
+- [ ] Manual testing: toggle folder view, expand/collapse folders in left pane, folder detail shows on right
 
 ---
 
-### Phase 2: Depth Configuration & Polish (3 Days)
+### Phase 2: Folder Detail Pane & Bulk Import (3 Days)
 
 **Duration**: 3 days
 **Dependencies**: Phase 1 complete
@@ -125,78 +134,76 @@ Phase 1 delivers the foundational tree-building utilities and UI components need
 
 #### Overview
 
-Phase 2 refines the core functionality with depth configuration controls, visual polish, folder count accuracy, and persistence. Users can now configure how deep the tree expands initially via dropdown (Auto/TopLevel/1/2/3 Levels). Folder counts are accurate, empty folders show helpful messages, and view preference persists to localStorage. E2E tests verify the complete folder view workflow.
+Phase 2 builds out the folder detail pane (right side) with rich metadata display, artifact grouping by type, and bulk import functionality. The folder detail header shows title, parent breadcrumb chip, folder description (extracted from README or AI-generated summary), and "Import All" button. Artifacts are grouped by type (Skills, Commands, Agents, etc.) with section headers. Filters apply to the right pane artifacts. E2E tests verify the complete folder view workflow including bulk import.
 
 #### Task Breakdown
 
 | Task ID | Task Name | Description | Acceptance Criteria | Est. | Subagent(s) | Dependencies |
 |---------|-----------|-------------|-------------------|------|-------------|--------------|
-| **MFV-2.1** | **Depth controls dropdown** | Create FolderDepthControls component in toolbar; dropdown with options: Auto, Top Level, 1 Level Deep, 2 Levels, 3 Levels Deep; updates tree on selection | Dropdown renders in toolbar; all options work; tree re-renders with correct depth; selection persists visually | 2 pts | ui-engineer-enhanced | MFV-1.7 |
-| **MFV-2.2** | **Auto depth detection algorithm** | Refine `calculateAutoDepth()` to intelligently detect optimal depth; prioritize `root_hint`, scan first 50 entries for depth patterns; return sensible default | Function detects depth from repository structure; returns safe default (2-3 levels typically); handles edge cases (flat repos, deep monorepos) | 2 pts | frontend-developer | MFV-1.2 |
-| **MFV-2.3** | **Folder count badges** | Show accurate artifact counts on folder nodes (direct children only); update counts when filters applied; include "(N) importable artifacts" format | Count badges render on all folders; counts accurate; "(0 importable artifacts)" shown for filtered empty folders; counts update on filter change | 2 pts | ui-engineer-enhanced | MFV-1.6 |
-| **MFV-2.4** | **Empty folder messages** | Display helpful message for empty folders: "(No importable artifacts)" with styling matching empty states elsewhere in app | Message shown for folders with no matching items under current filters; styled consistently with grid/list empty state | 1 pt | ui-engineer-enhanced | MFV-1.6 |
-| **MFV-2.5** | **Deep nesting handling** | Test and handle 4+ nesting levels; implement breadcrumb or path truncation if needed; ensure UI doesn't break under deep nesting | UI remains readable at 5+ levels; deep nesting doesn't cause layout issues; visual hierarchy clear; consider breadcrumb for context | 2 pts | ui-engineer-enhanced | MFV-1.6 |
-| **MFV-2.6** | **View mode localStorage persistence** | Implement localStorage storage for view mode preference; use existing `VIEW_MODE_STORAGE_KEY` pattern; persist folder view selection | View mode saved to localStorage; on page return, folder view restored; matches existing grid/list persistence pattern | 1 pt | frontend-developer | MFV-1.7 |
-| **MFV-2.7** | **Depth configuration persistence** | Save selected depth level to localStorage (e.g., `folder-depth-setting`); restore on page return | Depth setting persists; on return to source detail page, previously selected depth restored; dropdown reflects saved value | 1 pt | frontend-developer | MFV-2.1 |
-| **MFV-2.8** | **Visual refinement & polish** | Review spacing, colors, icon alignment against design system; ensure folder/file icons from Lucide match grid/list; adjust margins, padding, hover states | Visual consistency with existing components; spacing matches design tokens; icons clearly indicate folder/artifact; hover states intuitive | 1 pt | ui-designer | MFV-1.4, MFV-1.5 |
-| **MFV-2.9** | **E2E tests: folder workflow** | Write Playwright tests covering: toggle to folder view, expand/collapse folders, apply filters, see updated tree, import artifact from tree | Test suite covers critical path: view toggle → folder expansion → filter application → import action | 3 pts | frontend-developer | MFV-1.6, MFV-2.1 |
-| **MFV-2.10** | **Analytics events** | Log folder view toggle, folder expand/collapse, depth control changes to analytics; prepare for adoption tracking | Events fired on view toggle, folder expand, depth change; events include context (view mode, folder path, depth setting) | 1 pt | frontend-developer | MFV-1.7, MFV-2.1 |
+| **MFV-2.1** | **Folder-detail-header component** | Create header showing: folder title, parent breadcrumb chip, folder description, "Import All" button. Extract description from folder README or generate AI summary | Header renders folder metadata; parent chip clickable (navigates to parent folder); "Import All" button functional; description displayed | 3 pts | ui-engineer-enhanced | MFV-1.7 |
+| **MFV-2.2** | **Folder README extraction** | Create utility to extract README from folder artifacts (if any); parse markdown content; extract summary section or first paragraph | Utility detects README files in folder; extracts content; falls back to AI summary generation if no README found | 2 pts | frontend-developer | None |
+| **MFV-2.3** | **Artifact-type-section component** | Create component showing artifacts grouped by type with section header (e.g., "Skills (5)", "Commands (2)"); render artifact rows in section | Section header shows type name + count; artifacts render below; consistent styling with grid/list views; collapsible sections (optional) | 2 pts | ui-engineer-enhanced | None |
+| **MFV-2.4** | **Type grouping logic** | Implement grouping of artifacts by type within folder; handle all artifact types (Skill, Command, Agent, MCP Server, Hook); maintain sort order | Artifacts grouped correctly by type; grouping includes all types; groups render in consistent order; empty groups hidden | 2 pts | frontend-developer | MFV-1.7 |
+| **MFV-2.5** | **"Import All" bulk action** | Implement bulk import button; import all artifacts in selected folder; show progress indicator; handle success/error states | Button imports all artifacts in folder; progress shown during import; success/error message displayed; folder refreshes after completion | 3 pts | frontend-developer | MFV-2.1 |
+| **MFV-2.6** | **Empty folder detail state** | Show helpful empty state when folder has no importable artifacts under current filters | Empty state message shown (e.g., "No importable artifacts in this folder"); styled consistently with grid/list empty states | 1 pt | ui-engineer-enhanced | MFV-1.7 |
+| **MFV-2.7** | **Filter integration: right pane** | Ensure all filters (type, confidence, search, status) apply to artifacts shown in folder detail pane; pane updates reactively on filter change | Filters applied to right pane artifacts; artifact counts in type sections update; empty state shown if no results; no performance lag | 2 pts | frontend-developer | MFV-2.1, MFV-2.4 |
+| **MFV-2.8** | **Visual refinement & polish** | Review spacing, colors, icon alignment between left/right panes; ensure type section headers consistent; adjust hover states, transitions | Visual consistency across panes; spacing matches design tokens; type grouping clearly labeled; interactions smooth | 1 pt | ui-designer | MFV-2.1, MFV-2.3 |
+| **MFV-2.9** | **E2E tests: folder detail workflow** | Write Playwright tests: toggle to folder view, select folder, see right pane populate, apply filters, use "Import All" button, verify import success | Test suite covers: folder selection → right pane display → filter application → bulk import action | 2 pts | frontend-developer | MFV-2.1, MFV-2.5 |
+| **MFV-2.10** | **View mode & filter persistence** | Persist view mode and filter state to localStorage; restore on page return | View mode + selected folder path saved; filters persisted; on return, layout restored to previous state | 1 pt | frontend-developer | MFV-1.8 |
 
-**Phase 2 Total**: 16 story points
+**Phase 2 Total**: 19 story points
 
 #### Phase 2 Quality Gates
 
-- [ ] Depth dropdown works and updates tree correctly
-- [ ] Auto depth detection produces reasonable results for test repositories
-- [ ] Folder counts accurate and update on filter change
-- [ ] Empty folder messages styled consistently
-- [ ] Deep nesting (4+ levels) doesn't break UI
-- [ ] View mode and depth setting persist to localStorage
-- [ ] Visual polish complete; icons and spacing match design system
-- [ ] E2E tests pass (toggle, expand/collapse, filter, import)
-- [ ] Analytics events firing correctly
+- [ ] Folder detail header displays title, parent chip, description, "Import All" button
+- [ ] README extraction works; falls back to AI summary if no README
+- [ ] Artifacts grouped by type in right pane with section headers
+- [ ] Type grouping includes all artifact types; counts accurate
+- [ ] "Import All" bulk action works; progress shown; success/error states handled
+- [ ] Empty folder state shown when no artifacts match filters
+- [ ] Filters apply to right pane; counts update reactively
+- [ ] Visual polish complete; panes balanced, consistent spacing
+- [ ] E2E tests pass (folder selection → right pane display → bulk import)
+- [ ] View mode and filter state persist to localStorage
 
 ---
 
-### Phase 3: Accessibility & Performance Optimization (3 Days)
+### Phase 3: Accessibility & Performance Optimization (2 Days)
 
-**Duration**: 3 days
+**Duration**: 2 days
 **Dependencies**: Phase 2 complete
-**Assigned Subagent(s)**: web-accessibility-checker, ui-engineer-enhanced, frontend-developer, react-performance-optimizer
-**Start Date**: Day 8 | **End Date**: Day 10
+**Assigned Subagent(s)**: web-accessibility-checker, frontend-developer, react-performance-optimizer
+**Start Date**: Day 8 | **End Date**: Day 9
 
 #### Overview
 
-Phase 3 ensures accessibility compliance (WCAG 2.1 AA), full keyboard navigation, and performance optimization. Users can navigate the entire tree using arrow keys, enter/space to expand/collapse, and Tab between controls. Screen readers announce folder state, item counts, and artifact types. Performance is optimized: collapsed folders don't render children initially, tree renders 1000+ artifacts within 200ms budget. Final validation includes accessibility audit and performance profiling.
+Phase 3 ensures accessibility compliance (WCAG 2.1 AA) and performance optimization. Users can navigate the left pane tree using arrow keys, enter/space to expand/collapse, and Tab between panes. Screen readers announce folder state, item counts, and artifact types. Performance is optimized: collapsed folders don't render children initially, tree renders 1000+ artifacts within 200ms budget. Final validation includes accessibility audit and performance profiling.
 
 #### Task Breakdown
 
 | Task ID | Task Name | Description | Acceptance Criteria | Est. | Subagent(s) | Dependencies |
 |---------|-----------|-------------|-------------------|------|-------------|--------------|
-| **MFV-3.1** | **Keyboard navigation** | Implement full keyboard support: Up/Down arrows navigate siblings, Left/Right expand/collapse folders, Enter/Space to toggle, Tab to next control, Home/End for first/last | Up/Down moves between tree items; Left collapses, Right expands; Enter/Space toggles; Tab moves to next control; focus stays in tree | 3 pts | web-accessibility-checker | MFV-1.5 |
-| **MFV-3.2** | **ARIA labels & roles** | Add semantic roles and labels: folders as `role="treeitem"`, announce expanded/collapsed state, item counts, artifact types; roving tabindex pattern | Screen reader announces: "Folder: skills, 42 artifacts, expanded"; "Artifact: my-skill, type: skill, confidence: high" | 2 pts | web-accessibility-checker | MFV-1.4, MFV-1.5, MFV-1.6 |
-| **MFV-3.3** | **Focus management** | Implement roving tabindex pattern; manage focus when expanding/collapsing; focus indicators visible (2px ring); focus trap not created | Focus moves with tree navigation; focus visible on keyboard nav; expanding folder doesn't move focus away; no focus traps | 2 pts | web-accessibility-checker | MFV-3.1 |
-| **MFV-3.4** | **Screen reader testing** | Test with NVDA (Windows), JAWS (Windows), VoiceOver (macOS); verify folder structure announced correctly; test expand/collapse announcements | Tested on at least 2 screen readers; folder/artifact structure clear; expand/collapse state announced; no confusion or missing context | 2 pts | web-accessibility-checker | MFV-3.2 |
-| **MFV-3.5** | **Lazy folder rendering** | Prevent DOM explosion: collapsed folders don't render children initially; render on demand when expanded; measure DOM node count before/after | Collapsed folders have no child DOM nodes; expanding loads children on-demand; DOM node count reduced 60-80% with mostly collapsed tree | 3 pts | frontend-developer | MFV-1.5, MFV-1.6 |
-| **MFV-3.6** | **Performance profiling** | Profile tree rendering with DevTools; measure render time for 500/1000 item trees; optimize hot paths; target <200ms for 1000 items | Tree renders 1000 artifacts in <200ms; filter changes apply in <100ms; no jank on expand/collapse; DevTools timeline shows smooth frames | 2 pts | react-performance-optimizer | MFV-1.3, MFV-1.6 |
-| **MFV-3.7** | **Memoization & optimization** | Add React.memo() to components; memoize tree calculation functions; prevent unnecessary re-renders on leaf changes | Components wrapped with React.memo; functions memoized with useMemo; re-render count reduced in DevTools profiler | 2 pts | frontend-developer | MFV-3.5, MFV-3.6 |
-| **MFV-3.8** | **Accessibility audit** | Run automated WCAG audit (axe); manual testing of all interactions; verify focus indicators, color contrast, label associations | Automated audit passes (zero critical/serious issues); manual keyboard nav complete; color contrast >4.5:1 for text | 2 pts | web-accessibility-checker | MFV-3.2, MFV-3.4 |
-| **MFV-3.9** | **Performance E2E tests** | Write Playwright tests measuring render time; benchmark tree loading for 500/1000 items; create performance regression test | E2E tests verify render time <200ms; performance baseline established; tests run in CI to catch regressions | 2 pts | frontend-developer | MFV-3.6 |
-| **MFV-3.10** | **Documentation: accessibility guide** | Document keyboard navigation, ARIA patterns, screen reader behavior in `.claude/context/` or CLAUDE.md; include implementation notes | Developer guide explains keyboard nav, ARIA labels, roving tabindex; includes code examples and patterns | 1 pt | documentation-writer | MFV-3.1, MFV-3.2 |
+| **MFV-3.1** | **Keyboard navigation (tree + panes)** | Implement: Up/Down arrows navigate tree siblings, Left/Right expand/collapse folders, Enter/Space to select, Tab to move between left pane/right pane, Home/End for first/last | Up/Down moves between tree items; Left collapses, Right expands; Enter selects folder; Tab moves pane focus; no focus traps | 2 pts | web-accessibility-checker | MFV-1.5 |
+| **MFV-3.2** | **ARIA labels & roles (semantic tree + detail pane)** | Add semantic roles/labels: left pane as `role="tree"`, folders as `role="treeitem"`, right pane as main content region; announce folder counts, artifact types | Screen reader announces: "Folder tree region"; "Folder: skills, 42 artifacts, expanded"; artifact types and counts in right pane | 2 pts | web-accessibility-checker | MFV-1.5, MFV-2.1 |
+| **MFV-3.3** | **Focus management & indicators** | Implement roving tabindex in tree; manage focus when selecting folders; visible focus indicators (2px ring); focus transitions between panes smooth | Focus moves with tree navigation; visible on keyboard nav; selecting folder doesn't lose focus; Tab cycles between panes; no traps | 2 pts | web-accessibility-checker | MFV-3.1 |
+| **MFV-3.4** | **Screen reader testing** | Test with NVDA (Windows), JAWS (Windows), VoiceOver (macOS); verify tree structure, folder selection, right pane content all announced correctly | Tested on 2+ screen readers; tree navigation clear; folder selection announced; right pane content accessible | 2 pts | web-accessibility-checker | MFV-3.2 |
+| **MFV-3.5** | **Lazy folder rendering** | Prevent DOM explosion: collapsed folders don't render children initially; render on demand when expanded; measure DOM node count before/after | Collapsed folders have no child DOM nodes; expanding loads children on-demand; DOM node count reduced 60-80% with mostly collapsed tree | 2 pts | frontend-developer | MFV-1.5 |
+| **MFV-3.6** | **Performance profiling & optimization** | Profile tree rendering with DevTools; measure render time for 500/1000 item trees; optimize hot paths; target <200ms for 1000 items | Tree renders 1000 artifacts in <200ms; filter changes apply in <100ms; no jank on expand/collapse; smooth frames in DevTools | 2 pts | react-performance-optimizer | MFV-1.3, MFV-1.5 |
+| **MFV-3.7** | **Memoization & component optimization** | Add React.memo() to tree nodes and detail pane components; memoize tree/filtering functions; prevent unnecessary re-renders | Components wrapped with React.memo; functions memoized with useMemo; re-render count reduced in DevTools profiler | 2 pts | frontend-developer | MFV-3.5, MFV-3.6 |
+| **MFV-3.8** | **Accessibility audit** | Run automated WCAG audit (axe); manual keyboard nav and screen reader testing; verify color contrast, labels, focus indicators | Automated audit passes (zero critical/serious issues); manual testing complete; contrast >4.5:1 for text; all interactions keyboard accessible | 2 pts | web-accessibility-checker | MFV-3.2, MFV-3.4 |
 
-**Phase 3 Total**: 21 story points
+**Phase 3 Total**: 16 story points
 
 #### Phase 3 Quality Gates
 
-- [ ] Full keyboard navigation working (all keys tested)
-- [ ] Screen reader announces folder/artifact correctly (tested on 2+ readers)
-- [ ] Focus indicators visible and focus management correct
+- [ ] Full keyboard navigation working (tree, pane focus, Home/End, Tab)
+- [ ] Screen reader announces tree structure, folder selection, artifact counts (tested on 2+ readers)
+- [ ] Focus indicators visible; focus management correct between panes
 - [ ] Accessibility audit passes WCAG 2.1 AA (automated + manual)
 - [ ] Tree renders 1000 items in <200ms
 - [ ] Lazy rendering reduces initial DOM nodes 60-80%
-- [ ] No performance regression on filter changes
-- [ ] Performance E2E tests pass
-- [ ] Accessibility documentation complete
+- [ ] No performance regression on filter changes or folder selection
+- [ ] Memoization prevents unnecessary re-renders
 
 ---
 
@@ -349,38 +356,43 @@ expect(end - start).toBeLessThan(200); // ms
 ### Optimal Parallelization
 
 **Days 1-2 (Early Phase 1)**:
-- **Stream A**: Tree utilities (MFV-1.1, MFV-1.2) - frontend-developer
-- **Stream B**: Component design + Storybook setup (MFV-1.10 prep) - ui-engineer-enhanced, ui-designer
+- **Stream A**: Tree utilities + semantic filtering (MFV-1.1, MFV-1.2) - frontend-developer
+- **Stream B**: Two-pane layout design + tree node component (MFV-1.4, MFV-1.6 prep) - ui-engineer-enhanced
 
 **Merge Point (Day 3)**:
-- Integrate utilities into hooks (MFV-1.3)
-- Leaf components use hooks (MFV-1.4, MFV-1.5)
+- Integrate utilities into use-folder-selection hook (MFV-1.3)
+- Semantic tree component (MFV-1.5), tree node (MFV-1.6)
+- Two-pane layout container (MFV-1.4)
+
+**Day 4 (Phase 1 Finalization)**:
+- Folder detail pane (MFV-1.7), toolbar integration (MFV-1.8), first folder auto-selection (MFV-1.9)
+- Unit tests (MFV-1.10)
 
 **Days 5-7 (Phase 2)**:
-- Sequential work (depth controls, count badges, polish) - single developer focus
+- Sequential work (detail header, README extraction, type grouping, bulk import) - primary focus
 - ui-designer available for visual review (MFV-2.8)
 
-**Days 8-10 (Phase 3)**:
-- **Stream A**: Accessibility (keyboard nav, ARIA, a11y audit) - web-accessibility-checker
-- **Stream B**: Performance (profiling, memoization, lazy rendering) - react-performance-optimizer + frontend-developer
-- **Stream C**: Documentation - documentation-writer (low priority, can parallelize)
-- **Merge Point (Day 10)**: Final validation, E2E tests
+**Days 8-9 (Phase 3)**:
+- **Stream A**: Accessibility (keyboard nav, ARIA, focus, audit) - web-accessibility-checker
+- **Stream B**: Performance (lazy rendering, profiling, memoization) - react-performance-optimizer + frontend-developer
+- **Merge Point (Day 9)**: Final validation, E2E tests
 
-**Estimated Parallelization Savings**: ~2 FTE days (20% reduction in wall-clock time)
+**Estimated Parallelization Savings**: ~1.5 FTE days (17% reduction in wall-clock time)
 
 ---
 
 ## Critical Path
 
-1. **Tree utilities** (MFV-1.1, MFV-1.2) → Must complete before hooks (Day 2 EOD)
-2. **Hooks** (MFV-1.3) → Must complete before leaf components (Day 3)
-3. **Leaf components** (MFV-1.4, MFV-1.5) → Must complete before CatalogFolder (Day 3)
-4. **CatalogFolder** (MFV-1.6) → Must complete before Phase 2 depth config (Day 4)
-5. **Depth config** (MFV-2.1, MFV-2.2) → Prerequisite for E2E tests (Day 6)
-6. **E2E tests** (MFV-2.9) → Prerequisite for Phase 3 (Day 7)
-7. **Phase 3 accessibility/performance** → Can parallelize; both must complete by Day 10
+1. **Tree utilities + semantic filtering** (MFV-1.1, MFV-1.2) → Must complete before hooks (Day 2 EOD)
+2. **use-folder-selection hook** (MFV-1.3) → Must complete before semantic tree (Day 3)
+3. **Semantic tree component** (MFV-1.5) → Must complete before two-pane layout (Day 3)
+4. **Two-pane layout** (MFV-1.4) → Must complete before folder detail pane (Day 4)
+5. **Folder detail pane** (MFV-1.7) → Must complete before type grouping + bulk import (Phase 2, Day 5)
+6. **Type grouping + bulk import** (MFV-2.4, MFV-2.5) → Prerequisite for filter integration (Day 6)
+7. **Filter integration** (MFV-2.7) → Prerequisite for E2E tests (Day 7)
+8. **Phase 3 accessibility/performance** → Can parallelize; both must complete by Day 9
 
-**Total Critical Path**: 10 days (no shortcuts; all dependencies critical)
+**Total Critical Path**: 9 days (no shortcuts; all dependencies critical)
 
 ---
 
@@ -389,67 +401,89 @@ expect(end - start).toBeLessThan(200); // ms
 ### Key Technical Decisions
 
 1. **No API changes**: All tree building client-side using existing `CatalogEntry.path` field
-2. **Radix Collapsible**: Reuse existing shadcn/ui pattern for consistency and a11y
-3. **Lazy rendering**: Collapsed folders don't render DOM until expanded (performance optimization)
-4. **Filter propagation**: All existing filters apply at tree level; tree re-renders on filter change
-5. **Depth heuristics**: "Auto" scans `root_hint` first; falls back to intelligent depth detection
-6. **Roving tabindex**: Keyboard nav uses Radix pattern for accessibility best practice
-7. **Performance budget**: 200ms tree render for 1000 items (Phase 3 target)
-8. **Memoization**: React.memo() on leaf components + useMemo() on tree calculations
+2. **Two-pane layout**: 25% left (semantic tree), 75% right (folder detail) - responsive fallback to stacked
+3. **Semantic filtering**: Exclude designated root folders (plugins/, src/, skills/, etc.) and leaf containers (commands/, agents/, mcp_servers/, etc.)
+4. **Lazy rendering**: Collapsed folders don't render DOM until expanded (performance optimization)
+5. **Folder selection state**: `use-folder-selection` hook manages selected folder + expanded state; first folder auto-selects on load
+6. **Artifact grouping**: Right pane groups artifacts by type with section headers; counts reflect current filters
+7. **Bulk import**: "Import All" button imports all artifacts in selected folder; shows progress and success/error states
+8. **Filter propagation**: All existing filters apply to right pane; pane updates reactively
+9. **README extraction**: Utility detects and extracts README from folder; falls back to AI-generated summary
+10. **Roving tabindex**: Keyboard nav uses Radix pattern for accessibility best practice
+11. **Performance budget**: 200ms tree render for 1000 items; lazy rendering target
+12. **Memoization**: React.memo() on tree nodes + type sections + useMemo() on tree/grouping calculations
 
 ### Component Architecture
 
 ```typescript
-// File: skillmeat/web/lib/folder-tree.ts
+// File: skillmeat/web/lib/tree-builder.ts
 export function buildFolderTree(entries: CatalogEntry[], maxDepth: number): FolderTree
-export function calculateAutoDepth(entries: CatalogEntry[], rootHint?: string): number
 
-// File: skillmeat/web/lib/hooks/use-folder-tree.ts
-export function useFolderTree(catalog: CatalogEntry[], filters: CatalogFilters): {
-  tree: FolderTree
+// File: skillmeat/web/lib/tree-filter-utils.ts
+export function isSemanticFolder(folderPath: string): boolean
+export function filterSemanticFolders(tree: FolderTree): FolderTree
+
+// File: skillmeat/web/lib/folder-readme-utils.ts
+export function extractFolderReadme(folderPath: string, entries: CatalogEntry[]): string | null
+export function generateFolderSummary(folderPath: string): Promise<string>
+
+// File: skillmeat/web/lib/hooks/use-folder-selection.ts
+export function useFolderSelection(semanticTree: FolderTree, entries: CatalogEntry[]): {
+  selectedFolder: string | null
+  setSelectedFolder: (path: string) => void
   expanded: Set<string>
   setExpanded: (path: string, isExpanded: boolean) => void
-  depth: number
-  setDepth: (depth: number) => void
 }
 
-// File: skillmeat/web/app/marketplace/sources/[id]/components/artifact-row-folder.tsx
-export function ArtifactRowFolder({ entry, onImport, onExclude }: Props): JSX.Element
+// File: skillmeat/web/app/marketplace/sources/[id]/components/source-folder-layout.tsx
+export function SourceFolderLayout({ catalog, filters, onImport, onExclude }: Props): JSX.Element
 
-// File: skillmeat/web/app/marketplace/sources/[id]/components/directory-node.tsx
-export function DirectoryNode({ node, depth, expanded, onToggleExpand, onImport }: Props): JSX.Element
+// File: skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx
+export function SemanticTree({ tree, selectedFolder, expanded, onSelectFolder, onToggleExpand }: Props): JSX.Element
 
-// File: skillmeat/web/app/marketplace/sources/[id]/components/catalog-folder.tsx
-export function CatalogFolder({ catalog, filters, onImport, onExclude }: Props): JSX.Element
+// File: skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx
+export function TreeNode({ folderPath, count, selected, expanded, onSelect, onToggleExpand }: Props): JSX.Element
 
-// File: skillmeat/web/app/marketplace/sources/[id]/components/folder-depth-controls.tsx
-export function FolderDepthControls({ value, onChange }: Props): JSX.Element
+// File: skillmeat/web/app/marketplace/sources/[id]/components/folder-detail-pane.tsx
+export function FolderDetailPane({ folder, catalog, filters, onImport, onExclude }: Props): JSX.Element
+
+// File: skillmeat/web/app/marketplace/sources/[id]/components/folder-detail-header.tsx
+export function FolderDetailHeader({ folder, parentFolder, description, onImportAll }: Props): JSX.Element
+
+// File: skillmeat/web/app/marketplace/sources/[id]/components/artifact-type-section.tsx
+export function ArtifactTypeSection({ type, artifacts, onImport, onExclude }: Props): JSX.Element
 ```
 
 ### Files to Create
 
-1. `/skillmeat/web/lib/folder-tree.ts` - Tree builder utility functions
-2. `/skillmeat/web/lib/hooks/use-folder-tree.ts` - React hook for tree state
-3. `/skillmeat/web/app/marketplace/sources/[id]/components/catalog-folder.tsx` - Main tree container
-4. `/skillmeat/web/app/marketplace/sources/[id]/components/directory-node.tsx` - Collapsible folder
-5. `/skillmeat/web/app/marketplace/sources/[id]/components/artifact-row-folder.tsx` - Artifact row
-6. `/skillmeat/web/app/marketplace/sources/[id]/components/folder-depth-controls.tsx` - Depth dropdown
+1. `/skillmeat/web/lib/tree-builder.ts` - Tree builder utility functions
+2. `/skillmeat/web/lib/tree-filter-utils.ts` - Semantic filtering utilities (exclude roots/leafs)
+3. `/skillmeat/web/lib/folder-readme-utils.ts` - README extraction and AI summary generation
+4. `/skillmeat/web/lib/hooks/use-folder-selection.ts` - React hook for folder selection state
+5. `/skillmeat/web/app/marketplace/sources/[id]/components/source-folder-layout.tsx` - Two-pane container layout
+6. `/skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx` - Left pane semantic tree
+7. `/skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx` - Individual tree folder item
+8. `/skillmeat/web/app/marketplace/sources/[id]/components/folder-detail-pane.tsx` - Right pane container
+9. `/skillmeat/web/app/marketplace/sources/[id]/components/folder-detail-header.tsx` - Title, chip, description, import all
+10. `/skillmeat/web/app/marketplace/sources/[id]/components/artifact-type-section.tsx` - Type grouping component
 
 ### Files to Modify
 
 1. `/skillmeat/web/app/marketplace/sources/[id]/page.tsx` - Add folder view conditional rendering
-2. `/skillmeat/web/app/marketplace/sources/[id]/components/source-toolbar.tsx` - Add folder button + depth controls
+2. `/skillmeat/web/app/marketplace/sources/[id]/components/source-toolbar.tsx` - Add folder button
 3. `/skillmeat/web/CLAUDE.md` - Add component patterns and accessibility guide
-4. `/skillmeat/web/__tests__/` - Add tree builder unit tests
+4. `/skillmeat/web/__tests__/` - Add tree builder + semantic filtering unit tests
 
 ### Edge Cases Handled
 
 - **Malformed paths**: Missing levels, special characters, Windows backslashes → Logged but don't crash
 - **Circular references**: Prevented by depth filtering; tree depth controlled by `maxDepth`
 - **Empty catalog**: Tree builder returns empty object; UI shows empty state
-- **Filtered empty tree**: Folders with no matching items show "(0 importable artifacts)" message
-- **Deep nesting**: 5+ levels tested; breadcrumb or truncation implemented if UI breaks
-- **Single artifact**: Tree still renders correctly; no unnecessary nesting
+- **Semantic filtering edge cases**: Root-only catalogs show empty tree; leaf containers properly excluded; intermediate folders preserved
+- **Filtered empty tree**: Folders with no matching items show "(0 importable artifacts)" message in right pane
+- **No README**: Folder description falls back to AI-generated summary or generic text
+- **First folder missing**: Auto-selection skips to first available semantic folder
+- **Pane overflow**: Right pane scrolls independently; left pane (semantic tree) scrollable; layout responsive on small screens
 
 ---
 
@@ -463,11 +497,12 @@ export function FolderDepthControls({ value, onChange }: Props): JSX.Element
 
 ### Iteration Opportunities
 
-- **Phase 4**: React window virtualization (if performance issues arise)
-- **Phase 4**: Nested count badges (if UX testing validates value)
-- **Phase 4**: URL state for view mode (`?view=folder` for deep linking)
-- **Phase 4**: Per-folder sorting options
-- **Phase 4**: Bookmark/favorite folders
+- **Phase 4**: React window virtualization for left pane (if performance issues arise with 500+ folders)
+- **Phase 4**: Smart breadcrumb navigation in detail pane (if deep nesting UX testing shows value)
+- **Phase 4**: URL state for view mode + selected folder (`?view=folder&folder=skills` for deep linking)
+- **Phase 4**: Per-folder sorting options in right pane (artifacts by type, name, import date)
+- **Phase 4**: Folder favorites/bookmarks with quick access
+- **Phase 4**: Folder-level statistics (total artifacts, types distribution, import rate)
 
 ### Maintenance Notes
 
@@ -483,13 +518,16 @@ export function FolderDepthControls({ value, onChange }: Props): JSX.Element
 ### Functional Acceptance (All Phases)
 
 - [x] Folder view button appears in view mode toggle
-- [x] Tree renders hierarchy from artifact paths
-- [x] Folders expand/collapse with click and keyboard
-- [x] Folder count badges show accurate artifact counts
-- [x] All filters (type, confidence, search, status) work in folder view
-- [x] Empty folders show helpful messages
-- [x] Deep nesting (4+ levels) handled gracefully
-- [x] View mode and depth persist to localStorage
+- [x] Two-pane layout renders: left (semantic tree 25%), right (folder detail 75%)
+- [x] Semantic tree excludes roots and leaf containers; shows intermediate folders only
+- [x] Folders expand/collapse with click and keyboard in left pane
+- [x] Folder selection populates right pane with folder metadata and artifacts
+- [x] Artifacts grouped by type in right pane with section headers and counts
+- [x] "Import All" button bulk imports all artifacts in selected folder
+- [x] Folder description shows README content or AI-generated summary
+- [x] All filters (type, confidence, search, status) work in right pane
+- [x] Empty folders show helpful messages in right pane
+- [x] View mode and selected folder path persist to localStorage
 - [x] URL state remains synchronized with existing filters
 
 ### Technical Acceptance (All Phases)
@@ -498,26 +536,29 @@ export function FolderDepthControls({ value, onChange }: Props): JSX.Element
 - [x] Follows Next.js 15 App Router patterns
 - [x] Follows component conventions (shadcn/ui, Radix, named exports)
 - [x] TypeScript fully typed; no `any` types
-- [x] Tree builder function unit tested (>80% coverage)
+- [x] Tree builder + semantic filtering functions unit tested (>80% coverage)
 - [x] Performance: tree renders <200ms for 1000 artifacts
 - [x] Lazy rendering implemented for collapsed folders
+- [x] React.memo and useMemo applied to prevent unnecessary re-renders
+- [x] Responsive layout (two-pane on desktop, stacked on mobile)
 
 ### Quality Acceptance (All Phases)
 
-- [x] Unit tests >80% (tree builder, hooks)
-- [x] Component tests >85% (all UI components)
-- [x] E2E tests cover critical path
-- [x] WCAG 2.1 AA compliance (keyboard nav, ARIA, focus)
-- [x] No performance regressions
-- [x] Visual consistency with grid/list views
+- [x] Unit tests >80% (tree builder, semantic filtering, folder README utils, hooks)
+- [x] Component tests >85% (semantic tree, tree node, folder detail pane, type sections)
+- [x] E2E tests cover critical path (folder selection, type grouping, bulk import, filter integration)
+- [x] WCAG 2.1 AA compliance (keyboard nav, ARIA, focus management)
+- [x] No performance regressions on filter changes or folder selection
+- [x] Visual consistency across both panes; balanced proportions
 
 ### Documentation Acceptance (All Phases)
 
 - [x] Component usage guide in CLAUDE.md or dedicated .md
-- [x] JSDoc comments on all exported functions
-- [x] Accessibility implementation guide (keyboard nav, ARIA patterns)
-- [x] PR description explains tree building approach
-- [x] Storybook stories for all components
+- [x] JSDoc comments on all exported functions and utilities
+- [x] Semantic filtering rules documented (which folders excluded/included)
+- [x] Accessibility implementation guide (keyboard nav, ARIA patterns, focus management)
+- [x] PR description explains two-pane layout, semantic filtering, type grouping, bulk import
+- [x] Storybook stories for semantic tree, tree nodes, folder detail pane, type sections
 
 ---
 
