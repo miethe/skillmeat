@@ -45,6 +45,9 @@ success_criteria:
   - id: "SC-1.8"
     description: "Performance baseline: tree renders for 500 items in <300ms"
     status: pending
+  - id: "SC-1.9"
+    description: "Mixed-content folders show direct count badge (N) and total count on hover [M]"
+    status: pending
 
 tasks:
   - id: "MFV-1.1"
@@ -52,10 +55,10 @@ tasks:
     status: pending
     assigned_to: ["frontend-developer"]
     model: sonnet
-    effort: 2
+    effort: 3
     priority: critical
     dependencies: []
-    description: "Create buildFolderTree() function to convert flat CatalogEntry[] to nested tree structure with maxDepth parameter"
+    description: "Create buildFolderTree() function to convert flat CatalogEntry[] to nested tree structure with maxDepth parameter; includes directArtifacts vs children separation, directCount, totalArtifactCount, hasSubfolders, hasDirectArtifacts flags"
 
   - id: "MFV-1.2"
     title: "Semantic filtering utilities"
@@ -102,10 +105,10 @@ tasks:
     status: pending
     assigned_to: ["ui-engineer-enhanced"]
     model: sonnet
-    effort: 2
+    effort: 3
     priority: high
     dependencies: []
-    description: "Create individual tree folder item with: folder icon, folder name, expand/collapse chevron, count badge; integrate with selection state"
+    description: "Create individual tree folder item with: folder icon, folder name, expand/collapse chevron, direct count badge '(N)', total count on hover '[M]', mixed-folder indicator icon/dot; integrate with selection state"
 
   - id: "MFV-1.7"
     title: "Toolbar folder toggle"
@@ -142,10 +145,10 @@ tasks:
     status: pending
     assigned_to: ["frontend-developer"]
     model: sonnet
-    effort: 2
+    effort: 3
     priority: medium
     dependencies: ["MFV-1.1", "MFV-1.2"]
-    description: "Test buildFolderTree(), isSemanticFolder(), and filtering logic; cover edge cases (roots, leafs, special chars, deep nesting)"
+    description: "Test buildFolderTree(), isSemanticFolder(), and filtering logic; cover edge cases (roots, leafs, special chars, deep nesting); includes mixed-content edge cases, count calculations, indicator logic"
 
 parallelization:
   batch_1: ["MFV-1.1", "MFV-1.2", "MFV-1.4", "MFV-1.6", "MFV-1.7"]
@@ -161,7 +164,7 @@ parallelization:
 Phase 1 delivers the two-pane master-detail layout with semantic navigation tree (left pane) and folder detail pane container (right pane). This phase builds tree utilities with smart semantic filtering (excluding root folders like `plugins/`, `src/` and leaf artifact containers like `commands/`, `agents/`), renders the semantic tree component with collapsible folders, implements the folder detail pane container, and integrates the layout into the source detail page. By end of Phase 1, users can toggle to folder view, see the two-pane layout, select folders from the semantic tree, and see the folder detail pane populate on the right.
 
 **Duration**: 4 days
-**Total Effort**: 21 story points
+**Total Effort**: 24 story points
 **Dependencies**: None (frontend-only, no API changes)
 **Design Reference**: Aligns with Gemini design spec for two-pane layout
 
@@ -172,16 +175,18 @@ Phase 1 delivers the two-pane master-detail layout with semantic navigation tree
 **Status**: `pending`
 **Assigned**: frontend-developer
 **Model**: sonnet
-**Effort**: 2 pts
+**Effort**: 3 pts
 **Priority**: critical
 
-**Description**: Create `buildFolderTree()` function to convert flat CatalogEntry[] to nested tree structure; handle depth filtering with `maxDepth` parameter.
+**Description**: Create `buildFolderTree()` function to convert flat CatalogEntry[] to nested tree structure; handle depth filtering with `maxDepth` parameter. Includes directArtifacts vs children separation, directCount, totalArtifactCount, hasSubfolders, hasDirectArtifacts flags for mixed-content folder handling.
 
 **Acceptance Criteria**:
 - Tree converts flat paths into nested object structure
 - Handles 1000+ items without performance issues
 - Filters by depth with maxDepth parameter
-- Returns proper FolderTree type
+- Returns proper FolderTree type with directArtifacts array separate from children
+- Computes directCount (artifacts directly in folder) and totalArtifactCount (all descendants)
+- hasSubfolders and hasDirectArtifacts boolean flags on each node
 - No console errors on malformed paths
 
 **Files to Create**:
@@ -287,15 +292,17 @@ Phase 1 delivers the two-pane master-detail layout with semantic navigation tree
 **Status**: `pending`
 **Assigned**: ui-engineer-enhanced
 **Model**: sonnet
-**Effort**: 2 pts
+**Effort**: 3 pts
 **Priority**: high
 
-**Description**: Create individual tree folder item with: folder icon, folder name, expand/collapse chevron, count badge; integrate with selection state.
+**Description**: Create individual tree folder item with: folder icon, folder name, expand/collapse chevron, direct count badge "(N)", total count on hover "[M]", mixed-folder indicator icon/dot; integrate with selection state.
 
 **Acceptance Criteria**:
 - Folder node renders with proper styling
 - Chevron rotates on expand
-- Count shows
+- Direct count badge shows "(N)" for artifacts directly in folder
+- Tooltip/hover shows total descendant count "[M]"
+- Mixed-folder indicator (dot/icon) when folder has both direct artifacts AND subfolders
 - Keyboard-accessible
 - Consistent with design system
 
@@ -379,15 +386,18 @@ Phase 1 delivers the two-pane master-detail layout with semantic navigation tree
 **Status**: `pending`
 **Assigned**: frontend-developer
 **Model**: sonnet
-**Effort**: 2 pts
+**Effort**: 3 pts
 **Priority**: medium
 
-**Description**: Test `buildFolderTree()`, `isSemanticFolder()`, and filtering logic; cover edge cases (roots, leafs, special chars, deep nesting).
+**Description**: Test `buildFolderTree()`, `isSemanticFolder()`, and filtering logic; cover edge cases (roots, leafs, special chars, deep nesting); includes mixed-content edge cases, count calculations, and indicator logic.
 
 **Acceptance Criteria**:
 - >80% coverage for utility functions
 - Semantic filtering works correctly
 - Tests pass for 1000+ item sets
+- Mixed-content scenarios tested: directCount vs totalArtifactCount
+- hasSubfolders/hasDirectArtifacts flags tested
+- Indicator logic for mixed-content folders verified
 
 **Files to Create**:
 - `skillmeat/web/__tests__/lib/tree-builder.test.ts`
@@ -409,6 +419,7 @@ Phase 1 delivers the two-pane master-detail layout with semantic navigation tree
 - [ ] Folder selection works; tree node selection state visual feedback
 - [ ] No console errors; malformed paths handled gracefully
 - [ ] Performance baseline: tree renders for 500 items in <300ms (initial, not optimized)
+- [ ] Mixed-content folders show direct count badge (N) and total count on hover [M]
 - [ ] Manual testing: toggle folder view, expand/collapse folders in left pane, folder detail shows on right
 
 ---
@@ -433,4 +444,4 @@ Phase 1 delivers the two-pane master-detail layout with semantic navigation tree
 
 ## Notes
 
-Phase 1 is frontend-only with no API changes. All tree building happens client-side using existing `CatalogEntry.path` field. This phase implements a two-pane master-detail layout aligning with Gemini design spec. Focus on getting core layout and semantic tree working before Phase 2 folder detail pane features.
+Phase 1 is frontend-only with no API changes. All tree building happens client-side using existing `CatalogEntry.path` field. This phase implements a two-pane master-detail layout aligning with Gemini design spec. Focus on getting core layout and semantic tree working before Phase 2 folder detail pane features. Mixed-content handling (directArtifacts vs children separation, count badges) is foundational for Phase 2 subfolder navigation.

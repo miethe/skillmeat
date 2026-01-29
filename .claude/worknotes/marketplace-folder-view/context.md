@@ -72,6 +72,13 @@ decisions:
     tradeoffs: "Implementation complexity; handled by Phase 3"
     location: "skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx"
 
+  - id: "DECISION-8"
+    question: "How to handle mixed-content folders (folders with both direct artifacts AND subfolders)?"
+    decision: "Direct artifacts shown in type sections above Subfolders section; tree node badges show (N) for direct count, [M] for total descendants on hover; visual indicator (dot/icon) for mixed-content folders"
+    rationale: "Clear separation between direct content and navigation to children; count badges provide at-a-glance information without requiring expansion; hover-for-total reduces visual clutter while keeping info accessible"
+    tradeoffs: "More complex tree node rendering; two count numbers may confuse users initially"
+    location: "skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx"
+
 integrations: []
 
 gotchas: []
@@ -100,15 +107,25 @@ Two-pane master-detail Folder View for marketplace source detail pages with sema
 - Semantic filtering eliminates root/leaf containers for cleaner navigation
 - Folder detail pane shows rich metadata and "Import All" bulk action
 - Artifacts grouped by type within each folder for clarity
+- Subfolder navigation in detail pane for drilling into nested folders
 - Full WCAG 2.1 AA accessibility compliance with keyboard navigation
 - Tree renders 1000+ artifacts within 200ms budget via lazy rendering
+
+## Effort Summary
+
+| Phase | Title | Effort |
+|-------|-------|--------|
+| Phase 1 | Two-Pane Layout & Semantic Tree | 24 pts |
+| Phase 2 | Folder Detail Pane & Bulk Import | 28 pts |
+| Phase 3 | Accessibility & Performance Optimization | 17 pts |
+| **Total** | | **69 pts** |
 
 ## Architecture Overview
 
 ### Two-Pane Layout Architecture
 
 ```
-SourceFolderLayout (two-pane container)
+ SourceFolderLayout (two-pane container)
 ├── Left Pane (25%)
 │   └── SemanticTree
 │       └── TreeNode (recursive, collapsible)
@@ -116,8 +133,10 @@ SourceFolderLayout (two-pane container)
 └── Right Pane (75%)
     └── FolderDetailPane
         ├── FolderDetailHeader (title, chip, description, "Import All")
-        └── ArtifactTypeSection (repeated per type)
-            └── Artifact rows
+        ├── ArtifactTypeSection (repeated per type)
+        │   └── Artifact rows
+        └── SubfoldersSection (when hasSubfolders)
+            └── SubfolderCard (repeated per subfolder)
 ```
 
 ### Component Architecture
@@ -128,12 +147,18 @@ Source Detail Page
 └── SourceFolderLayout (container)
     ├── SemanticTree (left pane)
     │   └── TreeNode (recursive, filtered by semantic rules)
+    │       ├── Folder icon + name
+    │       ├── Direct count badge "(N)"
+    │       ├── Total count on hover "[M]"
+    │       └── Mixed-content indicator (dot/icon)
     └── FolderDetailPane (right pane)
         ├── FolderDetailHeader
-        └── ArtifactTypeSection (grouped by type)
+        ├── ArtifactTypeSection (grouped by type)
+        └── SubfoldersSection
+            └── SubfolderCard
 
 Utilities:
-├── buildFolderTree() → converts flat paths to tree
+├── buildFolderTree() → converts flat paths to tree with directArtifacts/children separation
 ├── isSemanticFolder() → filters roots/leafs
 ├── filterSemanticFolders() → applies semantic filtering
 ├── extractFolderReadme() → extracts README content
@@ -145,13 +170,30 @@ Utilities:
 ```
 CatalogEntry[] (flat)
     ↓ buildFolderTree(entries, maxDepth)
-FolderTree (nested)
+FolderTree (nested with directArtifacts, children, counts)
     ↓ filterSemanticFolders(tree)
 SemanticTree (filtered - no roots/leafs)
     ↓ useFolderSelection(tree, entries)
 { selectedFolder, setSelectedFolder, expanded, setExpanded }
     ↓ SourceFolderLayout renders
 SemanticTree (left) + FolderDetailPane (right)
+    ↓ FolderDetailPane renders
+ArtifactTypeSections + SubfoldersSection (if hasSubfolders)
+```
+
+### FolderTree Node Structure
+
+```typescript
+interface FolderTreeNode {
+  path: string;
+  name: string;
+  directArtifacts: CatalogEntry[];  // Artifacts directly in this folder
+  children: FolderTreeNode[];        // Subfolders
+  directCount: number;               // Count of directArtifacts
+  totalArtifactCount: number;        // All descendants (direct + nested)
+  hasSubfolders: boolean;            // children.length > 0
+  hasDirectArtifacts: boolean;       // directArtifacts.length > 0
+}
 ```
 
 ## File Locations
@@ -160,12 +202,12 @@ SemanticTree (left) + FolderDetailPane (right)
 
 | File | Purpose |
 |------|---------|
-| `skillmeat/web/lib/tree-builder.ts` | Tree builder utilities |
+| `skillmeat/web/lib/tree-builder.ts` | Tree builder utilities with mixed-content support |
 | `skillmeat/web/lib/tree-filter-utils.ts` | Semantic filtering utilities |
 | `skillmeat/web/lib/hooks/use-folder-selection.ts` | Folder selection state hook |
 | `skillmeat/web/app/marketplace/sources/[id]/components/source-folder-layout.tsx` | Two-pane container |
 | `skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx` | Left pane semantic tree |
-| `skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx` | Individual folder item |
+| `skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx` | Individual folder item with count badges |
 
 ### New Files (Phase 2)
 
@@ -176,6 +218,8 @@ SemanticTree (left) + FolderDetailPane (right)
 | `skillmeat/web/app/marketplace/sources/[id]/components/folder-detail-pane.tsx` | Right pane container |
 | `skillmeat/web/app/marketplace/sources/[id]/components/folder-detail-header.tsx` | Title, chip, description, import all |
 | `skillmeat/web/app/marketplace/sources/[id]/components/artifact-type-section.tsx` | Type grouping component |
+| `skillmeat/web/app/marketplace/sources/[id]/components/subfolders-section.tsx` | Subfolders grid section |
+| `skillmeat/web/app/marketplace/sources/[id]/components/subfolder-card.tsx` | Clickable subfolder card |
 
 ### Modified Files
 
@@ -188,7 +232,7 @@ SemanticTree (left) + FolderDetailPane (right)
 
 | File | Purpose |
 |------|---------|
-| `skillmeat/web/__tests__/lib/tree-builder.test.ts` | Tree builder unit tests |
+| `skillmeat/web/__tests__/lib/tree-builder.test.ts` | Tree builder unit tests (including mixed-content) |
 | `skillmeat/web/__tests__/lib/tree-filter-utils.test.ts` | Semantic filtering unit tests |
 | `skillmeat/web/tests/marketplace/folder-view.spec.ts` | E2E tests |
 
@@ -289,6 +333,10 @@ cd skillmeat/web && pnpm typecheck
 | No README | Fall back to AI-generated summary or generic text |
 | Root-only catalog | Show empty semantic tree |
 | First folder missing | Auto-select first available semantic folder |
+| **Folder with ONLY direct artifacts** | Show type sections, no Subfolders section |
+| **Folder with ONLY subfolders** | Show Subfolders section only, no "Import All" if no direct artifacts |
+| **Empty folder with subfolders** | Show Subfolders section, "(0)" direct count in tree |
+| **Mixed folder (direct + subfolders)** | Type sections ABOVE Subfolders section |
 
 ## Next Steps for Agents
 
