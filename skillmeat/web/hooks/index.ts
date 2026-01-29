@@ -176,7 +176,7 @@ export {
 } from './useIndexingMode';
 
 // ============================================================================
-// MARKETPLACE (5 hooks + 13 source hooks + 1 search hook)
+// MARKETPLACE (5 hooks + 13 source hooks + 1 search hook + 1 folder hook)
 // ============================================================================
 // Marketplace listings, brokers, and artifact sourcing
 export {
@@ -220,6 +220,12 @@ export {
   type UseArtifactSearchOptions,
   type UseArtifactSearchReturn,
 } from './use-artifact-search';
+
+// Folder navigation for marketplace sources
+export {
+  useFolderSelection,
+  type UseFolderSelectionReturn,
+} from '../lib/hooks/use-folder-selection';
 
 // ============================================================================
 // MCP (9 hooks)

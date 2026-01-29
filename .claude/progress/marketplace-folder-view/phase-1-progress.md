@@ -3,13 +3,13 @@ type: progress
 prd: marketplace-folder-view
 phase: 1
 title: Two-Pane Layout & Semantic Tree
-status: pending
+status: completed
 started: null
 completed: null
-progress: 70
+progress: 100
 completion_estimate: on-track
 total_tasks: 10
-completed_tasks: 7
+completed_tasks: 10
 in_progress_tasks: 0
 blocked_tasks: 0
 owners:
@@ -98,7 +98,7 @@ tasks:
     and right pane (75%, folder detail). Manage layout, responsive behavior
 - id: MFV-1.5
   title: Semantic tree component
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   model: opus
@@ -134,7 +134,7 @@ tasks:
     between grid/list/folder modes
 - id: MFV-1.8
   title: Page integration
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   model: sonnet
@@ -146,7 +146,7 @@ tasks:
   description: Integrate two-pane layout into source detail page with view mode switching
 - id: MFV-1.9
   title: First folder auto-selection
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   model: sonnet

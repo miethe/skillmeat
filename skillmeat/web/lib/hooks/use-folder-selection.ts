@@ -23,8 +23,8 @@
  * ```
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import type { FolderTree } from '@/lib/tree-builder';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import type { FolderTree, FolderNode } from '@/lib/tree-builder';
 
 export interface UseFolderSelectionReturn {
   /**
@@ -65,14 +65,43 @@ export interface UseFolderSelectionReturn {
 }
 
 /**
+ * Find the first semantic folder in a tree (depth-first, alphabetically sorted)
+ *
+ * @param tree - The filtered semantic folder tree
+ * @returns First folder node found, or null if tree is empty
+ */
+function findFirstSemanticFolder(tree: FolderTree): FolderNode | null {
+  // Get all top-level folders and sort alphabetically
+  const topLevelFolders = Object.values(tree).sort((a, b) => a.name.localeCompare(b.name));
+
+  if (topLevelFolders.length === 0) {
+    return null;
+  }
+
+  // Return the first folder (alphabetically), handle undefined case
+  return topLevelFolders[0] ?? null;
+}
+
+/**
  * Manage folder selection and expansion state for folder tree views.
  *
  * @param tree - The folder tree structure built from catalog entries
  * @returns Folder selection state and controls
  */
 export function useFolderSelection(tree: FolderTree): UseFolderSelectionReturn {
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [selectedFolder, setSelectedFolderInternal] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // Track if user has manually interacted to avoid overriding their choice
+  const hasUserInteracted = useRef(false);
+
+  /**
+   * Wrapped setter that tracks user interaction
+   */
+  const setSelectedFolder = useCallback((path: string | null) => {
+    hasUserInteracted.current = true;
+    setSelectedFolderInternal(path);
+  }, []);
 
   /**
    * Get all folder paths from the tree (for expandAll)
@@ -80,14 +109,14 @@ export function useFolderSelection(tree: FolderTree): UseFolderSelectionReturn {
   const allFolderPaths = useMemo(() => {
     const paths: string[] = [];
 
-    function collectPaths(node: Record<string, any>, parentPath: string = ''): void {
-      for (const [key, folderNode] of Object.entries(node)) {
+    function collectPaths(node: Record<string, any>): void {
+      for (const folderNode of Object.values(node)) {
         if (folderNode && typeof folderNode === 'object' && 'fullPath' in folderNode) {
           paths.push(folderNode.fullPath);
 
           // Recursively collect from children
           if (folderNode.children && typeof folderNode.children === 'object') {
-            collectPaths(folderNode.children, folderNode.fullPath);
+            collectPaths(folderNode.children);
           }
         }
       }
@@ -98,20 +127,33 @@ export function useFolderSelection(tree: FolderTree): UseFolderSelectionReturn {
   }, [tree]);
 
   /**
-   * Auto-select first semantic folder when tree loads
+   * Auto-select first semantic folder when tree loads.
+   * Only runs if user hasn't manually interacted with the selection.
    */
   useEffect(() => {
-    // Only auto-select if no selection exists and tree has content
-    if (selectedFolder === null && Object.keys(tree).length > 0) {
-      // Get first top-level folder
-      const firstFolderKey = Object.keys(tree)[0];
-      if (firstFolderKey && tree[firstFolderKey]) {
-        const firstFolder = tree[firstFolderKey];
-        setSelectedFolder(firstFolder.fullPath);
+    // Only auto-select if:
+    // 1. User hasn't manually interacted
+    // 2. No current selection
+    // 3. Tree has content
+    if (!hasUserInteracted.current && selectedFolder === null && Object.keys(tree).length > 0) {
+      const firstFolder = findFirstSemanticFolder(tree);
 
-        // Auto-expand the first folder if it has children
-        if (firstFolder.hasSubfolders) {
-          setExpanded(new Set([firstFolder.fullPath]));
+      if (firstFolder) {
+        // Set selection without triggering user interaction flag
+        setSelectedFolderInternal(firstFolder.fullPath);
+
+        // Auto-expand path to first folder
+        const segments = firstFolder.fullPath.split('/').filter(Boolean);
+        const pathsToExpand: string[] = [];
+        let currentPath = '';
+
+        for (const segment of segments) {
+          currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+          pathsToExpand.push(currentPath);
+        }
+
+        if (pathsToExpand.length > 0) {
+          setExpanded(new Set(pathsToExpand));
         }
       }
     }
