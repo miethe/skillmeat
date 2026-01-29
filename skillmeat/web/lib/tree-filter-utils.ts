@@ -11,7 +11,8 @@ import type { FolderTree, FolderNode } from './tree-builder';
  * Root-level folders to exclude (depth 1)
  * These are too high-level to be useful for navigation
  */
-const ROOT_EXCLUSIONS = ['plugins', 'src', 'skills', 'lib', 'packages', 'apps', 'examples'];
+// Note: 'skills' intentionally excluded - it's a meaningful folder that should be shown
+const ROOT_EXCLUSIONS = ['plugins', 'src', 'lib', 'packages', 'apps', 'examples'];
 
 /**
  * Leaf container folders to exclude (any depth)

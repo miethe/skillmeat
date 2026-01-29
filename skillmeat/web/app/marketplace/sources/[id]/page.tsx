@@ -81,6 +81,7 @@ import { ScoreBadge } from '@/components/ScoreBadge';
 import { TagBadge } from '@/components/marketplace/tag-badge';
 import { SourceFolderLayout } from './components/source-folder-layout';
 import { buildFolderTree } from '@/lib/tree-builder';
+import { filterSemanticTree } from '@/lib/tree-filter-utils';
 import { useFolderSelection } from '@/lib/hooks/use-folder-selection';
 import type {
   CatalogEntry,
@@ -611,10 +612,23 @@ export default function SourceDetailPage() {
     return excluded;
   }, [allEntries, showOnlyDuplicates]);
 
+  // Fetch all artifacts when entering folder view mode (Bug fix: folder view pagination)
+  // Folder view needs all artifacts to build the complete tree structure
+  useEffect(() => {
+    if (viewMode === 'folder' && hasNextPage && !isFetchingNextPage && !catalogFetching) {
+      fetchNextPage();
+    }
+  }, [viewMode, hasNextPage, isFetchingNextPage, catalogFetching, fetchNextPage]);
+
+  // Show loading state for folder view while fetching all pages
+  const isFolderViewLoading = viewMode === 'folder' && (catalogLoading || hasNextPage);
+
   // Build folder tree for folder view mode (MFV-1.8)
+  // Apply semantic filtering to remove type container folders (Bug fix: commands/agents/etc showing)
   const folderTree = useMemo(() => {
     if (viewMode !== 'folder') return {};
-    return buildFolderTree(filteredEntries, 0);
+    const rawTree = buildFolderTree(filteredEntries, 0);
+    return filterSemanticTree(rawTree);
   }, [filteredEntries, viewMode]);
 
   // Folder selection state (MFV-1.8)
@@ -1296,9 +1310,15 @@ export default function SourceDetailPage() {
           <span>
             {viewMode === 'folder' ? (
               <>
-                {filteredEntries.length.toLocaleString()} artifacts in{' '}
-                {Object.keys(folderTree).length} top-level folder
-                {Object.keys(folderTree).length !== 1 ? 's' : ''}
+                {isFolderViewLoading ? (
+                  <>Loading all artifacts for folder view...</>
+                ) : (
+                  <>
+                    {filteredEntries.length.toLocaleString()} artifacts in{' '}
+                    {Object.keys(folderTree).length} top-level folder
+                    {Object.keys(folderTree).length !== 1 ? 's' : ''}
+                  </>
+                )}
               </>
             ) : (
               <>
@@ -1314,9 +1334,10 @@ export default function SourceDetailPage() {
       )}
 
       {/* Catalog Grid/List/Folder */}
-      {catalogLoading ? (
+      {/* For folder view, show loading while fetching all pages (isFolderViewLoading) */}
+      {(viewMode === 'folder' ? isFolderViewLoading : catalogLoading) ? (
         viewMode === 'folder' ? (
-          // Folder view loading skeleton
+          // Folder view loading skeleton - shown while fetching all pages
           <div className="flex h-[400px] min-h-[400px] flex-col md:flex-row">
             <aside className="h-[200px] w-full border-b bg-muted/20 p-3 md:h-full md:w-1/4 md:min-w-[200px] md:max-w-[300px] md:border-b-0 md:border-r">
               <Skeleton className="mb-3 h-4 w-16" />
