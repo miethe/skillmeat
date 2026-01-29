@@ -134,7 +134,7 @@ export function FolderDetailPane({
               <Folder className="h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
               <div>
                 <p className="text-sm font-medium">No artifacts match current filters</p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {unfilteredCount} artifact{unfilteredCount !== 1 ? 's' : ''} in this folder (
                   {isFiltered ? 'filtered out' : 'hidden'})
                 </p>
@@ -190,7 +190,7 @@ export function FolderDetailPane({
         {folder.hasDirectArtifacts && filteredArtifacts.length > 0 && (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Artifacts</h3>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {(Object.keys(artifactsByType) as ArtifactType[])
                 .sort()
                 .map((type) => {

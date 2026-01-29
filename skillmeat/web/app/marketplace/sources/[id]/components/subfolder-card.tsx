@@ -62,15 +62,15 @@ export function SubfolderCard({ folder, onSelect }: SubfolderCardProps) {
       onKeyDown={handleKeyDown}
       aria-label={ariaLabel}
       className={cn(
-        'group cursor-pointer border rounded-lg p-4',
-        'hover:border-primary/50 hover:shadow-sm transition-all',
+        'group cursor-pointer rounded-lg border p-4',
+        'transition-all duration-200 hover:border-primary/50 hover:shadow-sm',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
       )}
     >
       {/* Header Row: Folder Icon + Name */}
-      <div className="flex items-center gap-2 mb-2">
-        <Folder className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-        <h3 className="font-medium text-sm truncate">{folder.name}</h3>
+      <div className="mb-2 flex items-center gap-2">
+        <Folder className="h-5 w-5 text-muted-foreground transition-colors duration-200 group-hover:text-primary" />
+        <h3 className="truncate text-sm font-medium">{folder.name}</h3>
       </div>
 
       {/* Stats Row: Artifact Count */}
@@ -79,7 +79,7 @@ export function SubfolderCard({ folder, onSelect }: SubfolderCardProps) {
       </div>
 
       {/* Action Row: Click to Explore */}
-      <div className="flex items-center gap-1 text-xs text-muted-foreground group-hover:text-primary transition-colors">
+      <div className="flex items-center gap-1 text-xs text-muted-foreground transition-colors duration-200 group-hover:text-primary">
         <span>Click to explore</span>
         <ChevronRight className="h-3 w-3" />
       </div>

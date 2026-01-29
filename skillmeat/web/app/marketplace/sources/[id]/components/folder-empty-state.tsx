@@ -70,10 +70,10 @@ export function FolderEmptyState({
     return (
       <div className={cn('flex flex-col items-center justify-center py-12')}>
         <SearchX className={cn('h-12 w-12 text-muted-foreground/50')} aria-hidden="true" />
-        <h3 className={cn('text-lg font-medium text-muted-foreground mt-4')}>
+        <h3 className={cn('mt-4 text-lg font-medium text-muted-foreground')}>
           No matching artifacts
         </h3>
-        <p className={cn('text-sm text-muted-foreground text-center max-w-[300px] mt-2')}>
+        <p className={cn('mt-2 max-w-[300px] text-center text-sm text-muted-foreground')}>
           {unfilteredCount ? `${unfilteredCount} artifact${unfilteredCount !== 1 ? 's' : ''} ` : ''}
           in "{folderName}" don't match your current filters.
         </p>
@@ -96,10 +96,10 @@ export function FolderEmptyState({
   return (
     <div className={cn('flex flex-col items-center justify-center py-12')}>
       <FolderOpen className={cn('h-12 w-12 text-muted-foreground/50')} aria-hidden="true" />
-      <h3 className={cn('text-lg font-medium text-muted-foreground mt-4')}>
+      <h3 className={cn('mt-4 text-lg font-medium text-muted-foreground')}>
         No artifacts in this folder
       </h3>
-      <p className={cn('text-sm text-muted-foreground text-center max-w-[300px] mt-2')}>
+      <p className={cn('mt-2 max-w-[300px] text-center text-sm text-muted-foreground')}>
         This folder contains no importable artifacts. Try selecting a different folder from the
         tree.
       </p>

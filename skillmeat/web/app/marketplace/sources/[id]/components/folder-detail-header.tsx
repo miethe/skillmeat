@@ -95,13 +95,13 @@ export function FolderDetailHeader({
   const isImportDisabled = importableCount === 0 || isImporting;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Parent breadcrumb chip */}
       {parentFolderName && onNavigateToParent && (
         <div>
           <Badge
             variant="outline"
-            className="cursor-pointer hover:bg-muted"
+            className="cursor-pointer transition-colors duration-200 hover:bg-muted"
             onClick={onNavigateToParent}
             role="button"
             tabIndex={0}
@@ -127,6 +127,7 @@ export function FolderDetailHeader({
           variant="default"
           onClick={handleImportAll}
           disabled={isImportDisabled}
+          className="transition-all duration-200"
           aria-label={
             isImporting
               ? 'Importing artifacts...'

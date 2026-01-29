@@ -75,13 +75,13 @@ function ArtifactRow({ entry, onImport, onExclude }: ArtifactRowProps) {
   const isExcluded = entry.status === 'excluded';
 
   return (
-    <div className="flex items-center justify-between gap-4 py-2 border-b last:border-b-0">
+    <div className="flex items-center justify-between gap-4 border-b py-3 last:border-b-0">
       {/* Name and description */}
       <div className="min-w-0 flex-1">
-        <h4 className="font-medium text-sm truncate">{entry.name}</h4>
+        <h4 className="truncate text-sm font-medium">{entry.name}</h4>
         {/* Only show description if it exists and is different from name */}
         {entry.path && (
-          <p className="text-xs text-muted-foreground truncate max-w-[200px]" title={entry.path}>
+          <p className="max-w-[200px] truncate text-xs text-muted-foreground" title={entry.path}>
             {entry.path}
           </p>
         )}
@@ -162,9 +162,8 @@ export function ArtifactTypeSection({
       <CollapsibleTrigger asChild>
         <button
           className={cn(
-            'flex w-full items-center gap-2 py-2 px-3 rounded-md',
-            'hover:bg-muted/50 cursor-pointer',
-            'transition-colors duration-200',
+            'flex w-full items-center gap-2 rounded-md px-3 py-2',
+            'cursor-pointer transition-colors duration-200 hover:bg-muted/50',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
           )}
           aria-expanded={isOpen}
@@ -183,10 +182,10 @@ export function ArtifactTypeSection({
           <TypeIcon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
 
           {/* Type Name (Plural) */}
-          <span className="font-medium text-sm">{config.pluralLabel}</span>
+          <span className="text-sm font-medium">{config.pluralLabel}</span>
 
           {/* Count Badge */}
-          <span className="text-muted-foreground text-sm">({artifacts.length})</span>
+          <span className="text-sm text-muted-foreground">({artifacts.length})</span>
         </button>
       </CollapsibleTrigger>
 

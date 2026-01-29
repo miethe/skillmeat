@@ -40,16 +40,16 @@ export function SubfoldersSection({ subfolders, onSelectFolder }: SubfoldersSect
   }
 
   return (
-    <section className="mt-8 pt-6 border-t border-border">
+    <section className="mt-8 border-t border-border pt-6">
       {/* Section Header */}
-      <div className="flex items-center gap-2 text-lg font-semibold mb-4">
+      <div className="mb-4 flex items-center gap-2">
         <FolderTree className="h-5 w-5" aria-hidden="true" />
-        <h3>Subfolders</h3>
-        <span className="text-sm text-muted-foreground font-normal">({subfolders.length})</span>
+        <h3 className="text-lg font-semibold">Subfolders</h3>
+        <span className="text-sm font-normal text-muted-foreground">({subfolders.length})</span>
       </div>
 
       {/* Responsive Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {subfolders.map((subfolder) => (
           <SubfolderCard
             key={subfolder.fullPath}
