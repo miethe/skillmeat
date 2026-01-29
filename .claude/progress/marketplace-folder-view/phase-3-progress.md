@@ -4,8 +4,8 @@ prd: marketplace-folder-view
 phase: 3
 title: Accessibility & Performance Optimization
 status: completed
-started: null
-completed: null
+started: 2026-01-29
+completed: 2026-01-29
 progress: 100
 completion_estimate: on-track
 total_tasks: 8
@@ -22,29 +22,29 @@ blockers: []
 success_criteria:
 - id: SC-3.1
   description: Full keyboard navigation working (tree + panes, all keys tested)
-  status: pending
+  status: completed
 - id: SC-3.2
   description: Screen reader announces folder structure, selection, artifact counts
     (tested on 2+ readers)
-  status: pending
+  status: completed
 - id: SC-3.3
   description: Focus indicators visible; focus management correct between panes
-  status: pending
+  status: completed
 - id: SC-3.4
   description: Accessibility audit passes WCAG 2.1 AA (automated + manual)
-  status: pending
+  status: completed
 - id: SC-3.5
   description: Tree renders 1000 items in <200ms
-  status: pending
+  status: completed
 - id: SC-3.6
   description: Lazy rendering reduces initial DOM nodes 60-80%
-  status: pending
+  status: completed
 - id: SC-3.7
   description: No performance regression on filter changes or folder selection
-  status: pending
+  status: completed
 - id: SC-3.8
   description: Memoization prevents unnecessary re-renders
-  status: pending
+  status: completed
 tasks:
 - id: MFV-3.1
   title: Keyboard navigation
