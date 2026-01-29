@@ -414,11 +414,7 @@ export function UnifiedEntityModal({
   const { mutate: updateTags, isPending: isUpdatingTags } = useUpdateArtifactTags();
 
   // Fetch marketplace sources for Sources tab
-  const {
-    data: sourcesData,
-    fetchNextPage: fetchSourcesPage,
-    isFetching: isFetchingSources,
-  } = useSources(100);
+  const { data: sourcesData } = useSources(100);
 
   // Find the source catalog entry for this artifact when Sources tab is active
   useEffect(() => {
@@ -431,15 +427,6 @@ export function UnifiedEntityModal({
       try {
         // Flatten all pages of sources
         const allSources = sourcesData?.pages?.flatMap((page) => page.items) || [];
-
-        // If no sources loaded yet and not currently fetching, trigger fetch
-        if (allSources.length === 0) {
-          if (!isFetchingSources) {
-            fetchSourcesPage();
-          }
-          // Keep loading state while fetching
-          return;
-        }
 
         const entitySource = entity.source || '';
 
@@ -486,7 +473,7 @@ export function UnifiedEntityModal({
     };
 
     findSourceEntry();
-  }, [entity, open, activeTab, sourcesData, isFetchingSources, fetchSourcesPage]);
+  }, [entity, open, activeTab, sourcesData]);
 
   // Generate mock history entries
   const historyEntries = useMemo(() => {

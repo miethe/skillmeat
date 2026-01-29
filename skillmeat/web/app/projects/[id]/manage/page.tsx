@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Grid3x3, List, Loader2, ArrowLeft, Package, RefreshCw } from 'lucide-react';
+import { Grid3x3, List, Loader2, ArrowLeft, Package, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -13,10 +13,10 @@ import { EntityList } from '@/components/entity/entity-list';
 import { EntityForm } from '@/components/entity/entity-form';
 import { EntityTabs } from '@/app/manage/components/entity-tabs';
 import { EntityFilters } from '@/app/manage/components/entity-filters';
-import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
+import { ProjectArtifactModal } from '@/components/shared/ProjectArtifactModal';
 import { DeployFromCollectionDialog } from './components/deploy-from-collection-dialog';
 import { PullToCollectionDialog } from './components/pull-to-collection-dialog';
-import { Entity, EntityType, EntityStatus } from '@/types/entity';
+import { Entity, EntityType } from '@/types/entity';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,8 +47,6 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
     searchQuery,
     statusFilter,
     deleteEntity,
-    updateEntity,
-    syncEntity,
   } = useEntityLifecycle();
 
   // Local state
@@ -187,7 +185,7 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
         {/* Tabs */}
         <div className="mt-4">
           <EntityTabs>
-            {(entityType) => (
+            {() => (
               <div className="flex h-full flex-col">
                 {/* Filters */}
                 <EntityFilters
@@ -231,33 +229,14 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
       </div>
 
       {/* Entity Detail Modal */}
-      <UnifiedEntityModal
-        entity={selectedEntity}
+      <ProjectArtifactModal
+        artifact={selectedEntity}
         open={detailPanelOpen}
         onClose={() => {
           setDetailPanelOpen(false);
           setSelectedEntity(null);
         }}
-        onNavigateToSource={(sourceId, artifactPath) => {
-          setDetailPanelOpen(false);
-          setSelectedEntity(null);
-          router.push(`/marketplace/sources/${sourceId}?artifact=${encodeURIComponent(artifactPath)}`);
-        }}
-        onNavigateToDeployment={(targetProjectPath, artifactId) => {
-          // If navigating to same project, just select the artifact
-          if (targetProjectPath === projectPath) {
-            const entity = entities.find((e) => e.id === artifactId || e.name === artifactId);
-            if (entity) {
-              setSelectedEntity(entity);
-              setDetailPanelOpen(true);
-            }
-          } else {
-            setDetailPanelOpen(false);
-            setSelectedEntity(null);
-            const encodedPath = btoa(targetProjectPath);
-            router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
-          }
-        }}
+        currentProjectPath={projectPath}
       />
 
       {/* Deploy from Collection Dialog */}

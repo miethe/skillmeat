@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Plus, Grid3x3, List, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -13,7 +13,7 @@ import { EntityList } from '@/components/entity/entity-list';
 import { EntityForm } from '@/components/entity/entity-form';
 import { EntityTabs } from './components/entity-tabs';
 import { EntityFilters } from './components/entity-filters';
-import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
+import { CollectionArtifactModal } from '@/components/shared/CollectionArtifactModal';
 import { AddEntityDialog } from './components/add-entity-dialog';
 import type { Artifact, ArtifactType } from '@/types';
 import {
@@ -25,7 +25,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 function ManagePageContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const activeEntityType = (searchParams.get('type') as ArtifactType) || 'skill';
 
@@ -246,23 +245,12 @@ function ManagePageContent() {
       </div>
 
       {/* Artifact Detail Modal */}
-      <UnifiedEntityModal
+      <CollectionArtifactModal
         artifact={selectedArtifact}
         open={detailPanelOpen}
         onClose={() => {
           setDetailPanelOpen(false);
           setSelectedArtifact(null);
-        }}
-        onNavigateToSource={(sourceId, artifactPath) => {
-          setDetailPanelOpen(false);
-          setSelectedArtifact(null);
-          router.push(`/marketplace/sources/${sourceId}?artifact=${encodeURIComponent(artifactPath)}`);
-        }}
-        onNavigateToDeployment={(projectPath, artifactId) => {
-          setDetailPanelOpen(false);
-          setSelectedArtifact(null);
-          const encodedPath = btoa(projectPath);
-          router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
         }}
       />
 

@@ -7,7 +7,7 @@ import { CollectionHeader } from '@/components/collection/collection-header';
 import { CollectionToolbar } from '@/components/collection/collection-toolbar';
 import { ArtifactGrid } from '@/components/collection/artifact-grid';
 import { ArtifactList } from '@/components/collection/artifact-list';
-import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
+import { CollectionArtifactModal } from '@/components/shared/CollectionArtifactModal';
 import { EditCollectionDialog } from '@/components/collection/edit-collection-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
 import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
@@ -716,21 +716,10 @@ function CollectionPageContent() {
       </div>
 
       {/* Artifact Detail Modal */}
-      <UnifiedEntityModal
+      <CollectionArtifactModal
         artifact={selectedArtifact}
         open={isDetailOpen}
         onClose={handleDetailClose}
-        onNavigateToSource={(sourceId, artifactPath) => {
-          setIsDetailOpen(false);
-          setSelectedArtifact(null);
-          router.push(`/marketplace/sources/${sourceId}?artifact=${encodeURIComponent(artifactPath)}`);
-        }}
-        onNavigateToDeployment={(projectPath, artifactId) => {
-          setIsDetailOpen(false);
-          setSelectedArtifact(null);
-          const encodedPath = btoa(projectPath);
-          router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
-        }}
       />
 
       {/* Edit Collection Dialog */}
