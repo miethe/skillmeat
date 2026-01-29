@@ -1,162 +1,170 @@
 ---
 type: progress
-prd: "modal-architecture-improvements"
-phase: "all"
-status: "not_started"
-progress: 0
-created: "2026-01-28"
-last_updated: "2026-01-28"
-
+prd: modal-architecture-improvements
+phase: all
+status: completed
+progress: 100
+created: '2026-01-28'
+last_updated: '2026-01-28'
 tasks:
-  # Phase 1: Fix Critical Bugs
-  - id: "BUG-001"
-    name: "Fix `/projects/[id]/page.tsx` handlers"
-    phase: 1
-    status: "pending"
-    assigned_to: "ui-engineer-enhanced"
-    dependencies: []
-    model: "opus"
-    estimate_hours: 1.5
-
-  - id: "BUG-002"
-    name: "Fix `/projects/[id]/manage/page.tsx` handlers"
-    phase: 1
-    status: "pending"
-    assigned_to: "ui-engineer-enhanced"
-    dependencies: []
-    model: "opus"
-    estimate_hours: 1.0
-
-  - id: "BUG-003"
-    name: "Manual verification of projects pages navigation"
-    phase: 1
-    status: "pending"
-    assigned_to: "ui-engineer-enhanced"
-    dependencies: ["BUG-001", "BUG-002"]
-    model: "sonnet"
-    estimate_hours: 0.5
-
-  # Phase 2: Component Props Contract Enforcement + Prop Migration
-  - id: "COMP-001"
-    name: "Create `CollectionArtifactModal` wrapper"
-    phase: 2
-    status: "pending"
-    assigned_to: "ui-engineer-enhanced"
-    dependencies: []
-    model: "opus"
-    estimate_hours: 1.5
-
-  - id: "COMP-002"
-    name: "Create `ProjectArtifactModal` wrapper"
-    phase: 2
-    status: "pending"
-    assigned_to: "ui-engineer-enhanced"
-    dependencies: []
-    model: "opus"
-    estimate_hours: 1.5
-
-  - id: "COMP-003"
-    name: "Update `/collection/page.tsx` to use wrapper"
-    phase: 2
-    status: "pending"
-    assigned_to: "ui-engineer-enhanced"
-    dependencies: ["COMP-001"]
-    model: "sonnet"
-    estimate_hours: 0.5
-
-  - id: "COMP-004"
-    name: "Update `/manage/page.tsx` to use wrapper"
-    phase: 2
-    status: "pending"
-    assigned_to: "ui-engineer-enhanced"
-    dependencies: ["COMP-001"]
-    model: "sonnet"
-    estimate_hours: 0.5
-
-  - id: "COMP-005"
-    name: "Update `/projects/[id]/page.tsx` to use wrapper"
-    phase: 2
-    status: "pending"
-    assigned_to: "ui-engineer-enhanced"
-    dependencies: ["COMP-002", "BUG-001"]
-    model: "sonnet"
-    estimate_hours: 0.5
-
-  - id: "COMP-006"
-    name: "Update `/projects/[id]/manage/page.tsx` to use wrapper"
-    phase: 2
-    status: "pending"
-    assigned_to: "ui-engineer-enhanced"
-    dependencies: ["COMP-002", "BUG-002"]
-    model: "sonnet"
-    estimate_hours: 0.5
-
-  - id: "COMP-007"
-    name: "Complete `entity` → `artifact` prop migration"
-    phase: 2
-    status: "pending"
-    assigned_to: "ui-engineer-enhanced"
-    dependencies: []
-    model: "opus"
-    estimate_hours: 1.5
-
-  # Phase 3: App-Level Data Prefetching
-  - id: "PREF-001"
-    name: "Add `DataPrefetcher` component to `providers.tsx`"
-    phase: 3
-    status: "pending"
-    assigned_to: "ui-engineer-enhanced"
-    dependencies: []
-    model: "opus"
-    estimate_hours: 1.0
-
-  - id: "PREF-002"
-    name: "Integrate prefetcher in provider tree"
-    phase: 3
-    status: "pending"
-    assigned_to: "ui-engineer-enhanced"
-    dependencies: ["PREF-001"]
-    model: "sonnet"
-    estimate_hours: 0.5
-
-  - id: "PREF-003"
-    name: "Remove eager fetch from modal"
-    phase: 3
-    status: "pending"
-    assigned_to: "ui-engineer-enhanced"
-    dependencies: ["PREF-002"]
-    model: "sonnet"
-    estimate_hours: 0.5
-
-  - id: "PREF-004"
-    name: "Performance verification of Sources tab"
-    phase: 3
-    status: "pending"
-    assigned_to: "ui-engineer-enhanced"
-    dependencies: ["PREF-003"]
-    model: "sonnet"
-    estimate_hours: 1.0
-
+- id: BUG-001
+  name: Fix `/projects/[id]/page.tsx` handlers
+  phase: 1
+  status: completed
+  assigned_to: ui-engineer-enhanced
+  dependencies: []
+  model: opus
+  estimate_hours: 1.5
+- id: BUG-002
+  name: Fix `/projects/[id]/manage/page.tsx` handlers
+  phase: 1
+  status: completed
+  assigned_to: ui-engineer-enhanced
+  dependencies: []
+  model: opus
+  estimate_hours: 1.0
+- id: BUG-003
+  name: Manual verification of projects pages navigation
+  phase: 1
+  status: completed
+  assigned_to: ui-engineer-enhanced
+  dependencies:
+  - BUG-001
+  - BUG-002
+  model: sonnet
+  estimate_hours: 0.5
+- id: COMP-001
+  name: Create `CollectionArtifactModal` wrapper
+  phase: 2
+  status: completed
+  assigned_to: ui-engineer-enhanced
+  dependencies: []
+  model: opus
+  estimate_hours: 1.5
+- id: COMP-002
+  name: Create `ProjectArtifactModal` wrapper
+  phase: 2
+  status: completed
+  assigned_to: ui-engineer-enhanced
+  dependencies: []
+  model: opus
+  estimate_hours: 1.5
+- id: COMP-003
+  name: Update `/collection/page.tsx` to use wrapper
+  phase: 2
+  status: completed
+  assigned_to: ui-engineer-enhanced
+  dependencies:
+  - COMP-001
+  model: sonnet
+  estimate_hours: 0.5
+- id: COMP-004
+  name: Update `/manage/page.tsx` to use wrapper
+  phase: 2
+  status: completed
+  assigned_to: ui-engineer-enhanced
+  dependencies:
+  - COMP-001
+  model: sonnet
+  estimate_hours: 0.5
+- id: COMP-005
+  name: Update `/projects/[id]/page.tsx` to use wrapper
+  phase: 2
+  status: completed
+  assigned_to: ui-engineer-enhanced
+  dependencies:
+  - COMP-002
+  - BUG-001
+  model: sonnet
+  estimate_hours: 0.5
+- id: COMP-006
+  name: Update `/projects/[id]/manage/page.tsx` to use wrapper
+  phase: 2
+  status: completed
+  assigned_to: ui-engineer-enhanced
+  dependencies:
+  - COMP-002
+  - BUG-002
+  model: sonnet
+  estimate_hours: 0.5
+- id: COMP-007
+  name: Complete `entity` → `artifact` prop migration
+  phase: 2
+  status: completed
+  assigned_to: ui-engineer-enhanced
+  dependencies: []
+  model: opus
+  estimate_hours: 1.5
+- id: PREF-001
+  name: Add `DataPrefetcher` component to `providers.tsx`
+  phase: 3
+  status: completed
+  assigned_to: ui-engineer-enhanced
+  dependencies: []
+  model: opus
+  estimate_hours: 1.0
+- id: PREF-002
+  name: Integrate prefetcher in provider tree
+  phase: 3
+  status: completed
+  assigned_to: ui-engineer-enhanced
+  dependencies:
+  - PREF-001
+  model: sonnet
+  estimate_hours: 0.5
+- id: PREF-003
+  name: Remove eager fetch from modal
+  phase: 3
+  status: completed
+  assigned_to: ui-engineer-enhanced
+  dependencies:
+  - PREF-002
+  model: sonnet
+  estimate_hours: 0.5
+- id: PREF-004
+  name: Performance verification of Sources tab
+  phase: 3
+  status: completed
+  assigned_to: ui-engineer-enhanced
+  dependencies:
+  - PREF-003
+  model: sonnet
+  estimate_hours: 1.0
 parallelization:
-  # Phase 1: BUG-001 and BUG-002 can run in parallel
-  phase_1_batch_1: ["BUG-001", "BUG-002"]
-  phase_1_batch_2: ["BUG-003"]
-
-  # Phase 2: COMP-001/002 parallel, then 003-006, then 007 independent
-  phase_2_batch_1: ["COMP-001", "COMP-002"]
-  phase_2_batch_2: ["COMP-003", "COMP-004", "COMP-005", "COMP-006"]
-  phase_2_batch_3: ["COMP-007"]
-
-  # Phase 3: Sequential only
-  phase_3_batch_1: ["PREF-001"]
-  phase_3_batch_2: ["PREF-002"]
-  phase_3_batch_3: ["PREF-003"]
-  phase_3_batch_4: ["PREF-004"]
-
+  phase_1_batch_1:
+  - BUG-001
+  - BUG-002
+  phase_1_batch_2:
+  - BUG-003
+  phase_2_batch_1:
+  - COMP-001
+  - COMP-002
+  phase_2_batch_2:
+  - COMP-003
+  - COMP-004
+  - COMP-005
+  - COMP-006
+  phase_2_batch_3:
+  - COMP-007
+  phase_3_batch_1:
+  - PREF-001
+  phase_3_batch_2:
+  - PREF-002
+  phase_3_batch_3:
+  - PREF-003
+  phase_3_batch_4:
+  - PREF-004
 phase_dependencies:
   phase_1: []
-  phase_2: ["phase_1"]
-  phase_3: ["phase_1"]
+  phase_2:
+  - phase_1
+  phase_3:
+  - phase_1
+total_tasks: 14
+completed_tasks: 14
+in_progress_tasks: 0
+blocked_tasks: 0
+updated: '2026-01-28'
 ---
 
 # Modal Architecture Improvements - All Phases Progress
