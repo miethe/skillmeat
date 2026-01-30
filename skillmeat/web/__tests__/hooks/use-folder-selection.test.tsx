@@ -25,7 +25,7 @@ function createFolderNode(
 
 describe('useFolderSelection', () => {
   describe('initialization', () => {
-    it('starts with null selection and empty expansion', () => {
+    it('starts with null selection (Source Root) and empty expansion', () => {
       const tree: FolderTree = {};
       const { result } = renderHook(() => useFolderSelection(tree));
 
@@ -33,7 +33,7 @@ describe('useFolderSelection', () => {
       expect(result.current.expanded.size).toBe(0);
     });
 
-    it('auto-selects first semantic folder on mount', () => {
+    it('starts at Source Root (null) even with folders in tree', () => {
       const tree: FolderTree = {
         anthropics: createFolderNode('anthropics', 'anthropics', {
           tools: createFolderNode('tools', 'anthropics/tools'),
@@ -43,12 +43,12 @@ describe('useFolderSelection', () => {
 
       const { result } = renderHook(() => useFolderSelection(tree));
 
-      // Should select first folder alphabetically
-      expect(result.current.selectedFolder).toBe('anthropics');
-      expect(result.current.expanded.has('anthropics')).toBe(true);
+      // Should NOT auto-select - stays at Source Root (null)
+      expect(result.current.selectedFolder).toBeNull();
+      expect(result.current.expanded.size).toBe(0);
     });
 
-    it('does not auto-select on empty tree', () => {
+    it('maintains null selection on empty tree', () => {
       const tree: FolderTree = {};
       const { result } = renderHook(() => useFolderSelection(tree));
 
@@ -57,8 +57,8 @@ describe('useFolderSelection', () => {
     });
   });
 
-  describe('auto-selection behavior', () => {
-    it('auto-expands path to first selected folder', () => {
+  describe('Source Root behavior', () => {
+    it('starts at Source Root (null) without auto-selecting', () => {
       const tree: FolderTree = {
         anthropics: createFolderNode('anthropics', 'anthropics', {
           tools: createFolderNode('tools', 'anthropics/tools', {
@@ -69,12 +69,12 @@ describe('useFolderSelection', () => {
 
       const { result } = renderHook(() => useFolderSelection(tree));
 
-      // Should expand the selected folder
-      expect(result.current.selectedFolder).toBe('anthropics');
-      expect(result.current.expanded.has('anthropics')).toBe(true);
+      // Should NOT auto-select - stays at Source Root
+      expect(result.current.selectedFolder).toBeNull();
+      expect(result.current.expanded.size).toBe(0);
     });
 
-    it('does not override user selection', () => {
+    it('user can select a folder and return to Source Root', () => {
       const tree: FolderTree = {
         first: createFolderNode('first', 'first'),
         second: createFolderNode('second', 'second'),
@@ -82,31 +82,60 @@ describe('useFolderSelection', () => {
 
       const { result } = renderHook(() => useFolderSelection(tree));
 
-      // First auto-select
-      expect(result.current.selectedFolder).toBe('first');
+      // Starts at Source Root
+      expect(result.current.selectedFolder).toBeNull();
 
-      // User manually selects different folder
+      // User manually selects a folder
       act(() => {
         result.current.setSelectedFolder('second');
       });
 
       expect(result.current.selectedFolder).toBe('second');
 
-      // Re-render should not override user selection
+      // User returns to Source Root
       act(() => {
-        result.current.setSelectedFolder('second');
+        result.current.setSelectedFolder(null);
       });
 
-      expect(result.current.selectedFolder).toBe('second');
+      expect(result.current.selectedFolder).toBeNull();
     });
 
-    it('handles tree changes after initial mount', () => {
+    it('maintains Source Root after tree changes', () => {
       const { result, rerender } = renderHook(({ tree }) => useFolderSelection(tree), {
         initialProps: {
           tree: {
             first: createFolderNode('first', 'first'),
           } as FolderTree,
         },
+      });
+
+      // Starts at Source Root
+      expect(result.current.selectedFolder).toBeNull();
+
+      // Update tree with new folders
+      rerender({
+        tree: {
+          first: createFolderNode('first', 'first'),
+          second: createFolderNode('second', 'second'),
+        },
+      });
+
+      // Should stay at Source Root
+      expect(result.current.selectedFolder).toBeNull();
+    });
+
+    it('preserves user selection after tree changes', () => {
+      const { result, rerender } = renderHook(({ tree }) => useFolderSelection(tree), {
+        initialProps: {
+          tree: {
+            first: createFolderNode('first', 'first'),
+          } as FolderTree,
+        },
+      });
+
+      // User selects a folder
+      act(() => {
+        result.current.setSelectedFolder('first');
       });
 
       expect(result.current.selectedFolder).toBe('first');
@@ -119,20 +148,8 @@ describe('useFolderSelection', () => {
         },
       });
 
-      // Should not change selection (user interaction flag set)
+      // Should keep user selection
       expect(result.current.selectedFolder).toBe('first');
-    });
-
-    it('selects first folder alphabetically', () => {
-      const tree: FolderTree = {
-        zebra: createFolderNode('zebra', 'zebra'),
-        alpha: createFolderNode('alpha', 'alpha'),
-        beta: createFolderNode('beta', 'beta'),
-      };
-
-      const { result } = renderHook(() => useFolderSelection(tree));
-
-      expect(result.current.selectedFolder).toBe('alpha');
     });
   });
 
@@ -145,6 +162,9 @@ describe('useFolderSelection', () => {
 
       const { result } = renderHook(() => useFolderSelection(tree));
 
+      // Starts at Source Root
+      expect(result.current.selectedFolder).toBeNull();
+
       act(() => {
         result.current.setSelectedFolder('second');
       });
@@ -152,15 +172,20 @@ describe('useFolderSelection', () => {
       expect(result.current.selectedFolder).toBe('second');
     });
 
-    it('allows clearing selection', () => {
+    it('allows returning to Source Root (clearing selection)', () => {
       const tree: FolderTree = {
         first: createFolderNode('first', 'first'),
       };
 
       const { result } = renderHook(() => useFolderSelection(tree));
 
+      // Select a folder first
+      act(() => {
+        result.current.setSelectedFolder('first');
+      });
       expect(result.current.selectedFolder).toBe('first');
 
+      // Return to Source Root
       act(() => {
         result.current.setSelectedFolder(null);
       });
@@ -177,7 +202,14 @@ describe('useFolderSelection', () => {
 
       const { result } = renderHook(() => useFolderSelection(tree));
 
-      // Initially expanded (auto-selected)
+      // Initially collapsed (no auto-expand)
+      expect(result.current.expanded.has('first')).toBe(false);
+
+      // Toggle on
+      act(() => {
+        result.current.toggleExpand('first');
+      });
+
       expect(result.current.expanded.has('first')).toBe(true);
 
       // Toggle off
@@ -186,13 +218,6 @@ describe('useFolderSelection', () => {
       });
 
       expect(result.current.expanded.has('first')).toBe(false);
-
-      // Toggle back on
-      act(() => {
-        result.current.toggleExpand('first');
-      });
-
-      expect(result.current.expanded.has('first')).toBe(true);
     });
 
     it('expands full path to folder', () => {
@@ -224,13 +249,13 @@ describe('useFolderSelection', () => {
 
       const { result } = renderHook(() => useFolderSelection(tree));
 
-      // Expand multiple folders
+      // Expand folders manually (no auto-expand)
       act(() => {
         result.current.toggleExpand('first');
         result.current.toggleExpand('second');
       });
 
-      expect(result.current.expanded.size).toBeGreaterThan(0);
+      expect(result.current.expanded.size).toBe(2);
 
       // Collapse all
       act(() => {
@@ -309,7 +334,7 @@ describe('useFolderSelection', () => {
   });
 
   describe('user interaction tracking', () => {
-    it('prevents auto-selection after manual interaction', () => {
+    it('preserves user selection after tree changes', () => {
       const tree: FolderTree = {
         first: createFolderNode('first', 'first'),
       };
@@ -318,13 +343,15 @@ describe('useFolderSelection', () => {
         initialProps: { tree },
       });
 
-      // Auto-selected first
-      expect(result.current.selectedFolder).toBe('first');
+      // Starts at Source Root
+      expect(result.current.selectedFolder).toBeNull();
 
       // User manually selects
       act(() => {
         result.current.setSelectedFolder('first');
       });
+
+      expect(result.current.selectedFolder).toBe('first');
 
       // Add new folder to tree
       const newTree: FolderTree = {
@@ -334,11 +361,11 @@ describe('useFolderSelection', () => {
 
       rerender({ tree: newTree });
 
-      // Should not auto-select the new folder
+      // Should keep user selection
       expect(result.current.selectedFolder).toBe('first');
     });
 
-    it('sets user interaction flag on setSelectedFolder call', () => {
+    it('tracks user interaction flag on setSelectedFolder call', () => {
       const tree: FolderTree = {
         first: createFolderNode('first', 'first'),
         second: createFolderNode('second', 'second'),
@@ -348,18 +375,20 @@ describe('useFolderSelection', () => {
         initialProps: { tree },
       });
 
-      // Auto-selected
-      expect(result.current.selectedFolder).toBe('first');
+      // Starts at Source Root
+      expect(result.current.selectedFolder).toBeNull();
 
       // Manual selection
       act(() => {
         result.current.setSelectedFolder('second');
       });
 
+      expect(result.current.selectedFolder).toBe('second');
+
       // Re-render with same tree
       rerender({ tree });
 
-      // Should not revert to first
+      // Should keep user selection
       expect(result.current.selectedFolder).toBe('second');
     });
   });

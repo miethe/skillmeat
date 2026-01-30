@@ -41,6 +41,7 @@
  */
 
 import { useMemo, useCallback, useRef, useState, useEffect, useImperativeHandle, forwardRef, memo } from 'react';
+import { Home } from 'lucide-react';
 import type { FolderTree } from '@/lib/tree-builder';
 import { filterSemanticTree } from '@/lib/tree-filter-utils';
 import { TreeNode } from './tree-node';
@@ -57,8 +58,8 @@ export interface SemanticTreeProps {
   selectedFolder: string | null;
   /** Set of expanded folder paths */
   expanded: Set<string>;
-  /** Callback when a folder is selected */
-  onSelectFolder: (path: string) => void;
+  /** Callback when a folder is selected (null = Source Root) */
+  onSelectFolder: (path: string | null) => void;
   /** Callback to toggle folder expansion */
   onToggleExpand: (path: string) => void;
   /** Optional className for the container */
@@ -526,6 +527,24 @@ export const SemanticTree = forwardRef<SemanticTreeHandle, SemanticTreeProps>(fu
 
   return (
     <nav aria-label="Folder navigation" className={cn('overflow-y-auto', className)}>
+      {/* Source Root entry - always visible at top */}
+      <button
+        type="button"
+        onClick={() => onSelectFolder(null)}
+        className={cn(
+          'w-full text-left px-2 py-2 rounded-md text-sm mb-2',
+          'flex items-center gap-2 transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
+          selectedFolder === null
+            ? 'bg-accent text-accent-foreground font-medium'
+            : 'bg-transparent hover:bg-accent/50'
+        )}
+        aria-current={selectedFolder === null ? 'true' : undefined}
+      >
+        <Home className="h-4 w-4 flex-shrink-0" />
+        <span>Source Root</span>
+      </button>
+
       <div
         ref={treeRef}
         role="tree"

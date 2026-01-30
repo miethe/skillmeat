@@ -29,8 +29,8 @@
  * ```
  */
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import type { FolderTree, FolderNode } from '@/lib/tree-builder';
+import { useState, useCallback, useMemo, useRef } from 'react';
+import type { FolderTree } from '@/lib/tree-builder';
 
 export interface UseFolderSelectionReturn {
   /**
@@ -88,23 +88,6 @@ export interface UseFolderSelectionReturn {
   navigateToFolder: (path: string) => void;
 }
 
-/**
- * Find the first semantic folder in a tree (depth-first, alphabetically sorted)
- *
- * @param tree - The filtered semantic folder tree
- * @returns First folder node found, or null if tree is empty
- */
-function findFirstSemanticFolder(tree: FolderTree): FolderNode | null {
-  // Get all top-level folders and sort alphabetically
-  const topLevelFolders = Object.values(tree).sort((a, b) => a.name.localeCompare(b.name));
-
-  if (topLevelFolders.length === 0) {
-    return null;
-  }
-
-  // Return the first folder (alphabetically), handle undefined case
-  return topLevelFolders[0] ?? null;
-}
 
 /**
  * Manage folder selection and expansion state for folder tree views.
@@ -150,38 +133,9 @@ export function useFolderSelection(tree: FolderTree): UseFolderSelectionReturn {
     return paths;
   }, [tree]);
 
-  /**
-   * Auto-select first semantic folder when tree loads.
-   * Only runs if user hasn't manually interacted with the selection.
-   */
-  useEffect(() => {
-    // Only auto-select if:
-    // 1. User hasn't manually interacted
-    // 2. No current selection
-    // 3. Tree has content
-    if (!hasUserInteracted.current && selectedFolder === null && Object.keys(tree).length > 0) {
-      const firstFolder = findFirstSemanticFolder(tree);
-
-      if (firstFolder) {
-        // Set selection without triggering user interaction flag
-        setSelectedFolderInternal(firstFolder.fullPath);
-
-        // Auto-expand path to first folder
-        const segments = firstFolder.fullPath.split('/').filter(Boolean);
-        const pathsToExpand: string[] = [];
-        let currentPath = '';
-
-        for (const segment of segments) {
-          currentPath = currentPath ? `${currentPath}/${segment}` : segment;
-          pathsToExpand.push(currentPath);
-        }
-
-        if (pathsToExpand.length > 0) {
-          setExpanded(new Set(pathsToExpand));
-        }
-      }
-    }
-  }, [tree, selectedFolder]);
+  // NOTE: Auto-selection of first folder was removed to show "Source Root" by default.
+  // This allows users to see root-level artifacts when entering folder view.
+  // Users can click a folder to navigate into it, or click "Source Root" to return.
 
   /**
    * Toggle expansion state for a folder
