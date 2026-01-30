@@ -86,7 +86,13 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
               aliases: matchingArtifact.aliases || entity.aliases,
               source: matchingArtifact.source || entity.source,
             }
-          : entity;
+          : {
+              ...entity,
+              // Construct collections from single collection property when no match found
+              collections: entity.collection
+                ? [{ id: entity.collection, name: entity.collection === 'default' ? 'Default Collection' : entity.collection }]
+                : undefined,
+            };
         setSelectedEntity(enrichedEntity);
         setDetailPanelOpen(true);
       }
@@ -117,7 +123,13 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
             aliases: matchingArtifact.aliases || entity.aliases,
             source: matchingArtifact.source || entity.source,
           }
-        : entity;
+        : {
+            ...entity,
+            // Construct collections from single collection property when no match found
+            collections: entity.collection
+              ? [{ id: entity.collection, name: entity.collection === 'default' ? 'Default Collection' : entity.collection }]
+              : undefined,
+          };
 
       setSelectedEntity(enrichedEntity);
       setDetailPanelOpen(true);
