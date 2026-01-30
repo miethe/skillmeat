@@ -7,9 +7,9 @@ or orphaned files.
 import argparse
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from .config import MAPPING_PATH
 from .utils import get_notebook_id, get_target_files, is_in_scope, load_mapping
@@ -43,6 +43,62 @@ def format_relative_time(iso_timestamp: str) -> str:
         return f"{days}d ago"
     except (ValueError, AttributeError):
         return "unknown"
+
+
+def get_file_mtime(filepath: Path) -> str | None:
+    """Get file modification time as ISO timestamp.
+
+    Args:
+        filepath: Path to the file
+
+    Returns:
+        ISO format timestamp string, or None if file doesn't exist
+    """
+    try:
+        mtime = filepath.stat().st_mtime
+        return datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
+    except (OSError, FileNotFoundError):
+        return None
+
+
+def get_stale_files(mapping: Dict[str, Any]) -> List[Tuple[str, str, str]]:
+    """Find files modified since last sync.
+
+    Args:
+        mapping: Loaded mapping dictionary
+
+    Returns:
+        List of tuples: (filepath, last_synced, file_mtime)
+    """
+    sources = mapping.get("sources", {})
+    stale = []
+
+    for filepath_str in sorted(sources.keys()):
+        source_info = sources[filepath_str]
+        last_synced = source_info.get("last_synced")
+
+        if not last_synced:
+            continue
+
+        # Get file modification time
+        filepath = Path(filepath_str)
+        file_mtime = get_file_mtime(filepath)
+
+        if not file_mtime:
+            continue
+
+        # Parse timestamps for comparison
+        try:
+            synced_dt = datetime.fromisoformat(last_synced.replace("Z", "+00:00"))
+            mtime_dt = datetime.fromisoformat(file_mtime.replace("Z", "+00:00"))
+
+            # If file was modified after last sync, it's stale
+            if mtime_dt > synced_dt:
+                stale.append((filepath_str, last_synced, file_mtime))
+        except (ValueError, AttributeError):
+            continue
+
+    return stale
 
 
 def get_status_summary(mapping: Dict[str, Any]) -> Dict[str, Any]:
@@ -199,12 +255,35 @@ def print_orphaned_files(mapping: Dict[str, Any]) -> None:
         print(f"{filepath} (source_id: {source_id})")
 
 
+def print_stale_files(mapping: Dict[str, Any]) -> None:
+    """Print files modified since last sync.
+
+    Args:
+        mapping: Loaded mapping dictionary
+    """
+    stale = get_stale_files(mapping)
+
+    if not stale:
+        print("No stale files.")
+        return
+
+    print("Stale Files ({})".format(len(stale)))
+    print("-" * 60)
+
+    for filepath, last_synced, file_mtime in stale:
+        synced_relative = format_relative_time(last_synced)
+        mtime_relative = format_relative_time(file_mtime)
+
+        # Format: "path/to/file.md   synced 2h ago, modified 30m ago"
+        print(f"{filepath:<40} synced {synced_relative}, modified {mtime_relative}")
+
+
 def output_json(mapping: Dict[str, Any], output_type: str) -> None:
     """Output status as JSON.
 
     Args:
         mapping: Loaded mapping dictionary
-        output_type: Type of output ('summary', 'tracked', 'untracked', 'orphaned')
+        output_type: Type of output ('summary', 'tracked', 'untracked', 'orphaned', 'stale')
     """
     sources = mapping.get("sources", {})
     tracked_files = set(sources.keys())
@@ -246,6 +325,20 @@ def output_json(mapping: Dict[str, Any], output_type: str) -> None:
             },
         }
         print(json.dumps(output, indent=2))
+    elif output_type == "stale":
+        stale = get_stale_files(mapping)
+        output = {
+            "type": "stale",
+            "count": len(stale),
+            "files": {
+                filepath: {
+                    "last_synced": last_synced,
+                    "file_mtime": file_mtime,
+                }
+                for filepath, last_synced, file_mtime in stale
+            },
+        }
+        print(json.dumps(output, indent=2))
 
 
 def main() -> int:
@@ -271,6 +364,11 @@ def main() -> int:
         "--orphaned",
         action="store_true",
         help="Show tracked files that have been deleted locally",
+    )
+    parser.add_argument(
+        "--stale",
+        action="store_true",
+        help="Show files that have been modified locally since their last sync",
     )
     parser.add_argument(
         "--json",
@@ -302,6 +400,12 @@ def main() -> int:
             output_json(mapping, output_type)
         else:
             print_orphaned_files(mapping)
+    elif args.stale:
+        output_type = "stale"
+        if args.json:
+            output_json(mapping, output_type)
+        else:
+            print_stale_files(mapping)
     else:
         # Default: summary
         if args.json:

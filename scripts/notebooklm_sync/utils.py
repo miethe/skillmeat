@@ -7,6 +7,7 @@ and execute notebooklm CLI commands.
 import json
 import subprocess
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -67,18 +68,36 @@ def save_mapping(data: Dict[str, Any], path: Optional[Path] = None) -> None:
         raise RuntimeError(f"Failed to save mapping to {target_path}: {e}")
 
 
-def get_target_files(base_dir: Path = Path(".")) -> List[Path]:
+def get_target_files(
+    base_dir: Path = Path("."),
+    include_patterns: Optional[List[str]] = None,
+    exclude_patterns: Optional[List[str]] = None,
+) -> List[Path]:
     """Discover all markdown files in scope for NotebookLM sync.
 
-    Includes:
+    Default scope:
     - Root-level .md files (not in subdirectories)
     - Files under docs/ (recursively, excluding docs/project_plans/)
 
     Args:
         base_dir: Base directory to search from. Defaults to current directory.
+        include_patterns: Additional glob patterns to include (e.g., ["docs/project_plans/PRDs/**/*.md"]).
+                         Patterns are relative to base_dir and support ** for recursive matching.
+        exclude_patterns: Glob patterns to exclude (e.g., ["docs/user/beta/**"]).
+                         Applied AFTER includes. Patterns are relative to base_dir.
 
     Returns:
         Sorted list of relative paths to markdown files.
+
+    Examples:
+        # Default scope
+        >>> files = get_target_files()
+
+        # Include project_plans PRDs too
+        >>> files = get_target_files(include_patterns=["docs/project_plans/PRDs/**/*.md"])
+
+        # Exclude beta docs
+        >>> files = get_target_files(exclude_patterns=["docs/user/beta/**"])
     """
     base_dir = Path(base_dir).resolve()
     target_files: List[Path] = []
@@ -95,7 +114,7 @@ def get_target_files(base_dir: Path = Path(".")) -> List[Path]:
             if md_file.is_file():
                 relative_path = md_file.relative_to(base_dir)
 
-                # Check if it matches any exclude pattern
+                # Check if it matches any default exclude pattern
                 excluded = False
                 for pattern in EXCLUDE_PATTERNS:
                     # Convert glob pattern to path check
@@ -106,6 +125,48 @@ def get_target_files(base_dir: Path = Path(".")) -> List[Path]:
 
                 if not excluded:
                     target_files.append(relative_path)
+
+    # Add files matching include_patterns
+    if include_patterns:
+        for pattern in include_patterns:
+            # Use glob or rglob depending on whether pattern contains **
+            if "**" in pattern:
+                # For recursive patterns, extract the base directory and use rglob
+                pattern_parts = pattern.split("**", 1)
+                base_pattern = pattern_parts[0].rstrip("/")
+                suffix_pattern = pattern_parts[1].lstrip("/")
+
+                search_base = base_dir / base_pattern if base_pattern else base_dir
+
+                if search_base.exists():
+                    for match in search_base.rglob(suffix_pattern):
+                        if match.is_file():
+                            relative_path = match.relative_to(base_dir)
+                            if relative_path not in target_files:
+                                target_files.append(relative_path)
+            else:
+                # Non-recursive pattern
+                for match in base_dir.glob(pattern):
+                    if match.is_file():
+                        relative_path = match.relative_to(base_dir)
+                        if relative_path not in target_files:
+                            target_files.append(relative_path)
+
+    # Apply exclude_patterns
+    if exclude_patterns:
+        filtered_files = []
+        for filepath in target_files:
+            excluded = False
+            for pattern in exclude_patterns:
+                # Use match() for glob-style pattern matching
+                if filepath.match(pattern):
+                    excluded = True
+                    break
+
+            if not excluded:
+                filtered_files.append(filepath)
+
+        target_files = filtered_files
 
     return sorted(target_files)
 
@@ -194,3 +255,30 @@ def get_notebook_id() -> Optional[str]:
     """
     mapping = load_mapping()
     return mapping.get("notebook_id")
+
+
+def get_file_mtime(filepath: Path) -> Optional[str]:
+    """Get file modification time as ISO timestamp.
+
+    Args:
+        filepath: Path to the file to check
+
+    Returns:
+        ISO 8601 formatted timestamp string (e.g., "2024-01-30T14:23:45"),
+        or None if file doesn't exist.
+
+    Examples:
+        >>> mtime = get_file_mtime(Path("README.md"))
+        >>> print(mtime)
+        2024-01-30T14:23:45
+    """
+    if not filepath.exists():
+        return None
+
+    try:
+        mtime_timestamp = filepath.stat().st_mtime
+        mtime_dt = datetime.fromtimestamp(mtime_timestamp)
+        return mtime_dt.isoformat(timespec="seconds")
+    except (OSError, ValueError) as e:
+        print(f"Warning: Could not get mtime for {filepath}: {e}")
+        return None

@@ -154,6 +154,10 @@ def init_notebook(
     title: str = DEFAULT_NOTEBOOK_TITLE,
     dry_run: bool = False,
     force: bool = False,
+    include_patterns: list[str] | None = None,
+    exclude_patterns: list[str] | None = None,
+    notebook_id: str | None = None,
+    verbose: bool = False,
 ) -> int:
     """Initialize NotebookLM notebook with documentation.
 
@@ -161,13 +165,17 @@ def init_notebook(
         title: Notebook title
         dry_run: If True, show what would be done without executing
         force: If True, reinitialize even if already initialized
+        include_patterns: Additional glob patterns to include
+        exclude_patterns: Additional glob patterns to exclude
+        notebook_id: Use existing notebook instead of creating new one
+        verbose: Enable verbose output
 
     Returns:
         Exit code (0 for success, 1 for failure).
     """
     # Check if already initialized
     if check_existing_initialization():
-        if not force:
+        if not force and not notebook_id:
             print(f"Error: Notebook already initialized.")
             print(f"  Mapping file: {MAPPING_PATH}")
             print(f"  Notebook ID: {get_notebook_id()}")
@@ -176,9 +184,10 @@ def init_notebook(
             return 1
 
         # Force reinitialize - delete existing
-        existing_id = get_notebook_id()
-        if existing_id:
-            delete_existing_notebook(existing_id, dry_run=dry_run)
+        if force:
+            existing_id = get_notebook_id()
+            if existing_id:
+                delete_existing_notebook(existing_id, dry_run=dry_run)
 
     # Verify authentication
     if not dry_run and not verify_authentication():
@@ -187,10 +196,15 @@ def init_notebook(
         print("Run: notebooklm auth login")
         return 1
 
-    # Create notebook
-    notebook_id = create_notebook(title, dry_run=dry_run)
-    if not notebook_id:
-        return 1
+    # Use existing notebook or create new one
+    if notebook_id:
+        if verbose:
+            print(f"Using existing notebook: {notebook_id}")
+    else:
+        # Create notebook
+        notebook_id = create_notebook(title, dry_run=dry_run)
+        if not notebook_id:
+            return 1
 
     # Set as active
     if not set_active_notebook(notebook_id, dry_run=dry_run):
@@ -199,7 +213,13 @@ def init_notebook(
     # Discover target files
     print()
     print("Discovering documentation files...")
-    target_files = get_target_files()
+    if verbose and (include_patterns or exclude_patterns):
+        print(f"  Include patterns: {include_patterns or 'default'}")
+        print(f"  Exclude patterns: {exclude_patterns or 'default'}")
+    target_files = get_target_files(
+        include_patterns=include_patterns,
+        exclude_patterns=exclude_patterns,
+    )
     print(f"Found {len(target_files)} files to upload")
 
     # Upload files
@@ -210,12 +230,17 @@ def init_notebook(
     current_time = datetime.now(timezone.utc).isoformat()
 
     for i, filepath in enumerate(target_files, 1):
-        print(f"  [{i}/{len(target_files)}] {filepath}...", end=" ")
+        if verbose:
+            print(f"  [{i}/{len(target_files)}] {filepath}...", end=" ")
+        else:
+            print(f"  [{i}/{len(target_files)}] {filepath.name}...", end=" ")
 
         source_id = upload_file(filepath, dry_run=dry_run)
 
         if source_id:
             print("OK")
+            if verbose:
+                print(f"    Source ID: {source_id}")
             sources[str(filepath)] = {
                 "source_id": source_id,
                 "title": filepath.name,
@@ -275,6 +300,10 @@ Examples:
   %(prog)s --notebook-title "Foo"   # Custom title
   %(prog)s --dry-run                # Show what would be done
   %(prog)s --force                  # Reinitialize (delete existing)
+  %(prog)s --include "docs/project_plans/PRDs/**" --include "docs/archive/*.md"
+  %(prog)s --exclude "docs/user/beta/**"
+  %(prog)s --notebook-id abc123     # Use existing notebook
+  %(prog)s --verbose                # Detailed output
         """,
     )
     parser.add_argument(
@@ -292,6 +321,29 @@ Examples:
         action="store_true",
         help="Reinitialize even if already initialized (deletes existing notebook)",
     )
+    parser.add_argument(
+        "--include",
+        action="append",
+        metavar="PATTERN",
+        help="Add glob pattern to include (repeatable, added to defaults)",
+    )
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        metavar="PATTERN",
+        help="Add glob pattern to exclude (repeatable)",
+    )
+    parser.add_argument(
+        "--notebook-id",
+        metavar="ID",
+        help="Use existing notebook instead of creating new one",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="More detailed output during upload",
+    )
 
     args = parser.parse_args()
 
@@ -299,6 +351,10 @@ Examples:
         title=args.notebook_title,
         dry_run=args.dry_run,
         force=args.force,
+        include_patterns=args.include,
+        exclude_patterns=args.exclude,
+        notebook_id=args.notebook_id,
+        verbose=args.verbose,
     )
 
 

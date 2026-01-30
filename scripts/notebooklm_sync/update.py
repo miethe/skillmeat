@@ -8,6 +8,7 @@ Usage:
     python scripts/notebooklm_sync/update.py CLAUDE.md
     python scripts/notebooklm_sync/update.py docs/dev/foo.md --verbose
     python scripts/notebooklm_sync/update.py README.md --dry-run
+    python scripts/notebooklm_sync/update.py skillmeat/web/README.md --force-add
 """
 
 import argparse
@@ -83,6 +84,7 @@ def update_source(
     filepath: Path,
     verbose: bool = False,
     dry_run: bool = False,
+    force_add: bool = False,
 ) -> int:
     """Update or add a NotebookLM source for a changed file.
 
@@ -90,6 +92,7 @@ def update_source(
         filepath: Path to the file that changed
         verbose: Enable verbose output
         dry_run: Don't actually make changes, just show what would happen
+        force_add: Add file even if it's not in the default scope
 
     Returns:
         Exit code (0 = success, non-zero = error)
@@ -100,7 +103,7 @@ def update_source(
         log_verbose(f"Processing file: {norm_path}", verbose)
 
         # 2. Check if file is in scope
-        if not is_in_scope(norm_path):
+        if not force_add and not is_in_scope(norm_path):
             log_verbose(f"File not in sync scope, skipping: {norm_path}", verbose)
             return 0
 
@@ -250,12 +253,19 @@ Examples:
         help="Show what would be done without making changes",
     )
 
+    parser.add_argument(
+        "--force-add",
+        action="store_true",
+        help="Add file even if it's not in the default scope",
+    )
+
     args = parser.parse_args()
 
     return update_source(
         filepath=Path(args.filepath),
         verbose=args.verbose,
         dry_run=args.dry_run,
+        force_add=args.force_add,
     )
 
 
