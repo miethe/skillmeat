@@ -2,11 +2,9 @@
 
 Personal collection manager for Claude Code artifacts
 
-![SkillMeat Logo](docs/assets/logo.png)
-
 [![Version](https://img.shields.io/badge/version-0.3.0--beta-blue.svg)](https://github.com/yourusername/skillmeat/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/yourusername/skillmeat/actions)
-[![npm](https://img.shields.io/badge/npm-latest-red.svg)](https://www.npmjs.com/package/skillmeat)
+[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
 Organize, deploy, and sync your Claude Code skills, commands, agents, and MCP servers across projects with a powerful CLI and web interface.

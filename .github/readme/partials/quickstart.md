@@ -37,4 +37,4 @@ skillmeat web dev
 # Open http://localhost:3000 to access the dashboard
 ```
 
-For complete documentation, see the [Getting Started Guide](docs/getting-started.md).
+For complete documentation, see the [Quickstart Guide](docs/user/quickstart.md).

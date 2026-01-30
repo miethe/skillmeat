@@ -480,7 +480,8 @@
       "duration": "20-30s",
       "category": "readme",
       "tool": "claude-in-chrome",
-      "status": "pending",
+      "status": "placeholder",
+      "placeholder_note": "GIF creation deferred - will be added in future iteration",
       "sequence": [
         "Open dashboard",
         "Navigate to Collection",
@@ -504,7 +505,8 @@
       "duration": "25-35s",
       "category": "readme",
       "tool": "claude-in-chrome",
-      "status": "pending",
+      "status": "placeholder",
+      "placeholder_note": "GIF creation deferred - will be added in future iteration",
       "sequence": [
         "Navigate to Marketplace Sources",
         "Click Add Source",
@@ -531,7 +533,8 @@
       "duration": "30-40s",
       "category": "docs",
       "tool": "claude-in-chrome",
-      "status": "pending",
+      "status": "placeholder",
+      "placeholder_note": "GIF creation deferred - will be added in future iteration",
       "sequence": [
         "Show modified artifact",
         "Open artifact detail",
@@ -559,7 +562,8 @@
       "duration": "15-20s",
       "category": "readme",
       "tool": "asciinema",
-      "status": "pending",
+      "status": "placeholder",
+      "placeholder_note": "GIF creation deferred - will be added in future iteration",
       "sequence": [
         "skillmeat init",
         "skillmeat add skill anthropics/skills/canvas",
