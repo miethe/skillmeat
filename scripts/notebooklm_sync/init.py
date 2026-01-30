@@ -68,7 +68,8 @@ def create_notebook(title: str, dry_run: bool = False) -> str | None:
         print(f"Error: Failed to create notebook")
         return None
 
-    notebook_id = output.get("id")
+    # Handle both response formats: {"id": "..."} or {"notebook": {"id": "..."}}
+    notebook_id = output.get("id") or output.get("notebook", {}).get("id")
     if not notebook_id:
         print(f"Error: No notebook ID in response: {output}")
         return None
@@ -122,7 +123,8 @@ def upload_file(filepath: Path, dry_run: bool = False) -> str | None:
     if returncode != 0 or not output:
         return None
 
-    source_id = output.get("id")
+    # Handle both response formats: {"id": "..."} or {"source": {"id": "..."}}
+    source_id = output.get("id") or output.get("source", {}).get("id")
     return source_id
 
 

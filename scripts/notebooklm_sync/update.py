@@ -160,7 +160,8 @@ def update_source(
                     return 0  # Don't fail the hook
 
                 # Update mapping with new source_id
-                new_source_id = output.get("id")
+                # Handle both: {"id": "..."} or {"source": {"id": "..."}}
+                new_source_id = output.get("id") or output.get("source", {}).get("id")
                 if not new_source_id:
                     log_error("No source ID in response", verbose)
                     return 0
@@ -191,7 +192,8 @@ def update_source(
                     return 0  # Don't fail the hook
 
                 # Add new entry to mapping
-                new_source_id = output.get("id")
+                # Handle both: {"id": "..."} or {"source": {"id": "..."}}
+                new_source_id = output.get("id") or output.get("source", {}).get("id")
                 if not new_source_id:
                     log_error("No source ID in response", verbose)
                     return 0
