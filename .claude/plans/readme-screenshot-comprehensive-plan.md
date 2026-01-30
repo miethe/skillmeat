@@ -213,6 +213,7 @@ These are the **must-have** screenshots for the README.
 | **Page** | Artifact Detail Modal (Sync Tab) or Project Manage |
 | **Viewport** | 1000x700 (modal) |
 | **Purpose** | Show bidirectional sync and diff preview |
+| **Artifact to Use** | 'meatycapture-capture' Skill |
 
 **What to Show:**
 - Diff viewer showing changes (colored diff)
@@ -881,7 +882,7 @@ jobs:
 1. Create directory structure
 2. Create `features.json` from feature catalog
 3. Create `screenshots.json` schema
-4. Set up sample data in dev environment
+4. Set up sample data in dev environment (should already be completed)
 5. Install recording dependencies
 
 ### Phase 2: Screenshot Capture (Day 1-2)
