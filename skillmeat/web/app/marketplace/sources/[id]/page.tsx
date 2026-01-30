@@ -1391,7 +1391,7 @@ export default function SourceDetailPage() {
         </div>
       ) : (
         <>
-          <div className="max-h-[600px] overflow-y-auto">
+          <div className="h-[calc(100vh-280px)] min-h-[400px]">
             {/* Show loading state when we need data for the current page but don't have it yet */}
             {paginatedEntries.length === 0 && needsMoreDataForPage ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
