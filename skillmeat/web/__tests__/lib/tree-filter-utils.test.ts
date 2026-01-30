@@ -4,7 +4,12 @@ import {
   filterSemanticTree,
   countSemanticFolders,
   getSemanticFolderPaths,
+  type SemanticFilterConfig,
 } from '@/lib/tree-filter-utils';
+import {
+  DEFAULT_LEAF_CONTAINERS,
+  DEFAULT_ROOT_EXCLUSIONS,
+} from '@/hooks/use-detection-patterns';
 import { buildFolderTree, type FolderTree, type FolderNode } from '@/lib/tree-builder';
 import type { CatalogEntry } from '@/types/marketplace';
 
@@ -44,16 +49,8 @@ const createNode = (
 
 describe('isSemanticFolder', () => {
   describe('root exclusions at depth 1', () => {
-    it('excludes "plugins" at depth 1', () => {
-      expect(isSemanticFolder('plugins', 1)).toBe(false);
-    });
-
     it('excludes "src" at depth 1', () => {
       expect(isSemanticFolder('src', 1)).toBe(false);
-    });
-
-    it('excludes "skills" at depth 1', () => {
-      expect(isSemanticFolder('skills', 1)).toBe(false);
     });
 
     it('excludes "lib" at depth 1', () => {
@@ -76,24 +73,35 @@ describe('isSemanticFolder', () => {
       expect(isSemanticFolder('anthropics', 1)).toBe(true);
       expect(isSemanticFolder('miethe', 1)).toBe(true);
       expect(isSemanticFolder('custom', 1)).toBe(true);
+      expect(isSemanticFolder('plugins', 1)).toBe(true); // plugins is not a root exclusion
     });
   });
 
   describe('root exclusions at depth > 1', () => {
-    it('includes "plugins" at depth 2', () => {
-      expect(isSemanticFolder('user/plugins', 2)).toBe(true);
-    });
-
-    it('includes "src" at depth 3', () => {
-      expect(isSemanticFolder('project/code/src', 3)).toBe(true);
-    });
-
-    it('includes "skills" at deeper levels', () => {
-      expect(isSemanticFolder('vendor/collection/skills', 3)).toBe(true);
+    it('includes "src" at depth 2', () => {
+      expect(isSemanticFolder('project/src', 2)).toBe(true);
     });
 
     it('includes "lib" at depth 2', () => {
       expect(isSemanticFolder('vendor/lib', 2)).toBe(true);
+    });
+
+    it('includes "packages" at depth 3', () => {
+      expect(isSemanticFolder('vendor/monorepo/packages', 3)).toBe(true);
+    });
+  });
+
+  describe('leaf containers excluded at any depth (including depth 1)', () => {
+    it('excludes "skills" at depth 1 (leaf container)', () => {
+      expect(isSemanticFolder('skills', 1)).toBe(false);
+    });
+
+    it('excludes "skills" at depth 2', () => {
+      expect(isSemanticFolder('vendor/skills', 2)).toBe(false);
+    });
+
+    it('excludes "skills" at depth 3', () => {
+      expect(isSemanticFolder('vendor/collection/skills', 3)).toBe(false);
     });
   });
 
@@ -164,10 +172,123 @@ describe('isSemanticFolder', () => {
     });
 
     it('is case-sensitive for exclusions', () => {
-      expect(isSemanticFolder('Commands', 1)).toBe(true); // Capital C
-      expect(isSemanticFolder('commands', 1)).toBe(false); // lowercase
-      expect(isSemanticFolder('PLUGINS', 1)).toBe(true); // ALL CAPS
-      expect(isSemanticFolder('plugins', 1)).toBe(false); // lowercase
+      expect(isSemanticFolder('Commands', 1)).toBe(true); // Capital C - not matched
+      expect(isSemanticFolder('commands', 1)).toBe(false); // lowercase - leaf container
+      expect(isSemanticFolder('SRC', 1)).toBe(true); // ALL CAPS - not matched
+      expect(isSemanticFolder('src', 1)).toBe(false); // lowercase - root exclusion
+    });
+  });
+
+  describe('custom config overrides', () => {
+    it('uses custom leafContainers when provided', () => {
+      const config: SemanticFilterConfig = {
+        leafContainers: ['custom-container', 'my-artifacts'],
+      };
+
+      // Default leaf containers should now be allowed
+      expect(isSemanticFolder('commands', 2, config)).toBe(true);
+      expect(isSemanticFolder('skills', 2, config)).toBe(true);
+
+      // Custom containers should be excluded
+      expect(isSemanticFolder('custom-container', 2, config)).toBe(false);
+      expect(isSemanticFolder('my-artifacts', 2, config)).toBe(false);
+    });
+
+    it('uses custom rootExclusions when provided', () => {
+      const config: SemanticFilterConfig = {
+        rootExclusions: ['custom-root', 'my-root'],
+      };
+
+      // Default root exclusions should now be allowed at depth 1
+      expect(isSemanticFolder('src', 1, config)).toBe(true);
+      expect(isSemanticFolder('lib', 1, config)).toBe(true);
+
+      // Custom root exclusions should be excluded at depth 1
+      expect(isSemanticFolder('custom-root', 1, config)).toBe(false);
+      expect(isSemanticFolder('my-root', 1, config)).toBe(false);
+
+      // Custom root exclusions allowed at deeper depths
+      expect(isSemanticFolder('vendor/custom-root', 2, config)).toBe(true);
+    });
+
+    it('combines custom leafContainers and rootExclusions', () => {
+      const config: SemanticFilterConfig = {
+        leafContainers: ['artifacts'],
+        rootExclusions: ['root-only'],
+      };
+
+      // Both custom configs should apply
+      expect(isSemanticFolder('artifacts', 2, config)).toBe(false); // custom leaf
+      expect(isSemanticFolder('root-only', 1, config)).toBe(false); // custom root
+      expect(isSemanticFolder('root-only', 2, config)).toBe(true); // allowed at depth 2
+
+      // Defaults should not apply
+      expect(isSemanticFolder('commands', 2, config)).toBe(true); // default leaf now allowed
+      expect(isSemanticFolder('src', 1, config)).toBe(true); // default root now allowed
+    });
+
+    it('partial config only overrides specified values', () => {
+      // Only override leafContainers, rootExclusions should use default
+      const config: SemanticFilterConfig = {
+        leafContainers: ['custom-leaf'],
+      };
+
+      // Root exclusions should still use defaults
+      expect(isSemanticFolder('src', 1, config)).toBe(false); // default root exclusion
+      expect(isSemanticFolder('lib', 1, config)).toBe(false); // default root exclusion
+
+      // Only custom leaf container should be excluded
+      expect(isSemanticFolder('custom-leaf', 2, config)).toBe(false);
+      expect(isSemanticFolder('commands', 2, config)).toBe(true); // default no longer excluded
+    });
+
+    it('empty arrays exclude nothing', () => {
+      const config: SemanticFilterConfig = {
+        leafContainers: [],
+        rootExclusions: [],
+      };
+
+      // All folders should be included
+      expect(isSemanticFolder('commands', 2, config)).toBe(true);
+      expect(isSemanticFolder('skills', 2, config)).toBe(true);
+      expect(isSemanticFolder('src', 1, config)).toBe(true);
+      expect(isSemanticFolder('lib', 1, config)).toBe(true);
+    });
+  });
+
+  describe('default constants validation', () => {
+    it('DEFAULT_LEAF_CONTAINERS are excluded by default', () => {
+      // Verify a sampling of default leaf containers
+      expect(DEFAULT_LEAF_CONTAINERS).toContain('commands');
+      expect(DEFAULT_LEAF_CONTAINERS).toContain('skills');
+      expect(DEFAULT_LEAF_CONTAINERS).toContain('agents');
+      expect(DEFAULT_LEAF_CONTAINERS).toContain('hooks');
+      expect(DEFAULT_LEAF_CONTAINERS).toContain('mcp_servers');
+
+      // All should be excluded at any depth without config
+      for (const container of DEFAULT_LEAF_CONTAINERS) {
+        expect(isSemanticFolder(container, 2)).toBe(false);
+        expect(isSemanticFolder(`vendor/${container}`, 3)).toBe(false);
+      }
+    });
+
+    it('DEFAULT_ROOT_EXCLUSIONS are excluded at depth 1 by default', () => {
+      // Verify default root exclusions
+      expect(DEFAULT_ROOT_EXCLUSIONS).toContain('src');
+      expect(DEFAULT_ROOT_EXCLUSIONS).toContain('lib');
+      expect(DEFAULT_ROOT_EXCLUSIONS).toContain('packages');
+      expect(DEFAULT_ROOT_EXCLUSIONS).toContain('apps');
+      expect(DEFAULT_ROOT_EXCLUSIONS).toContain('examples');
+
+      // All should be excluded at depth 1 without config
+      for (const root of DEFAULT_ROOT_EXCLUSIONS) {
+        expect(isSemanticFolder(root, 1)).toBe(false);
+      }
+
+      // All should be allowed at deeper depths
+      for (const root of DEFAULT_ROOT_EXCLUSIONS) {
+        expect(isSemanticFolder(`vendor/${root}`, 2)).toBe(true);
+      }
     });
   });
 });
@@ -180,18 +301,18 @@ describe('filterSemanticTree', () => {
       expect(filtered).toEqual({});
     });
 
-    it('filters out root exclusions at depth 1', () => {
+    it('filters out root exclusions and leaf containers at depth 1', () => {
       const entries = [
-        createEntry('plugins/tool1'),
-        createEntry('skills/tool2'),
-        createEntry('anthropics/tool3'),
+        createEntry('src/tool1'), // root exclusion
+        createEntry('skills/tool2'), // leaf container
+        createEntry('anthropics/tool3'), // normal folder
       ];
       const tree = buildFolderTree(entries, 0);
       const filtered = filterSemanticTree(tree);
 
-      expect(filtered).not.toHaveProperty('plugins');
-      expect(filtered).not.toHaveProperty('skills');
-      expect(filtered).toHaveProperty('anthropics');
+      expect(filtered).not.toHaveProperty('src'); // root exclusion
+      expect(filtered).not.toHaveProperty('skills'); // leaf container
+      expect(filtered).toHaveProperty('anthropics'); // normal folder
     });
 
     it('filters out leaf containers at any depth', () => {
@@ -223,13 +344,19 @@ describe('filterSemanticTree', () => {
       expect(filtered.anthropics.children.development.children).toHaveProperty('tools');
     });
 
-    it('removes folders with only excluded children', () => {
+    it('keeps parent folders when they have artifacts in excluded children', () => {
       const entries = [createEntry('anthropics/commands/tool1')];
       const tree = buildFolderTree(entries, 0);
       const filtered = filterSemanticTree(tree);
 
-      // anthropics should be removed because it only contains commands folder
-      expect(filtered).toEqual({});
+      // anthropics should be kept because it has totalArtifactCount > 0
+      // (artifacts exist in the excluded 'commands' subfolder)
+      // This allows the UI to show the parent folder even though
+      // the leaf container is filtered from the tree navigation
+      expect(filtered).toHaveProperty('anthropics');
+      expect(filtered.anthropics.totalArtifactCount).toBe(1);
+      expect(filtered.anthropics.children).toEqual({}); // commands filtered out
+      expect(filtered.anthropics.hasSubfolders).toBe(false);
     });
   });
 
@@ -296,7 +423,7 @@ describe('filterSemanticTree', () => {
   describe('complex tree filtering', () => {
     it('handles mixed tree with multiple levels', () => {
       const entries = [
-        createEntry('plugins/tool0'), // Root exclusion
+        createEntry('src/tool0'), // Root exclusion
         createEntry('anthropics/development/commands/tool1'), // Leaf container
         createEntry('anthropics/development/utilities/tool2'), // Semantic
         createEntry('anthropics/commands/tool3'), // Leaf container
@@ -305,7 +432,7 @@ describe('filterSemanticTree', () => {
       const tree = buildFolderTree(entries, 0);
       const filtered = filterSemanticTree(tree);
 
-      expect(filtered).not.toHaveProperty('plugins');
+      expect(filtered).not.toHaveProperty('src'); // root exclusion
       expect(filtered).toHaveProperty('anthropics');
       expect(filtered).toHaveProperty('miethe');
 
@@ -319,7 +446,7 @@ describe('filterSemanticTree', () => {
     });
 
     it('handles tree with only excluded folders', () => {
-      const entries = [createEntry('plugins/tool1'), createEntry('skills/commands/tool2')];
+      const entries = [createEntry('src/tool1'), createEntry('skills/commands/tool2')];
       const tree = buildFolderTree(entries, 0);
       const filtered = filterSemanticTree(tree);
 
@@ -346,7 +473,7 @@ describe('filterSemanticTree', () => {
       expect(node.directCount).toBe(1);
     });
 
-    it('removes empty intermediate folders after filtering', () => {
+    it('keeps intermediate folders with artifacts in excluded descendants', () => {
       const entries = [
         createEntry('anthropics/wrapper/commands/tool1'),
         createEntry('anthropics/wrapper/agents/tool2'),
@@ -354,9 +481,13 @@ describe('filterSemanticTree', () => {
       const tree = buildFolderTree(entries, 0);
       const filtered = filterSemanticTree(tree);
 
-      // anthropics/wrapper has no direct artifacts and only excluded children
-      // so it should be removed entirely
-      expect(filtered).toEqual({});
+      // anthropics/wrapper has artifacts in its subtree (via excluded leaf containers)
+      // so it's kept even though all direct children are filtered out
+      // This allows the UI to navigate to wrapper and see its artifacts
+      expect(filtered).toHaveProperty('anthropics');
+      expect(filtered.anthropics.children).toHaveProperty('wrapper');
+      expect(filtered.anthropics.children.wrapper.totalArtifactCount).toBe(2);
+      expect(filtered.anthropics.children.wrapper.children).toEqual({});
     });
 
     it('preserves intermediate folders with semantic descendants', () => {
@@ -393,7 +524,7 @@ describe('filterSemanticTree', () => {
 
     it('filters vendor organization structure', () => {
       const entries = [
-        createEntry('anthropics/skills/python/tool1'),
+        createEntry('anthropics/categories/python/tool1'),
         createEntry('anthropics/tools/commands/tool2'),
         createEntry('anthropics/tools/utilities/tool3'),
         createEntry('miethe/homelab/agents/tool4'),
@@ -402,10 +533,10 @@ describe('filterSemanticTree', () => {
       const tree = buildFolderTree(entries, 0);
       const filtered = filterSemanticTree(tree);
 
-      // skills is root exclusion at depth 1, but not at depth 2
-      // commands and agents are leaf containers
+      // commands and agents are leaf containers (excluded at any depth)
+      // categories, tools, scripts are normal folders (included)
       expect(filtered).toHaveProperty('anthropics');
-      expect(filtered.anthropics.children.skills).toBeDefined();
+      expect(filtered.anthropics.children.categories).toBeDefined();
       expect(filtered.anthropics.children.tools).toBeDefined();
       expect(filtered.anthropics.children.tools.children).not.toHaveProperty('commands');
       expect(filtered.anthropics.children.tools.children).toHaveProperty('utilities');
@@ -413,6 +544,113 @@ describe('filterSemanticTree', () => {
       expect(filtered).toHaveProperty('miethe');
       expect(filtered.miethe.children.homelab.children).not.toHaveProperty('agents');
       expect(filtered.miethe.children.homelab.children).toHaveProperty('scripts');
+    });
+  });
+
+  describe('custom config filtering', () => {
+    it('applies custom leafContainers throughout tree', () => {
+      const entries = [
+        createEntry('anthropics/commands/tool1'),
+        createEntry('anthropics/custom-artifacts/tool2'),
+        createEntry('anthropics/utilities/tool3'),
+      ];
+      const tree = buildFolderTree(entries, 0);
+
+      // With custom config, commands should be included but custom-artifacts excluded
+      const config: SemanticFilterConfig = {
+        leafContainers: ['custom-artifacts'],
+      };
+      const filtered = filterSemanticTree(tree, 1, config);
+
+      expect(filtered.anthropics.children).toHaveProperty('commands'); // default no longer excluded
+      expect(filtered.anthropics.children).not.toHaveProperty('custom-artifacts'); // custom excluded
+      expect(filtered.anthropics.children).toHaveProperty('utilities');
+    });
+
+    it('applies custom rootExclusions at depth 1 only', () => {
+      const entries = [
+        createEntry('src/components/tool1'),
+        createEntry('custom-root/nested/tool2'),
+        createEntry('anthropics/custom-root/tool3'),
+      ];
+      const tree = buildFolderTree(entries, 0);
+
+      // With custom config, src should be included but custom-root excluded at root
+      const config: SemanticFilterConfig = {
+        rootExclusions: ['custom-root'],
+      };
+      const filtered = filterSemanticTree(tree, 1, config);
+
+      expect(filtered).toHaveProperty('src'); // default no longer excluded
+      expect(filtered).not.toHaveProperty('custom-root'); // custom excluded at root
+      expect(filtered.anthropics.children).toHaveProperty('custom-root'); // allowed at depth 2
+    });
+
+    it('propagates config through recursive filtering', () => {
+      const entries = [
+        createEntry('vendor/category/commands/tool1'),
+        createEntry('vendor/category/custom-leaf/tool2'),
+        createEntry('vendor/category/utilities/tool3'),
+      ];
+      const tree = buildFolderTree(entries, 0);
+
+      const config: SemanticFilterConfig = {
+        leafContainers: ['custom-leaf'],
+      };
+      const filtered = filterSemanticTree(tree, 1, config);
+
+      // commands should be present (default no longer excluded)
+      const categoryNode = filtered.vendor.children.category;
+      expect(categoryNode.children).toHaveProperty('commands');
+      expect(categoryNode.children).not.toHaveProperty('custom-leaf');
+      expect(categoryNode.children).toHaveProperty('utilities');
+    });
+
+    it('empty config arrays include all folders', () => {
+      const entries = [
+        createEntry('src/commands/tool1'),
+        createEntry('lib/agents/tool2'),
+        createEntry('skills/utilities/tool3'),
+      ];
+      const tree = buildFolderTree(entries, 0);
+
+      const config: SemanticFilterConfig = {
+        leafContainers: [],
+        rootExclusions: [],
+      };
+      const filtered = filterSemanticTree(tree, 1, config);
+
+      // All should be included
+      expect(filtered).toHaveProperty('src');
+      expect(filtered).toHaveProperty('lib');
+      expect(filtered).toHaveProperty('skills');
+      expect(filtered.src.children).toHaveProperty('commands');
+      expect(filtered.lib.children).toHaveProperty('agents');
+    });
+
+    it('default behavior unchanged when no config passed', () => {
+      const entries = [
+        createEntry('src/tool1'),
+        createEntry('anthropics/commands/tool2'),
+        createEntry('anthropics/utilities/tool3'),
+      ];
+      const tree = buildFolderTree(entries, 0);
+
+      // Without config
+      const filteredNoConfig = filterSemanticTree(tree);
+
+      // With undefined config
+      const filteredUndefinedConfig = filterSemanticTree(tree, 1, undefined);
+
+      // Both should produce same results using defaults
+      expect(filteredNoConfig).not.toHaveProperty('src');
+      expect(filteredUndefinedConfig).not.toHaveProperty('src');
+
+      expect(filteredNoConfig.anthropics.children).not.toHaveProperty('commands');
+      expect(filteredUndefinedConfig.anthropics.children).not.toHaveProperty('commands');
+
+      expect(filteredNoConfig.anthropics.children).toHaveProperty('utilities');
+      expect(filteredUndefinedConfig.anthropics.children).toHaveProperty('utilities');
     });
   });
 });

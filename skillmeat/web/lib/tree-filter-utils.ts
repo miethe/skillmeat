@@ -3,47 +3,67 @@
  *
  * Filters folder trees to show only "semantic" navigation folders,
  * excluding both root-level containers and leaf artifact containers.
+ *
+ * These are pure functions that work in SSR context. Use with
+ * useDetectionPatterns() hook at the component level for dynamic config.
  */
 
 import type { FolderTree, FolderNode } from './tree-builder';
+import {
+  DEFAULT_LEAF_CONTAINERS,
+  DEFAULT_ROOT_EXCLUSIONS,
+} from '@/hooks/use-detection-patterns';
 
 /**
- * Root-level folders to exclude (depth 1)
- * These are too high-level to be useful for navigation
+ * Configuration for semantic folder filtering
+ *
+ * Allows overriding default filtering behavior with custom patterns.
+ * Typically populated from useDetectionPatterns() hook at the component level.
  */
-// Note: 'skills' and 'plugins' intentionally excluded from exclusion list - they're meaningful
-// folders that should be shown as they often contain the main artifact structure
-const ROOT_EXCLUSIONS = ['src', 'lib', 'packages', 'apps', 'examples'];
-
-/**
- * Leaf container folders to exclude (any depth)
- * These are artifact type containers that don't aid navigation
- */
-const LEAF_CONTAINERS = ['commands', 'agents', 'mcp_servers', 'hooks', 'mcp-servers'];
+export interface SemanticFilterConfig {
+  /** Leaf container folders to exclude (any depth) - artifact type containers */
+  leafContainers?: string[];
+  /** Root-level folders to exclude (depth 1) - too high-level for navigation */
+  rootExclusions?: string[];
+}
 
 /**
  * Determines if a folder should be included in semantic navigation
  *
  * @param folderPath - Full path of the folder
  * @param depth - Depth in the tree (1 = root level)
+ * @param config - Optional filter configuration (defaults to centralized patterns)
  * @returns true if folder should be included in navigation
  *
  * @example
+ * // Using defaults
  * isSemanticFolder('plugins', 1) // false - root exclusion
  * isSemanticFolder('anthropics/tools/commands', 3) // false - leaf container
  * isSemanticFolder('anthropics/tools', 2) // true - intermediate folder
+ *
+ * @example
+ * // Using custom config from hook
+ * const { leafContainers } = useDetectionPatterns();
+ * isSemanticFolder('mypath', 2, { leafContainers });
  */
-export function isSemanticFolder(folderPath: string, depth: number): boolean {
+export function isSemanticFolder(
+  folderPath: string,
+  depth: number,
+  config?: SemanticFilterConfig
+): boolean {
+  const leafContainers = config?.leafContainers ?? DEFAULT_LEAF_CONTAINERS;
+  const rootExclusions = config?.rootExclusions ?? DEFAULT_ROOT_EXCLUSIONS;
+
   // Extract folder name from path
   const folderName = folderPath.split('/').pop() || '';
 
   // Exclude root-level folders from exclusion list
-  if (depth === 1 && ROOT_EXCLUSIONS.includes(folderName)) {
+  if (depth === 1 && rootExclusions.includes(folderName)) {
     return false;
   }
 
   // Exclude leaf container folders at any depth
-  if (LEAF_CONTAINERS.includes(folderName)) {
+  if (leafContainers.includes(folderName)) {
     return false;
   }
 
@@ -55,23 +75,33 @@ export function isSemanticFolder(folderPath: string, depth: number): boolean {
  *
  * @param tree - The folder tree to filter
  * @param depth - Current depth in the tree (internal, starts at 1)
+ * @param config - Optional filter configuration (defaults to centralized patterns)
  * @returns Filtered tree with only semantic folders
  *
  * @example
+ * // Using defaults
  * const filtered = filterSemanticTree(fullTree);
- * // Result: Tree without root containers or leaf artifact folders
+ *
+ * @example
+ * // Using custom config from hook
+ * const { leafContainers } = useDetectionPatterns();
+ * const filtered = filterSemanticTree(fullTree, 1, { leafContainers });
  */
-export function filterSemanticTree(tree: FolderTree, depth: number = 1): FolderTree {
+export function filterSemanticTree(
+  tree: FolderTree,
+  depth: number = 1,
+  config?: SemanticFilterConfig
+): FolderTree {
   const filtered: FolderTree = {};
 
   for (const [path, node] of Object.entries(tree)) {
     // Check if this folder should be included
-    if (!isSemanticFolder(path, depth)) {
+    if (!isSemanticFolder(path, depth, config)) {
       continue;
     }
 
     // Create filtered node with recursively filtered children
-    const filteredChildren = filterSemanticTree(node.children, depth + 1);
+    const filteredChildren = filterSemanticTree(node.children, depth + 1, config);
     const filteredNode: FolderNode = {
       ...node,
       children: filteredChildren,
