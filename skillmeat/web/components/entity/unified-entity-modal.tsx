@@ -48,6 +48,7 @@ import { FileCreationDialog } from '@/components/entity/file-creation-dialog';
 import { FileDeletionDialog } from '@/components/entity/file-deletion-dialog';
 import { UnsavedChangesDialog } from '@/components/entity/unsaved-changes-dialog';
 import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
+import { ArtifactInstanceIndicator } from '@/components/entity/artifact-instance-indicator';
 import { ProjectSelectorForDiff } from '@/components/entity/project-selector-for-diff';
 import { SyncStatusTab } from '@/components/sync-status';
 import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
@@ -1672,12 +1673,14 @@ export function UnifiedEntityModal({
     <>
       <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="flex h-[90vh] max-h-[90vh] min-h-0 max-w-4xl flex-col overflow-hidden p-0 lg:max-w-6xl xl:max-w-7xl">
+
           {/* Header Section - Fixed */}
           <div className="border-b px-6 pb-4 pt-6">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
                 {IconComponent && <IconComponent className={`h-5 w-5 ${config.color}`} />}
                 <span className="flex-1">{entity.name}</span>
+                <ArtifactInstanceIndicator artifact={entity} />
                 <Badge variant="outline" className="gap-1">
                   {config.label}
                 </Badge>
