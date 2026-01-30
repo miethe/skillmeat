@@ -1,0 +1,76 @@
+{{!--
+  Command List Partial
+  Displays CLI commands grouped by category.
+
+  Expected context:
+  - categories: Array of category objects from features.json
+  - stats: Statistics object
+
+  Extracts cliCommand from features that have them defined.
+--}}
+## CLI Reference
+
+SkillMeat provides **{{stats.totalCommands}}+ commands** across **{{stats.commandGroups}} command groups**.
+
+### Quick Reference
+
+| Category | Commands |
+|----------|----------|
+{{#each categories}}
+{{#if (hasCliCommands features)}}
+| **{{name}}** | {{#each features}}{{#if cliCommand}}`{{cliCommand}}`{{#unless @last}}, {{/unless}}{{/if}}{{/each}} |
+{{/if}}
+{{/each}}
+
+### Core Commands
+
+```bash
+# Collection Management
+skillmeat init                    # Initialize collection or project
+skillmeat add <source>            # Add artifact from GitHub/local
+skillmeat list                    # List all artifacts
+skillmeat search <query>          # Search artifacts
+
+# Deployment
+skillmeat deploy <artifact>       # Deploy artifact to project
+skillmeat status                  # Show deployment status
+skillmeat undeploy <artifact>     # Remove deployment
+
+# Sync & Updates
+skillmeat sync check              # Check for drift/updates
+skillmeat sync pull               # Pull changes from projects
+skillmeat sync push               # Push updates to projects
+
+# Web Interface
+skillmeat web dev                 # Start development servers
+skillmeat web build               # Build for production
+skillmeat web start               # Start production servers
+```
+
+### Command Groups
+
+{{#each categories}}
+{{#if (hasCliCommands features)}}
+<details>
+<summary><strong>{{name}}</strong>{{#if tagline}} - {{tagline}}{{/if}}</summary>
+
+| Command | Description |
+|---------|-------------|
+{{#each features}}
+{{#if cliCommand}}
+| `{{cliCommand}}` | {{shortDescription}} |
+{{/if}}
+{{/each}}
+
+</details>
+{{/if}}
+{{/each}}
+
+---
+
+For complete command documentation, run:
+
+```bash
+skillmeat --help
+skillmeat <command> --help
+```

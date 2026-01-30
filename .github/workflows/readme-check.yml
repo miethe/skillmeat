@@ -1,0 +1,57 @@
+name: README Validation
+
+on:
+  push:
+    paths:
+      - '.github/readme/**'
+      - 'README.md'
+      - 'docs/screenshots/**'
+  pull_request:
+    paths:
+      - '.github/readme/**'
+      - 'README.md'
+      - 'docs/screenshots/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: '.github/readme/package-lock.json'
+
+      - name: Install dependencies
+        run: cd .github/readme && npm install
+
+      - name: Validate links
+        run: node .github/readme/scripts/validate-links.js
+
+      - name: Check screenshots exist
+        run: node .github/readme/scripts/check-screenshots.js --required-only
+
+      - name: Verify generated matches source
+        run: |
+          # Create backup of current README
+          cp README.md /tmp/readme-original.md
+
+          # Generate fresh README
+          cd .github/readme && npm run build
+
+          # Compare with backup
+          if ! diff -u /tmp/readme-original.md ../../README.md; then
+            echo "::error::README.md does not match generated output. Run 'npm run build' in .github/readme/ to regenerate."
+
+            # Restore original
+            cp /tmp/readme-original.md ../../README.md
+            exit 1
+          fi
+
+          # Restore original (keep repo clean)
+          cp /tmp/readme-original.md ../../README.md
+          echo "README.md matches generated output ✓"
