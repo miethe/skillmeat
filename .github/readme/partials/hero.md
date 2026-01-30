@@ -7,4 +7,4 @@ Personal collection manager for Claude Code artifacts
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/yourusername/skillmeat/actions)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
-Organize, deploy, and sync your Claude Code skills, commands, agents, and MCP servers across projects with a powerful CLI and web interface.
+Organize, deploy, and sync your Claude Code skills, commands, agents, hooks, and MCP servers across projects with a powerful CLI and web interface.
