@@ -2,21 +2,20 @@
  * Artifact Type Section Component
  *
  * Groups artifacts by type with collapsible section headers.
- * Each section displays type-specific icons, counts, and artifact rows with actions.
+ * Each section displays type-specific icons, counts, and a grid of compact artifact cards.
  */
 
 'use client';
 
 import { useState, useCallback, memo } from 'react';
-import { ChevronRight, Sparkles, Terminal, Bot, Server, Anchor, Download, EyeOff } from 'lucide-react';
+import { ChevronRight, Sparkles, Terminal, Bot, Server, Anchor } from 'lucide-react';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { ArtifactCompactCard } from './artifact-compact-card';
 import type { CatalogEntry, ArtifactType } from '@/types/marketplace';
 
 // ============================================================================
@@ -34,6 +33,12 @@ export interface ArtifactTypeSectionProps {
   onImport: (entry: CatalogEntry) => void;
   /** Callback when exclude is requested */
   onExclude: (entry: CatalogEntry) => void;
+  /** Callback when artifact card is clicked (opens modal) */
+  onArtifactClick?: (entry: CatalogEntry) => void;
+  /** Source ID for exclude operations */
+  sourceId: string;
+  /** Whether import is in progress */
+  isImporting?: boolean;
 }
 
 // ============================================================================
@@ -57,80 +62,6 @@ const typeConfig: Record<ArtifactType, {
 };
 
 // ============================================================================
-// Sub-components
-// ============================================================================
-
-interface ArtifactRowProps {
-  entry: CatalogEntry;
-  onImport: () => void;
-  onExclude: () => void;
-}
-
-/**
- * Individual artifact row with name, description, and action buttons.
- * Memoized to prevent re-renders when sibling artifacts change.
- */
-const ArtifactRow = memo(function ArtifactRow({ entry, onImport, onExclude }: ArtifactRowProps) {
-  // Determine if actions should be disabled based on status
-  const isImported = entry.status === 'imported';
-  const isExcluded = entry.status === 'excluded';
-
-  return (
-    <div className="flex items-center justify-between gap-4 border-b py-3 last:border-b-0">
-      {/* Name and description */}
-      <div className="min-w-0 flex-1">
-        <h4 className="truncate text-sm font-medium">{entry.name}</h4>
-        {/* Only show description if it exists and is different from name */}
-        {entry.path && (
-          <p className="max-w-[200px] truncate text-xs text-muted-foreground" title={entry.path}>
-            {entry.path}
-          </p>
-        )}
-      </div>
-
-      {/* Action buttons */}
-      <div className="flex flex-shrink-0 items-center gap-1">
-        {/* Status badges */}
-        {isImported && (
-          <Badge variant="secondary" className="text-xs">
-            Imported
-          </Badge>
-        )}
-        {isExcluded && (
-          <Badge variant="outline" className="text-xs text-muted-foreground">
-            Excluded
-          </Badge>
-        )}
-
-        {/* Import button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onImport}
-          disabled={isImported}
-          aria-label={`Import ${entry.name}`}
-          className="h-8 w-8"
-        >
-          <Download className="h-4 w-4" />
-        </Button>
-
-        {/* Exclude button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onExclude}
-          disabled={isExcluded}
-          aria-label={`Exclude ${entry.name}`}
-          className="h-8 w-8"
-        >
-          <EyeOff className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  );
-});
-
-// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -149,21 +80,27 @@ function ArtifactTypeSectionComponent({
   artifacts,
   defaultExpanded = false,
   onImport,
-  onExclude,
+  onExclude: _onExclude,
+  onArtifactClick,
+  sourceId,
+  isImporting = false,
 }: ArtifactTypeSectionProps) {
   // Hooks must be called unconditionally (Rules of Hooks)
   const [isOpen, setIsOpen] = useState(defaultExpanded);
 
-  // Memoize import handler factory to provide stable callbacks to ArtifactRow
+  // Note: onExclude is handled internally by ArtifactCompactCard via ExcludeArtifactDialog
+  void _onExclude;
+
+  // Memoize import handler factory to provide stable callbacks
   const handleImport = useCallback(
     (entry: CatalogEntry) => () => onImport(entry),
     [onImport]
   );
 
-  // Memoize exclude handler factory to provide stable callbacks to ArtifactRow
-  const handleExclude = useCallback(
-    (entry: CatalogEntry) => () => onExclude(entry),
-    [onExclude]
+  // Memoize click handler factory to provide stable callbacks
+  const handleClick = useCallback(
+    (entry: CatalogEntry) => () => onArtifactClick?.(entry),
+    [onArtifactClick]
   );
 
   // Don't render if no artifacts (after hooks)
@@ -207,15 +144,17 @@ function ArtifactTypeSectionComponent({
         </button>
       </CollapsibleTrigger>
 
-      {/* Collapsible Content */}
+      {/* Collapsible Content - Grid of compact cards */}
       <CollapsibleContent>
-        <div className="pl-6">
+        <div className="grid grid-cols-2 gap-3 pt-3 md:grid-cols-3 lg:grid-cols-4">
           {artifacts.map((entry) => (
-            <ArtifactRow
+            <ArtifactCompactCard
               key={entry.id}
               entry={entry}
+              sourceId={sourceId}
+              onClick={handleClick(entry)}
               onImport={handleImport(entry)}
-              onExclude={handleExclude(entry)}
+              isImporting={isImporting}
             />
           ))}
         </div>

@@ -61,6 +61,12 @@ export interface SourceFolderLayoutProps {
    * If not provided, falls back to separate onSelectFolder + expandPath calls.
    */
   onNavigateToFolder?: (path: string) => void;
+  /** Callback when artifact card is clicked (opens modal) */
+  onArtifactClick?: (entry: CatalogEntry) => void;
+  /** Source ID for exclude operations */
+  sourceId: string;
+  /** Whether import is in progress */
+  isImporting?: boolean;
 }
 
 // ============================================================================
@@ -101,6 +107,9 @@ export function SourceFolderLayout({
   onImport,
   onExclude,
   onNavigateToFolder,
+  onArtifactClick,
+  sourceId,
+  isImporting = false,
 }: SourceFolderLayoutProps) {
   // Ref for programmatic focus control of the tree
   const treeRef = useRef<SemanticTreeHandle>(null);
@@ -195,6 +204,9 @@ export function SourceFolderLayout({
           }}
           onSelectSubfolder={handleSubfolderSelect}
           rootFolders={rootNodes}
+          onArtifactClick={onArtifactClick}
+          sourceId={sourceId}
+          isImporting={isImporting}
         />
       </main>
     </div>

@@ -56,6 +56,12 @@ export interface FolderDetailPaneProps {
   onSelectSubfolder: (path: string) => void;
   /** Top-level folders to show as subfolders when at root (folder === null) */
   rootFolders?: FolderNode[];
+  /** Callback when artifact card is clicked (opens modal) */
+  onArtifactClick?: (entry: CatalogEntry) => void;
+  /** Source ID for exclude operations */
+  sourceId: string;
+  /** Whether import is in progress */
+  isImporting?: boolean;
 }
 
 // ============================================================================
@@ -94,6 +100,9 @@ export function FolderDetailPane({
   onImportAll: _onImportAll,
   onSelectSubfolder,
   rootFolders,
+  onArtifactClick,
+  sourceId,
+  isImporting = false,
 }: FolderDetailPaneProps) {
   // Note: onImportAll is intentionally unused in this implementation.
   // It will be wired up when batch import functionality is integrated.
@@ -269,6 +278,9 @@ export function FolderDetailPane({
                       defaultExpanded={true}
                       onImport={handleImport}
                       onExclude={handleExclude}
+                      onArtifactClick={onArtifactClick}
+                      sourceId={sourceId}
+                      isImporting={isImporting}
                     />
                   );
                 })}

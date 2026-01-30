@@ -431,9 +431,9 @@ export default function SourceDetailPage() {
   });
   const [itemsPerPage, setItemsPerPage] = useState(() => {
     const limitParam = searchParams.get('limit');
-    const limit = limitParam ? parseInt(limitParam, 10) : 25;
+    const limit = limitParam ? parseInt(limitParam, 10) : 100;
     // Ensure valid limit value
-    return [10, 25, 50, 100].includes(limit) ? limit : 25;
+    return [10, 25, 50, 100].includes(limit) ? limit : 100;
   });
 
   // View mode with localStorage persistence
@@ -1418,6 +1418,12 @@ export default function SourceDetailPage() {
                 onExclude={() => {
                   // Exclude is handled within the detail pane via ExcludeArtifactDialog
                 }}
+                onArtifactClick={(entry) => {
+                  setSelectedEntry(entry);
+                  setModalOpen(true);
+                }}
+                sourceId={sourceId}
+                isImporting={importMutation.isPending}
               />
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
