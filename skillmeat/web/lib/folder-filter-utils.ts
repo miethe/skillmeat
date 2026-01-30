@@ -6,6 +6,7 @@
  */
 
 import type { CatalogEntry, CatalogFilters, ArtifactType, CatalogStatus } from '@/types/marketplace';
+import { DEFAULT_LEAF_CONTAINERS } from '@/hooks/use-detection-patterns';
 
 /**
  * Apply filters to catalog entries.
@@ -198,4 +199,122 @@ export function getCountsByType(entries: CatalogEntry[]): Record<ArtifactType, n
     },
     {} as Record<ArtifactType, number>
   );
+}
+
+/**
+ * Get artifacts that should be displayed for a folder in the filtered tree context.
+ *
+ * This includes:
+ * 1. Artifacts directly in the folder
+ * 2. Artifacts from filtered-out leaf containers that are immediate children of this folder
+ *
+ * When leaf containers (skills/, commands/, etc.) are filtered from the navigation tree,
+ * their artifacts need to be "promoted" to the parent folder for display.
+ *
+ * @param catalog - All catalog entries for the source
+ * @param folderPath - The folder path to get artifacts for
+ * @param leafContainers - List of leaf container folder names (defaults to DEFAULT_LEAF_CONTAINERS)
+ * @returns Artifacts that should be displayed for this folder
+ *
+ * @example
+ * ```ts
+ * // Folder: "anthropics"
+ * // Catalog has: anthropics/my-skill, anthropics/skills/other-skill
+ * // With skills being a leaf container, both artifacts are returned
+ * const artifacts = getDisplayArtifactsForFolder(catalog, 'anthropics');
+ * // Returns both my-skill and other-skill
+ * ```
+ *
+ * @example
+ * ```ts
+ * // With custom leaf containers
+ * const artifacts = getDisplayArtifactsForFolder(
+ *   catalog,
+ *   'vendor/tools',
+ *   ['custom-container', 'artifacts']
+ * );
+ * ```
+ */
+export function getDisplayArtifactsForFolder(
+  catalog: CatalogEntry[],
+  folderPath: string,
+  leafContainers: string[] = DEFAULT_LEAF_CONTAINERS
+): CatalogEntry[] {
+  const leafContainerSet = new Set(leafContainers);
+
+  return catalog.filter((entry) => {
+    // Get the directory containing this artifact
+    const lastSlash = entry.path.lastIndexOf('/');
+    if (lastSlash === -1) return false; // Root-level artifact, no folder
+
+    const entryDir = entry.path.substring(0, lastSlash);
+
+    // Case 1: Direct match - artifact is directly in the folder
+    if (entryDir === folderPath) {
+      return true;
+    }
+
+    // Case 2: Artifact is in an immediate leaf container child
+    // Pattern: folderPath/leafContainer/artifactName
+    // We need to check if entryDir matches folderPath/leafContainer
+    if (entryDir.startsWith(folderPath + '/')) {
+      const relativePath = entryDir.substring(folderPath.length + 1);
+
+      // Check if the relative path is just a single leaf container segment
+      // e.g., "skills" or "commands" (no further nesting)
+      if (!relativePath.includes('/')) {
+        // Single segment - check if it's a leaf container
+        if (leafContainerSet.has(relativePath)) {
+          return true;
+        }
+      }
+
+      // Case 3: Artifact is in nested leaf containers
+      // Pattern: folderPath/leafContainer1/leafContainer2/.../artifactName
+      // All intermediate segments must be leaf containers
+      const segments = relativePath.split('/');
+      const pathSegments = segments.slice(0, -1); // Exclude the artifact name segment
+
+      // If there are no path segments after folder path, not a match
+      // (already handled in Case 1)
+      if (pathSegments.length === 0) {
+        // Just the leaf container, which we check below
+        if (leafContainerSet.has(segments[0])) {
+          return true;
+        }
+        return false;
+      }
+
+      // Check if ALL segments in the path are leaf containers
+      // This handles: folderPath/skills/commands/artifact (both skills and commands are leaves)
+      const allSegmentsAreLeafContainers = segments
+        .slice(0, -1) // All segments except the last (which is artifact name if this is the full remaining path after folderPath)
+        // Actually, segments is from relativePath which is entryDir minus folderPath
+        // So segments contains the path parts between folderPath and the artifact
+        // We need to check all of them
+        .every((segment) => leafContainerSet.has(segment));
+
+      // Actually, let me reconsider. The entry.path includes the artifact name.
+      // entryDir = entry.path without the artifact name
+      // relativePath = entryDir minus folderPath and the leading slash
+      // So relativePath is the path between folderPath and the artifact (not including artifact)
+
+      // For "folderPath/skills/commands/my-cmd":
+      // entry.path = "folderPath/skills/commands/my-cmd"
+      // entryDir = "folderPath/skills/commands"
+      // relativePath = "skills/commands"
+      // segments = ["skills", "commands"]
+      // All must be leaf containers for the artifact to be promoted
+
+      const allAreLeafContainers = segments.every((segment) =>
+        leafContainerSet.has(segment)
+      );
+
+      if (allAreLeafContainers) {
+        return true;
+      }
+    }
+
+    return false;
+  });
 }

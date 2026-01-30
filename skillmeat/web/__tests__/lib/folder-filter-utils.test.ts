@@ -6,6 +6,7 @@ import {
   groupByType,
   getCountsByStatus,
   getCountsByType,
+  getDisplayArtifactsForFolder,
 } from '@/lib/folder-filter-utils';
 import type { CatalogEntry, CatalogFilters, ArtifactType } from '@/types/marketplace';
 
@@ -573,5 +574,147 @@ describe('getCountsByType', () => {
     const counts = getCountsByType(entries);
     expect(counts.skill).toBe(2);
     expect(Object.keys(counts)).toEqual(['skill']);
+  });
+});
+
+describe('getDisplayArtifactsForFolder', () => {
+  describe('direct artifacts', () => {
+    it('returns artifacts directly in the folder', () => {
+      const catalog = [
+        createEntry({ id: '1', path: 'vendor/my-skill' }),
+        createEntry({ id: '2', path: 'vendor/other-skill' }),
+        createEntry({ id: '3', path: 'different/tool' }),
+      ];
+
+      const result = getDisplayArtifactsForFolder(catalog, 'vendor');
+      expect(result).toHaveLength(2);
+      expect(result.map((e) => e.id)).toEqual(['1', '2']);
+    });
+
+    it('returns empty array for folder with no direct artifacts', () => {
+      const catalog = [createEntry({ id: '1', path: 'other/skill' })];
+
+      const result = getDisplayArtifactsForFolder(catalog, 'vendor');
+      expect(result).toEqual([]);
+    });
+
+    it('handles nested folder paths correctly', () => {
+      const catalog = [
+        createEntry({ id: '1', path: 'vendor/tools/my-tool' }),
+        createEntry({ id: '2', path: 'vendor/my-skill' }),
+      ];
+
+      const result = getDisplayArtifactsForFolder(catalog, 'vendor/tools');
+      expect(result).toHaveLength(1);
+      expect(result[0]?.id).toBe('1');
+    });
+  });
+
+  describe('artifacts from leaf containers', () => {
+    it('includes artifacts from immediate leaf container children', () => {
+      const catalog = [
+        createEntry({ id: '1', path: 'vendor/skills/my-skill' }),
+        createEntry({ id: '2', path: 'vendor/commands/my-cmd' }),
+        createEntry({ id: '3', path: 'vendor/direct-tool' }),
+      ];
+
+      const result = getDisplayArtifactsForFolder(catalog, 'vendor');
+      expect(result).toHaveLength(3);
+      expect(result.map((e) => e.id).sort()).toEqual(['1', '2', '3']);
+    });
+
+    it('includes artifacts from nested leaf containers (skills/commands)', () => {
+      // When both skills and commands are leaf containers
+      const catalog = [createEntry({ id: '1', path: 'vendor/skills/commands/my-cmd' })];
+
+      const result = getDisplayArtifactsForFolder(catalog, 'vendor');
+      expect(result).toHaveLength(1);
+      expect(result[0]?.id).toBe('1');
+    });
+
+    it('does NOT include artifacts from semantic subfolders inside leaf containers', () => {
+      // Structure: vendor/skills/category/my-skill
+      // "skills" is a leaf container, but "category" is semantic
+      // This artifact should NOT be included at vendor level - it belongs to category
+      const catalog = [createEntry({ id: '1', path: 'vendor/skills/category/my-skill' })];
+
+      // At vendor level, this shouldn't be included (category is not a leaf)
+      const result = getDisplayArtifactsForFolder(catalog, 'vendor');
+      expect(result).toHaveLength(0);
+    });
+
+    it('includes artifacts when folder itself is reached through navigation', () => {
+      // When navigating to vendor/skills/category (promoted from skills/category)
+      // The artifacts in that folder should be visible
+      const catalog = [createEntry({ id: '1', path: 'vendor/skills/category/my-skill' })];
+
+      // Note: The fullPath in filtered tree would be 'vendor/skills/category'
+      // even though 'skills' is filtered from navigation
+      const result = getDisplayArtifactsForFolder(catalog, 'vendor/skills/category');
+      expect(result).toHaveLength(1);
+      expect(result[0]?.id).toBe('1');
+    });
+  });
+
+  describe('custom leaf containers', () => {
+    it('uses provided leaf containers list', () => {
+      const catalog = [
+        createEntry({ id: '1', path: 'vendor/custom-leaf/my-tool' }),
+        createEntry({ id: '2', path: 'vendor/skills/my-skill' }),
+      ];
+
+      // With custom leaf containers, only 'custom-leaf' is considered a leaf
+      const result = getDisplayArtifactsForFolder(catalog, 'vendor', ['custom-leaf']);
+      expect(result).toHaveLength(1);
+      expect(result[0]?.id).toBe('1');
+    });
+
+    it('returns only direct artifacts when leaf containers is empty', () => {
+      const catalog = [
+        createEntry({ id: '1', path: 'vendor/skills/my-skill' }),
+        createEntry({ id: '2', path: 'vendor/direct-tool' }),
+      ];
+
+      const result = getDisplayArtifactsForFolder(catalog, 'vendor', []);
+      expect(result).toHaveLength(1);
+      expect(result[0]?.id).toBe('2');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('handles root-level artifacts (no folder)', () => {
+      const catalog = [createEntry({ id: '1', path: 'root-skill' })];
+
+      const result = getDisplayArtifactsForFolder(catalog, 'anything');
+      expect(result).toEqual([]);
+    });
+
+    it('handles empty catalog', () => {
+      const result = getDisplayArtifactsForFolder([], 'vendor');
+      expect(result).toEqual([]);
+    });
+
+    it('does not match partial folder names', () => {
+      const catalog = [
+        createEntry({ id: '1', path: 'vendor-extended/skill' }),
+        createEntry({ id: '2', path: 'vendor/skill' }),
+      ];
+
+      const result = getDisplayArtifactsForFolder(catalog, 'vendor');
+      expect(result).toHaveLength(1);
+      expect(result[0]?.id).toBe('2');
+    });
+
+    it('handles deeply nested paths', () => {
+      const catalog = [
+        createEntry({ id: '1', path: 'a/b/c/d/e/skill' }),
+        createEntry({ id: '2', path: 'a/b/skills/skill' }), // skills is leaf
+      ];
+
+      const result = getDisplayArtifactsForFolder(catalog, 'a/b');
+      // Only the one in the leaf container should be included (skill in skills/)
+      expect(result).toHaveLength(1);
+      expect(result[0]?.id).toBe('2');
+    });
   });
 });

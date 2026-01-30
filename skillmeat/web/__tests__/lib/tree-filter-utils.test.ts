@@ -655,6 +655,153 @@ describe('filterSemanticTree', () => {
   });
 });
 
+describe('leaf container promotion', () => {
+  describe('promoting semantic subfolders from leaf containers', () => {
+    it('promotes semantic subfolders from filtered leaf containers to parent', () => {
+      // Structure: plugins/skills/dev/my-skill
+      // "skills" is a leaf container, "dev" is a semantic folder
+      // After filtering: plugins/dev should be visible (promoted from skills/dev)
+      const entries = [createEntry('plugins/skills/dev/my-skill')];
+      const tree = buildFolderTree(entries, 0);
+      const filtered = filterSemanticTree(tree);
+
+      expect(filtered).toHaveProperty('plugins');
+      // "skills" should be filtered out
+      expect(filtered.plugins.children).not.toHaveProperty('skills');
+      // "dev" should be promoted to plugins level
+      expect(filtered.plugins.children).toHaveProperty('dev');
+      expect(filtered.plugins.children.dev.fullPath).toBe('plugins/skills/dev');
+    });
+
+    it('promotes multiple semantic subfolders from same leaf container', () => {
+      const entries = [
+        createEntry('vendor/commands/category-a/cmd1'),
+        createEntry('vendor/commands/category-b/cmd2'),
+      ];
+      const tree = buildFolderTree(entries, 0);
+      const filtered = filterSemanticTree(tree);
+
+      expect(filtered.vendor.children).not.toHaveProperty('commands');
+      expect(filtered.vendor.children).toHaveProperty('category-a');
+      expect(filtered.vendor.children).toHaveProperty('category-b');
+    });
+
+    it('promotes from multiple leaf containers at same level', () => {
+      const entries = [
+        createEntry('vendor/skills/utils/skill1'),
+        createEntry('vendor/commands/cli/cmd1'),
+      ];
+      const tree = buildFolderTree(entries, 0);
+      const filtered = filterSemanticTree(tree);
+
+      expect(filtered.vendor.children).not.toHaveProperty('skills');
+      expect(filtered.vendor.children).not.toHaveProperty('commands');
+      expect(filtered.vendor.children).toHaveProperty('utils');
+      expect(filtered.vendor.children).toHaveProperty('cli');
+    });
+
+    it('preserves semantic siblings alongside promoted folders', () => {
+      const entries = [
+        createEntry('vendor/skills/promoted/skill1'),
+        createEntry('vendor/regular/tool1'),
+      ];
+      const tree = buildFolderTree(entries, 0);
+      const filtered = filterSemanticTree(tree);
+
+      expect(filtered.vendor.children).toHaveProperty('regular');
+      expect(filtered.vendor.children).toHaveProperty('promoted');
+      expect(filtered.vendor.children).not.toHaveProperty('skills');
+    });
+  });
+
+  describe('nested leaf containers', () => {
+    it('handles nested leaf containers (skills/commands)', () => {
+      // Structure: plugins/skills/commands/my-cmd
+      // Both "skills" and "commands" are leaf containers
+      // The artifact should still be accessible via plugins
+      const entries = [createEntry('plugins/skills/commands/my-cmd')];
+      const tree = buildFolderTree(entries, 0);
+      const filtered = filterSemanticTree(tree);
+
+      expect(filtered).toHaveProperty('plugins');
+      expect(filtered.plugins.children).not.toHaveProperty('skills');
+      expect(filtered.plugins.children).not.toHaveProperty('commands');
+      // plugins should still have totalArtifactCount > 0
+      expect(filtered.plugins.totalArtifactCount).toBe(1);
+    });
+
+    it('promotes semantic folder from inside nested leaf containers', () => {
+      // Structure: vendor/skills/commands/category/cmd
+      // skills and commands are leaves, category is semantic
+      const entries = [createEntry('vendor/skills/commands/category/cmd')];
+      const tree = buildFolderTree(entries, 0);
+      const filtered = filterSemanticTree(tree);
+
+      expect(filtered.vendor.children).not.toHaveProperty('skills');
+      // category should be promoted
+      expect(filtered.vendor.children).toHaveProperty('category');
+    });
+  });
+
+  describe('root exclusions vs leaf containers', () => {
+    it('does NOT promote from root exclusions (they are completely skipped)', () => {
+      // Root exclusions at depth 1 should be completely filtered - no promotion
+      const entries = [
+        createEntry('src/utils/tool1'),
+        createEntry('lib/helpers/tool2'),
+      ];
+      const tree = buildFolderTree(entries, 0);
+      const filtered = filterSemanticTree(tree);
+
+      // Root exclusions should be gone entirely
+      expect(filtered).not.toHaveProperty('src');
+      expect(filtered).not.toHaveProperty('lib');
+      // Their children should NOT be promoted to root level
+      expect(filtered).not.toHaveProperty('utils');
+      expect(filtered).not.toHaveProperty('helpers');
+    });
+
+    it('leaf containers at depth 1 still promote their children', () => {
+      // "skills" at root level is a leaf container (not a root exclusion)
+      // Its semantic children should be promoted to root level
+      const entries = [createEntry('skills/category/my-skill')];
+      const tree = buildFolderTree(entries, 0);
+      const filtered = filterSemanticTree(tree);
+
+      expect(filtered).not.toHaveProperty('skills');
+      // "category" should be promoted to root level
+      expect(filtered).toHaveProperty('category');
+    });
+  });
+
+  describe('totalArtifactCount with promotion', () => {
+    it('parent retains totalArtifactCount including promoted artifacts', () => {
+      const entries = [
+        createEntry('vendor/skills/skill1'),
+        createEntry('vendor/skills/skill2'),
+        createEntry('vendor/tool1'),
+      ];
+      const tree = buildFolderTree(entries, 0);
+      const filtered = filterSemanticTree(tree);
+
+      // vendor should have totalArtifactCount = 3 (2 from skills + 1 direct)
+      expect(filtered.vendor.totalArtifactCount).toBe(3);
+    });
+
+    it('deeply nested promotion preserves artifact counts', () => {
+      const entries = [
+        createEntry('vendor/wrapper/skills/commands/cmd1'),
+        createEntry('vendor/wrapper/skills/commands/cmd2'),
+      ];
+      const tree = buildFolderTree(entries, 0);
+      const filtered = filterSemanticTree(tree);
+
+      expect(filtered.vendor.totalArtifactCount).toBe(2);
+      expect(filtered.vendor.children.wrapper.totalArtifactCount).toBe(2);
+    });
+  });
+});
+
 describe('countSemanticFolders', () => {
   it('counts zero for empty tree', () => {
     const tree: FolderTree = {};

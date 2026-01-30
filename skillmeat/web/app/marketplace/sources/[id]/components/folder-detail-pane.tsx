@@ -21,7 +21,12 @@
 import { useMemo, useCallback } from 'react';
 import { Folder } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { applyFiltersToEntries, hasActiveFilters, groupByType } from '@/lib/folder-filter-utils';
+import {
+  applyFiltersToEntries,
+  hasActiveFilters,
+  groupByType,
+  getDisplayArtifactsForFolder,
+} from '@/lib/folder-filter-utils';
 import { ArtifactTypeSection } from './artifact-type-section';
 import { SubfoldersSection } from './subfolders-section';
 import type { FolderNode } from '@/lib/tree-builder';
@@ -92,14 +97,11 @@ export function FolderDetailPane({
   void _onImportAll;
 
   // PERFORMANCE: All hooks must be called unconditionally (Rules of Hooks)
-  // Memoize folder artifacts filtering - handles null folder safely
+  // Memoize folder artifacts - includes artifacts from filtered-out leaf containers
+  // This handles "promotion" of artifacts from skills/, commands/, etc. to parent folders
   const folderArtifacts = useMemo(() => {
     if (!folder) return [];
-    return catalog.filter((entry) => {
-      // Match entries where path matches the folder's fullPath
-      const entryDir = entry.path.substring(0, entry.path.lastIndexOf('/'));
-      return entryDir === folder.fullPath;
-    });
+    return getDisplayArtifactsForFolder(catalog, folder.fullPath);
   }, [catalog, folder]);
 
   // PERFORMANCE: Memoize filtered artifacts calculation
@@ -123,6 +125,9 @@ export function FolderDetailPane({
   // Determine if we're showing filtered results
   const isFiltered = hasActiveFilters(filters);
   const unfilteredCount = folderArtifacts.length;
+
+  // Check if folder has any artifacts to display (direct + promoted from leaf containers)
+  const hasDisplayableArtifacts = folderArtifacts.length > 0;
 
   // PERFORMANCE: Memoize handlers passed to child components
   const handleImport = useCallback(
@@ -162,8 +167,8 @@ export function FolderDetailPane({
     );
   }
 
-  // Empty state: no artifacts match filters
-  if (filteredArtifacts.length === 0 && folder.hasDirectArtifacts) {
+  // Empty state: no artifacts match filters (but folder has artifacts to show without filters)
+  if (filteredArtifacts.length === 0 && hasDisplayableArtifacts) {
     return (
       <section
         role="region"
@@ -245,8 +250,8 @@ export function FolderDetailPane({
           </div>
         </header>
 
-        {/* Artifact type sections */}
-        {folder.hasDirectArtifacts && filteredArtifacts.length > 0 && (
+        {/* Artifact type sections (includes promoted artifacts from leaf containers) */}
+        {hasDisplayableArtifacts && filteredArtifacts.length > 0 && (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Artifacts</h3>
             <div className="space-y-4">
@@ -274,8 +279,8 @@ export function FolderDetailPane({
           <SubfoldersSection subfolders={subfolders} onSelectFolder={handleSelectSubfolder} />
         )}
 
-        {/* Empty state for folder with no artifacts or subfolders */}
-        {!folder.hasDirectArtifacts && !folder.hasSubfolders && (
+        {/* Empty state for folder with no artifacts (direct or promoted) and no subfolders */}
+        {!hasDisplayableArtifacts && !folder.hasSubfolders && (
           <div className="flex min-h-[200px] items-center justify-center">
             <p className="text-sm text-muted-foreground">This folder is empty</p>
           </div>

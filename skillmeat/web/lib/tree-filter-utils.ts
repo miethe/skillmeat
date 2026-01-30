@@ -9,6 +9,7 @@
  */
 
 import type { FolderTree, FolderNode } from './tree-builder';
+import type { CatalogEntry } from '@/types/marketplace';
 import {
   DEFAULT_LEAF_CONTAINERS,
   DEFAULT_ROOT_EXCLUSIONS,
@@ -71,7 +72,52 @@ export function isSemanticFolder(
 }
 
 /**
- * Recursively filters a folder tree to only include semantic navigation folders
+ * Check if a folder is a root exclusion (only applies at depth 1)
+ */
+function isRootExclusion(
+  folderPath: string,
+  depth: number,
+  config?: SemanticFilterConfig
+): boolean {
+  const rootExclusions = config?.rootExclusions ?? DEFAULT_ROOT_EXCLUSIONS;
+  const folderName = folderPath.split('/').pop() || '';
+  return depth === 1 && rootExclusions.includes(folderName);
+}
+
+/**
+ * Check if a folder is a leaf container (applies at any depth)
+ */
+function isLeafContainer(
+  folderPath: string,
+  config?: SemanticFilterConfig
+): boolean {
+  const leafContainers = config?.leafContainers ?? DEFAULT_LEAF_CONTAINERS;
+  const folderName = folderPath.split('/').pop() || '';
+  return leafContainers.includes(folderName);
+}
+
+/**
+ * Result from filtering that includes promoted content
+ */
+interface FilterResult {
+  /** Filtered tree at this level */
+  tree: FolderTree;
+  /** Artifacts promoted from filtered-out leaf containers */
+  promotedArtifacts: CatalogEntry[];
+  /** Count of artifacts promoted from leaf containers */
+  promotedCount: number;
+}
+
+/**
+ * Recursively filters a folder tree to only include semantic navigation folders.
+ *
+ * When leaf containers (skills, commands, etc.) are filtered out, their contents
+ * are "promoted" to the parent level:
+ * - Artifacts from leaf containers become accessible via the parent folder
+ * - Non-leaf subfolders inside leaf containers are promoted as direct children
+ *
+ * Root exclusions (src, lib, etc.) at depth 1 are completely skipped - nothing
+ * inside them is promoted.
  *
  * @param tree - The folder tree to filter
  * @param depth - Current depth in the tree (internal, starts at 1)
@@ -86,40 +132,92 @@ export function isSemanticFolder(
  * // Using custom config from hook
  * const { leafContainers } = useDetectionPatterns();
  * const filtered = filterSemanticTree(fullTree, 1, { leafContainers });
+ *
+ * @example
+ * // Promotion behavior:
+ * // Input:  plugins/skills/dev/my-skill (skills is leaf container)
+ * // Output: plugins/dev/my-skill (dev promoted from skills/dev)
  */
 export function filterSemanticTree(
   tree: FolderTree,
   depth: number = 1,
   config?: SemanticFilterConfig
 ): FolderTree {
+  const result = filterSemanticTreeInternal(tree, depth, config);
+  return result.tree;
+}
+
+/**
+ * Internal implementation that tracks promoted content through recursion
+ */
+function filterSemanticTreeInternal(
+  tree: FolderTree,
+  depth: number,
+  config?: SemanticFilterConfig
+): FilterResult {
   const filtered: FolderTree = {};
+  let allPromotedArtifacts: CatalogEntry[] = [];
+  let allPromotedCount = 0;
 
   for (const [path, node] of Object.entries(tree)) {
-    // Check if this folder should be included
-    if (!isSemanticFolder(path, depth, config)) {
+    // Root exclusions at depth 1 are completely skipped - nothing promoted
+    if (isRootExclusion(path, depth, config)) {
       continue;
     }
 
-    // Create filtered node with recursively filtered children
-    const filteredChildren = filterSemanticTree(node.children, depth + 1, config);
+    // Leaf containers: filter out the container itself but promote its contents
+    if (isLeafContainer(path, config)) {
+      // Recursively filter the leaf container's children to get promotable content
+      const childResult = filterSemanticTreeInternal(node.children, depth + 1, config);
+
+      // Promote semantic children from this leaf container to parent level
+      for (const [childPath, childNode] of Object.entries(childResult.tree)) {
+        filtered[childPath] = childNode;
+      }
+
+      // Accumulate artifacts from this leaf container for parent to access
+      // Include both direct artifacts and any promoted from deeper levels
+      allPromotedArtifacts = [
+        ...allPromotedArtifacts,
+        ...node.directArtifacts,
+        ...childResult.promotedArtifacts,
+      ];
+      allPromotedCount += node.directCount + childResult.promotedCount;
+
+      continue;
+    }
+
+    // Semantic folder: include it with recursively filtered children
+    const childResult = filterSemanticTreeInternal(node.children, depth + 1, config);
+
+    // Merge promoted children into this node's children
+    const mergedChildren = { ...childResult.tree };
+
+    // Create the filtered node
     const filteredNode: FolderNode = {
       ...node,
-      children: filteredChildren,
-      hasSubfolders: Object.keys(filteredChildren).length > 0,
+      children: mergedChildren,
+      hasSubfolders: Object.keys(mergedChildren).length > 0,
+      // Note: directArtifacts stays as-is; promoted artifacts are handled
+      // at the folder-detail-pane level via getDisplayArtifactsForFolder
     };
 
-    // Only include node if it has children or any artifacts in its subtree
-    // Use totalArtifactCount (not directArtifacts) to include artifacts in leaf containers
-    // e.g., skills/commands/my-cmd - "skills" has artifacts via "commands" even if commands is filtered
+    // Include node if it has children, direct artifacts, or artifacts in subtree
+    // (including promoted artifacts from leaf containers)
     const hasChildren = Object.keys(filteredNode.children).length > 0;
     const hasArtifactsInSubtree = node.totalArtifactCount > 0;
+    const hasPromotedArtifacts = childResult.promotedCount > 0;
 
-    if (hasChildren || hasArtifactsInSubtree) {
+    if (hasChildren || hasArtifactsInSubtree || hasPromotedArtifacts) {
       filtered[path] = filteredNode;
     }
   }
 
-  return filtered;
+  return {
+    tree: filtered,
+    promotedArtifacts: allPromotedArtifacts,
+    promotedCount: allPromotedCount,
+  };
 }
 
 /**
