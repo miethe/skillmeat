@@ -359,12 +359,13 @@ describe('FolderDetailPane Accessibility', () => {
     expect(region).toHaveAttribute('aria-live', 'polite');
   });
 
-  it('empty state has accessible region', () => {
+  it('root view has accessible region when no folder selected', () => {
     render(<FolderDetailPane {...defaultProps} folder={null} />);
     const region = screen.getByRole('region');
 
-    expect(region).toHaveAttribute('aria-label', 'Folder details');
-    expect(screen.getByText('Select a folder to view its contents')).toBeInTheDocument();
+    // When folder is null, we show "Source Root" view instead of empty state
+    expect(region).toHaveAttribute('aria-label', 'Source Root folder details');
+    expect(screen.getByText('Source Root')).toBeInTheDocument();
   });
 
   it('heading structure is correct', () => {

@@ -194,6 +194,7 @@ export function SourceFolderLayout({
             entries.forEach((entry) => onImport(entry));
           }}
           onSelectSubfolder={handleSubfolderSelect}
+          rootFolders={rootNodes}
         />
       </main>
     </div>

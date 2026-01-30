@@ -578,6 +578,66 @@ describe('getCountsByType', () => {
 });
 
 describe('getDisplayArtifactsForFolder', () => {
+  describe('root path (empty string)', () => {
+    it('returns root-level artifacts when folderPath is empty string', () => {
+      const catalog = [
+        createEntry({ id: '1', path: 'root-skill' }),
+        createEntry({ id: '2', path: 'plugins/nested-skill' }),
+      ];
+      const result = getDisplayArtifactsForFolder(catalog, '');
+      expect(result).toHaveLength(1);
+      expect(result[0]?.path).toBe('root-skill');
+    });
+
+    it('includes artifacts from root-level leaf containers', () => {
+      const catalog = [
+        createEntry({ id: '1', path: 'skills/my-skill' }),
+        createEntry({ id: '2', path: 'plugins/other-skill' }),
+      ];
+      // "skills" is a default leaf container, "plugins" is not
+      const result = getDisplayArtifactsForFolder(catalog, '');
+      expect(result).toHaveLength(1);
+      expect(result[0]?.path).toBe('skills/my-skill');
+    });
+
+    it('returns both root artifacts and leaf container artifacts at root', () => {
+      const catalog = [
+        createEntry({ id: '1', path: 'root-skill' }),
+        createEntry({ id: '2', path: 'skills/nested-skill' }),
+        createEntry({ id: '3', path: 'commands/my-cmd' }),
+        createEntry({ id: '4', path: 'plugins/other/deep' }),
+      ];
+      const result = getDisplayArtifactsForFolder(catalog, '');
+      expect(result).toHaveLength(3);
+      expect(result.map((e) => e.id).sort()).toEqual(['1', '2', '3']);
+    });
+
+    it('does not include deeply nested artifacts in leaf containers at root', () => {
+      const catalog = [
+        createEntry({ id: '1', path: 'skills/category/my-skill' }), // depth > 2, not included
+        createEntry({ id: '2', path: 'skills/my-skill' }), // depth = 2, included
+      ];
+      const result = getDisplayArtifactsForFolder(catalog, '');
+      expect(result).toHaveLength(1);
+      expect(result[0]?.id).toBe('2');
+    });
+
+    it('returns empty array for empty catalog at root', () => {
+      const result = getDisplayArtifactsForFolder([], '');
+      expect(result).toEqual([]);
+    });
+
+    it('uses custom leaf containers for root view', () => {
+      const catalog = [
+        createEntry({ id: '1', path: 'custom-leaf/my-skill' }),
+        createEntry({ id: '2', path: 'skills/my-skill' }),
+      ];
+      const result = getDisplayArtifactsForFolder(catalog, '', ['custom-leaf']);
+      expect(result).toHaveLength(1);
+      expect(result[0]?.id).toBe('1');
+    });
+  });
+
   describe('direct artifacts', () => {
     it('returns artifacts directly in the folder', () => {
       const catalog = [

@@ -40,7 +40,7 @@ import type { CatalogEntry, CatalogFilters, ArtifactType } from '@/types/marketp
  * Props for FolderDetailPane component.
  */
 export interface FolderDetailPaneProps {
-  /** Selected folder node (null if none selected) */
+  /** Selected folder node (null if none selected, shows root view) */
   folder: FolderNode | null;
   /** All catalog entries for the source */
   catalog: CatalogEntry[];
@@ -54,6 +54,8 @@ export interface FolderDetailPaneProps {
   onImportAll: (entries: CatalogEntry[]) => void;
   /** Callback when a subfolder is selected */
   onSelectSubfolder: (path: string) => void;
+  /** Top-level folders to show as subfolders when at root (folder === null) */
+  rootFolders?: FolderNode[];
 }
 
 // ============================================================================
@@ -91,18 +93,23 @@ export function FolderDetailPane({
   onExclude,
   onImportAll: _onImportAll,
   onSelectSubfolder,
+  rootFolders,
 }: FolderDetailPaneProps) {
   // Note: onImportAll is intentionally unused in this implementation.
   // It will be wired up when batch import functionality is integrated.
   void _onImportAll;
 
+  // When folder is null, we're at the source root
+  const isAtRoot = !folder;
+  const folderPath = folder?.fullPath ?? '';
+
   // PERFORMANCE: All hooks must be called unconditionally (Rules of Hooks)
   // Memoize folder artifacts - includes artifacts from filtered-out leaf containers
   // This handles "promotion" of artifacts from skills/, commands/, etc. to parent folders
+  // For root (folderPath === ''), returns root-level artifacts
   const folderArtifacts = useMemo(() => {
-    if (!folder) return [];
-    return getDisplayArtifactsForFolder(catalog, folder.fullPath);
-  }, [catalog, folder]);
+    return getDisplayArtifactsForFolder(catalog, folderPath);
+  }, [catalog, folderPath]);
 
   // PERFORMANCE: Memoize filtered artifacts calculation
   // Applies type, confidence, search, and status filters
@@ -116,18 +123,22 @@ export function FolderDetailPane({
     return groupByType(filteredArtifacts);
   }, [filteredArtifacts]);
 
-  // PERFORMANCE: Memoize subfolders array - handles null folder safely
+  // PERFORMANCE: Memoize subfolders array
+  // At root: use rootFolders prop; in folder: use folder.children
   const subfolders = useMemo(() => {
-    if (!folder) return [];
-    return Object.values(folder.children);
-  }, [folder]);
+    if (folder) {
+      return Object.values(folder.children);
+    }
+    return rootFolders ?? [];
+  }, [folder, rootFolders]);
 
   // Determine if we're showing filtered results
   const isFiltered = hasActiveFilters(filters);
   const unfilteredCount = folderArtifacts.length;
 
-  // Check if folder has any artifacts to display (direct + promoted from leaf containers)
+  // Check if folder/root has any artifacts to display (direct + promoted from leaf containers)
   const hasDisplayableArtifacts = folderArtifacts.length > 0;
+  const hasSubfolders = isAtRoot ? (rootFolders?.length ?? 0) > 0 : folder?.hasSubfolders ?? false;
 
   // PERFORMANCE: Memoize handlers passed to child components
   const handleImport = useCallback(
@@ -151,38 +162,29 @@ export function FolderDetailPane({
     [onSelectSubfolder]
   );
 
-  // Empty state: no folder selected (after all hooks)
-  if (!folder) {
-    return (
-      <section
-        role="region"
-        aria-label="Folder details"
-        className="flex h-full min-h-[400px] items-center justify-center"
-      >
-        <div className="flex flex-col items-center gap-3 text-center">
-          <Folder className="h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
-          <p className="text-sm text-muted-foreground">Select a folder to view its contents</p>
-        </div>
-      </section>
-    );
-  }
+  // Display name and description for header
+  const displayName = isAtRoot ? 'Source Root' : folder.name;
+  const displayPath = isAtRoot ? '' : folder.fullPath;
+  const displayDescription = isAtRoot
+    ? 'Root-level artifacts and top-level folders'
+    : displayPath;
 
-  // Empty state: no artifacts match filters (but folder has artifacts to show without filters)
+  // Empty state: no artifacts match filters (but folder/root has artifacts to show without filters)
   if (filteredArtifacts.length === 0 && hasDisplayableArtifacts) {
     return (
       <section
         role="region"
-        aria-label={`${folder.name} folder details`}
+        aria-label={`${displayName} folder details`}
         aria-live="polite"
         className={cn('h-full overflow-y-auto p-6')}
       >
         <div className="space-y-6">
-          {/* Folder header */}
+          {/* Folder/Root header */}
           <header className="space-y-2">
             <h2 id="folder-detail-heading" className="text-2xl font-semibold">
-              {folder.name}
+              {displayName}
             </h2>
-            <p className="text-sm text-muted-foreground">{folder.fullPath}</p>
+            <p className="text-sm text-muted-foreground">{displayDescription}</p>
           </header>
 
           {/* No matches empty state */}
@@ -192,15 +194,15 @@ export function FolderDetailPane({
               <div>
                 <p className="text-sm font-medium">No artifacts match current filters</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {unfilteredCount} artifact{unfilteredCount !== 1 ? 's' : ''} in this folder (
-                  {isFiltered ? 'filtered out' : 'hidden'})
+                  {unfilteredCount} artifact{unfilteredCount !== 1 ? 's' : ''} in this{' '}
+                  {isAtRoot ? 'source' : 'folder'} ({isFiltered ? 'filtered out' : 'hidden'})
                 </p>
               </div>
             </div>
           </div>
 
           {/* Show subfolders even when artifacts are filtered */}
-          {folder.hasSubfolders && (
+          {hasSubfolders && (
             <SubfoldersSection subfolders={subfolders} onSelectFolder={handleSelectSubfolder} />
           )}
         </div>
@@ -211,36 +213,36 @@ export function FolderDetailPane({
   return (
     <section
       role="region"
-      aria-label={`${folder.name} folder details`}
+      aria-label={`${displayName} folder details`}
       aria-live="polite"
       className={cn('h-full overflow-y-auto p-6')}
     >
       <div className="space-y-6">
-        {/* Folder header with metadata */}
+        {/* Folder/Root header with metadata */}
         <header className="space-y-2">
           <h2 id="folder-detail-heading" className="text-2xl font-semibold">
-            {folder.name}
+            {displayName}
           </h2>
-          <p className="text-sm text-muted-foreground">{folder.fullPath}</p>
+          <p className="text-sm text-muted-foreground">{displayDescription}</p>
           <div className="flex items-center gap-4 text-sm">
             <span>
               <span className="font-medium">
-                {isFiltered ? filteredArtifacts.length : folder.directCount}
+                {isFiltered ? filteredArtifacts.length : folderArtifacts.length}
               </span>{' '}
-              {isFiltered ? 'matching' : 'direct'} artifact
-              {(isFiltered ? filteredArtifacts.length : folder.directCount) !== 1 ? 's' : ''}
+              {isFiltered ? 'matching' : 'root'} artifact
+              {(isFiltered ? filteredArtifacts.length : folderArtifacts.length) !== 1 ? 's' : ''}
             </span>
             {isFiltered && unfilteredCount !== filteredArtifacts.length && (
               <>
-                <span className="text-muted-foreground">•</span>
+                <span className="text-muted-foreground">.</span>
                 <span className="text-muted-foreground">
-                  {unfilteredCount} total in folder
+                  {unfilteredCount} total in {isAtRoot ? 'source' : 'folder'}
                 </span>
               </>
             )}
-            {!isFiltered && (
+            {!isFiltered && !isAtRoot && folder && (
               <>
-                <span className="text-muted-foreground">•</span>
+                <span className="text-muted-foreground">.</span>
                 <span>
                   <span className="font-medium">{folder.totalArtifactCount}</span> total artifact
                   {folder.totalArtifactCount !== 1 ? 's' : ''}
@@ -275,14 +277,16 @@ export function FolderDetailPane({
         )}
 
         {/* SubfoldersSection - integrated with navigation (NOT affected by filters) */}
-        {folder.hasSubfolders && (
+        {hasSubfolders && (
           <SubfoldersSection subfolders={subfolders} onSelectFolder={handleSelectSubfolder} />
         )}
 
-        {/* Empty state for folder with no artifacts (direct or promoted) and no subfolders */}
-        {!hasDisplayableArtifacts && !folder.hasSubfolders && (
+        {/* Empty state for folder/root with no artifacts (direct or promoted) and no subfolders */}
+        {!hasDisplayableArtifacts && !hasSubfolders && (
           <div className="flex min-h-[200px] items-center justify-center">
-            <p className="text-sm text-muted-foreground">This folder is empty</p>
+            <p className="text-sm text-muted-foreground">
+              {isAtRoot ? 'This source is empty' : 'This folder is empty'}
+            </p>
           </div>
         )}
       </div>

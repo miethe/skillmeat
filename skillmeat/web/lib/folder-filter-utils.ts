@@ -245,7 +245,24 @@ export function getDisplayArtifactsForFolder(
   return catalog.filter((entry) => {
     // Get the directory containing this artifact
     const lastSlash = entry.path.lastIndexOf('/');
-    if (lastSlash === -1) return false; // Root-level artifact, no folder
+
+    // Special case: root path (empty string) - return artifacts with no parent folder
+    if (folderPath === '') {
+      // Root artifacts have no slash in their path
+      if (lastSlash === -1) {
+        return true;
+      }
+      // Also include artifacts directly in leaf containers at root level
+      // e.g., "skills/my-skill" when viewing root
+      const segments = entry.path.split('/');
+      const firstSegment = segments[0];
+      if (segments.length === 2 && firstSegment && leafContainerSet.has(firstSegment)) {
+        return true;
+      }
+      return false;
+    }
+
+    if (lastSlash === -1) return false; // Root-level artifact, no folder (and we're not at root)
 
     const entryDir = entry.path.substring(0, lastSlash);
 
@@ -279,20 +296,12 @@ export function getDisplayArtifactsForFolder(
       // (already handled in Case 1)
       if (pathSegments.length === 0) {
         // Just the leaf container, which we check below
-        if (leafContainerSet.has(segments[0])) {
+        const firstSegment = segments[0];
+        if (firstSegment && leafContainerSet.has(firstSegment)) {
           return true;
         }
         return false;
       }
-
-      // Check if ALL segments in the path are leaf containers
-      // This handles: folderPath/skills/commands/artifact (both skills and commands are leaves)
-      const allSegmentsAreLeafContainers = segments
-        .slice(0, -1) // All segments except the last (which is artifact name if this is the full remaining path after folderPath)
-        // Actually, segments is from relativePath which is entryDir minus folderPath
-        // So segments contains the path parts between folderPath and the artifact
-        // We need to check all of them
-        .every((segment) => leafContainerSet.has(segment));
 
       // Actually, let me reconsider. The entry.path includes the artifact name.
       // entryDir = entry.path without the artifact name
