@@ -113,36 +113,59 @@ function loadData(filename) {
 
 /**
  * Load and register all partials with Handlebars
+ * Loads .md files from partials/ and .hbs files from templates/ (excluding README.hbs)
  * @param {Object} Handlebars - Handlebars instance
  * @returns {Object} Map of partial names to content
  */
 function loadPartials(Handlebars) {
   const partialsDir = path.join(README_DIR, 'partials');
+  const templatesDir = path.join(README_DIR, 'templates');
   const partials = {};
 
-  // Create partials directory if it doesn't exist
-  if (!fs.existsSync(partialsDir)) {
+  // Load .md content partials from partials/
+  if (fs.existsSync(partialsDir)) {
+    const mdFiles = fs.readdirSync(partialsDir);
+
+    for (const file of mdFiles) {
+      if (!file.endsWith('.md')) continue;
+
+      const name = path.basename(file, '.md');
+      const filepath = path.join(partialsDir, file);
+
+      try {
+        const content = fs.readFileSync(filepath, 'utf8');
+        Handlebars.registerPartial(name, content);
+        partials[name] = content;
+      } catch (err) {
+        console.error(`Error loading partial ${file}: ${err.message}`);
+        process.exit(1);
+      }
+    }
+  } else {
     console.warn(`Partials directory not found: ${partialsDir}`);
     console.warn('Creating empty partials directory...');
     fs.mkdirSync(partialsDir, { recursive: true });
-    return partials;
   }
 
-  const files = fs.readdirSync(partialsDir);
+  // Load .hbs structural partials from templates/ (excluding README.hbs)
+  if (fs.existsSync(templatesDir)) {
+    const hbsFiles = fs.readdirSync(templatesDir);
 
-  for (const file of files) {
-    if (!file.endsWith('.md')) continue;
+    for (const file of hbsFiles) {
+      if (!file.endsWith('.hbs')) continue;
+      if (file === 'README.hbs') continue; // Skip main template
 
-    const name = path.basename(file, '.md');
-    const filepath = path.join(partialsDir, file);
+      const name = path.basename(file, '.hbs');
+      const filepath = path.join(templatesDir, file);
 
-    try {
-      const content = fs.readFileSync(filepath, 'utf8');
-      Handlebars.registerPartial(name, content);
-      partials[name] = content;
-    } catch (err) {
-      console.error(`Error loading partial ${file}: ${err.message}`);
-      process.exit(1);
+      try {
+        const content = fs.readFileSync(filepath, 'utf8');
+        Handlebars.registerPartial(name, content);
+        partials[name] = content;
+      } catch (err) {
+        console.error(`Error loading template partial ${file}: ${err.message}`);
+        process.exit(1);
+      }
     }
   }
 
@@ -192,6 +215,11 @@ function registerHelpers(Handlebars) {
     return array.join(typeof separator === 'string' ? separator : ', ');
   });
 
+  // Check if number is odd (for table row alternating)
+  Handlebars.registerHelper('isOdd', function(value) {
+    return value % 2 === 1;
+  });
+
   // Get highlighted features across all categories
   Handlebars.registerHelper('highlightedFeatures', function(categories) {
     if (!Array.isArray(categories)) return [];
@@ -218,6 +246,12 @@ function registerHelpers(Handlebars) {
   Handlebars.registerHelper('totalFeatures', function(categories) {
     if (!Array.isArray(categories)) return 0;
     return categories.reduce((sum, cat) => sum + (cat.features?.length || 0), 0);
+  });
+
+  // Check if any feature in array has a CLI command
+  Handlebars.registerHelper('hasCliCommands', function(features) {
+    if (!Array.isArray(features)) return false;
+    return features.some(feature => feature.cliCommand);
   });
 }
 

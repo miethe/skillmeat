@@ -49,6 +49,8 @@ SkillMeat: Personal collection manager for Claude Code artifacts with web UI
 - `.claude/worknotes/fixes/` → ONE per month
 - `.claude/worknotes/observations/` → ONE per month
 
+**README Updates**: When changing features, CLI commands, screenshots, or version → rebuild README. See `.claude/specs/script-usage/readme-build.md`
+
 **Prohibited**:
 
 - Debugging summaries → git commit

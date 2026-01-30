@@ -11,7 +11,7 @@
 > **{{stats.totalCommands}}+ CLI commands** | **{{stats.apiEndpoints}}+ API endpoints** | **{{stats.webPages}} web pages**
 
 {{#each categories}}
-### {{#if icon}}{{> icon name=icon }} {{/if}}{{name}}
+### {{name}}
 
 {{#if tagline}}_{{tagline}}_{{/if}}
 
@@ -31,6 +31,6 @@ SkillMeat manages multiple artifact types for Claude Code:
 
 | Type | Description |
 |------|-------------|
-{{#each ../artifactTypes}}
+{{#each @root.artifactTypes}}
 | **{{name}}** | {{description}} |
 {{/each}}

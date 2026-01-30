@@ -1,459 +1,554 @@
-# SkillMeat: Personal Collection Manager for Claude Code Artifacts
+<!-- AUTO-GENERATED: Do not edit directly. See .github/readme/ -->
+<!-- GENERATED: 2026-01-30T20:24:48.605Z -->
+<!-- VERSION: 0.3.0-beta -->
 
-[![Tests and Build](https://github.com/chrisvoncsefalvay/skillmeat/workflows/Tests%20and%20Build/badge.svg)](https://github.com/chrisvoncsefalvay/skillmeat/actions/workflows/tests.yml)
-[![Code Quality](https://github.com/chrisvoncsefalvay/skillmeat/workflows/Code%20Quality%20Checks/badge.svg)](https://github.com/chrisvoncsefalvay/skillmeat/actions/workflows/quality.yml)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<!-- BEGIN:hero -->
+# SkillMeat
 
-**SkillMeat** is your personal Claude Code artifact collection manager with intelligent discovery, sync, and analytics. Maintain, version, discover, and manage Claude artifacts (Skills, Commands, Agents, and more) across multiple projects with confidence.
+Personal collection manager for Claude Code artifacts
 
-## What is SkillMeat?
+[![Version](https://img.shields.io/badge/version-0.3.0--beta-blue.svg)](https://github.com/yourusername/skillmeat/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/yourusername/skillmeat/actions)
+[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
-SkillMeat provides a unified system for managing all types of Claude Code artifacts:
+Organize, deploy, and sync your Claude Code skills, commands, agents, hooks, and MCP servers across projects with a powerful CLI and web interface.
+<!-- END:hero -->
 
-- **Skills** - Specialized capabilities for Claude
-- **Commands** - Custom slash commands
-- **Agents** - Autonomous task executors
-- *More coming:* MCP servers, hooks, and custom configurations
+<!-- BEGIN:value-prop -->
+### The missing management layer for Claude Code.
 
-### Key Features
+**SkillMeat** is a professional-grade collection manager designed to bridge the gap between building Claude Code artifacts and actually using them at scale. It transforms scattered `.claude` files into a version-controlled, searchable, and shareable library.
 
-#### Intelligence & Sync (v0.2.0-alpha)
-- **Smart Search** - Find artifacts across projects with metadata and content search using ripgrep
-- **Bidirectional Sync** - Keep projects and collection in sync with drift detection and safe merging
-- **Usage Analytics** - Track usage, identify cleanup candidates, analyze trends with detailed reports
-- **Safe Updates** - Preview changes, auto-merge safely, handle conflicts with rollback protection
-- **Duplicate Detection** - Find and manage duplicate artifacts intelligently with similarity scoring
+---
 
-#### Collection Management (v0.1.0)
-- **Collection-First Architecture** - Organize artifacts into named collections (work, personal, experimental)
-- **GitHub Integration** - Add artifacts directly from GitHub repositories with version tracking
-- **Smart Deployment** - Deploy from collection to projects with automatic tracking
-- **Version Management** - Snapshots and rollback for your entire collection
-- **Multi-Collection Support** - Manage different sets of artifacts for different contexts
+## 💡 Why SkillMeat?
 
+As you build more complex agentic workflows with Claude Code, managing your **Skills, Commands, Agents, and MCP Servers** becomes a bottleneck.
+
+* **The Problem:** Artifacts are often trapped within individual projects. If you improve a "Code Review" skill in one repo, your other ten projects are now running an outdated version. Sharing these tools with a team usually involves brittle copy-pasting.
+* **The Solution:** SkillMeat provides a **centralized source of truth**. You manage your artifacts in a global collection and "deploy" them to projects. When you update the global version, SkillMeat handles the sync, drift detection, and versioning across every project on your machine.
+
+## 🎯 Who is it for?
+
+* **Individual Power Users:** Developers who have a growing library of custom Claude skills and need to keep them in sync across dozens of local repositories.
+* **Team Leads & Architects:** Teams looking to standardize their agentic SDLC by sharing "Golden Path" skills, rules, and MCP configurations.
+* **Artifact Creators:** Developers building tools for the Claude community who need a structured way to package, sign, and publish their work.
+
+---
+
+## 🚀 Key Capabilities
+
+* **📦 Three-Tier Architecture:** Manage artifacts at the Source (GitHub/Local), Collection (Your Library), and Project (Deployment) levels.
+* **🔄 Intelligent Sync:** Bidirectional synchronization with built-in drift detection. See exactly how your project-specific customizations differ from your global library.
+* **🛡️ Safety-First Versioning:** Automatic snapshots before any destructive operation. If a new skill version breaks your workflow, roll back with a single command.
+* **🌐 Dual Interface:** Use the high-performance **CLI** for your terminal workflows or the **Next.js Web UI** for visual discovery and analytics.
+* **🧩 MCP Orchestration:** Centralized management for Model Context Protocol servers—deploy, health-check, and configure environment variables from one place.
+
+---
+
+### Comparison of artifact management with standard Claude Code:
+
+| Feature | Standard Claude Code | With SkillMeat |
+| --- | --- | --- |
+| **Storage** | Scattered in `.claude/` dirs | Centralized Library (`~/.skillmeat`) |
+| **Updates** | Manual copy-paste | Automated Sync & Merge |
+| **Versioning** | None | Snapshots & Rollbacks |
+| **Sharing** | Manual file transfer | Signed `.skillmeat-pack` Bundles |
+| **Visibility** | Terminal only | Full Web Dashboard & Analytics |
+<!-- END:value-prop -->
+
+<!-- BEGIN:screenshots -->
+## Screenshots
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/readme/hero-dashboard.png" alt="SkillMeat Dashboard showing analytics overview with stats cards, usage trends, and top artifacts" width="100%">
+<br>
+<em>Full dashboard with sidebar, stats cards, trends chart, top artifacts widget. Light mode.</em>
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/readme/feature-collection.png" alt="Collection browser showing grid view with artifact cards, filters, and search" width="100%">
+<br>
+<em>Grid view with 9+ cards, toolbar visible, mix of artifact types, some tags shown</em>
+</td>
+</tr>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/readme/feature-marketplace.png" alt="Marketplace sources page showing GitHub repositories with artifact counts" width="100%">
+<br>
+<em>Source cards with repo names, artifact counts, scan status. Filter bar visible.</em>
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/readme/feature-deploy.png" alt="Deployments dashboard showing sync status across projects" width="100%">
+<br>
+<em>Summary cards, deployment list with mixed statuses (synced, modified, outdated)</em>
+</td>
+</tr>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/readme/feature-sync.png" alt="Sync modal showing colored diff preview of artifact changes" width="100%">
+<br>
+<em>Diff viewer with red/green highlighting, sync buttons visible, modal context</em>
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/readme/cli-quickstart.png" alt="Terminal showing SkillMeat CLI commands with colored output" width="100%">
+<br>
+<em>Show init, add, deploy, list commands with Rich formatted output</em>
+</td>
+</tr>
+<tr>
+</tr>
+</table>
+
+<!-- END:screenshots -->
+
+<!-- BEGIN:quickstart -->
 ## Quick Start
+
+Get started with SkillMeat in minutes.
 
 ### Installation
 
 ```bash
-# Via pip (recommended) - installs v0.2.0-alpha
-pip install skillmeat>=0.2.0a1
+# Using pip
+pip install skillmeat
 
-# Via uv (fast)
-uv tool install skillmeat>=0.2.0a1
-
-# Via pipx
-pipx install skillmeat>=0.2.0a1
+# Using uv (recommended)
+uv tool install skillmeat
 ```
 
-### Basic Usage
+### Basic Workflow
 
 ```bash
 # Initialize your collection
 skillmeat init
 
 # Add a skill from GitHub
-skillmeat add skill anthropics/skills/canvas
-
-# Search across all your projects
-skillmeat search "authentication"
+skillmeat add skill anthropics/skills/canvas-design
 
 # Deploy to your project
-cd /path/to/your/project
-skillmeat deploy canvas
+skillmeat deploy canvas --scope user
 
-# Check for drift and sync changes
-skillmeat sync check
-skillmeat sync pull
-
-# View usage analytics
-skillmeat analytics usage
+# List your artifacts
+skillmeat list
 ```
 
-That's it! Your artifact is now available in your project's `.claude/` directory.
-
-## Why SkillMeat?
-
-### Before SkillMeat
-
-- Copy/paste Claude configurations between projects manually
-- No way to track upstream changes
-- Difficult to maintain consistency across projects
-- Separate tools for different artifact types
-
-### With SkillMeat
-
-- Centralized collection of all your Claude artifacts
-- Automatic upstream tracking and update notifications
-- Deploy artifacts to any project in seconds
-- One tool for Skills, Commands, Agents, and more
-- Version control with snapshots and rollback
-
-## What's New in v0.2.0-alpha
-
-### Intelligence Features
-
-**Smart Search & Discovery**
-- Search artifacts across all your projects using metadata and file content
-- Ripgrep integration for ultra-fast content search (fallback to Python grep)
-- Find duplicate artifacts with similarity scoring
-
-**Bidirectional Sync**
-- Detect drift between your projects and collection automatically
-- Safely merge changes from projects back to your collection
-- Multiple sync strategies (overwrite, merge, fork) for flexibility
-
-**Safe Updates**
-- Preview what will change before applying updates
-- Auto-merge non-conflicting changes safely
-- Automatic rollback if something goes wrong
-- Handle upstream changes intelligently
-
-**Usage Analytics**
-- Track when and where artifacts are used
-- Get cleanup suggestions for unused artifacts
-- Analyze usage trends over time
-- Export reports in JSON and CSV formats
-
-[Full release notes →](CHANGELOG.md#0.2.0-alpha)
-
-## Example Workflow
+### Web Interface
 
 ```bash
-# Create a collection
-skillmeat init
+# Start the web UI with development servers
+skillmeat web dev
 
-# Add artifacts from GitHub
-skillmeat add skill anthropics/skills/python
-skillmeat add command user/repo/commands/review.md
-skillmeat add agent user/repo/agents/code-reviewer.md
-
-# Add local artifacts
-skillmeat add skill ./my-custom-skill
-
-# View your collection
-skillmeat list
-
-# Deploy to projects
-cd ~/projects/web-app
-skillmeat deploy python review code-reviewer
-
-cd ~/projects/api-server
-skillmeat deploy python code-reviewer
-
-# Check for updates
-skillmeat status
-
-# Create backup before changes
-skillmeat snapshot "Before cleanup"
-
-# Update artifacts
-skillmeat update python
+# Open http://localhost:3000 to access the dashboard
 ```
 
+For complete documentation, see the [Quickstart Guide](docs/user/quickstart.md).
+<!-- END:quickstart -->
+
+<!-- BEGIN:features -->
+## Features
+
+> **116+ CLI commands** | **150+ API endpoints** | **22 web pages**
+
+### Collection Management
+
+_Organize artifacts in named collections_
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-Collection Support** | Organize by context (`skillmeat collection create`) |
+| Multiple View Modes | Grid/List/Grouped views |
+| Tag-Based Filtering | Filter by tags |
+| Infinite Scroll | Progressive loading |
+
+### Deployment &amp; Projects
+
+_Deploy anywhere, track everything_
+
+| Feature | Description |
+|---------|-------------|
+| **One-Command Deploy** | Deploy in seconds (`skillmeat deploy`) |
+| Deployment Tracking | Track all deployments (`skillmeat status`) |
+| Project Management | Manage projects |
+| Update Alerts | Update notifications |
+
+### Intelligence &amp; Sync
+
+_Smart sync with conflict resolution_
+
+| Feature | Description |
+|---------|-------------|
+| **Drift Detection** | Detect changes (`skillmeat sync check`) |
+| Bidirectional Sync | Two-way sync (`skillmeat sync pull`) |
+| Diff Preview | Preview changes (`skillmeat sync preview`) |
+| Merge Strategies | Flexible merge |
+| Automatic Rollback | Safe updates |
+
+### Marketplace &amp; Discovery
+
+_Discover and share artifacts_
+
+| Feature | Description |
+|---------|-------------|
+| **GitHub Sources** | Import from GitHub |
+| Semantic Tree Navigation | Browse folder structure |
+| Cross-Source Search | Search everywhere |
+| Trust &amp; Quality Scores | Quality indicators |
+| Bundle Publishing | Share with team (`skillmeat marketplace-publish`) |
+
+### Analytics &amp; Insights
+
+_Track usage, identify patterns_
+
+| Feature | Description |
+|---------|-------------|
+| Usage Tracking | Track usage (`skillmeat analytics usage`) |
+| Top Artifacts | Most used (`skillmeat analytics top`) |
+| Cleanup Suggestions | Cleanup help (`skillmeat analytics cleanup`) |
+| Trend Analysis | Usage trends (`skillmeat analytics trends`) |
+
+### Search &amp; Discovery
+
+_Find anything instantly_
+
+| Feature | Description |
+|---------|-------------|
+| Smart Search | Search everything (`skillmeat search`) |
+| Duplicate Detection | Find duplicates (`skillmeat find-duplicates`) |
+| Ripgrep Integration | Fast search |
+
+### Versioning &amp; Safety
+
+_Snapshots and rollback_
+
+| Feature | Description |
+|---------|-------------|
+| Collection Snapshots | Backup collection (`skillmeat snapshot`) |
+| Rollback Support | Easy restore (`skillmeat rollback`) |
+| Version History | View history (`skillmeat history`) |
+
+### MCP Server Management
+
+_Model Context Protocol servers_
+
+| Feature | Description |
+|---------|-------------|
+| MCP Installation | Install MCP servers (`skillmeat mcp add`) |
+| MCP Deploy | Deploy servers (`skillmeat mcp deploy`) |
+| Health Monitoring | Monitor health (`skillmeat mcp health`) |
+
+### Context Entities
+
+_Project configuration artifacts_
+
+| Feature | Description |
+|---------|-------------|
+| Context Entity Management | Manage project config (`skillmeat context`) |
+| Context Deploy | Deploy config (`skillmeat context deploy`) |
+
+### Team Collaboration
+
+_Share and collaborate_
+
+| Feature | Description |
+|---------|-------------|
+| Bundle Creation | Create bundles (`skillmeat bundle create`) |
+| Vault Connectors | Team storage (`skillmeat vault`) |
+| Cryptographic Signing | Secure sharing (`skillmeat sign`) |
+
+### Three-Way Interface
+
+_CLI + Web UI + API_
+
+| Feature | Description |
+|---------|-------------|
+| **Powerful CLI** | Full CLI (`skillmeat --help`) |
+| **Visual Web UI** | Web interface (`skillmeat web dev`) |
+| REST API | REST API |
+
+
+---
+
+### Artifact Types
+
+SkillMeat manages multiple artifact types for Claude Code:
+
+| Type | Description |
+|------|-------------|
+| **Skill** | Specialized capabilities for Claude |
+| **Command** | Custom slash commands |
+| **Agent** | Autonomous task executors |
+| **MCP Server** | Model Context Protocol servers |
+| **Hook** | Event-triggered automations |
+<!-- END:features -->
+
+<!-- BEGIN:cli-reference -->
+## CLI Reference
+
+SkillMeat provides **116+ commands** across **23 command groups**.
+
+### Quick Reference
+
+| Category | Commands |
+|----------|----------|
+| **Collection Management** | `skillmeat collection create`,  |
+| **Deployment &amp; Projects** | `skillmeat deploy`, `skillmeat status`,  |
+| **Intelligence &amp; Sync** | `skillmeat sync check`, `skillmeat sync pull`, `skillmeat sync preview`,  |
+| **Marketplace &amp; Discovery** | `skillmeat marketplace-publish` |
+| **Analytics &amp; Insights** | `skillmeat analytics usage`, `skillmeat analytics top`, `skillmeat analytics cleanup`, `skillmeat analytics trends` |
+| **Search &amp; Discovery** | `skillmeat search`, `skillmeat find-duplicates`,  |
+| **Versioning &amp; Safety** | `skillmeat snapshot`, `skillmeat rollback`, `skillmeat history` |
+| **MCP Server Management** | `skillmeat mcp add`, `skillmeat mcp deploy`, `skillmeat mcp health` |
+| **Context Entities** | `skillmeat context`, `skillmeat context deploy` |
+| **Team Collaboration** | `skillmeat bundle create`, `skillmeat vault`, `skillmeat sign` |
+| **Three-Way Interface** | `skillmeat --help`, `skillmeat web dev`,  |
+
+### Core Commands
+
+```bash
+# Collection Management
+skillmeat init                    # Initialize collection or project
+skillmeat add <source>            # Add artifact from GitHub/local
+skillmeat list                    # List all artifacts
+skillmeat search <query>          # Search artifacts
+
+# Deployment
+skillmeat deploy <artifact>       # Deploy artifact to project
+skillmeat status                  # Show deployment status
+skillmeat undeploy <artifact>     # Remove deployment
+
+# Sync & Updates
+skillmeat sync check              # Check for drift/updates
+skillmeat sync pull               # Pull changes from projects
+skillmeat sync push               # Push updates to projects
+
+# Web Interface
+skillmeat web dev                 # Start development servers
+skillmeat web build               # Build for production
+skillmeat web start               # Start production servers
+```
+
+### Command Groups
+
+<details>
+<summary><strong>Collection Management</strong> - Organize artifacts in named collections</summary>
+
+| Command | Description |
+|---------|-------------|
+| `skillmeat collection create` | Organize by context |
+
+</details>
+<details>
+<summary><strong>Deployment &amp; Projects</strong> - Deploy anywhere, track everything</summary>
+
+| Command | Description |
+|---------|-------------|
+| `skillmeat deploy` | Deploy in seconds |
+| `skillmeat status` | Track all deployments |
+
+</details>
+<details>
+<summary><strong>Intelligence &amp; Sync</strong> - Smart sync with conflict resolution</summary>
+
+| Command | Description |
+|---------|-------------|
+| `skillmeat sync check` | Detect changes |
+| `skillmeat sync pull` | Two-way sync |
+| `skillmeat sync preview` | Preview changes |
+
+</details>
+<details>
+<summary><strong>Marketplace &amp; Discovery</strong> - Discover and share artifacts</summary>
+
+| Command | Description |
+|---------|-------------|
+| `skillmeat marketplace-publish` | Share with team |
+
+</details>
+<details>
+<summary><strong>Analytics &amp; Insights</strong> - Track usage, identify patterns</summary>
+
+| Command | Description |
+|---------|-------------|
+| `skillmeat analytics usage` | Track usage |
+| `skillmeat analytics top` | Most used |
+| `skillmeat analytics cleanup` | Cleanup help |
+| `skillmeat analytics trends` | Usage trends |
+
+</details>
+<details>
+<summary><strong>Search &amp; Discovery</strong> - Find anything instantly</summary>
+
+| Command | Description |
+|---------|-------------|
+| `skillmeat search` | Search everything |
+| `skillmeat find-duplicates` | Find duplicates |
+
+</details>
+<details>
+<summary><strong>Versioning &amp; Safety</strong> - Snapshots and rollback</summary>
+
+| Command | Description |
+|---------|-------------|
+| `skillmeat snapshot` | Backup collection |
+| `skillmeat rollback` | Easy restore |
+| `skillmeat history` | View history |
+
+</details>
+<details>
+<summary><strong>MCP Server Management</strong> - Model Context Protocol servers</summary>
+
+| Command | Description |
+|---------|-------------|
+| `skillmeat mcp add` | Install MCP servers |
+| `skillmeat mcp deploy` | Deploy servers |
+| `skillmeat mcp health` | Monitor health |
+
+</details>
+<details>
+<summary><strong>Context Entities</strong> - Project configuration artifacts</summary>
+
+| Command | Description |
+|---------|-------------|
+| `skillmeat context` | Manage project config |
+| `skillmeat context deploy` | Deploy config |
+
+</details>
+<details>
+<summary><strong>Team Collaboration</strong> - Share and collaborate</summary>
+
+| Command | Description |
+|---------|-------------|
+| `skillmeat bundle create` | Create bundles |
+| `skillmeat vault` | Team storage |
+| `skillmeat sign` | Secure sharing |
+
+</details>
+<details>
+<summary><strong>Three-Way Interface</strong> - CLI + Web UI + API</summary>
+
+| Command | Description |
+|---------|-------------|
+| `skillmeat --help` | Full CLI |
+| `skillmeat web dev` | Web interface |
+
+</details>
+
+---
+
+For complete command documentation, run:
+
+```bash
+skillmeat --help
+skillmeat <command> --help
+```
+<!-- END:cli-reference -->
+
+<!-- BEGIN:documentation -->
 ## Documentation
 
-### Getting Started
-- **[Quickstart Guide](docs/user/quickstart.md)** - Get started in 5 minutes
-- **[Commands Reference](docs/user/cli/commands.md)** - Complete CLI documentation
+Comprehensive guides and references to help you get the most out of SkillMeat.
 
-### Feature Guides
-- **[Smart Search Guide](docs/user/guides/searching.md)** - Find artifacts across projects
-- **[Safe Updates Guide](docs/user/guides/updating-safely.md)** - Preview and update artifacts
-- **[Syncing Changes Guide](docs/user/guides/syncing-changes.md)** - Sync projects with collection
-- **[Analytics Guide](docs/user/guides/using-analytics.md)** - Track usage and trends
+### User Guides
 
-### Resources
-- **[Examples](docs/user/examples.md)** - Real-world workflows and patterns
-- **[Security Guide](docs/ops/security/SECURITY.md)** - Security best practices
+- [Quickstart Guide](docs/user/quickstart.md) - Installation, setup, and first steps
+- [CLI Commands](docs/user/cli/commands.md) - Complete command documentation
+- [Web Commands](docs/user/cli/web-commands.md) - Web interface CLI usage
+- [Examples](docs/user/examples.md) - Common workflows and use cases
+- [Beta Program](docs/user/beta/README.md) - Beta testing information
 
-## Core Concepts
+### Development
 
-### Collections
+- [API Development](skillmeat/api/CLAUDE.md) - Backend development guide
+- [Web Development](skillmeat/web/CLAUDE.md) - Frontend development guide
+- [Contributing Guide](CONTRIBUTING.md) - Development setup, coding standards, and guidelines
 
-Collections are named groups of artifacts stored in `~/.skillmeat/collections/`. You can have multiple collections for different contexts:
+### Advanced Topics
 
-```bash
-skillmeat collection create work
-skillmeat collection create personal
-skillmeat collection use work
-```
+<!-- Planned documentation - Coming soon:
+- API Reference - REST API endpoints and schemas
+- Testing Guide - Testing strategies and patterns
+- Sync & Conflict Resolution - Bidirectional sync workflows
+- Marketplace Publishing - Share your artifacts
+- MCP Integration - Model Context Protocol servers
+- Security & Vault - Credential management
+-->
+<!-- END:documentation -->
 
-### Deployment
+<!-- BEGIN:contributing -->
+## Contributing
 
-Deployment copies artifacts from your collection to a project's `.claude/` directory while maintaining tracking:
+Contributions are welcome! SkillMeat is built with Python, FastAPI, Next.js, and React.
 
-```bash
-# Deploy to current directory
-skillmeat deploy my-skill
-
-# Deploy to specific project
-skillmeat deploy my-skill --project /path/to/project
-
-# Deploy multiple artifacts
-skillmeat deploy skill1 skill2 skill3
-```
-
-### Versioning
-
-Snapshots preserve your entire collection state:
+### Development Setup
 
 ```bash
-# Create snapshot
-skillmeat snapshot "Before major changes"
-
-# View history
-skillmeat history
-
-# Rollback
-skillmeat rollback abc123d
-```
-
-## Use Cases
-
-### Solo Developer
-
-Maintain a personal library of your favorite Claude configurations and deploy them instantly to new projects.
-
-### Team Lead
-
-Create standardized collections for your team and share setup instructions for consistent development environments.
-
-### Multi-Project Developer
-
-Manage different collections for different types of work (web dev, data science, DevOps) and switch between them effortlessly.
-
-### Open Source Maintainer
-
-Track and manage Claude artifacts from multiple upstream sources, getting notified when updates are available.
-
-## Architecture
-
-```
-Collection (Personal Library)
-  ~/.skillmeat/collections/default/
-  ├── collection.toml      # Manifest
-  ├── collection.lock      # Version lock
-  ├── skills/              # Skills
-  ├── commands/            # Commands
-  └── agents/              # Agents
-            │
-            ├── deploy → Project A (.claude/)
-            ├── deploy → Project B (.claude/)
-            └── deploy → Project C (.claude/)
-```
-
-## Configuration
-
-### GitHub Authentication (Optional)
-
-Configure a GitHub Personal Access Token to increase API rate limits from 60 to 5,000 requests/hour:
-
-1. Via Web UI: Go to Settings → GitHub Authentication
-2. Via environment variable: `export GITHUB_TOKEN=ghp_...`
-3. Via CLI: `skillmeat config set github-token ghp_...`
-
-Create a PAT at [github.com/settings/tokens](https://github.com/settings/tokens) with `repo` scope.
-
-### General Settings
-
-```bash
-# Set GitHub token (for private repos and higher rate limits)
-skillmeat config set github-token ghp_xxxxxxxxxxxxx
-
-# Set default collection
-skillmeat config set default-collection work
-
-# View all settings
-skillmeat config list
-```
-
-Configuration is stored in `~/.skillmeat/config.toml`.
-
-## Security
-
-SkillMeat takes security seriously. Artifacts can execute code and access system resources, so:
-
-- **Security warnings** are shown before installation
-- Only install from **trusted sources**
-- Use `verify` to inspect artifacts before adding
-- Review what artifacts do before deploying
-
-See [Using Skills in Claude - Security](https://support.claude.com/en/articles/12512180-using-skills-in-claude#h_2746475e70) for more information.
-
-## Development
-
-### Setup
-
-```bash
-# Clone repository
-git clone https://github.com/chrisvoncsefalvay/skillmeat.git
+# Clone the repository
+git clone https://github.com/yourusername/skillmeat.git
 cd skillmeat
 
 # Install in development mode
 pip install -e ".[dev]"
-```
 
-### Testing
-
-```bash
-# Run all tests
+# Run tests
 pytest -v --cov=skillmeat
 
-# Run specific test file
-pytest tests/test_cli.py -v
+# Start development servers
+skillmeat web dev
+```
+
+### Code Quality
+
+```bash
+# Format code (required)
+black skillmeat
 
 # Type checking
 mypy skillmeat --ignore-missing-imports
 
-# Formatting
-black skillmeat
-
-# Linting
-flake8 skillmeat --count --select=E9,F63,F7,F82 --show-source --statistics
+# Lint
+flake8 skillmeat --select=E9,F63,F7,F82
 ```
 
-### Project Structure
+### Contribution Guidelines
 
-```
-skillmeat/
-├── skillmeat/
-│   ├── cli.py                 # CLI interface
-│   ├── core/                  # Core managers
-│   │   ├── collection.py      # Collection management
-│   │   ├── artifact.py        # Artifact operations
-│   │   ├── deployment.py      # Deployment system
-│   │   └── version.py         # Versioning & snapshots
-│   ├── sources/               # Source integrations
-│   │   ├── github.py          # GitHub source
-│   │   └── local.py           # Local filesystem
-│   ├── storage/               # Storage layer
-│   │   ├── manifest.py        # TOML manifests
-│   │   ├── lockfile.py        # Lock files
-│   │   └── snapshot.py        # Snapshot storage
-│   └── utils/                 # Utilities
-│       ├── validator.py       # Artifact validation
-│       └── metadata.py        # Metadata extraction
-├── tests/                     # Test suite
-├── docs/                      # Documentation
-└── README.md                  # This file
-```
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests (`pytest`)
-5. Run code quality checks (`black skillmeat && flake8 skillmeat`)
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
-
-### Development Guidelines
-
-- Follow existing code style (Black formatting)
+- Follow existing code patterns and conventions
 - Add tests for new features
-- Update documentation as needed
-- Keep commits focused and atomic
-- Write descriptive commit messages
+- Update documentation for user-facing changes
+- Run code quality checks before submitting
+- Write clear commit messages
 
-## Requirements
+For detailed guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-- Python 3.9+
-- Git 2.0+
-- Internet connection (for GitHub integration)
+### Reporting Issues
 
-### Python Dependencies
+Found a bug or have a feature request? Open an issue on [GitHub Issues](https://github.com/yourusername/skillmeat/issues).
+<!-- END:contributing -->
 
-- click - CLI framework
-- rich - Terminal output formatting
-- GitPython - Git operations
-- requests - HTTP client
-- tomli/tomllib - TOML parsing (Python 3.11+ uses built-in tomllib)
+<!-- BEGIN:footer -->
+## License
 
-## Roadmap
-
-### Phase 1: Collection Management (v0.1.0) ✅
-
-- [x] Collection management
-- [x] Skills, Commands, Agents support
-- [x] GitHub and local sources
-- [x] Deployment tracking
-- [x] Snapshots and rollback
-- [x] Update checking
-
-### Phase 2: Intelligence & Sync (v0.2.0-alpha) ✅
-
-- [x] Cross-project search with metadata and content queries
-- [x] Usage analytics and cleanup suggestions
-- [x] Smart merge strategies (overwrite, merge, prompt)
-- [x] Bidirectional sync (project → collection) with drift detection
-- [x] Diff and preview before applying changes
-- [x] Automatic rollback on failures
-
-### Phase 3: Advanced Features (Planned)
-
-- [ ] Web interface
-- [ ] Team sharing and recommendations
-- [ ] MCP server management
-- [ ] Marketplace integration
-- [ ] Collection sync across machines
-- [ ] Enhanced filtering and tags
-
-## FAQ
-
-**Q: Do artifacts get re-downloaded for each project?**
-
-A: No. Artifacts are stored once in your collection (`~/.skillmeat/`) and copied to projects when deployed.
-
-**Q: How do I share my collection with my team?**
-
-A: Document your collection setup commands (see [Examples](docs/user/examples.md#example-7-team-artifact-sharing)) or export your `collection.toml` manifest.
-
-**Q: Can I use private GitHub repositories?**
-
-A: Yes! Set your GitHub token: `skillmeat config set github-token ghp_xxxxx`
-
-**Q: What happens if I modify a deployed artifact?**
-
-A: SkillMeat tracks deployments and will detect modifications with `skillmeat sync check`.
-
-**Q: How do I search for artifacts across my projects?**
-
-A: Use `skillmeat search "query"` to search by name, description, or content across all your projects. Add `--projects ~/dev` to search in specific directories.
-
-**Q: Can I safely update artifacts without losing my changes?**
-
-A: Yes! Use `skillmeat update artifact-name --preview` to see changes first, then `--strategy merge` to auto-merge non-conflicting changes. Use `--strategy overwrite` for a clean update. Automatic rollback happens if anything fails.
+SkillMeat is released under the [MIT License](LICENSE).
 
 ## Support
 
-- **Documentation:** See [docs/](docs/) directory
-- **Issues:** [GitHub Issues](https://github.com/chrisvoncsefalvay/skillmeat/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/chrisvoncsefalvay/skillmeat/discussions)
+- [Documentation](docs/) - Comprehensive guides and references
+- [GitHub Issues](https://github.com/yourusername/skillmeat/issues) - Bug reports and feature requests
+- [Discussions](https://github.com/yourusername/skillmeat/discussions) - Community Q&A and ideas
 
-## License
+## Credits
 
-MIT License - see [LICENSE](LICENSE) file for details.
+Built with:
 
-## Acknowledgments
+- [Python 3.9+](https://www.python.org/) - Core CLI and backend
+- [FastAPI](https://fastapi.tiangolo.com/) - REST API framework
+- [Next.js 15](https://nextjs.org/) - React framework
+- [Radix UI](https://www.radix-ui.com/) - Accessible component primitives
+- [shadcn/ui](https://ui.shadcn.com/) - Beautiful component library
+- [TanStack Query](https://tanstack.com/query) - Data fetching and caching
+- [Rich](https://rich.readthedocs.io/) - Terminal formatting
 
-- Built on the foundation of the original `skillman` tool
-- Inspired by package managers like npm, pip, and brew
-- Powered by Claude Code and the Claude API
-
-## AI Development Context
-
-For AI assistants working with this codebase, see [CLAUDE.md](CLAUDE.md) for:
-- Project architecture and design decisions
-- Development setup and testing procedures
-- Code style guidelines
-- Implementation patterns
-
----
-
-Made with ❤️ in the Mile High City 🏔️ by [Chris von Csefalvay](https://chrisvoncsefalvay.com)
+Developed with support from the Claude Code community.
+<!-- END:footer -->

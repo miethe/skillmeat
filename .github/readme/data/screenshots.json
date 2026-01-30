@@ -1,7 +1,7 @@
 {
   "$schema": "./screenshots.schema.json",
   "version": "0.3.0-beta",
-  "lastUpdated": "2026-01-29",
+  "lastUpdated": "2026-01-30",
   "screenshots": [
     {
       "id": "hero-dashboard",
@@ -12,8 +12,8 @@
       "category": "readme",
       "page": "/",
       "features": ["dashboard", "analytics"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Full dashboard with sidebar, stats cards, trends chart, top artifacts widget. Light mode."
     },
     {
@@ -25,8 +25,8 @@
       "category": "readme",
       "page": "/collection",
       "features": ["collection", "grid-view", "filtering"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Grid view with 9+ cards, toolbar visible, mix of artifact types, some tags shown"
     },
     {
@@ -38,8 +38,8 @@
       "category": "readme",
       "page": "/marketplace/sources",
       "features": ["marketplace", "github-sources"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Source cards with repo names, artifact counts, scan status. Filter bar visible."
     },
     {
@@ -51,8 +51,8 @@
       "category": "readme",
       "page": "/deployments",
       "features": ["deployments", "sync-status"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Summary cards, deployment list with mixed statuses (synced, modified, outdated)"
     },
     {
@@ -64,8 +64,8 @@
       "category": "readme",
       "page": "modal",
       "features": ["sync", "diff-preview"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Diff viewer with red/green highlighting, sync buttons visible, modal context"
     },
     {
@@ -77,8 +77,8 @@
       "category": "readme",
       "page": "terminal",
       "features": ["cli"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Show init, add, deploy, list commands with Rich formatted output"
     },
     {
@@ -90,8 +90,8 @@
       "category": "features",
       "page": "/",
       "features": ["dashboard"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Full page scroll capture showing all dashboard widgets"
     },
     {
@@ -129,8 +129,8 @@
       "category": "features",
       "page": "/collection",
       "features": ["collection", "grid-view"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "12+ cards visible, varied artifact types"
     },
     {
@@ -173,6 +173,19 @@
       "notes": "Unified entity modal showing artifact details"
     },
     {
+      "id": "groups-list",
+      "file": "docs/screenshots/features/collection/groups-list.png",
+      "alt": "Groups page showing artifact organization",
+      "width": 1280,
+      "height": 720,
+      "category": "features",
+      "page": "/groups",
+      "features": ["groups", "organization"],
+      "captured": "2026-01-30",
+      "status": "captured",
+      "notes": "Groups page showing artifact groupings"
+    },
+    {
       "id": "manage-skills",
       "file": "docs/screenshots/features/manage/manage-skills.png",
       "alt": "Manage page with Skills tab selected",
@@ -181,8 +194,8 @@
       "category": "features",
       "page": "/manage",
       "features": ["manage", "skills"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Skills tab active, list of skills visible"
     },
     {
@@ -194,8 +207,8 @@
       "category": "features",
       "page": "/projects",
       "features": ["projects"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Project cards with deployment counts"
     },
     {
@@ -220,8 +233,8 @@
       "category": "features",
       "page": "/deployments",
       "features": ["deployments"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Flat list with status badges"
     },
     {
@@ -246,8 +259,8 @@
       "category": "features",
       "page": "/marketplace/sources",
       "features": ["marketplace", "github-sources"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Source cards with filter bar"
     },
     {
@@ -259,8 +272,8 @@
       "category": "features",
       "page": "/marketplace/sources/[id]",
       "features": ["marketplace", "semantic-tree"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Tree navigation on left, detail pane on right"
     },
     {
@@ -298,8 +311,8 @@
       "category": "features",
       "page": "/context-entities",
       "features": ["context-entities"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Entity cards with type filters"
     },
     {
@@ -324,8 +337,8 @@
       "category": "features",
       "page": "/templates",
       "features": ["templates"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Template cards with deploy buttons"
     },
     {
@@ -337,8 +350,8 @@
       "category": "features",
       "page": "/mcp",
       "features": ["mcp"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "Server cards with status indicators"
     },
     {
@@ -363,8 +376,8 @@
       "category": "features",
       "page": "/settings",
       "features": ["settings"],
-      "captured": null,
-      "status": "pending",
+      "captured": "2026-01-30",
+      "status": "captured",
       "notes": "General settings and GitHub auth sections"
     },
     {
@@ -467,7 +480,8 @@
       "duration": "20-30s",
       "category": "readme",
       "tool": "claude-in-chrome",
-      "status": "pending",
+      "status": "placeholder",
+      "placeholder_note": "GIF creation deferred - will be added in future iteration",
       "sequence": [
         "Open dashboard",
         "Navigate to Collection",
@@ -491,7 +505,8 @@
       "duration": "25-35s",
       "category": "readme",
       "tool": "claude-in-chrome",
-      "status": "pending",
+      "status": "placeholder",
+      "placeholder_note": "GIF creation deferred - will be added in future iteration",
       "sequence": [
         "Navigate to Marketplace Sources",
         "Click Add Source",
@@ -518,7 +533,8 @@
       "duration": "30-40s",
       "category": "docs",
       "tool": "claude-in-chrome",
-      "status": "pending",
+      "status": "placeholder",
+      "placeholder_note": "GIF creation deferred - will be added in future iteration",
       "sequence": [
         "Show modified artifact",
         "Open artifact detail",
@@ -546,7 +562,8 @@
       "duration": "15-20s",
       "category": "readme",
       "tool": "asciinema",
-      "status": "pending",
+      "status": "placeholder",
+      "placeholder_note": "GIF creation deferred - will be added in future iteration",
       "sequence": [
         "skillmeat init",
         "skillmeat add skill anthropics/skills/canvas",
