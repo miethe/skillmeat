@@ -79,6 +79,10 @@ import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialo
 import { CatalogEntryModal } from '@/components/CatalogEntryModal';
 import { ScoreBadge } from '@/components/ScoreBadge';
 import { TagBadge } from '@/components/marketplace/tag-badge';
+import { SourceFolderLayout } from './components/source-folder-layout';
+import { buildFolderTree } from '@/lib/tree-builder';
+import { filterSemanticTree } from '@/lib/tree-filter-utils';
+import { useFolderSelection } from '@/lib/hooks/use-folder-selection';
 import type {
   CatalogEntry,
   CatalogFilters,
@@ -427,9 +431,9 @@ export default function SourceDetailPage() {
   });
   const [itemsPerPage, setItemsPerPage] = useState(() => {
     const limitParam = searchParams.get('limit');
-    const limit = limitParam ? parseInt(limitParam, 10) : 25;
+    const limit = limitParam ? parseInt(limitParam, 10) : 100;
     // Ensure valid limit value
-    return [10, 25, 50, 100].includes(limit) ? limit : 25;
+    return [10, 25, 50, 100].includes(limit) ? limit : 100;
   });
 
   // View mode with localStorage persistence
@@ -607,6 +611,35 @@ export default function SourceDetailPage() {
 
     return excluded;
   }, [allEntries, showOnlyDuplicates]);
+
+  // Fetch all artifacts when entering folder view mode (Bug fix: folder view pagination)
+  // Folder view needs all artifacts to build the complete tree structure
+  useEffect(() => {
+    if (viewMode === 'folder' && hasNextPage && !isFetchingNextPage && !catalogFetching) {
+      fetchNextPage();
+    }
+  }, [viewMode, hasNextPage, isFetchingNextPage, catalogFetching, fetchNextPage]);
+
+  // Show loading state for folder view while fetching all pages
+  const isFolderViewLoading = viewMode === 'folder' && (catalogLoading || hasNextPage);
+
+  // Build folder tree for folder view mode (MFV-1.8)
+  // Apply semantic filtering to remove type container folders (Bug fix: commands/agents/etc showing)
+  const folderTree = useMemo(() => {
+    if (viewMode !== 'folder') return {};
+    const rawTree = buildFolderTree(filteredEntries, 0);
+    return filterSemanticTree(rawTree);
+  }, [filteredEntries, viewMode]);
+
+  // Folder selection state (MFV-1.8)
+  const {
+    navigateToFolder,
+    selectedFolder,
+    setSelectedFolder,
+    expanded,
+    toggleExpand,
+    expandPath,
+  } = useFolderSelection(folderTree);
 
   // Get counts from first page (needed for totalCount calculation)
   const countsByStatus = catalogData?.pages[0]?.counts_by_status || {};
@@ -1275,18 +1308,57 @@ export default function SourceDetailPage() {
       {!catalogLoading && filteredEntries.length > 0 && (
         <div className="flex items-center py-2 text-sm text-muted-foreground">
           <span>
-            Showing {startIndex + 1}-{endIndex} of{' '}
-            {(totalCount ?? totalFilteredCount).toLocaleString()} artifacts
-            {searchQuery.trim() && totalCount && totalFilteredCount !== totalCount && (
-              <> ({totalFilteredCount.toLocaleString()} matching search)</>
+            {viewMode === 'folder' ? (
+              <>
+                {isFolderViewLoading ? (
+                  <>Loading all artifacts for folder view...</>
+                ) : (
+                  <>
+                    {filteredEntries.length.toLocaleString()} artifacts in{' '}
+                    {Object.keys(folderTree).length} top-level folder
+                    {Object.keys(folderTree).length !== 1 ? 's' : ''}
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                Showing {startIndex + 1}-{endIndex} of{' '}
+                {(totalCount ?? totalFilteredCount).toLocaleString()} artifacts
+                {searchQuery.trim() && totalCount && totalFilteredCount !== totalCount && (
+                  <> ({totalFilteredCount.toLocaleString()} matching search)</>
+                )}
+              </>
             )}
           </span>
         </div>
       )}
 
-      {/* Catalog Grid/List */}
-      {catalogLoading ? (
-        viewMode === 'grid' ? (
+      {/* Catalog Grid/List/Folder */}
+      {/* For folder view, show loading while fetching all pages (isFolderViewLoading) */}
+      {(viewMode === 'folder' ? isFolderViewLoading : catalogLoading) ? (
+        viewMode === 'folder' ? (
+          // Folder view loading skeleton - shown while fetching all pages
+          <div className="flex h-[400px] min-h-[400px] flex-col md:flex-row">
+            <aside className="h-[200px] w-full border-b bg-muted/20 p-3 md:h-full md:w-1/4 md:min-w-[200px] md:max-w-[300px] md:border-b-0 md:border-r">
+              <Skeleton className="mb-3 h-4 w-16" />
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="ml-4 h-6 w-3/4" />
+                <Skeleton className="ml-4 h-6 w-3/4" />
+                <Skeleton className="h-6 w-full" />
+              </div>
+            </aside>
+            <main className="flex-1 p-4">
+              <Skeleton className="mb-2 h-6 w-48" />
+              <Skeleton className="mb-4 h-4 w-32" />
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            </main>
+          </div>
+        ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <CatalogCardSkeleton key={i} />
@@ -1319,7 +1391,7 @@ export default function SourceDetailPage() {
         </div>
       ) : (
         <>
-          <div className="max-h-[600px] overflow-y-auto">
+          <div className="h-[calc(100vh-280px)] min-h-[400px]">
             {/* Show loading state when we need data for the current page but don't have it yet */}
             {paginatedEntries.length === 0 && needsMoreDataForPage ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -1329,6 +1401,30 @@ export default function SourceDetailPage() {
                   Fetching artifacts {startIndex + 1} to {endIndex}
                 </p>
               </div>
+            ) : viewMode === 'folder' ? (
+              <SourceFolderLayout
+                tree={folderTree}
+                selectedFolder={selectedFolder}
+                onSelectFolder={(path) => {
+                  expandPath(path);
+                  setSelectedFolder(path);
+                }}
+                onNavigateToFolder={navigateToFolder}
+                expanded={expanded}
+                onToggleExpand={toggleExpand}
+                catalog={filteredEntries}
+                filters={filters}
+                onImport={(entry) => handleImportSingle(entry.id)}
+                onExclude={() => {
+                  // Exclude is handled within the detail pane via ExcludeArtifactDialog
+                }}
+                onArtifactClick={(entry) => {
+                  setSelectedEntry(entry);
+                  setModalOpen(true);
+                }}
+                sourceId={sourceId}
+                isImporting={importMutation.isPending}
+              />
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {paginatedEntries.map((entry) => (
@@ -1363,8 +1459,8 @@ export default function SourceDetailPage() {
             )}
           </div>
 
-          {/* Pagination Controls */}
-          {totalPages > 0 && (
+          {/* Pagination Controls (not shown for folder view) */}
+          {totalPages > 0 && viewMode !== 'folder' && (
             <div className="sticky bottom-0 -mx-6 mt-6 border-t border-border/40 bg-background/95 px-6 py-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:shadow-[0_-2px_10px_rgba(0,0,0,0.2)]">
               <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
                 {/* Items per page selector */}

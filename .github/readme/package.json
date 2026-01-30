@@ -1,0 +1,21 @@
+{
+  "name": "@skillmeat/readme-tools",
+  "version": "1.0.0",
+  "description": "README generation and validation tools for SkillMeat",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-readme.js",
+    "validate-links": "node scripts/validate-links.js",
+    "check-screenshots": "node scripts/check-screenshots.js",
+    "sync-features": "node scripts/sync-features.js",
+    "update-version": "node scripts/update-version.js",
+    "validate": "npm run validate-links && npm run check-screenshots"
+  },
+  "dependencies": {
+    "handlebars": "^4.7.8"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

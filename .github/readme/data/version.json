@@ -1,0 +1,20 @@
+{
+  "current": "0.3.0-beta",
+  "releaseDate": "2026-01-29",
+  "previousVersions": [
+    {
+      "version": "0.2.0-alpha",
+      "releaseDate": "2025-12-15",
+      "highlights": ["Intelligence & Sync features", "Analytics", "Marketplace integration"]
+    },
+    {
+      "version": "0.1.0",
+      "releaseDate": "2025-11-01",
+      "highlights": ["Initial release", "Collection management", "GitHub integration"]
+    }
+  ],
+  "upcoming": {
+    "version": "0.4.0",
+    "plannedFeatures": ["Enhanced marketplace", "Team sharing", "Collection sync across machines"]
+  }
+}

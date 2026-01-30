@@ -18,6 +18,7 @@ import {
   Search,
   Grid3x3,
   List,
+  FolderTree,
   ArrowUpDown,
   X,
   Sparkles,
@@ -53,7 +54,7 @@ import type { ArtifactType } from '@/types/marketplace';
 // Types
 // ============================================================================
 
-export type ViewMode = 'grid' | 'list';
+export type ViewMode = 'grid' | 'list' | 'folder';
 export type SortOption =
   | 'confidence-desc'
   | 'confidence-asc'
@@ -432,6 +433,16 @@ export function SourceToolbar({
             >
               <List className="h-4 w-4" />
             </Button>
+            <Button
+              variant={viewMode === 'folder' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => onViewModeChange('folder')}
+              aria-label="Folder view"
+              aria-pressed={viewMode === 'folder'}
+              className="h-7 w-7 p-0"
+            >
+              <FolderTree className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </div>
@@ -448,7 +459,7 @@ export function useViewMode(): [ViewMode, (mode: ViewMode) => void] {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(VIEW_MODE_STORAGE_KEY) as ViewMode | null;
-      if (stored === 'grid' || stored === 'list') {
+      if (stored === 'grid' || stored === 'list' || stored === 'folder') {
         setViewMode(stored);
       }
     }

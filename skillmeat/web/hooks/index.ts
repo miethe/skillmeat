@@ -165,7 +165,7 @@ export { useCacheRefresh } from './useCacheRefresh';
 export { useCacheStatus } from './useCacheStatus';
 
 // ============================================================================
-// SETTINGS (1 hook)
+// SETTINGS & CONFIG (2 hooks)
 // ============================================================================
 // Application configuration and settings
 export {
@@ -175,8 +175,19 @@ export {
   type IndexingModeResponse,
 } from './useIndexingMode';
 
+// Detection patterns for artifact container identification
+export {
+  detectionPatternKeys,
+  useDetectionPatterns,
+  DEFAULT_LEAF_CONTAINERS,
+  DEFAULT_CONTAINER_ALIASES,
+  DEFAULT_CANONICAL_CONTAINERS,
+  DEFAULT_ROOT_EXCLUSIONS,
+  type DetectionPatternsResponse,
+} from './use-detection-patterns';
+
 // ============================================================================
-// MARKETPLACE (5 hooks + 13 source hooks + 1 search hook)
+// MARKETPLACE (5 hooks + 13 source hooks + 1 search hook + 1 folder hook)
 // ============================================================================
 // Marketplace listings, brokers, and artifact sourcing
 export {
@@ -220,6 +231,19 @@ export {
   type UseArtifactSearchOptions,
   type UseArtifactSearchReturn,
 } from './use-artifact-search';
+
+// Folder navigation for marketplace sources
+export {
+  useFolderSelection,
+  type UseFolderSelectionReturn,
+} from '../lib/hooks/use-folder-selection';
+
+// Bulk import for folder view
+export {
+  useBulkImport,
+  type UseBulkImportOptions,
+  type UseBulkImportResult,
+} from '../lib/hooks/use-bulk-import';
 
 // ============================================================================
 // MCP (9 hooks)

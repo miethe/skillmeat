@@ -1,0 +1,474 @@
+{
+  "$schema": "./features.schema.json",
+  "version": "0.3.0-beta",
+  "lastUpdated": "2026-01-29",
+  "categories": [
+    {
+      "id": "collection",
+      "name": "Collection Management",
+      "icon": "package",
+      "tagline": "Organize artifacts in named collections",
+      "features": [
+        {
+          "id": "multi-collection",
+          "name": "Multi-Collection Support",
+          "description": "Create named collections (work, personal, experimental) to organize artifacts by context",
+          "shortDescription": "Organize by context",
+          "cliCommand": "skillmeat collection create",
+          "webPage": "/collection",
+          "since": "0.1.0",
+          "screenshot": "collection-selector.png",
+          "highlight": true
+        },
+        {
+          "id": "grid-list-views",
+          "name": "Multiple View Modes",
+          "description": "Browse artifacts in grid, list, or grouped views with instant switching",
+          "shortDescription": "Grid/List/Grouped views",
+          "webPage": "/collection",
+          "since": "0.1.0",
+          "screenshot": "collection-grid.png"
+        },
+        {
+          "id": "tag-filtering",
+          "name": "Tag-Based Filtering",
+          "description": "Filter artifacts by tags with URL state sync for shareable filters",
+          "shortDescription": "Filter by tags",
+          "webPage": "/collection",
+          "since": "0.2.0"
+        },
+        {
+          "id": "infinite-scroll",
+          "name": "Infinite Scroll",
+          "description": "Load artifacts progressively with smooth infinite scroll pagination",
+          "shortDescription": "Progressive loading",
+          "webPage": "/collection",
+          "since": "0.2.0"
+        }
+      ]
+    },
+    {
+      "id": "deployment",
+      "name": "Deployment & Projects",
+      "icon": "rocket",
+      "tagline": "Deploy anywhere, track everything",
+      "features": [
+        {
+          "id": "one-command-deploy",
+          "name": "One-Command Deploy",
+          "description": "Deploy artifacts to any project with a single command",
+          "shortDescription": "Deploy in seconds",
+          "cliCommand": "skillmeat deploy",
+          "webPage": "/deployments",
+          "since": "0.1.0",
+          "screenshot": "deploy-result.png",
+          "highlight": true
+        },
+        {
+          "id": "deployment-tracking",
+          "name": "Deployment Tracking",
+          "description": "Track all deployments across projects with status indicators",
+          "shortDescription": "Track all deployments",
+          "cliCommand": "skillmeat status",
+          "webPage": "/deployments",
+          "since": "0.1.0",
+          "screenshot": "deployments-flat.png"
+        },
+        {
+          "id": "project-management",
+          "name": "Project Management",
+          "description": "Register and manage projects with deployment history and configuration",
+          "shortDescription": "Manage projects",
+          "webPage": "/projects",
+          "since": "0.2.0"
+        },
+        {
+          "id": "outdated-alerts",
+          "name": "Update Alerts",
+          "description": "Get notified when deployed artifacts have updates available",
+          "shortDescription": "Update notifications",
+          "webPage": "/projects",
+          "since": "0.2.0"
+        }
+      ]
+    },
+    {
+      "id": "sync",
+      "name": "Intelligence & Sync",
+      "icon": "refresh-cw",
+      "tagline": "Smart sync with conflict resolution",
+      "features": [
+        {
+          "id": "drift-detection",
+          "name": "Drift Detection",
+          "description": "Automatically detect when deployed artifacts diverge from your collection",
+          "shortDescription": "Detect changes",
+          "cliCommand": "skillmeat sync check",
+          "webPage": "/projects/[id]/manage",
+          "since": "0.2.0",
+          "screenshot": "sync-status.png",
+          "highlight": true
+        },
+        {
+          "id": "bidirectional-sync",
+          "name": "Bidirectional Sync",
+          "description": "Pull changes from projects back to collection or push updates out",
+          "shortDescription": "Two-way sync",
+          "cliCommand": "skillmeat sync pull",
+          "since": "0.2.0"
+        },
+        {
+          "id": "diff-preview",
+          "name": "Diff Preview",
+          "description": "See exactly what changed before applying any updates",
+          "shortDescription": "Preview changes",
+          "cliCommand": "skillmeat sync preview",
+          "screenshot": "modal-diff-viewer.png",
+          "since": "0.2.0"
+        },
+        {
+          "id": "merge-strategies",
+          "name": "Merge Strategies",
+          "description": "Choose overwrite, merge, or fork strategies when syncing",
+          "shortDescription": "Flexible merge",
+          "since": "0.2.0"
+        },
+        {
+          "id": "auto-rollback",
+          "name": "Automatic Rollback",
+          "description": "Automatic rollback if sync fails, protecting your work",
+          "shortDescription": "Safe updates",
+          "since": "0.2.0"
+        }
+      ]
+    },
+    {
+      "id": "marketplace",
+      "name": "Marketplace & Discovery",
+      "icon": "store",
+      "tagline": "Discover and share artifacts",
+      "features": [
+        {
+          "id": "github-sources",
+          "name": "GitHub Sources",
+          "description": "Add GitHub repositories as artifact sources with automatic scanning",
+          "shortDescription": "Import from GitHub",
+          "webPage": "/marketplace/sources",
+          "since": "0.2.0",
+          "screenshot": "marketplace-sources.png",
+          "highlight": true
+        },
+        {
+          "id": "semantic-tree",
+          "name": "Semantic Tree Navigation",
+          "description": "Browse repository artifacts in an intuitive folder tree with README previews",
+          "shortDescription": "Browse folder structure",
+          "webPage": "/marketplace/sources/[id]",
+          "since": "0.3.0",
+          "screenshot": "marketplace-source-detail.png"
+        },
+        {
+          "id": "artifact-search",
+          "name": "Cross-Source Search",
+          "description": "Full-text search across all catalog entries with FTS5",
+          "shortDescription": "Search everywhere",
+          "webPage": "/marketplace/sources",
+          "since": "0.2.0"
+        },
+        {
+          "id": "trust-levels",
+          "name": "Trust & Quality Scores",
+          "description": "See confidence scores and trust levels for informed decisions",
+          "shortDescription": "Quality indicators",
+          "since": "0.2.0"
+        },
+        {
+          "id": "marketplace-publish",
+          "name": "Bundle Publishing",
+          "description": "Publish artifact bundles to marketplace for team discovery",
+          "shortDescription": "Share with team",
+          "cliCommand": "skillmeat marketplace-publish",
+          "webPage": "/marketplace/publish",
+          "since": "0.2.0"
+        }
+      ]
+    },
+    {
+      "id": "analytics",
+      "name": "Analytics & Insights",
+      "icon": "bar-chart",
+      "tagline": "Track usage, identify patterns",
+      "features": [
+        {
+          "id": "usage-tracking",
+          "name": "Usage Tracking",
+          "description": "Track when and where artifacts are deployed and used",
+          "shortDescription": "Track usage",
+          "cliCommand": "skillmeat analytics usage",
+          "webPage": "/",
+          "since": "0.2.0",
+          "screenshot": "dashboard-trends.png"
+        },
+        {
+          "id": "top-artifacts",
+          "name": "Top Artifacts",
+          "description": "See which artifacts are most popular across your projects",
+          "shortDescription": "Most used",
+          "cliCommand": "skillmeat analytics top",
+          "webPage": "/",
+          "since": "0.2.0"
+        },
+        {
+          "id": "cleanup-suggestions",
+          "name": "Cleanup Suggestions",
+          "description": "Get recommendations for unused or duplicate artifacts",
+          "shortDescription": "Cleanup help",
+          "cliCommand": "skillmeat analytics cleanup",
+          "since": "0.2.0"
+        },
+        {
+          "id": "trend-analysis",
+          "name": "Trend Analysis",
+          "description": "Visualize usage patterns over time with trend charts",
+          "shortDescription": "Usage trends",
+          "cliCommand": "skillmeat analytics trends",
+          "since": "0.2.0"
+        }
+      ]
+    },
+    {
+      "id": "search",
+      "name": "Search & Discovery",
+      "icon": "search",
+      "tagline": "Find anything instantly",
+      "features": [
+        {
+          "id": "smart-search",
+          "name": "Smart Search",
+          "description": "Search across all artifacts by name, description, tags, and content",
+          "shortDescription": "Search everything",
+          "cliCommand": "skillmeat search",
+          "since": "0.2.0"
+        },
+        {
+          "id": "duplicate-detection",
+          "name": "Duplicate Detection",
+          "description": "Find similar or duplicate artifacts with similarity scoring",
+          "shortDescription": "Find duplicates",
+          "cliCommand": "skillmeat find-duplicates",
+          "since": "0.2.0"
+        },
+        {
+          "id": "ripgrep-integration",
+          "name": "Ripgrep Integration",
+          "description": "Ultra-fast content search powered by ripgrep",
+          "shortDescription": "Fast search",
+          "since": "0.2.0"
+        }
+      ]
+    },
+    {
+      "id": "versioning",
+      "name": "Versioning & Safety",
+      "icon": "git-branch",
+      "tagline": "Snapshots and rollback",
+      "features": [
+        {
+          "id": "snapshots",
+          "name": "Collection Snapshots",
+          "description": "Create point-in-time snapshots of your entire collection",
+          "shortDescription": "Backup collection",
+          "cliCommand": "skillmeat snapshot",
+          "since": "0.1.0"
+        },
+        {
+          "id": "rollback",
+          "name": "Rollback Support",
+          "description": "Restore to any previous snapshot with one command",
+          "shortDescription": "Easy restore",
+          "cliCommand": "skillmeat rollback",
+          "since": "0.1.0"
+        },
+        {
+          "id": "version-history",
+          "name": "Version History",
+          "description": "Browse complete history of collection changes",
+          "shortDescription": "View history",
+          "cliCommand": "skillmeat history",
+          "since": "0.1.0"
+        }
+      ]
+    },
+    {
+      "id": "mcp",
+      "name": "MCP Server Management",
+      "icon": "server",
+      "tagline": "Model Context Protocol servers",
+      "features": [
+        {
+          "id": "mcp-add",
+          "name": "MCP Installation",
+          "description": "Add and configure MCP servers with environment variables",
+          "shortDescription": "Install MCP servers",
+          "cliCommand": "skillmeat mcp add",
+          "webPage": "/mcp",
+          "since": "0.2.0",
+          "screenshot": "mcp-list.png"
+        },
+        {
+          "id": "mcp-deploy",
+          "name": "MCP Deploy",
+          "description": "Deploy MCP servers to projects with one command",
+          "shortDescription": "Deploy servers",
+          "cliCommand": "skillmeat mcp deploy",
+          "since": "0.2.0"
+        },
+        {
+          "id": "mcp-health",
+          "name": "Health Monitoring",
+          "description": "Check MCP server health and diagnostics",
+          "shortDescription": "Monitor health",
+          "cliCommand": "skillmeat mcp health",
+          "since": "0.2.0"
+        }
+      ]
+    },
+    {
+      "id": "context",
+      "name": "Context Entities",
+      "icon": "file-text",
+      "tagline": "Project configuration artifacts",
+      "features": [
+        {
+          "id": "context-management",
+          "name": "Context Entity Management",
+          "description": "Manage CLAUDE.md, specs, rules, and context files",
+          "shortDescription": "Manage project config",
+          "cliCommand": "skillmeat context",
+          "webPage": "/context-entities",
+          "since": "0.3.0",
+          "screenshot": "context-entities-list.png"
+        },
+        {
+          "id": "context-deploy",
+          "name": "Context Deploy",
+          "description": "Deploy context entities to projects",
+          "shortDescription": "Deploy config",
+          "cliCommand": "skillmeat context deploy",
+          "since": "0.3.0"
+        }
+      ]
+    },
+    {
+      "id": "collaboration",
+      "name": "Team Collaboration",
+      "icon": "users",
+      "tagline": "Share and collaborate",
+      "features": [
+        {
+          "id": "bundle-create",
+          "name": "Bundle Creation",
+          "description": "Create shareable bundles of multiple artifacts",
+          "shortDescription": "Create bundles",
+          "cliCommand": "skillmeat bundle create",
+          "webPage": "/sharing",
+          "since": "0.2.0"
+        },
+        {
+          "id": "vault-storage",
+          "name": "Vault Connectors",
+          "description": "Connect to team vaults (S3, Git, local) for shared storage",
+          "shortDescription": "Team storage",
+          "cliCommand": "skillmeat vault",
+          "since": "0.2.0"
+        },
+        {
+          "id": "signing",
+          "name": "Cryptographic Signing",
+          "description": "Sign and verify bundles for security",
+          "shortDescription": "Secure sharing",
+          "cliCommand": "skillmeat sign",
+          "since": "0.2.0"
+        }
+      ]
+    },
+    {
+      "id": "interface",
+      "name": "Three-Way Interface",
+      "icon": "layout",
+      "tagline": "CLI + Web UI + API",
+      "features": [
+        {
+          "id": "cli",
+          "name": "Powerful CLI",
+          "description": "116+ commands with rich terminal output and shell completion",
+          "shortDescription": "Full CLI",
+          "cliCommand": "skillmeat --help",
+          "since": "0.1.0",
+          "highlight": true
+        },
+        {
+          "id": "web-ui",
+          "name": "Visual Web UI",
+          "description": "Modern React interface for visual artifact management",
+          "shortDescription": "Web interface",
+          "cliCommand": "skillmeat web dev",
+          "webPage": "/",
+          "since": "0.2.0",
+          "highlight": true
+        },
+        {
+          "id": "api",
+          "name": "REST API",
+          "description": "150+ API endpoints for automation and integration",
+          "shortDescription": "REST API",
+          "since": "0.2.0"
+        }
+      ]
+    }
+  ],
+  "artifactTypes": [
+    {
+      "id": "skill",
+      "name": "Skill",
+      "description": "Specialized capabilities for Claude",
+      "icon": "zap",
+      "color": "purple"
+    },
+    {
+      "id": "command",
+      "name": "Command",
+      "description": "Custom slash commands",
+      "icon": "terminal",
+      "color": "blue"
+    },
+    {
+      "id": "agent",
+      "name": "Agent",
+      "description": "Autonomous task executors",
+      "icon": "bot",
+      "color": "orange"
+    },
+    {
+      "id": "mcp",
+      "name": "MCP Server",
+      "description": "Model Context Protocol servers",
+      "icon": "server",
+      "color": "green"
+    },
+    {
+      "id": "hook",
+      "name": "Hook",
+      "description": "Event-triggered automations",
+      "icon": "anchor",
+      "color": "yellow"
+    }
+  ],
+  "stats": {
+    "totalCommands": 116,
+    "commandGroups": 23,
+    "webPages": 22,
+    "apiEndpoints": 150,
+    "modals": 40
+  }
+}

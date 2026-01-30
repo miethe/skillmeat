@@ -175,6 +175,9 @@ skills.lock
 !skillmeat/web/lib/
 !skillmeat/web/lib/api.ts
 
+# Allow test files in __tests__/lib/ (not Python build output)
+!skillmeat/web/__tests__/lib/
+
 # Node.js / Next.js (for web interface)
 node_modules/
 .next/

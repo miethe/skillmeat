@@ -1,0 +1,42 @@
+{{!--
+  Screenshot Table Partial
+  Displays README screenshots in a responsive grid format.
+
+  Expected context:
+  - screenshots: Array of screenshot objects from screenshots.json
+
+  Filters to category "readme" for main README display.
+--}}
+## Screenshots
+
+<table>
+<tr>
+{{#each screenshots}}
+{{#if (eq category "readme")}}
+<td align="center" width="50%">
+<img src="{{file}}" alt="{{alt}}" width="100%">
+<br>
+<em>{{#if notes}}{{notes}}{{else}}{{alt}}{{/if}}</em>
+</td>
+{{#if (isOdd @index)}}
+</tr>
+<tr>
+{{/if}}
+{{/if}}
+{{/each}}
+</tr>
+</table>
+
+{{!-- Alternative: Simple image list for better mobile rendering --}}
+{{!--
+{{#each screenshots}}
+{{#if (eq category "readme")}}
+### {{alt}}
+
+![{{alt}}]({{file}})
+
+{{#if notes}}_{{notes}}_{{/if}}
+
+{{/if}}
+{{/each}}
+--}}

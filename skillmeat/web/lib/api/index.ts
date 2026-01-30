@@ -4,6 +4,7 @@
 export * from './artifacts';
 export * from './catalog';
 export * from './collections';
+export * from './config';
 export * from './groups';
 export * from './deployments';
 export * from './context-entities';

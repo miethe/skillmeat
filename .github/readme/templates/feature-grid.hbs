@@ -1,0 +1,36 @@
+{{!--
+  Feature Grid Partial
+  Displays feature categories with their features in a clean grid format.
+
+  Expected context:
+  - categories: Array of category objects from features.json
+  - stats: Statistics object with totalCommands, apiEndpoints, etc.
+--}}
+## Features
+
+> **{{stats.totalCommands}}+ CLI commands** | **{{stats.apiEndpoints}}+ API endpoints** | **{{stats.webPages}} web pages**
+
+{{#each categories}}
+### {{#if icon}}{{> icon name=icon }} {{/if}}{{name}}
+
+{{#if tagline}}_{{tagline}}_{{/if}}
+
+| Feature | Description |
+|---------|-------------|
+{{#each features}}
+| {{#if highlight}}**{{name}}**{{else}}{{name}}{{/if}} | {{shortDescription}}{{#if cliCommand}} (`{{cliCommand}}`){{/if}} |
+{{/each}}
+
+{{/each}}
+
+---
+
+### Artifact Types
+
+SkillMeat manages multiple artifact types for Claude Code:
+
+| Type | Description |
+|------|-------------|
+{{#each ../artifactTypes}}
+| **{{name}}** | {{description}} |
+{{/each}}
