@@ -178,6 +178,7 @@ function ProjectDetailPageContent() {
         syncStatus: deployedArtifact.local_modifications ? 'modified' : 'synced',
         scope: matchingArtifact.scope,
         collection: deployedArtifact.from_collection,
+        collections: matchingArtifact.collections,
         projectPath: project?.path, // Set project path for project-level operations
         deployedAt: deployedArtifact.deployed_at,
         modifiedAt: deployedArtifact.local_modifications ? new Date().toISOString() : undefined,

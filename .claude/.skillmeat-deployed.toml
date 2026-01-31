@@ -1490,5 +1490,19 @@ deployed_at = "2026-01-28T16:43:21.785409"
 artifact_path = "skills/crafting-effective-readmes"
 content_hash = "65e22cd81e06ed5344019427b98a77075c66baf38e0e55b9a3da29c7d4b718ae"
 local_modifications = false
+version_lineage = [
+    "65e22cd81e06ed5344019427b98a77075c66baf38e0e55b9a3da29c7d4b718ae",
+]
 merge_base_snapshot = "65e22cd81e06ed5344019427b98a77075c66baf38e0e55b9a3da29c7d4b718ae"
 collection_sha = "65e22cd81e06ed5344019427b98a77075c66baf38e0e55b9a3da29c7d4b718ae"
+
+[[deployed]]
+artifact_name = "gemini-orchestrator"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-31T13:00:54.577891"
+artifact_path = "agents/gemini-orchestrator.md"
+content_hash = "ab626801f8011325173b66ffb1a0182fa3261d515788851b5c60416a809dd2a1"
+local_modifications = false
+merge_base_snapshot = "ab626801f8011325173b66ffb1a0182fa3261d515788851b5c60416a809dd2a1"
+collection_sha = "ab626801f8011325173b66ffb1a0182fa3261d515788851b5c60416a809dd2a1"

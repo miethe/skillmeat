@@ -44,6 +44,8 @@ export interface EntityRowProps {
   onViewDiff?: () => void;
   /** Callback to rollback (enabled for "modified" or "conflict" status) */
   onRollback?: () => void;
+  /** Callback for copying CLI command to clipboard */
+  onCopyCliCommand?: () => void;
 }
 
 /**
@@ -82,6 +84,7 @@ export const EntityRow = React.memo(
     onSync,
     onViewDiff,
     onRollback,
+    onCopyCliCommand,
   }: EntityRowProps) {
     const config = getArtifactTypeConfig(entity.type);
     // Type-safe icon lookup with fallback
@@ -210,6 +213,7 @@ export const EntityRow = React.memo(
             onSync={onSync}
             onViewDiff={onViewDiff}
             onRollback={onRollback}
+            onCopyCliCommand={onCopyCliCommand}
           />
         </div>
       </div>

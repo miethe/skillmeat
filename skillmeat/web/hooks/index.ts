@@ -386,6 +386,14 @@ export { useSSE } from './useSSE';
 export { useDebounce } from './use-debounce';
 
 /**
+ * Clipboard copy with feedback state for CLI commands
+ * @example
+ * const { copied, copy } = useCliCopy();
+ * await copy('skillmeat deploy my-artifact');
+ */
+export { useCliCopy } from './use-cli-copy';
+
+/**
  * Intersection observer for detecting element visibility
  * Useful for infinite scroll and lazy loading
  * @example

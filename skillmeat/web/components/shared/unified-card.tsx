@@ -173,6 +173,8 @@ export interface UnifiedCardProps {
   onViewDiff?: () => void;
   /** Callback to rollback (Entity types only, shows in actions menu) */
   onRollback?: () => void;
+  /** Callback for copying CLI command to clipboard */
+  onCopyCliCommand?: () => void;
   /** @deprecated mode prop is no longer used - visual style is now unified */
   mode?: 'selection' | 'browse';
 }
@@ -252,6 +254,7 @@ export const UnifiedCard = React.memo(
     onSync,
     onViewDiff,
     onRollback,
+    onCopyCliCommand,
     mode, // Deprecated but kept for backward compatibility
   }: UnifiedCardProps) {
     const queryClient = useQueryClient();
@@ -457,6 +460,7 @@ export const UnifiedCard = React.memo(
                   onSync={onSync}
                   onViewDiff={onViewDiff}
                   onRollback={onRollback}
+                  onCopyCliCommand={onCopyCliCommand}
                 />
               )}
             </div>

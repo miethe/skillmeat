@@ -24,7 +24,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useProject } from '@/hooks';
+import { useProject, useArtifacts } from '@/hooks';
 
 interface ProjectManagePageContentProps {
   projectPath: string;
@@ -49,6 +49,9 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
     deleteEntity,
   } = useEntityLifecycle();
 
+  // Fetch all artifacts from collection to enrich project entities
+  const { data: artifactsData } = useArtifacts();
+
   // Local state
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
@@ -70,11 +73,31 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
       // Find the entity matching the artifact ID
       const entity = entities.find((e) => e.id === artifactId || e.name === artifactId);
       if (entity) {
-        setSelectedEntity(entity);
+        // Enrich with collection data
+        const matchingArtifact = artifactsData?.artifacts.find(
+          (artifact) => artifact.name === entity.name && artifact.type === entity.type
+        );
+        const enrichedEntity: Entity = matchingArtifact
+          ? {
+              ...entity,
+              collections: matchingArtifact.collections,
+              description: matchingArtifact.description || entity.description,
+              tags: matchingArtifact.tags || entity.tags,
+              aliases: matchingArtifact.aliases || entity.aliases,
+              source: matchingArtifact.source || entity.source,
+            }
+          : {
+              ...entity,
+              // Construct collections from single collection property when no match found
+              collections: entity.collection
+                ? [{ id: entity.collection, name: entity.collection === 'default' ? 'Default Collection' : entity.collection }]
+                : undefined,
+            };
+        setSelectedEntity(enrichedEntity);
         setDetailPanelOpen(true);
       }
     }
-  }, [searchParams, entities, selectedEntity]);
+  }, [searchParams, entities, selectedEntity, artifactsData]);
 
   // Filter entities by tags client-side
   const filteredEntities =
@@ -83,10 +106,36 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
       : entities;
 
   // Memoize event handlers to prevent EntityList re-renders
-  const handleEntityClick = useCallback((entity: Entity) => {
-    setSelectedEntity(entity);
-    setDetailPanelOpen(true);
-  }, []);
+  const handleEntityClick = useCallback(
+    (entity: Entity) => {
+      // Look up matching artifact from collection by name and type
+      const matchingArtifact = artifactsData?.artifacts.find(
+        (artifact) => artifact.name === entity.name && artifact.type === entity.type
+      );
+
+      // Enrich entity with collection data if found
+      const enrichedEntity: Entity = matchingArtifact
+        ? {
+            ...entity,
+            collections: matchingArtifact.collections,
+            description: matchingArtifact.description || entity.description,
+            tags: matchingArtifact.tags || entity.tags,
+            aliases: matchingArtifact.aliases || entity.aliases,
+            source: matchingArtifact.source || entity.source,
+          }
+        : {
+            ...entity,
+            // Construct collections from single collection property when no match found
+            collections: entity.collection
+              ? [{ id: entity.collection, name: entity.collection === 'default' ? 'Default Collection' : entity.collection }]
+              : undefined,
+          };
+
+      setSelectedEntity(enrichedEntity);
+      setDetailPanelOpen(true);
+    },
+    [artifactsData]
+  );
 
   const handleEdit = useCallback((entity: Entity) => {
     setEditingEntity(entity);

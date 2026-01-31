@@ -46,7 +46,9 @@ import {
   useGroupArtifacts,
   useReorderGroups,
   useReorderArtifactsInGroup,
+  useCliCopy,
 } from '@/hooks';
+import { generateBasicDeployCommand } from '@/lib/cli-commands';
 
 // Props interface
 export interface GroupedArtifactViewProps {
@@ -83,9 +85,10 @@ interface SortableArtifactCardProps {
   onManageGroups?: (artifact: Artifact) => void;
   onEdit?: (artifact: Artifact) => void;
   onDelete?: (artifact: Artifact) => void;
+  onCopyCliCommand?: (artifactName: string) => void;
 }
 
-function SortableArtifactCard({ artifact, onArtifactClick }: SortableArtifactCardProps) {
+function SortableArtifactCard({ artifact, onArtifactClick, onCopyCliCommand }: SortableArtifactCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: artifact.id,
     data: {
@@ -113,7 +116,11 @@ function SortableArtifactCard({ artifact, onArtifactClick }: SortableArtifactCar
       </div>
 
       <div className="group pl-8">
-        <UnifiedCard item={artifact} onClick={() => onArtifactClick?.(artifact)} />
+        <UnifiedCard
+          item={artifact}
+          onClick={() => onArtifactClick?.(artifact)}
+          onCopyCliCommand={onCopyCliCommand ? () => onCopyCliCommand(artifact.name) : undefined}
+        />
       </div>
     </div>
   );
@@ -130,6 +137,7 @@ interface SortableGroupSectionProps {
   onManageGroups?: (artifact: Artifact) => void;
   onEdit?: (artifact: Artifact) => void;
   onDelete?: (artifact: Artifact) => void;
+  onCopyCliCommand?: (artifactName: string) => void;
 }
 
 function SortableGroupSection({
@@ -142,6 +150,7 @@ function SortableGroupSection({
   onManageGroups,
   onEdit,
   onDelete,
+  onCopyCliCommand,
 }: SortableGroupSectionProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: group.id,
@@ -207,6 +216,7 @@ function SortableGroupSection({
                     onManageGroups={onManageGroups}
                     onEdit={onEdit}
                     onDelete={onDelete}
+                    onCopyCliCommand={onCopyCliCommand}
                   />
                 ))}
               </div>
@@ -248,6 +258,12 @@ export function GroupedArtifactView({
   // Fetch groups
   const { data: groupsData, isLoading: isLoadingGroups } = useGroups(collectionId);
   const groups = groupsData?.groups || [];
+  const { copy } = useCliCopy();
+
+  const handleCopyCliCommand = (artifactName: string) => {
+    const command = generateBasicDeployCommand(artifactName);
+    copy(command);
+  };
 
   // Track open/closed state for each group
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
@@ -473,6 +489,7 @@ export function GroupedArtifactView({
                 onManageGroups={onManageGroups}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                onCopyCliCommand={handleCopyCliCommand}
               />
             );
           })}
@@ -502,6 +519,7 @@ export function GroupedArtifactView({
                       key={artifact.id}
                       item={artifact}
                       onClick={() => onArtifactClick?.(artifact)}
+                      onCopyCliCommand={() => handleCopyCliCommand(artifact.name)}
                     />
                   ))}
                 </div>

@@ -13,7 +13,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Artifact } from '@/types/artifact';
 import { EntityCard, EntityCardSkeleton } from './entity-card';
 import { EntityRow } from './entity-row';
-import { useEntityLifecycle } from '@/hooks';
+import { useEntityLifecycle, useCliCopy } from '@/hooks';
+import { generateBasicDeployCommand } from '@/lib/cli-commands';
 
 const { useCallback } = React;
 
@@ -84,6 +85,15 @@ export function EntityList({
   const entities = entitiesProp ?? context.entities;
   const selectedEntities = context.selectedEntities;
   const { selectEntity, deselectEntity, isLoading } = context;
+  const { copy } = useCliCopy();
+
+  const handleCopyCliCommand = useCallback(
+    (artifactName: string) => {
+      const command = generateBasicDeployCommand(artifactName);
+      copy(command);
+    },
+    [copy]
+  );
 
   // Memoize handlers to prevent EntityCard/EntityRow re-renders
   const handleEntityClick = useCallback(
@@ -122,6 +132,7 @@ export function EntityList({
           onSync={onSync ? () => onSync(artifact) : undefined}
           onViewDiff={onViewDiff ? () => onViewDiff(artifact) : undefined}
           onRollback={onRollback ? () => onRollback(artifact) : undefined}
+          onCopyCliCommand={() => handleCopyCliCommand(artifact.name)}
         />
       );
     },
@@ -136,6 +147,7 @@ export function EntityList({
       onSync,
       onViewDiff,
       onRollback,
+      handleCopyCliCommand,
     ]
   );
 
@@ -155,6 +167,7 @@ export function EntityList({
           onSync={onSync ? () => onSync(artifact) : undefined}
           onViewDiff={onViewDiff ? () => onViewDiff(artifact) : undefined}
           onRollback={onRollback ? () => onRollback(artifact) : undefined}
+          onCopyCliCommand={() => handleCopyCliCommand(artifact.name)}
         />
       );
     },
@@ -169,6 +182,7 @@ export function EntityList({
       onSync,
       onViewDiff,
       onRollback,
+      handleCopyCliCommand,
     ]
   );
 

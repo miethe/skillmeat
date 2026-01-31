@@ -628,6 +628,7 @@ async function fetchProjectEntities(
       name: deployment.artifact_name,
       type: deployment.artifact_type as EntityType,
       scope: 'local' as const,
+      collection: deployment.from_collection,
       projectPath,
       syncStatus: (deployment.local_modifications ? 'modified' : 'synced') as SyncStatus,
       version: deployment.version || undefined,

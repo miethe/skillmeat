@@ -5,6 +5,8 @@ import { Package } from 'lucide-react';
 import type { Artifact } from '@/types/artifact';
 import { UnifiedCard, UnifiedCardSkeleton } from '@/components/shared/unified-card';
 import { UnifiedCardActions } from '@/components/shared/unified-card-actions';
+import { useCliCopy } from '@/hooks';
+import { generateBasicDeployCommand } from '@/lib/cli-commands';
 import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
@@ -40,6 +42,7 @@ function ArtifactCard({
   onEdit,
   onDelete,
   onDeploy,
+  onCopyCliCommand,
 }: {
   artifact: Artifact;
   onClick: () => void;
@@ -50,6 +53,7 @@ function ArtifactCard({
   onEdit?: () => void;
   onDelete?: () => void;
   onDeploy?: () => void;
+  onCopyCliCommand?: () => void;
 }) {
   return (
     <div className="group relative">
@@ -84,6 +88,7 @@ function ArtifactCard({
           onAddToGroup={onManageGroups}
           onEdit={onEdit}
           onDelete={onDelete}
+          onCopyCliCommand={onCopyCliCommand}
         />
       </div>
     </div>
@@ -116,6 +121,7 @@ export function ArtifactGrid({
 }: ArtifactGridProps) {
   const [deleteArtifact, setDeleteArtifact] = useState<Artifact | null>(null);
   const [deployArtifact, setDeployArtifact] = useState<Artifact | null>(null);
+  const { copy } = useCliCopy();
 
   const handleDelete = (artifact: Artifact) => {
     setDeleteArtifact(artifact);
@@ -123,6 +129,11 @@ export function ArtifactGrid({
 
   const handleDeploy = (artifact: Artifact) => {
     setDeployArtifact(artifact);
+  };
+
+  const handleCopyCliCommand = (artifactName: string) => {
+    const command = generateBasicDeployCommand(artifactName);
+    copy(command);
   };
 
   const confirmDelete = () => {
@@ -168,6 +179,7 @@ export function ArtifactGrid({
             onManageGroups={onManageGroups ? () => onManageGroups(artifact) : undefined}
             onEdit={onEdit ? () => onEdit(artifact) : undefined}
             onDelete={handleDelete ? () => handleDelete(artifact) : undefined}
+            onCopyCliCommand={() => handleCopyCliCommand(artifact.name)}
           />
         ))}
       </div>

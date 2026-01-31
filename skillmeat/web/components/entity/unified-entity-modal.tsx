@@ -48,7 +48,9 @@ import { FileCreationDialog } from '@/components/entity/file-creation-dialog';
 import { FileDeletionDialog } from '@/components/entity/file-deletion-dialog';
 import { UnsavedChangesDialog } from '@/components/entity/unsaved-changes-dialog';
 import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
+import { ArtifactInstanceIndicator } from '@/components/entity/artifact-instance-indicator';
 import { ProjectSelectorForDiff } from '@/components/entity/project-selector-for-diff';
+import { CollapsibleActionBar } from '@/components/entity/collapsible-action-bar';
 import { SyncStatusTab } from '@/components/sync-status';
 import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
 import {
@@ -67,6 +69,7 @@ import {
   useSources,
 } from '@/hooks';
 import { apiRequest } from '@/lib/api';
+import { getCollectionColor } from '@/lib/utils/collection-colors';
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
 import { TagEditor } from '@/components/shared/tag-editor';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
@@ -159,13 +162,17 @@ function truncateSha(sha: string | undefined, length: number = 7): string {
 /**
  * Check if entity has a valid upstream source (not local-only)
  * Returns false for: undefined, null, empty, 'local', 'local:*', 'unknown'
+ * Valid sources must match GitHub pattern: owner/repo/path (at least 3 segments)
+ * Invalid: 'skills/canvas-design' (only 2 segments, local relative path)
+ * Valid: 'anthropics/skills/canvas-design' (3+ segments, GitHub spec)
  */
 function hasValidUpstreamSource(source: string | undefined | null): boolean {
   if (!source) return false;
   if (source === 'local' || source === 'unknown') return false;
   if (source.startsWith('local:')) return false;
-  // Must look like a remote source (GitHub pattern with '/')
-  return source.includes('/') && !source.startsWith('local');
+  // Must look like a GitHub source with owner/repo/path pattern (at least 3 segments)
+  const segments = source.split('/').filter(Boolean);
+  return segments.length >= 3 && !source.startsWith('local');
 }
 
 /**
@@ -1668,12 +1675,14 @@ export function UnifiedEntityModal({
     <>
       <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="flex h-[90vh] max-h-[90vh] min-h-0 max-w-4xl flex-col overflow-hidden p-0 lg:max-w-6xl xl:max-w-7xl">
+
           {/* Header Section - Fixed */}
           <div className="border-b px-6 pb-4 pt-6">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
                 {IconComponent && <IconComponent className={`h-5 w-5 ${config.color}`} />}
                 <span className="flex-1">{entity.name}</span>
+                <ArtifactInstanceIndicator artifact={entity} />
                 <Badge variant="outline" className="gap-1">
                   {config.label}
                 </Badge>
@@ -1812,6 +1821,26 @@ export function UnifiedEntityModal({
                     </div>
                   )}
 
+                  {/* Collections */}
+                  {entity.collections && entity.collections.length > 0 && (
+                    <div>
+                      <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
+                        <FolderOpen className="h-4 w-4" />
+                        Collections
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {entity.collections.map((collection) => (
+                          <Badge
+                            key={collection.id || collection.name}
+                            colorStyle={getCollectionColor(collection.name)}
+                          >
+                            {collection.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Origin */}
                   {entity.origin && (
                     <div>
@@ -1931,25 +1960,19 @@ export function UnifiedEntityModal({
                   </div>
 
                   {/* Location */}
-                  <div>
-                    <h3 className="mb-2 text-sm font-medium">Location</h3>
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                      {entity.collection && (
-                        <div className="flex justify-between">
-                          <span>Collection:</span>
-                          <span>{entity.collection}</span>
-                        </div>
-                      )}
-                      {entity.projectPath && (
+                  {entity.projectPath && (
+                    <div>
+                      <h3 className="mb-2 text-sm font-medium">Location</h3>
+                      <div className="space-y-2 text-sm text-muted-foreground">
                         <div className="flex flex-col gap-1">
                           <span>Project Path:</span>
                           <code className="break-all rounded bg-muted px-2 py-1 text-xs">
                             {entity.projectPath}
                           </code>
                         </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </ScrollArea>
             </TabsContent>
@@ -2340,6 +2363,14 @@ export function UnifiedEntityModal({
               </ScrollArea>
             </TabsContent>
           </Tabs>
+
+          {/* Collapsible Action Bar - hidden on Contents and Sync Status tabs */}
+          {entity.name && activeTab !== 'contents' && activeTab !== 'sync' && (
+            <CollapsibleActionBar
+              artifactName={entity.name}
+              className="mt-auto"
+            />
+          )}
         </DialogContent>
       </Dialog>
 
