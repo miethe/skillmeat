@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useProject, useArtifacts } from '@/hooks';
+import { mapArtifactToEntity } from '@/lib/api/entity-mapper';
 
 interface ProjectManagePageContentProps {
   projectPath: string;
@@ -73,26 +74,15 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
       // Find the entity matching the artifact ID
       const entity = entities.find((e) => e.id === artifactId || e.name === artifactId);
       if (entity) {
-        // Enrich with collection data
+        // Look up matching artifact from collection to get full data
         const matchingArtifact = artifactsData?.artifacts.find(
           (artifact) => artifact.name === entity.name && artifact.type === entity.type
         );
-        const enrichedEntity: Entity = matchingArtifact
-          ? {
-              ...entity,
-              collections: matchingArtifact.collections,
-              description: matchingArtifact.description || entity.description,
-              tags: matchingArtifact.tags || entity.tags,
-              aliases: matchingArtifact.aliases || entity.aliases,
-              source: matchingArtifact.source || entity.source,
-            }
-          : {
-              ...entity,
-              // Construct collections from single collection property when no match found
-              collections: entity.collection
-                ? [{ id: entity.collection, name: entity.collection === 'default' ? 'Default Collection' : entity.collection }]
-                : undefined,
-            };
+        // Use centralized mapper with project context
+        // Merge collection artifact data with project entity data
+        const enrichedEntity = matchingArtifact
+          ? mapArtifactToEntity({ ...matchingArtifact, ...entity } as any, 'project')
+          : entity;
         setSelectedEntity(enrichedEntity);
         setDetailPanelOpen(true);
       }
@@ -113,23 +103,11 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
         (artifact) => artifact.name === entity.name && artifact.type === entity.type
       );
 
-      // Enrich entity with collection data if found
-      const enrichedEntity: Entity = matchingArtifact
-        ? {
-            ...entity,
-            collections: matchingArtifact.collections,
-            description: matchingArtifact.description || entity.description,
-            tags: matchingArtifact.tags || entity.tags,
-            aliases: matchingArtifact.aliases || entity.aliases,
-            source: matchingArtifact.source || entity.source,
-          }
-        : {
-            ...entity,
-            // Construct collections from single collection property when no match found
-            collections: entity.collection
-              ? [{ id: entity.collection, name: entity.collection === 'default' ? 'Default Collection' : entity.collection }]
-              : undefined,
-          };
+      // Use centralized mapper with project context
+      // Merge collection artifact data with project entity data
+      const enrichedEntity = matchingArtifact
+        ? mapArtifactToEntity({ ...matchingArtifact, ...entity } as any, 'project')
+        : entity;
 
       setSelectedEntity(enrichedEntity);
       setDetailPanelOpen(true);

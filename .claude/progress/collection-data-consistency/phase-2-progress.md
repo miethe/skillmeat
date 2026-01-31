@@ -1,105 +1,111 @@
 ---
 type: progress
-prd: "collection-data-consistency"
+prd: collection-data-consistency
 phase: 2
-title: "Frontend Mapping Consolidation"
-status: pending
+title: Frontend Mapping Consolidation
+status: completed
 started: null
 completed: null
-progress: 0
-
+progress: 100
 total_tasks: 5
-completed_tasks: 0
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
-
-owners: ["ui-engineer"]
+owners:
+- ui-engineer
 contributors: []
-
 tasks:
-  - id: "TASK-2.1"
-    title: "Create Centralized Entity Mapper"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    dependencies: []
-    model: "opus"
-    effort: "1.5h"
-    priority: "critical"
-    files:
-      - "skillmeat/web/lib/api/entity-mapper.ts"
-
-  - id: "TASK-2.2"
-    title: "Migrate useEntityLifecycle"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-2.1"]
-    model: "sonnet"
-    effort: "0.5h"
-    priority: "high"
-    files:
-      - "skillmeat/web/hooks/useEntityLifecycle.tsx"
-
-  - id: "TASK-2.3"
-    title: "Migrate collection/page.tsx"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-2.1"]
-    model: "sonnet"
-    effort: "0.5h"
-    priority: "high"
-    files:
-      - "skillmeat/web/app/collection/page.tsx"
-
-  - id: "TASK-2.4"
-    title: "Migrate projects/[id]/manage/page.tsx"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-2.1"]
-    model: "sonnet"
-    effort: "0.5h"
-    priority: "high"
-    files:
-      - "skillmeat/web/app/projects/[id]/manage/page.tsx"
-
-  - id: "TASK-2.5"
-    title: "Add Unit Tests for Entity Mapper"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-2.1"]
-    model: "sonnet"
-    effort: "0.5h"
-    priority: "medium"
-    files:
-      - "skillmeat/web/__tests__/lib/api/entity-mapper.test.ts"
-
+- id: TASK-2.1
+  title: Create Centralized Entity Mapper
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies: []
+  model: opus
+  effort: 1.5h
+  priority: critical
+  files:
+  - skillmeat/web/lib/api/entity-mapper.ts
+- id: TASK-2.2
+  title: Migrate useEntityLifecycle
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-2.1
+  model: sonnet
+  effort: 0.5h
+  priority: high
+  files:
+  - skillmeat/web/hooks/useEntityLifecycle.tsx
+- id: TASK-2.3
+  title: Migrate collection/page.tsx
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-2.1
+  model: sonnet
+  effort: 0.5h
+  priority: high
+  files:
+  - skillmeat/web/app/collection/page.tsx
+- id: TASK-2.4
+  title: Migrate projects/[id]/manage/page.tsx
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-2.1
+  model: sonnet
+  effort: 0.5h
+  priority: high
+  files:
+  - skillmeat/web/app/projects/[id]/manage/page.tsx
+- id: TASK-2.5
+  title: Add Unit Tests for Entity Mapper
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-2.1
+  model: sonnet
+  effort: 0.5h
+  priority: medium
+  files:
+  - skillmeat/web/__tests__/lib/api/entity-mapper.test.ts
 parallelization:
-  batch_1: ["TASK-2.1"]
-  batch_2: ["TASK-2.2", "TASK-2.3", "TASK-2.4", "TASK-2.5"]
-
+  batch_1:
+  - TASK-2.1
+  batch_2:
+  - TASK-2.2
+  - TASK-2.3
+  - TASK-2.4
+  - TASK-2.5
 blockers: []
-
 success_criteria:
-  - id: "SC-2.1"
-    description: "Single mapper file exports mapArtifactToEntity and mapArtifactsToEntities"
-    status: "pending"
-  - id: "SC-2.2"
-    description: "All 24 Entity fields mapped correctly"
-    status: "pending"
-  - id: "SC-2.3"
-    description: "Collection badges visible on /collection page"
-    status: "pending"
-  - id: "SC-2.4"
-    description: "Collection badges visible on /projects/[id]/manage page"
-    status: "pending"
-  - id: "SC-2.5"
-    description: "No TypeScript errors"
-    status: "pending"
-  - id: "SC-2.6"
-    description: "Entity mapper unit tests pass with >90% coverage"
-    status: "pending"
-  - id: "SC-2.7"
-    description: "Zero instances of enrichArtifactSummary or inline mapping remain"
-    status: "pending"
+- id: SC-2.1
+  description: Single mapper file exports mapArtifactToEntity and mapArtifactsToEntities
+  status: pending
+- id: SC-2.2
+  description: All 24 Entity fields mapped correctly
+  status: pending
+- id: SC-2.3
+  description: Collection badges visible on /collection page
+  status: pending
+- id: SC-2.4
+  description: Collection badges visible on /projects/[id]/manage page
+  status: pending
+- id: SC-2.5
+  description: No TypeScript errors
+  status: pending
+- id: SC-2.6
+  description: Entity mapper unit tests pass with >90% coverage
+  status: pending
+- id: SC-2.7
+  description: Zero instances of enrichArtifactSummary or inline mapping remain
+  status: pending
+updated: '2026-01-31'
 ---
 
 # Phase 2: Frontend Mapping Consolidation
