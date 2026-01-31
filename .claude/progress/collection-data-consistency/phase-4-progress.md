@@ -3,12 +3,12 @@ type: progress
 prd: collection-data-consistency
 phase: 4
 title: Caching Layer
-status: pending
+status: completed
 started: null
 completed: null
-progress: 16
+progress: 100
 total_tasks: 6
-completed_tasks: 1
+completed_tasks: 6
 in_progress_tasks: 0
 blocked_tasks: 0
 owners:
@@ -28,7 +28,7 @@ tasks:
   - skillmeat/cache/collection_cache.py
 - id: TASK-4.2
   title: Integrate Cache with CollectionService
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -40,7 +40,7 @@ tasks:
   - skillmeat/api/services/collection_service.py
 - id: TASK-4.3
   title: Add Cache Invalidation on Add Artifact
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -52,7 +52,7 @@ tasks:
   - skillmeat/api/routers/user_collections.py
 - id: TASK-4.4
   title: Add Cache Invalidation on Remove Artifact
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -64,7 +64,7 @@ tasks:
   - skillmeat/api/routers/user_collections.py
 - id: TASK-4.5
   title: Add Cache Invalidation on Delete Collection
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -76,7 +76,7 @@ tasks:
   - skillmeat/api/routers/user_collections.py
 - id: TASK-4.6
   title: Add Cache Unit Tests
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:

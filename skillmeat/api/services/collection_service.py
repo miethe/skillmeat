@@ -12,6 +12,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from skillmeat.api.schemas.artifacts import ArtifactCollectionInfo
+from skillmeat.cache.collection_cache import get_collection_count_cache
 from skillmeat.cache.models import Collection, CollectionArtifact
 
 logger = logging.getLogger(__name__)
@@ -88,42 +89,83 @@ class CollectionService:
         # Get unique collection IDs from associations
         collection_ids = {a.collection_id for a in associations}
 
-        # Batch fetch collection details with artifact counts in a single query
-        # Uses subquery for counts to avoid GROUP BY on all collection fields
-        count_subquery = (
-            self.db.query(
-                CollectionArtifact.collection_id,
-                func.count("*").label("count"),
-            )
-            .group_by(CollectionArtifact.collection_id)
-            .subquery()
-        )
+        # Check cache for counts first
+        cache = get_collection_count_cache()
+        cached_counts: Dict[str, int] = {}
+        missing_ids = collection_ids
 
-        collections_with_counts = (
-            self.db.query(Collection, count_subquery.c.count)
-            .outerjoin(
-                count_subquery,
-                Collection.id == count_subquery.c.collection_id,
+        try:
+            cached_counts, missing_ids = cache.get_counts(collection_ids)
+            logger.debug(
+                f"Collection count cache: {len(cached_counts)} hits, "
+                f"{len(missing_ids)} misses"
             )
-            .filter(Collection.id.in_(collection_ids))
-            .all()
-        )
+        except Exception as e:
+            # Cache failure shouldn't break the service - fall back to DB
+            logger.warning(f"Cache lookup failed, falling back to DB: {e}")
+            missing_ids = collection_ids
+
+        # Query DB for collection details and counts
+        # Strategy: Always fetch collection details for ALL collections.
+        # For counts: use cache when available, query DB only for missing counts.
+        if missing_ids:
+            # Some counts are missing - need to query DB for those
+            count_subquery = (
+                self.db.query(
+                    CollectionArtifact.collection_id,
+                    func.count("*").label("count"),
+                )
+                .group_by(CollectionArtifact.collection_id)
+                .subquery()
+            )
+
+            collections_with_counts = (
+                self.db.query(Collection, count_subquery.c.count)
+                .outerjoin(
+                    count_subquery,
+                    Collection.id == count_subquery.c.collection_id,
+                )
+                .filter(Collection.id.in_(collection_ids))
+                .all()
+            )
+
+            # Store fetched counts in cache for future requests (only missing ones)
+            fetched_counts = {
+                c.id: count or 0
+                for c, count in collections_with_counts
+                if c.id in missing_ids
+            }
+            try:
+                cache.set_counts(fetched_counts)
+            except Exception as e:
+                # Cache write failure shouldn't break the service
+                logger.warning(f"Cache write failed: {e}")
+        else:
+            # All counts in cache - only need collection details
+            collections_with_counts = (
+                self.db.query(Collection)
+                .filter(Collection.id.in_(collection_ids))
+                .all()
+            )
+            # Convert to same format as query with counts
+            collections_with_counts = [(c, None) for c in collections_with_counts]
 
         total_query_time = time.perf_counter() - start_time
         logger.debug(
             f"Collection details query: {len(collections_with_counts)} collections "
-            f"with counts in {total_query_time:.3f}s total"
+            f"in {total_query_time:.3f}s total"
         )
 
-        # Build collection map for fast lookup
-        collection_map: Dict[str, ArtifactCollectionInfo] = {
-            c.id: ArtifactCollectionInfo(
+        # Build collection map for fast lookup, combining cached and fetched counts
+        collection_map: Dict[str, ArtifactCollectionInfo] = {}
+        for c, count in collections_with_counts:
+            # Use cached count if available, otherwise use DB count
+            artifact_count = cached_counts.get(c.id, count or 0)
+            collection_map[c.id] = ArtifactCollectionInfo(
                 id=c.id,
                 name=c.name,
-                artifact_count=count or 0,
+                artifact_count=artifact_count,
             )
-            for c, count in collections_with_counts
-        }
 
         # Build result - ensure all input artifact_ids have entries (even if empty)
         result: Dict[str, List[ArtifactCollectionInfo]] = {

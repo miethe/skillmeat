@@ -11,11 +11,25 @@ from sqlalchemy.orm import Session, Query
 
 from skillmeat.api.services.collection_service import CollectionService
 from skillmeat.api.schemas.artifacts import ArtifactCollectionInfo
+from skillmeat.cache.collection_cache import get_collection_count_cache
 from skillmeat.cache.models import Collection, CollectionArtifact
 
 
 class TestCollectionService:
     """Test suite for CollectionService batch and single-artifact methods."""
+
+    @pytest.fixture(autouse=True)
+    def clear_cache(self):
+        """Clear collection count cache before each test.
+
+        This fixture automatically runs before each test to ensure test isolation.
+        The cache is a singleton, so without this, cached data would leak between tests.
+        """
+        cache = get_collection_count_cache()
+        cache.invalidate_all()
+        yield
+        # Optional: Clear again after test for extra safety
+        cache.invalidate_all()
 
     @pytest.fixture
     def mock_session(self) -> MagicMock:

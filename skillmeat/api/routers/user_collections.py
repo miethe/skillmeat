@@ -35,6 +35,7 @@ from skillmeat.api.schemas.user_collections import (
     UserCollectionWithGroupsResponse,
 )
 from skillmeat.api.services import get_artifact_metadata
+from skillmeat.cache import get_collection_count_cache
 from skillmeat.core.refresher import CollectionRefresher, RefreshMode, validate_fields
 from skillmeat.cache.models import (
     DEFAULT_COLLECTION_ID,
@@ -762,6 +763,10 @@ async def delete_user_collection(
         session.delete(collection)
         session.commit()
 
+        # Invalidate cache for deleted collection
+        cache = get_collection_count_cache()
+        cache.invalidate(collection_id)
+
         logger.info(f"Deleted user collection: {collection_id}")
 
     except HTTPException:
@@ -1057,6 +1062,10 @@ async def add_artifacts_to_collection(
 
         session.commit()
 
+        # Invalidate collection count cache
+        cache = get_collection_count_cache()
+        cache.invalidate(collection_id)
+
         logger.info(
             f"Added {added_count} new artifacts to collection {collection_id} "
             f"({len(request.artifact_ids) - added_count} already present)"
@@ -1142,6 +1151,11 @@ async def remove_artifact_from_collection(
         if association:
             session.delete(association)
             session.commit()
+
+            # Invalidate cache for this collection
+            cache = get_collection_count_cache()
+            cache.invalidate(collection_id)
+
             logger.info(
                 f"Removed artifact {artifact_id} from collection {collection_id}"
             )
