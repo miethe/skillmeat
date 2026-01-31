@@ -25,6 +25,7 @@ import {
   RotateCcw,
   FolderPlus,
   Layers,
+  Copy,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -72,6 +73,10 @@ export interface UnifiedCardActionsProps {
   onMoveToCollection?: () => void;
   /** Callback for managing group membership */
   onAddToGroup?: () => void;
+
+  // Utility actions
+  /** Callback for copying CLI command to clipboard */
+  onCopyCliCommand?: () => void;
 }
 
 /**
@@ -147,6 +152,7 @@ export function UnifiedCardActions({
   onRollback,
   onMoveToCollection,
   onAddToGroup,
+  onCopyCliCommand,
 }: UnifiedCardActionsProps) {
   // Determine which status-dependent actions to show
   const showViewDiff = shouldShowViewDiff(artifact.syncStatus) && !!onViewDiff;
@@ -161,7 +167,8 @@ export function UnifiedCardActions({
     onEdit ||
     showViewDiff ||
     showRollback ||
-    onDelete;
+    onDelete ||
+    onCopyCliCommand;
 
   // Don't render anything if no actions are available
   if (!hasAnyAction) {
@@ -173,6 +180,7 @@ export function UnifiedCardActions({
   const hasOrganizationActions = onMoveToCollection || onAddToGroup;
   const hasEditAction = onEdit;
   const hasStatusActions = showViewDiff || showRollback;
+  const hasUtilityActions = onCopyCliCommand;
   const hasDeleteAction = onDelete;
 
   return (
@@ -257,8 +265,16 @@ export function UnifiedCardActions({
           </DropdownMenuItem>
         )}
 
+        {/* Utility actions: Copy CLI Command */}
+        {onCopyCliCommand && (
+          <DropdownMenuItem onClick={onCopyCliCommand}>
+            <Copy className="mr-2 h-4 w-4" />
+            Copy CLI Command
+          </DropdownMenuItem>
+        )}
+
         {/* Separator before delete */}
-        {hasDeleteAction && (hasPrimaryActions || hasOrganizationActions || hasEditAction || hasStatusActions) && (
+        {hasDeleteAction && (hasPrimaryActions || hasOrganizationActions || hasEditAction || hasStatusActions || hasUtilityActions) && (
           <DropdownMenuSeparator />
         )}
 

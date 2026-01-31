@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Package, Grid, List, Loader2, AlertCircle, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { useGroupArtifacts, useArtifact, useToast } from '@/hooks';
+import { useGroupArtifacts, useArtifact, useToast, useCliCopy } from '@/hooks';
+import { generateBasicDeployCommand } from '@/lib/cli-commands';
 import { UnifiedCard, UnifiedCardSkeleton } from '@/components/shared/unified-card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -56,10 +57,12 @@ function ArtifactWithData({
   groupArtifact,
   viewMode,
   onClick,
+  onCopyCliCommand,
 }: {
   groupArtifact: GroupArtifact;
   viewMode: 'grid' | 'list';
   onClick: (artifact: Artifact) => void;
+  onCopyCliCommand: (artifactName: string) => void;
 }) {
   const { data: artifact, isLoading, error } = useFullArtifact(groupArtifact.artifact_id);
 
@@ -83,7 +86,13 @@ function ArtifactWithData({
     );
   }
 
-  return <UnifiedCard item={artifact} onClick={() => onClick(artifact)} />;
+  return (
+    <UnifiedCard
+      item={artifact}
+      onClick={() => onClick(artifact)}
+      onCopyCliCommand={() => onCopyCliCommand(artifact.name)}
+    />
+  );
 }
 
 /**
@@ -111,6 +120,15 @@ export function GroupArtifactGrid({
 }: GroupArtifactGridProps) {
   // Note: collectionId is used for empty state link and reserved for future filter features
   const { toast } = useToast();
+  const { copy } = useCliCopy();
+
+  const handleCopyCliCommand = useCallback(
+    (artifactName: string) => {
+      const command = generateBasicDeployCommand(artifactName);
+      copy(command);
+    },
+    [copy]
+  );
 
   // View mode state with localStorage persistence
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -374,6 +392,7 @@ export function GroupArtifactGrid({
             groupArtifact={groupArtifact}
             viewMode={viewMode}
             onClick={handleArtifactClick}
+            onCopyCliCommand={handleCopyCliCommand}
           />
         ))}
       </div>

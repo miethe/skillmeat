@@ -33,6 +33,8 @@ import {
 import { DeployDialog } from '@/components/collection/deploy-dialog';
 import { UnifiedCardActions } from '@/components/shared/unified-card-actions';
 import type { Artifact, ArtifactType } from '@/types/artifact';
+import { useCliCopy } from '@/hooks';
+import { generateBasicDeployCommand } from '@/lib/cli-commands';
 
 interface ArtifactListProps {
   artifacts: Artifact[];
@@ -183,6 +185,7 @@ export function ArtifactList({
 }: ArtifactListProps) {
   const [deleteArtifact, setDeleteArtifact] = useState<Artifact | null>(null);
   const [deployArtifact, setDeployArtifact] = useState<Artifact | null>(null);
+  const { copy } = useCliCopy();
 
   const handleDelete = (artifact: Artifact) => {
     setDeleteArtifact(artifact);
@@ -190,6 +193,11 @@ export function ArtifactList({
 
   const handleDeploy = (artifact: Artifact) => {
     setDeployArtifact(artifact);
+  };
+
+  const handleCopyCliCommand = (artifactName: string) => {
+    const command = generateBasicDeployCommand(artifactName);
+    copy(command);
   };
 
   const confirmDelete = () => {
@@ -335,6 +343,7 @@ export function ArtifactList({
                       onAddToGroup={onManageGroups ? () => onManageGroups(artifact) : undefined}
                       onEdit={onEdit ? () => onEdit(artifact) : undefined}
                       onDelete={handleDelete ? () => handleDelete(artifact) : undefined}
+                      onCopyCliCommand={() => handleCopyCliCommand(artifact.name)}
                     />
                   </TableCell>
                 </TableRow>

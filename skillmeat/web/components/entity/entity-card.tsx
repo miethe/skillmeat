@@ -42,6 +42,8 @@ export interface EntityCardProps {
   onViewDiff?: () => void;
   /** Callback to rollback (enabled for "modified" or "conflict" status) */
   onRollback?: () => void;
+  /** Callback for copying CLI command to clipboard */
+  onCopyCliCommand?: () => void;
 }
 
 /**
@@ -67,7 +69,13 @@ export interface EntityCardProps {
  * @returns Unified card component with consistent ArtifactCard styling
  */
 export function EntityCard(props: EntityCardProps) {
-  return <UnifiedCard {...props} item={props.entity} />;
+  return (
+    <UnifiedCard
+      {...props}
+      item={props.entity}
+      onCopyCliCommand={props.onCopyCliCommand}
+    />
+  );
 }
 
 /**
