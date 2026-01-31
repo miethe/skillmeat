@@ -50,6 +50,7 @@ import { UnsavedChangesDialog } from '@/components/entity/unsaved-changes-dialog
 import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
 import { ArtifactInstanceIndicator } from '@/components/entity/artifact-instance-indicator';
 import { ProjectSelectorForDiff } from '@/components/entity/project-selector-for-diff';
+import { CliCommandSection } from '@/components/entity/cli-command-section';
 import { SyncStatusTab } from '@/components/sync-status';
 import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
 import {
@@ -1692,6 +1693,14 @@ export function UnifiedEntityModal({
               </DialogTitle>
             </DialogHeader>
           </div>
+
+          {/* CLI Command Section - visible on all tabs */}
+          {entity.name && (
+            <CliCommandSection
+              artifactName={entity.name}
+              className="border-b px-6 py-3"
+            />
+          )}
 
           {/* Tabs Section */}
           <Tabs
