@@ -69,6 +69,7 @@ import {
   useSources,
 } from '@/hooks';
 import { apiRequest } from '@/lib/api';
+import { getCollectionColor } from '@/lib/utils/collection-colors';
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
 import { TagEditor } from '@/components/shared/tag-editor';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
@@ -1820,6 +1821,26 @@ export function UnifiedEntityModal({
                     </div>
                   )}
 
+                  {/* Collections */}
+                  {entity.collections && entity.collections.length > 0 && (
+                    <div>
+                      <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
+                        <FolderOpen className="h-4 w-4" />
+                        Collections
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {entity.collections.map((collection) => (
+                          <Badge
+                            key={collection.id || collection.name}
+                            colorStyle={getCollectionColor(collection.name)}
+                          >
+                            {collection.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Origin */}
                   {entity.origin && (
                     <div>
@@ -1939,25 +1960,19 @@ export function UnifiedEntityModal({
                   </div>
 
                   {/* Location */}
-                  <div>
-                    <h3 className="mb-2 text-sm font-medium">Location</h3>
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                      {entity.collection && (
-                        <div className="flex justify-between">
-                          <span>Collection:</span>
-                          <span>{entity.collection}</span>
-                        </div>
-                      )}
-                      {entity.projectPath && (
+                  {entity.projectPath && (
+                    <div>
+                      <h3 className="mb-2 text-sm font-medium">Location</h3>
+                      <div className="space-y-2 text-sm text-muted-foreground">
                         <div className="flex flex-col gap-1">
                           <span>Project Path:</span>
                           <code className="break-all rounded bg-muted px-2 py-1 text-xs">
                             {entity.projectPath}
                           </code>
                         </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </ScrollArea>
             </TabsContent>
