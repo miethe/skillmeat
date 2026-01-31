@@ -62,3 +62,5 @@ export type {
   LinkedArtifactsSectionProps,
   LinkedArtifactReference,
 } from './linked-artifacts-section';
+export { CollapsibleActionBar } from './collapsible-action-bar';
+export type { CollapsibleActionBarProps } from './collapsible-action-bar';

@@ -44,6 +44,14 @@ export interface CliCommandSectionProps {
   commandOptions?: CommandOption[];
   /** Optional className for additional styling */
   className?: string;
+  /** Hide the label (useful when label is shown elsewhere, e.g., in a collapsible trigger) */
+  hideLabel?: boolean;
+  /** Hide the copy button (when copy is handled externally) */
+  hideCopyButton?: boolean;
+  /** Controlled value for selected command */
+  value?: string;
+  /** Callback when selected command changes (for controlled mode) */
+  onValueChange?: (value: string) => void;
 }
 
 // ============================================================================
@@ -53,7 +61,7 @@ export interface CliCommandSectionProps {
 /**
  * Default command options when none are provided
  */
-const DEFAULT_COMMAND_OPTIONS: CommandOption[] = [
+export const DEFAULT_COMMAND_OPTIONS: CommandOption[] = [
   {
     label: 'Basic Deploy',
     value: 'basic',
@@ -78,7 +86,7 @@ const DEFAULT_COMMAND_OPTIONS: CommandOption[] = [
 /**
  * Generate the CLI command based on the selected option and artifact name
  */
-function getCommandForOption(artifactName: string, optionValue: string): string {
+export function getCommandForOption(artifactName: string, optionValue: string): string {
   switch (optionValue) {
     case 'overwrite':
       return generateDeployWithOverwriteCommand(artifactName);
@@ -121,8 +129,16 @@ export function CliCommandSection({
   artifactName,
   commandOptions = DEFAULT_COMMAND_OPTIONS,
   className,
+  hideLabel = false,
+  hideCopyButton = false,
+  value,
+  onValueChange,
 }: CliCommandSectionProps) {
-  const [selectedCommand, setSelectedCommand] = useState<string>('basic');
+  // Support both controlled and uncontrolled modes
+  const [internalValue, setInternalValue] = useState<string>('basic');
+  const selectedCommand = value ?? internalValue;
+  const setSelectedCommand = onValueChange ?? setInternalValue;
+
   const { copied, copy } = useCliCopy();
 
   // Get the current command based on selection
@@ -135,13 +151,15 @@ export function CliCommandSection({
 
   return (
     <div className={cn('space-y-2', className)}>
-      {/* Label */}
-      <label
-        htmlFor="cli-command-select"
-        className="text-sm font-medium text-foreground"
-      >
-        CLI Deploy Command
-      </label>
+      {/* Label - hidden when used in collapsible context */}
+      {!hideLabel && (
+        <label
+          htmlFor="cli-command-select"
+          className="text-sm font-medium text-foreground"
+        >
+          CLI Deploy Command
+        </label>
+      )}
 
       {/* Command section: dropdown, code display, and copy button */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -172,20 +190,22 @@ export function CliCommandSection({
             {currentCommand}
           </code>
 
-          {/* Copy button */}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleCopy}
-            aria-label="Copy CLI command"
-            className="shrink-0"
-          >
-            {copied ? (
-              <Check className="h-4 w-4 text-green-500" aria-hidden="true" />
-            ) : (
-              <Copy className="h-4 w-4" aria-hidden="true" />
-            )}
-          </Button>
+          {/* Copy button - hidden when handled externally */}
+          {!hideCopyButton && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleCopy}
+              aria-label="Copy CLI command"
+              className="shrink-0"
+            >
+              {copied ? (
+                <Check className="h-4 w-4 text-green-500" aria-hidden="true" />
+              ) : (
+                <Copy className="h-4 w-4" aria-hidden="true" />
+              )}
+            </Button>
+          )}
         </div>
       </div>
     </div>
