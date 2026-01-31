@@ -290,7 +290,7 @@ class Artifact(Base):
         primaryjoin="foreign(CollectionArtifact.artifact_id) == Artifact.id",
         secondaryjoin="foreign(CollectionArtifact.collection_id) == Collection.id",
         viewonly=True,
-        lazy="selectin",
+        lazy="select",
     )
     tags: Mapped[List["Tag"]] = relationship(
         "Tag",
@@ -687,12 +687,12 @@ class Collection(Base):
         "Group",
         back_populates="collection",
         cascade="all, delete-orphan",
-        lazy="selectin",
+        lazy="select",
     )
     collection_artifacts: Mapped[List["CollectionArtifact"]] = relationship(
         "CollectionArtifact",
         cascade="all, delete-orphan",
-        lazy="selectin",
+        lazy="select",
     )
     templates: Mapped[List["ProjectTemplate"]] = relationship(
         "ProjectTemplate",

@@ -103,6 +103,7 @@ from skillmeat.core.importer import (
 )
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.utils.filesystem import compute_content_hash
+from sqlalchemy import func
 from skillmeat.cache.models import Collection, CollectionArtifact, get_session
 from skillmeat.cache.repositories import MarketplaceCatalogRepository
 
@@ -1723,6 +1724,9 @@ async def list_artifacts(
         HTTPException: On error
     """
     try:
+        # Start timing for performance monitoring
+        start_time = time.perf_counter()
+
         logger.info(
             f"Listing artifacts (limit={limit}, after={after}, "
             f"type={artifact_type}, collection={collection}, tags={tags}, tools={tools}, "
@@ -1894,6 +1898,22 @@ async def list_artifacts(
                     )
                     collection_details = {c.id: c for c in collections}
 
+                    # Get all artifact counts in a single aggregation query
+                    count_query = (
+                        db_session.query(
+                            CollectionArtifact.collection_id,
+                            func.count(CollectionArtifact.artifact_id).label(
+                                "artifact_count"
+                            ),
+                        )
+                        .filter(CollectionArtifact.collection_id.in_(collection_ids))
+                        .group_by(CollectionArtifact.collection_id)
+                        .all()
+                    )
+                    count_map = {
+                        row.collection_id: row.artifact_count for row in count_query
+                    }
+
                     # Build mapping: artifact_id -> list of collection info
                     for assoc in associations:
                         if assoc.artifact_id not in collections_map:
@@ -1901,17 +1921,11 @@ async def list_artifacts(
 
                         coll = collection_details.get(assoc.collection_id)
                         if coll:
-                            # Count artifacts in this collection
-                            artifact_count = (
-                                db_session.query(CollectionArtifact)
-                                .filter_by(collection_id=coll.id)
-                                .count()
-                            )
                             collections_map[assoc.artifact_id].append(
                                 {
                                     "id": coll.id,
                                     "name": coll.name,
-                                    "artifact_count": artifact_count,
+                                    "artifact_count": count_map.get(coll.id, 0),
                                 }
                             )
 
@@ -1959,6 +1973,16 @@ async def list_artifacts(
             start_cursor=start_cursor,
             end_cursor=end_cursor,
             total_count=len(artifacts),
+        )
+
+        # Log query performance
+        elapsed = time.perf_counter() - start_time
+        logger.debug(
+            "Artifact list query completed",
+            extra={
+                "elapsed_ms": round(elapsed * 1000, 2),
+                "artifact_count": len(items),
+            }
         )
 
         logger.info(f"Retrieved {len(items)} artifacts")
