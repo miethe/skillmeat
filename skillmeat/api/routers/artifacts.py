@@ -8,7 +8,7 @@ import logging
 import time
 from datetime import datetime, timezone
 from pathlib import Path as PathLib
-from typing import Dict, List, Optional
+from typing import Annotated, Dict, List, Optional
 
 from fastapi import (
     APIRouter,
@@ -20,6 +20,7 @@ from fastapi import (
     Request,
     status,
 )
+from sqlalchemy.orm import Session
 
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
@@ -104,6 +105,7 @@ from skillmeat.core.importer import (
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.utils.filesystem import compute_content_hash
 from sqlalchemy import func
+from skillmeat.api.services import CollectionService
 from skillmeat.cache.models import Collection, CollectionArtifact, get_session
 from skillmeat.cache.repositories import MarketplaceCatalogRepository
 
@@ -187,6 +189,22 @@ router = APIRouter(
     tags=["artifacts"],
     dependencies=[Depends(verify_api_key)],  # All endpoints require API key
 )
+
+
+def get_db_session():
+    """Dependency that provides a database session.
+
+    Yields:
+        Session: SQLAlchemy database session
+    """
+    session = get_session()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+DbSessionDep = Annotated[Session, Depends(get_db_session)]
 
 
 def encode_cursor(value: str) -> str:
@@ -478,7 +496,7 @@ def artifact_to_response(
     artifact,
     drift_status: Optional[str] = None,
     has_local_modifications: Optional[bool] = None,
-    collections_data: Optional[List[dict]] = None,
+    collections_data: Optional[List[ArtifactCollectionInfo]] = None,
 ) -> ArtifactResponse:
     """Convert Artifact model to API response schema.
 
@@ -486,7 +504,7 @@ def artifact_to_response(
         artifact: Artifact instance
         drift_status: Optional drift status ("none", "modified", "deleted", "added")
         has_local_modifications: Optional flag indicating local modifications
-        collections_data: Optional list of collection info dicts from database query
+        collections_data: Optional list of ArtifactCollectionInfo from CollectionService
 
     Returns:
         ArtifactResponse schema
@@ -531,17 +549,8 @@ def artifact_to_response(
     # Determine version to display
     version = artifact.version_spec or "unknown"
 
-    # Convert collections from passed data (queried from database)
-    collections_response = []
-    if collections_data:
-        for coll in collections_data:
-            collections_response.append(
-                ArtifactCollectionInfo(
-                    id=coll["id"],
-                    name=coll["name"],
-                    artifact_count=coll.get("artifact_count"),
-                )
-            )
+    # Convert collections from passed data (from CollectionService)
+    collections_response = collections_data or []
 
     return ArtifactResponse(
         id=f"{artifact.type.value}:{artifact.name}",
@@ -1813,7 +1822,7 @@ async def list_artifacts(
         # Filter by import_id if specified
         if import_id:
             artifacts = [
-                a for a in artifacts if getattr(a, 'import_id', None) == import_id
+                a for a in artifacts if getattr(a, "import_id", None) == import_id
             ]
 
         # Sort artifacts for consistent pagination
@@ -1872,63 +1881,17 @@ async def list_artifacts(
                 logger.warning(f"Failed to check drift: {e}")
                 # Continue without drift info rather than failing the request
 
-        # Query database for collection memberships
+        # Query database for collection memberships using CollectionService
         artifact_ids = [f"{a.type.value}:{a.name}" for a in page_artifacts]
-        collections_map: Dict[str, List[dict]] = {}
+        collections_map: Dict[str, List[ArtifactCollectionInfo]] = {}
 
         if artifact_ids:
             try:
                 db_session = get_session()
-                # Query CollectionArtifact associations
-                associations = (
-                    db_session.query(CollectionArtifact)
-                    .filter(CollectionArtifact.artifact_id.in_(artifact_ids))
-                    .all()
+                collection_service = CollectionService(db_session)
+                collections_map = collection_service.get_collection_membership_batch(
+                    artifact_ids
                 )
-
-                # Get unique collection IDs
-                collection_ids = {assoc.collection_id for assoc in associations}
-
-                if collection_ids:
-                    # Query Collection details
-                    collections = (
-                        db_session.query(Collection)
-                        .filter(Collection.id.in_(collection_ids))
-                        .all()
-                    )
-                    collection_details = {c.id: c for c in collections}
-
-                    # Get all artifact counts in a single aggregation query
-                    count_query = (
-                        db_session.query(
-                            CollectionArtifact.collection_id,
-                            func.count(CollectionArtifact.artifact_id).label(
-                                "artifact_count"
-                            ),
-                        )
-                        .filter(CollectionArtifact.collection_id.in_(collection_ids))
-                        .group_by(CollectionArtifact.collection_id)
-                        .all()
-                    )
-                    count_map = {
-                        row.collection_id: row.artifact_count for row in count_query
-                    }
-
-                    # Build mapping: artifact_id -> list of collection info
-                    for assoc in associations:
-                        if assoc.artifact_id not in collections_map:
-                            collections_map[assoc.artifact_id] = []
-
-                        coll = collection_details.get(assoc.collection_id)
-                        if coll:
-                            collections_map[assoc.artifact_id].append(
-                                {
-                                    "id": coll.id,
-                                    "name": coll.name,
-                                    "artifact_count": count_map.get(coll.id, 0),
-                                }
-                            )
-
                 db_session.close()
             except Exception as e:
                 logger.warning(f"Failed to query collection memberships: {e}")
@@ -1982,7 +1945,7 @@ async def list_artifacts(
             extra={
                 "elapsed_ms": round(elapsed * 1000, 2),
                 "artifact_count": len(items),
-            }
+            },
         )
 
         logger.info(f"Retrieved {len(items)} artifacts")
@@ -2014,6 +1977,7 @@ async def get_artifact(
     artifact_id: str,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    db_session: DbSessionDep,
     token: TokenDep,
     collection: Optional[str] = Query(
         default=None,
@@ -2030,12 +1994,13 @@ async def get_artifact(
         artifact_id: Artifact identifier (format: "type:name")
         artifact_mgr: Artifact manager dependency
         collection_mgr: Collection manager dependency
+        db_session: Database session dependency
         token: Authentication token
         collection: Optional collection filter
         include_deployments: Whether to include deployment statistics
 
     Returns:
-        Artifact details with optional deployment statistics
+        Artifact details with optional deployment statistics and collections
 
     Raises:
         HTTPException: If artifact not found or on error
@@ -2095,8 +2060,14 @@ async def get_artifact(
                 detail=f"Artifact '{artifact_id}' not found",
             )
 
-        # Build base response
-        response = artifact_to_response(artifact)
+        # Fetch collection memberships using CollectionService
+        collection_service = CollectionService(db_session)
+        collections_data = collection_service.get_collection_membership_single(
+            artifact_id
+        )
+
+        # Build base response with collections
+        response = artifact_to_response(artifact, collections_data=collections_data)
 
         # Add deployment statistics if requested
         if include_deployments:
