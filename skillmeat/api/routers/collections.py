@@ -276,7 +276,12 @@ async def get_collection(
     "/{collection_id}/artifacts",
     response_model=CollectionArtifactsResponse,
     summary="List artifacts in collection",
-    description="Retrieve a paginated list of artifacts within a specific collection",
+    description=(
+        "Retrieve a paginated list of artifacts within a specific collection. "
+        "NOTE: This endpoint uses legacy file-based collections and does NOT include "
+        "collection membership information. Use /user-collections/{id}/artifacts instead "
+        "for full database-backed functionality."
+    ),
     responses={
         200: {"description": "Successfully retrieved artifacts"},
         401: {"model": ErrorResponse, "description": "Unauthorized"},
@@ -306,6 +311,13 @@ async def list_collection_artifacts(
 ) -> CollectionArtifactsResponse:
     """List all artifacts in a collection with pagination.
 
+    LIMITATION: This deprecated endpoint cannot include collection membership
+    information because it operates on file-based artifacts (no database IDs).
+    CollectionService.get_collection_membership_batch() requires database
+    artifact IDs which don't exist in the legacy CollectionManager system.
+
+    For collection membership info, use /user-collections/{id}/artifacts instead.
+
     Args:
         collection_id: Collection identifier
         response: FastAPI response object for headers
@@ -316,7 +328,7 @@ async def list_collection_artifacts(
         artifact_type: Optional type filter
 
     Returns:
-        Paginated list of artifacts
+        Paginated list of artifacts (WITHOUT collection membership data)
 
     Raises:
         HTTPException: If collection not found or on error
@@ -372,7 +384,19 @@ async def list_collection_artifacts(
         end_idx = start_idx + limit
         page_artifacts = artifacts[start_idx:end_idx]
 
-        # Convert to summary format
+        # NOTE: Cannot include collection memberships here because:
+        # 1. This endpoint uses file-based CollectionManager (no database)
+        # 2. CollectionService.get_collection_membership_batch() requires DB artifact IDs
+        # 3. These Artifact objects only have name/type/source, not database IDs
+        #
+        # If this were database-backed (like /user-collections), the pattern would be:
+        # from skillmeat.api.services import CollectionService
+        # artifact_ids = [artifact.id for artifact in page_artifacts]  # Need DB IDs!
+        # collection_service = CollectionService(db_session)
+        # collections_map = collection_service.get_collection_membership_batch(artifact_ids)
+        # Then include collections_map.get(artifact.id, []) in each ArtifactSummary
+
+        # Convert to summary format (legacy file-based, no collection membership)
         items: List[ArtifactSummary] = [
             ArtifactSummary(
                 name=artifact.name,
