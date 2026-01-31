@@ -1,113 +1,121 @@
 ---
 type: progress
-prd: "collection-data-consistency"
+prd: collection-data-consistency
 phase: 4
-title: "Caching Layer"
+title: Caching Layer
 status: pending
 started: null
 completed: null
-progress: 0
-
+progress: 16
 total_tasks: 6
-completed_tasks: 0
+completed_tasks: 1
 in_progress_tasks: 0
 blocked_tasks: 0
-
-owners: ["python-backend-engineer"]
+owners:
+- python-backend-engineer
 contributors: []
-
 tasks:
-  - id: "TASK-4.1"
-    title: "Implement Collection Count Cache"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "opus"
-    effort: "1h"
-    priority: "high"
-    files:
-      - "skillmeat/cache/collection_cache.py"
-
-  - id: "TASK-4.2"
-    title: "Integrate Cache with CollectionService"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-4.1"]
-    model: "sonnet"
-    effort: "0.5h"
-    priority: "high"
-    files:
-      - "skillmeat/api/services/collection_service.py"
-
-  - id: "TASK-4.3"
-    title: "Add Cache Invalidation on Add Artifact"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-4.1"]
-    model: "sonnet"
-    effort: "0.25h"
-    priority: "high"
-    files:
-      - "skillmeat/api/routers/user_collections.py"
-
-  - id: "TASK-4.4"
-    title: "Add Cache Invalidation on Remove Artifact"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-4.1"]
-    model: "sonnet"
-    effort: "0.25h"
-    priority: "high"
-    files:
-      - "skillmeat/api/routers/user_collections.py"
-
-  - id: "TASK-4.5"
-    title: "Add Cache Invalidation on Delete Collection"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-4.1"]
-    model: "sonnet"
-    effort: "0.25h"
-    priority: "high"
-    files:
-      - "skillmeat/api/routers/user_collections.py"
-
-  - id: "TASK-4.6"
-    title: "Add Cache Unit Tests"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-4.1"]
-    model: "sonnet"
-    effort: "0.5h"
-    priority: "medium"
-    files:
-      - "tests/cache/test_collection_cache.py"
-
+- id: TASK-4.1
+  title: Implement Collection Count Cache
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: opus
+  effort: 1h
+  priority: high
+  files:
+  - skillmeat/cache/collection_cache.py
+- id: TASK-4.2
+  title: Integrate Cache with CollectionService
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-4.1
+  model: sonnet
+  effort: 0.5h
+  priority: high
+  files:
+  - skillmeat/api/services/collection_service.py
+- id: TASK-4.3
+  title: Add Cache Invalidation on Add Artifact
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-4.1
+  model: sonnet
+  effort: 0.25h
+  priority: high
+  files:
+  - skillmeat/api/routers/user_collections.py
+- id: TASK-4.4
+  title: Add Cache Invalidation on Remove Artifact
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-4.1
+  model: sonnet
+  effort: 0.25h
+  priority: high
+  files:
+  - skillmeat/api/routers/user_collections.py
+- id: TASK-4.5
+  title: Add Cache Invalidation on Delete Collection
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-4.1
+  model: sonnet
+  effort: 0.25h
+  priority: high
+  files:
+  - skillmeat/api/routers/user_collections.py
+- id: TASK-4.6
+  title: Add Cache Unit Tests
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-4.1
+  model: sonnet
+  effort: 0.5h
+  priority: medium
+  files:
+  - tests/cache/test_collection_cache.py
 parallelization:
-  batch_1: ["TASK-4.1"]
-  batch_2: ["TASK-4.2", "TASK-4.3", "TASK-4.4", "TASK-4.5", "TASK-4.6"]
-
+  batch_1:
+  - TASK-4.1
+  batch_2:
+  - TASK-4.2
+  - TASK-4.3
+  - TASK-4.4
+  - TASK-4.5
+  - TASK-4.6
 blockers: []
-
 success_criteria:
-  - id: "SC-4.1"
-    description: "Cache class created with thread-safe operations"
-    status: "pending"
-  - id: "SC-4.2"
-    description: "TTL expiration working (verified via tests)"
-    status: "pending"
-  - id: "SC-4.3"
-    description: "Cache invalidation triggered on add/remove/delete operations"
-    status: "pending"
-  - id: "SC-4.4"
-    description: "Cache hit rate visible in logs"
-    status: "pending"
-  - id: "SC-4.5"
-    description: "No stale data visible after invalidation events"
-    status: "pending"
-  - id: "SC-4.6"
-    description: "Cache unit tests achieve >80% coverage"
-    status: "pending"
+- id: SC-4.1
+  description: Cache class created with thread-safe operations
+  status: pending
+- id: SC-4.2
+  description: TTL expiration working (verified via tests)
+  status: pending
+- id: SC-4.3
+  description: Cache invalidation triggered on add/remove/delete operations
+  status: pending
+- id: SC-4.4
+  description: Cache hit rate visible in logs
+  status: pending
+- id: SC-4.5
+  description: No stale data visible after invalidation events
+  status: pending
+- id: SC-4.6
+  description: Cache unit tests achieve >80% coverage
+  status: pending
+updated: '2026-01-31'
 ---
 
 # Phase 4: Caching Layer
