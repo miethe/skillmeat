@@ -236,3 +236,273 @@ class TestRateLimitMiddleware:
         # Check headers
         assert "Retry-After" in response.headers
         assert int(response.headers["Retry-After"]) == 2
+
+    def test_middleware_per_ip_tracking(self):
+        """Test that rate limits are tracked per IP."""
+        app = FastAPI()
+        app.add_middleware(
+            RateLimitMiddleware,
+            window_seconds=10,
+            burst_threshold=5,
+            block_duration=10,
+        )
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"status": "ok"}
+
+        client = TestClient(app)
+
+        # Make requests up to threshold - 1 (4 requests OK)
+        for _ in range(4):
+            response = client.get("/test")
+            assert response.status_code == 200
+
+        # 5th request should trigger burst (threshold reached)
+        response = client.get("/test")
+        assert response.status_code == 429
+
+        # Note: TestClient uses same IP for all requests
+        # Per-IP isolation is tested in unit tests
+
+    def test_middleware_blocked_ip_stays_blocked(self):
+        """Test that blocked IP continues to receive 429."""
+        app = FastAPI()
+        app.add_middleware(
+            RateLimitMiddleware,
+            window_seconds=10,
+            burst_threshold=3,
+            block_duration=10,
+        )
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"status": "ok"}
+
+        client = TestClient(app)
+
+        # Trigger burst
+        for _ in range(3):
+            client.get("/test")
+
+        # Should be blocked
+        response = client.get("/test")
+        assert response.status_code == 429
+
+        # Should remain blocked on subsequent requests
+        response = client.get("/test")
+        assert response.status_code == 429
+
+        response = client.get("/test")
+        assert response.status_code == 429
+
+    def test_middleware_block_expires(self):
+        """Test that block expires after duration (QuickReset - RL-004)."""
+        app = FastAPI()
+        app.add_middleware(
+            RateLimitMiddleware,
+            window_seconds=2,  # Short window for testing
+            burst_threshold=3,
+            block_duration=1,  # Short block for testing
+        )
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"status": "ok"}
+
+        client = TestClient(app)
+
+        # Trigger burst on /test (2 OK, 3rd triggers)
+        for _ in range(2):
+            client.get("/test")
+
+        # 3rd request triggers burst
+        response = client.get("/test")
+        assert response.status_code == 429
+
+        # Wait for both block AND window to expire
+        time.sleep(2.5)
+
+        # After block and window expire, same endpoint should work again
+        response = client.get("/test")
+        assert response.status_code == 200
+
+    def test_middleware_different_endpoints_no_burst(self):
+        """Test that 20 different endpoints don't trigger burst."""
+        app = FastAPI()
+        app.add_middleware(
+            RateLimitMiddleware,
+            window_seconds=10,
+            burst_threshold=20,
+            block_duration=10,
+        )
+
+        # Create multiple endpoints
+        endpoints = []
+        for i in range(25):
+
+            @app.get(f"/test/{i}")
+            async def test_endpoint():
+                return {"status": "ok"}
+
+            endpoints.append(f"/test/{i}")
+
+        client = TestClient(app)
+
+        # Make requests to different endpoints
+        for endpoint in endpoints:
+            response = client.get(endpoint)
+            # Should not trigger burst (all different fingerprints)
+            assert response.status_code == 200
+
+    def test_middleware_same_endpoint_different_params_no_burst(self):
+        """Test that same endpoint with different params creates different fingerprints."""
+        app = FastAPI()
+        app.add_middleware(
+            RateLimitMiddleware,
+            window_seconds=10,
+            burst_threshold=20,
+            block_duration=10,
+        )
+
+        @app.get("/test")
+        async def test_endpoint(page: int = 1):
+            return {"status": "ok", "page": page}
+
+        client = TestClient(app)
+
+        # Make requests with different query params
+        for i in range(25):
+            response = client.get(f"/test?page={i}")
+            # Should not trigger burst (different fingerprints due to params)
+            assert response.status_code == 200
+
+    def test_middleware_same_endpoint_same_params_triggers_burst(self):
+        """Test that identical requests (endpoint + params) trigger burst."""
+        app = FastAPI()
+        app.add_middleware(
+            RateLimitMiddleware,
+            window_seconds=10,
+            burst_threshold=10,
+            block_duration=10,
+        )
+
+        @app.get("/test")
+        async def test_endpoint(page: int = 1):
+            return {"status": "ok", "page": page}
+
+        client = TestClient(app)
+
+        # Make identical requests (same endpoint and params) - 9 OK
+        for i in range(9):
+            response = client.get("/test?page=1")
+            assert response.status_code == 200
+
+        # 10th identical request should trigger burst (threshold reached)
+        response = client.get("/test?page=1")
+        assert response.status_code == 429
+
+    def test_middleware_excluded_path_prefix(self):
+        """Test that excluded path works as prefix match."""
+        app = FastAPI()
+        app.add_middleware(
+            RateLimitMiddleware,
+            window_seconds=10,
+            burst_threshold=5,
+            block_duration=10,
+            excluded_paths=["/api/public", "/health", "/docs", "/redoc", "/openapi.json", "/"],
+        )
+
+        @app.get("/api/public/test")
+        async def public_endpoint():
+            return {"status": "ok"}
+
+        @app.get("/api/private/test")
+        async def private_endpoint():
+            return {"status": "ok"}
+
+        client = TestClient(app)
+
+        # Public endpoints should never be rate limited (prefix match)
+        for _ in range(20):
+            response = client.get("/api/public/test")
+            assert response.status_code == 200
+
+        # Private endpoint should be rate limited (4 OK, 5th triggers)
+        for _ in range(4):
+            response = client.get("/api/private/test")
+            assert response.status_code == 200
+
+        response = client.get("/api/private/test")
+        assert response.status_code == 429
+
+    def test_middleware_default_excluded_paths(self):
+        """Test that default excluded paths are respected."""
+        app = FastAPI()
+        app.add_middleware(
+            RateLimitMiddleware,
+            window_seconds=10,
+            burst_threshold=5,
+            block_duration=10,
+            # Uses default excluded_paths: ["/health", "/docs", "/redoc", "/openapi.json", "/"]
+        )
+
+        @app.get("/")
+        async def root():
+            return {"status": "ok"}
+
+        @app.get("/health")
+        async def health():
+            return {"status": "healthy"}
+
+        @app.get("/docs")
+        async def docs():
+            return {"status": "docs"}
+
+        @app.get("/api/test")
+        async def api_test():
+            return {"status": "ok"}
+
+        client = TestClient(app)
+
+        # All default excluded paths should allow unlimited requests
+        for _ in range(10):
+            assert client.get("/").status_code == 200
+            assert client.get("/health").status_code == 200
+            assert client.get("/docs").status_code == 200
+
+        # Regular API endpoint should be rate limited (4 OK, 5th triggers)
+        for _ in range(4):
+            response = client.get("/api/test")
+            assert response.status_code == 200
+
+        response = client.get("/api/test")
+        assert response.status_code == 429
+
+    def test_middleware_headers_show_current_count(self):
+        """Test that headers correctly show current request count."""
+        app = FastAPI()
+        app.add_middleware(
+            RateLimitMiddleware,
+            window_seconds=10,
+            burst_threshold=10,
+            block_duration=10,
+        )
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"status": "ok"}
+
+        client = TestClient(app)
+
+        # First request
+        response = client.get("/test")
+        assert response.headers["X-RateLimit-Current"] == "1"
+
+        # Second request
+        response = client.get("/test")
+        assert response.headers["X-RateLimit-Current"] == "2"
+
+        # Third request
+        response = client.get("/test")
+        assert response.headers["X-RateLimit-Current"] == "3"
