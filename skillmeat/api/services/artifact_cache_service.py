@@ -11,7 +11,7 @@ the cache update fails.
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -19,6 +19,9 @@ from sqlalchemy.orm import Session
 from skillmeat.cache.models import CollectionArtifact
 
 logger = logging.getLogger(__name__)
+
+# Default TTL for artifact metadata cache: 30 minutes
+DEFAULT_METADATA_TTL_SECONDS = 30 * 60
 
 
 def refresh_single_artifact_cache(
@@ -205,3 +208,161 @@ def delete_artifact_cache(
         except Exception:
             pass  # Ignore rollback errors
         return False
+
+
+def find_stale_artifacts(
+    session: Session,
+    ttl_seconds: int = DEFAULT_METADATA_TTL_SECONDS,
+) -> list:
+    """Find artifacts where cached metadata is stale.
+
+    An artifact is considered stale if:
+    - synced_at is NULL (never synced)
+    - synced_at < now - TTL
+
+    Args:
+        session: Database session
+        ttl_seconds: Time-to-live for cached metadata (default 30 min)
+
+    Returns:
+        List of CollectionArtifact objects with stale metadata
+    """
+    cutoff_time = datetime.utcnow() - timedelta(seconds=ttl_seconds)
+
+    stale_artifacts = (
+        session.query(CollectionArtifact)
+        .filter(
+            (CollectionArtifact.synced_at.is_(None))
+            | (CollectionArtifact.synced_at < cutoff_time)
+        )
+        .all()
+    )
+
+    return stale_artifacts
+
+
+def get_staleness_stats(
+    session: Session,
+    ttl_seconds: int = DEFAULT_METADATA_TTL_SECONDS,
+) -> dict:
+    """Get statistics about cache staleness.
+
+    Args:
+        session: Database session
+        ttl_seconds: Time-to-live for cached metadata (default 30 min)
+
+    Returns:
+        dict with: total_artifacts, stale_count, fresh_count,
+                   oldest_sync_age_seconds, percentage_stale, ttl_seconds
+    """
+    total = session.query(CollectionArtifact).count()
+
+    if total == 0:
+        return {
+            "total_artifacts": 0,
+            "stale_count": 0,
+            "fresh_count": 0,
+            "oldest_sync_age_seconds": 0,
+            "percentage_stale": 0.0,
+            "ttl_seconds": ttl_seconds,
+        }
+
+    stale = find_stale_artifacts(session, ttl_seconds)
+
+    # Find oldest sync time
+    oldest = (
+        session.query(CollectionArtifact.synced_at)
+        .filter(CollectionArtifact.synced_at.isnot(None))
+        .order_by(CollectionArtifact.synced_at.asc())
+        .first()
+    )
+
+    oldest_age = None
+    if oldest and oldest[0]:
+        oldest_age = (datetime.utcnow() - oldest[0]).total_seconds()
+
+    return {
+        "total_artifacts": total,
+        "stale_count": len(stale),
+        "fresh_count": total - len(stale),
+        "oldest_sync_age_seconds": oldest_age or 0,
+        "percentage_stale": round((len(stale) / total * 100), 1) if total > 0 else 0.0,
+        "ttl_seconds": ttl_seconds,
+    }
+
+
+def invalidate_collection_artifacts(
+    session: Session,
+    collection_id: str,
+) -> int:
+    """Invalidate cache for all artifacts in a collection.
+
+    Sets synced_at to NULL for all artifacts in the collection,
+    marking them as needing refresh.
+
+    Args:
+        session: Database session
+        collection_id: Collection ID
+
+    Returns:
+        Number of artifacts invalidated
+    """
+    try:
+        # Update all artifacts in the collection
+        updated_count = (
+            session.query(CollectionArtifact)
+            .filter(CollectionArtifact.collection_id == collection_id)
+            .update({CollectionArtifact.synced_at: None})
+        )
+        session.commit()
+        logger.debug(
+            f"Invalidated cache for {updated_count} artifacts in collection: {collection_id}"
+        )
+        return updated_count
+    except Exception as e:
+        logger.warning(
+            f"Failed to invalidate cache for collection {collection_id}: {e}"
+        )
+        try:
+            session.rollback()
+        except Exception:
+            pass  # Ignore rollback errors
+        return 0
+
+
+# =============================================================================
+# Cache Monitoring Metrics (TASK-3.4)
+# =============================================================================
+
+
+def log_cache_metrics(
+    session: Session,
+    ttl_seconds: int = DEFAULT_METADATA_TTL_SECONDS,
+) -> dict:
+    """Log cache health metrics for monitoring.
+
+    Logs cache staleness statistics at INFO level and returns the stats dict.
+    This function is useful for periodic health checks and observability.
+
+    Args:
+        session: Database session
+        ttl_seconds: TTL in seconds for staleness calculation (default 30 min)
+
+    Returns:
+        Dictionary with staleness statistics (same as get_staleness_stats)
+
+    Example:
+        >>> stats = log_cache_metrics(session)
+        Cache metrics: total=42, fresh=40, stale=2 (4.8%), oldest_age=1200s
+    """
+    stats = get_staleness_stats(session, ttl_seconds)
+
+    logger.info(
+        f"Cache metrics: "
+        f"total={stats['total_artifacts']}, "
+        f"fresh={stats['fresh_count']}, "
+        f"stale={stats['stale_count']} ({stats['percentage_stale']}%), "
+        f"oldest_age={stats['oldest_sync_age_seconds']:.0f}s"
+    )
+
+    return stats

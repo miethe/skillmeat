@@ -2,7 +2,7 @@
 type: progress
 prd: "artifact-metadata-cache-v1"
 status: in_progress
-progress: 54
+progress: 69
 total_phases: 5
 total_tasks: 26
 estimated_effort: "12-16 hours (Phases 1-4) + 6-8 hours (Phase 5 future)"
@@ -249,7 +249,7 @@ tasks:
     title: "Create staleness detection service"
     description: "Implement ArtifactCacheService.find_stale_artifacts() for CollectionArtifact cache rows based on synced_at and TTL"
     phase: 3
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: high
     effort: "25-35 min"
@@ -263,7 +263,7 @@ tasks:
     title: "Create cache invalidation hook"
     description: "Implement invalidation mechanism triggered by collection add/remove operations; mark affected cache rows stale"
     phase: 3
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: high
     effort: "35-45 min"
@@ -278,7 +278,7 @@ tasks:
     title: "Create background refresh task (optional)"
     description: "Implement optional background task to periodically refresh stale CollectionArtifact metadata without blocking API requests"
     phase: 3
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: low
     effort: "40-50 min"
@@ -293,7 +293,7 @@ tasks:
     title: "Add monitoring metrics"
     description: "Track cache hit rate, refresh latency, stale cache row count; emit to observability system for dashboard"
     phase: 3
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: medium
     effort: "20-30 min"
@@ -501,10 +501,10 @@ This 5-phase implementation plan populates and maintains a complete artifact met
 
 | Task | Status | Effort | Assigned To |
 |------|--------|--------|-------------|
-| TASK-3.1: Create staleness detection service | pending | 25-35 min | python-backend-engineer |
-| TASK-3.2: Create cache invalidation hook | pending | 35-45 min | python-backend-engineer |
-| TASK-3.3: Create background refresh task (optional) | pending | 40-50 min | python-backend-engineer |
-| TASK-3.4: Add monitoring metrics | pending | 20-30 min | python-backend-engineer |
+| TASK-3.1: Create staleness detection service | completed | 25-35 min | python-backend-engineer |
+| TASK-3.2: Create cache invalidation hook | completed | 35-45 min | python-backend-engineer |
+| TASK-3.3: Create background refresh task (optional) | completed | 40-50 min | python-backend-engineer |
+| TASK-3.4: Add monitoring metrics | completed | 20-30 min | python-backend-engineer |
 
 **Completion Criteria**: Staleness detection working, invalidation triggers on collection changes, metrics emitted
 

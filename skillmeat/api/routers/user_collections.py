@@ -36,6 +36,9 @@ from skillmeat.api.schemas.user_collections import (
     UserCollectionWithGroupsResponse,
 )
 from skillmeat.api.services import get_artifact_metadata
+from skillmeat.api.services.artifact_cache_service import (
+    invalidate_collection_artifacts,
+)
 from skillmeat.api.services.artifact_metadata_service import _get_artifact_collections
 from skillmeat.cache import get_collection_count_cache
 from skillmeat.core.artifact import ArtifactType as CoreArtifactType
@@ -345,7 +348,9 @@ def populate_collection_artifact_metadata(
     for coll_name in collection_mgr.list_collections():
         try:
             artifacts = artifact_mgr.list_artifacts(collection_name=coll_name)
-            logger.debug(f"Processing collection '{coll_name}': {len(artifacts)} artifacts")
+            logger.debug(
+                f"Processing collection '{coll_name}': {len(artifacts)} artifacts"
+            )
         except Exception as e:
             error_msg = f"Failed to load artifacts from collection '{coll_name}': {e}"
             logger.warning(error_msg)
@@ -557,9 +562,7 @@ def _refresh_single_collection_cache(
 
     # Get all CollectionArtifact rows for this collection
     collection_artifacts = (
-        session.query(CollectionArtifact)
-        .filter_by(collection_id=collection.id)
-        .all()
+        session.query(CollectionArtifact).filter_by(collection_id=collection.id).all()
     )
 
     if not collection_artifacts:
@@ -598,9 +601,7 @@ def _refresh_single_collection_cache(
                     artifact_type=artifact_type_enum,
                 )
             except Exception as e:
-                logger.debug(
-                    f"File-based lookup failed for {ca.artifact_id}: {e}"
-                )
+                logger.debug(f"File-based lookup failed for {ca.artifact_id}: {e}")
                 skipped += 1
                 continue
 
@@ -740,10 +741,12 @@ async def refresh_all_collections_cache(
                 total_skipped += result["skipped"]
 
                 if result["errors"]:
-                    errors.append({
-                        "collection_id": collection.id,
-                        "errors": result["errors"],
-                    })
+                    errors.append(
+                        {
+                            "collection_id": collection.id,
+                            "errors": result["errors"],
+                        }
+                    )
 
                 logger.debug(
                     f"Collection '{collection.id}': updated={result['updated']}, "
@@ -753,10 +756,12 @@ async def refresh_all_collections_cache(
             except Exception as e:
                 error_msg = f"Failed to refresh collection '{collection.id}': {e}"
                 logger.warning(error_msg)
-                errors.append({
-                    "collection_id": collection.id,
-                    "errors": [str(e)],
-                })
+                errors.append(
+                    {
+                        "collection_id": collection.id,
+                        "errors": [str(e)],
+                    }
+                )
 
         # Commit all changes
         session.commit()
@@ -1429,7 +1434,8 @@ async def list_collection_artifacts(
                             ),
                             tags=(
                                 file_artifact.metadata.tags
-                                if file_artifact.metadata and file_artifact.metadata.tags
+                                if file_artifact.metadata
+                                and file_artifact.metadata.tags
                                 else None
                             ),
                             collections=_get_artifact_collections(
@@ -1590,6 +1596,11 @@ async def add_artifacts_to_collection(
         # Invalidate collection count cache
         cache = get_collection_count_cache()
         cache.invalidate(collection_id)
+
+        # Invalidate metadata cache for newly added artifacts
+        # This ensures they will be refreshed with current metadata
+        if added_count > 0:
+            invalidate_collection_artifacts(session, collection_id)
 
         logger.info(
             f"Added {added_count} new artifacts to collection {collection_id} "
@@ -2033,7 +2044,10 @@ async def list_collection_entities(
     ),
     responses={
         200: {"description": "Cache refresh completed successfully"},
-        404: {"model": ErrorResponse, "description": "Collection not found in database"},
+        404: {
+            "model": ErrorResponse,
+            "description": "Collection not found in database",
+        },
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
@@ -2181,7 +2195,9 @@ async def refresh_collection_cache(
         )
     except Exception as e:
         db_session.rollback()
-        logger.error(f"Failed to commit cache updates for collection '{collection_id}': {e}")
+        logger.error(
+            f"Failed to commit cache updates for collection '{collection_id}': {e}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
@@ -2387,3 +2403,163 @@ async def refresh_collection(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to refresh collection: {str(e)}",
         )
+
+
+# =============================================================================
+# Cache Statistics Endpoint (TASK-3.4)
+# =============================================================================
+
+
+@router.get(
+    "/cache-stats",
+    response_model=dict,
+    tags=["user-collections"],
+    summary="Get artifact cache statistics",
+    description="Get statistics about artifact metadata cache health including "
+    "total artifacts, fresh/stale counts, and staleness percentage.",
+)
+async def get_cache_stats(
+    db_session: DbSessionDep,
+    ttl_seconds: int = Query(
+        default=None,
+        description="Custom TTL in seconds for staleness calculation. "
+        "Default is 30 minutes (1800 seconds).",
+        ge=60,
+        le=86400,
+    ),
+    collection_id: Optional[str] = Query(
+        default=None,
+        description="Filter stats to a specific collection ID. "
+        "If not provided, stats are for all collections.",
+    ),
+) -> dict:
+    """Get statistics about artifact metadata cache health.
+
+    This endpoint returns metrics about the CollectionArtifact cache,
+    useful for monitoring cache freshness and identifying performance issues.
+
+    Returns:
+        Dictionary with cache statistics:
+        - total_artifacts: Total number of cached artifacts
+        - fresh_count: Artifacts with synced_at within TTL
+        - stale_count: Artifacts needing refresh (synced_at older than TTL or NULL)
+        - percentage_stale: Percentage of stale artifacts (0-100)
+        - oldest_sync_age_seconds: Age of oldest cached metadata in seconds
+        - ttl_seconds: The TTL used for calculation
+        - collection_id: The collection filter if provided
+
+    Example response:
+        {
+            "total_artifacts": 42,
+            "fresh_count": 40,
+            "stale_count": 2,
+            "percentage_stale": 4.8,
+            "oldest_sync_age_seconds": 1234,
+            "ttl_seconds": 1800
+        }
+    """
+    from skillmeat.api.services.artifact_cache_service import (
+        DEFAULT_METADATA_TTL_SECONDS,
+        get_staleness_stats,
+    )
+
+    # Use default TTL if not provided
+    effective_ttl = (
+        ttl_seconds if ttl_seconds is not None else DEFAULT_METADATA_TTL_SECONDS
+    )
+
+    try:
+        stats = get_staleness_stats(db_session, effective_ttl)
+
+        # Add collection_id filter if provided
+        if collection_id:
+            # Re-query with collection filter
+            stats = _get_filtered_staleness_stats(
+                db_session, effective_ttl, collection_id
+            )
+
+        logger.debug(
+            f"Cache stats requested: total={stats['total_artifacts']}, "
+            f"stale={stats['stale_count']} ({stats['percentage_stale']}%)"
+        )
+
+        return stats
+
+    except Exception as e:
+        logger.error(f"Error getting cache stats: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get cache statistics: {str(e)}",
+        )
+
+
+def _get_filtered_staleness_stats(
+    session: Session,
+    ttl_seconds: int,
+    collection_id: str,
+) -> dict:
+    """Get staleness stats filtered to a specific collection.
+
+    Args:
+        session: Database session
+        ttl_seconds: TTL for staleness calculation
+        collection_id: Collection ID to filter by
+
+    Returns:
+        Dictionary with staleness statistics for the collection
+    """
+    from datetime import timedelta
+
+    cutoff_time = datetime.utcnow() - timedelta(seconds=ttl_seconds)
+
+    # Filter to specific collection
+    total = (
+        session.query(CollectionArtifact)
+        .filter(CollectionArtifact.collection_id == collection_id)
+        .count()
+    )
+
+    if total == 0:
+        return {
+            "total_artifacts": 0,
+            "stale_count": 0,
+            "fresh_count": 0,
+            "oldest_sync_age_seconds": 0,
+            "percentage_stale": 0.0,
+            "ttl_seconds": ttl_seconds,
+            "collection_id": collection_id,
+        }
+
+    # Count stale artifacts in this collection
+    stale_count = (
+        session.query(CollectionArtifact)
+        .filter(CollectionArtifact.collection_id == collection_id)
+        .filter(
+            (CollectionArtifact.synced_at.is_(None))
+            | (CollectionArtifact.synced_at < cutoff_time)
+        )
+        .count()
+    )
+
+    # Find oldest sync time in this collection
+    oldest = (
+        session.query(CollectionArtifact.synced_at)
+        .filter(CollectionArtifact.collection_id == collection_id)
+        .filter(CollectionArtifact.synced_at.isnot(None))
+        .order_by(CollectionArtifact.synced_at.asc())
+        .first()
+    )
+
+    oldest_age = 0
+    if oldest and oldest[0]:
+        oldest_age = (datetime.utcnow() - oldest[0]).total_seconds()
+
+    return {
+        "total_artifacts": total,
+        "stale_count": stale_count,
+        "fresh_count": total - stale_count,
+        "oldest_sync_age_seconds": oldest_age,
+        "percentage_stale": round((stale_count / total * 100), 1) if total > 0 else 0.0,
+        "ttl_seconds": ttl_seconds,
+        "collection_id": collection_id,
+    }
