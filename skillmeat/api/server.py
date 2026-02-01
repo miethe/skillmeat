@@ -152,6 +152,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                     f"{result['already_present_count']} already present, "
                     f"{result['total_artifacts']} total"
                 )
+                # Log metadata cache stats if available
+                if "metadata_cache" in result:
+                    cache_stats = result["metadata_cache"]
+                    if cache_stats.get("errors"):
+                        logger.warning(
+                            f"Metadata cache errors: {len(cache_stats['errors'])} artifacts failed"
+                        )
         finally:
             session.close()
     except Exception as e:

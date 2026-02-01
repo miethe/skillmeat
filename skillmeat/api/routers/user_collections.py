@@ -226,7 +226,8 @@ def migrate_artifacts_to_default_collection(
 
     This function ensures all artifacts from file-system collections
     are also registered in the default database collection, enabling
-    them to use Groups and other collection features.
+    them to use Groups and other collection features. Also populates
+    the metadata cache for efficient artifact card rendering.
 
     Args:
         session: Database session
@@ -234,12 +235,20 @@ def migrate_artifacts_to_default_collection(
         collection_mgr: Collection manager for listing collections
 
     Returns:
-        dict with migration stats: migrated_count, already_present_count, total_artifacts
+        dict with migration stats: migrated_count, already_present_count,
+        total_artifacts, and metadata_cache stats
     """
-    # Ensure default collection exists first
+    # 1. Ensure default collection exists first
     ensure_default_collection(session)
 
-    # Get all artifacts from all file-system collections
+    # 2. Populate metadata cache from file-based artifacts
+    # This creates/updates CollectionArtifact rows with full metadata
+    # enabling the /collection page to render without N file reads
+    metadata_stats = populate_collection_artifact_metadata(
+        session, artifact_mgr, collection_mgr
+    )
+
+    # 3. Get all artifacts from all file-system collections
     all_artifact_ids = set()
     for coll_name in collection_mgr.list_collections():
         try:
@@ -257,7 +266,7 @@ def migrate_artifacts_to_default_collection(
         f"Found {len(all_artifact_ids)} unique artifacts across all collections"
     )
 
-    # Get existing associations for the default collection
+    # 4. Get existing associations for the default collection
     existing_associations = (
         session.query(CollectionArtifact.artifact_id)
         .filter_by(collection_id=DEFAULT_COLLECTION_ID)
@@ -265,10 +274,10 @@ def migrate_artifacts_to_default_collection(
     )
     existing_artifact_ids = {row[0] for row in existing_associations}
 
-    # Find artifacts not yet in default collection
+    # 5. Find artifacts not yet in default collection
     missing_artifact_ids = all_artifact_ids - existing_artifact_ids
 
-    # Add missing artifacts to default collection
+    # 6. Add missing artifacts to default collection
     migrated_count = 0
     for artifact_id in missing_artifact_ids:
         try:
@@ -289,10 +298,158 @@ def migrate_artifacts_to_default_collection(
         session.commit()
         logger.info(f"Migrated {migrated_count} artifacts to default collection")
 
+    # 7. Return combined stats including metadata cache results
     return {
         "migrated_count": migrated_count,
         "already_present_count": len(existing_artifact_ids),
         "total_artifacts": len(all_artifact_ids),
+        "metadata_cache": metadata_stats,
+    }
+
+
+def populate_collection_artifact_metadata(
+    session: Session,
+    artifact_mgr,
+    collection_mgr,
+) -> dict:
+    """Populate CollectionArtifact metadata cache from file-based artifacts.
+
+    For each file-based artifact, create or update CollectionArtifact rows with
+    full metadata from YAML frontmatter and manifest entries. This enables the
+    /collection page to render artifact cards without N file reads.
+
+    Args:
+        session: Database session
+        artifact_mgr: ArtifactManager for listing and reading artifacts
+        collection_mgr: CollectionManager for collection access
+
+    Returns:
+        dict with stats: created_count, updated_count, skipped_count, errors
+    """
+    import json
+    import time
+
+    logger.info("Starting CollectionArtifact metadata cache population...")
+    start_time = time.time()
+
+    created_count = 0
+    updated_count = 0
+    skipped_count = 0
+    errors = []
+
+    # Ensure default collection exists
+    ensure_default_collection(session)
+
+    # Iterate all file-based collections
+    for coll_name in collection_mgr.list_collections():
+        try:
+            artifacts = artifact_mgr.list_artifacts(collection_name=coll_name)
+            logger.debug(f"Processing collection '{coll_name}': {len(artifacts)} artifacts")
+        except Exception as e:
+            error_msg = f"Failed to load artifacts from collection '{coll_name}': {e}"
+            logger.warning(error_msg)
+            errors.append(error_msg)
+            continue
+
+        for artifact in artifacts:
+            try:
+                # Build artifact_id: "{type}:{name}"
+                artifact_id = f"{artifact.type.value}:{artifact.name}"
+
+                # Extract metadata fields from artifact
+                metadata = artifact.metadata
+                description = metadata.description if metadata else None
+                author = metadata.author if metadata else None
+                license_val = metadata.license if metadata else None
+                version = metadata.version if metadata else None
+
+                # Convert tags list to JSON string
+                tags_json = None
+                if metadata and metadata.tags:
+                    tags_json = json.dumps(metadata.tags)
+
+                # Source and origin fields
+                source = artifact.upstream
+                origin = artifact.origin
+                origin_source = artifact.origin_source
+                resolved_sha = getattr(artifact, "resolved_sha", None)
+                resolved_version = getattr(artifact, "resolved_version", None)
+
+                # Check if CollectionArtifact exists for default collection
+                existing = (
+                    session.query(CollectionArtifact)
+                    .filter_by(
+                        collection_id=DEFAULT_COLLECTION_ID,
+                        artifact_id=artifact_id,
+                    )
+                    .first()
+                )
+
+                if existing:
+                    # Update existing row
+                    existing.description = description
+                    existing.author = author
+                    existing.license = license_val
+                    existing.tags_json = tags_json
+                    existing.version = version
+                    existing.source = source
+                    existing.origin = origin
+                    existing.origin_source = origin_source
+                    existing.resolved_sha = resolved_sha
+                    existing.resolved_version = resolved_version
+                    existing.synced_at = datetime.utcnow()
+                    updated_count += 1
+                else:
+                    # Create new row
+                    new_association = CollectionArtifact(
+                        collection_id=DEFAULT_COLLECTION_ID,
+                        artifact_id=artifact_id,
+                        added_at=datetime.utcnow(),
+                        description=description,
+                        author=author,
+                        license=license_val,
+                        tags_json=tags_json,
+                        version=version,
+                        source=source,
+                        origin=origin,
+                        origin_source=origin_source,
+                        resolved_sha=resolved_sha,
+                        resolved_version=resolved_version,
+                        synced_at=datetime.utcnow(),
+                    )
+                    session.add(new_association)
+                    created_count += 1
+
+            except Exception as e:
+                error_msg = (
+                    f"Failed to populate metadata for artifact "
+                    f"'{artifact.name}' ({artifact.type.value}): {e}"
+                )
+                logger.warning(error_msg)
+                errors.append(error_msg)
+                skipped_count += 1
+                continue
+
+    # Batch commit after all artifacts processed
+    try:
+        session.commit()
+        duration = time.time() - start_time
+        logger.info(
+            f"CollectionArtifact metadata cache: created={created_count}, "
+            f"updated={updated_count}, skipped={skipped_count}, errors={len(errors)}"
+        )
+        logger.info(f"Metadata cache population completed in {duration:.2f}s")
+    except Exception as e:
+        session.rollback()
+        error_msg = f"Failed to commit metadata updates: {e}"
+        logger.error(error_msg)
+        errors.append(error_msg)
+
+    return {
+        "created_count": created_count,
+        "updated_count": updated_count,
+        "skipped_count": skipped_count,
+        "errors": errors,
     }
 
 
