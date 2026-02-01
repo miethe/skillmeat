@@ -5,6 +5,7 @@ Distinct from file-based collections in collections.py router.
 """
 
 import base64
+import json
 import logging
 import uuid
 from datetime import datetime
@@ -518,6 +519,273 @@ async def migrate_to_default_collection(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Migration failed: {str(e)}",
+        )
+
+
+# =============================================================================
+# Batch Cache Refresh Endpoint (MUST be before /{collection_id} routes)
+# =============================================================================
+
+
+def _refresh_single_collection_cache(
+    session: Session,
+    collection: Collection,
+    artifact_mgr,
+) -> dict:
+    """Refresh CollectionArtifact metadata cache for a single DB collection.
+
+    This helper extracts the core refresh logic to be reused by both scoped
+    and batch refresh endpoints.
+
+    Args:
+        session: Database session
+        collection: Collection ORM instance to refresh
+        artifact_mgr: ArtifactManager for reading file-based artifacts
+
+    Returns:
+        dict with stats:
+            - collection_id: str
+            - updated: int (artifacts updated)
+            - skipped: int (artifacts skipped/unchanged)
+            - errors: list of error strings
+    """
+    updated = 0
+    skipped = 0
+    errors = []
+
+    logger.debug(f"Refreshing cache for collection '{collection.id}'")
+
+    # Get all CollectionArtifact rows for this collection
+    collection_artifacts = (
+        session.query(CollectionArtifact)
+        .filter_by(collection_id=collection.id)
+        .all()
+    )
+
+    if not collection_artifacts:
+        logger.debug(f"Collection '{collection.id}' has no artifacts to refresh")
+        return {
+            "collection_id": collection.id,
+            "updated": 0,
+            "skipped": 0,
+            "errors": [],
+        }
+
+    # Process each CollectionArtifact
+    for ca in collection_artifacts:
+        try:
+            # Parse artifact_id (format: "type:name")
+            if ":" in ca.artifact_id:
+                type_str, artifact_name = ca.artifact_id.split(":", 1)
+            else:
+                type_str, artifact_name = "unknown", ca.artifact_id
+
+            # Try to get artifact type enum
+            artifact_type_enum = None
+            try:
+                artifact_type_enum = CoreArtifactType(type_str)
+            except ValueError:
+                # Unknown type - skip
+                logger.debug(f"Unknown artifact type '{type_str}' for {ca.artifact_id}")
+                skipped += 1
+                continue
+
+            # Look up artifact in file system
+            file_artifact = None
+            try:
+                file_artifact = artifact_mgr.show(
+                    artifact_name=artifact_name,
+                    artifact_type=artifact_type_enum,
+                )
+            except Exception as e:
+                logger.debug(
+                    f"File-based lookup failed for {ca.artifact_id}: {e}"
+                )
+                skipped += 1
+                continue
+
+            if not file_artifact:
+                skipped += 1
+                continue
+
+            # Extract metadata fields from file-based artifact
+            metadata = file_artifact.metadata
+            description = metadata.description if metadata else None
+            author = metadata.author if metadata else None
+            license_val = metadata.license if metadata else None
+            version = metadata.version if metadata else None
+
+            # Convert tags list to JSON string
+            tags_json = None
+            if metadata and metadata.tags:
+                tags_json = json.dumps(metadata.tags)
+
+            # Source and origin fields
+            source = file_artifact.upstream
+            origin = file_artifact.origin
+            origin_source = file_artifact.origin_source
+            resolved_sha = getattr(file_artifact, "resolved_sha", None)
+            resolved_version = getattr(file_artifact, "resolved_version", None)
+
+            # Update CollectionArtifact row
+            ca.description = description
+            ca.author = author
+            ca.license = license_val
+            ca.tags_json = tags_json
+            ca.version = version
+            ca.source = source
+            ca.origin = origin
+            ca.origin_source = origin_source
+            ca.resolved_sha = resolved_sha
+            ca.resolved_version = resolved_version
+            ca.synced_at = datetime.utcnow()
+            updated += 1
+
+        except Exception as e:
+            error_msg = f"Failed to refresh {ca.artifact_id}: {e}"
+            logger.warning(error_msg)
+            errors.append(error_msg)
+            skipped += 1
+
+    return {
+        "collection_id": collection.id,
+        "updated": updated,
+        "skipped": skipped,
+        "errors": errors,
+    }
+
+
+@router.post(
+    "/refresh-cache",
+    response_model=dict,
+    status_code=status.HTTP_200_OK,
+    summary="Refresh metadata cache for all collections",
+    description=(
+        "Refresh CollectionArtifact metadata cache across all DB collections. "
+        "Iterates all collections in the database and refreshes cached metadata "
+        "from file-based artifacts. This is a bulk operation and may take time "
+        "for large collections."
+    ),
+    responses={
+        200: {"description": "Cache refresh completed"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+    tags=["user-collections"],
+)
+async def refresh_all_collections_cache(
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    session: DbSessionDep,
+    token: TokenDep,
+) -> dict:
+    """Refresh CollectionArtifact metadata cache across all DB collections.
+
+    Iterates all collections in the database and refreshes cached metadata
+    from file-based artifacts.
+
+    Args:
+        artifact_mgr: Artifact manager for listing artifacts
+        collection_mgr: Collection manager for listing collections
+        session: Database session
+        token: Authentication token
+
+    Returns:
+        dict with stats:
+            - collections_refreshed: int
+            - total_updated: int
+            - total_skipped: int
+            - errors: list of error dicts with collection_id and error messages
+
+    Raises:
+        HTTPException: On failure
+    """
+    import time
+
+    start_time = time.time()
+    logger.info("Starting batch cache refresh for all collections")
+
+    try:
+        # Query all Collection rows from database
+        all_collections = session.query(Collection).all()
+        logger.info(f"Found {len(all_collections)} collections to refresh")
+
+        # Handle empty database gracefully
+        if not all_collections:
+            logger.info("No collections found in database, cache refresh skipped")
+            return {
+                "success": True,
+                "collections_refreshed": 0,
+                "total_updated": 0,
+                "total_skipped": 0,
+                "errors": [],
+                "duration_seconds": 0.0,
+            }
+
+        collections_refreshed = 0
+        total_updated = 0
+        total_skipped = 0
+        errors = []
+
+        # Process each collection
+        for collection in all_collections:
+            try:
+                result = _refresh_single_collection_cache(
+                    session=session,
+                    collection=collection,
+                    artifact_mgr=artifact_mgr,
+                )
+
+                collections_refreshed += 1
+                total_updated += result["updated"]
+                total_skipped += result["skipped"]
+
+                if result["errors"]:
+                    errors.append({
+                        "collection_id": collection.id,
+                        "errors": result["errors"],
+                    })
+
+                logger.debug(
+                    f"Collection '{collection.id}': updated={result['updated']}, "
+                    f"skipped={result['skipped']}"
+                )
+
+            except Exception as e:
+                error_msg = f"Failed to refresh collection '{collection.id}': {e}"
+                logger.warning(error_msg)
+                errors.append({
+                    "collection_id": collection.id,
+                    "errors": [str(e)],
+                })
+
+        # Commit all changes
+        session.commit()
+
+        duration = time.time() - start_time
+        logger.info(
+            f"Batch cache refresh completed in {duration:.2f}s: "
+            f"collections={collections_refreshed}, updated={total_updated}, "
+            f"skipped={total_skipped}, errors={len(errors)}"
+        )
+
+        return {
+            "success": True,
+            "collections_refreshed": collections_refreshed,
+            "total_updated": total_updated,
+            "total_skipped": total_skipped,
+            "errors": errors,
+            "duration_seconds": round(duration, 2),
+        }
+
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Batch cache refresh failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "batch_cache_refresh_failed",
+                "message": f"Failed to refresh all collections cache: {str(e)}",
+            },
         )
 
 
@@ -1084,8 +1352,7 @@ async def list_collection_artifacts(
                     )
 
         # Fetch artifact metadata for each association
-        # Primary: Use ArtifactManager (file-based source of truth)
-        # Fallback: Use database service for cached/marketplace metadata
+        # Priority: 1. DB cache (if synced_at is set), 2. File system, 3. Marketplace
         items: List[ArtifactSummary] = []
         for assoc in page_associations:
             # Parse artifact_id (format: "type:name")
@@ -1094,65 +1361,92 @@ async def list_collection_artifacts(
             else:
                 type_str, artifact_name = "unknown", assoc.artifact_id
 
-            # Try to get artifact from file-based manager
             artifact_summary = None
-            try:
-                # Convert type string to ArtifactType enum
-                artifact_type_enum = None
+
+            # 1. Primary: Try to build from DB cache (check synced_at)
+            if assoc.synced_at is not None:
+                # Cache hit - use cached fields from CollectionArtifact
+                tags = None
+                if assoc.tags_json:
+                    try:
+                        tags = json.loads(assoc.tags_json)
+                    except (json.JSONDecodeError, TypeError):
+                        tags = None
+
+                artifact_summary = ArtifactSummary(
+                    id=assoc.artifact_id,
+                    name=artifact_name,
+                    type=type_str,
+                    version=assoc.version,
+                    source=assoc.source or assoc.artifact_id,
+                    description=assoc.description,
+                    author=assoc.author,
+                    tags=tags,
+                    collections=_get_artifact_collections(session, assoc.artifact_id),
+                )
+                logger.debug(f"Cache hit for {assoc.artifact_id}")
+
+            # 2. Fallback: Try file-based ArtifactManager on cache miss
+            if artifact_summary is None:
                 try:
-                    artifact_type_enum = CoreArtifactType(type_str)
-                except ValueError:
-                    pass
+                    # Convert type string to ArtifactType enum
+                    artifact_type_enum = None
+                    try:
+                        artifact_type_enum = CoreArtifactType(type_str)
+                    except ValueError:
+                        pass
 
-                file_artifact = artifact_mgr.show(
-                    artifact_name=artifact_name,
-                    artifact_type=artifact_type_enum,
-                )
-
-                if file_artifact:
-                    # Build ArtifactSummary from file-based artifact
-                    artifact_summary = ArtifactSummary(
-                        id=assoc.artifact_id,
-                        name=file_artifact.name,
-                        type=(
-                            file_artifact.type.value
-                            if hasattr(file_artifact.type, "value")
-                            else str(file_artifact.type)
-                        ),
-                        version=(
-                            file_artifact.metadata.version
-                            if file_artifact.metadata
-                            else None
-                        ),
-                        source=file_artifact.upstream or assoc.artifact_id,
-                        description=(
-                            file_artifact.metadata.description
-                            if file_artifact.metadata
-                            else None
-                        ),
-                        author=(
-                            file_artifact.metadata.author
-                            if file_artifact.metadata
-                            else None
-                        ),
-                        tags=(
-                            file_artifact.metadata.tags
-                            if file_artifact.metadata and file_artifact.metadata.tags
-                            else None
-                        ),
-                        collections=_get_artifact_collections(
-                            session, assoc.artifact_id
-                        ),
+                    file_artifact = artifact_mgr.show(
+                        artifact_name=artifact_name,
+                        artifact_type=artifact_type_enum,
                     )
-            except (ValueError, Exception) as e:
-                # Artifact not found in file system, fall through to fallback
-                logger.debug(
-                    f"File-based lookup failed for {assoc.artifact_id}: {e}"
-                )
 
-            # Fallback to database service if file-based lookup failed
+                    if file_artifact:
+                        # Build ArtifactSummary from file-based artifact
+                        artifact_summary = ArtifactSummary(
+                            id=assoc.artifact_id,
+                            name=file_artifact.name,
+                            type=(
+                                file_artifact.type.value
+                                if hasattr(file_artifact.type, "value")
+                                else str(file_artifact.type)
+                            ),
+                            version=(
+                                file_artifact.metadata.version
+                                if file_artifact.metadata
+                                else None
+                            ),
+                            source=file_artifact.upstream or assoc.artifact_id,
+                            description=(
+                                file_artifact.metadata.description
+                                if file_artifact.metadata
+                                else None
+                            ),
+                            author=(
+                                file_artifact.metadata.author
+                                if file_artifact.metadata
+                                else None
+                            ),
+                            tags=(
+                                file_artifact.metadata.tags
+                                if file_artifact.metadata and file_artifact.metadata.tags
+                                else None
+                            ),
+                            collections=_get_artifact_collections(
+                                session, assoc.artifact_id
+                            ),
+                        )
+                        logger.debug(f"File-based lookup for {assoc.artifact_id}")
+                except (ValueError, Exception) as e:
+                    # Artifact not found in file system, fall through to fallback
+                    logger.debug(
+                        f"File-based lookup failed for {assoc.artifact_id}: {e}"
+                    )
+
+            # 3. Last resort: Fallback to marketplace/database service
             if artifact_summary is None:
                 artifact_summary = get_artifact_metadata(session, assoc.artifact_id)
+                logger.debug(f"Marketplace fallback for {assoc.artifact_id}")
 
             # Apply type filter if specified
             if artifact_type is None or artifact_summary.type == artifact_type:
@@ -1721,7 +2015,193 @@ async def list_collection_entities(
 
 
 # =============================================================================
-# Refresh Endpoint
+# Cache Refresh Endpoints
+# =============================================================================
+
+
+@router.post(
+    "/{collection_id}/refresh-cache",
+    response_model=dict,
+    status_code=status.HTTP_200_OK,
+    tags=["user-collections"],
+    summary="Refresh collection metadata cache (DB-backed)",
+    description=(
+        "Refresh CollectionArtifact metadata cache for a specific DB collection. "
+        "This is separate from /{collection_id}/refresh, which refreshes file-based "
+        "collections. This endpoint targets only the DB cache, reading current "
+        "file-based artifact metadata and updating CollectionArtifact cache rows."
+    ),
+    responses={
+        200: {"description": "Cache refresh completed successfully"},
+        404: {"model": ErrorResponse, "description": "Collection not found in database"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def refresh_collection_cache(
+    collection_id: str,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    db_session: DbSessionDep,
+    token: TokenDep,
+) -> dict:
+    """Refresh CollectionArtifact metadata cache for a specific DB collection.
+
+    IMPORTANT: This is separate from /{collection_id}/refresh, which refreshes
+    file-based collections. This endpoint targets only the DB cache.
+
+    Reads current file-based artifact metadata and updates CollectionArtifact
+    cache rows for all artifacts in the specified collection.
+
+    Args:
+        collection_id: UUID or name of the collection
+        artifact_mgr: Artifact manager for reading file-based metadata
+        collection_mgr: Collection manager for file-based collection access
+        db_session: Database session
+        token: Authentication token
+
+    Returns:
+        dict with refresh stats: updated_count, skipped_count, errors
+
+    Raises:
+        HTTPException: If collection not found in database
+    """
+    import json
+    import time
+
+    logger.info(f"Starting DB cache refresh for collection '{collection_id}'")
+    start_time = time.time()
+
+    # 1. Validate collection exists in database (Collection table)
+    collection = db_session.query(Collection).filter_by(id=collection_id).first()
+    if not collection:
+        logger.error(f"Collection not found in database: {collection_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": "collection_not_found",
+                "collection_id": collection_id,
+                "message": f"Collection '{collection_id}' not found in database",
+            },
+        )
+
+    # 2. Query all CollectionArtifact rows for this collection_id
+    collection_artifacts = (
+        db_session.query(CollectionArtifact)
+        .filter_by(collection_id=collection_id)
+        .all()
+    )
+
+    logger.debug(
+        f"Found {len(collection_artifacts)} artifacts in collection '{collection_id}'"
+    )
+
+    updated_count = 0
+    skipped_count = 0
+    errors: list[str] = []
+
+    # 3. For each artifact: Read file-based metadata via ArtifactManager, update cache
+    for ca in collection_artifacts:
+        try:
+            # Parse artifact_id (format: "type:name")
+            if ":" in ca.artifact_id:
+                type_str, artifact_name = ca.artifact_id.split(":", 1)
+            else:
+                type_str, artifact_name = "unknown", ca.artifact_id
+
+            # Try to get artifact from file-based manager
+            artifact_type_enum = None
+            try:
+                artifact_type_enum = CoreArtifactType(type_str)
+            except ValueError:
+                pass
+
+            file_artifact = artifact_mgr.show(
+                artifact_name=artifact_name,
+                artifact_type=artifact_type_enum,
+            )
+
+            if file_artifact is None:
+                # Artifact no longer exists in file system
+                logger.debug(
+                    f"Artifact '{ca.artifact_id}' not found in file system, skipping"
+                )
+                skipped_count += 1
+                continue
+
+            # Extract metadata fields from artifact
+            metadata = file_artifact.metadata
+            description = metadata.description if metadata else None
+            author = metadata.author if metadata else None
+            license_val = metadata.license if metadata else None
+            version = metadata.version if metadata else None
+
+            # Convert tags list to JSON string
+            tags_json = None
+            if metadata and metadata.tags:
+                tags_json = json.dumps(metadata.tags)
+
+            # Source and origin fields
+            source = file_artifact.upstream
+            origin = file_artifact.origin
+            origin_source = file_artifact.origin_source
+            resolved_sha = getattr(file_artifact, "resolved_sha", None)
+            resolved_version = getattr(file_artifact, "resolved_version", None)
+
+            # Update cache fields
+            ca.description = description
+            ca.author = author
+            ca.license = license_val
+            ca.tags_json = tags_json
+            ca.version = version
+            ca.source = source
+            ca.origin = origin
+            ca.origin_source = origin_source
+            ca.resolved_sha = resolved_sha
+            ca.resolved_version = resolved_version
+            ca.synced_at = datetime.utcnow()
+
+            updated_count += 1
+            logger.debug(f"Updated cache for artifact '{ca.artifact_id}'")
+
+        except Exception as e:
+            error_msg = f"Failed to refresh cache for artifact '{ca.artifact_id}': {e}"
+            logger.warning(error_msg)
+            errors.append(error_msg)
+            skipped_count += 1
+            continue
+
+    # 4. Commit all updates
+    try:
+        db_session.commit()
+        duration = time.time() - start_time
+        logger.info(
+            f"DB cache refresh for collection '{collection_id}' completed: "
+            f"updated={updated_count}, skipped={skipped_count}, errors={len(errors)}, "
+            f"duration={duration:.2f}s"
+        )
+    except Exception as e:
+        db_session.rollback()
+        logger.error(f"Failed to commit cache updates for collection '{collection_id}': {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "cache_commit_failed",
+                "collection_id": collection_id,
+                "message": f"Failed to commit cache updates: {str(e)}",
+            },
+        )
+
+    # 5. Return stats
+    return {
+        "collection_id": collection_id,
+        "updated_count": updated_count,
+        "skipped_count": skipped_count,
+        "errors": errors,
+    }
+
+
+# =============================================================================
+# File-Based Refresh Endpoint
 # =============================================================================
 
 

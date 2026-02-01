@@ -2,7 +2,7 @@
 type: progress
 prd: "artifact-metadata-cache-v1"
 status: in_progress
-progress: 19
+progress: 54
 total_phases: 5
 total_tasks: 26
 estimated_effort: "12-16 hours (Phases 1-4) + 6-8 hours (Phase 5 future)"
@@ -116,7 +116,7 @@ tasks:
     title: "Create DB cache refresh endpoint (scoped)"
     description: "Implement POST /api/v1/user-collections/{collection_id}/refresh-cache to fetch file-based metadata and update CollectionArtifact cache rows for a DB collection"
     phase: 2
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: high
     effort: "40-50 min"
@@ -131,7 +131,7 @@ tasks:
     title: "Create batch refresh endpoint (all collections)"
     description: "Implement POST /api/v1/user-collections/refresh-cache to refresh CollectionArtifact cache across all DB collections"
     phase: 2
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: high
     effort: "50-60 min"
@@ -146,7 +146,7 @@ tasks:
     title: "Add endpoint parameters validation"
     description: "Validate request parameters: collection_id ownership and request payload; enforce rate limiting for refresh-cache operations"
     phase: 2
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: medium
     effort: "20-30 min"
@@ -161,7 +161,7 @@ tasks:
     title: "Add error handling and logging"
     description: "Implement comprehensive error handling for refresh-cache endpoints: malformed metadata, missing fields, collection not found"
     phase: 2
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: high
     effort: "30-40 min"
@@ -176,7 +176,7 @@ tasks:
     title: "Add unit tests for endpoints"
     description: "Test refresh-cache endpoints: successful refresh, missing collections, partial failures, batch operations"
     phase: 2
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: high
     effort: "45-60 min"
@@ -190,7 +190,7 @@ tasks:
     title: "Hook deploy endpoint to refresh cache"
     description: "After artifacts.py deploy_artifact() completes file operation, trigger cache refresh for deployed artifact"
     phase: 2
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: high
     effort: "30 min"
@@ -205,7 +205,7 @@ tasks:
     title: "Hook sync endpoint to refresh cache"
     description: "After artifacts.py sync_artifact() completes file operation, trigger cache refresh for synced artifact"
     phase: 2
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: high
     effort: "30 min"
@@ -220,7 +220,7 @@ tasks:
     title: "Hook create/update/delete endpoints"
     description: "After create/update/delete operations, refresh or invalidate cache for affected artifacts"
     phase: 2
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: medium
     effort: "25-35 min"
@@ -235,7 +235,7 @@ tasks:
     title: "Make /user-collections read path DB-first"
     description: "Use CollectionArtifact cache as primary source; fallback to filesystem only on cache miss"
     phase: 2
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: high
     effort: "45-60 min"

@@ -105,7 +105,11 @@ from skillmeat.core.importer import (
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.utils.filesystem import compute_content_hash
 from sqlalchemy import func
-from skillmeat.api.services import CollectionService
+from skillmeat.api.services import (
+    CollectionService,
+    delete_artifact_cache,
+    refresh_single_artifact_cache,
+)
 from skillmeat.cache.models import Collection, CollectionArtifact, get_session
 from skillmeat.cache.repositories import MarketplaceCatalogRepository
 
@@ -1627,9 +1631,22 @@ async def create_artifact(
             f"in collection '{collection_name}'"
         )
 
+        # Refresh DB cache after successful create (non-blocking)
+        artifact_id = f"{artifact.type.value}:{artifact.name}"
+        try:
+            db_session = get_session()
+            try:
+                refresh_single_artifact_cache(
+                    db_session, artifact_mgr, artifact_id, collection_name
+                )
+            finally:
+                db_session.close()
+        except Exception as cache_err:
+            logger.warning(f"Cache refresh failed for {artifact_id}: {cache_err}")
+
         return ArtifactCreateResponse(
             success=True,
-            artifact_id=f"{artifact.type.value}:{artifact.name}",
+            artifact_id=artifact_id,
             artifact_name=artifact.name,
             artifact_type=artifact.type.value,
             collection=collection_name,
@@ -2419,6 +2436,18 @@ async def update_artifact(
             )
 
             logger.info(f"Successfully updated artifact: {artifact_id}")
+
+            # Refresh DB cache after successful update (non-blocking)
+            try:
+                db_session = get_session()
+                try:
+                    refresh_single_artifact_cache(
+                        db_session, artifact_mgr, artifact_id, collection_name
+                    )
+                finally:
+                    db_session.close()
+            except Exception as cache_err:
+                logger.warning(f"Cache refresh failed for {artifact_id}: {cache_err}")
         else:
             logger.info(f"No changes made to artifact: {artifact_id}")
 
@@ -2819,6 +2848,16 @@ async def delete_artifact(
                 f"{catalog_error}"
             )
 
+        # Delete DB cache entry after successful artifact deletion (non-blocking)
+        try:
+            db_session = get_session()
+            try:
+                delete_artifact_cache(db_session, artifact_id, collection_name)
+            finally:
+                db_session.close()
+        except Exception as cache_err:
+            logger.warning(f"Cache deletion failed for {artifact_id}: {cache_err}")
+
         # Return 204 No Content (no body)
         return None
 
@@ -2953,6 +2992,18 @@ async def deploy_artifact(
             logger.info(
                 f"Artifact '{artifact_name}' deployed successfully to {deployed_path}"
             )
+
+            # Refresh DB cache after successful deploy (non-blocking)
+            try:
+                db_session = get_session()
+                try:
+                    refresh_single_artifact_cache(
+                        db_session, artifact_mgr, artifact_id, collection_name
+                    )
+                finally:
+                    db_session.close()
+            except Exception as cache_err:
+                logger.warning(f"Cache refresh failed for {artifact_id}: {cache_err}")
 
             return ArtifactDeployResponse(
                 success=True,
@@ -3178,6 +3229,21 @@ async def sync_artifact(
                 f"updated={update_result.updated}, status={update_result.status}"
             )
 
+            # Refresh DB cache after successful upstream sync (non-blocking)
+            if update_result.updated:
+                try:
+                    db_session = get_session()
+                    try:
+                        refresh_single_artifact_cache(
+                            db_session, artifact_mgr, artifact_id, collection_name
+                        )
+                    finally:
+                        db_session.close()
+                except Exception as cache_err:
+                    logger.warning(
+                        f"Cache refresh failed for {artifact_id}: {cache_err}"
+                    )
+
             return ArtifactSyncResponse(
                 success=update_result.updated,
                 message=f"Artifact '{artifact_name}' synced from upstream: {update_result.status}",
@@ -3315,6 +3381,21 @@ async def sync_artifact(
                 f"Artifact '{artifact_name}' sync completed: status={sync_result.status}, "
                 f"conflicts={len(conflicts_list) if conflicts_list else 0}"
             )
+
+            # Refresh DB cache after successful project sync (non-blocking)
+            if success:
+                try:
+                    db_session = get_session()
+                    try:
+                        refresh_single_artifact_cache(
+                            db_session, artifact_mgr, artifact_id, collection_name
+                        )
+                    finally:
+                        db_session.close()
+                except Exception as cache_err:
+                    logger.warning(
+                        f"Cache refresh failed for {artifact_id}: {cache_err}"
+                    )
 
             return ArtifactSyncResponse(
                 success=success,
