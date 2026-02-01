@@ -931,7 +931,7 @@ async def list_collection_artifacts(
             # Apply type filter if specified
             if artifact_type is None or artifact_summary.type == artifact_type:
                 if include_groups:
-                    # Add groups field to artifact summary
+                    # Add groups field to artifact summary while preserving all metadata
                     groups = artifact_groups_map.get(assoc.artifact_id, [])
                     items.append(
                         ArtifactSummary(
@@ -940,6 +940,10 @@ async def list_collection_artifacts(
                             type=artifact_summary.type,
                             version=artifact_summary.version,
                             source=artifact_summary.source,
+                            description=artifact_summary.description,
+                            author=artifact_summary.author,
+                            tags=artifact_summary.tags,
+                            collections=artifact_summary.collections,
                             groups=groups,
                         )
                     )
@@ -1444,31 +1448,11 @@ async def list_collection_entities(
         end_idx = start_idx + limit
         page_associations = all_associations[start_idx:end_idx]
 
-        # Fetch artifact metadata for each association
+        # Fetch artifact metadata for each association using fallback service
+        # This ensures consistent metadata including description, tags, and collections
         items: List[ArtifactSummary] = []
         for assoc in page_associations:
-            # Try to get artifact metadata from cache database
-            artifact = session.query(Artifact).filter_by(id=assoc.artifact_id).first()
-
-            if artifact:
-                # If artifact metadata exists, use it
-                artifact_summary = ArtifactSummary(
-                    id=assoc.artifact_id,
-                    name=artifact.name,
-                    type=artifact.type,
-                    version=artifact.deployed_version or artifact.upstream_version,
-                    source=artifact.source or assoc.artifact_id,
-                )
-            else:
-                # Fallback: return artifact_id as both name and source
-                artifact_summary = ArtifactSummary(
-                    id=assoc.artifact_id,
-                    name=assoc.artifact_id,
-                    type="unknown",
-                    version=None,
-                    source=assoc.artifact_id,
-                )
-
+            artifact_summary = get_artifact_metadata(session, assoc.artifact_id)
             items.append(artifact_summary)
 
         # Build pagination info
