@@ -1,230 +1,117 @@
 """Tests for rate limiting middleware.
 
-Tests token bucket algorithm, rate limiting, and middleware integration.
+Tests burst detection, rate limiting middleware, and deprecation warnings.
 """
 
 import time
+import warnings
 
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from skillmeat.api.middleware.rate_limit import (
+    RateLimitConfig,
     RateLimiter,
     RateLimitMiddleware,
     TokenBucket,
 )
 
 
-class TestTokenBucket:
-    """Tests for TokenBucket implementation."""
+class TestDeprecatedClasses:
+    """Tests for deprecated classes and their deprecation warnings."""
 
-    def test_token_bucket_init(self):
-        """Test token bucket initialization."""
-        bucket = TokenBucket(max_tokens=10, refill_rate=1.0)
+    def test_rate_limit_config_deprecation_warning(self):
+        """Test that RateLimitConfig raises DeprecationWarning on instantiation."""
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            config = RateLimitConfig(requests_per_hour=100)
 
-        assert bucket.max_tokens == 10
-        assert bucket.refill_rate == 1.0
-        assert bucket.tokens == 10.0
+            # Should have one warning
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "RateLimitConfig is deprecated" in str(w[0].message)
+            assert "will be removed in v1.0" in str(w[0].message)
+            assert "SlidingWindowTracker" in str(w[0].message)
 
-    def test_consume_success(self):
-        """Test successful token consumption."""
-        bucket = TokenBucket(max_tokens=10, refill_rate=1.0)
+    def test_rate_limit_config_has_value(self):
+        """Test that RateLimitConfig still holds the value despite deprecation."""
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            config = RateLimitConfig(requests_per_hour=50)
+            assert config.requests_per_hour == 50
 
-        result = bucket.consume(5)
-        assert result is True
-        assert bucket.tokens == 5.0
+    def test_token_bucket_deprecation_warning(self):
+        """Test that TokenBucket raises DeprecationWarning on instantiation."""
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            bucket = TokenBucket()
 
-    def test_consume_failure(self):
-        """Test token consumption when insufficient tokens."""
-        bucket = TokenBucket(max_tokens=10, refill_rate=1.0)
+            # Should have one warning
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "TokenBucket is deprecated" in str(w[0].message)
+            assert "will be removed in v1.0" in str(w[0].message)
+            assert "SlidingWindowTracker" in str(w[0].message)
 
-        # Consume all tokens
-        bucket.consume(10)
+    def test_token_bucket_methods_not_implemented(self):
+        """Test that TokenBucket methods raise NotImplementedError."""
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            bucket = TokenBucket()
 
-        # Should fail
-        result = bucket.consume(1)
-        assert result is False
+        # Test add_tokens
+        with pytest.raises(NotImplementedError, match="TokenBucket is deprecated"):
+            bucket.add_tokens(5)
 
-    def test_refill(self):
-        """Test token refilling over time."""
-        bucket = TokenBucket(max_tokens=10, refill_rate=10.0)  # 10 tokens/second
+        # Test consume_token
+        with pytest.raises(NotImplementedError, match="TokenBucket is deprecated"):
+            bucket.consume_token()
 
-        # Consume tokens
-        bucket.consume(10)
-        assert bucket.tokens == 0
+        # Test get_available_tokens
+        with pytest.raises(NotImplementedError, match="TokenBucket is deprecated"):
+            bucket.get_available_tokens()
 
-        # Wait and refill
-        time.sleep(0.5)
-        bucket.refill()
+    def test_rate_limiter_deprecation_warning(self):
+        """Test that RateLimiter raises DeprecationWarning on instantiation."""
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            limiter = RateLimiter()
 
-        # Should have ~5 tokens (0.5s * 10 tokens/s)
-        assert bucket.tokens >= 4.0
-        assert bucket.tokens <= 6.0
+            # Should have one warning
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "RateLimiter is deprecated" in str(w[0].message)
+            assert "will be removed in v1.0" in str(w[0].message)
+            assert "SlidingWindowTracker" in str(w[0].message)
 
-    def test_refill_max_cap(self):
-        """Test that refill doesn't exceed max tokens."""
-        bucket = TokenBucket(max_tokens=10, refill_rate=10.0)
+    def test_rate_limiter_methods_not_implemented(self):
+        """Test that RateLimiter methods raise NotImplementedError."""
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            limiter = RateLimiter()
 
-        # Wait and refill
-        time.sleep(2.0)
-        bucket.refill()
+        # Test is_allowed
+        with pytest.raises(NotImplementedError, match="RateLimiter is deprecated"):
+            limiter.is_allowed()
 
-        # Should be capped at max_tokens
-        assert bucket.tokens == 10.0
-
-    def test_time_until_refill(self):
-        """Test calculating time until tokens available."""
-        bucket = TokenBucket(max_tokens=10, refill_rate=1.0)
-
-        # Consume all tokens
-        bucket.consume(10)
-
-        # Should take ~5 seconds to get 5 tokens
-        time_needed = bucket.time_until_refill(5)
-        assert time_needed >= 4.9
-        assert time_needed <= 5.1
-
-    def test_time_until_refill_sufficient(self):
-        """Test time until refill when tokens already sufficient."""
-        bucket = TokenBucket(max_tokens=10, refill_rate=1.0)
-
-        time_needed = bucket.time_until_refill(5)
-        assert time_needed == 0.0
-
-
-class TestRateLimiter:
-    """Tests for RateLimiter."""
-
-    def test_rate_limiter_init(self):
-        """Test rate limiter initialization."""
-        limiter = RateLimiter(default_max_requests=100, default_window_seconds=60)
-
-        assert limiter.default_config.max_requests == 100
-        assert limiter.default_config.window_seconds == 60
-
-    def test_add_endpoint_limit(self):
-        """Test adding endpoint-specific limit."""
-        limiter = RateLimiter()
-
-        limiter.add_endpoint_limit("/api/test", max_requests=10, window_seconds=60)
-
-        assert "/api/test" in limiter.endpoint_configs
-        config = limiter.endpoint_configs["/api/test"]
-        assert config.max_requests == 10
-        assert config.window_seconds == 60
-
-    def test_check_rate_limit_allowed(self):
-        """Test rate limit check when allowed."""
-        limiter = RateLimiter(default_max_requests=10, default_window_seconds=60)
-
-        allowed, retry_after = limiter.check_rate_limit("192.168.1.1", "/api/test")
-
-        assert allowed is True
-        assert retry_after is None
-
-    def test_check_rate_limit_exceeded(self):
-        """Test rate limit check when exceeded."""
-        limiter = RateLimiter(default_max_requests=3, default_window_seconds=60)
-
-        # Make requests up to limit
-        for i in range(3):
-            allowed, _ = limiter.check_rate_limit("192.168.1.1", "/api/test")
-            assert allowed is True
-
-        # Fourth request should be rate limited
-        allowed, retry_after = limiter.check_rate_limit("192.168.1.1", "/api/test")
-
-        assert allowed is False
-        assert retry_after is not None
-        assert retry_after > 0
-
-    def test_endpoint_specific_limits(self):
-        """Test that endpoint-specific limits work."""
-        limiter = RateLimiter(default_max_requests=10, default_window_seconds=60)
-
-        # Add stricter limit for specific endpoint
-        limiter.add_endpoint_limit("/api/restricted", max_requests=2, window_seconds=60)
-
-        # Make requests to default endpoint
-        for i in range(5):
-            allowed, _ = limiter.check_rate_limit("192.168.1.1", "/api/test")
-            assert allowed is True
-
-        # Make requests to restricted endpoint
-        for i in range(2):
-            allowed, _ = limiter.check_rate_limit("192.168.1.1", "/api/restricted")
-            assert allowed is True
-
-        # Third request to restricted should fail
-        allowed, _ = limiter.check_rate_limit("192.168.1.1", "/api/restricted")
-        assert allowed is False
-
-    def test_per_ip_tracking(self):
-        """Test that rate limits are tracked per IP."""
-        limiter = RateLimiter(default_max_requests=2, default_window_seconds=60)
-
-        # Make requests from IP1
-        for i in range(2):
-            allowed, _ = limiter.check_rate_limit("192.168.1.1", "/api/test")
-            assert allowed is True
-
-        # IP1 should be rate limited
-        allowed, _ = limiter.check_rate_limit("192.168.1.1", "/api/test")
-        assert allowed is False
-
-        # IP2 should still be allowed
-        allowed, _ = limiter.check_rate_limit("192.168.1.2", "/api/test")
-        assert allowed is True
-
-    def test_reset_specific_ip(self):
-        """Test resetting rate limits for specific IP."""
-        limiter = RateLimiter(default_max_requests=2, default_window_seconds=60)
-
-        # Exhaust rate limit
-        for i in range(2):
-            limiter.check_rate_limit("192.168.1.1", "/api/test")
-
-        # Should be rate limited
-        allowed, _ = limiter.check_rate_limit("192.168.1.1", "/api/test")
-        assert allowed is False
-
-        # Reset
-        limiter.reset(ip="192.168.1.1")
-
-        # Should be allowed again
-        allowed, _ = limiter.check_rate_limit("192.168.1.1", "/api/test")
-        assert allowed is True
-
-    def test_reset_all(self):
-        """Test resetting all rate limits."""
-        limiter = RateLimiter(default_max_requests=2, default_window_seconds=60)
-
-        # Exhaust rate limits for multiple IPs
-        for i in range(2):
-            limiter.check_rate_limit("192.168.1.1", "/api/test")
-            limiter.check_rate_limit("192.168.1.2", "/api/test")
-
-        # Reset all
-        limiter.reset()
-
-        # Both should be allowed again
-        allowed, _ = limiter.check_rate_limit("192.168.1.1", "/api/test")
-        assert allowed is True
-
-        allowed, _ = limiter.check_rate_limit("192.168.1.2", "/api/test")
-        assert allowed is True
+        # Test reset
+        with pytest.raises(NotImplementedError, match="RateLimiter is deprecated"):
+            limiter.reset()
 
 
 class TestRateLimitMiddleware:
-    """Tests for RateLimitMiddleware integration."""
+    """Tests for RateLimitMiddleware with burst detection."""
 
-    def test_middleware_allows_requests(self):
-        """Test that middleware allows requests under limit."""
+    def test_middleware_allows_normal_requests(self):
+        """Test that middleware allows normal requests under burst threshold."""
         app = FastAPI()
-
-        limiter = RateLimiter(default_max_requests=10, default_window_seconds=60)
-        app.add_middleware(RateLimitMiddleware, rate_limiter=limiter)
+        app.add_middleware(
+            RateLimitMiddleware,
+            window_seconds=10,
+            burst_threshold=20,
+            block_duration=10,
+        )
 
         @app.get("/test")
         async def test_endpoint():
@@ -232,17 +119,20 @@ class TestRateLimitMiddleware:
 
         client = TestClient(app)
 
-        # Make requests under limit
-        for i in range(5):
+        # Make requests under burst threshold
+        for i in range(10):
             response = client.get("/test")
             assert response.status_code == 200
 
-    def test_middleware_rate_limits(self):
-        """Test that middleware enforces rate limits."""
+    def test_middleware_detects_burst(self):
+        """Test that middleware detects burst and returns 429."""
         app = FastAPI()
-
-        limiter = RateLimiter(default_max_requests=3, default_window_seconds=60)
-        app.add_middleware(RateLimitMiddleware, rate_limiter=limiter)
+        app.add_middleware(
+            RateLimitMiddleware,
+            window_seconds=10,
+            burst_threshold=5,  # Low threshold for testing
+            block_duration=1,
+        )
 
         @app.get("/test")
         async def test_endpoint():
@@ -250,26 +140,24 @@ class TestRateLimitMiddleware:
 
         client = TestClient(app)
 
-        # Make requests up to limit
-        for i in range(3):
+        # Make requests up to burst threshold (4 requests are OK)
+        for i in range(4):
             response = client.get("/test")
             assert response.status_code == 200
 
-        # Fourth request should be rate limited
+        # 5th identical request triggers burst detection (threshold reached)
         response = client.get("/test")
         assert response.status_code == 429
         assert "error" in response.json()
         assert response.json()["error"] == "RATE_LIMIT_EXCEEDED"
-        assert "Retry-After" in response.headers
 
     def test_middleware_excludes_paths(self):
         """Test that excluded paths bypass rate limiting."""
         app = FastAPI()
-
-        limiter = RateLimiter(default_max_requests=2, default_window_seconds=60)
         app.add_middleware(
             RateLimitMiddleware,
-            rate_limiter=limiter,
+            window_seconds=10,
+            burst_threshold=2,
             excluded_paths=["/health"],
         )
 
@@ -283,47 +171,51 @@ class TestRateLimitMiddleware:
 
         client = TestClient(app)
 
-        # Exhaust rate limit on /test
-        for i in range(2):
+        # Trigger burst on /test
+        for i in range(3):
             response = client.get("/test")
-            assert response.status_code == 200
 
         # /test should be rate limited
         response = client.get("/test")
         assert response.status_code == 429
 
         # /health should still work (excluded)
-        for i in range(5):
+        for i in range(10):
             response = client.get("/health")
             assert response.status_code == 200
 
-    def test_middleware_adds_headers(self):
-        """Test that middleware adds rate limit headers."""
+    def test_middleware_adds_rate_limit_headers(self):
+        """Test that middleware adds rate limit headers to successful responses."""
         app = FastAPI()
-
-        limiter = RateLimiter(default_max_requests=10, default_window_seconds=60)
-        app.add_middleware(RateLimitMiddleware, rate_limiter=limiter)
+        app.add_middleware(
+            RateLimitMiddleware,
+            window_seconds=10,
+            burst_threshold=20,
+        )
 
         @app.get("/test")
         async def test_endpoint():
             return {"status": "ok"}
 
         client = TestClient(app)
-
         response = client.get("/test")
+
         assert response.status_code == 200
+        # Check for new-style headers
+        assert "X-RateLimit-Window" in response.headers
+        assert "X-RateLimit-Threshold" in response.headers
+        assert "X-RateLimit-Current" in response.headers
+        assert "X-RateLimit-Blocked" in response.headers
 
-        # Check headers
-        assert "X-RateLimit-Limit" in response.headers
-        assert "X-RateLimit-Remaining" in response.headers
-        assert "X-RateLimit-Reset" in response.headers
-
-    def test_middleware_429_response(self):
-        """Test 429 response format."""
+    def test_middleware_429_response_format(self):
+        """Test 429 response format and headers."""
         app = FastAPI()
-
-        limiter = RateLimiter(default_max_requests=1, default_window_seconds=60)
-        app.add_middleware(RateLimitMiddleware, rate_limiter=limiter)
+        app.add_middleware(
+            RateLimitMiddleware,
+            window_seconds=10,
+            burst_threshold=1,
+            block_duration=2,
+        )
 
         @app.get("/test")
         async def test_endpoint():
@@ -331,21 +223,16 @@ class TestRateLimitMiddleware:
 
         client = TestClient(app)
 
-        # Exhaust limit
+        # Trigger burst
         client.get("/test")
-
-        # Get 429 response
         response = client.get("/test")
-        assert response.status_code == 429
 
+        assert response.status_code == 429
         data = response.json()
         assert data["error"] == "RATE_LIMIT_EXCEEDED"
         assert "message" in data
         assert "retry_after" in data
-        assert isinstance(data["retry_after"], int)
 
         # Check headers
         assert "Retry-After" in response.headers
-        assert "X-RateLimit-Limit" in response.headers
-        assert "X-RateLimit-Remaining" in response.headers
-        assert response.headers["X-RateLimit-Remaining"] == "0"
+        assert int(response.headers["Retry-After"]) == 2
