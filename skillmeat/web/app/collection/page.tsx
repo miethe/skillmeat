@@ -305,7 +305,7 @@ function CollectionPageContent() {
       const allSummaries = infiniteCollectionData.pages.flatMap((page) => page.items);
 
       // Map summaries to Artifact entities using centralized mapper
-      artifacts = mapArtifactsToEntities(allSummaries as any, 'collection');
+      artifacts = mapArtifactsToEntities(allSummaries, 'collection');
 
       // Deduplicate by ID to prevent React key conflicts
       const seen = new Set<string>();

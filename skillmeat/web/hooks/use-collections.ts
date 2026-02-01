@@ -43,10 +43,24 @@ interface ApiCollectionListResponse {
  */
 interface ApiCollectionArtifactsResponse {
   items: Array<{
+    id: string;
     name: string;
     type: string;
     version?: string;
     source: string;
+    description?: string;
+    author?: string;
+    tags?: string[];
+    collections?: Array<{
+      id: string;
+      name: string;
+      artifact_count: number;
+    }>;
+    groups?: Array<{
+      id: string;
+      name: string;
+      position: number;
+    }>;
   }>;
   page_info: {
     has_next_page: boolean;
