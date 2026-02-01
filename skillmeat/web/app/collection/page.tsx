@@ -28,71 +28,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { Artifact, ArtifactFilters } from '@/types/artifact';
 import type { ArtifactParameters } from '@/types/discovery';
 import { mapApiResponseToArtifact, type ArtifactResponse } from '@/lib/api/mappers';
+import { mapArtifactsToEntities } from '@/lib/api/entity-mapper';
 
 type ViewMode = 'grid' | 'list' | 'grouped';
-
-/**
- * Enrich ArtifactSummary with full Artifact data
- *
- * When viewing a specific collection, the API returns lightweight ArtifactSummary objects.
- * This function enriches them with full Artifact data from the catalog for consistent UI rendering.
- *
- * @param summary - Lightweight artifact summary from collection endpoint
- * @param allArtifacts - Full artifact list from catalog
- * @param collectionId - Optional collection ID (directory name, e.g., "default") to attach for API calls
- * @returns Full Artifact object or enriched fallback
- */
-function enrichArtifactSummary(
-  summary: { name: string; type: string; version?: string | null; source: string },
-  allArtifacts: Artifact[],
-  collectionId?: string
-): Artifact {
-  // Try to find matching full artifact by name and type
-  const fullArtifact = allArtifacts.find((a) => a.name === summary.name && a.type === summary.type);
-
-  if (fullArtifact) {
-    // If we have collection context and the full artifact lacks it, add it
-    if (collectionId && !fullArtifact.collection) {
-      return { ...fullArtifact, collection: collectionId };
-    }
-    return fullArtifact;
-  }
-
-  // Fallback: Convert summary to Artifact-like structure with defaults
-  // This ensures cards still render even if full data isn't available
-  // Note: source may be in "type:name" format if backend doesn't have the real source
-  // We detect this and leave source empty rather than showing the ID format
-  const artifactId = `${summary.type}:${summary.name}`;
-  const isSourceMissingOrSynthetic =
-    !summary.source || summary.source === artifactId || summary.source === summary.name;
-
-  return {
-    id: artifactId,
-    name: summary.name,
-    type: summary.type as any,
-    scope: 'user',
-    syncStatus: 'synced',
-    version: summary.version || undefined,
-    // If source looks like the ID format, don't use it - prefer undefined
-    source: isSourceMissingOrSynthetic ? undefined : summary.source,
-    // Flattened metadata fields
-    description: '',
-    tags: [],
-    upstream: {
-      enabled: false,
-      updateAvailable: false,
-    },
-    usageStats: {
-      totalDeployments: 0,
-      activeProjects: 0,
-      usageCount: 0,
-    },
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    aliases: [],
-    collection: collectionId,
-  };
-}
 
 function CollectionPageSkeleton() {
   return (
@@ -363,22 +301,11 @@ function CollectionPageContent() {
     let artifacts: Artifact[] = [];
 
     if (isSpecificCollection && infiniteCollectionData?.pages) {
-      // Collection-specific view with infinite scroll: Flatten pages and enrich
+      // Collection-specific view with infinite scroll: Flatten pages and map
       const allSummaries = infiniteCollectionData.pages.flatMap((page) => page.items);
 
-      // Get full artifacts from infiniteAllArtifactsData for enrichment
-      const fullArtifacts: Artifact[] = infiniteAllArtifactsData?.pages
-        ? infiniteAllArtifactsData.pages.flatMap((page) => page.items.map(mapApiArtifactToArtifact))
-        : [];
-
-      // Build collection ID from current context to ensure artifacts have collection set
-      // Use .id (directory name like "default") not .name (display name like "Default Collection")
-      const collectionId = currentCollection?.id;
-
-      // Enrich each summary with full data from catalog, including collection context
-      artifacts = allSummaries.map((summary) =>
-        enrichArtifactSummary(summary, fullArtifacts, collectionId)
-      );
+      // Map summaries to Artifact entities using centralized mapper
+      artifacts = mapArtifactsToEntities(allSummaries, 'collection');
 
       // Deduplicate by ID to prevent React key conflicts
       const seen = new Set<string>();
@@ -486,14 +413,8 @@ function CollectionPageContent() {
 
     if (isSpecificCollection && infiniteCollectionData?.pages) {
       const allSummaries = infiniteCollectionData.pages.flatMap((page) => page.items);
-      const fullArtifacts: Artifact[] = infiniteAllArtifactsData?.pages
-        ? infiniteAllArtifactsData.pages.flatMap((page) => page.items.map(mapApiArtifactToArtifact))
-        : [];
-      // Use .id (directory name like "default") not .name (display name like "Default Collection")
-      const collectionId = currentCollection?.id;
-      allArtifacts = allSummaries.map((summary) =>
-        enrichArtifactSummary(summary, fullArtifacts, collectionId)
-      );
+      // Map summaries to Artifact entities using centralized mapper
+      allArtifacts = mapArtifactsToEntities(allSummaries as any, 'collection');
     } else if (!isSpecificCollection && infiniteAllArtifactsData?.pages) {
       allArtifacts = infiniteAllArtifactsData.pages.flatMap((page) =>
         page.items.map(mapApiArtifactToArtifact)

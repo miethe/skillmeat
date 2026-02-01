@@ -177,13 +177,30 @@ export async function moveArtifactToCollection(
 
 /**
  * Response type for paginated collection artifacts
+ *
+ * Must be compatible with ApiArtifactResponse for mapArtifactsToEntities.
+ * Optional fields use `?` without `| null` for TypeScript compatibility.
  */
 export interface CollectionArtifactsPaginatedResponse {
   items: Array<{
+    id: string;
     name: string;
     type: string;
-    version?: string | null;
+    version?: string;
     source: string;
+    description?: string;
+    author?: string;
+    tags?: string[];
+    collections?: Array<{
+      id: string;
+      name: string;
+      artifact_count?: number | null;
+    }>;
+    groups?: Array<{
+      id: string;
+      name: string;
+      position: number;
+    }>;
   }>;
   page_info: {
     has_next_page: boolean;

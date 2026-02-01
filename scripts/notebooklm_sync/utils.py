@@ -11,7 +11,20 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from .config import DEFAULT_NOTEBOOK_TITLE, EXCLUDE_PATTERNS, MAPPING_PATH
+try:
+    from .config import (
+        DEFAULT_NOTEBOOK_TITLE,
+        EXCLUDE_PATTERNS,
+        INCLUDE_PATTERNS,
+        MAPPING_PATH,
+    )
+except ImportError:
+    from config import (
+        DEFAULT_NOTEBOOK_TITLE,
+        EXCLUDE_PATTERNS,
+        INCLUDE_PATTERNS,
+        MAPPING_PATH,
+    )
 
 
 def load_mapping(path: Optional[Path] = None) -> Dict[str, Any]:
@@ -126,9 +139,10 @@ def get_target_files(
                 if not excluded:
                     target_files.append(relative_path)
 
-    # Add files matching include_patterns
-    if include_patterns:
-        for pattern in include_patterns:
+    # Add files matching include_patterns (use config defaults if not specified)
+    patterns_to_include = include_patterns if include_patterns is not None else INCLUDE_PATTERNS
+    if patterns_to_include:
+        for pattern in patterns_to_include:
             # Use glob or rglob depending on whether pattern contains **
             if "**" in pattern:
                 # For recursive patterns, extract the base directory and use rglob
@@ -176,7 +190,8 @@ def is_in_scope(filepath: Union[str, Path]) -> bool:
 
     A file is in scope if:
     - It's a root-level .md file (not in subdirectories)
-    - It's under docs/ (but not docs/project_plans/)
+    - It's under docs/ (but not docs/project_plans/ unless in INCLUDE_PATTERNS)
+    - It matches one of the INCLUDE_PATTERNS
 
     Args:
         filepath: Path to check (relative or absolute)
@@ -185,15 +200,24 @@ def is_in_scope(filepath: Union[str, Path]) -> bool:
         True if file is in scope, False otherwise.
     """
     path = Path(filepath)
+    filepath_str = str(path)
     parts = path.parts
 
     # Check if it's a root-level .md file
     if len(parts) == 1 and path.suffix == ".md":
         return True
 
+    # Check if it matches any include pattern (overrides exclusions)
+    # Convert glob patterns to prefix checks (e.g., "docs/foo/**/*.md" -> "docs/foo/")
+    for pattern in INCLUDE_PATTERNS:
+        # Extract prefix before ** and check if file is under that directory
+        pattern_prefix = pattern.split("**")[0].rstrip("/")
+        if filepath_str.startswith(pattern_prefix + "/") and filepath_str.endswith(".md"):
+            return True
+
     # Check if it's under docs/ but not docs/project_plans/
     if len(parts) >= 2 and parts[0] == "docs":
-        # Excluded if under project_plans
+        # Excluded if under project_plans (unless matched by INCLUDE_PATTERNS above)
         if len(parts) >= 2 and parts[1] == "project_plans":
             return False
         return True

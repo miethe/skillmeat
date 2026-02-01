@@ -8,6 +8,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from .artifacts import ArtifactCollectionInfo
 from .common import PageInfo, PaginatedResponse
 
 
@@ -212,12 +213,33 @@ class ArtifactSummary(BaseModel):
 
     When include_groups=true query parameter is used, the groups field
     will be populated with group membership information.
+
+    This schema includes metadata fields (description, author, tags, collections)
+    to support the frontend entity-mapper which expects these fields for
+    consistent Entity rendering including collection badges.
     """
 
+    id: str = Field(description="Unique artifact identifier")
     name: str = Field(description="Artifact name")
     type: str = Field(description="Artifact type (skill, command, agent, etc.)")
     version: Optional[str] = Field(default=None, description="Current version")
     source: str = Field(description="Source specification")
+    description: Optional[str] = Field(
+        default=None,
+        description="Artifact description from metadata",
+    )
+    author: Optional[str] = Field(
+        default=None,
+        description="Artifact author from metadata",
+    )
+    tags: Optional[List[str]] = Field(
+        default=None,
+        description="Artifact tags",
+    )
+    collections: Optional[List[ArtifactCollectionInfo]] = Field(
+        default=None,
+        description="Collections this artifact belongs to (for collection badges)",
+    )
     groups: Optional[List[ArtifactGroupMembership]] = Field(
         default=None,
         description="Groups this artifact belongs to (only populated when include_groups=true)",

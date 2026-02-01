@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy.orm import Session
 
 from skillmeat.api.dependencies import get_app_state, get_collection_manager, verify_api_key
 from skillmeat.api.middleware.auth import TokenDep
@@ -235,18 +236,38 @@ def build_project_summary(project_path: Path) -> ProjectSummary:
     )
 
 
-def build_project_detail(project_path: Path) -> ProjectDetail:
+def build_project_detail(project_path: Path, db_session: Optional[Session] = None) -> ProjectDetail:
     """Build a ProjectDetail from a project path.
 
     Args:
         project_path: Absolute path to project directory
+        db_session: Optional database session for collection lookups
 
     Returns:
         ProjectDetail object
     """
+    from skillmeat.api.services import CollectionService
+    from skillmeat.cache.models import get_session
+
     deployments = DeploymentTracker.read_deployments(project_path)
 
-    # Convert to API schema
+    # Fetch collection memberships for all artifacts (batch query)
+    collections_map = {}
+    if deployments:
+        # Construct artifact IDs: {type}:{name}
+        artifact_ids = [f"{d.artifact_type}:{d.artifact_name}" for d in deployments]
+
+        # Use provided session or create new one
+        session = db_session or get_session()
+        try:
+            collection_service = CollectionService(session)
+            collections_map = collection_service.get_collection_membership_batch(artifact_ids)
+        finally:
+            # Only close session if we created it
+            if db_session is None:
+                session.close()
+
+    # Convert to API schema with collection memberships
     deployed_artifacts = [
         DeployedArtifact(
             artifact_name=d.artifact_name,
@@ -257,6 +278,7 @@ def build_project_detail(project_path: Path) -> ProjectDetail:
             version=None,  # Version not currently stored in deployment
             collection_sha=d.collection_sha,
             local_modifications=d.local_modifications,
+            collections=collections_map.get(f"{d.artifact_type}:{d.artifact_name}", []),
         )
         for d in deployments
     ]

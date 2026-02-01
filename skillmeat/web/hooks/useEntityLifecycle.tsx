@@ -9,10 +9,10 @@ import { createContext, useContext, useState, useCallback, useMemo, ReactNode } 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, apiConfig } from '@/lib/api';
 import {
-  mapApiResponsesToArtifacts,
-  type ArtifactResponse as MapperArtifactResponse,
-} from '@/lib/api/mappers';
-import type { Artifact, SyncStatus } from '@/types/artifact';
+  mapArtifactsToEntities,
+  type ApiArtifactResponse,
+} from '@/lib/api/entity-mapper';
+import type { SyncStatus } from '@/types/artifact';
 import type { Entity, EntityType, EntityStatus } from '@/types/entity';
 import type {
   ArtifactCreateRequest,
@@ -578,22 +578,21 @@ async function fetchCollectionEntities(
 
   const processResponse = (response: ArtifactListResponse): Entity[] => {
     // Use centralized mapper with 'collection' context
-    // Cast SDK ArtifactResponse[] to mapper's ArtifactResponse[] (compatible structure)
-    const artifacts: Artifact[] = mapApiResponsesToArtifacts(
-      response.items as MapperArtifactResponse[],
+    const entities: Entity[] = mapArtifactsToEntities(
+      response.items as ApiArtifactResponse[],
       'collection'
     );
 
     // Attach collection info if provided (mapper doesn't have access to external collectionId)
-    const entities: Entity[] = artifacts.map((artifact) => ({
-      ...artifact,
-      collection: collectionId || artifact.collection || 'default',
+    const entitiesWithCollection: Entity[] = entities.map((entity) => ({
+      ...entity,
+      collection: collectionId || entity.collection || 'default',
     }));
 
     // Apply search filter client-side
     if (searchQuery) {
       const searchLower = searchQuery.toLowerCase();
-      return entities.filter(
+      return entitiesWithCollection.filter(
         (e: Entity) =>
           e.name.toLowerCase().includes(searchLower) ||
           e.description?.toLowerCase().includes(searchLower) ||
@@ -601,7 +600,7 @@ async function fetchCollectionEntities(
       );
     }
 
-    return entities;
+    return entitiesWithCollection;
   };
 
   return withMockFallback(

@@ -51,7 +51,7 @@ from .routers import (
     user_collections,
     versions,
 )
-from .middleware import ObservabilityMiddleware, RateLimitMiddleware, get_rate_limiter
+from .middleware import ObservabilityMiddleware, RateLimitMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +195,12 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.add_middleware(ObservabilityMiddleware)
     logger.info("Observability middleware enabled")
 
-    app.add_middleware(RateLimitMiddleware, rate_limiter=get_rate_limiter())
+    app.add_middleware(
+        RateLimitMiddleware,
+        window_seconds=10,
+        burst_threshold=20,
+        block_duration=10,
+    )
     logger.info("RateLimit middleware enabled")
 
     # Configure CORS middleware

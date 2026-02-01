@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from .artifacts import ArtifactCollectionInfo
 from .common import PageInfo, PaginatedResponse
 
 
@@ -49,6 +50,10 @@ class DeployedArtifact(BaseModel):
     local_modifications: bool = Field(
         default=False,
         description="Whether local modifications detected",
+    )
+    collections: List["ArtifactCollectionInfo"] = Field(
+        default_factory=list,
+        description="Collections this artifact belongs to (many-to-many relationship)",
     )
 
 

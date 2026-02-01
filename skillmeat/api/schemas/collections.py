@@ -46,6 +46,10 @@ class ArtifactSummary(BaseModel):
     Lightweight artifact representation for collection listings.
     """
 
+    id: str = Field(
+        description="Artifact unique identifier",
+        examples=["pdf-skill"],
+    )
     name: str = Field(
         description="Artifact name",
         examples=["pdf-skill"],

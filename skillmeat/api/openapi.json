@@ -288,7 +288,7 @@
           "collections"
         ],
         "summary": "List artifacts in collection",
-        "description": "Retrieve a paginated list of artifacts within a specific collection",
+        "description": "Retrieve a paginated list of artifacts within a specific collection. NOTE: This endpoint uses legacy file-based collections and does NOT include collection membership information. Use /user-collections/{id}/artifacts instead for full database-backed functionality.",
         "operationId": "list_collection_artifacts_api_v1_collections__collection_id__artifacts_get",
         "security": [
           {
@@ -2280,6 +2280,24 @@
               "title": "Has Unlinked"
             },
             "description": "Filter for artifacts with unlinked references (true) or without (false)"
+          },
+          {
+            "name": "import_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by marketplace import batch ID",
+              "title": "Import Id"
+            },
+            "description": "Filter by marketplace import batch ID"
           }
         ],
         "responses": {
@@ -7172,6 +7190,29 @@
         }
       }
     },
+    "/api/v1/config/detection-patterns": {
+      "get": {
+        "tags": [
+          "config",
+          "config"
+        ],
+        "summary": "Get artifact detection patterns",
+        "description": "Returns the detection patterns used by the backend for identifying artifact types\n    from directory structures. This includes:\n\n    - **container_aliases**: Maps each artifact type to all valid container directory names\n    - **leaf_containers**: Flattened list of all valid container names for quick lookups\n    - **canonical_containers**: Maps each artifact type to its preferred container name\n\n    Frontend applications can use this data to replicate the same detection logic\n    for consistent artifact type inference across the stack.",
+        "operationId": "get_detection_patterns_api_v1_config_detection_patterns_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionPatternsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/context-entities": {
       "get": {
         "tags": [
@@ -10505,6 +10546,182 @@
         }
       }
     },
+    "/api/v1/marketplace/catalog/search": {
+      "get": {
+        "tags": [
+          "marketplace-catalog",
+          "marketplace-catalog"
+        ],
+        "summary": "Search artifacts across all marketplace sources",
+        "description": "Search for artifacts across all configured marketplace sources using text matching\nand various filters. Results are ordered by confidence score descending.\n\n**Text Search**: The `q` parameter performs full-text search (FTS5) against:\n- Artifact name\n- Title (from frontmatter)\n- Description (from frontmatter)\n- Search tags (from frontmatter)\n- Deep-indexed content (full artifact file text, when available)\n\nMatches in title/description rank higher than deep-indexed content matches.\nResults include `deep_match=true` and `matched_file` when a match came from\ndeep-indexed content rather than the artifact metadata.\n\n**Filtering Options**:\n- `type`: Filter by artifact type (skill, command, agent, etc.)\n- `source_id`: Limit search to a specific source\n- `min_confidence`: Only return entries with confidence >= this value\n- `tags`: Comma-separated list of tags to filter by (OR logic)\n\n**Pagination**: Uses cursor-based pagination for efficient traversal of large result sets.\nThe `cursor` value from a previous response can be used to fetch the next page.",
+        "operationId": "search_catalog_api_v1_marketplace_catalog_search_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search query for full-text matching on name, title, description, tags, and deep-indexed content",
+              "examples": [
+                "canvas",
+                "testing",
+                "api"
+              ],
+              "title": "Q"
+            },
+            "description": "Search query for full-text matching on name, title, description, tags, and deep-indexed content"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by artifact type",
+              "examples": [
+                "skill",
+                "command",
+                "agent"
+              ],
+              "title": "Type"
+            },
+            "description": "Filter by artifact type"
+          },
+          {
+            "name": "source_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Limit search to a specific source ID",
+              "examples": [
+                "src_anthropics_quickstarts"
+              ],
+              "title": "Source Id"
+            },
+            "description": "Limit search to a specific source ID"
+          },
+          {
+            "name": "min_confidence",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 0,
+              "description": "Minimum confidence score (0-100)",
+              "default": 0,
+              "title": "Min Confidence"
+            },
+            "description": "Minimum confidence score (0-100)"
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated list of tags to filter by (OR logic)",
+              "examples": [
+                "design,ui",
+                "testing,automation"
+              ],
+              "title": "Tags"
+            },
+            "description": "Comma-separated list of tags to filter by (OR logic)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Maximum number of results per page",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum number of results per page"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Pagination cursor from previous response",
+              "examples": [
+                "95:cat_abc123"
+              ],
+              "title": "Cursor"
+            },
+            "description": "Pagination cursor from previous response"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogSearchResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database operation failed"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/marketplace/sources/infer-url": {
       "post": {
         "tags": [
@@ -11318,6 +11535,75 @@
         }
       }
     },
+    "/api/v1/marketplace/sources/{source_id}/entries/{entry_id}/reimport": {
+      "post": {
+        "tags": [
+          "marketplace-sources",
+          "marketplace-sources"
+        ],
+        "summary": "Force re-import artifact",
+        "description": "Force re-import an artifact from upstream, resetting its catalog entry status.\n\n    This endpoint handles several scenarios:\n    - Artifacts with status=\"imported\" that need to be refreshed from upstream\n    - Artifacts that were deleted but catalog entry still shows \"imported\"\n    - Broken or missing artifacts in the collection\n\n    **Workflow**:\n    1. Validates the catalog entry exists and belongs to this source\n    2. If `keep_deployments=True` and artifact exists in collection:\n       - Saves deployment records\n       - Deletes the existing artifact\n       - Re-imports from upstream\n       - Restores deployment records\n    3. If `keep_deployments=False` or artifact is missing:\n       - Resets catalog entry status to \"new\"\n       - Performs a fresh import from upstream\n\n    **Request Body**:\n    - `keep_deployments` (bool, optional): Whether to preserve deployment records (default: false)\n\n    **Response**: Result with success flag, new artifact ID, and restoration count\n\n    **Example**:\n    ```bash\n    curl -X POST \"http://localhost:8080/api/v1/marketplace/sources/src-abc123/entries/cat-def456/reimport\" \\\n         -H \"Content-Type: application/json\" \\\n         -d '{\"keep_deployments\": true}'\n    ```\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
+        "operationId": "reimport_catalog_entry",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReimportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Re-import completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReimportResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source or catalog entry not found"
+          },
+          "500": {
+            "description": "Re-import failed - check error message"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/marketplace/sources/{source_id}/artifacts/{entry_id}/exclude": {
       "patch": {
         "tags": [
@@ -11755,6 +12041,93 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UpdateAutoTagResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/marketplace/sources/{source_id}/refresh-auto-tags": {
+      "post": {
+        "tags": [
+          "marketplace-sources",
+          "marketplace-sources"
+        ],
+        "summary": "Refresh auto-tags from GitHub topics",
+        "description": "Fetches the current GitHub topics for the source repository and updates\n    the auto_tags field. Existing tag approval status is preserved.\n\n    This is useful for:\n    - Sources created before auto-tags feature was added\n    - Syncing with updated GitHub topics after repository changes",
+        "operationId": "refresh_source_auto_tags_api_v1_marketplace_sources__source_id__refresh_auto_tags_post",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoTagRefreshResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/marketplace/sources/bulk-refresh-auto-tags": {
+      "post": {
+        "tags": [
+          "marketplace-sources",
+          "marketplace-sources"
+        ],
+        "summary": "Refresh auto-tags for multiple sources",
+        "description": "Fetches GitHub topics for multiple sources in a single request.\n    Each source is processed independently, so failures for one source\n    do not affect others.\n\n    Rate limiting is handled gracefully - if rate limited during bulk\n    operation, remaining sources will be marked as failed with the\n    rate limit error.",
+        "operationId": "bulk_refresh_auto_tags_api_v1_marketplace_sources_bulk_refresh_auto_tags_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAutoTagRefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkAutoTagRefreshResponse"
                 }
               }
             }
@@ -13873,7 +14246,7 @@
           "settings"
         ],
         "summary": "Check GitHub token status",
-        "description": "Check if a GitHub Personal Access Token is configured.\n\n    Returns:\n    - Whether a token is set\n    - Masked token (first 7 characters) if set\n    - Associated GitHub username if set",
+        "description": "Check if a GitHub Personal Access Token is configured.\n\n    Returns:\n    - Whether a token is set\n    - Masked token (first 7 characters) if set\n    - Associated GitHub username if set\n    - Rate limit information (remaining/limit)",
         "operationId": "get_github_token_status_api_v1_settings_github_token_status_get",
         "responses": {
           "200": {
@@ -13925,6 +14298,29 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/indexing-mode": {
+      "get": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "Get global artifact search indexing mode",
+        "description": "Get the global artifact search indexing mode setting.\n\n    Returns:\n    - \"off\": Indexing is disabled globally\n    - \"on\": Indexing is enabled globally\n    - \"opt_in\": Indexing is opt-in per artifact (default)",
+        "operationId": "get_indexing_mode_api_v1_settings_indexing_mode_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexingModeResponse"
                 }
               }
             }
@@ -16171,6 +16567,18 @@
             "format": "date-time",
             "title": "Updated",
             "description": "Timestamp of last update"
+          },
+          "import_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Import Id",
+            "description": "Marketplace import batch ID if imported from marketplace"
           }
         },
         "type": "object",
@@ -17016,6 +17424,83 @@
           }
         }
       },
+      "AutoTagRefreshResponse": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id",
+            "description": "Marketplace source ID",
+            "examples": [
+              "src_anthropics_skills"
+            ]
+          },
+          "tags_found": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Tags Found",
+            "description": "Total number of GitHub topics found",
+            "examples": [
+              5
+            ]
+          },
+          "tags_added": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Tags Added",
+            "description": "Number of new tags added",
+            "examples": [
+              3
+            ]
+          },
+          "tags_updated": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Tags Updated",
+            "description": "Number of existing tags updated (status preserved)",
+            "examples": [
+              2
+            ]
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/AutoTagSegment"
+            },
+            "type": "array",
+            "title": "Segments",
+            "description": "All auto-tags after refresh"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "tags_found",
+          "tags_added",
+          "tags_updated",
+          "segments"
+        ],
+        "title": "AutoTagRefreshResponse",
+        "description": "Response from auto-tag refresh operation.\n\nReturns statistics about tags found and updated from GitHub topics.",
+        "example": {
+          "segments": [
+            {
+              "normalized": "claude-code",
+              "source": "github_topic",
+              "status": "approved",
+              "value": "claude-code"
+            },
+            {
+              "normalized": "ai-assistant",
+              "source": "github_topic",
+              "status": "pending",
+              "value": "ai-assistant"
+            }
+          ],
+          "source_id": "src_anthropics_skills",
+          "tags_added": 3,
+          "tags_found": 5,
+          "tags_updated": 2
+        }
+      },
       "AutoTagSegment": {
         "properties": {
           "value": {
@@ -17368,6 +17853,202 @@
               "supports_publish": false
             }
           ]
+        }
+      },
+      "BulkAutoTagRefreshItemResult": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id",
+            "description": "Marketplace source ID",
+            "examples": [
+              "src_anthropics_skills"
+            ]
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether the refresh succeeded",
+            "examples": [
+              true
+            ]
+          },
+          "tags_found": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags Found",
+            "description": "Number of tags found (None if failed)",
+            "examples": [
+              5
+            ]
+          },
+          "tags_added": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags Added",
+            "description": "Number of new tags added (None if failed)",
+            "examples": [
+              3
+            ]
+          },
+          "tags_updated": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags Updated",
+            "description": "Number of existing tags updated (None if failed)",
+            "examples": [
+              2
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error message if refresh failed",
+            "examples": [
+              "Rate limit exceeded"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "success"
+        ],
+        "title": "BulkAutoTagRefreshItemResult",
+        "description": "Result for a single source in bulk refresh operation.",
+        "example": {
+          "source_id": "src_anthropics_skills",
+          "success": true,
+          "tags_added": 3,
+          "tags_found": 5,
+          "tags_updated": 2
+        }
+      },
+      "BulkAutoTagRefreshRequest": {
+        "properties": {
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Source Ids",
+            "description": "List of source IDs to refresh (max 50)",
+            "examples": [
+              [
+                "src_abc123",
+                "src_def456"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_ids"
+        ],
+        "title": "BulkAutoTagRefreshRequest",
+        "description": "Request to refresh auto-tags for multiple sources.\n\nAllows batch refresh of GitHub topics for specified sources.",
+        "example": {
+          "source_ids": [
+            "src_anthropics_skills",
+            "src_user_myrepo"
+          ]
+        }
+      },
+      "BulkAutoTagRefreshResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/BulkAutoTagRefreshItemResult"
+            },
+            "type": "array",
+            "title": "Results",
+            "description": "Individual results for each source"
+          },
+          "total_requested": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Requested",
+            "description": "Total number of sources requested",
+            "examples": [
+              5
+            ]
+          },
+          "total_succeeded": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Succeeded",
+            "description": "Number of sources successfully refreshed",
+            "examples": [
+              4
+            ]
+          },
+          "total_failed": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Failed",
+            "description": "Number of sources that failed to refresh",
+            "examples": [
+              1
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "results",
+          "total_requested",
+          "total_succeeded",
+          "total_failed"
+        ],
+        "title": "BulkAutoTagRefreshResponse",
+        "description": "Response from bulk auto-tag refresh operation.\n\nReturns individual results for each source and summary statistics.",
+        "example": {
+          "results": [
+            {
+              "source_id": "src_anthropics_skills",
+              "success": true,
+              "tags_added": 3,
+              "tags_found": 5,
+              "tags_updated": 2
+            },
+            {
+              "error": "Rate limit exceeded",
+              "source_id": "src_user_myrepo",
+              "success": false
+            }
+          ],
+          "total_failed": 1,
+          "total_requested": 2,
+          "total_succeeded": 1
         }
       },
       "BulkImportArtifact": {
@@ -19977,6 +20658,316 @@
           }
         }
       },
+      "CatalogSearchResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogSearchResult"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "List of matching catalog entries"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Cursor for fetching next page (None if no more results)",
+            "examples": [
+              "95:cat_xyz789"
+            ]
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "True if more results exist beyond this page",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "has_more"
+        ],
+        "title": "CatalogSearchResponse",
+        "description": "Response model for cross-source catalog search.\n\nReturns paginated search results with cursor-based pagination support.",
+        "example": {
+          "has_more": true,
+          "items": [
+            {
+              "artifact_type": "skill",
+              "confidence_score": 95,
+              "description": "Design system for interfaces",
+              "id": "cat_abc123",
+              "name": "canvas-design",
+              "path": "skills/canvas-design",
+              "search_tags": [
+                "design",
+                "ui"
+              ],
+              "source_id": "src_anthropics_quickstarts",
+              "source_owner": "anthropics",
+              "source_repo": "quickstarts",
+              "status": "new",
+              "title": "Canvas Design System",
+              "upstream_url": "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"
+            }
+          ],
+          "next_cursor": "95:cat_xyz789"
+        }
+      },
+      "CatalogSearchResult": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique catalog entry identifier",
+            "examples": [
+              "cat_abc123"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Artifact name",
+            "examples": [
+              "canvas-design"
+            ]
+          },
+          "artifact_type": {
+            "type": "string",
+            "enum": [
+              "skill",
+              "command",
+              "agent",
+              "mcp",
+              "mcp_server",
+              "hook"
+            ],
+            "title": "Artifact Type",
+            "description": "Type of artifact",
+            "examples": [
+              "skill"
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Artifact title from frontmatter",
+            "examples": [
+              "Canvas Design System"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Artifact description from frontmatter",
+            "examples": [
+              "A comprehensive design system for building beautiful interfaces"
+            ]
+          },
+          "confidence_score": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Confidence Score",
+            "description": "Confidence score of detection (0-100)",
+            "examples": [
+              95
+            ]
+          },
+          "source_owner": {
+            "type": "string",
+            "title": "Source Owner",
+            "description": "GitHub repository owner/organization",
+            "examples": [
+              "anthropics"
+            ]
+          },
+          "source_repo": {
+            "type": "string",
+            "title": "Source Repo",
+            "description": "GitHub repository name",
+            "examples": [
+              "quickstarts"
+            ]
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id",
+            "description": "ID of the source this artifact belongs to",
+            "examples": [
+              "src_anthropics_quickstarts"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to artifact within repository",
+            "examples": [
+              "skills/canvas-design"
+            ]
+          },
+          "upstream_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream Url",
+            "description": "Full URL to artifact in source repository",
+            "examples": [
+              "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "new",
+              "updated",
+              "removed",
+              "imported",
+              "excluded"
+            ],
+            "title": "Status",
+            "description": "Lifecycle status of the catalog entry",
+            "examples": [
+              "new"
+            ]
+          },
+          "search_tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Tags",
+            "description": "Tags from frontmatter for filtering",
+            "examples": [
+              [
+                "design",
+                "ui",
+                "components"
+              ]
+            ]
+          },
+          "title_snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Snippet",
+            "description": "Highlighted title snippet with <mark> tags around matched terms (FTS5 search only)",
+            "examples": [
+              "<mark>Canvas</mark> Design System"
+            ]
+          },
+          "description_snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Snippet",
+            "description": "Highlighted description snippet with <mark> tags around matched terms (FTS5 search only)",
+            "examples": [
+              "A comprehensive <mark>design</mark> system for building...interfaces"
+            ]
+          },
+          "deep_match": {
+            "type": "boolean",
+            "title": "Deep Match",
+            "description": "True if this result matched from deep-indexed content rather than title/description metadata. Deep matches come from full artifact file content.",
+            "default": false
+          },
+          "matched_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched File",
+            "description": "Relative file path where the search match was found. Only populated for deep index matches (when deep_match=True)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "artifact_type",
+          "confidence_score",
+          "source_owner",
+          "source_repo",
+          "source_id",
+          "path",
+          "status"
+        ],
+        "title": "CatalogSearchResult",
+        "description": "Individual search result from cross-source catalog search.\n\nIncludes artifact metadata and source context (owner/repo) for display\nand navigation purposes.",
+        "example": {
+          "artifact_type": "skill",
+          "confidence_score": 95,
+          "deep_match": false,
+          "description": "A comprehensive design system for building interfaces",
+          "description_snippet": "A comprehensive <mark>design</mark> system for building...interfaces",
+          "id": "cat_abc123",
+          "name": "canvas-design",
+          "path": "skills/canvas-design",
+          "search_tags": [
+            "design",
+            "ui",
+            "components"
+          ],
+          "source_id": "src_anthropics_quickstarts",
+          "source_owner": "anthropics",
+          "source_repo": "quickstarts",
+          "status": "new",
+          "title": "Canvas Design System",
+          "title_snippet": "<mark>Canvas</mark> Design System",
+          "upstream_url": "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"
+        }
+      },
       "CollectionListResponse": {
         "properties": {
           "items": {
@@ -21176,6 +22167,18 @@
             "description": "Enable parsing markdown frontmatter for artifact type hints",
             "default": false
           },
+          "indexing_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indexing Enabled",
+            "description": "Enable frontmatter indexing for artifacts from this source (None = use global config default)"
+          },
           "import_repo_description": {
             "type": "boolean",
             "title": "Import Repo Description",
@@ -21227,6 +22230,12 @@
             ],
             "title": "Single Artifact Type",
             "description": "Artifact type when single_artifact_mode is enabled (required when mode is True)"
+          },
+          "deep_indexing_enabled": {
+            "type": "boolean",
+            "title": "Deep Indexing Enabled",
+            "description": "Enable deep indexing for enhanced full-text search. When enabled, clones entire artifact directories instead of just manifest files. May significantly increase scan time for large repositories.",
+            "default": false
           }
         },
         "type": "object",
@@ -21236,6 +22245,7 @@
         "title": "CreateSourceRequest",
         "description": "Request to add a GitHub repository source.\n\nSpecifies repository URL, branch/tag/SHA, and scanning options.",
         "example": {
+          "deep_indexing_enabled": false,
           "description": "Anthropic's official quickstart examples",
           "import_repo_description": true,
           "import_repo_readme": true,
@@ -21550,6 +22560,14 @@
             "title": "Local Modifications",
             "description": "Whether local modifications detected",
             "default": false
+          },
+          "collections": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactCollectionInfo"
+            },
+            "type": "array",
+            "title": "Collections",
+            "description": "Collections this artifact belongs to (many-to-many relationship)"
           }
         },
         "type": "object",
@@ -22245,6 +23263,57 @@
             ],
             "title": "Status",
             "description": "Artifact status (e.g., 'new', 'excluded')"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Artifact title from frontmatter for search display"
+          },
+          "frontmatter_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frontmatter Description",
+            "description": "Artifact description from frontmatter for search"
+          },
+          "search_tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Tags",
+            "description": "Tags from frontmatter for search filtering"
+          },
+          "search_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Text",
+            "description": "Concatenated searchable text (title + description + tags)"
           }
         },
         "type": "object",
@@ -22268,6 +23337,135 @@
           "name": "canvas-design",
           "path": "skills/canvas-design",
           "upstream_url": "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"
+        }
+      },
+      "DetectionPatternsResponse": {
+        "properties": {
+          "container_aliases": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Container Aliases",
+            "description": "Maps artifact type to list of valid container directory names",
+            "examples": [
+              {
+                "command": [
+                  "commands",
+                  "command",
+                  "claude-commands"
+                ],
+                "skill": [
+                  "skills",
+                  "skill",
+                  "claude-skills"
+                ]
+              }
+            ]
+          },
+          "leaf_containers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Leaf Containers",
+            "description": "Flattened unique list of all valid container names across all types",
+            "examples": [
+              [
+                "skills",
+                "skill",
+                "claude-skills",
+                "commands",
+                "command",
+                "claude-commands"
+              ]
+            ]
+          },
+          "canonical_containers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Canonical Containers",
+            "description": "Maps artifact type to its canonical (preferred) container name",
+            "examples": [
+              {
+                "agent": "agents",
+                "command": "commands",
+                "skill": "skills"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "container_aliases",
+          "leaf_containers",
+          "canonical_containers"
+        ],
+        "title": "DetectionPatternsResponse",
+        "description": "Response model for artifact detection patterns.\n\nThis schema exposes the detection patterns used by the Python backend\nfor identifying artifact types from directory structures. Frontend\napplications can use this data to replicate the same detection logic.\n\nAttributes:\n    container_aliases: Maps artifact type to list of valid container names.\n        e.g., {\"skill\": [\"skills\", \"skill\", \"claude-skills\"]}\n    leaf_containers: Flattened unique list of all valid container names.\n        Useful for quick membership checks when traversing directories.\n    canonical_containers: Maps artifact type to its preferred container name.\n        e.g., {\"skill\": \"skills\"}",
+        "example": {
+          "canonical_containers": {
+            "agent": "agents",
+            "command": "commands",
+            "hook": "hooks",
+            "mcp": "mcp",
+            "skill": "skills"
+          },
+          "container_aliases": {
+            "agent": [
+              "agents",
+              "agent",
+              "subagents",
+              "claude-agents"
+            ],
+            "command": [
+              "commands",
+              "command",
+              "claude-commands"
+            ],
+            "hook": [
+              "hooks",
+              "hook",
+              "claude-hooks"
+            ],
+            "mcp": [
+              "mcp",
+              "mcp-servers",
+              "servers",
+              "mcp_servers",
+              "claude-mcp"
+            ],
+            "skill": [
+              "skills",
+              "skill",
+              "claude-skills"
+            ]
+          },
+          "leaf_containers": [
+            "skills",
+            "skill",
+            "claude-skills",
+            "commands",
+            "command",
+            "claude-commands",
+            "agents",
+            "agent",
+            "subagents",
+            "claude-agents",
+            "hooks",
+            "hook",
+            "claude-hooks",
+            "mcp",
+            "mcp-servers",
+            "servers",
+            "mcp_servers",
+            "claude-mcp"
+          ]
         }
       },
       "DiscoveredArtifact": {
@@ -23653,6 +24851,36 @@
             "examples": [
               "octocat"
             ]
+          },
+          "rate_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Limit",
+            "description": "Maximum requests per hour (5000 with token, 60 without)",
+            "examples": [
+              5000
+            ]
+          },
+          "rate_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Remaining",
+            "description": "Remaining requests in current rate limit window",
+            "examples": [
+              4999
+            ]
           }
         },
         "type": "object",
@@ -23660,7 +24888,7 @@
           "is_set"
         ],
         "title": "GitHubTokenStatusResponse",
-        "description": "Response for GitHub token status check.\n\nReturns whether a token is configured and, if so, a masked version\nalong with the associated GitHub username."
+        "description": "Response for GitHub token status check.\n\nReturns whether a token is configured and, if so, a masked version\nalong with the associated GitHub username and rate limit information."
       },
       "GitHubTokenValidationResponse": {
         "properties": {
@@ -24773,6 +26001,24 @@
         ],
         "title": "ImportedArtifactResponse",
         "description": "Single imported artifact in import result."
+      },
+      "IndexingModeResponse": {
+        "properties": {
+          "indexing_mode": {
+            "type": "string",
+            "title": "Indexing Mode",
+            "description": "Global indexing mode: 'off', 'on', or 'opt_in'",
+            "examples": [
+              "opt_in"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "indexing_mode"
+        ],
+        "title": "IndexingModeResponse",
+        "description": "Response for indexing mode configuration.\n\nReturns the current global artifact search indexing mode."
       },
       "InferUrlRequest": {
         "properties": {
@@ -28183,6 +29429,83 @@
           "mode": "metadata_only"
         }
       },
+      "ReimportRequest": {
+        "properties": {
+          "keep_deployments": {
+            "type": "boolean",
+            "title": "Keep Deployments",
+            "description": "If True and artifact exists, save deployment records, delete artifact, re-import, and restore deployments. If False, performs a full fresh import.",
+            "default": false,
+            "examples": [
+              true
+            ]
+          }
+        },
+        "type": "object",
+        "title": "ReimportRequest",
+        "description": "Request to force re-import an artifact from upstream.\n\nUsed when an artifact was deleted but the catalog entry still shows 'imported',\nor when you want to replace an existing artifact with the upstream version.",
+        "example": {
+          "keep_deployments": false
+        }
+      },
+      "ReimportResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether the re-import succeeded",
+            "examples": [
+              true
+            ]
+          },
+          "artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Id",
+            "description": "ID of the newly imported artifact (format: 'type:name')",
+            "examples": [
+              "skill:canvas-design"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable description of the result",
+            "examples": [
+              "Successfully re-imported artifact from upstream"
+            ]
+          },
+          "deployments_restored": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Deployments Restored",
+            "description": "Number of deployment records restored (when keep_deployments=True)",
+            "default": 0,
+            "examples": [
+              3
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "ReimportResponse",
+        "description": "Response from a re-import operation.\n\nContains the result of the re-import including the new artifact ID\nand count of restored deployments.",
+        "example": {
+          "artifact_id": "skill:canvas-design",
+          "deployments_restored": 0,
+          "message": "Successfully re-imported artifact from upstream",
+          "success": true
+        }
+      },
       "ReorderArtifactsRequest": {
         "properties": {
           "artifacts": {
@@ -29602,6 +30925,115 @@
             ],
             "title": "Single Artifact Type",
             "description": "Artifact type when single_artifact_mode is enabled"
+          },
+          "indexing_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indexing Enabled",
+            "description": "Whether indexing is enabled for this source. None indicates default indexing behavior (typically enabled).",
+            "examples": [
+              true,
+              false,
+              null
+            ]
+          },
+          "deep_indexing_enabled": {
+            "type": "boolean",
+            "title": "Deep Indexing Enabled",
+            "description": "Whether deep indexing is enabled for this source. When enabled, clones entire artifact directories instead of just manifest files. May significantly increase scan time for large repositories.",
+            "default": false
+          },
+          "artifacts_root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifacts Root",
+            "description": "Common ancestor directory path of all artifacts in this source. None if artifacts are scattered or source has never been indexed.",
+            "examples": [
+              ".claude/skills",
+              null
+            ]
+          },
+          "artifact_count_from_cache": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Count From Cache",
+            "description": "Number of artifacts from last indexing run (cached in clone_target). May differ from artifact_count if source has been re-scanned. None if source has never been indexed.",
+            "examples": [
+              12,
+              null
+            ]
+          },
+          "indexing_strategy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "api",
+                  "sparse_manifest",
+                  "sparse_directory"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indexing Strategy",
+            "description": "Clone/indexing strategy computed for this source. 'api' = direct GitHub API (small repos), 'sparse_manifest' = clone manifest files only (medium repos), 'sparse_directory' = clone artifact directory (large repos). None if source has never been indexed.",
+            "examples": [
+              "sparse_manifest",
+              null
+            ]
+          },
+          "last_indexed_tree_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Indexed Tree Sha",
+            "description": "Git tree SHA from last successful indexing run. Used for cache invalidation - if current tree SHA differs, re-indexing needed. None if source has never been indexed.",
+            "examples": [
+              "abc123def456",
+              null
+            ]
+          },
+          "last_indexed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Indexed At",
+            "description": "Timestamp of last successful indexing run. None if source has never been indexed.",
+            "examples": [
+              "2025-12-06T10:30:00Z",
+              null
+            ]
           }
         },
         "type": "object",
@@ -29623,14 +31055,21 @@
         "description": "Response model for a GitHub repository source.\n\nContains source metadata, scan status, and artifact statistics.",
         "example": {
           "artifact_count": 12,
+          "artifact_count_from_cache": 12,
+          "artifacts_root": ".claude/skills",
           "counts_by_type": {
             "agent": 1,
             "command": 3,
             "skill": 8
           },
           "created_at": "2025-12-05T09:00:00Z",
+          "deep_indexing_enabled": false,
           "description": "Official skills repository",
           "id": "src_anthropics_quickstarts",
+          "indexing_enabled": true,
+          "indexing_strategy": "sparse_manifest",
+          "last_indexed_at": "2025-12-06T10:30:00Z",
+          "last_indexed_tree_sha": "abc123def456",
           "last_sync_at": "2025-12-06T10:30:00Z",
           "notes": "Contains verified skills from Anthropic",
           "owner": "anthropics",
@@ -31150,6 +32589,18 @@
             "title": "Enable Frontmatter Detection",
             "description": "Enable parsing markdown frontmatter for artifact type hints"
           },
+          "indexing_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indexing Enabled",
+            "description": "Enable frontmatter indexing for artifacts from this source (None = use global config default)"
+          },
           "import_repo_description": {
             "anyOf": [
               {
@@ -31188,12 +32639,25 @@
             ],
             "title": "Tags",
             "description": "Tags to apply to source (max 20)"
+          },
+          "deep_indexing_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deep Indexing Enabled",
+            "description": "Enable deep indexing for enhanced full-text search. When enabled, clones entire artifact directories instead of just manifest files. May significantly increase scan time for large repositories."
           }
         },
         "type": "object",
         "title": "UpdateSourceRequest",
         "description": "Request to update a GitHub repository source.\n\nAll fields are optional - only provided fields will be updated.\nUses PATCH semantics for partial updates.",
         "example": {
+          "deep_indexing_enabled": true,
           "description": "Updated description for repository",
           "import_repo_description": true,
           "import_repo_readme": false,
@@ -32201,6 +33665,14 @@
       },
       "skillmeat__api__schemas__collections__ArtifactSummary": {
         "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Artifact unique identifier",
+            "examples": [
+              "pdf-skill"
+            ]
+          },
           "name": {
             "type": "string",
             "title": "Name",
@@ -32243,6 +33715,7 @@
         },
         "type": "object",
         "required": [
+          "id",
           "name",
           "type",
           "source"
@@ -32603,6 +34076,11 @@
       },
       "skillmeat__api__schemas__user_collections__ArtifactSummary": {
         "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique artifact identifier"
+          },
           "name": {
             "type": "string",
             "title": "Name",
@@ -32630,6 +34108,60 @@
             "title": "Source",
             "description": "Source specification"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Artifact description from metadata"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author",
+            "description": "Artifact author from metadata"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags",
+            "description": "Artifact tags"
+          },
+          "collections": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ArtifactCollectionInfo"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collections",
+            "description": "Collections this artifact belongs to (for collection badges)"
+          },
           "groups": {
             "anyOf": [
               {
@@ -32648,12 +34180,13 @@
         },
         "type": "object",
         "required": [
+          "id",
           "name",
           "type",
           "source"
         ],
         "title": "ArtifactSummary",
-        "description": "Lightweight artifact summary for collection listings.\n\nWhen include_groups=true query parameter is used, the groups field\nwill be populated with group membership information."
+        "description": "Lightweight artifact summary for collection listings.\n\nWhen include_groups=true query parameter is used, the groups field\nwill be populated with group membership information.\n\nThis schema includes metadata fields (description, author, tags, collections)\nto support the frontend entity-mapper which expects these fields for\nconsistent Entity rendering including collection badges."
       },
       "skillmeat__api__schemas__user_collections__CollectionArtifactsResponse": {
         "properties": {

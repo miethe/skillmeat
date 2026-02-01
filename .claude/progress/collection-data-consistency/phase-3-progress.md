@@ -1,124 +1,134 @@
 ---
 type: progress
-prd: "collection-data-consistency"
+prd: collection-data-consistency
 phase: 3
-title: "API Endpoint Consistency (CollectionService)"
-status: pending
+title: API Endpoint Consistency (CollectionService)
+status: completed
 started: null
 completed: null
-progress: 0
-
+progress: 100
 total_tasks: 7
-completed_tasks: 0
+completed_tasks: 7
 in_progress_tasks: 0
 blocked_tasks: 0
-
-owners: ["python-backend-engineer"]
+owners:
+- python-backend-engineer
 contributors: []
-
 tasks:
-  - id: "TASK-3.1"
-    title: "Create CollectionService Class"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "opus"
-    effort: "2h"
-    priority: "critical"
-    files:
-      - "skillmeat/api/services/collection_service.py"
-
-  - id: "TASK-3.2"
-    title: "Create Services __init__.py"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-3.1"]
-    model: "haiku"
-    effort: "0.25h"
-    priority: "medium"
-    files:
-      - "skillmeat/api/services/__init__.py"
-
-  - id: "TASK-3.3"
-    title: "Update GET /api/v1/artifacts"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-3.1"]
-    model: "sonnet"
-    effort: "0.5h"
-    priority: "high"
-    files:
-      - "skillmeat/api/routers/artifacts.py"
-
-  - id: "TASK-3.4"
-    title: "Update GET /api/v1/artifacts/{id}"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-3.1"]
-    model: "sonnet"
-    effort: "0.25h"
-    priority: "high"
-    files:
-      - "skillmeat/api/routers/artifacts.py"
-
-  - id: "TASK-3.5"
-    title: "Update GET /api/v1/projects/{id}/artifacts"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-3.1"]
-    model: "sonnet"
-    effort: "0.5h"
-    priority: "high"
-    files:
-      - "skillmeat/api/routers/projects.py"
-
-  - id: "TASK-3.6"
-    title: "Update GET /api/v1/collections/{id}/artifacts"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-3.1"]
-    model: "sonnet"
-    effort: "0.25h"
-    priority: "medium"
-    files:
-      - "skillmeat/api/routers/collections.py"
-
-  - id: "TASK-3.7"
-    title: "Add CollectionService Unit Tests"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-3.1"]
-    model: "sonnet"
-    effort: "1h"
-    priority: "high"
-    files:
-      - "tests/api/services/test_collection_service.py"
-
+- id: TASK-3.1
+  title: Create CollectionService Class
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: opus
+  effort: 2h
+  priority: critical
+  files:
+  - skillmeat/api/services/collection_service.py
+- id: TASK-3.2
+  title: Create Services __init__.py
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-3.1
+  model: haiku
+  effort: 0.25h
+  priority: medium
+  files:
+  - skillmeat/api/services/__init__.py
+- id: TASK-3.3
+  title: Update GET /api/v1/artifacts
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-3.1
+  model: sonnet
+  effort: 0.5h
+  priority: high
+  files:
+  - skillmeat/api/routers/artifacts.py
+- id: TASK-3.4
+  title: Update GET /api/v1/artifacts/{id}
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-3.1
+  model: sonnet
+  effort: 0.25h
+  priority: high
+  files:
+  - skillmeat/api/routers/artifacts.py
+- id: TASK-3.5
+  title: Update GET /api/v1/projects/{id}/artifacts
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-3.1
+  model: sonnet
+  effort: 0.5h
+  priority: high
+  files:
+  - skillmeat/api/routers/projects.py
+- id: TASK-3.6
+  title: Update GET /api/v1/collections/{id}/artifacts
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-3.1
+  model: sonnet
+  effort: 0.25h
+  priority: medium
+  files:
+  - skillmeat/api/routers/collections.py
+- id: TASK-3.7
+  title: Add CollectionService Unit Tests
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-3.1
+  model: sonnet
+  effort: 1h
+  priority: high
+  files:
+  - tests/api/services/test_collection_service.py
 parallelization:
-  batch_1: ["TASK-3.1"]
-  batch_2: ["TASK-3.2", "TASK-3.3", "TASK-3.4", "TASK-3.5", "TASK-3.6", "TASK-3.7"]
-
+  batch_1:
+  - TASK-3.1
+  batch_2:
+  - TASK-3.2
+  - TASK-3.3
+  - TASK-3.4
+  - TASK-3.5
+  - TASK-3.6
+  - TASK-3.7
 blockers: []
-
 success_criteria:
-  - id: "SC-3.1"
-    description: "CollectionService class created with batch and single methods"
-    status: "pending"
-  - id: "SC-3.2"
-    description: "All artifact-returning endpoints use CollectionService"
-    status: "pending"
-  - id: "SC-3.3"
-    description: "No N+1 queries in any endpoint (verified via query logging)"
-    status: "pending"
-  - id: "SC-3.4"
-    description: "API responses include consistent collections array structure"
-    status: "pending"
-  - id: "SC-3.5"
-    description: "CollectionService unit tests achieve >80% coverage"
-    status: "pending"
-  - id: "SC-3.6"
-    description: "No regression in endpoint response schemas"
-    status: "pending"
+- id: SC-3.1
+  description: CollectionService class created with batch and single methods
+  status: pending
+- id: SC-3.2
+  description: All artifact-returning endpoints use CollectionService
+  status: pending
+- id: SC-3.3
+  description: No N+1 queries in any endpoint (verified via query logging)
+  status: pending
+- id: SC-3.4
+  description: API responses include consistent collections array structure
+  status: pending
+- id: SC-3.5
+  description: CollectionService unit tests achieve >80% coverage
+  status: pending
+- id: SC-3.6
+  description: No regression in endpoint response schemas
+  status: pending
+updated: '2026-01-31'
 ---
 
 # Phase 3: API Endpoint Consistency (CollectionService)

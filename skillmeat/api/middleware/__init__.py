@@ -1,14 +1,20 @@
 """FastAPI middleware for SkillMeat API."""
 
 from .auth import AuthMiddleware, get_token_manager
-from .rate_limit import RateLimitMiddleware, RateLimiter, get_rate_limiter
+from .burst_detection import (
+    RequestFingerprint,
+    SlidingWindowTracker,
+    create_fingerprint,
+)
 from .observability import ObservabilityMiddleware
+from .rate_limit import RateLimitMiddleware
 
 __all__ = [
     "AuthMiddleware",
     "get_token_manager",
     "RateLimitMiddleware",
-    "RateLimiter",
-    "get_rate_limiter",
+    "RequestFingerprint",
+    "SlidingWindowTracker",
+    "create_fingerprint",
     "ObservabilityMiddleware",
 ]

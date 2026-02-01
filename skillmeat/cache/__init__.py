@@ -41,6 +41,10 @@ Example:
 
 __version__ = "0.1.0"
 
+from skillmeat.cache.collection_cache import (
+    CollectionCountCache,
+    get_collection_count_cache,
+)
 from skillmeat.cache.manager import CacheManager
 from skillmeat.cache.marketplace import MarketplaceCache
 from skillmeat.cache.refresh import (
@@ -62,6 +66,7 @@ from skillmeat.cache.watcher import FileWatcher
 __all__ = [
     "CacheManager",
     "CacheRepository",
+    "CollectionCountCache",
     "FileWatcher",
     "MarketplaceCache",
     "RefreshJob",
@@ -73,4 +78,5 @@ __all__ = [
     "MarketplaceTransactionHandler",
     "ScanUpdateContext",
     "ImportContext",
+    "get_collection_count_cache",
 ]
