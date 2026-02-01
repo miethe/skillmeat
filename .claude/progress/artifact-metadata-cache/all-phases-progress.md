@@ -3,9 +3,9 @@ type: progress
 prd: "artifact-metadata-cache-v1"
 status: pending
 progress: 0
-total_phases: 4
-total_tasks: 18
-estimated_effort: "10-14 hours"
+total_phases: 5
+total_tasks: 25
+estimated_effort: "12-16 hours (Phases 1-4) + 6-8 hours (Phase 5 future)"
 start_date: 2026-02-01
 
 parallelization:
@@ -16,7 +16,7 @@ parallelization:
     blocked_by: []
   batch_2:
     phase: 2
-    tasks: [TASK-2.1, TASK-2.2, TASK-2.3, TASK-2.4, TASK-2.5]
+    tasks: [TASK-2.1, TASK-2.2, TASK-2.3, TASK-2.4, TASK-2.5, TASK-2.6, TASK-2.7]
     max_parallel: 3
     blocked_by: [TASK-1.4]
   batch_3:
@@ -30,6 +30,13 @@ parallelization:
     max_parallel: 2
     blocked_by: [TASK-2.1, TASK-2.2]
     optional: true
+  batch_5:
+    phase: 5
+    tasks: [TASK-5.1, TASK-5.2, TASK-5.3, TASK-5.4, TASK-5.5]
+    max_parallel: 2
+    blocked_by: [TASK-3.1]
+    future: true
+    notes: "Groundwork only - implementation deferred until web editing feature prioritized"
 
 tasks:
   TASK-1.1:
@@ -178,6 +185,36 @@ tasks:
       - skillmeat/api/routers/__tests__/test_user_collections.py
     notes: "Mock ArtifactManager, test happy path and error cases; verify database state after sync"
 
+  TASK-2.6:
+    id: TASK-2.6
+    title: "Hook deploy endpoint to refresh cache"
+    description: "After artifacts.py deploy_artifact() completes file operation, trigger cache refresh for deployed artifact"
+    phase: 2
+    status: pending
+    assigned_to: python-backend-engineer
+    priority: high
+    effort: "30 min"
+    dependencies: [TASK-2.1]
+    files:
+      - skillmeat/api/routers/artifacts.py
+      - skillmeat/api/services/artifact_cache_service.py
+    notes: "Deploy via web auto-refreshes DB cache; no manual refresh needed; graceful failure handling"
+
+  TASK-2.7:
+    id: TASK-2.7
+    title: "Hook sync endpoint to refresh cache"
+    description: "After artifacts.py sync_artifact() completes file operation, trigger cache refresh for synced artifact"
+    phase: 2
+    status: pending
+    assigned_to: python-backend-engineer
+    priority: high
+    effort: "30 min"
+    dependencies: [TASK-2.1]
+    files:
+      - skillmeat/api/routers/artifacts.py
+      - skillmeat/api/services/artifact_cache_service.py
+    notes: "Sync via web auto-refreshes DB cache; version changes reflected immediately; graceful failure handling"
+
   TASK-3.1:
     id: TASK-3.1
     title: "Create staleness detection service"
@@ -281,17 +318,97 @@ tasks:
       - skillmeat/tests/test_cli_artifact_sync.py
     notes: "Optional Phase: Full integration test from CLI through to web API; verify /collection page performance"
 
+  # Phase 5: Web-Based Artifact Editing Groundwork (FUTURE)
+  # Groundwork only - implementation deferred until web editing feature prioritized
+
+  TASK-5.1:
+    id: TASK-5.1
+    title: "Create artifact metadata write service"
+    description: "Service that writes metadata changes to file system (collection.toml and artifact frontmatter). File system is source of truth."
+    phase: 5
+    status: future
+    assigned_to: python-backend-engineer
+    priority: low
+    effort: "2h"
+    dependencies: [TASK-3.1]
+    files:
+      - skillmeat/api/services/artifact_write_service.py
+    notes: "FUTURE: Ensures correct data flow Web → File → DB. Writes to correct file locations; preserves existing data; handles TOML/YAML correctly"
+
+  TASK-5.2:
+    id: TASK-5.2
+    title: "Create PUT /api/v1/artifacts/{id}/metadata endpoint"
+    description: "API endpoint for updating artifact metadata via web. Writes to file system first, then refreshes cache."
+    phase: 5
+    status: future
+    assigned_to: python-backend-engineer
+    priority: low
+    effort: "1.5h"
+    dependencies: [TASK-5.1]
+    files:
+      - skillmeat/api/routers/artifacts.py
+      - skillmeat/api/schemas/artifacts.py
+    notes: "FUTURE: Validates input; calls write service; refreshes cache; returns updated artifact"
+
+  TASK-5.3:
+    id: TASK-5.3
+    title: "Create POST /api/v1/artifacts endpoint (web add)"
+    description: "API endpoint for adding new artifacts via web UI. Creates file-based artifact first, then syncs to cache."
+    phase: 5
+    status: future
+    assigned_to: python-backend-engineer
+    priority: low
+    effort: "2h"
+    dependencies: [TASK-5.1]
+    files:
+      - skillmeat/api/routers/artifacts.py
+      - skillmeat/api/services/artifact_write_service.py
+    notes: "FUTURE: Creates artifact in file system; adds to collection.toml; syncs to DB cache"
+
+  TASK-5.4:
+    id: TASK-5.4
+    title: "Add optimistic locking"
+    description: "Prevent concurrent edits from CLI and web causing conflicts. Version/hash check before write."
+    phase: 5
+    status: future
+    assigned_to: python-backend-engineer
+    priority: low
+    effort: "1h"
+    dependencies: [TASK-5.2]
+    files:
+      - skillmeat/api/services/artifact_write_service.py
+      - skillmeat/api/routers/artifacts.py
+    notes: "FUTURE: Returns 409 Conflict on version mismatch; prevents lost updates"
+
+  TASK-5.5:
+    id: TASK-5.5
+    title: "Create web UI for metadata editing"
+    description: "Frontend form for editing artifact description, tags, author, license. Follows Design Principles."
+    phase: 5
+    status: future
+    assigned_to: ui-engineer-enhanced
+    priority: low
+    effort: "2h"
+    dependencies: [TASK-5.2]
+    files:
+      - skillmeat/web/components/artifacts/metadata-edit-form.tsx
+      - skillmeat/web/app/artifacts/[id]/edit/page.tsx
+    notes: "FUTURE: Form validates input; shows loading state; handles errors; uses existing shadcn components"
+
 completion_criteria:
   Phase 1: "Artifact model extended, migration applied, startup sync populates cache with 100% of artifacts"
-  Phase 2: "Incremental sync endpoints tested with 95%+ success rate; batch refresh handles filters and errors"
+  Phase 2: "Incremental sync endpoints tested with 95%+ success rate; ArtifactManager hooks auto-refresh cache on deploy/sync"
   Phase 3: "Staleness detection working, invalidation triggers on collection changes, metrics emitted"
   Phase 4: "CLI commands integrated and E2E tested (optional); all sync mechanisms coordinated"
+  Phase 5: "FUTURE: Write service writes to file system; PUT endpoint refreshes cache after file write; optimistic locking prevents conflicts"
 
 success_metrics:
   - "Database Artifact table contains metadata for 100% of file-based artifacts"
   - "/collection page response time <100ms (database-backed)"
   - "Cache invalidation automatic and reliable"
   - "Metadata staleness bounded by TTL (default 30 min)"
+  - "Web deploy/sync operations auto-refresh cache (no manual refresh needed)"
+  - "FUTURE: Web editing writes to file first, then refreshes cache (correct data flow)"
 ---
 
 # Artifact Metadata Cache v1 Progress
@@ -300,11 +417,14 @@ success_metrics:
 
 ## Overview
 
-This 4-phase implementation plan populates and maintains a complete artifact metadata cache in the database, enabling the `/collection` page to operate entirely from the database with sub-100ms response times. Follow-on enhancement to collection-data-consistency-v1 (Phase 5).
+This 5-phase implementation plan populates and maintains a complete artifact metadata cache in the database, enabling the `/collection` page to operate entirely from the database with sub-100ms response times. Follow-on enhancement to collection-data-consistency-v1.
 
-**Current Status**: Pending (not started)  
-**Total Effort**: 10-14 hours across 2-3 days  
-**Team**: python-backend-engineer (all phases)
+- **Phases 1-4**: Core caching implementation (12-16 hours)
+- **Phase 5**: Web-based editing groundwork (6-8 hours, FUTURE)
+
+**Current Status**: Pending (not started)
+**Total Effort**: 12-16 hours (Phases 1-4) + 6-8 hours (Phase 5 future)
+**Team**: python-backend-engineer (Phases 1-4), ui-engineer-enhanced (Phase 5)
 
 ---
 

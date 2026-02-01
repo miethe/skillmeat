@@ -8,7 +8,7 @@ updated: 2026-02-01
 category: "refactors"
 status: draft
 complexity: Medium
-total_effort: "10-14 hours"
+total_effort: "12-16 hours (Phases 1-4) + 6-8 hours (Phase 5 future)"
 related:
   - /docs/project_plans/implementation_plans/refactors/collection-data-consistency-v1.md
   - /docs/project_plans/reports/dual-collection-system-architecture-analysis.md
@@ -181,7 +181,71 @@ File-Based Artifacts              Sync Mechanism              Database Cache
 4. Background: Staleness check
    └─ NEW: Cache invalidation service
       └─ Refresh metadata older than TTL (30 min default)
+
+5. Web: Deploy/Sync operations (via ArtifactManager)
+   └─ NEW: After ArtifactManager completes file operation
+      └─ Auto-refresh affected artifact(s) in DB cache
+         └─ Hook into router response to trigger cache update
 ```
+
+---
+
+## Data Flow Architecture
+
+### Architectural Principle
+
+**File system is source of truth for artifact content and metadata.**
+
+All metadata changes must flow through the file system first, then sync to database cache. This ensures:
+- CLI users always see authoritative data
+- Offline CLI operations remain functional
+- Lock file integrity maintained
+- No divergence between file and database states
+
+### Data Flow by Operation Type
+
+| Operation | Initiator | Flow | DB Cache Action |
+|-----------|-----------|------|-----------------|
+| **Add artifact** | CLI | File → DB | Sync new artifact to cache |
+| **Sync artifact** | CLI | File → DB | Refresh artifact in cache |
+| **Deploy artifact** | Web/CLI | File (via ArtifactManager) → DB | Refresh after deploy completes |
+| **Remove artifact** | CLI | File → DB | Invalidate/remove from cache |
+| **Edit metadata** | Web (future) | Web → File → DB | Write to file, then refresh cache |
+| **Create artifact** | Web (future) | Web → File → DB | Write to file, then sync to cache |
+| **Collection membership** | Web | DB only | No file sync (web-only feature) |
+| **Groups/organization** | Web | DB only | No file sync (web-only feature) |
+
+### Web Operations That Modify Files
+
+When the web app performs operations that affect file-based artifacts, it must:
+
+1. **Call ArtifactManager** to perform the file operation
+2. **Wait for file operation to complete**
+3. **Trigger DB cache refresh** for affected artifact(s)
+
+```
+Web Request → ArtifactManager (file ops) → File System
+                     ↓ (on success)
+              DB Cache Refresh ← API Response
+```
+
+### Future: Web-Based Artifact Editing
+
+When web-based metadata editing is implemented, it MUST follow this flow:
+
+```
+1. User edits metadata in web UI
+2. Web app calls API endpoint (e.g., PUT /api/v1/artifacts/{id}/metadata)
+3. API writes changes to file system:
+   - Update collection.toml [[artifacts]] entry
+   - Update artifact's SKILL.md/COMMAND.md frontmatter (if applicable)
+4. API refreshes DB cache from updated file
+5. Return success to web UI
+
+NEVER: Write to DB only (causes file/DB divergence)
+```
+
+This ensures CLI users see the same metadata as web users, and lock file integrity is preserved
 
 ---
 
@@ -208,6 +272,11 @@ File-Based Artifacts              Sync Mechanism              Database Cache
 - Add `--web-sync` flag to CLI commands
 - Call sync endpoint after add/sync operations
 - No CLI changes required; API calls handle sync
+
+**Phase 5** (Future): Web-based artifact editing groundwork
+- Write service for file system metadata updates
+- API endpoints for web-based metadata editing
+- Ensures correct data flow: Web → File → DB Cache
 
 ### Parallel Work Opportunities
 
@@ -445,7 +514,7 @@ def migrate_artifacts_to_default_collection(
 ### Phase 2: Incremental Sync & API Endpoints
 
 **Priority**: HIGH
-**Duration**: 3-4 hours
+**Duration**: 4-5 hours
 **Dependencies**: Phase 1 complete
 **Risk**: Medium (new endpoints)
 **Assigned Subagent(s)**: `python-backend-engineer`
@@ -459,6 +528,8 @@ def migrate_artifacts_to_default_collection(
 | TASK-2.3 | Add endpoint parameters validation | Validate artifact_id format and collection_id ownership | Validation prevents invalid requests; returns 400 with clear message | 0.5h | TASK-2.1, TASK-2.2 |
 | TASK-2.4 | Add error handling and logging | Comprehensive error handling with detailed logging for debugging | Errors logged before returning; no unhandled exceptions | 0.5h | TASK-2.2 |
 | TASK-2.5 | Add unit tests for endpoints | Create tests for happy path and error cases | Tests cover: valid artifact, missing artifact, collection not found | 1h | TASK-2.2 |
+| TASK-2.6 | Hook deploy endpoint to refresh cache | After artifacts.py deploy_artifact() completes, trigger cache refresh for deployed artifact | Deploy via web auto-refreshes DB cache; no manual refresh needed | 0.5h | TASK-2.1 |
+| TASK-2.7 | Hook sync endpoint to refresh cache | After artifacts.py sync_artifact() completes, trigger cache refresh for synced artifact | Sync via web auto-refreshes DB cache; version changes reflected | 0.5h | TASK-2.1 |
 
 #### Implementation Details
 
@@ -680,6 +751,110 @@ async def refresh_artifact_metadata(
         )
 ```
 
+**TASK-2.6 & TASK-2.7: Hook ArtifactManager operations to refresh cache**
+
+File: `skillmeat/api/routers/artifacts.py` (MODIFY existing endpoints)
+
+After `deploy_artifact()` and `sync_artifact()` complete their file operations, call the cache refresh:
+
+```python
+from skillmeat.api.services.artifact_cache_service import refresh_single_artifact_cache
+
+@router.post("/{artifact_id}/deploy")
+async def deploy_artifact(
+    artifact_id: str,
+    # ... existing params
+) -> dict:
+    """Deploy artifact to project."""
+    # ... existing deploy logic via ArtifactManager ...
+
+    # NEW: After successful file operation, refresh DB cache
+    try:
+        refresh_single_artifact_cache(db_session, artifact_mgr, artifact_id)
+        logger.debug(f"Refreshed cache for deployed artifact: {artifact_id}")
+    except Exception as e:
+        # Don't fail deploy if cache refresh fails - log and continue
+        logger.warning(f"Cache refresh failed for {artifact_id}: {e}")
+
+    return {"deployed": True, "artifact_id": artifact_id}
+
+
+@router.post("/{artifact_id}/sync")
+async def sync_artifact(
+    artifact_id: str,
+    # ... existing params
+) -> dict:
+    """Sync artifact with upstream."""
+    # ... existing sync logic via ArtifactManager ...
+
+    # NEW: After successful file sync, refresh DB cache
+    try:
+        refresh_single_artifact_cache(db_session, artifact_mgr, artifact_id)
+        logger.debug(f"Refreshed cache for synced artifact: {artifact_id}")
+    except Exception as e:
+        # Don't fail sync if cache refresh fails - log and continue
+        logger.warning(f"Cache refresh failed for {artifact_id}: {e}")
+
+    return {"synced": True, "artifact_id": artifact_id, "new_version": new_version}
+```
+
+Helper function in `artifact_cache_service.py`:
+
+```python
+def refresh_single_artifact_cache(
+    session: Session,
+    artifact_mgr,
+    artifact_id: str,
+) -> bool:
+    """Refresh cache for a single artifact after file operation.
+
+    Args:
+        session: Database session
+        artifact_mgr: ArtifactManager instance
+        artifact_id: Artifact ID in 'type:name' format
+
+    Returns:
+        True if refresh succeeded, False otherwise
+    """
+    if ":" not in artifact_id:
+        return False
+
+    artifact_type, artifact_name = artifact_id.split(":", 1)
+
+    file_artifact = artifact_mgr.get_artifact(artifact_name)
+    if not file_artifact:
+        return False
+
+    # Upsert artifact with fresh metadata
+    existing = session.query(Artifact).filter_by(id=artifact_id).first()
+
+    metadata_fields = {
+        "description": getattr(file_artifact, 'description', None),
+        "author": getattr(file_artifact.metadata, 'author', None) if hasattr(file_artifact, 'metadata') else None,
+        "license": getattr(file_artifact.metadata, 'license', None) if hasattr(file_artifact, 'metadata') else None,
+        "tags": ",".join(getattr(file_artifact.metadata, 'tags', [])) if hasattr(file_artifact, 'metadata') else None,
+        "resolved_version": getattr(file_artifact, 'resolved_version', None),
+        "resolved_sha": getattr(file_artifact, 'resolved_sha', None),
+        "synced_at": datetime.utcnow(),
+    }
+
+    if existing:
+        for key, value in metadata_fields.items():
+            setattr(existing, key, value)
+    else:
+        new_artifact = Artifact(
+            id=artifact_id,
+            name=artifact_name,
+            type=artifact_type,
+            source=str(file_artifact.source),
+            **metadata_fields,
+        )
+        session.add(new_artifact)
+
+    session.commit()
+    return True
+```
+
 #### Phase 2 Quality Gates
 
 - [ ] POST /api/v1/user-collections/sync-artifact works for valid artifact
@@ -690,6 +865,9 @@ async def refresh_artifact_metadata(
 - [ ] All endpoints have error handling and logging
 - [ ] Unit tests pass for happy path and error cases
 - [ ] No unhandled exceptions
+- [ ] Deploy endpoint auto-refreshes cache after file operation completes
+- [ ] Sync endpoint auto-refreshes cache after file operation completes
+- [ ] Cache refresh failures don't break deploy/sync operations (graceful degradation)
 
 ---
 
@@ -1018,6 +1196,239 @@ async def refresh_stale_metadata_task(
 
 ---
 
+### Phase 5: Web-Based Artifact Editing Groundwork (Future)
+
+**Priority**: LOW (Future Enhancement)
+**Duration**: 6-8 hours (when implemented)
+**Dependencies**: Phases 1-3 complete
+**Risk**: Medium (new write path)
+**Assigned Subagent(s)**: `python-backend-engineer`, `ui-engineer-enhanced`
+
+**Status**: GROUNDWORK ONLY - This phase lays architectural foundation for future implementation.
+
+#### Overview
+
+When web-based artifact editing/creation is implemented, it MUST follow the correct data flow:
+
+```
+Web UI Edit → API → File System → DB Cache Refresh → Response
+```
+
+This ensures file system remains source of truth and CLI users see the same data as web users.
+
+#### Task Table (Future Implementation)
+
+| Task ID | Task Name | Description | Acceptance Criteria | Estimate | Dependencies |
+|---------|-----------|-------------|---------------------|----------|--------------|
+| TASK-5.1 | Create artifact metadata write service | Service that writes metadata changes to file system (collection.toml and artifact frontmatter) | Service writes to correct file locations; preserves existing data; handles TOML/YAML correctly | 2h | Phase 3 |
+| TASK-5.2 | Create PUT /api/v1/artifacts/{id}/metadata endpoint | API endpoint for updating artifact metadata via web | Endpoint validates input; calls write service; refreshes cache; returns updated artifact | 1.5h | TASK-5.1 |
+| TASK-5.3 | Create POST /api/v1/artifacts endpoint (web add) | API endpoint for adding new artifacts via web | Endpoint creates file-based artifact; adds to collection.toml; syncs to cache | 2h | TASK-5.1 |
+| TASK-5.4 | Add optimistic locking | Prevent concurrent edits from CLI and web causing conflicts | Version/hash check before write; 409 Conflict on mismatch | 1h | TASK-5.2 |
+| TASK-5.5 | Create web UI for metadata editing | Frontend form for editing artifact description, tags, etc. | Form validates input; shows loading state; handles errors | 2h | TASK-5.2 |
+
+#### Architectural Requirements
+
+**TASK-5.1: Artifact Metadata Write Service**
+
+File: `skillmeat/api/services/artifact_write_service.py` (NEW - Future)
+
+```python
+"""Service for writing artifact metadata to file system.
+
+CRITICAL: All metadata writes MUST go through this service to ensure
+file system remains source of truth. Never write metadata directly to DB.
+"""
+
+import logging
+from pathlib import Path
+from typing import Optional, List
+
+logger = logging.getLogger(__name__)
+
+
+class ArtifactWriteService:
+    """Service for writing artifact changes to file system."""
+
+    def __init__(self, collection_mgr, artifact_mgr):
+        self.collection_mgr = collection_mgr
+        self.artifact_mgr = artifact_mgr
+
+    def update_artifact_metadata(
+        self,
+        artifact_id: str,
+        description: Optional[str] = None,
+        author: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        license: Optional[str] = None,
+    ) -> dict:
+        """Update artifact metadata in file system.
+
+        Flow:
+        1. Load current artifact from file system
+        2. Update specified fields
+        3. Write back to file system (collection.toml + SKILL.md frontmatter)
+        4. Return updated metadata for cache refresh
+
+        Args:
+            artifact_id: Artifact ID in 'type:name' format
+            description: New description (None = no change)
+            author: New author (None = no change)
+            tags: New tags list (None = no change)
+            license: New license (None = no change)
+
+        Returns:
+            dict with updated metadata fields
+
+        Raises:
+            FileNotFoundError: Artifact not found in collection
+            PermissionError: Cannot write to collection files
+            ValueError: Invalid artifact_id format
+        """
+        if ":" not in artifact_id:
+            raise ValueError(f"Invalid artifact_id format: {artifact_id}")
+
+        artifact_type, artifact_name = artifact_id.split(":", 1)
+
+        # 1. Get current artifact from file system
+        artifact = self.artifact_mgr.get_artifact(artifact_name)
+        if not artifact:
+            raise FileNotFoundError(f"Artifact not found: {artifact_id}")
+
+        # 2. Build update dict (only non-None values)
+        updates = {}
+        if description is not None:
+            updates["description"] = description
+        if author is not None:
+            updates["author"] = author
+        if tags is not None:
+            updates["tags"] = tags
+        if license is not None:
+            updates["license"] = license
+
+        if not updates:
+            return {"artifact_id": artifact_id, "changed": False}
+
+        # 3. Write to collection.toml
+        self._update_collection_toml(artifact_name, artifact_type, updates)
+
+        # 4. Write to artifact frontmatter (if artifact has SKILL.md/etc)
+        self._update_artifact_frontmatter(artifact, updates)
+
+        logger.info(f"Updated artifact metadata in file system: {artifact_id}")
+
+        return {
+            "artifact_id": artifact_id,
+            "changed": True,
+            "updated_fields": list(updates.keys()),
+        }
+
+    def _update_collection_toml(
+        self, artifact_name: str, artifact_type: str, updates: dict
+    ) -> None:
+        """Update artifact entry in collection.toml."""
+        # Implementation: Load TOML, find artifact entry, update fields, write back
+        # Use atomic write pattern (write to temp, then rename)
+        pass  # Future implementation
+
+    def _update_artifact_frontmatter(self, artifact, updates: dict) -> None:
+        """Update YAML frontmatter in artifact's main file (SKILL.md, etc)."""
+        # Implementation: Load file, parse frontmatter, update, write back
+        # Preserve non-metadata content
+        pass  # Future implementation
+```
+
+**TASK-5.2: Metadata Update Endpoint**
+
+File: `skillmeat/api/routers/artifacts.py` (ADD new endpoint - Future)
+
+```python
+from skillmeat.api.services.artifact_write_service import ArtifactWriteService
+from skillmeat.api.services.artifact_cache_service import refresh_single_artifact_cache
+
+@router.put(
+    "/{artifact_id}/metadata",
+    response_model=ArtifactResponse,
+    tags=["artifacts"],
+    summary="Update artifact metadata (web editing)",
+)
+async def update_artifact_metadata(
+    artifact_id: str,
+    request: UpdateMetadataRequest,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    db_session: DbSessionDep,
+) -> ArtifactResponse:
+    """Update artifact metadata via web interface.
+
+    IMPORTANT: This endpoint writes to file system first, then refreshes DB cache.
+    File system is source of truth - never write directly to database.
+
+    Flow:
+    1. Validate request
+    2. Write changes to file system (collection.toml + artifact frontmatter)
+    3. Refresh DB cache from updated files
+    4. Return updated artifact
+
+    Args:
+        artifact_id: Artifact ID in 'type:name' format
+        request: Metadata update request (description, author, tags, license)
+
+    Returns:
+        Updated ArtifactResponse with new metadata
+
+    Raises:
+        HTTPException(404): Artifact not found
+        HTTPException(409): Conflict - artifact modified by another process
+        HTTPException(422): Invalid input
+    """
+    write_service = ArtifactWriteService(collection_mgr, artifact_mgr)
+
+    try:
+        # 1. Write to file system
+        result = write_service.update_artifact_metadata(
+            artifact_id=artifact_id,
+            description=request.description,
+            author=request.author,
+            tags=request.tags,
+            license=request.license,
+        )
+
+        # 2. Refresh DB cache from updated files
+        refresh_single_artifact_cache(db_session, artifact_mgr, artifact_id)
+
+        # 3. Return updated artifact from cache
+        artifact = db_session.query(Artifact).filter_by(id=artifact_id).first()
+        return ArtifactResponse.from_orm(artifact)
+
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Artifact not found: {artifact_id}")
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Failed to update artifact metadata: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update metadata")
+```
+
+#### Quality Gates (Future)
+
+- [ ] All metadata writes go through `ArtifactWriteService` (never direct DB writes)
+- [ ] File system updated before DB cache refresh
+- [ ] CLI can read metadata written via web (file is source of truth)
+- [ ] Web can read metadata written via CLI (cache refresh works)
+- [ ] Optimistic locking prevents lost updates
+- [ ] Atomic file writes prevent corruption
+- [ ] Error handling preserves file integrity on failure
+
+#### Why This Architecture
+
+| Approach | Problem |
+|----------|---------|
+| Write to DB only | CLI users don't see changes; lock file breaks; offline CLI fails |
+| Write to DB, sync to file | Complex sync logic; race conditions; source of truth unclear |
+| **Write to file, refresh cache** | ✅ Simple; file remains source of truth; CLI/web always consistent |
+
+---
+
 ## Risk Mitigation
 
 ### Technical Risks
@@ -1158,11 +1569,16 @@ logger.info(f"Cache staleness: {cache_stats}")
 
 ### Future Enhancements
 
-Deferred to subsequent PRD:
+**Phase 5 (Groundwork Included)**: Web-based artifact editing
+- Architecture and service design documented in this plan
+- Implementation deferred until web editing feature prioritized
+- Ensures correct data flow: Web → File → DB Cache
 
-1. **Bi-directional sync**: Database changes sync back to files (low priority)
+**Deferred to subsequent PRD**:
+
+1. **Web artifact creation**: Add new artifacts via web UI (builds on Phase 5)
 2. **Unified ID scheme**: Same artifact IDs across CLI and web (medium priority)
-3. **Conflict resolution**: Handle artifact modifications in both systems (medium priority)
+3. **Optimistic locking**: Prevent CLI/web edit conflicts (builds on Phase 5)
 4. **Analytics tracking**: Usage stats from database queries (low priority)
 
 ### Documentation

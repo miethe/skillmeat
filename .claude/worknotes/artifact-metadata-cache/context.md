@@ -102,7 +102,38 @@ File System                         Database
 | Server startup | `populate_artifact_metadata()` | N/A (internal) | All artifacts |
 | CLI: `skillmeat add` | POST sync-artifact | `/api/v1/user-collections/sync-artifact` | Single artifact |
 | CLI: `skillmeat sync` | POST refresh-metadata | `/api/v1/user-collections/refresh-metadata` | Batch (filtered) |
+| Web: Deploy artifact | Hook in `deploy_artifact()` | Internal (auto-refresh) | Single artifact |
+| Web: Sync artifact | Hook in `sync_artifact()` | Internal (auto-refresh) | Single artifact |
 | Background (optional) | APScheduler/Celery task | Internal | Stale artifacts (TTL-based) |
+
+---
+
+## Data Flow Architecture
+
+### Architectural Principle
+
+**File system is source of truth for artifact content and metadata.**
+
+All metadata changes must flow through the file system first, then sync to database cache.
+
+### Data Flow by Operation Type
+
+| Operation | Flow | DB Cache Action |
+|-----------|------|-----------------|
+| Add artifact (CLI) | File → DB | Sync new artifact |
+| Sync artifact (CLI/Web) | File → DB | Refresh after file op |
+| Deploy artifact (Web) | File → DB | Refresh after deploy |
+| Edit metadata (Web, FUTURE) | **Web → File → DB** | Write to file, then refresh |
+| Collection membership (Web) | DB only | N/A (web-only feature) |
+
+### Future: Web-Based Editing
+
+When web editing is implemented, it MUST follow:
+```
+Web UI Edit → API → File System → DB Cache Refresh → Response
+```
+
+NEVER: Write to DB only (causes file/DB divergence with CLI)
 
 ---
 
