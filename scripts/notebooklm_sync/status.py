@@ -11,8 +11,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from .config import MAPPING_PATH
-from .utils import get_notebook_id, get_target_files, is_in_scope, load_mapping
+try:
+    from .config import MAPPING_PATH
+    from .utils import get_notebook_id, get_target_files, is_in_scope, load_mapping
+except ImportError:
+    from config import MAPPING_PATH
+    from utils import get_notebook_id, get_target_files, is_in_scope, load_mapping
 
 
 def format_relative_time(iso_timestamp: str) -> str:
