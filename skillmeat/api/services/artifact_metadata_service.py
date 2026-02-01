@@ -47,16 +47,32 @@ def _parse_artifact_id(artifact_id: str) -> tuple[str, str]:
 
 
 def _lookup_in_cache(session: Session, artifact_id: str) -> Optional[Artifact]:
-    """Look up artifact in cache table by ID.
+    """Look up artifact in cache table by type and name.
+
+    Since artifact_id uses 'type:name' format (e.g., 'agent:my-agent') but
+    Artifact.id in the database uses different formats (e.g., 'ctx_abc123...'),
+    we parse the artifact_id and query by type and name fields instead.
 
     Args:
         session: Database session
-        artifact_id: Artifact identifier to search for
+        artifact_id: Artifact identifier in 'type:name' format
 
     Returns:
         Artifact record if found, None otherwise
     """
-    return session.query(Artifact).filter(Artifact.id == artifact_id).first()
+    # Parse artifact_id into type and name components
+    artifact_type, artifact_name = _parse_artifact_id(artifact_id)
+
+    if artifact_type == "unknown":
+        # Fall back to direct ID lookup for backward compatibility
+        return session.query(Artifact).filter(Artifact.id == artifact_id).first()
+
+    # Query by type and name fields instead of ID
+    return (
+        session.query(Artifact)
+        .filter(Artifact.type == artifact_type, Artifact.name == artifact_name)
+        .first()
+    )
 
 
 def _lookup_in_marketplace(

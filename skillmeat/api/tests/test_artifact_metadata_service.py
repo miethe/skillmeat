@@ -194,6 +194,54 @@ def test_lookup_in_cache_not_found(mock_session):
     mock_session.query.assert_called_once_with(Artifact)
 
 
+def test_lookup_in_cache_by_type_and_name(mock_session, sample_artifact):
+    """Test cache lookup using type:name format (e.g., 'agent:my-agent').
+
+    This tests the fix for the bug where artifact_id in CollectionArtifact
+    uses 'type:name' format but Artifact.id uses different formats like
+    'ctx_abc123...'. The lookup should parse the type:name and query by
+    Artifact.type and Artifact.name instead.
+    """
+    # Create artifact with separate type and name
+    sample_artifact.type = "agent"
+    sample_artifact.name = "a11y-sheriff"
+
+    # Mock query chain - should call filter with type and name
+    mock_query = MagicMock()
+    mock_filter = MagicMock()
+    mock_query.filter.return_value = mock_filter
+    mock_filter.first.return_value = sample_artifact
+    mock_session.query.return_value = mock_query
+
+    # Call function with type:name format
+    result = _lookup_in_cache(mock_session, "agent:a11y-sheriff")
+
+    # Assertions
+    assert result == sample_artifact
+    mock_session.query.assert_called_once_with(Artifact)
+    # Verify filter was called (the filter call should use type and name)
+    mock_query.filter.assert_called_once()
+    mock_filter.first.assert_called_once()
+
+
+def test_lookup_in_cache_fallback_for_unknown_format(mock_session, sample_artifact):
+    """Test cache lookup falls back to ID lookup for non-type:name format."""
+    # Mock query chain
+    mock_query = MagicMock()
+    mock_filter = MagicMock()
+    mock_query.filter.return_value = mock_filter
+    mock_filter.first.return_value = sample_artifact
+    mock_session.query.return_value = mock_query
+
+    # Call function with a format that doesn't match type:name
+    result = _lookup_in_cache(mock_session, "some-artifact-without-colon")
+
+    # Assertions
+    assert result == sample_artifact
+    mock_session.query.assert_called_once_with(Artifact)
+    mock_query.filter.assert_called_once()
+
+
 # =============================================================================
 # Marketplace Lookup Tests (_lookup_in_marketplace)
 # =============================================================================

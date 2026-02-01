@@ -35,7 +35,9 @@ from skillmeat.api.schemas.user_collections import (
     UserCollectionWithGroupsResponse,
 )
 from skillmeat.api.services import get_artifact_metadata
+from skillmeat.api.services.artifact_metadata_service import _get_artifact_collections
 from skillmeat.cache import get_collection_count_cache
+from skillmeat.core.artifact import ArtifactType as CoreArtifactType
 from skillmeat.core.refresher import CollectionRefresher, RefreshMode, validate_fields
 from skillmeat.cache.models import (
     DEFAULT_COLLECTION_ID,
@@ -797,6 +799,7 @@ async def delete_user_collection(
 async def list_collection_artifacts(
     collection_id: str,
     session: DbSessionDep,
+    artifact_mgr: ArtifactManagerDep,
     token: TokenDep,
     limit: int = Query(default=20, ge=1, le=100),
     after: Optional[str] = Query(default=None),
@@ -923,10 +926,76 @@ async def list_collection_artifacts(
                         )
                     )
 
-        # Fetch artifact metadata for each association using fallback service
+        # Fetch artifact metadata for each association
+        # Primary: Use ArtifactManager (file-based source of truth)
+        # Fallback: Use database service for cached/marketplace metadata
         items: List[ArtifactSummary] = []
         for assoc in page_associations:
-            artifact_summary = get_artifact_metadata(session, assoc.artifact_id)
+            # Parse artifact_id (format: "type:name")
+            if ":" in assoc.artifact_id:
+                type_str, artifact_name = assoc.artifact_id.split(":", 1)
+            else:
+                type_str, artifact_name = "unknown", assoc.artifact_id
+
+            # Try to get artifact from file-based manager
+            artifact_summary = None
+            try:
+                # Convert type string to ArtifactType enum
+                artifact_type_enum = None
+                try:
+                    artifact_type_enum = CoreArtifactType(type_str)
+                except ValueError:
+                    pass
+
+                file_artifact = artifact_mgr.show(
+                    artifact_name=artifact_name,
+                    artifact_type=artifact_type_enum,
+                )
+
+                if file_artifact:
+                    # Build ArtifactSummary from file-based artifact
+                    artifact_summary = ArtifactSummary(
+                        id=assoc.artifact_id,
+                        name=file_artifact.name,
+                        type=(
+                            file_artifact.type.value
+                            if hasattr(file_artifact.type, "value")
+                            else str(file_artifact.type)
+                        ),
+                        version=(
+                            file_artifact.metadata.version
+                            if file_artifact.metadata
+                            else None
+                        ),
+                        source=file_artifact.upstream or assoc.artifact_id,
+                        description=(
+                            file_artifact.metadata.description
+                            if file_artifact.metadata
+                            else None
+                        ),
+                        author=(
+                            file_artifact.metadata.author
+                            if file_artifact.metadata
+                            else None
+                        ),
+                        tags=(
+                            file_artifact.metadata.tags
+                            if file_artifact.metadata and file_artifact.metadata.tags
+                            else None
+                        ),
+                        collections=_get_artifact_collections(
+                            session, assoc.artifact_id
+                        ),
+                    )
+            except (ValueError, Exception) as e:
+                # Artifact not found in file system, fall through to fallback
+                logger.debug(
+                    f"File-based lookup failed for {assoc.artifact_id}: {e}"
+                )
+
+            # Fallback to database service if file-based lookup failed
+            if artifact_summary is None:
+                artifact_summary = get_artifact_metadata(session, assoc.artifact_id)
 
             # Apply type filter if specified
             if artifact_type is None or artifact_summary.type == artifact_type:
