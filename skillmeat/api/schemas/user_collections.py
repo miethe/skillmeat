@@ -214,6 +214,7 @@ class ArtifactSummary(BaseModel):
     will be populated with group membership information.
     """
 
+    id: str = Field(description="Unique artifact identifier")
     name: str = Field(description="Artifact name")
     type: str = Field(description="Artifact type (skill, command, agent, etc.)")
     version: Optional[str] = Field(default=None, description="Current version")

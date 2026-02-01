@@ -180,6 +180,7 @@ export async function moveArtifactToCollection(
  */
 export interface CollectionArtifactsPaginatedResponse {
   items: Array<{
+    id: string;
     name: string;
     type: string;
     version?: string | null;

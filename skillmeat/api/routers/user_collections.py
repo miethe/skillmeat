@@ -935,6 +935,7 @@ async def list_collection_artifacts(
                     groups = artifact_groups_map.get(assoc.artifact_id, [])
                     items.append(
                         ArtifactSummary(
+                            id=assoc.artifact_id,
                             name=artifact_summary.name,
                             type=artifact_summary.type,
                             version=artifact_summary.version,
@@ -1452,6 +1453,7 @@ async def list_collection_entities(
             if artifact:
                 # If artifact metadata exists, use it
                 artifact_summary = ArtifactSummary(
+                    id=assoc.artifact_id,
                     name=artifact.name,
                     type=artifact.type,
                     version=artifact.deployed_version or artifact.upstream_version,
@@ -1460,6 +1462,7 @@ async def list_collection_entities(
             else:
                 # Fallback: return artifact_id as both name and source
                 artifact_summary = ArtifactSummary(
+                    id=assoc.artifact_id,
                     name=assoc.artifact_id,
                     type="unknown",
                     version=None,

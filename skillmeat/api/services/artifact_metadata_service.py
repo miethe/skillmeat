@@ -103,6 +103,7 @@ def get_artifact_metadata(session: Session, artifact_id: str) -> ArtifactSummary
     if artifact:
         logger.debug(f"Cache hit for artifact_id={artifact_id}")
         return ArtifactSummary(
+            id=artifact_id,
             name=artifact.name,
             type=artifact.type,
             version=artifact.deployed_version or artifact.upstream_version,
@@ -114,6 +115,7 @@ def get_artifact_metadata(session: Session, artifact_id: str) -> ArtifactSummary
     if entry:
         logger.debug(f"Marketplace hit for artifact_id={artifact_id}")
         return ArtifactSummary(
+            id=artifact_id,
             name=entry.name,
             type=entry.artifact_type,
             version=entry.detected_version,
@@ -124,6 +126,7 @@ def get_artifact_metadata(session: Session, artifact_id: str) -> ArtifactSummary
     logger.debug(f"Fallback metadata for artifact_id={artifact_id}")
     parsed_type, parsed_name = _parse_artifact_id(artifact_id)
     return ArtifactSummary(
+        id=artifact_id,
         name=parsed_name,
         type=parsed_type,
         version=None,
