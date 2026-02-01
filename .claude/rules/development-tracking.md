@@ -2,13 +2,25 @@
 
 Track bugs/enhancements via MeatyCapture request-logs.
 
+## Document Structure
+
+| Type | Document | Items |
+|------|----------|-------|
+| bug | Daily log ("Bug Log - YYYY-MM-DD") | One per bug (appends) |
+| enhancement, feature, idea | Per-request doc | Usually 1 per request, or related sub-items |
+| task, question | Per-request doc | Usually 1 per request |
+
+**Pattern**: Bugs batch into daily logs; other types create new docs per request.
+
 ## Capture Decision
 
-| Scenario | Method | Tokens |
-|----------|--------|--------|
-| Single/batch capture | `mc-quick.sh` | ~50/item |
-| Complex notes | Direct JSON with `meatycapture log create` | ~200+ |
-| List/view/search | `/mc` command | varies |
+| Scenario | Method | Tokens | Document |
+|----------|--------|--------|----------|
+| Single bug | `mc-quick.sh bug ...` | ~50 | Appends to today's "Bug Log - YYYY-MM-DD" |
+| Multiple bugs (batch) | Multiple `mc-quick.sh bug ...` | ~50/item | All append to same daily log |
+| Feature/enhancement/idea | `mc-quick.sh enhancement ...` | ~50 | Creates new doc per request |
+| Complex notes | Direct JSON with `meatycapture log create` | ~200+ | Custom doc structure |
+| List/view/search | `/mc` command | varies | Queries existing docs |
 
 ## mc-quick.sh (Fast Path)
 

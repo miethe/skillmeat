@@ -21,6 +21,24 @@ Request-log markdown files for development tracking.
 
 **Scripts spec**: `.claude/specs/script-usage/bug-automation-scripts.md`
 
+## Document/Item Structure
+
+- **Document**: Container for related items (a topic, feature, or daily log)
+- **Item**: Individual request within a document
+
+### Aggregation Rules
+
+| Type | Strategy |
+|------|----------|
+| bug | Daily aggregation - all bugs from same day in one doc titled "Bug Log - YYYY-MM-DD" |
+| enhancement/idea/task/question | One doc per topic (title = request title, often 1 item) |
+
+### When to Use Multiple Items per Doc
+
+- Related sub-tasks of a larger feature (manually specify doc-id)
+- Multiple bugs captured in same session (automatic daily aggregation)
+- Batch of similar requests for same topic
+
 ## Quick Capture Script
 
 Ultra-simple wrapper - reduces ~20 lines JSON to single command:

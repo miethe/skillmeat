@@ -264,6 +264,8 @@ Full format spec: `.claude/skills/artifact-tracking/SKILL.md`
 
 Track bugs/enhancements via MeatyCapture request-logs.
 
+**Structure**: Docs contain Items. Bugs aggregate daily ("Bug Log - YYYY-MM-DD"); other types create one doc per request.
+
 **Quick capture** (~50 tokens): `mc-quick.sh TYPE DOMAIN SUBDOMAIN "Title" "Problem" "Goal"`
 
 **Full guidance**: `.claude/rules/development-tracking.md` — read when capturing bugs, using `/mc`, or working with request-logs.
