@@ -34,7 +34,7 @@ tasks:
     when applicable (no sync/drift indicators)'
   estimated_hours: 2
   assigned_to: ui-engineer-enhanced
-  status: pending
+  status: completed
   batch: 2
   depends_on:
   - CARD-2.3
@@ -45,7 +45,7 @@ tasks:
     deployments, badges (drift/update), sync time, action buttons'
   estimated_hours: 2
   assigned_to: ui-engineer-enhanced
-  status: pending
+  status: completed
   batch: 2
   depends_on:
   - CARD-2.3
@@ -100,10 +100,10 @@ quality_gates:
   verified: false
 blockers: []
 total_tasks: 5
-completed_tasks: 1
+completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 20
+progress: 60
 updated: '2026-02-02'
 ---
 
