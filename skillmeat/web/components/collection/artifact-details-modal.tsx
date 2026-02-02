@@ -61,6 +61,7 @@ import { apiRequest } from '@/lib/api';
 import { useToast, useSources, useTags, useUpdateArtifactTags } from '@/hooks';
 import { TagEditor } from '@/components/shared/tag-editor';
 import type { FileListResponse, FileContentResponse } from '@/types/files';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // ============================================================================
 // Types
@@ -88,6 +89,172 @@ export interface ArtifactDetailsModalProps {
   onTabChange?: (tab: ArtifactDetailsTab) => void;
   /** URL to return to if navigated from another page */
   returnTo?: string;
+  /** Whether artifact data is currently loading */
+  isLoading?: boolean;
+}
+
+// ============================================================================
+// Skeleton Components
+// ============================================================================
+
+/**
+ * ModalHeaderSkeleton - Loading skeleton for modal header
+ */
+function ModalHeaderSkeleton() {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b px-6 py-4">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-10 w-10 rounded-lg" />
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-9 w-9 rounded-md" />
+        <Skeleton className="h-9 w-24 rounded-md" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * OverviewTabSkeleton - Loading skeleton for overview tab content
+ */
+function OverviewTabSkeleton() {
+  return (
+    <div className="space-y-6 p-6">
+      {/* Description skeleton */}
+      <div>
+        <Skeleton className="mb-2 h-4 w-24" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="mt-1 h-4 w-3/4" />
+      </div>
+
+      {/* Collections skeleton */}
+      <div>
+        <Skeleton className="mb-2 h-4 w-20" />
+        <div className="flex gap-2">
+          <Skeleton className="h-6 w-20 rounded-full" />
+          <Skeleton className="h-6 w-24 rounded-full" />
+        </div>
+      </div>
+
+      {/* Source skeleton */}
+      <div>
+        <Skeleton className="mb-2 h-4 w-16" />
+        <Skeleton className="h-10 w-full rounded-md" />
+      </div>
+
+      {/* Tags skeleton */}
+      <div>
+        <Skeleton className="mb-2 h-4 w-12" />
+        <div className="flex gap-2">
+          <Skeleton className="h-6 w-16 rounded-full" />
+          <Skeleton className="h-6 w-20 rounded-full" />
+          <Skeleton className="h-6 w-14 rounded-full" />
+        </div>
+      </div>
+
+      {/* Timestamps skeleton */}
+      <div>
+        <Skeleton className="mb-2 h-4 w-24" />
+        <div className="space-y-2">
+          <div className="flex justify-between">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <div className="flex justify-between">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ContentsTabSkeleton - Loading skeleton for contents tab
+ */
+function ContentsTabSkeleton() {
+  return (
+    <div className="flex h-full gap-0">
+      {/* File tree skeleton */}
+      <div className="w-64 flex-shrink-0 border-r p-4 lg:w-72">
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <Skeleton className="h-4 w-4" />
+              <Skeleton className="h-4" style={{ width: `${60 + Math.random() * 40}%` }} />
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Content pane skeleton */}
+      <div className="flex-1 p-4">
+        <div className="space-y-2">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <Skeleton key={i} className="h-4" style={{ width: `${40 + Math.random() * 50}%` }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * LinksTabSkeleton - Loading skeleton for links tab
+ */
+function LinksTabSkeleton() {
+  return (
+    <div className="space-y-4 p-6">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-9 w-24 rounded-md" />
+      </div>
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 rounded-lg border p-4">
+            <Skeleton className="h-8 w-8 rounded-md" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-48" />
+            </div>
+            <Skeleton className="h-6 w-16 rounded-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * HistoryTabSkeleton - Loading skeleton for history tab
+ */
+function HistoryTabSkeleton() {
+  return (
+    <div className="space-y-4 p-6">
+      <Skeleton className="h-5 w-32" />
+      <div className="relative space-y-4 pl-6">
+        <div className="absolute bottom-0 left-4 top-0 w-px bg-muted" />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="relative">
+            <Skeleton className="absolute -left-4 h-4 w-4 rounded-full" />
+            <div className="rounded-lg border p-4">
+              <div className="flex justify-between">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+                <Skeleton className="h-4 w-16" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 interface HistoryEntry {
@@ -291,6 +458,7 @@ export function ArtifactDetailsModal({
   initialTab = 'overview',
   onTabChange,
   returnTo,
+  isLoading = false,
 }: ArtifactDetailsModalProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -561,8 +729,27 @@ export function ArtifactDetailsModal({
     setSelectedPath(path);
   }, []);
 
-  // Early return if no artifact
-  if (!artifact) return null;
+  // Early return if no artifact and not loading
+  if (!artifact && !isLoading) return null;
+
+  // Show loading skeleton when modal is open but artifact is loading
+  if (isLoading || !artifact) {
+    return (
+      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+        <DialogContent className="flex h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
+          <ModalHeaderSkeleton />
+          <div className="border-b px-6">
+            <div className="flex gap-4 py-2">
+              {TABS.map((tab) => (
+                <Skeleton key={tab.value} className="h-8 w-20 rounded-md" />
+              ))}
+            </div>
+          </div>
+          <OverviewTabSkeleton />
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   const Icon = getArtifactIcon(artifact.type);
   const iconColor = getArtifactColor(artifact.type);

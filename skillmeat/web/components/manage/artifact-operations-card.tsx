@@ -250,6 +250,7 @@ export function ArtifactOperationsCard({
     <Card
       className={cn(
         'cursor-pointer border-l-4 transition-all hover:border-primary/50 hover:shadow-md',
+        'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
         artifactTypeBorderAccents[artifact.type],
         artifactTypeCardTints[artifact.type],
         selected && 'ring-2 ring-primary',
@@ -261,7 +262,7 @@ export function ArtifactOperationsCard({
       role="button"
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      aria-label={`Manage ${artifact.name}`}
+      aria-label={`Manage ${artifact.name}, ${artifact.type} artifact. Status: ${artifact.syncStatus}`}
     >
       {/* Header Row: Checkbox, Icon, Name, Status, Health */}
       <div className="flex items-start gap-3 p-4 pb-2">
@@ -299,6 +300,7 @@ export function ArtifactOperationsCard({
                 <span className="text-orange-600 dark:text-orange-400">
                   {versionInfo.available}
                 </span>
+                <span className="sr-only">available</span>
               </>
             )}
           </div>
@@ -418,11 +420,11 @@ export function ArtifactOperationsCard({
               onClick={() => onManage?.()}
               disabled={!onManage}
             >
-              <LucideIcons.Settings className="mr-2 h-4 w-4" />
+              <LucideIcons.Settings className="mr-2 h-4 w-4" aria-hidden="true" />
               Manage Settings
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onClick()}>
-              <LucideIcons.Info className="mr-2 h-4 w-4" />
+              <LucideIcons.Info className="mr-2 h-4 w-4" aria-hidden="true" />
               View Details
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -433,7 +435,7 @@ export function ArtifactOperationsCard({
                 );
               }}
             >
-              <LucideIcons.Copy className="mr-2 h-4 w-4" />
+              <LucideIcons.Copy className="mr-2 h-4 w-4" aria-hidden="true" />
               Copy Deploy Command
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -443,7 +445,7 @@ export function ArtifactOperationsCard({
                 );
               }}
             >
-              <LucideIcons.Copy className="mr-2 h-4 w-4" />
+              <LucideIcons.Copy className="mr-2 h-4 w-4" aria-hidden="true" />
               Copy Sync Command
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -471,42 +473,42 @@ export function ArtifactOperationsCardSkeleton({
   selectable?: boolean;
 }) {
   return (
-    <Card className="border-l-4">
+    <Card className="border-l-4" aria-busy="true" aria-label="Loading artifact card">
       {/* Header Row */}
       <div className="flex items-start gap-3 p-4 pb-2">
-        {selectable && <Skeleton className="mt-1 h-4 w-4 flex-shrink-0 rounded" />}
-        <Skeleton className="h-8 w-8 flex-shrink-0 rounded-md" />
+        {selectable && <Skeleton className="mt-1 h-4 w-4 flex-shrink-0 rounded" aria-hidden="true" />}
+        <Skeleton className="h-8 w-8 flex-shrink-0 rounded-md" aria-hidden="true" />
         <div className="min-w-0 flex-1 space-y-1">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-4 w-32" aria-hidden="true" />
+          <Skeleton className="h-3 w-20" aria-hidden="true" />
         </div>
         <div className="flex items-center gap-2">
-          <Skeleton className="h-5 w-16 rounded-full" />
-          <Skeleton className="h-4 w-4 rounded-full" />
+          <Skeleton className="h-5 w-16 rounded-full" aria-hidden="true" />
+          <Skeleton className="h-4 w-4 rounded-full" aria-hidden="true" />
         </div>
       </div>
 
       {/* Deployments Row */}
       <div className="border-t px-4 py-2">
         <div className="flex items-center gap-2">
-          <Skeleton className="h-3 w-20" />
-          <Skeleton className="h-5 w-24 rounded-full" />
-          <Skeleton className="h-5 w-24 rounded-full" />
+          <Skeleton className="h-3 w-20" aria-hidden="true" />
+          <Skeleton className="h-5 w-24 rounded-full" aria-hidden="true" />
+          <Skeleton className="h-5 w-24 rounded-full" aria-hidden="true" />
         </div>
       </div>
 
       {/* Status Row */}
       <div className="flex items-center gap-2 border-t px-4 py-2">
-        <Skeleton className="h-5 w-20 rounded-full" />
-        <Skeleton className="ml-auto h-3 w-32" />
+        <Skeleton className="h-5 w-20 rounded-full" aria-hidden="true" />
+        <Skeleton className="ml-auto h-3 w-32" aria-hidden="true" />
       </div>
 
       {/* Actions Row */}
       <div className="flex items-center gap-2 border-t px-4 py-3">
-        <Skeleton className="h-8 w-16 rounded-md" />
-        <Skeleton className="h-8 w-20 rounded-md" />
-        <Skeleton className="h-8 w-24 rounded-md" />
-        <Skeleton className="ml-auto h-8 w-8 rounded-md" />
+        <Skeleton className="h-8 w-16 rounded-md" aria-hidden="true" />
+        <Skeleton className="h-8 w-20 rounded-md" aria-hidden="true" />
+        <Skeleton className="h-8 w-24 rounded-md" aria-hidden="true" />
+        <Skeleton className="ml-auto h-8 w-8 rounded-md" aria-hidden="true" />
       </div>
     </Card>
   );

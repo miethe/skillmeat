@@ -187,7 +187,7 @@ export function ArtifactBrowseCard({
       className={cn(
         'cursor-pointer border-l-4 transition-all',
         'hover:border-primary/50 hover:shadow-md',
-        'focus:outline-none focus:ring-2 focus:ring-ring',
+        'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
         artifactTypeBorderAccents[artifact.type],
         artifactTypeCardTints[artifact.type],
         className
@@ -196,7 +196,7 @@ export function ArtifactBrowseCard({
       onKeyDown={handleKeyDown}
       role="button"
       tabIndex={0}
-      aria-label={`View details for ${artifact.name}`}
+      aria-label={`View details for ${artifact.name}, ${artifact.type} artifact by ${authorDisplay}`}
     >
       {/* Header: Icon, Name, Author, Quick Actions */}
       <div className="p-4 pb-3">
@@ -205,7 +205,10 @@ export function ArtifactBrowseCard({
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {/* Type Icon */}
             <div className="flex-shrink-0 rounded-md border bg-background p-2">
-              <Icon className={cn('h-5 w-5', config?.color ?? 'text-muted-foreground')} />
+              <Icon
+                className={cn('h-5 w-5', config?.color ?? 'text-muted-foreground')}
+                aria-hidden="true"
+              />
             </div>
 
             {/* Name and Author */}
@@ -226,10 +229,10 @@ export function ArtifactBrowseCard({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 flex-shrink-0"
-                aria-label="Quick actions"
+                aria-label={`Quick actions for ${artifact.name}`}
                 onClick={(e) => e.stopPropagation()}
               >
-                <LucideIcons.MoreVertical className="h-4 w-4" />
+                <LucideIcons.MoreVertical className="h-4 w-4" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -238,20 +241,20 @@ export function ArtifactBrowseCard({
                   onViewDetails?.();
                 }}
               >
-                <LucideIcons.Eye className="mr-2 h-4 w-4" />
+                <LucideIcons.Eye className="mr-2 h-4 w-4" aria-hidden="true" />
                 View Details
               </DropdownMenuItem>
 
               {onQuickDeploy && (
                 <DropdownMenuItem onClick={() => onQuickDeploy()}>
-                  <LucideIcons.Rocket className="mr-2 h-4 w-4" />
+                  <LucideIcons.Rocket className="mr-2 h-4 w-4" aria-hidden="true" />
                   Quick Deploy
                 </DropdownMenuItem>
               )}
 
               {onAddToGroup && (
                 <DropdownMenuItem onClick={() => onAddToGroup()}>
-                  <LucideIcons.FolderPlus className="mr-2 h-4 w-4" />
+                  <LucideIcons.FolderPlus className="mr-2 h-4 w-4" aria-hidden="true" />
                   Add to Group
                 </DropdownMenuItem>
               )}
@@ -259,7 +262,7 @@ export function ArtifactBrowseCard({
               <DropdownMenuSeparator />
 
               <DropdownMenuItem onClick={handleCopyCliCommand}>
-                <LucideIcons.Terminal className="mr-2 h-4 w-4" />
+                <LucideIcons.Terminal className="mr-2 h-4 w-4" aria-hidden="true" />
                 Copy CLI Command
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -268,7 +271,7 @@ export function ArtifactBrowseCard({
 
         {/* Collection Badge (when in All Collections view) */}
         {showCollectionBadge && artifact.collections && artifact.collections.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
+          <div className="mt-2 flex flex-wrap gap-1" role="list" aria-label="Collections">
             {artifact.collections.slice(0, 2).map((collection) => (
               <Badge
                 key={collection.id}
@@ -278,13 +281,23 @@ export function ArtifactBrowseCard({
                   e.stopPropagation();
                   onCollectionClick?.(collection.id);
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onCollectionClick?.(collection.id);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={`View collection ${collection.name}`}
               >
-                <LucideIcons.FolderOpen className="mr-1 h-3 w-3" />
+                <LucideIcons.FolderOpen className="mr-1 h-3 w-3" aria-hidden="true" />
                 {collection.name}
               </Badge>
             ))}
             {artifact.collections.length > 2 && (
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs" aria-label={`${artifact.collections.length - 2} more collections`}>
                 +{artifact.collections.length - 2}
               </Badge>
             )}
@@ -300,14 +313,14 @@ export function ArtifactBrowseCard({
       </div>
 
       {/* Tags */}
-      <div className="flex min-h-[28px] flex-wrap items-center gap-1 px-4 pb-3">
+      <div className="flex min-h-[28px] flex-wrap items-center gap-1 px-4 pb-3" role="list" aria-label="Tags">
         {visibleTags.map((tag) => (
-          <Badge key={tag} variant="secondary" className="text-xs">
+          <Badge key={tag} variant="secondary" className="text-xs" role="listitem">
             {tag}
           </Badge>
         ))}
         {remainingTagsCount > 0 && (
-          <Badge variant="secondary" className="text-xs">
+          <Badge variant="secondary" className="text-xs" aria-label={`${remainingTagsCount} more tags`}>
             +{remainingTagsCount} more
           </Badge>
         )}
@@ -316,15 +329,15 @@ export function ArtifactBrowseCard({
       {/* Footer: Tools, Deployed Badge, Score */}
       <div className="flex items-center justify-between border-t px-4 py-3">
         {/* Left: Tools */}
-        <div className="flex flex-wrap items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1" role="list" aria-label="Tools">
           {tools.slice(0, 3).map((tool) => (
-            <Badge key={tool} variant="outline" className="text-xs font-normal">
-              <LucideIcons.Wrench className="mr-1 h-3 w-3" />
+            <Badge key={tool} variant="outline" className="text-xs font-normal" role="listitem">
+              <LucideIcons.Wrench className="mr-1 h-3 w-3" aria-hidden="true" />
               {tool}
             </Badge>
           ))}
           {tools.length > 3 && (
-            <Badge variant="outline" className="text-xs font-normal">
+            <Badge variant="outline" className="text-xs font-normal" aria-label={`${tools.length - 3} more tools`}>
               +{tools.length - 3}
             </Badge>
           )}
@@ -334,8 +347,8 @@ export function ArtifactBrowseCard({
         <div className="flex items-center gap-2">
           {hasDeployments && (
             <Badge variant="secondary" className="text-xs">
-              <LucideIcons.CheckCircle2 className="mr-1 h-3 w-3" />
-              Deployed ({deploymentCount})
+              <LucideIcons.CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
+              <span>Deployed ({deploymentCount})</span>
             </Badge>
           )}
 
@@ -355,44 +368,44 @@ export function ArtifactBrowseCard({
  */
 export function ArtifactBrowseCardSkeleton({ className }: { className?: string }) {
   return (
-    <Card className={cn('border-l-4', className)}>
+    <Card className={cn('border-l-4', className)} aria-busy="true" aria-label="Loading artifact card">
       {/* Header skeleton */}
       <div className="p-4 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-1 items-center gap-3">
             {/* Icon skeleton */}
-            <div className="h-9 w-9 animate-pulse rounded-md bg-muted" />
+            <div className="h-9 w-9 animate-pulse rounded-md bg-muted" aria-hidden="true" />
             {/* Name/author skeleton */}
             <div className="flex-1 space-y-2">
-              <div className="h-4 w-32 animate-pulse rounded bg-muted" />
-              <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+              <div className="h-4 w-32 animate-pulse rounded bg-muted" aria-hidden="true" />
+              <div className="h-3 w-24 animate-pulse rounded bg-muted" aria-hidden="true" />
             </div>
           </div>
           {/* Actions skeleton */}
-          <div className="h-8 w-8 animate-pulse rounded bg-muted" />
+          <div className="h-8 w-8 animate-pulse rounded bg-muted" aria-hidden="true" />
         </div>
       </div>
 
       {/* Description skeleton */}
       <div className="space-y-2 px-4 pb-3">
-        <div className="h-4 w-full animate-pulse rounded bg-muted" />
-        <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+        <div className="h-4 w-full animate-pulse rounded bg-muted" aria-hidden="true" />
+        <div className="h-4 w-3/4 animate-pulse rounded bg-muted" aria-hidden="true" />
       </div>
 
       {/* Tags skeleton */}
       <div className="flex gap-1 px-4 pb-3">
-        <div className="h-5 w-14 animate-pulse rounded-full bg-muted" />
-        <div className="h-5 w-16 animate-pulse rounded-full bg-muted" />
-        <div className="h-5 w-12 animate-pulse rounded-full bg-muted" />
+        <div className="h-5 w-14 animate-pulse rounded-full bg-muted" aria-hidden="true" />
+        <div className="h-5 w-16 animate-pulse rounded-full bg-muted" aria-hidden="true" />
+        <div className="h-5 w-12 animate-pulse rounded-full bg-muted" aria-hidden="true" />
       </div>
 
       {/* Footer skeleton */}
       <div className="flex items-center justify-between border-t px-4 py-3">
         <div className="flex gap-1">
-          <div className="h-5 w-16 animate-pulse rounded bg-muted" />
-          <div className="h-5 w-16 animate-pulse rounded bg-muted" />
+          <div className="h-5 w-16 animate-pulse rounded bg-muted" aria-hidden="true" />
+          <div className="h-5 w-16 animate-pulse rounded bg-muted" aria-hidden="true" />
         </div>
-        <div className="h-5 w-12 animate-pulse rounded bg-muted" />
+        <div className="h-5 w-12 animate-pulse rounded bg-muted" aria-hidden="true" />
       </div>
     </Card>
   );

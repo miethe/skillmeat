@@ -124,6 +124,156 @@ export interface ArtifactOperationsModalProps {
   onTabChange?: (tab: OperationsModalTab) => void;
   /** URL to return to if navigated from another page */
   returnTo?: string;
+  /** Whether artifact data is currently loading */
+  isLoading?: boolean;
+}
+
+// ============================================================================
+// Skeleton Components
+// ============================================================================
+
+/**
+ * OperationsModalHeaderSkeleton - Loading skeleton for operations modal header
+ */
+function OperationsModalHeaderSkeleton() {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b px-6 py-4">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-10 w-10 rounded-lg" />
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-6 w-6 rounded-full" />
+        <Skeleton className="h-6 w-16 rounded-full" />
+        <Skeleton className="h-9 w-9 rounded-md" />
+        <Skeleton className="h-9 w-24 rounded-md" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * StatusTabSkeleton - Loading skeleton for status tab content
+ */
+function StatusTabSkeleton() {
+  return (
+    <div className="grid gap-6 p-6 md:grid-cols-2">
+      {/* Health Summary Card Skeleton */}
+      <div className="rounded-lg border p-4">
+        <Skeleton className="mb-4 h-5 w-32" />
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-6 w-6 rounded-full" />
+          </div>
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-6 w-16 rounded-full" />
+          </div>
+        </div>
+      </div>
+
+      {/* Sync Summary Card Skeleton */}
+      <div className="rounded-lg border p-4">
+        <Skeleton className="mb-4 h-5 w-32" />
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-16" />
+          </div>
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-5 w-20 rounded-md" />
+          </div>
+        </div>
+      </div>
+
+      {/* Deployments Summary Card Skeleton */}
+      <div className="rounded-lg border p-4 md:col-span-2">
+        <Skeleton className="mb-4 h-5 w-36" />
+        <div className="flex gap-2">
+          <Skeleton className="h-6 w-28 rounded-full" />
+          <Skeleton className="h-6 w-24 rounded-full" />
+        </div>
+        <div className="mt-4 flex justify-end">
+          <Skeleton className="h-9 w-36 rounded-md" />
+        </div>
+      </div>
+
+      {/* Quick Actions Card Skeleton */}
+      <div className="rounded-lg border p-4 md:col-span-2">
+        <Skeleton className="mb-4 h-5 w-28" />
+        <div className="flex flex-wrap gap-2">
+          <Skeleton className="h-9 w-40 rounded-md" />
+          <Skeleton className="h-9 w-44 rounded-md" />
+          <Skeleton className="h-9 w-28 rounded-md" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * DeploymentsTabSkeleton - Loading skeleton for deployments tab
+ */
+function DeploymentsTabSkeleton() {
+  return (
+    <div className="space-y-4 p-6">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-9 w-36 rounded-md" />
+      </div>
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="rounded-lg border p-4">
+            <div className="flex items-start justify-between">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-6 w-20 rounded-full" />
+                <Skeleton className="h-8 w-8 rounded-md" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * VersionHistoryTabSkeleton - Loading skeleton for version history tab
+ */
+function VersionHistoryTabSkeleton() {
+  return (
+    <div className="space-y-4 p-6">
+      <Skeleton className="h-5 w-32" />
+      <div className="relative space-y-4 border-l-2 border-muted pl-6">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="relative">
+            <Skeleton className="absolute -left-[1.625rem] h-4 w-4 rounded-full" />
+            <div className="rounded-lg border p-4">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-40" />
+                </div>
+                <div className="space-y-1 text-right">
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-3 w-12" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 interface HistoryEntry {
@@ -289,6 +439,7 @@ export function ArtifactOperationsModal({
   initialTab = 'status',
   onTabChange,
   returnTo,
+  isLoading = false,
 }: ArtifactOperationsModalProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -513,9 +664,29 @@ export function ArtifactOperationsModal({
     };
   }, [artifact]);
 
-  // Early return if no artifact
-  if (!artifact) {
+  // Early return if no artifact and not loading
+  if (!artifact && !isLoading) {
     return null;
+  }
+
+  // Show loading skeleton when modal is open but artifact is loading
+  if (isLoading || !artifact) {
+    const defaultTabs = getTabs(null);
+    return (
+      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+        <DialogContent className="flex h-[90vh] max-h-[90vh] min-h-0 max-w-5xl flex-col overflow-hidden p-0 lg:max-w-6xl">
+          <OperationsModalHeaderSkeleton />
+          <div className="border-b px-6">
+            <div className="flex gap-2 py-2">
+              {defaultTabs.map((tab) => (
+                <Skeleton key={tab.value} className="h-8 w-24 rounded-md" />
+              ))}
+            </div>
+          </div>
+          <StatusTabSkeleton />
+        </DialogContent>
+      </Dialog>
+    );
   }
 
   // Fallback for unknown artifact type

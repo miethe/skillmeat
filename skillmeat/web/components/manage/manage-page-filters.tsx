@@ -199,18 +199,18 @@ export function ManagePageFilters({
     tags.length;
 
   return (
-    <div className="space-y-3 border-b bg-muted/20 p-4">
+    <div className="space-y-3 border-b bg-muted/20 p-4" role="search" aria-label="Filter artifacts">
       {/* Primary Filter Row */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Search Input */}
         <div className="relative min-w-[200px] flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
             placeholder="Search artifacts..."
             value={searchInput}
             onChange={(e) => handleSearchInputChange(e.target.value)}
             className="pl-9"
-            aria-label="Search artifacts"
+            aria-label="Search artifacts by name or description"
           />
           {searchInput && (
             <Button
@@ -223,7 +223,7 @@ export function ManagePageFilters({
               }}
               aria-label="Clear search"
             >
-              <X className="h-3 w-3" />
+              <X className="h-3 w-3" aria-hidden="true" />
             </Button>
           )}
         </div>
@@ -234,7 +234,7 @@ export function ManagePageFilters({
           onValueChange={(value) => onProjectChange(value === 'all' ? null : value)}
         >
           <SelectTrigger className="w-[200px]" aria-label="Filter by project">
-            <FolderKanban className="mr-2 h-4 w-4 text-muted-foreground" />
+            <FolderKanban className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
             <SelectValue placeholder="All Projects" />
           </SelectTrigger>
           <SelectContent>
@@ -269,7 +269,7 @@ export function ManagePageFilters({
           value={type}
           onValueChange={(value) => onTypeChange(value as ArtifactType | 'all')}
         >
-          <SelectTrigger className="w-[140px]" aria-label="Filter by type">
+          <SelectTrigger className="w-[140px]" aria-label="Filter by artifact type">
             <SelectValue placeholder="All Types" />
           </SelectTrigger>
           <SelectContent>
@@ -284,8 +284,15 @@ export function ManagePageFilters({
         {/* Tags Filter Popover */}
         <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="default" className="gap-2">
-              <Filter className="h-4 w-4" />
+            <Button
+              variant="outline"
+              size="default"
+              className="gap-2"
+              aria-label={`Filter by tags${tags.length > 0 ? `, ${tags.length} selected` : ''}`}
+              aria-expanded={tagPopoverOpen}
+              aria-haspopup="listbox"
+            >
+              <Filter className="h-4 w-4" aria-hidden="true" />
               Tags
               {tags.length > 0 && (
                 <Badge variant="secondary" className="ml-1 rounded-full px-2">
@@ -297,7 +304,7 @@ export function ManagePageFilters({
           <PopoverContent className="w-72 p-0" align="start">
             <div className="border-b p-3">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-medium">Filter by tags</span>
+                <span className="text-sm font-medium" id="tag-filter-heading">Filter by tags</span>
                 {tags.length > 0 && (
                   <Button
                     variant="ghost"
@@ -313,17 +320,18 @@ export function ManagePageFilters({
                 )}
               </div>
               <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   placeholder="Search tags..."
                   value={tagSearch}
                   onChange={(e) => setTagSearch(e.target.value)}
                   className="h-9 pl-8"
+                  aria-label="Search available tags"
                 />
               </div>
             </div>
             <ScrollArea className="h-60">
-              <div className="p-2">
+              <div className="p-2" role="listbox" aria-labelledby="tag-filter-heading" aria-multiselectable="true">
                 {filteredTags.length === 0 ? (
                   <div className="py-4 text-center text-sm text-muted-foreground">
                     No tags found
@@ -339,6 +347,15 @@ export function ManagePageFilters({
                           isSelected && 'bg-accent'
                         )}
                         onClick={() => toggleTag(tagName)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            toggleTag(tagName);
+                          }
+                        }}
+                        role="option"
+                        aria-selected={isSelected}
+                        tabIndex={0}
                       >
                         <div className="flex items-center gap-2">
                           <div
@@ -346,6 +363,7 @@ export function ManagePageFilters({
                               'flex h-4 w-4 items-center justify-center rounded border',
                               isSelected ? 'border-primary bg-primary' : 'border-input'
                             )}
+                            aria-hidden="true"
                           >
                             {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
                           </div>
@@ -375,17 +393,21 @@ export function ManagePageFilters({
 
       {/* Active Filters Display (Chips) */}
       {activeFilterCount > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2" role="status" aria-live="polite" aria-label="Active filters">
           <span className="text-sm text-muted-foreground">Active filters:</span>
 
           {/* Project chip */}
           {project && (
             <Badge variant="secondary" className="gap-1">
               Project: {project}
-              <X
-                className="h-3 w-3 cursor-pointer hover:opacity-70"
+              <button
+                type="button"
+                className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-ring"
                 onClick={() => onProjectChange(null)}
-              />
+                aria-label={`Remove project filter: ${project}`}
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
             </Badge>
           )}
 
@@ -393,10 +415,14 @@ export function ManagePageFilters({
           {status !== 'all' && (
             <Badge variant="secondary" className="gap-1">
               Status: {STATUS_OPTIONS.find((o) => o.value === status)?.label}
-              <X
-                className="h-3 w-3 cursor-pointer hover:opacity-70"
+              <button
+                type="button"
+                className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-ring"
                 onClick={() => onStatusChange('all')}
-              />
+                aria-label={`Remove status filter: ${STATUS_OPTIONS.find((o) => o.value === status)?.label}`}
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
             </Badge>
           )}
 
@@ -404,10 +430,14 @@ export function ManagePageFilters({
           {type !== 'all' && (
             <Badge variant="secondary" className="gap-1">
               Type: {TYPE_OPTIONS.find((o) => o.value === type)?.label}
-              <X
-                className="h-3 w-3 cursor-pointer hover:opacity-70"
+              <button
+                type="button"
+                className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-ring"
                 onClick={() => onTypeChange('all')}
-              />
+                aria-label={`Remove type filter: ${TYPE_OPTIONS.find((o) => o.value === type)?.label}`}
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
             </Badge>
           )}
 
@@ -415,10 +445,14 @@ export function ManagePageFilters({
           {tags.map((tagName) => (
             <Badge key={tagName} variant="secondary" className="gap-1">
               {tagName}
-              <X
-                className="h-3 w-3 cursor-pointer hover:opacity-70"
+              <button
+                type="button"
+                className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-ring"
                 onClick={() => onTagsChange(tags.filter((t) => t !== tagName))}
-              />
+                aria-label={`Remove tag filter: ${tagName}`}
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
             </Badge>
           ))}
         </div>
