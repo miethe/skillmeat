@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { FolderOpen, Plus, X, MoreHorizontal, FolderPlus, Layers } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { FolderOpen, Plus, X, MoreHorizontal, FolderPlus, Layers, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -31,6 +32,16 @@ interface ModalCollectionsTabProps {
    * Will be removed in a future version.
    */
   entity?: Artifact;
+  /**
+   * Context determines which action buttons to show per collection.
+   * - 'discovery': No extra navigation buttons (default behavior)
+   * - 'operations': Shows "View in Collection" button per collection
+   */
+  context?: 'discovery' | 'operations';
+  /**
+   * Callback invoked before navigation (e.g., to close the modal).
+   */
+  onNavigate?: () => void;
 }
 
 /**
@@ -52,9 +63,15 @@ interface ModalCollectionsTabProps {
  * <ModalCollectionsTab artifact={artifact} />
  * ```
  */
-export function ModalCollectionsTab({ artifact, entity }: ModalCollectionsTabProps) {
+export function ModalCollectionsTab({
+  artifact,
+  entity,
+  context,
+  onNavigate,
+}: ModalCollectionsTabProps) {
   // Support both 'artifact' (canonical) and 'entity' (deprecated) prop names
   const resolvedArtifact = artifact ?? entity;
+  const router = useRouter();
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -98,6 +115,16 @@ export function ModalCollectionsTab({ artifact, entity }: ModalCollectionsTabPro
         variant: 'destructive',
       });
     }
+  };
+
+  const handleViewInCollection = (collectionId: string) => {
+    onNavigate?.();
+    const params = new URLSearchParams({
+      collection: collectionId,
+      artifact: resolvedArtifact.id,
+      returnTo: '/manage',
+    });
+    router.push(`/collection?${params.toString()}`);
   };
 
   if (isLoadingCollections) {
@@ -160,22 +187,35 @@ export function ModalCollectionsTab({ artifact, entity }: ModalCollectionsTabPro
                       {collection.artifact_count !== 1 ? 's' : ''}
                     </Badge>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => handleRemoveFromCollection(collection.id)}
-                        className="text-destructive"
+                  <div className="flex items-center gap-1">
+                    {context === 'operations' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => handleViewInCollection(collection.id)}
                       >
-                        <X className="mr-2 h-4 w-4" />
-                        Remove from Collection
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        <ExternalLink className="mr-1 h-3 w-3" />
+                        View in Collection
+                      </Button>
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => handleRemoveFromCollection(collection.id)}
+                          className="text-destructive"
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          Remove from Collection
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
 
                 {/* Groups within this collection */}

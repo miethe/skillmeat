@@ -9,7 +9,7 @@ import { CollectionToolbar } from '@/components/collection/collection-toolbar';
 import { ArtifactGrid } from '@/components/collection/artifact-grid';
 import { ArtifactList } from '@/components/collection/artifact-list';
 import { ArtifactBrowseCardSkeleton } from '@/components/collection/artifact-browse-card';
-import { CollectionArtifactModal, type ArtifactModalTab } from '@/components/shared/CollectionArtifactModal';
+import { ArtifactDetailsModal, type ArtifactDetailsTab } from '@/components/collection/artifact-details-modal';
 import { EditCollectionDialog } from '@/components/collection/edit-collection-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
 import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
@@ -25,6 +25,7 @@ import {
   useIntersectionObserver,
   useEditArtifactParameters,
   useToast,
+  useReturnTo,
 } from '@/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Artifact, ArtifactFilters } from '@/types/artifact';
@@ -85,6 +86,7 @@ function CollectionPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const { returnTo } = useReturnTo();
 
   // View mode with localStorage persistence
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -152,7 +154,7 @@ function CollectionPageContent() {
   const urlArtifactId = searchParams.get('artifact');
   const urlCollectionId = searchParams.get('collection');
   const urlGroupId = searchParams.get('group');
-  const urlTab = searchParams.get('tab') as ArtifactModalTab | null;
+  const urlTab = searchParams.get('tab') as ArtifactDetailsTab | null;
 
   // Helper to update URL params without full page reload
   const updateUrlParams = useCallback(
@@ -547,7 +549,7 @@ function CollectionPageContent() {
     setTimeout(() => setSelectedArtifact(null), 300);
   };
 
-  const handleTabChange = (tab: ArtifactModalTab) => {
+  const handleTabChange = (tab: ArtifactDetailsTab) => {
     // Update URL with new tab
     updateUrlParams({
       tab: tab === 'overview' ? null : tab, // Don't clutter URL with default tab
@@ -749,13 +751,14 @@ function CollectionPageContent() {
         )}
       </div>
 
-      {/* Artifact Detail Modal with URL-synced tab */}
-      <CollectionArtifactModal
+      {/* Artifact Detail Modal - Discovery-focused modal */}
+      <ArtifactDetailsModal
         artifact={selectedArtifact}
         open={isDetailOpen}
         onClose={handleDetailClose}
         initialTab={urlTab || 'overview'}
         onTabChange={handleTabChange}
+        returnTo={returnTo || undefined}
       />
 
       {/* Edit Collection Dialog */}

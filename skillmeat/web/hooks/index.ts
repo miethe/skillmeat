@@ -44,6 +44,7 @@
  * - Analytics (summary + trends + stream)
  * - SSE (real-time event streaming)
  * - Utility Hooks (debounce, toast, focus trap, etc.)
+ * - Navigation Hooks (return-to, cross-navigation)
  * - Context Hooks (collection context + entity lifecycle)
  *
  * See `.claude/analysis/hooks-structure-analysis.md` for detailed inventory.
@@ -463,6 +464,25 @@ export { useOutdatedArtifacts } from './useOutdatedArtifacts';
  * Version graph visualization for artifact history
  */
 export { versionKeys, useVersionGraph } from './useVersionGraph';
+
+// ============================================================================
+// NAVIGATION HOOKS
+// ============================================================================
+
+/**
+ * Cross-navigation state preservation for modal system
+ * Manages returnTo URL parameter for navigation between pages
+ * @example
+ * const { hasReturnTo, returnToLabel, navigateBack, createReturnUrl } = useReturnTo();
+ * if (hasReturnTo) {
+ *   return <Button onClick={navigateBack}>Return to {returnToLabel}</Button>
+ * }
+ */
+export {
+  useReturnTo,
+  type UseReturnToOptions,
+  type UseReturnToReturn,
+} from './use-return-to';
 
 // ============================================================================
 // CONTEXT HOOKS

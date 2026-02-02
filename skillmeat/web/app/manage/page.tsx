@@ -9,12 +9,13 @@ import { PageHeader } from '@/components/shared/page-header';
 import {
   EntityLifecycleProvider,
   useEntityLifecycle,
-} from '@/components/entity/EntityLifecycleProvider';
+  useReturnTo,
+} from '@/hooks';
 import { EntityList } from '@/components/entity/entity-list';
 import { EntityForm } from '@/components/entity/entity-form';
 import { EntityTabs } from './components/entity-tabs';
 import { EntityFilters } from './components/entity-filters';
-import { CollectionArtifactModal, type ArtifactModalTab } from '@/components/shared/CollectionArtifactModal';
+import { ArtifactOperationsModal, type OperationsModalTab } from '@/components/manage/artifact-operations-modal';
 import { AddEntityDialog } from './components/add-entity-dialog';
 import type { Artifact, ArtifactType } from '@/types';
 import {
@@ -30,6 +31,7 @@ function ManagePageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const activeEntityType = (searchParams.get('type') as ArtifactType) || 'skill';
+  const { returnTo } = useReturnTo();
 
   const {
     entities,
@@ -58,7 +60,7 @@ function ManagePageContent() {
 
   // Get URL params for deep linking
   const urlArtifactId = searchParams.get('artifact');
-  const urlTab = searchParams.get('tab') as ArtifactModalTab | null;
+  const urlTab = searchParams.get('tab') as OperationsModalTab | null;
 
   // Helper to update URL params without full page reload
   const updateUrlParams = useCallback(
@@ -130,7 +132,7 @@ function ManagePageContent() {
   const handleArtifactClick = useCallback((artifact: Artifact) => {
     setSelectedArtifact(artifact);
     setDetailPanelOpen(true);
-    // Update URL with artifact ID (clear tab to start at default)
+    // Update URL with artifact ID (clear tab to start at default 'status' for operations modal)
     updateUrlParams({
       artifact: artifact.id,
       tab: null,
@@ -147,10 +149,10 @@ function ManagePageContent() {
     });
   }, [updateUrlParams]);
 
-  const handleTabChange = useCallback((tab: ArtifactModalTab) => {
+  const handleTabChange = useCallback((tab: OperationsModalTab) => {
     // Update URL with new tab
     updateUrlParams({
-      tab: tab === 'overview' ? null : tab, // Don't clutter URL with default tab
+      tab: tab === 'status' ? null : tab, // Don't clutter URL with default tab
     });
   }, [updateUrlParams]);
 
@@ -173,12 +175,12 @@ function ManagePageContent() {
   );
 
   const handleDeploy = useCallback((artifact: Artifact) => {
-    // Open artifact modal to sync tab for deployment
+    // Open artifact modal to deployments tab for deployment
     setSelectedArtifact(artifact);
     setDetailPanelOpen(true);
     updateUrlParams({
       artifact: artifact.id,
-      tab: 'sync',
+      tab: 'deployments',
     });
   }, [updateUrlParams]);
 
@@ -213,12 +215,12 @@ function ManagePageContent() {
   }, [updateUrlParams]);
 
   const handleManage = useCallback((artifact: Artifact) => {
-    // Open artifact modal to overview tab for management options
+    // Open artifact modal to status tab (default) for management options
     setSelectedArtifact(artifact);
     setDetailPanelOpen(true);
     updateUrlParams({
       artifact: artifact.id,
-      tab: null, // Default to overview which has settings
+      tab: null, // Default to status which has health overview
     });
   }, [updateUrlParams]);
 
@@ -327,13 +329,14 @@ function ManagePageContent() {
         </EntityTabs>
       </div>
 
-      {/* Artifact Detail Modal with URL-synced tab */}
-      <CollectionArtifactModal
+      {/* Artifact Operations Modal - Operations-focused modal with status as default tab */}
+      <ArtifactOperationsModal
         artifact={selectedArtifact}
         open={detailPanelOpen}
         onClose={handleDetailClose}
-        initialTab={urlTab || 'overview'}
+        initialTab={urlTab || 'status'}
         onTabChange={handleTabChange}
+        returnTo={returnTo || undefined}
       />
 
       {/* Add Dialog */}
