@@ -8,6 +8,7 @@ phases: 5
 related_specs:
   - /docs/design/ui-component-specs-page-refactor.md
   - /docs/project_plans/reports/manage-collection-page-architecture-analysis.md
+  - /docs/project_plans/PRDs/tools-api-support-v1.md
 created: 2026-02-01
 updated: 2026-02-01
 category: "features"
@@ -20,6 +21,7 @@ category: "features"
 **Key Decision**: Each page uses its optimal backend system while maintaining clear semantic separation:
 - `/collection` = Browse & Discover (primary page) - "What artifacts do I have?"
 - `/manage` = Operations Dashboard (secondary page) - "What needs attention?"
+- `/collection` remains the canonical route (collection and group selection via query params and local state)
 
 ---
 
@@ -73,14 +75,15 @@ Uses Haiku agents for mechanical work + Sonnet agents for component implementati
 |---------|-----------|-------------|-------------------|-----------|----------|
 | NAV-1.1 | Update sidebar navigation labels | Update sidebar component to show "Health & Sync" (for /manage) and "Collections" (for /collection) with icon changes | 1. Sidebar reflects new labels<br>2. Icons changed appropriately<br>3. Hover states work<br>4. Mobile nav updated | 1 | ui-engineer-enhanced |
 | NAV-1.2 | Add page headers with descriptions | Implement PageHeader components with purpose statements: Collection → "Browse & Discover", Manage → "Health & Sync" | 1. Headers render on both pages<br>2. Icons display correctly<br>3. Description text clear and concise<br>4. Responsive on mobile | 1 | frontend-developer |
-| NAV-1.3 | Implement deep link support for artifacts | Support `?artifact={id}` query param on both pages to open modal with specific artifact | 1. Query param parsed correctly<br>2. Modal opens automatically<br>3. URL updates on modal open<br>4. Browser back button works<br>5. Bookmarkable links work | 2 | frontend-developer |
-| NAV-1.4 | Add cross-navigation buttons to UnifiedEntityModal | Add "Open in Manage →" button (for collection context) and "View Full Details →" button (for manage context) in modal headers | 1. Buttons appear in correct context<br>2. Navigation preserves artifact state<br>3. Modal closes on navigation<br>4. No console errors on click | 1.5 | frontend-developer |
+| NAV-1.3 | Implement deep link + URL state support | Support `?artifact={id}` on both pages, and `/collection?collection={id}&group={id}` for selection; include optional `returnTo` and `tab` params for cross-nav | 1. Query params parsed correctly<br>2. Modal opens automatically<br>3. URL updates on modal open<br>4. Browser back button works<br>5. Bookmarkable links work<br>6. Collection/group selection restores from URL | 2 | frontend-developer |
+| NAV-1.4 | Add cross-navigation buttons to UnifiedEntityModal | Add "Manage Artifact →" (from discovery) and "Collection Details →" (from operations) in modal headers | 1. Buttons appear in correct context<br>2. Navigation preserves artifact + collection context<br>3. Modal closes on navigation<br>4. No console errors on click | 1.5 | frontend-developer |
 | NAV-1.5 | Create PageHeader component variant | Create reusable PageHeader component with title, description, icon, and optional action button slots | 1. Component accepts title, description, icon<br>2. Renders correctly on multiple pages<br>3. Accessible with semantic HTML<br>4. Responsive layout | 1 | ui-engineer-enhanced |
 
 **Phase 1 Quality Gate**:
 - [ ] Sidebar reflects new navigation labels
 - [ ] Page headers display with correct descriptions
 - [ ] Deep links (`?artifact={id}`) work on both pages
+- [ ] Collection/group selection restores from URL (`?collection=...&group=...`)
 - [ ] Modal cross-navigation buttons appear and function
 - [ ] No accessibility violations in navigation elements
 
@@ -101,14 +104,14 @@ Uses Haiku agents for mechanical work + Sonnet agents for component implementati
 
 | Task ID | Task Name | Description | Acceptance Criteria | Est. Hours | Assignee |
 |---------|-----------|-------------|-------------------|-----------|----------|
-| CARD-2.1 | Create ArtifactBrowseCard component | Discovery-focused card: type icon, name, author, description (truncated), tags, tools, score badge, quick actions menu | 1. All props accepted and rendered<br>2. Description truncates to 2-3 lines<br>3. Quick actions menu functional<br>4. Hover/focus states work<br>5. No drift/sync indicators | 2 | ui-engineer-enhanced |
+| CARD-2.1 | Create ArtifactBrowseCard component | Discovery-focused card: type icon, name, author, description (truncated), tags, tools, score badge, quick actions menu; **subtle deployed/outdated indicator only when applicable** | 1. All props accepted and rendered<br>2. Description truncates to 2-3 lines<br>3. Quick actions menu functional<br>4. Hover/focus states work<br>5. Subtle status indicator shown only for deployed/outdated items | 2 | ui-engineer-enhanced |
 | CARD-2.2 | Create ArtifactOperationsCard component | Operations-focused card: checkbox, type icon, name, version arrows, deployments, badges (drift/update), sync time, action buttons | 1. Checkbox selection works<br>2. Status badges display correctly<br>3. Deployment badges stack properly<br>4. Health indicator colored correctly<br>5. All action buttons functional | 2 | ui-engineer-enhanced |
 | CARD-2.3 | Create shared status utility components | StatusBadge, HealthIndicator, DeploymentBadgeStack components with proper styling and tooltips | 1. StatusBadge renders all states<br>2. HealthIndicator shows correct health<br>3. DeploymentBadgeStack shows overflow<br>4. All tooltips functional<br>5. Accessible labels present | 1.5 | ui-engineer-enhanced |
 | CARD-2.4 | Integrate ArtifactBrowseCard into collection page | Replace existing card rendering with ArtifactBrowseCard; update prop passing and event handlers | 1. Cards render on collection page<br>2. Quick actions work<br>3. Click opens modal<br>4. No visual regressions<br>5. Performance maintained | 1 | frontend-developer |
 | CARD-2.5 | Integrate ArtifactOperationsCard into manage page | Replace existing card rendering with ArtifactOperationsCard; integrate bulk selection, action handlers | 1. Cards render on manage page<br>2. Checkboxes functional<br>3. Action buttons work<br>4. Bulk selection affects button state<br>5. No visual regressions | 1 | frontend-developer |
 
 **Phase 2 Quality Gate**:
-- [ ] ArtifactBrowseCard renders without drift indicators
+- [ ] ArtifactBrowseCard avoids full ops indicators; only subtle deployed/outdated badge when relevant
 - [ ] ArtifactOperationsCard shows health and deployment status
 - [ ] Shared utilities (StatusBadge, HealthIndicator, DeploymentBadgeStack) exported and working
 - [ ] Both cards integrate into pages with no console errors
@@ -133,16 +136,16 @@ Uses Haiku agents for mechanical work + Sonnet agents for component implementati
 
 | Task ID | Task Name | Description | Acceptance Criteria | Est. Hours | Assignee |
 |---------|-----------|-------------|-------------------|-----------|----------|
-| MODAL-3.1 | Create ArtifactDetailsModal (collection-focused) | Discovery modal with Overview (default), Documentation, Dependencies, Advanced tabs; emphasizes description, tools, tags; includes "Open in Manage" button | 1. All tabs render<br>2. Overview is default tab<br>3. Cross-navigation button works<br>4. Deploy action available<br>5. Add to Group action available<br>6. No sync/drift indicators | 2.5 | ui-engineer-enhanced |
-| MODAL-3.2 | Create ArtifactOperationsModal (manage-focused) | Operations modal with Status (default), Deployments, Version History, Diff tabs; emphasizes health, sync, version tracking | 1. All tabs render<br>2. Status tab is default<br>3. Health indicators display<br>4. Sync actions work<br>5. Cross-navigation button present<br>6. Version history shows correctly | 2.5 | ui-engineer-enhanced |
+| MODAL-3.1 | Create ArtifactDetailsModal (collection-focused) | Discovery modal reusing existing content: Overview + Contents + Links + Collections + Sources + History; includes "Manage Artifact" button | 1. All tabs render<br>2. Overview + Contents present<br>3. Overview is default tab<br>4. Cross-navigation button works<br>5. Deploy action available<br>6. Add to Group action available<br>7. Upstream status summary shown (if any)<br>8. No project-level sync details | 2.5 | ui-engineer-enhanced |
+| MODAL-3.2 | Create ArtifactOperationsModal (manage-focused) | Operations modal reusing existing content: Overview + Contents + Status + Sync Status + Deployments + Version History | 1. All tabs render<br>2. Overview + Contents present<br>3. Status tab is default<br>4. Health indicators display<br>5. Sync actions work<br>6. Cross-navigation button present<br>7. Version history shows correctly | 2.5 | ui-engineer-enhanced |
 | MODAL-3.3 | Extract shared modal components | Create reusable modal subcomponents: TabNavigation, ModalHeader, TabContent wrapper | 1. Components are reusable<br>2. No duplication between modals<br>3. Props accept customization<br>4. Accessibility preserved | 1 | frontend-developer |
-| MODAL-3.4 | Update CollectionsTabNavigation component | Implement dual-button navigation showing "View in Collection" and "Open in Manage" for each collection | 1. Buttons appear in modal<br>2. Navigation works correctly<br>3. Collection list renders<br>4. Focus management correct | 1 | ui-engineer-enhanced |
+| MODAL-3.4 | Update ModalCollectionsTab component | Add optional "View in Collection" and "Manage Artifact" actions per collection when in operations context | 1. Buttons appear in modal<br>2. Navigation works correctly<br>3. Collection list renders<br>4. Focus management correct | 1 | ui-engineer-enhanced |
 | MODAL-3.5 | Implement cross-navigation state preservation | Ensure modal context (current page, artifact ID) preserved when navigating between pages | 1. URL state includes origin<br>2. Return navigation possible<br>3. No data loss on navigation<br>4. Modal reopens correctly | 1 | frontend-developer |
 | MODAL-3.6 | Integrate modals into respective pages | Wire ArtifactDetailsModal to collection page, ArtifactOperationsModal to manage page | 1. Correct modal opens on each page<br>2. Artifact data flows correctly<br>3. Modal close handlers work<br>4. No console errors<br>5. No visual regressions | 1 | frontend-developer |
 
 **Phase 3 Quality Gate**:
-- [ ] ArtifactDetailsModal shows discovery-focused content (no drift/sync)
-- [ ] ArtifactOperationsModal shows operations-focused content (health/sync/deployments)
+- [ ] ArtifactDetailsModal shows discovery-focused content (overview/contents/links/collections/sources/history)
+- [ ] ArtifactOperationsModal shows operations-focused content (status/sync/deployments/version history)
 - [ ] Cross-navigation buttons present in both modals
 - [ ] Modals integrate into pages without errors
 - [ ] All tabs in both modals render and function correctly
@@ -152,7 +155,7 @@ Uses Haiku agents for mechanical work + Sonnet agents for component implementati
 - New `skillmeat/web/components/manage/artifact-operations-modal.tsx`
 - New `skillmeat/web/components/shared/modal-header.tsx`
 - New `skillmeat/web/components/shared/cross-navigation-buttons.tsx`
-- Updated `skillmeat/web/components/shared/collections-tab-navigation.tsx`
+- Updated `skillmeat/web/components/entity/modal-collections-tab.tsx`
 - Updated `skillmeat/web/app/collection/page.tsx` (modal integration)
 - Updated `skillmeat/web/app/manage/page.tsx` (modal integration)
 
@@ -166,9 +169,9 @@ Uses Haiku agents for mechanical work + Sonnet agents for component implementati
 
 | Task ID | Task Name | Description | Acceptance Criteria | Est. Hours | Assignee |
 |---------|-----------|-------------|-------------------|-----------|----------|
-| FILTER-4.1 | Create ManagePageFilters component | Project dropdown, Status filter (All, Needs Update, Has Drift, Deployed, Error), Type filter, search input | 1. All filters render<br>2. Project dropdown populated<br>3. Status options functional<br>4. Type filtering works<br>5. Search input functional<br>6. Active filters display | 1.5 | frontend-developer |
-| FILTER-4.2 | Enhance CollectionPageFilters with tools filter | Add Tools multi-select popover to existing filters (Collection, Group, Type, Tags, Search) | 1. Tools filter popover opens<br>2. Tools list displays<br>3. Multi-select works<br>4. Selected tools show in active filters<br>5. Clear all works<br>6. Responsive on mobile | 1 | frontend-developer |
-| FILTER-4.3 | Add filter state to URL for bookmarkability | Serialize filter state to query params, restore on page load, update on filter change | 1. URL updates on filter change<br>2. Filters restore from URL<br>3. Back button works<br>4. Bookmarkable URLs work<br>5. No race conditions<br>6. Deep links work with artifacts | 1.5 | frontend-developer |
+| FILTER-4.1 | Create ManagePageFilters component | Project dropdown (prominent), Status filter (All, Needs Update, Has Drift, Deployed, Error), Type filter, search input, optional tag filter (retained) | 1. All filters render<br>2. Project dropdown populated<br>3. Status options functional<br>4. Type filtering works<br>5. Search input functional<br>6. Tag filter optional and non-blocking<br>7. Active filters display | 1.5 | frontend-developer |
+| FILTER-4.2 | Enhance CollectionPageFilters with tools filter | Add Tools multi-select popover to existing filters (Collection, Group, Type, Tags, Search). **Depends on Tools API PRD** | 1. Tools filter popover opens<br>2. Tools list displays (when API available)<br>3. Multi-select works<br>4. Selected tools show in active filters<br>5. Clear all works<br>6. Responsive on mobile | 1 | frontend-developer |
+| FILTER-4.3 | Add filter state to URL for bookmarkability | Serialize filter state to query params, restore on page load, update on filter change (including collection/group selection) | 1. URL updates on filter change<br>2. Filters restore from URL<br>3. Back button works<br>4. Bookmarkable URLs work<br>5. No race conditions<br>6. Deep links work with artifacts | 1.5 | frontend-developer |
 
 **Phase 4 Quality Gate**:
 - [ ] ManagePageFilters component renders with all filter types
@@ -314,6 +317,7 @@ Shared Utilities
 - [ ] Filters serialize to URL correctly
 - [ ] Filters restore from URL on page load
 - [ ] Deep links with filters work
+- [ ] Collection/group selection persists via URL without breaking local state
 - [ ] No race conditions
 - [ ] No console errors
 ```
@@ -444,26 +448,6 @@ Estimated time with maximum parallelization: 12-16 hours wall-clock time
 
 ---
 
-## Feature Flag Strategy
-
-For safer rollout, implement feature flag: `NEXT_PUBLIC_NEW_PAGE_UI`
-
-```typescript
-// .env.local
-NEXT_PUBLIC_NEW_PAGE_UI=true  // Enable new UI
-```
-
-### Rollout Phases
-
-1. **Staging**: All new features enabled for testing
-2. **Production (Phase 1)**: 10% of users (canary)
-3. **Production (Phase 2)**: 50% of users (rollout)
-4. **Production (Phase 3)**: 100% of users (full release)
-
-Each phase requires successful gate validation before advancing.
-
----
-
 ## Success Metrics & Monitoring
 
 ### Post-Launch Metrics (Track for 1-2 Weeks)
@@ -491,6 +475,7 @@ Each phase requires successful gate validation before advancing.
 ### Source Documents
 - [Architecture Analysis Report](/docs/project_plans/reports/manage-collection-page-architecture-analysis.md)
 - [UI Component Specifications](/docs/design/ui-component-specs-page-refactor.md)
+- [Tools API Support PRD](/docs/project_plans/PRDs/tools-api-support-v1.md)
 
 ### Reference Documentation
 - [MeatyPrompts Component Patterns](/.claude/context/key-context/component-patterns.md)
@@ -527,7 +512,6 @@ Each phase requires successful gate validation before advancing.
 
 ### Pre-Implementation
 - [ ] Review component specifications document thoroughly
-- [ ] Set up feature flag in environment
 - [ ] Create branch for feature development
 - [ ] Set up local testing environment
 
@@ -574,7 +558,6 @@ Each phase requires successful gate validation before advancing.
 - [ ] QA testing on staging
 - [ ] Performance baseline established
 - [ ] Documentation complete
-- [ ] Feature flag prepared for rollout
 
 ---
 
@@ -582,4 +565,3 @@ Each phase requires successful gate validation before advancing.
 **Status**: Ready for Implementation
 **Approved By**: Architecture Review (2026-02-01)
 **Last Updated**: 2026-02-01
-

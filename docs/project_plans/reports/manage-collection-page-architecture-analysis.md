@@ -43,14 +43,14 @@ The endpoint assignments align with the [dual collection system architecture](/d
 | Page | Route | Primary Endpoint | Backend System | Primary Use Case |
 |------|-------|------------------|----------------|------------------|
 | Manage | `/manage` | `GET /api/v1/artifacts` | CollectionManager (file-based) | Artifact lifecycle management |
-| Collection | `/collection/[id]` | `GET /api/v1/user-collections/{id}/artifacts` | Database collections | Collection organization |
+| Collection | `/collection` (collection via `?collection=` and local state) | `GET /api/v1/user-collections/{id}/artifacts` | Database collections | Collection organization |
 
 ### Feature Comparison
 
 | Feature | `/manage` Page | `/collection` Page |
 |---------|---------------|-------------------|
 | View all artifacts across collections | ✅ | ❌ |
-| Filter by specific collection | ✅ (query param) | ✅ (URL path) |
+| Filter by specific collection | ✅ (query param) | ✅ (query param + local state) |
 | Drift detection display | ✅ | ❌ |
 | Sync status | ✅ | ❌ |
 | Unlinked references filter | ✅ | ❌ |
@@ -142,7 +142,7 @@ The current design reflects valid architectural decisions but creates friction:
 | Current | Proposed | Rationale |
 |---------|----------|-----------|
 | `/manage` | `/library` or `/artifacts` | Reflects "all artifacts" browsing with lifecycle features |
-| `/collection/[id]` | `/organize/[id]` or `/workspace/[id]` | Reflects organizational/grouping focus |
+| `/collection` | `/organize` or `/workspace` (collection via query param) | Reflects organizational/grouping focus |
 
 **Navigation Updates**:
 ```
@@ -234,7 +234,7 @@ export function useSmartArtifacts(options: SmartArtifactOptions) {
 | Page | New Tagline | Primary Actions | Secondary Actions |
 |------|-------------|-----------------|-------------------|
 | `/manage` | "Artifact Health & Sync" | View drift, sync artifacts, check versions | Quick deploy, view details |
-| `/collection/[id]` | "Organize & Discover" | Create groups, move artifacts, browse | Quick actions on items |
+| `/collection` | "Organize & Discover" | Create groups, move artifacts, browse | Quick actions on items |
 
 **UX Improvements**:
 
@@ -281,7 +281,7 @@ export function useSmartArtifacts(options: SmartArtifactOptions) {
   <ActionCard
     title="Organize Collection"
     description="12 ungrouped artifacts in Default"
-    href="/collection/default"
+    href="/collection?collection=default"
     icon={<FolderIcon />}
   />
 </QuickActions>
@@ -428,14 +428,16 @@ Based on stakeholder review, **Option C** has been selected with the following r
 
 | Tab | Content | Default |
 |-----|---------|---------|
-| Overview | Full description, metadata, author, license, tags, tools, score | ✅ Default |
-| Documentation | Usage examples, configuration, getting started | |
-| Dependencies | Required artifacts, external dependencies | |
-| Advanced | Version info, source links, **"Open in Manage →"** button | Collapsed |
+| Overview | Full description, metadata, tags, tools (Tools API), upstream summary | ✅ Default |
+| Contents | File tree + content pane (existing data) | |
+| Links | Linked artifacts + unlinked references | |
+| Collections | Collection/group membership | |
+| Sources | Repository/source details | |
+| History | General artifact history timeline | |
 
 **Header Actions**:
 - Close button (X)
-- "Open in Manage →" navigation button (top-right)
+- "Manage Artifact →" navigation button (top-right)
 - Deploy to Project button
 - Add to Group button
 
@@ -447,14 +449,16 @@ Based on stakeholder review, **Option C** has been selected with the following r
 
 | Tab | Content | Default |
 |-----|---------|---------|
-| Status | Sync status, version comparison, drift detection, quick actions | ✅ Default |
+| Overview | Metadata + operational highlights | |
+| Contents | File tree + content pane (existing data) | |
+| Status | Detailed operational status overview | ✅ Default |
+| Sync Status | Drift detection + sync actions | |
 | Deployments | List of projects deployed to, deploy/undeploy actions | |
 | Version History | Previous versions, changelogs, rollback options | |
-| Diff | Side-by-side or unified diff viewer, accept/revert actions | |
 
 **Header Actions**:
 - Close button (X)
-- "View Full Details →" navigation button (top-right)
+- "Collection Details →" navigation button (top-right)
 - Sync button
 - Deploy button
 
@@ -477,6 +481,7 @@ Based on stakeholder review, **Option C** has been selected with the following r
 ```
 
 **Quick Actions Menu**: View Details, Quick Deploy, Add to Group, Copy CLI Command
+**Status Indicator**: Subtle deployed/outdated badge only when applicable (links to /manage)
 
 #### ArtifactOperationsCard (Manage Page)
 
@@ -504,16 +509,16 @@ Based on stakeholder review, **Option C** has been selected with the following r
 |---------|-----------|-------------|
 | Card action menu | "Manage" | `/manage?artifact={id}` |
 | Card badge (if deployed & outdated) | "Outdated" | `/manage?artifact={id}&tab=status` |
-| Modal header | "Open in Manage →" | `/manage?artifact={id}` |
+| Modal header | "Manage Artifact →" | `/manage?artifact={id}` |
 | Collections tab button | "Manage Artifact" | `/manage?artifact={id}` |
 
 #### From `/manage` to `/collection`
 
 | Trigger | Link Text | Destination |
 |---------|-----------|-------------|
-| Card action menu | "View Details" | `/collection?artifact={id}` |
-| Modal header | "View Full Details →" | `/collection?artifact={id}` |
-| Modal diff tab | "What's new?" | `/collection?artifact={id}&tab=docs` |
+| Card action menu | "Collection Details" | `/collection?artifact={id}` (optionally `&collection={collectionId}`) |
+| Modal header | "Collection Details →" | `/collection?artifact={id}` (optionally `&collection={collectionId}`) |
+| Sync Status tab | "What's new?" | `/collection?artifact={id}&tab=history` |
 | Empty state | "Browse Collection" | `/collection` |
 
 ### Filter Components
@@ -535,7 +540,7 @@ Based on stakeholder review, **Option C** has been selected with the following r
 | Group | All Groups, [group list] | Filter by group membership |
 | Type | All, Skills, Commands, Agents, etc. | Filter by artifact type |
 | Tags | Multi-select popover | Filter by tags |
-| Tools | Multi-select popover | Filter by Claude tools used |
+| Tools | Multi-select popover | Filter by Claude tools used (Tools API PRD) |
 | Search | Text input | Find by name, description |
 
 ---
@@ -567,7 +572,7 @@ Based on stakeholder review, **Option C** has been selected with the following r
 | 3.1 | Create `ArtifactDetailsModal` (collection-focused) | `web/components/collection/artifact-details-modal.tsx` |
 | 3.2 | Create `ArtifactOperationsModal` (manage-focused) | `web/components/manage/artifact-operations-modal.tsx` |
 | 3.3 | Extract shared modal components | `web/components/shared/` |
-| 3.4 | Update `CollectionsTabNavigation` with dual buttons | `web/components/shared/collections-tab-navigation.tsx` |
+| 3.4 | Update `ModalCollectionsTab` with dual buttons | `web/components/entity/modal-collections-tab.tsx` |
 | 3.5 | Implement cross-navigation state preservation | Both modals |
 
 ### Phase 4: Filter Components (2-4h)
@@ -589,10 +594,9 @@ Based on stakeholder review, **Option C** has been selected with the following r
 
 ### Migration Strategy
 
-1. **Feature Flag**: `NEXT_PUBLIC_NEW_PAGE_UI=true`
-2. **Parallel Development**: New components alongside existing
-3. **Gradual Rollout**: Enable per-page, then globally
-4. **Deprecation**: Remove old components after validation
+1. **Parallel Development**: New components alongside existing
+2. **Incremental Adoption**: Migrate pages and tabs in small PRs
+3. **Deprecation**: Remove old components after validation
 
 ---
 
@@ -618,7 +622,7 @@ Based on stakeholder review, **Option C** has been selected with the following r
 3. User opens web UI → sees "3 new artifacts" notification
 4. Clicks notification → lands on /manage with filter
 5. Sees PDF skill, clicks "Organize in Collection"
-6. Lands on /collection/default with PDF selected
+6. Lands on /collection?collection=default with PDF selected
 7. Creates "Document Tools" group, adds PDF
 ```
 
@@ -636,7 +640,7 @@ Based on stakeholder review, **Option C** has been selected with the following r
 
 ```
 1. User opens web UI → clicks "Collections" → "Work Tools"
-2. Lands on /collection/work-tools
+2. Lands on /collection?collection=work-tools
 3. Expands "API Development" group
 4. Browses skills, clicks one for details
 5. Sees "Has updates available" badge
@@ -650,8 +654,7 @@ Based on stakeholder review, **Option C** has been selected with the following r
 
 ### Frontend Pages
 - `skillmeat/web/app/manage/page.tsx` - Current manage page
-- `skillmeat/web/app/collection/page.tsx` - Current collection page
-- `skillmeat/web/app/collection/[id]/page.tsx` - Collection detail (if exists)
+- `skillmeat/web/app/collection/page.tsx` - Current collection page (collection selection via query params)
 
 ### API Endpoints
 - `skillmeat/api/routers/artifacts.py` - `/artifacts` endpoint

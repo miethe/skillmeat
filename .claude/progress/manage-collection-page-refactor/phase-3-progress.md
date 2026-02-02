@@ -21,7 +21,7 @@ contributors: []
 
 tasks:
   - id: "MODAL-3.1"
-    description: "Create ArtifactDetailsModal (collection-focused): Overview (default), Documentation, Dependencies, Advanced tabs. Emphasizes description, tools, tags. Includes 'Open in Manage' button. No sync/drift indicators."
+    description: "Create ArtifactDetailsModal (collection-focused): Overview (default), Contents, Links, Collections, Sources, History tabs (reuse existing data). Includes 'Manage Artifact' button. Upstream summary shown when available."
     status: "pending"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["MODAL-3.3"]
@@ -30,7 +30,7 @@ tasks:
     model: "opus"
 
   - id: "MODAL-3.2"
-    description: "Create ArtifactOperationsModal (manage-focused): Status (default), Deployments, Version History, Diff tabs. Emphasizes health, sync, version tracking. Includes 'View Full Details' button."
+    description: "Create ArtifactOperationsModal (manage-focused): Overview, Contents, Status (default), Sync Status, Deployments, Version History tabs (reuse existing data). Includes 'Collection Details' button."
     status: "pending"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["MODAL-3.3"]
@@ -48,7 +48,7 @@ tasks:
     model: "opus"
 
   - id: "MODAL-3.4"
-    description: "Update CollectionsTabNavigation component with dual-button navigation showing 'View in Collection' and 'Open in Manage' for each collection."
+    description: "Update ModalCollectionsTab component with dual-button navigation showing 'View in Collection' and 'Manage Artifact' for each collection."
     status: "pending"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
@@ -85,8 +85,8 @@ parallelization:
 blockers: []
 
 success_criteria:
-  - { id: "SC-3.1", description: "ArtifactDetailsModal shows discovery-focused content (no drift/sync)", status: "pending" }
-  - { id: "SC-3.2", description: "ArtifactOperationsModal shows operations-focused content (health/sync/deployments)", status: "pending" }
+  - { id: "SC-3.1", description: "ArtifactDetailsModal shows discovery-focused content (overview/contents/links/collections/sources/history)", status: "pending" }
+  - { id: "SC-3.2", description: "ArtifactOperationsModal shows operations-focused content (status/sync/deployments/version history)", status: "pending" }
   - { id: "SC-3.3", description: "Cross-navigation buttons present in both modals", status: "pending" }
   - { id: "SC-3.4", description: "Modals integrate into pages without errors", status: "pending" }
   - { id: "SC-3.5", description: "All tabs in both modals render and function correctly", status: "pending" }
@@ -96,7 +96,7 @@ files_modified:
   - "skillmeat/web/components/manage/artifact-operations-modal.tsx"
   - "skillmeat/web/components/shared/modal-header.tsx"
   - "skillmeat/web/components/shared/cross-navigation-buttons.tsx"
-  - "skillmeat/web/components/shared/collections-tab-navigation.tsx"
+  - "skillmeat/web/components/entity/modal-collections-tab.tsx"
   - "skillmeat/web/app/collection/page.tsx"
   - "skillmeat/web/app/manage/page.tsx"
 ---
@@ -124,15 +124,15 @@ Create purpose-specific modals that reduce feature confusion and improve task co
 ```
 Task("frontend-developer", "MODAL-3.3: Extract shared modal components. Create reusable TabNavigation, ModalHeader, TabContent wrapper components. Must be composable for both detail and operations modals. Ensure accessibility preserved (focus management). Files: skillmeat/web/components/shared/modal-header.tsx, skillmeat/web/components/shared/tab-navigation.tsx, skillmeat/web/components/shared/tab-content.tsx")
 
-Task("ui-engineer-enhanced", "MODAL-3.4: Update CollectionsTabNavigation component. Add dual-button navigation showing 'View in Collection' and 'Open in Manage' for each collection. Buttons must navigate correctly, collection list renders properly, focus management correct. File: skillmeat/web/components/shared/collections-tab-navigation.tsx", model="sonnet")
+Task("ui-engineer-enhanced", "MODAL-3.4: Update ModalCollectionsTab component. Add dual-button navigation showing 'View in Collection' and 'Manage Artifact' for each collection (operations context). Buttons must navigate correctly, collection list renders properly, focus management correct. File: skillmeat/web/components/entity/modal-collections-tab.tsx", model="sonnet")
 ```
 
 ### Batch 2 (After batch_1 completes)
 
 ```
-Task("ui-engineer-enhanced", "MODAL-3.1: Create ArtifactDetailsModal (collection-focused). Tabs: Overview (default), Documentation, Dependencies, Advanced. Emphasizes description, tools, tags. Includes 'Open in Manage' cross-nav button. NO sync/drift indicators. Deploy and 'Add to Group' actions available. Use shared components from MODAL-3.3. File: skillmeat/web/components/collection/artifact-details-modal.tsx. Reference: /docs/design/ui-component-specs-page-refactor.md")
+Task("ui-engineer-enhanced", "MODAL-3.1: Create ArtifactDetailsModal (collection-focused). Tabs: Overview (default), Contents, Links, Collections, Sources, History (reusing existing data). Includes 'Manage Artifact' cross-nav button. Deploy and 'Add to Group' actions available. Upstream summary shown when available. Use shared components from MODAL-3.3. File: skillmeat/web/components/collection/artifact-details-modal.tsx. Reference: /docs/design/ui-component-specs-page-refactor.md")
 
-Task("ui-engineer-enhanced", "MODAL-3.2: Create ArtifactOperationsModal (manage-focused). Tabs: Status (default), Deployments, Version History, Diff. Shows health indicators, sync actions, version tracking. Includes 'View Full Details' cross-nav button. Use shared components from MODAL-3.3. File: skillmeat/web/components/manage/artifact-operations-modal.tsx. Reference: /docs/design/ui-component-specs-page-refactor.md")
+Task("ui-engineer-enhanced", "MODAL-3.2: Create ArtifactOperationsModal (manage-focused). Tabs: Overview, Contents, Status (default), Sync Status, Deployments, Version History (reusing existing data). Shows health indicators, sync actions, version tracking. Includes 'Collection Details' cross-nav button. Use shared components from MODAL-3.3. File: skillmeat/web/components/manage/artifact-operations-modal.tsx. Reference: /docs/design/ui-component-specs-page-refactor.md")
 ```
 
 ### Batch 3 (After batch_2 completes)
@@ -156,7 +156,7 @@ Task("frontend-developer", "MODAL-3.6: Integrate modals into respective pages. W
 | MODAL-3.1 | Create ArtifactDetailsModal | ui-engineer-enhanced | 2.5h | MODAL-3.3 |
 | MODAL-3.2 | Create ArtifactOperationsModal | ui-engineer-enhanced | 2.5h | MODAL-3.3 |
 | MODAL-3.3 | Extract shared modal components | frontend-developer | 1h | - |
-| MODAL-3.4 | Update CollectionsTabNavigation | ui-engineer-enhanced | 1h | - |
+| MODAL-3.4 | Update ModalCollectionsTab | ui-engineer-enhanced | 1h | - |
 | MODAL-3.5 | Implement cross-navigation state | frontend-developer | 1h | MODAL-3.1, MODAL-3.2 |
 | MODAL-3.6 | Integrate modals into pages | frontend-developer | 1h | MODAL-3.1, MODAL-3.2, MODAL-3.5 |
 
