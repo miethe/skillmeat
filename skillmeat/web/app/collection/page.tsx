@@ -8,6 +8,7 @@ import { CollectionHeader } from '@/components/collection/collection-header';
 import { CollectionToolbar } from '@/components/collection/collection-toolbar';
 import { ArtifactGrid } from '@/components/collection/artifact-grid';
 import { ArtifactList } from '@/components/collection/artifact-list';
+import { ArtifactBrowseCardSkeleton } from '@/components/collection/artifact-browse-card';
 import { CollectionArtifactModal, type ArtifactModalTab } from '@/components/shared/CollectionArtifactModal';
 import { EditCollectionDialog } from '@/components/collection/edit-collection-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
@@ -50,7 +51,7 @@ function CollectionPageSkeleton() {
       <div className="flex-1 overflow-auto p-6">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-48 w-full" />
+            <ArtifactBrowseCardSkeleton key={i} />
           ))}
         </div>
       </div>
@@ -654,7 +655,7 @@ function CollectionPageContent() {
         {!error && isLoadingArtifacts && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-48 w-full" />
+              <ArtifactBrowseCardSkeleton key={i} />
             ))}
           </div>
         )}

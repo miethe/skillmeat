@@ -212,6 +212,16 @@ function ManagePageContent() {
     });
   }, [updateUrlParams]);
 
+  const handleManage = useCallback((artifact: Artifact) => {
+    // Open artifact modal to overview tab for management options
+    setSelectedArtifact(artifact);
+    setDetailPanelOpen(true);
+    updateUrlParams({
+      artifact: artifact.id,
+      tab: null, // Default to overview which has settings
+    });
+  }, [updateUrlParams]);
+
   return (
     <div className="flex h-screen flex-col">
       {/* Header */}
@@ -296,10 +306,11 @@ function ManagePageContent() {
                 )}
               </div>
 
-              {/* Entity List */}
+              {/* Entity List with operations card variant for manage page */}
               <div className="flex-1 overflow-hidden">
                 <EntityList
                   viewMode={viewMode}
+                  cardVariant="operations"
                   entities={filteredEntities}
                   onEntityClick={handleArtifactClick}
                   onEdit={handleEdit}
@@ -308,6 +319,7 @@ function ManagePageContent() {
                   onSync={handleSync}
                   onViewDiff={handleViewDiff}
                   onRollback={handleRollback}
+                  onManage={handleManage}
                 />
               </div>
             </div>

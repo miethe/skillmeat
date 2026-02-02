@@ -3,11 +3,10 @@
 import { useState } from 'react';
 import { Package } from 'lucide-react';
 import type { Artifact } from '@/types/artifact';
-import { UnifiedCard, UnifiedCardSkeleton } from '@/components/shared/unified-card';
-import { UnifiedCardActions } from '@/components/shared/unified-card-actions';
-import { useCliCopy } from '@/hooks';
-import { generateBasicDeployCommand } from '@/lib/cli-commands';
-import { Badge } from '@/components/ui/badge';
+import {
+  ArtifactBrowseCard,
+  ArtifactBrowseCardSkeleton,
+} from '@/components/collection/artifact-browse-card';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,73 +25,12 @@ interface ArtifactGridProps {
   onArtifactClick: (artifact: Artifact) => void;
   showCollectionBadge?: boolean;
   onCollectionClick?: (collectionId: string) => void;
+  /** @deprecated Not currently used by ArtifactBrowseCard - kept for API stability */
   onMoveToCollection?: (artifact: Artifact) => void;
   onManageGroups?: (artifact: Artifact) => void;
+  /** @deprecated Not currently used by ArtifactBrowseCard - kept for API stability */
   onEdit?: (artifact: Artifact) => void;
   onDelete?: (artifact: Artifact) => void;
-}
-
-function ArtifactCard({
-  artifact,
-  onClick,
-  showCollectionBadge,
-  onCollectionClick,
-  onMoveToCollection,
-  onManageGroups,
-  onEdit,
-  onDelete,
-  onDeploy,
-  onCopyCliCommand,
-}: {
-  artifact: Artifact;
-  onClick: () => void;
-  showCollectionBadge?: boolean;
-  onCollectionClick?: (collectionId: string) => void;
-  onMoveToCollection?: () => void;
-  onManageGroups?: () => void;
-  onEdit?: () => void;
-  onDelete?: () => void;
-  onDeploy?: () => void;
-  onCopyCliCommand?: () => void;
-}) {
-  return (
-    <div className="group relative">
-      <UnifiedCard item={artifact} onClick={onClick} />
-
-      {/* Collection Badge - Top Right */}
-      {showCollectionBadge && artifact.collection && (
-        <Badge
-          variant="outline"
-          className="absolute right-2 top-2 z-10 cursor-pointer bg-background/95 text-xs backdrop-blur hover:bg-accent"
-          onClick={(e) => {
-            e.stopPropagation();
-            artifact.collection && onCollectionClick?.(artifact.collection);
-          }}
-        >
-          {artifact.collection}
-        </Badge>
-      )}
-
-      {/* Actions Menu - Top Right (below collection badge if present) */}
-      <div
-        className={
-          showCollectionBadge && artifact.collection
-            ? 'absolute right-2 top-10'
-            : 'absolute right-2 top-2'
-        }
-      >
-        <UnifiedCardActions
-          artifact={artifact}
-          onDeploy={onDeploy}
-          onMoveToCollection={onMoveToCollection}
-          onAddToGroup={onManageGroups}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onCopyCliCommand={onCopyCliCommand}
-        />
-      </div>
-    </div>
-  );
 }
 
 function ArtifactGridSkeleton() {
@@ -102,7 +40,7 @@ function ArtifactGridSkeleton() {
       data-testid="artifact-grid-skeleton"
     >
       {[...Array(6)].map((_, i) => (
-        <UnifiedCardSkeleton key={i} />
+        <ArtifactBrowseCardSkeleton key={i} />
       ))}
     </div>
   );
@@ -114,26 +52,21 @@ export function ArtifactGrid({
   onArtifactClick,
   showCollectionBadge,
   onCollectionClick,
-  onMoveToCollection,
+  onMoveToCollection: _onMoveToCollection,
   onManageGroups,
-  onEdit,
+  onEdit: _onEdit,
   onDelete,
 }: ArtifactGridProps) {
   const [deleteArtifact, setDeleteArtifact] = useState<Artifact | null>(null);
   const [deployArtifact, setDeployArtifact] = useState<Artifact | null>(null);
-  const { copy } = useCliCopy();
 
-  const handleDelete = (artifact: Artifact) => {
-    setDeleteArtifact(artifact);
-  };
+  // Note: handleDelete is kept for the delete confirmation dialog flow
+  // even though ArtifactBrowseCard doesn't currently expose a delete action
+  void _onMoveToCollection; // Preserved for API stability
+  void _onEdit; // Preserved for API stability
 
   const handleDeploy = (artifact: Artifact) => {
     setDeployArtifact(artifact);
-  };
-
-  const handleCopyCliCommand = (artifactName: string) => {
-    const command = generateBasicDeployCommand(artifactName);
-    copy(command);
   };
 
   const confirmDelete = () => {
@@ -168,18 +101,15 @@ export function ArtifactGrid({
         data-testid="artifact-grid"
       >
         {artifacts.map((artifact) => (
-          <ArtifactCard
+          <ArtifactBrowseCard
             key={artifact.id || `${artifact.name}-${artifact.type}`}
             artifact={artifact}
             onClick={() => onArtifactClick(artifact)}
+            onQuickDeploy={() => handleDeploy(artifact)}
+            onAddToGroup={onManageGroups ? () => onManageGroups(artifact) : undefined}
+            onViewDetails={() => onArtifactClick(artifact)}
             showCollectionBadge={showCollectionBadge}
             onCollectionClick={onCollectionClick}
-            onDeploy={() => handleDeploy(artifact)}
-            onMoveToCollection={onMoveToCollection ? () => onMoveToCollection(artifact) : undefined}
-            onManageGroups={onManageGroups ? () => onManageGroups(artifact) : undefined}
-            onEdit={onEdit ? () => onEdit(artifact) : undefined}
-            onDelete={handleDelete ? () => handleDelete(artifact) : undefined}
-            onCopyCliCommand={() => handleCopyCliCommand(artifact.name)}
           />
         ))}
       </div>
@@ -192,7 +122,7 @@ export function ArtifactGrid({
         onSuccess={() => setDeployArtifact(null)}
       />
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation Dialog - kept for future use when delete is added to card */}
       <AlertDialog
         open={!!deleteArtifact}
         onOpenChange={(open) => !open && setDeleteArtifact(null)}

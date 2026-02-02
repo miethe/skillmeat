@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import type { Artifact, ArtifactType } from '@/types/artifact';
-import { ARTIFACT_TYPES, getArtifactTypeConfig } from '@/types/artifact';
+import { getArtifactTypeConfig } from '@/types/artifact';
 import { Tool } from '@/types/enums';
 import { ScoreBadge } from '@/components/ScoreBadge';
 
@@ -136,9 +136,9 @@ export function ArtifactBrowseCard({
 
   // Get the icon component from Lucide
   const iconName = config?.icon ?? 'FileText';
-  const IconComponent = (LucideIcons as Record<string, React.ComponentType<{ className?: string }>>)[
-    iconName
-  ];
+  const IconComponent = (
+    LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>
+  )[iconName];
   const Icon = IconComponent || LucideIcons.FileText;
 
   // Extract tools and display tags
