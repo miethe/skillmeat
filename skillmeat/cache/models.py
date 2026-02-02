@@ -932,6 +932,7 @@ class CollectionArtifact(Base):
     license: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     tags_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON array string
     tools_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    deployments_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON array of deployment paths
     version: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     origin: Mapped[Optional[str]] = mapped_column(String, nullable=True)
