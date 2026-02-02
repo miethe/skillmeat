@@ -85,6 +85,11 @@ def refresh_single_artifact_cache(
                 if file_artifact.metadata and file_artifact.metadata.tags
                 else None
             ),
+            "tools_json": (
+                json.dumps(file_artifact.metadata.tools)
+                if file_artifact.metadata and file_artifact.metadata.tools
+                else None
+            ),
             "version": (
                 file_artifact.metadata.version if file_artifact.metadata else None
             ),

@@ -4,6 +4,7 @@ Markdown parser with YAML frontmatter support.
 Extracts structured metadata from markdown files used in SkillMeat artifacts.
 """
 
+import logging
 import re
 import sys
 from dataclasses import dataclass
@@ -15,6 +16,10 @@ else:
     import tomli as tomllib
 
 import yaml
+
+from skillmeat.core.enums import Tool
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -151,12 +156,13 @@ def extract_metadata(content: str) -> dict[str, Any]:
         - version: From frontmatter
         - references: From frontmatter (list of file paths)
         - last_verified: From frontmatter (ISO date string)
+        - tools: From frontmatter (list of tool names)
 
     Args:
         content: Raw markdown content (with or without frontmatter)
 
     Returns:
-        Dict with extracted metadata fields (None for missing fields)
+        Dict with extracted metadata fields (None for missing fields, empty list for tools)
     """
     try:
         result = parse_markdown_with_frontmatter(content)
@@ -168,12 +174,35 @@ def extract_metadata(content: str) -> dict[str, Any]:
             "version": None,
             "references": None,
             "last_verified": None,
+            "tools": [],
         }
 
     frontmatter = result.frontmatter or {}
 
     # Extract title (frontmatter or H1)
     title = extract_title(result.content, frontmatter)
+
+    # Extract tools from frontmatter
+    tools = frontmatter.get("tools", [])
+
+    # Handle case where tools is a single string instead of list
+    if isinstance(tools, str):
+        tools = [tools]
+
+    # Validate tools against Tool enum and log warnings for invalid values
+    valid_tool_values = {tool.value for tool in Tool}
+    validated_tools = []
+
+    for tool in tools:
+        if tool in valid_tool_values:
+            validated_tools.append(tool)
+        else:
+            logger.warning(
+                f"Tool '{tool}' in frontmatter does not match any known Tool enum value. "
+                f"Including it anyway. Valid tools: {', '.join(sorted(valid_tool_values))}"
+            )
+            # Include it anyway as per requirements
+            validated_tools.append(tool)
 
     # Extract other fields from frontmatter
     return {
@@ -182,4 +211,5 @@ def extract_metadata(content: str) -> dict[str, Any]:
         "version": frontmatter.get("version"),
         "references": frontmatter.get("references"),
         "last_verified": frontmatter.get("last_verified"),
+        "tools": validated_tools,
     }

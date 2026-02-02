@@ -403,6 +403,14 @@ async def list_collection_artifacts(
                 type=artifact.type.value,
                 version=artifact.version,
                 source=artifact.source,
+                tools=(
+                    [
+                        tool.value if hasattr(tool, "value") else str(tool)
+                        for tool in artifact.metadata.tools
+                    ]
+                    if artifact.metadata and artifact.metadata.tools
+                    else None
+                ),
             )
             for artifact in page_artifacts
         ]

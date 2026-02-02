@@ -374,6 +374,11 @@ def populate_collection_artifact_metadata(
                 if metadata and metadata.tags:
                     tags_json = json.dumps(metadata.tags)
 
+                # Convert tools list to JSON string
+                tools_json = None
+                if metadata and metadata.tools:
+                    tools_json = json.dumps(metadata.tools)
+
                 # Source and origin fields
                 source = artifact.upstream
                 origin = artifact.origin
@@ -397,6 +402,7 @@ def populate_collection_artifact_metadata(
                     existing.author = author
                     existing.license = license_val
                     existing.tags_json = tags_json
+                    existing.tools_json = tools_json
                     existing.version = version
                     existing.source = source
                     existing.origin = origin
@@ -415,6 +421,7 @@ def populate_collection_artifact_metadata(
                         author=author,
                         license=license_val,
                         tags_json=tags_json,
+                        tools_json=tools_json,
                         version=version,
                         source=source,
                         origin=origin,
@@ -621,6 +628,11 @@ def _refresh_single_collection_cache(
             if metadata and metadata.tags:
                 tags_json = json.dumps(metadata.tags)
 
+            # Convert tools list to JSON string
+            tools_json = None
+            if metadata and metadata.tools:
+                tools_json = json.dumps(metadata.tools)
+
             # Source and origin fields
             source = file_artifact.upstream
             origin = file_artifact.origin
@@ -633,6 +645,7 @@ def _refresh_single_collection_cache(
             ca.author = author
             ca.license = license_val
             ca.tags_json = tags_json
+            ca.tools_json = tools_json
             ca.version = version
             ca.source = source
             ca.origin = origin
@@ -1387,6 +1400,7 @@ async def list_collection_artifacts(
                     description=assoc.description,
                     author=assoc.author,
                     tags=tags,
+                    tools=assoc.tools,
                     collections=_get_artifact_collections(session, assoc.artifact_id),
                 )
                 logger.debug(f"Cache hit for {assoc.artifact_id}")
@@ -1438,6 +1452,15 @@ async def list_collection_artifacts(
                                 and file_artifact.metadata.tags
                                 else None
                             ),
+                            tools=(
+                                [
+                                    tool.value if hasattr(tool, "value") else str(tool)
+                                    for tool in file_artifact.metadata.tools
+                                ]
+                                if file_artifact.metadata
+                                and file_artifact.metadata.tools
+                                else None
+                            ),
                             collections=_get_artifact_collections(
                                 session, assoc.artifact_id
                             ),
@@ -1469,6 +1492,7 @@ async def list_collection_artifacts(
                             description=artifact_summary.description,
                             author=artifact_summary.author,
                             tags=artifact_summary.tags,
+                            tools=artifact_summary.tools,
                             collections=artifact_summary.collections,
                             groups=groups,
                         )
@@ -2154,6 +2178,11 @@ async def refresh_collection_cache(
             if metadata and metadata.tags:
                 tags_json = json.dumps(metadata.tags)
 
+            # Convert tools list to JSON string
+            tools_json = None
+            if metadata and metadata.tools:
+                tools_json = json.dumps(metadata.tools)
+
             # Source and origin fields
             source = file_artifact.upstream
             origin = file_artifact.origin
@@ -2166,6 +2195,7 @@ async def refresh_collection_cache(
             ca.author = author
             ca.license = license_val
             ca.tags_json = tags_json
+            ca.tools_json = tools_json
             ca.version = version
             ca.source = source
             ca.origin = origin
