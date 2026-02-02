@@ -3,13 +3,13 @@ type: progress
 prd: tools-api-support
 phase: 2
 title: Cache Population & API Wiring
-status: pending
+status: completed
 started: null
 completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 4
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -55,7 +55,7 @@ tasks:
   priority: high
 - id: TOOLS-2.5
   description: Add unit tests for tools extraction, caching, and API responses
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -110,7 +110,7 @@ files_modified:
 - skillmeat/cache/ (sync logic TBD)
 - skillmeat/api/routers/ (endpoint wiring TBD)
 - tests/
-progress: 80
+progress: 100
 updated: '2026-02-02'
 ---
 
