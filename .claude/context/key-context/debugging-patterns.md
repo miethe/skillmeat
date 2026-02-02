@@ -294,7 +294,34 @@ grep -A20 "\"name\": \"ComponentName\"" ai/symbols-frontend.json | grep "handle"
 
 ---
 
-### 6. State Management Issues
+### 6. ID vs Display Name Mismatch
+
+**Symptoms**: 404/not found errors where traced value looks human-readable (spaces, capitals: "Default Collection" instead of "default")
+
+**Investigation Commands**:
+
+```bash
+# Find where value was extracted from source
+grep -r "\.name" ai/symbols-backend.json | grep -B5 "id"
+
+# Check transformer/mapper functions
+grep -A10 "def.*mapper\\|def.*transform" ai/symbols-backend.json
+```
+
+**Common Causes**:
+- Mapper extracted `.name` instead of `.id`
+- Display name passed to API expecting identifier
+- Query parameter confusion (human-readable vs system ID)
+
+**Quick Diagnostic**: If failing parameter has spaces or mixed case → probable display name used as identifier
+
+**Fix Pattern**: Trace backwards from error to where value was first extracted. Replace `.name` with `.id` in mapper or caller.
+
+**Delegation**: `python-backend-engineer` (Sonnet) or `ui-engineer` (Sonnet) depending on layer
+
+---
+
+### 7. State Management Issues
 
 **Symptoms**: Stale data, incorrect updates, race conditions, cache issues
 
@@ -338,6 +365,7 @@ grep "invalidateQueries\\|setQueryData" ai/symbols-frontend.json
 | TypeScript Type | ui-engineer | Sonnet | backend-typescript-architect (Opus) |
 | API Endpoint | python-backend-engineer | Sonnet | ultrathink-debugger (Opus) |
 | Database/ORM | python-backend-engineer | Sonnet | ultrathink-debugger (Opus) |
+| ID vs Display Name | python-backend-engineer / ui-engineer | Sonnet | ultrathink-debugger (Opus) |
 | React Component | ui-engineer-enhanced | Sonnet | ui-engineer (Opus) |
 | State Management | ui-engineer-enhanced | Sonnet | ultrathink-debugger (Opus) |
 | Complex/Multi-system | ultrathink-debugger | Opus | Opus orchestration |
