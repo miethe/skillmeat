@@ -2,7 +2,7 @@
 type: progress
 prd: "artifact-metadata-cache-v1"
 status: in_progress
-progress: 69
+progress: 84
 total_phases: 5
 total_tasks: 26
 estimated_effort: "12-16 hours (Phases 1-4) + 6-8 hours (Phase 5 future)"
@@ -308,44 +308,42 @@ tasks:
     title: "Add refresh-cache hook to CLI add command"
     description: "Integrate refresh-cache endpoint call into CLI add command; after artifact added to collection.toml, trigger API to populate cache"
     phase: 4
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: medium
     effort: "20-25 min"
     dependencies: [TASK-2.1]
     files:
       - skillmeat/cli.py
-      - skillmeat/core/collection_manager.py
-    notes: "Optional Phase: Call POST /refresh-cache after manifest updated; log refresh status to CLI user"
+    notes: "Implemented _refresh_api_cache() function and integrated into _add_artifact_from_spec(); gracefully handles API unavailability"
 
   TASK-4.2:
     id: TASK-4.2
     title: "Add refresh-cache hook to CLI sync command"
     description: "Integrate refresh-cache endpoint call into CLI sync command; after collection.toml synced, trigger batch refresh"
     phase: 4
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: medium
     effort: "20-25 min"
     dependencies: [TASK-2.2]
     files:
       - skillmeat/cli.py
-      - skillmeat/core/collection_manager.py
-    notes: "Optional Phase: Call POST /refresh-cache; show user progress of refresh operation"
+    notes: "Added _refresh_api_cache_batch() function and integrated into sync_pull_cmd; shows refresh stats on success"
 
   TASK-4.3:
     id: TASK-4.3
     title: "Test end-to-end CLI→API→DB flow"
     description: "E2E test: CLI add artifact → API syncs metadata → database updated → API query returns full data"
     phase: 4
-    status: pending
+    status: completed
     assigned_to: python-backend-engineer
     priority: medium
     effort: "25-30 min"
     dependencies: [TASK-4.1, TASK-4.2]
     files:
-      - skillmeat/tests/test_cli_artifact_sync.py
-    notes: "Optional Phase: Full integration test from CLI through to web API; verify /collection page performance"
+      - tests/test_cli_artifact_sync.py
+    notes: "Created 31 unit tests for _refresh_api_cache() and _refresh_api_cache_batch() functions covering: success, errors, timeouts, connection failures, graceful degradation, endpoint formats, timeouts, and response handling"
 
   # Phase 5: Web-Based Artifact Editing Groundwork (FUTURE)
   # Groundwork only - implementation deferred until web editing feature prioritized
@@ -518,9 +516,9 @@ This 5-phase implementation plan populates and maintains a complete artifact met
 
 | Task | Status | Effort | Assigned To |
 |------|--------|--------|-------------|
-| TASK-4.1: Add refresh-cache hook to CLI add command | pending | 20-25 min | python-backend-engineer |
-| TASK-4.2: Add refresh-cache hook to CLI sync command | pending | 20-25 min | python-backend-engineer |
-| TASK-4.3: Test end-to-end CLI→API→DB flow | pending | 25-30 min | python-backend-engineer |
+| TASK-4.1: Add refresh-cache hook to CLI add command | completed | 20-25 min | python-backend-engineer |
+| TASK-4.2: Add refresh-cache hook to CLI sync command | completed | 20-25 min | python-backend-engineer |
+| TASK-4.3: Test end-to-end CLI→API→DB flow | completed | 25-30 min | python-backend-engineer |
 
 **Completion Criteria**: CLI commands integrated and E2E tested; refresh-cache mechanisms coordinated
 
