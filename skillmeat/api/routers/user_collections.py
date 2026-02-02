@@ -443,6 +443,67 @@ def populate_collection_artifact_metadata(
                 skipped_count += 1
                 continue
 
+    # Populate deployments from DeploymentManager (MVP: scan current directory only)
+    try:
+        import os
+        from pathlib import Path
+        from sqlalchemy import update, and_
+        from skillmeat.core.deployment import DeploymentManager
+
+        project_path = Path.cwd()
+        logger.debug(f"Scanning deployments in project: {project_path}")
+
+        deployment_mgr = DeploymentManager()
+        all_deployments = deployment_mgr.list_deployments(project_path=project_path)
+
+        # Group deployments by artifact name
+        deployments_by_artifact = {}
+        for deployment in all_deployments:
+            artifact_name = deployment.artifact_name
+            if artifact_name not in deployments_by_artifact:
+                deployments_by_artifact[artifact_name] = []
+
+            deployments_by_artifact[artifact_name].append(
+                {
+                    "project_path": (
+                        str(deployment.project_path)
+                        if hasattr(deployment, "project_path")
+                        else str(project_path)
+                    ),
+                    "project_name": os.path.basename(str(project_path)),
+                    "deployed_at": (
+                        deployment.deployed_at.isoformat()
+                        if hasattr(deployment.deployed_at, "isoformat")
+                        else str(deployment.deployed_at)
+                    ),
+                }
+            )
+
+        # Update cache entries with deployment data
+        deployment_update_count = 0
+        for artifact_name, deployments_list in deployments_by_artifact.items():
+            stmt = (
+                update(CollectionArtifact)
+                .where(
+                    and_(
+                        CollectionArtifact.collection_id == DEFAULT_COLLECTION_ID,
+                        CollectionArtifact.artifact_id.like(f"%:{artifact_name}"),
+                    )
+                )
+                .values(deployments_json=json.dumps(deployments_list))
+            )
+            result = session.execute(stmt)
+            deployment_update_count += result.rowcount
+
+        if deployment_update_count > 0:
+            logger.info(
+                f"Updated deployment data for {deployment_update_count} artifact(s)"
+            )
+
+    except Exception as e:
+        logger.warning(f"Failed to populate deployment data: {e}")
+        # Non-fatal: cache still works without deployment data
+
     # Batch commit after all artifacts processed
     try:
         session.commit()

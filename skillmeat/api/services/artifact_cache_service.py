@@ -90,6 +90,7 @@ def refresh_single_artifact_cache(
                 if file_artifact.metadata and file_artifact.metadata.tools
                 else None
             ),
+            "deployments_json": None,  # Populated at collection level, not per-artifact
             "version": (
                 file_artifact.metadata.version if file_artifact.metadata else None
             ),
