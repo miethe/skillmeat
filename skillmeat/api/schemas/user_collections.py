@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from .artifacts import ArtifactCollectionInfo
 from .common import PageInfo, PaginatedResponse
+from .deployments import DeploymentInfo
 
 
 class UserCollectionCreateRequest(BaseModel):
@@ -247,6 +248,10 @@ class ArtifactSummary(BaseModel):
     groups: Optional[List[ArtifactGroupMembership]] = Field(
         default=None,
         description="Groups this artifact belongs to (only populated when include_groups=true)",
+    )
+    deployments: Optional[List[DeploymentInfo]] = Field(
+        default=None,
+        description="Deployments of this artifact across projects",
     )
 
     class Config:
