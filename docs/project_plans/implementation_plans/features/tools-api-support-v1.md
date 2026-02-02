@@ -8,11 +8,12 @@ updated: 2026-02-02
 category: "features"
 status: approved
 complexity: Small
-total_effort: "6-8 hours"
+total_effort: "4-5 hours"
 phases: 2
 related:
   - /docs/project_plans/PRDs/tools-api-support-v1.md
   - /docs/project_plans/implementation_plans/features/manage-collection-page-refactor-v1.md
+  - /docs/project_plans/implementation_plans/features/enhanced-frontmatter-utilization-v1.md
 ---
 
 # Implementation Plan: Tools API Support for Artifact Metadata
@@ -23,46 +24,50 @@ related:
 **Related Documents**:
 - **PRD**: `/docs/project_plans/PRDs/tools-api-support-v1.md`
 - **Downstream**: `/docs/project_plans/implementation_plans/features/manage-collection-page-refactor-v1.md` (Phase 4: FILTER-4.2)
+- **Prior Work**: `/docs/project_plans/implementation_plans/features/enhanced-frontmatter-utilization-v1.md`
 
 **Complexity**: Small
-**Total Estimated Effort**: 6-8 hours
+**Total Estimated Effort**: 4-5 hours (reduced due to prior work)
 **Target Timeline**: Single sprint
 
 ---
 
 ## Executive Summary
 
-Wire up the `tools` field from artifact frontmatter (parsed during Marketplace Source imports) to API responses and the `collection_artifacts` cache table. This enables tools filtering and badge display on the `/collection` page. The Tool enum already exists in both Python and TypeScript; this plan connects it to the data flow.
+Complete the tools field wiring for collection API endpoints. Prior work (enhanced-frontmatter-utilization) established the Tool enum, core model, and artifact detail response. This plan adds tools to `ArtifactSummary` (collection endpoints), populates `tools_json` in the cache, and extracts tools from frontmatter.
 
 **Key Outcomes**:
-1. `tools` field appears in `ArtifactSummary` responses
+1. `tools` field appears in `ArtifactSummary` responses (collection endpoints)
 2. `tools_json` cached in `CollectionArtifact` for DB-first reads
-3. Frontend can filter by tools once Phase 4 of manage-collection-page-refactor is implemented
+3. Frontmatter tools extracted and populated during artifact sync
+4. Frontend can filter by tools once Phase 4 of manage-collection-page-refactor is implemented
 
 ---
 
-## Implementation Strategy
+## Gap Analysis (Prior Work)
 
-### Existing Components (Already Done)
+### Already Implemented (enhanced-frontmatter-utilization)
 
 | Component | Location | Status |
 |-----------|----------|--------|
 | Tool enum (Python) | `skillmeat/core/enums.py:58-135` | ✅ Complete (18 tools) |
 | Tool enum (TypeScript) | `skillmeat/web/types/enums.ts:23-42` | ✅ Complete (mirror) |
-| ArtifactMetadataResponse.tools | `skillmeat/api/schemas/artifacts.py:189-192` | ✅ Complete |
-| Frontmatter parser | `skillmeat/core/parsers/markdown_parser.py` | ✅ Infrastructure exists |
-| Migration template | `skillmeat/cache/migrations/versions/20260122_1100_add_tools_and_linked_artifacts.py` | ✅ Pattern established |
+| Core artifact model `.tools` | `skillmeat/core/artifact.py:57` | ✅ Complete |
+| ArtifactMetadataResponse.tools | `skillmeat/api/schemas/artifacts.py:189-193` | ✅ Complete |
+| API response conversion | `skillmeat/api/routers/artifacts.py:527-531` | ✅ Complete |
+| API filtering by tools param | `skillmeat/api/routers/artifacts.py:1707-1821` | ✅ Complete |
+| Migration template | `skillmeat/cache/migrations/versions/20260122_1100_*` | ✅ Pattern exists |
 
-### What Needs Implementation
+### Still Missing (This Plan)
 
 | Component | Location | Required Change |
 |-----------|----------|-----------------|
-| ArtifactSummary schema | `skillmeat/api/schemas/user_collections.py:211` | Add `tools: Optional[List[str]]` |
-| ArtifactSummary schema | `skillmeat/api/schemas/collections.py:43` | Add `tools: Optional[List[str]]` |
-| CollectionArtifact model | `skillmeat/cache/models.py:893` | Add `tools_json` column |
-| Alembic migration | `skillmeat/cache/migrations/versions/` | Create migration for collection_artifacts |
-| Cache population | Cache sync/refresh code | Populate tools_json from metadata |
-| Frontmatter extraction | `skillmeat/core/parsers/markdown_parser.py` | Extract tools from frontmatter |
+| ArtifactSummary.tools | `skillmeat/api/schemas/user_collections.py:211` | Add `tools: Optional[List[str]]` |
+| ArtifactSummary.tools | `skillmeat/api/schemas/collections.py:43` | Add `tools: Optional[List[str]]` |
+| CollectionArtifact.tools_json | `skillmeat/cache/models.py:893` | Add column + property |
+| Alembic migration | `skillmeat/cache/migrations/versions/` | Add tools_json to collection_artifacts |
+| Frontmatter extraction | `skillmeat/core/parsers/markdown_parser.py` | Extract tools field |
+| Cache population | Cache sync code (TBD) | Populate tools_json from metadata |
 
 ### Architecture Flow
 

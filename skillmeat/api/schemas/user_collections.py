@@ -236,6 +236,10 @@ class ArtifactSummary(BaseModel):
         default=None,
         description="Artifact tags",
     )
+    tools: Optional[List[str]] = Field(
+        default=None,
+        description="Claude Code tools used by this artifact",
+    )
     collections: Optional[List[ArtifactCollectionInfo]] = Field(
         default=None,
         description="Collections this artifact belongs to (for collection badges)",

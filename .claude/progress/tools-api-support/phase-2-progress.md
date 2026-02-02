@@ -1,96 +1,117 @@
 ---
-# === TOOLS API SUPPORT - PHASE 2 PROGRESS ===
-# Cache Population & API Wiring
-
 type: progress
-prd: "tools-api-support"
+prd: tools-api-support
 phase: 2
-title: "Cache Population & API Wiring"
-status: "planning"
+title: Cache Population & API Wiring
+status: completed
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 0
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer", "backend-architect"]
+owners:
+- python-backend-engineer
+- backend-architect
 contributors: []
-
 tasks:
-  - id: "TOOLS-2.1"
-    description: "Extract tools from frontmatter in markdown parser"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "1h"
-    priority: "high"
-
-  - id: "TOOLS-2.2"
-    description: "Populate tools_json in cache sync/refresh logic"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["TOOLS-2.1"]
-    estimated_effort: "1.5h"
-    priority: "high"
-
-  - id: "TOOLS-2.3"
-    description: "Wire tools to /user-collections/{id}/artifacts endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TOOLS-2.2"]
-    estimated_effort: "0.5h"
-    priority: "high"
-
-  - id: "TOOLS-2.4"
-    description: "Wire tools to /artifacts endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TOOLS-2.2"]
-    estimated_effort: "0.5h"
-    priority: "high"
-
-  - id: "TOOLS-2.5"
-    description: "Add unit tests for tools extraction, caching, and API responses"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TOOLS-2.3", "TOOLS-2.4"]
-    estimated_effort: "1h"
-    priority: "medium"
-
+- id: TOOLS-2.1
+  description: Extract tools from frontmatter in markdown parser
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 1h
+  priority: high
+- id: TOOLS-2.2
+  description: Populate tools_json in cache sync/refresh logic
+  status: completed
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - TOOLS-2.1
+  estimated_effort: 1.5h
+  priority: high
+- id: TOOLS-2.3
+  description: Wire tools to /user-collections/{id}/artifacts endpoint
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TOOLS-2.2
+  estimated_effort: 0.5h
+  priority: high
+- id: TOOLS-2.4
+  description: Wire tools to /artifacts endpoint
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TOOLS-2.2
+  estimated_effort: 0.5h
+  priority: high
+- id: TOOLS-2.5
+  description: Add unit tests for tools extraction, caching, and API responses
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TOOLS-2.3
+  - TOOLS-2.4
+  estimated_effort: 1h
+  priority: medium
 parallelization:
-  batch_1: ["TOOLS-2.1"]
-  batch_2: ["TOOLS-2.2"]
-  batch_3: ["TOOLS-2.3", "TOOLS-2.4"]
-  batch_4: ["TOOLS-2.5"]
-  critical_path: ["TOOLS-2.1", "TOOLS-2.2", "TOOLS-2.3", "TOOLS-2.5"]
-  estimated_total_time: "3.5h"
-
+  batch_1:
+  - TOOLS-2.1
+  batch_2:
+  - TOOLS-2.2
+  batch_3:
+  - TOOLS-2.3
+  - TOOLS-2.4
+  batch_4:
+  - TOOLS-2.5
+  critical_path:
+  - TOOLS-2.1
+  - TOOLS-2.2
+  - TOOLS-2.3
+  - TOOLS-2.5
+  estimated_total_time: 3.5h
 blockers:
-  - id: "BLOCKER-P2-001"
-    title: "Phase 1 must complete first"
-    severity: "high"
-    blocking: ["TOOLS-2.2", "TOOLS-2.3", "TOOLS-2.4"]
-    resolution: "Complete Phase 1 (schema & model updates)"
-    created: "2026-02-02"
-
+- id: BLOCKER-P2-001
+  title: Phase 1 must complete first
+  severity: high
+  blocking:
+  - TOOLS-2.2
+  - TOOLS-2.3
+  - TOOLS-2.4
+  resolution: Complete Phase 1 (schema & model updates)
+  created: '2026-02-02'
 success_criteria:
-  - { id: "SC-1", description: "Tools extracted from SKILL.md frontmatter", status: "pending" }
-  - { id: "SC-2", description: "Cache populated with tools_json on artifact sync", status: "pending" }
-  - { id: "SC-3", description: "tools field appears in user-collections endpoint", status: "pending" }
-  - { id: "SC-4", description: "tools field appears in artifacts endpoint", status: "pending" }
-  - { id: "SC-5", description: "Unit tests achieve >80% coverage", status: "pending" }
-
+- id: SC-1
+  description: Tools extracted from SKILL.md frontmatter
+  status: pending
+- id: SC-2
+  description: Cache populated with tools_json on artifact sync
+  status: pending
+- id: SC-3
+  description: tools field appears in user-collections endpoint
+  status: pending
+- id: SC-4
+  description: tools field appears in artifacts endpoint
+  status: pending
+- id: SC-5
+  description: Unit tests achieve >80% coverage
+  status: pending
 files_modified:
-  - "skillmeat/core/parsers/markdown_parser.py"
-  - "skillmeat/cache/ (sync logic TBD)"
-  - "skillmeat/api/routers/ (endpoint wiring TBD)"
-  - "tests/"
+- skillmeat/core/parsers/markdown_parser.py
+- skillmeat/cache/ (sync logic TBD)
+- skillmeat/api/routers/ (endpoint wiring TBD)
+- tests/
+progress: 100
+updated: '2026-02-02'
 ---
 
 # tools-api-support - Phase 2: Cache Population & API Wiring

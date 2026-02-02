@@ -264,6 +264,10 @@ references:
   - path/to/file1.py
   - path/to/file2.py
 last_verified: 2025-12-14
+tools:
+  - Bash
+  - Read
+  - Write
 ---
 # Content
 """
@@ -275,6 +279,7 @@ last_verified: 2025-12-14
         assert metadata["references"] == ["path/to/file1.py", "path/to/file2.py"]
         # PyYAML parses YYYY-MM-DD as datetime.date object
         assert metadata["last_verified"] == datetime.date(2025, 12, 14)
+        assert metadata["tools"] == ["Bash", "Read", "Write"]
 
     def test_extract_metadata_minimal(self):
         """Test extracting metadata with only title."""
@@ -286,14 +291,20 @@ last_verified: 2025-12-14
         assert metadata["version"] is None
         assert metadata["references"] is None
         assert metadata["last_verified"] is None
+        assert metadata["tools"] == []
 
     def test_extract_metadata_no_metadata(self):
         """Test extracting from content with no metadata."""
         content = "Just plain text, no title or frontmatter."
         metadata = extract_metadata(content)
 
-        # All fields should be None
-        assert all(value is None for value in metadata.values())
+        # All fields should be None except tools (empty list)
+        assert metadata["title"] is None
+        assert metadata["purpose"] is None
+        assert metadata["version"] is None
+        assert metadata["references"] is None
+        assert metadata["last_verified"] is None
+        assert metadata["tools"] == []
 
     def test_extract_metadata_invalid_frontmatter(self):
         """Test extracting metadata when frontmatter is invalid."""
@@ -304,8 +315,13 @@ Content
 """
         metadata = extract_metadata(content)
 
-        # Should return all None values gracefully
-        assert all(value is None for value in metadata.values())
+        # Should return all None values gracefully (except tools which is empty list)
+        assert metadata["title"] is None
+        assert metadata["purpose"] is None
+        assert metadata["version"] is None
+        assert metadata["references"] is None
+        assert metadata["last_verified"] is None
+        assert metadata["tools"] == []
 
     def test_extract_metadata_partial_frontmatter(self):
         """Test extracting metadata with partial frontmatter."""
@@ -322,3 +338,44 @@ Content
         assert metadata["purpose"] is None
         assert metadata["references"] is None
         assert metadata["last_verified"] is None
+        assert metadata["tools"] == []
+
+    def test_extract_metadata_tools_as_string(self):
+        """Test tools field when provided as string instead of list."""
+        content = """---
+title: Test
+tools: Bash
+---
+Content
+"""
+        metadata = extract_metadata(content)
+
+        assert metadata["tools"] == ["Bash"]
+
+    def test_extract_metadata_tools_with_invalid_value(self):
+        """Test tools field with invalid tool names (should warn but include)."""
+        content = """---
+title: Test
+tools:
+  - Bash
+  - InvalidTool
+  - Read
+---
+Content
+"""
+        metadata = extract_metadata(content)
+
+        # Should include all tools, even invalid ones
+        assert metadata["tools"] == ["Bash", "InvalidTool", "Read"]
+
+    def test_extract_metadata_tools_empty_list(self):
+        """Test tools field when provided as empty list."""
+        content = """---
+title: Test
+tools: []
+---
+Content
+"""
+        metadata = extract_metadata(content)
+
+        assert metadata["tools"] == []
