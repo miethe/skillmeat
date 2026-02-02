@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# Pre-commit hook: Check for stale NotebookLM docs
+# This hook warns about docs that should be synced but does not block commits.
+
+set -euo pipefail
+
+# Get the repository root
+REPO_ROOT=$(git rev-parse --show-toplevel)
+SCRIPTS_DIR="${REPO_ROOT}/scripts/notebooklm_sync"
+STATUS_SCRIPT="${SCRIPTS_DIR}/status.py"
+
+# Colors for output
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Check if status.py exists
+if [[ ! -f "${STATUS_SCRIPT}" ]]; then
+    # Silently exit if notebooklm_sync scripts aren't available
+    exit 0
+fi
+
+# Get list of staged .md files (added or modified)
+staged_md_files=$(git diff --cached --name-only --diff-filter=AM | grep '\.md$' || true)
+
+if [[ -z "${staged_md_files}" ]]; then
+    # No .md files staged, nothing to check
+    exit 0
+fi
+
+# Filter to in-scope files only:
+# Include: *.md in root, docs/**/*.md
+# Exclude: .claude/**/*.md, docs/project_plans/**
+in_scope_staged=()
+while IFS= read -r file; do
+    # Skip .claude/ directory
+    if [[ "${file}" == .claude/* ]]; then
+        continue
+    fi
+    
+    # Skip docs/project_plans/ directory
+    if [[ "${file}" == docs/project_plans/* ]]; then
+        continue
+    fi
+    
+    # Include root-level .md files (no / in path, or just the filename)
+    if [[ "${file}" != */* ]]; then
+        in_scope_staged+=("${file}")
+        continue
+    fi
+    
+    # Include docs/**/*.md (but not project_plans, already excluded above)
+    if [[ "${file}" == docs/* ]]; then
+        in_scope_staged+=("${file}")
+        continue
+    fi
+done <<< "${staged_md_files}"
+
+if [[ ${#in_scope_staged[@]} -eq 0 ]]; then
+    # No in-scope .md files staged
+    exit 0
+fi
+
+# Get stale files from status.py
+stale_json=$(python "${STATUS_SCRIPT}" --stale --json 2>/dev/null || echo '{"files":{}}')
+
+# Extract stale file paths
+stale_files=$(echo "${stale_json}" | python -c "
+import sys, json
+data = json.load(sys.stdin)
+for f in data.get('files', {}).keys():
+    print(f)
+" 2>/dev/null || true)
+
+if [[ -z "${stale_files}" ]]; then
+    # No stale files found
+    exit 0
+fi
+
+# Find intersection: staged files that are also stale
+stale_staged=()
+for staged in "${in_scope_staged[@]}"; do
+    while IFS= read -r stale; do
+        if [[ "${staged}" == "${stale}" ]]; then
+            stale_staged+=("${staged}")
+            break
+        fi
+    done <<< "${stale_files}"
+done
+
+if [[ ${#stale_staged[@]} -eq 0 ]]; then
+    # None of the staged files are stale
+    exit 0
+fi
+
+# Print warning
+echo ""
+echo -e "${YELLOW}Warning: ${#stale_staged[@]} doc(s) are stale and should be synced to NotebookLM${NC}"
+echo ""
+for file in "${stale_staged[@]}"; do
+    echo "  - ${file}"
+done
+echo ""
+echo "Run 'python scripts/notebooklm_sync/batch.py' to sync"
+echo ""
+
+# Always exit 0 - don't block commits
+exit 0

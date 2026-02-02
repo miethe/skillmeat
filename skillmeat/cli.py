@@ -657,6 +657,91 @@ def _security_warning():
     console.print()
 
 
+def _refresh_api_cache(collection_id: str, output_format: str = "table") -> None:
+    """Trigger API cache refresh if the API server is running.
+
+    Makes an HTTP POST to /api/v1/user-collections/{collection_id}/refresh-cache
+    to update the database-backed artifact metadata cache. This ensures web users
+    see newly added artifacts without delay.
+
+    Args:
+        collection_id: The collection ID to refresh (usually "default")
+        output_format: Output format preference ("json" or "table")
+
+    Note:
+        Gracefully degrades if API is not running - logs warning but never fails.
+    """
+    api_base_url = config_mgr.get("api.base_url", "http://localhost:8080")
+    endpoint = f"{api_base_url}/api/v1/user-collections/{collection_id}/refresh-cache"
+
+    try:
+        response = requests.post(endpoint, timeout=3)
+        if response.status_code == 200:
+            if output_format != "json":
+                console.print("[dim]API cache refreshed[/dim]")
+            logger.debug(f"API cache refresh successful: {response.json()}")
+        elif response.status_code == 404:
+            # Collection not in DB yet - this is expected for new collections
+            logger.debug(f"Collection '{collection_id}' not found in API database")
+        else:
+            logger.warning(
+                f"API cache refresh returned {response.status_code}: {response.text}"
+            )
+    except requests.exceptions.ConnectionError:
+        # API server not running - this is fine
+        logger.debug("API server not running, skipping cache refresh")
+    except requests.exceptions.Timeout:
+        logger.warning("API cache refresh timed out")
+    except Exception as e:
+        # Log but don't fail - cache refresh is non-critical
+        logger.debug(f"API cache refresh failed: {e}")
+
+
+def _refresh_api_cache_batch(output_format: str = "table") -> None:
+    """Trigger batch API cache refresh for all collections if API server is running.
+
+    Makes an HTTP POST to /api/v1/user-collections/refresh-cache to update the
+    database-backed artifact metadata cache for all collections. This ensures web
+    users see synced changes immediately after CLI sync operations.
+
+    Args:
+        output_format: Output format preference ("json" or "table")
+
+    Note:
+        Gracefully degrades if API is not running - logs warning but never fails.
+        Uses a longer timeout (10s) since batch operations may take more time.
+    """
+    api_base_url = config_mgr.get("api.base_url", "http://localhost:8080")
+    endpoint = f"{api_base_url}/api/v1/user-collections/refresh-cache"
+
+    try:
+        response = requests.post(endpoint, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if output_format != "json":
+                updated = data.get("total_updated", 0)
+                collections = data.get("collections_refreshed", 0)
+                if updated > 0:
+                    console.print(
+                        f"[dim]API cache refreshed ({updated} artifacts in {collections} collections)[/dim]"
+                    )
+                else:
+                    console.print("[dim]API cache refreshed[/dim]")
+            logger.debug(f"Batch API cache refresh successful: {data}")
+        else:
+            logger.warning(
+                f"Batch API cache refresh returned {response.status_code}: {response.text}"
+            )
+    except requests.exceptions.ConnectionError:
+        # API server not running - this is fine
+        logger.debug("API server not running, skipping batch cache refresh")
+    except requests.exceptions.Timeout:
+        logger.warning("Batch API cache refresh timed out (operation may still complete)")
+    except Exception as e:
+        # Log but don't fail - cache refresh is non-critical
+        logger.debug(f"Batch API cache refresh failed: {e}")
+
+
 def _format_artifact_output(artifact, output_format: str = "table") -> None:
     """Format artifact output based on output format preference."""
     if output_format == "json":
@@ -736,17 +821,21 @@ def _add_artifact_from_spec(
 
             _format_artifact_output(artifact, output_format)
 
-        # Invalidate cache after successful add
+        # Invalidate local cache after successful add
         try:
             from skillmeat.cache.manager import CacheManager
 
             cache_mgr = CacheManager()
             cache_mgr.initialize_cache()
             cache_mgr.invalidate_cache()
-            console.print("[dim]Cache invalidated[/dim]")
+            if output_format != "json":
+                console.print("[dim]Local cache invalidated[/dim]")
         except Exception as e:
             # Log but don't fail the command - cache is non-critical
-            logger.debug(f"Cache invalidation failed: {e}")
+            logger.debug(f"Local cache invalidation failed: {e}")
+
+        # Refresh API database cache (if API server is running)
+        _refresh_api_cache(collection or "default", output_format)
 
     except ValueError as e:
         console.print(f"[red]Invalid specification: {e}[/red]")
@@ -5884,6 +5973,11 @@ def sync_pull_cmd(
             _display_sync_pull_json(result)
         else:
             _display_sync_pull_results(result)
+
+        # Refresh API cache after successful sync (not dry-run)
+        # This ensures web users see synced changes immediately
+        if result.status in ["success", "partial"] and not dry_run:
+            _refresh_api_cache_batch(resolved_format)
 
         # Exit codes:
         # 0 = success or no_changes

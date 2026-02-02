@@ -4,9 +4,9 @@ description: "Phase 6 follow-on to collection-data-consistency-v1 that populates
 audience: [ai-agents, developers, architects]
 tags: [implementation, refactor, performance, caching, collections, web]
 created: 2026-02-01
-updated: 2026-02-01
+updated: 2026-02-02
 category: "refactors"
-status: draft
+status: completed
 complexity: Medium
 total_effort: "12-16 hours (Phases 1-4) + 6-8 hours (Phase 5 future)"
 related:
@@ -39,6 +39,8 @@ The collection-data-consistency-v1 plan (Phase 5 completed) established database
 
 **Enhancement Goal**: Populate and maintain a complete artifact metadata cache in the database, enabling the `/collection` page to operate entirely from the database with sub-100ms response times. This is a follow-on enhancement to collection-data-consistency-v1, not a replacement.
 
+**Implementation Status (2026-02-02)**: Phases 1-4 are complete; Phase 5 remains future-only. See `.claude/progress/artifact-metadata-cache/all-phases-progress.md`.
+
 **Success Metrics**:
 - `/collection` page metadata queries use only database, zero file-system access
 - API response times <100ms for metadata-heavy queries (50+ artifacts)
@@ -63,29 +65,20 @@ def migrate_artifacts_to_default_collection(session, artifact_mgr, collection_mg
             added_at=datetime.utcnow(),
         )
         session.add(new_association)
-    # Result: Collections table populated, but Artifact cache empty
+    # Result: Collection associations exist, but metadata cache fields are empty
 ```
 
-**Consequence**: When `/user-collections/{id}/artifacts` endpoint queries artifacts:
+**Consequence**: When `/user-collections/{id}/artifacts` lists artifacts, it
+cannot build metadata from the database cache and falls back to the file system:
 
 ```python
-# skillmeat/api/routers/user_collections.py (~line 350)
-artifacts = (
-    session.query(Artifact)
-    .join(CollectionArtifact)
-    .filter(CollectionArtifact.collection_id == collection_id)
-    .all()
-)
-# Result: Empty list because Artifact rows never populated!
+# skillmeat/api/routers/user_collections.py (list_collection_artifacts)
+# Primary: ArtifactManager.show (filesystem)
+# Fallback: get_artifact_metadata (DB/marketplace)
 ```
 
-**Current Workaround**: Frontend falls back to `ArtifactManager`:
-
-```typescript
-// skillmeat/web/app/collection/page.tsx (~line 80)
-const artifacts = await fetch('/api/v1/artifacts') // Falls back to file-based
-// Then filters by collection in JavaScript
-```
+**Current Workaround**: Backend still reads the file system per artifact to
+assemble summaries, keeping response times in the 800–1500ms range.
 
 ### Impact on User Experience
 
@@ -150,33 +143,34 @@ license = "MIT"
 tags = ["document", "extraction"]
 ```
 
-**Database Target** (`skillmeat/cache/models.py` - `Artifact` table):
-- Already has most fields: `name`, `type`, `source`, `path`, `content_hash`
-- Needs new fields: `description`, `author`, `license`, `tags`, `resolved_sha`, `resolved_version`, `synced_at`
+**Database Target** (`skillmeat/cache/models.py` - `CollectionArtifact` table):
+- This table already models membership between a database collection and an artifact ID.
+- Extend it to hold cached metadata fields, scoped to a collection (avoids project cache collisions and supports per-collection versions).
+- New fields: `description`, `author`, `license`, `tags_json`, `version`, `source`, `origin`, `origin_source`, `resolved_sha`, `resolved_version`, `synced_at`
 
 ### Sync Flow
 
 ```
 File-Based Artifacts              Sync Mechanism              Database Cache
-(CollectionManager)               ───────────────>             (Artifact table)
+(CollectionManager)               ───────────────>             (CollectionArtifact metadata)
 
 1. Server Startup
    └─ migrate_artifacts_to_default_collection()
-      └─ NEW: populate_artifact_metadata()
+      └─ NEW: populate_collection_artifact_metadata()
          └─ For each file-based artifact:
-            1. Create Artifact row with metadata
-            2. Create CollectionArtifact association
+            1. Create/Update CollectionArtifact row with metadata
+            2. Ensure default collection association exists
             3. Set synced_at timestamp
 
 2. CLI: skillmeat add <source>
    └─ NEW: After artifact added to file collection
-      └─ Trigger API endpoint to sync single artifact
-         └─ POST /api/v1/user-collections/sync-artifact
+      └─ Trigger API endpoint to sync single artifact into DB cache
+         └─ POST /api/v1/user-collections/{collection_id}/refresh-cache
 
 3. CLI: skillmeat sync
    └─ NEW: After collection.toml updated
       └─ Trigger refresh endpoint
-         └─ POST /api/v1/user-collections/refresh-metadata
+         └─ POST /api/v1/user-collections/{collection_id}/refresh-cache
 
 4. Background: Staleness check
    └─ NEW: Cache invalidation service
@@ -247,21 +241,40 @@ NEVER: Write to DB only (causes file/DB divergence)
 
 This ensures CLI users see the same metadata as web users, and lock file integrity is preserved
 
+### Read Path Decision (Per Dual-System Architecture)
+
+**/user-collections must be DB-first/DB-only for metadata rendering.**
+The `/user-collections/{id}/artifacts` endpoint should read metadata from the
+CollectionArtifact cache table, and only fall back to filesystem reads on
+explicit cache-miss (not as the primary path). This aligns with the
+dual-system architecture: file system remains source of truth, while the web
+UI reads from the DB cache for performance.
+
+### Endpoint Collision Avoidance
+
+The existing `POST /api/v1/user-collections/{collection_id}/refresh` endpoint
+targets **file-based** collections. To avoid collisions (especially for the
+`default` collection), this plan adds **new** DB-cache endpoints:
+
+- `POST /api/v1/user-collections/{collection_id}/refresh-cache` (scoped)
+- `POST /api/v1/user-collections/refresh-cache` (all collections)
+
 ---
 
 ## Implementation Strategy
 
 ### Phased Approach
 
-**Phase 1**: Enhance sync function to populate Artifact metadata
-- Modify `migrate_artifacts_to_default_collection()` to create full Artifact records
-- Create database schema migration for new fields
+**Phase 1**: Enhance sync function to populate CollectionArtifact metadata cache
+- Modify `migrate_artifacts_to_default_collection()` to populate metadata on CollectionArtifact rows
+- Create database schema migration for new CollectionArtifact fields
 - Test with existing artifacts
 
-**Phase 2**: Add incremental sync for CLI operations
-- Create API endpoint for single-artifact sync (called by CLI)
-- Create API endpoint for batch metadata refresh
+**Phase 2**: Add incremental sync for CLI/Web operations
+- Create API endpoint for metadata cache refresh (scoped to DB collection)
+- Create API endpoint for batch cache refresh (all collections)
 - Implement cache invalidation hooks
+- Make /user-collections list endpoint DB-first (filesystem only on cache miss)
 
 **Phase 3**: Cache invalidation and TTL-based refresh
 - Implement staleness tracking (synced_at timestamps)
@@ -270,7 +283,7 @@ This ensures CLI users see the same metadata as web users, and lock file integri
 
 **Phase 4** (Optional): CLI integration
 - Add `--web-sync` flag to CLI commands
-- Call sync endpoint after add/sync operations
+- Call refresh-cache endpoint after add/sync operations
 - No CLI changes required; API calls handle sync
 
 **Phase 5** (Future): Web-based artifact editing groundwork
@@ -303,51 +316,54 @@ Phases 1 and 2 have minimal dependencies.
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Dependencies |
 |---------|-----------|-------------|---------------------|----------|--------------|
-| TASK-1.1 | Add metadata fields to Artifact model | Add `description`, `author`, `license`, `tags`, `resolved_sha`, `resolved_version`, `synced_at` columns to cache/models.py | All 7 columns added; model loads without error; tests pass | 1h | None |
-| TASK-1.2 | Create Alembic migration | Create database schema migration for new Artifact fields | Migration auto-generates; upgrade/downgrade work correctly | 0.5h | TASK-1.1 |
-| TASK-1.3 | Create populate_artifact_metadata() function | New function that reads file-based artifacts and creates full Artifact cache records | Function extracts metadata from ArtifactManager; creates complete Artifact rows | 1.5h | TASK-1.1 |
-| TASK-1.4 | Integrate with migrate_artifacts_to_default_collection() | Call populate_artifact_metadata() from existing migration function | migrate_artifacts_to_default_collection() populates both CollectionArtifact AND Artifact rows | 0.5h | TASK-1.3 |
+| TASK-1.1 | Add metadata fields to CollectionArtifact model | Add `description`, `author`, `license`, `tags_json`, `version`, `source`, `origin`, `origin_source`, `resolved_sha`, `resolved_version`, `synced_at` columns to cache/models.py | All columns added; model loads without error; tests pass | 1h | None |
+| TASK-1.2 | Create Alembic migration | Create database schema migration for new CollectionArtifact fields | Migration auto-generates; upgrade/downgrade work correctly | 0.5h | TASK-1.1 |
+| TASK-1.3 | Create populate_collection_artifact_metadata() function | New function that reads file-based artifacts and upserts CollectionArtifact metadata cache records | Function extracts metadata from ArtifactManager; creates/updates CollectionArtifact rows | 1.5h | TASK-1.1 |
+| TASK-1.4 | Integrate with migrate_artifacts_to_default_collection() | Call populate_collection_artifact_metadata() from existing migration function | migrate_artifacts_to_default_collection() populates CollectionArtifact rows with metadata | 0.5h | TASK-1.3 |
 | TASK-1.5 | Add startup sync logging | Add detailed logging showing what metadata was cached | Logs show artifact count, fields populated, timing, any failures | 0.5h | TASK-1.4 |
 
 #### Implementation Details
 
-**TASK-1.1: Add metadata fields to Artifact model**
+**TASK-1.1: Add metadata fields to CollectionArtifact model**
 
-File: `skillmeat/cache/models.py` (Artifact class)
+File: `skillmeat/cache/models.py` (CollectionArtifact class)
 
-Add after existing fields (~line 268):
+Add new cache fields:
 
 ```python
-# Metadata from YAML frontmatter (populated by sync)
+# Cached metadata for DB-backed /collection page
 description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 author: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 license: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-tags: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON array or comma-separated
-
-# Version tracking from lock file
+tags_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON array string
+version: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+origin: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+origin_source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 resolved_sha: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 resolved_version: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-
-# Sync tracking
 synced_at: Mapped[Optional[datetime]] = mapped_column(
     DateTime, nullable=True, default=datetime.utcnow
 )
 ```
 
-**TASK-1.3: Create populate_artifact_metadata() function**
+**TASK-1.3: Create populate_collection_artifact_metadata() function**
 
 File: `skillmeat/api/routers/user_collections.py` (NEW function before migrate_artifacts_to_default_collection)
 
 ```python
-def populate_artifact_metadata(
+def populate_collection_artifact_metadata(
     session: Session,
     artifact_mgr,
     collection_mgr,
 ) -> dict:
-    """Populate Artifact cache with metadata from file-based artifacts.
+    """Populate CollectionArtifact metadata cache from file-based artifacts.
 
-    For each file-based artifact, create or update Artifact row with full metadata:
+    For each file-based artifact, create or update CollectionArtifact rows with
+    full metadata:
     - description, author, license, tags from YAML frontmatter
+    - version from metadata.version
+    - origin/source fields from core artifact
     - resolved_sha, resolved_version from lock file
     - synced_at timestamp marking cache currency
 
@@ -364,7 +380,6 @@ def populate_artifact_metadata(
     skipped_count = 0
     errors = []
 
-    # Iterate all artifacts across all collections
     for coll_name in collection_mgr.list_collections():
         try:
             artifacts = artifact_mgr.list_artifacts(collection_name=coll_name)
@@ -372,45 +387,75 @@ def populate_artifact_metadata(
                 artifact_id = f"{file_artifact.type.value}:{file_artifact.name}"
 
                 try:
-                    # Extract metadata from file-based artifact
-                    description = getattr(file_artifact, 'description', None)
-                    author = getattr(file_artifact.metadata, 'author', None)
-                    license_val = getattr(file_artifact.metadata, 'license', None)
-                    tags = getattr(file_artifact.metadata, 'tags', [])
+                    description = (
+                        file_artifact.metadata.description
+                        if file_artifact.metadata
+                        else None
+                    )
+                    author = (
+                        file_artifact.metadata.author
+                        if file_artifact.metadata
+                        else None
+                    )
+                    license_val = (
+                        file_artifact.metadata.license
+                        if file_artifact.metadata
+                        else None
+                    )
+                    tags = (
+                        file_artifact.metadata.tags
+                        if file_artifact.metadata and file_artifact.metadata.tags
+                        else []
+                    )
+                    version = (
+                        file_artifact.metadata.version
+                        if file_artifact.metadata
+                        else None
+                    )
                     resolved_sha = getattr(file_artifact, 'resolved_sha', None)
                     resolved_version = getattr(file_artifact, 'resolved_version', None)
 
-                    # Check if Artifact exists in database
-                    existing = session.query(Artifact).filter_by(
-                        id=artifact_id
-                    ).first()
+                    # Upsert CollectionArtifact metadata cache
+                    existing = (
+                        session.query(CollectionArtifact)
+                        .filter_by(
+                            collection_id=DEFAULT_COLLECTION_ID,
+                            artifact_id=artifact_id,
+                        )
+                        .first()
+                    )
 
                     if existing:
-                        # Update existing record
                         existing.description = description
                         existing.author = author
                         existing.license = license_val
-                        existing.tags = ",".join(tags) if tags else None
+                        existing.tags_json = json.dumps(tags) if tags else None
+                        existing.version = version
+                        existing.source = file_artifact.upstream or None
+                        existing.origin = file_artifact.origin
+                        existing.origin_source = file_artifact.origin_source
                         existing.resolved_sha = resolved_sha
                         existing.resolved_version = resolved_version
                         existing.synced_at = datetime.utcnow()
                         updated_count += 1
                     else:
-                        # Create new Artifact record
-                        new_artifact = Artifact(
-                            id=artifact_id,
-                            name=file_artifact.name,
-                            type=file_artifact.type.value,
-                            source=str(file_artifact.source),
+                        new_assoc = CollectionArtifact(
+                            collection_id=DEFAULT_COLLECTION_ID,
+                            artifact_id=artifact_id,
+                            added_at=datetime.utcnow(),
                             description=description,
                             author=author,
                             license=license_val,
-                            tags=",".join(tags) if tags else None,
+                            tags_json=json.dumps(tags) if tags else None,
+                            version=version,
+                            source=file_artifact.upstream or None,
+                            origin=file_artifact.origin,
+                            origin_source=file_artifact.origin_source,
                             resolved_sha=resolved_sha,
                             resolved_version=resolved_version,
                             synced_at=datetime.utcnow(),
                         )
-                        session.add(new_artifact)
+                        session.add(new_assoc)
                         created_count += 1
 
                 except Exception as e:
@@ -427,7 +472,7 @@ def populate_artifact_metadata(
         session.commit()
 
     logger.info(
-        f"Artifact metadata cache: created={created_count}, "
+        f"CollectionArtifact metadata cache: created={created_count}, "
         f"updated={updated_count}, skipped={skipped_count}, errors={len(errors)}"
     )
 
@@ -441,7 +486,7 @@ def populate_artifact_metadata(
 
 **TASK-1.4: Update migrate_artifacts_to_default_collection()**
 
-Modify existing function to call populate_artifact_metadata():
+Modify existing function to call populate_collection_artifact_metadata():
 
 ```python
 def migrate_artifacts_to_default_collection(
@@ -456,12 +501,18 @@ def migrate_artifacts_to_default_collection(
     # Ensure default collection exists
     ensure_default_collection(session)
 
-    # NEW: Populate artifact metadata cache from file-based artifacts
-    metadata_stats = populate_artifact_metadata(session, artifact_mgr, collection_mgr)
+    # NEW: Populate CollectionArtifact metadata cache from file-based artifacts
+    metadata_stats = populate_collection_artifact_metadata(
+        session, artifact_mgr, collection_mgr
+    )
 
-    # Get all artifacts (now from Artifact cache table)
-    all_artifacts = session.query(Artifact).all()
-    all_artifact_ids = {a.id for a in all_artifacts}
+    # Get all artifacts (from default collection associations)
+    all_associations = (
+        session.query(CollectionArtifact.artifact_id)
+        .filter_by(collection_id=DEFAULT_COLLECTION_ID)
+        .all()
+    )
+    all_artifact_ids = {row[0] for row in all_associations}
 
     # Get existing associations
     existing_associations = (
@@ -500,12 +551,12 @@ def migrate_artifacts_to_default_collection(
 
 #### Phase 1 Quality Gates
 
-- [ ] Artifact model includes all 7 new fields
+- [ ] CollectionArtifact model includes new cache fields
 - [ ] Alembic migration runs without errors (upgrade and downgrade)
-- [ ] `populate_artifact_metadata()` creates Artifact records with complete metadata
+- [ ] `populate_collection_artifact_metadata()` creates CollectionArtifact cache records with complete metadata
 - [ ] `migrate_artifacts_to_default_collection()` returns successful stats
 - [ ] Server startup completes within 5 seconds (including cache population)
-- [ ] All 7 new fields populated in Artifact rows after startup
+- [ ] Cache fields populated in CollectionArtifact rows after startup
 - [ ] Startup logs show accurate created/updated/skipped counts
 - [ ] Existing artifact tests pass
 
@@ -523,232 +574,86 @@ def migrate_artifacts_to_default_collection(
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Dependencies |
 |---------|-----------|-------------|---------------------|----------|--------------|
-| TASK-2.1 | Create sync single artifact endpoint | POST /api/v1/user-collections/sync-artifact with artifact_id parameter | Endpoint accepts POST; fetches metadata from file-based; updates Artifact row | 1h | TASK-1.4 |
-| TASK-2.2 | Create batch refresh endpoint | POST /api/v1/user-collections/refresh-metadata with optional collection_id | Endpoint refreshes all artifacts or scoped to collection; returns stats | 1h | TASK-1.4 |
-| TASK-2.3 | Add endpoint parameters validation | Validate artifact_id format and collection_id ownership | Validation prevents invalid requests; returns 400 with clear message | 0.5h | TASK-2.1, TASK-2.2 |
+| TASK-2.1 | Create DB cache refresh endpoint | POST /api/v1/user-collections/{collection_id}/refresh-cache | Endpoint accepts POST; fetches metadata from file-based; updates CollectionArtifact cache rows | 1h | TASK-1.4 |
+| TASK-2.2 | Create batch refresh endpoint | POST /api/v1/user-collections/refresh-cache | Endpoint refreshes all collections; returns stats | 1h | TASK-1.4 |
+| TASK-2.3 | Add endpoint parameters validation | Validate collection_id ownership and request parameters | Validation prevents invalid requests; returns 400 with clear message | 0.5h | TASK-2.1, TASK-2.2 |
 | TASK-2.4 | Add error handling and logging | Comprehensive error handling with detailed logging for debugging | Errors logged before returning; no unhandled exceptions | 0.5h | TASK-2.2 |
 | TASK-2.5 | Add unit tests for endpoints | Create tests for happy path and error cases | Tests cover: valid artifact, missing artifact, collection not found | 1h | TASK-2.2 |
 | TASK-2.6 | Hook deploy endpoint to refresh cache | After artifacts.py deploy_artifact() completes, trigger cache refresh for deployed artifact | Deploy via web auto-refreshes DB cache; no manual refresh needed | 0.5h | TASK-2.1 |
 | TASK-2.7 | Hook sync endpoint to refresh cache | After artifacts.py sync_artifact() completes, trigger cache refresh for synced artifact | Sync via web auto-refreshes DB cache; version changes reflected | 0.5h | TASK-2.1 |
+| TASK-2.8 | Hook create/update/delete endpoints | After create/update/delete operations, refresh/invalidate cache | Cache stays fresh after all file mutations | 0.5h | TASK-2.1 |
+| TASK-2.9 | Make /user-collections read path DB-first | Use CollectionArtifact cache as primary source; fallback to filesystem only on cache miss | /collection page avoids filesystem reads on cache hits | 1h | TASK-1.4 |
 
 #### Implementation Details
 
-**TASK-2.1: Create sync single artifact endpoint**
+**TASK-2.1: Create DB cache refresh endpoint (scoped)**
 
 File: `skillmeat/api/routers/user_collections.py` (NEW endpoint)
 
 ```python
 @router.post(
-    "/sync-artifact",
+    "/{collection_id}/refresh-cache",
     response_model=dict,
     tags=["user-collections"],
-    summary="Sync single artifact metadata to cache",
+    summary="Refresh collection metadata cache (DB-backed)",
 )
-async def sync_artifact_metadata(
-    artifact_id: str = Query(..., description="Artifact ID in format 'type:name'"),
-    artifact_mgr: ArtifactManagerDep,
-    db_session: DbSessionDep,
-) -> dict:
-    """Sync metadata for a single artifact from file-based source to database cache.
-
-    Called after `skillmeat add` to ensure web UI sees new artifact immediately.
-
-    Args:
-        artifact_id: Artifact identifier (e.g., 'skill:my-skill')
-        artifact_mgr: Injected ArtifactManager
-        db_session: Database session
-
-    Returns:
-        dict with sync status: synced=True/False, artifact_id, message
-
-    Raises:
-        HTTPException(404): Artifact not found in file-based system
-        HTTPException(422): Invalid artifact_id format
-    """
-    # Validate artifact_id format
-    if ":" not in artifact_id:
-        raise HTTPException(
-            status_code=422,
-            detail="Invalid artifact_id format. Expected 'type:name' (e.g., 'skill:my-skill')"
-        )
-
-    artifact_type, artifact_name = artifact_id.split(":", 1)
-
-    try:
-        # Get artifact from file-based system
-        file_artifact = artifact_mgr.get_artifact(artifact_name)
-        if not file_artifact:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Artifact '{artifact_id}' not found in collection"
-            )
-
-        # Extract metadata
-        description = getattr(file_artifact, 'description', None)
-        author = getattr(file_artifact.metadata, 'author', None) if hasattr(file_artifact, 'metadata') else None
-        license_val = getattr(file_artifact.metadata, 'license', None) if hasattr(file_artifact, 'metadata') else None
-        tags = getattr(file_artifact.metadata, 'tags', []) if hasattr(file_artifact, 'metadata') else []
-
-        # Upsert Artifact record
-        existing = db_session.query(Artifact).filter_by(id=artifact_id).first()
-
-        if existing:
-            existing.description = description
-            existing.author = author
-            existing.license = license_val
-            existing.tags = ",".join(tags) if tags else None
-            existing.synced_at = datetime.utcnow()
-            action = "updated"
-        else:
-            new_artifact = Artifact(
-                id=artifact_id,
-                name=artifact_name,
-                type=artifact_type,
-                source=str(file_artifact.source),
-                description=description,
-                author=author,
-                license=license_val,
-                tags=",".join(tags) if tags else None,
-                synced_at=datetime.utcnow(),
-            )
-            db_session.add(new_artifact)
-            action = "created"
-
-        db_session.commit()
-
-        logger.info(f"Synced artifact metadata: {artifact_id} ({action})")
-
-        return {
-            "synced": True,
-            "artifact_id": artifact_id,
-            "action": action,
-            "message": f"Artifact metadata {action} successfully"
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception(f"Failed to sync artifact '{artifact_id}': {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to sync artifact metadata: {str(e)}"
-        )
-```
-
-**TASK-2.2: Create batch refresh endpoint**
-
-File: `skillmeat/api/routers/user_collections.py` (NEW endpoint)
-
-```python
-@router.post(
-    "/refresh-metadata",
-    response_model=dict,
-    tags=["user-collections"],
-    summary="Refresh artifact metadata cache",
-)
-async def refresh_artifact_metadata(
-    collection_id: Optional[str] = Query(
-        None,
-        description="Optional collection ID to scope refresh; None = all"
-    ),
+async def refresh_collection_cache(
+    collection_id: str,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
     db_session: DbSessionDep,
 ) -> dict:
-    """Refresh metadata for artifacts in database cache from file-based source.
+    """Refresh CollectionArtifact metadata cache for a DB collection.
 
-    Called after `skillmeat sync` to ensure database cache reflects latest versions.
-
-    Args:
-        collection_id: Optional collection ID to scope refresh
-        artifact_mgr: Injected ArtifactManager
-        collection_mgr: Injected CollectionManager
-        db_session: Database session
-
-    Returns:
-        dict with refresh stats: refreshed_count, skipped_count, errors
-
-    Raises:
-        HTTPException(404): Collection not found (if scoped to collection)
+    IMPORTANT: This is separate from /{collection_id}/refresh, which refreshes
+    file-based collections. The new endpoint targets DB cache only.
     """
-    try:
-        # If scoped to collection, validate it exists
-        if collection_id:
-            coll = db_session.query(Collection).filter_by(id=collection_id).first()
-            if not coll:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Collection '{collection_id}' not found"
-                )
-
-            # Get artifacts in this collection
-            artifacts_to_refresh = (
-                db_session.query(Artifact)
-                .join(CollectionArtifact)
-                .filter(CollectionArtifact.collection_id == collection_id)
-                .all()
-            )
-        else:
-            # Get all artifacts
-            artifacts_to_refresh = db_session.query(Artifact).all()
-
-        refreshed_count = 0
-        skipped_count = 0
-        errors = []
-
-        # Refresh each artifact
-        for artifact in artifacts_to_refresh:
-            try:
-                # Parse artifact_id
-                if ":" not in artifact.id:
-                    skipped_count += 1
-                    continue
-
-                artifact_type, artifact_name = artifact.id.split(":", 1)
-
-                # Get from file-based system
-                file_artifact = artifact_mgr.get_artifact(artifact_name)
-                if not file_artifact:
-                    skipped_count += 1
-                    continue
-
-                # Update metadata
-                artifact.description = getattr(file_artifact, 'description', None)
-                artifact.author = getattr(file_artifact.metadata, 'author', None) if hasattr(file_artifact, 'metadata') else None
-                artifact.license = getattr(file_artifact.metadata, 'license', None) if hasattr(file_artifact, 'metadata') else None
-                artifact.tags = ",".join(getattr(file_artifact.metadata, 'tags', [])) if hasattr(file_artifact, 'metadata') else None
-                artifact.synced_at = datetime.utcnow()
-
-                refreshed_count += 1
-
-            except Exception as e:
-                logger.warning(f"Failed to refresh artifact '{artifact.id}': {e}")
-                errors.append({"artifact_id": artifact.id, "error": str(e)})
-                skipped_count += 1
-
-        if refreshed_count > 0:
-            db_session.commit()
-
-        logger.info(
-            f"Refreshed artifact metadata: refreshed={refreshed_count}, "
-            f"skipped={skipped_count}, scope={'collection:' + collection_id if collection_id else 'all'}"
-        )
-
-        return {
-            "refreshed_count": refreshed_count,
-            "skipped_count": skipped_count,
-            "errors": errors,
-            "scope": "collection" if collection_id else "all"
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception(f"Failed to refresh metadata: {e}")
+    # Validate collection exists in DB
+    coll = db_session.query(Collection).filter_by(id=collection_id).first()
+    if not coll:
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to refresh metadata: {str(e)}"
+            status_code=404,
+            detail=f"Collection '{collection_id}' not found",
         )
+
+    # Refresh all artifacts associated with this collection
+    # (Implementation uses populate_collection_artifact_metadata or equivalent
+    # scoped to this collection_id)
+```
+
+**TASK-2.2: Create batch refresh endpoint (all collections)**
+
+File: `skillmeat/api/routers/user_collections.py` (NEW endpoint)
+
+```python
+@router.post(
+    "/refresh-cache",
+    response_model=dict,
+    tags=["user-collections"],
+    summary="Refresh metadata cache for all collections",
+)
+async def refresh_all_collections_cache(
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    db_session: DbSessionDep,
+) -> dict:
+    """Refresh CollectionArtifact metadata cache across all DB collections."""
+    # Implementation loops DB collections and refreshes each one
+```
+
+**TASK-2.9: Make /user-collections read path DB-first**
+
+File: `skillmeat/api/routers/user_collections.py` (list_collection_artifacts)
+
+Guidance:
+- Build `ArtifactSummary` from CollectionArtifact cache fields first.
+- Only fall back to filesystem (`ArtifactManager.show`) on explicit cache miss.
+- Keep marketplace fallback as a last resort (unchanged).
+
+```python
+# Primary: use CollectionArtifact cached fields (DB)
+# Fallback: file-based lookup (only on cache miss)
+# Last resort: get_artifact_metadata(session, artifact_id)
 ```
 
 **TASK-2.6 & TASK-2.7: Hook ArtifactManager operations to refresh cache**
@@ -804,6 +709,7 @@ Helper function in `artifact_cache_service.py`:
 def refresh_single_artifact_cache(
     session: Session,
     artifact_mgr,
+    collection_id: str,
     artifact_id: str,
 ) -> bool:
     """Refresh cache for a single artifact after file operation.
@@ -821,18 +727,38 @@ def refresh_single_artifact_cache(
 
     artifact_type, artifact_name = artifact_id.split(":", 1)
 
-    file_artifact = artifact_mgr.get_artifact(artifact_name)
+    file_artifact = artifact_mgr.show(artifact_name)
     if not file_artifact:
         return False
 
-    # Upsert artifact with fresh metadata
-    existing = session.query(Artifact).filter_by(id=artifact_id).first()
+    # Upsert CollectionArtifact metadata cache
+    existing = (
+        session.query(CollectionArtifact)
+        .filter_by(collection_id=collection_id, artifact_id=artifact_id)
+        .first()
+    )
 
     metadata_fields = {
-        "description": getattr(file_artifact, 'description', None),
-        "author": getattr(file_artifact.metadata, 'author', None) if hasattr(file_artifact, 'metadata') else None,
-        "license": getattr(file_artifact.metadata, 'license', None) if hasattr(file_artifact, 'metadata') else None,
-        "tags": ",".join(getattr(file_artifact.metadata, 'tags', [])) if hasattr(file_artifact, 'metadata') else None,
+        "description": (
+            file_artifact.metadata.description if file_artifact.metadata else None
+        ),
+        "author": (
+            file_artifact.metadata.author if file_artifact.metadata else None
+        ),
+        "license": (
+            file_artifact.metadata.license if file_artifact.metadata else None
+        ),
+        "tags_json": (
+            json.dumps(file_artifact.metadata.tags)
+            if file_artifact.metadata and file_artifact.metadata.tags
+            else None
+        ),
+        "version": (
+            file_artifact.metadata.version if file_artifact.metadata else None
+        ),
+        "source": file_artifact.upstream or None,
+        "origin": file_artifact.origin,
+        "origin_source": file_artifact.origin_source,
         "resolved_version": getattr(file_artifact, 'resolved_version', None),
         "resolved_sha": getattr(file_artifact, 'resolved_sha', None),
         "synced_at": datetime.utcnow(),
@@ -842,14 +768,13 @@ def refresh_single_artifact_cache(
         for key, value in metadata_fields.items():
             setattr(existing, key, value)
     else:
-        new_artifact = Artifact(
-            id=artifact_id,
-            name=artifact_name,
-            type=artifact_type,
-            source=str(file_artifact.source),
+        new_assoc = CollectionArtifact(
+            collection_id=collection_id,
+            artifact_id=artifact_id,
+            added_at=datetime.utcnow(),
             **metadata_fields,
         )
-        session.add(new_artifact)
+        session.add(new_assoc)
 
     session.commit()
     return True
@@ -857,17 +782,19 @@ def refresh_single_artifact_cache(
 
 #### Phase 2 Quality Gates
 
-- [ ] POST /api/v1/user-collections/sync-artifact works for valid artifact
-- [ ] POST /api/v1/user-collections/refresh-metadata works (no scope and with scope)
+- [ ] POST /api/v1/user-collections/{collection_id}/refresh-cache works for valid collection
+- [ ] POST /api/v1/user-collections/refresh-cache works (all collections)
 - [ ] Endpoints validate input and return 400/404 appropriately
-- [ ] Artifact metadata updated in database after sync calls
+- [ ] CollectionArtifact metadata updated in database after refresh calls
 - [ ] Synced_at timestamps updated correctly
 - [ ] All endpoints have error handling and logging
 - [ ] Unit tests pass for happy path and error cases
 - [ ] No unhandled exceptions
 - [ ] Deploy endpoint auto-refreshes cache after file operation completes
 - [ ] Sync endpoint auto-refreshes cache after file operation completes
+- [ ] Create/update/delete endpoints refresh/invalidate cache after file operations
 - [ ] Cache refresh failures don't break deploy/sync operations (graceful degradation)
+- [ ] /user-collections list endpoint reads DB cache first (filesystem only on cache miss)
 
 ---
 
@@ -883,9 +810,9 @@ def refresh_single_artifact_cache(
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Dependencies |
 |---------|-----------|-------------|---------------------|----------|--------------|
-| TASK-3.1 | Create staleness detection service | Service to identify artifacts where synced_at > TTL threshold | Service queries artifacts with staleness calculation; returns stale list | 1h | TASK-2.2 |
+| TASK-3.1 | Create staleness detection service | Service to identify collection artifacts where synced_at > TTL threshold | Service queries cache rows with staleness calculation; returns stale list | 1h | TASK-2.2 |
 | TASK-3.2 | Create cache invalidation hook | Hook to invalidate cache on collection operations (add/remove artifact) | Invalidation triggered on POST/DELETE collection artifact endpoints | 0.75h | TASK-3.1 |
-| TASK-3.3 | Create background refresh task | Optional async task to auto-refresh stale metadata (can be scheduled) | Task runs on interval; calls refresh_metadata endpoint; logs results | 0.75h | TASK-3.1 |
+| TASK-3.3 | Create background refresh task | Optional async task to auto-refresh stale metadata (can be scheduled) | Task runs on interval; calls refresh-cache endpoint; logs results | 0.75h | TASK-3.1 |
 | TASK-3.4 | Add monitoring metrics | Log cache hit rate and staleness distribution | Logs show: total artifacts, stale count, refresh duration | 0.5h | TASK-3.3 |
 
 #### Implementation Details
@@ -903,7 +830,7 @@ from typing import List, Tuple
 
 from sqlalchemy.orm import Session
 
-from skillmeat.cache.models import Artifact
+from skillmeat.cache.models import CollectionArtifact
 
 logger = logging.getLogger(__name__)
 
@@ -924,7 +851,7 @@ class ArtifactCacheService:
 
     def find_stale_artifacts(
         self, session: Session
-    ) -> List[Artifact]:
+    ) -> List[CollectionArtifact]:
         """Find artifacts where cached metadata is stale.
 
         An artifact is considered stale if:
@@ -935,15 +862,15 @@ class ArtifactCacheService:
             session: Database session
 
         Returns:
-            List of Artifact objects with stale metadata
+            List of CollectionArtifact objects with stale metadata
         """
         cutoff_time = datetime.utcnow() - timedelta(seconds=self.ttl)
 
         stale_artifacts = (
-            session.query(Artifact)
+            session.query(CollectionArtifact)
             .filter(
-                (Artifact.synced_at.is_(None))
-                | (Artifact.synced_at < cutoff_time)
+                (CollectionArtifact.synced_at.is_(None))
+                | (CollectionArtifact.synced_at < cutoff_time)
             )
             .all()
         )
@@ -962,7 +889,7 @@ class ArtifactCacheService:
             dict with: total_artifacts, stale_count, fresh_count,
                        oldest_sync_age_seconds, percentage_stale
         """
-        total = session.query(Artifact).count()
+        total = session.query(CollectionArtifact).count()
 
         if total == 0:
             return {
@@ -976,8 +903,8 @@ class ArtifactCacheService:
         stale = self.find_stale_artifacts(session)
 
         # Find oldest sync time
-        oldest_sync = session.query(Artifact.synced_at).order_by(
-            Artifact.synced_at.asc()
+        oldest_sync = session.query(CollectionArtifact.synced_at).order_by(
+            CollectionArtifact.synced_at.asc()
         ).first()
 
         oldest_age = None
@@ -994,7 +921,7 @@ class ArtifactCacheService:
         }
 
     def invalidate_artifact(
-        self, session: Session, artifact_id: str
+        self, session: Session, collection_id: str, artifact_id: str
     ) -> bool:
         """Invalidate cache for a specific artifact.
 
@@ -1007,11 +934,17 @@ class ArtifactCacheService:
         Returns:
             True if artifact found and invalidated, False otherwise
         """
-        artifact = session.query(Artifact).filter_by(id=artifact_id).first()
-        if artifact:
-            artifact.synced_at = None
+        assoc = (
+            session.query(CollectionArtifact)
+            .filter_by(collection_id=collection_id, artifact_id=artifact_id)
+            .first()
+        )
+        if assoc:
+            assoc.synced_at = None
             session.commit()
-            logger.debug(f"Invalidated artifact cache: {artifact_id}")
+            logger.debug(
+                f"Invalidated artifact cache: {collection_id}:{artifact_id}"
+            )
             return True
         return False
 
@@ -1029,17 +962,16 @@ class ArtifactCacheService:
         """
         from skillmeat.cache.models import CollectionArtifact
 
-        # Find all artifacts in collection
+        # Find all artifact associations in collection
         artifacts_in_collection = (
-            session.query(Artifact)
-            .join(CollectionArtifact)
+            session.query(CollectionArtifact)
             .filter(CollectionArtifact.collection_id == collection_id)
             .all()
         )
 
         count = 0
-        for artifact in artifacts_in_collection:
-            artifact.synced_at = None
+        for assoc in artifacts_in_collection:
+            assoc.synced_at = None
             count += 1
 
         if count > 0:
@@ -1071,7 +1003,7 @@ async def add_artifact_to_collection(
     # ... existing add logic ...
 
     # Invalidate cache for added artifact
-    cache_service.invalidate_artifact(db_session, request.artifact_id)
+    cache_service.invalidate_artifact(db_session, collection_id, request.artifact_id)
 
     return {"success": True}
 
@@ -1088,7 +1020,7 @@ async def remove_artifact_from_collection(
     # ... existing remove logic ...
 
     # Invalidate cache for removed artifact
-    cache_service.invalidate_artifact(db_session, artifact_id)
+    cache_service.invalidate_artifact(db_session, collection_id, artifact_id)
 
     return {"success": True}
 ```
@@ -1139,17 +1071,34 @@ async def refresh_stale_metadata_task(
 
                 # Refresh each stale artifact
                 refreshed = 0
-                for artifact in stale:
+                for assoc in stale:
                     try:
-                        file_artifact = artifact_mgr.get_artifact(artifact.name)
+                        # Parse artifact_id format: "type:name"
+                        if ":" not in assoc.artifact_id:
+                            continue
+                        _, artifact_name = assoc.artifact_id.split(":", 1)
+
+                        file_artifact = artifact_mgr.show(artifact_name)
                         if file_artifact:
-                            artifact.description = getattr(file_artifact, 'description', None)
-                            artifact.author = getattr(file_artifact.metadata, 'author', None) if hasattr(file_artifact, 'metadata') else None
-                            artifact.license = getattr(file_artifact.metadata, 'license', None) if hasattr(file_artifact, 'metadata') else None
-                            artifact.synced_at = datetime.utcnow()
+                            assoc.description = (
+                                file_artifact.metadata.description
+                                if file_artifact.metadata
+                                else None
+                            )
+                            assoc.author = (
+                                file_artifact.metadata.author
+                                if file_artifact.metadata
+                                else None
+                            )
+                            assoc.license = (
+                                file_artifact.metadata.license
+                                if file_artifact.metadata
+                                else None
+                            )
+                            assoc.synced_at = datetime.utcnow()
                             refreshed += 1
                     except Exception as e:
-                        logger.warning(f"Failed to refresh {artifact.id}: {e}")
+                        logger.warning(f"Failed to refresh {assoc.artifact_id}: {e}")
 
                 if refreshed > 0:
                     session.commit()
@@ -1169,8 +1118,8 @@ async def refresh_stale_metadata_task(
 
 - [ ] `find_stale_artifacts()` correctly identifies null and expired synced_at
 - [ ] `get_staleness_stats()` returns accurate counts and percentages
-- [ ] Artifact cache invalidated on add/remove operations
-- [ ] Manual refresh endpoint successfully refreshes stale metadata
+- [ ] CollectionArtifact cache invalidated on add/remove operations
+- [ ] Manual refresh-cache endpoint successfully refreshes stale metadata
 - [ ] All monitoring metrics logged appropriately
 - [ ] No performance impact on normal endpoints (<50ms added latency)
 
@@ -1188,8 +1137,8 @@ async def refresh_stale_metadata_task(
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Dependencies |
 |---------|-----------|-------------|---------------------|----------|--------------|
-| TASK-4.1 | Add sync hook to CLI add command | After artifact added via CLI, call sync-artifact endpoint | CLI calls API after add; no errors if API unavailable | 0.5h | TASK-2.1 |
-| TASK-4.2 | Add refresh hook to CLI sync command | After sync operation, call refresh-metadata endpoint | CLI calls API after sync; no errors if API unavailable | 0.5h | TASK-2.2 |
+| TASK-4.1 | Add refresh-cache hook to CLI add command | After artifact added via CLI, call refresh-cache endpoint | CLI calls API after add; no errors if API unavailable | 0.5h | TASK-2.1 |
+| TASK-4.2 | Add refresh-cache hook to CLI sync command | After sync operation, call refresh-cache endpoint | CLI calls API after sync; no errors if API unavailable | 0.5h | TASK-2.2 |
 | TASK-4.3 | Test end-to-end CLI→API→DB flow | Verify artifact added via CLI appears in web UI without delay | Artifact visible in /collection within 1 second of CLI add | 0.5h | TASK-4.1, TASK-4.2 |
 
 **Note**: Phase 4 is optional and deferred if Phase 3 completes on time. The API endpoints function independently; CLI integration is a convenience feature.
@@ -1290,7 +1239,7 @@ class ArtifactWriteService:
         artifact_type, artifact_name = artifact_id.split(":", 1)
 
         # 1. Get current artifact from file system
-        artifact = self.artifact_mgr.get_artifact(artifact_name)
+        artifact = self.artifact_mgr.show(artifact_name)
         if not artifact:
             raise FileNotFoundError(f"Artifact not found: {artifact_id}")
 
@@ -1438,7 +1387,7 @@ async def update_artifact_metadata(
 | Metadata extraction fails for some artifacts | Medium | Medium | Graceful error handling with logging; skip count returned; no exception propagation |
 | Stale metadata visible briefly | Low | Low | Invalidation synchronous; no async staleness window |
 | Database migration breaks existing data | Low | High | Test migration both upgrade and downgrade; backup before applying |
-| Sync endpoint DOS abuse | Low | Medium | Add rate limiting to sync endpoints; consider auth requirements |
+| Refresh-cache endpoint DOS abuse | Low | Medium | Add rate limiting to refresh-cache endpoints; consider auth requirements |
 | Performance regression on startup | Low | Medium | Batch populate operation optimized; measure and log timing |
 
 ### Data Consistency Risks
@@ -1447,8 +1396,8 @@ async def update_artifact_metadata(
 |------|-----------|
 | File-based and DB metadata diverge | One-way sync only; file is source of truth. Manual refresh available. |
 | Stale cache during long CLI operations | TTL-based invalidation. User can manually refresh. |
-| Duplicate Artifact rows | Upsert logic prevents duplicates; unique constraint on id field |
-| Orphaned Artifact rows when artifact removed from file | Cascading delete via CollectionArtifact; orphaned rows harmless |
+| Duplicate CollectionArtifact rows | Upsert logic prevents duplicates; composite PK enforced |
+| Orphaned CollectionArtifact cache entries when artifact removed from file | Remove association on delete; orphans are safe and can be cleaned during refresh |
 
 ### Schedule Risks
 
@@ -1464,9 +1413,9 @@ async def update_artifact_metadata(
 
 ### Phase 1 Completion
 
-- [ ] All 7 new Artifact model fields added
+- [ ] CollectionArtifact cache fields added
 - [ ] Alembic migration created and tested (upgrade + downgrade)
-- [ ] `populate_artifact_metadata()` creates records with all fields populated
+- [ ] `populate_collection_artifact_metadata()` creates records with all fields populated
 - [ ] Server startup includes metadata population (logs show stats)
 - [ ] No regression in existing artifact list/detail endpoints
 - [ ] Startup time <5 seconds including cache population
@@ -1474,14 +1423,15 @@ async def update_artifact_metadata(
 
 ### Phase 2 Completion
 
-- [ ] POST /api/v1/user-collections/sync-artifact works for valid artifact
-- [ ] POST /api/v1/user-collections/refresh-metadata works (both scopes)
+- [ ] POST /api/v1/user-collections/{collection_id}/refresh-cache works for valid collection
+- [ ] POST /api/v1/user-collections/refresh-cache works (all collections)
 - [ ] Endpoints return appropriate error codes (404, 422, 500)
-- [ ] Artifact metadata updates verified in database
+- [ ] CollectionArtifact metadata updates verified in database
 - [ ] synced_at timestamps accurate
 - [ ] No unhandled exceptions in endpoint code
 - [ ] Unit tests for both endpoints pass
 - [ ] Error logging comprehensive and actionable
+- [ ] /user-collections list endpoint DB-first (filesystem only on cache miss)
 
 ### Phase 3 Completion
 
@@ -1494,8 +1444,8 @@ async def update_artifact_metadata(
 
 ### Phase 4 Completion (if implemented)
 
-- [ ] CLI add command calls sync endpoint successfully
-- [ ] CLI sync command calls refresh endpoint successfully
+- [ ] CLI add command calls refresh-cache endpoint successfully
+- [ ] CLI sync command calls refresh-cache endpoint successfully
 - [ ] E2E test: artifact added via CLI visible in web UI within 1 second
 - [ ] No errors if API unavailable (graceful degradation)
 
@@ -1503,27 +1453,31 @@ async def update_artifact_metadata(
 
 ## Data Schema Changes
 
-### Artifact Model Additions
+### CollectionArtifact Metadata Cache Additions
 
 **File**: `skillmeat/cache/models.py`
 
 ```sql
--- New columns in artifacts table
-ALTER TABLE artifacts ADD COLUMN description TEXT NULL;
-ALTER TABLE artifacts ADD COLUMN author VARCHAR(255) NULL;
-ALTER TABLE artifacts ADD COLUMN license VARCHAR(50) NULL;
-ALTER TABLE artifacts ADD COLUMN tags TEXT NULL;  -- comma-separated or JSON
-ALTER TABLE artifacts ADD COLUMN resolved_sha VARCHAR(64) NULL;
-ALTER TABLE artifacts ADD COLUMN resolved_version VARCHAR(50) NULL;
-ALTER TABLE artifacts ADD COLUMN synced_at DATETIME NULL;
+-- New columns in collection_artifacts table
+ALTER TABLE collection_artifacts ADD COLUMN description TEXT NULL;
+ALTER TABLE collection_artifacts ADD COLUMN author VARCHAR(255) NULL;
+ALTER TABLE collection_artifacts ADD COLUMN license VARCHAR(50) NULL;
+ALTER TABLE collection_artifacts ADD COLUMN tags_json TEXT NULL;  -- JSON array string
+ALTER TABLE collection_artifacts ADD COLUMN version VARCHAR(50) NULL;
+ALTER TABLE collection_artifacts ADD COLUMN source VARCHAR(255) NULL;
+ALTER TABLE collection_artifacts ADD COLUMN origin VARCHAR(50) NULL;
+ALTER TABLE collection_artifacts ADD COLUMN origin_source VARCHAR(50) NULL;
+ALTER TABLE collection_artifacts ADD COLUMN resolved_sha VARCHAR(64) NULL;
+ALTER TABLE collection_artifacts ADD COLUMN resolved_version VARCHAR(50) NULL;
+ALTER TABLE collection_artifacts ADD COLUMN synced_at DATETIME NULL;
 
 -- Add index for staleness queries
-CREATE INDEX idx_artifacts_synced_at ON artifacts(synced_at);
+CREATE INDEX idx_collection_artifacts_synced_at ON collection_artifacts(synced_at);
 ```
 
 ### Database Constraints
 
-- No new unique constraints (artifact_id already primary key)
+- No new unique constraints (composite PK already exists)
 - Existing foreign keys and cascades preserved
 - All new columns nullable (backward compatible)
 
@@ -1550,7 +1504,7 @@ Add to observability dashboard:
 
 ```python
 # Log on startup
-logger.info(f"Artifact metadata cache: {metadata_stats}")
+logger.info(f"CollectionArtifact metadata cache: {metadata_stats}")
 
 # Log on refresh
 logger.info(f"Metadata refresh: {refresh_stats}")
@@ -1587,7 +1541,7 @@ Create/update:
 
 1. **ADR: Artifact Metadata Caching Strategy** - Decision to implement TTL-based caching
 2. **Architecture update**: Dual-system architecture now includes cache layer
-3. **API documentation**: New sync and refresh endpoints
+3. **API documentation**: New refresh-cache endpoints
 4. **Operational guide**: Cache monitoring and invalidation procedures
 
 ---
@@ -1604,9 +1558,9 @@ Create/update:
 ### Key Files Reference
 
 **Backend**:
-- `skillmeat/cache/models.py` - Artifact model (Phase 1)
+- `skillmeat/cache/models.py` - CollectionArtifact model (Phase 1)
 - `skillmeat/api/routers/user_collections.py` - Endpoints (Phase 2, 3)
-- `skillmeat/api/services/artifact_metadata_service.py` - Reference for metadata extraction
+- `skillmeat/api/services/artifact_metadata_service.py` - Fallback metadata service (Phase 2+)
 - `skillmeat/api/services/artifact_cache_service.py` (NEW - Phase 3)
 - `skillmeat/api/services/background_tasks.py` (NEW - Phase 4, optional)
 - `alembic/versions/` - Database migration (Phase 1)
@@ -1639,4 +1593,3 @@ Complements:
 **Implementation Plan Version**: 1.0
 **Last Updated**: 2026-02-01
 **Status**: Ready for Phase 1 execution
-

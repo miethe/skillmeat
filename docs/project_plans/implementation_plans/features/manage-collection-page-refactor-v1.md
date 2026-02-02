@@ -3,13 +3,14 @@ title: "Implementation Plan: /manage vs /collection Page Architecture Refactor"
 description: "Detailed implementation plan for separating and clarifying the purpose of the /manage (Operations Dashboard) and /collection (Browse & Discover) pages with distinct card components, modals, and cross-navigation."
 status: approved
 complexity: Medium
-total_effort: "18-26 hours"
-phases: 5
+total_effort: "22-31 hours"
+phases: 6
 related_specs:
   - /docs/design/ui-component-specs-page-refactor.md
   - /docs/project_plans/reports/manage-collection-page-architecture-analysis.md
+  - /docs/project_plans/PRDs/tools-api-support-v1.md
 created: 2026-02-01
-updated: 2026-02-01
+updated: 2026-02-02
 category: "features"
 ---
 
@@ -20,6 +21,10 @@ category: "features"
 **Key Decision**: Each page uses its optimal backend system while maintaining clear semantic separation:
 - `/collection` = Browse & Discover (primary page) - "What artifacts do I have?"
 - `/manage` = Operations Dashboard (secondary page) - "What needs attention?"
+- `/collection` remains the canonical route (collection and group selection via query params and local state)
+
+**Prerequisites** (external dependencies):
+- [x] Tools API PRD (`/docs/project_plans/PRDs/tools-api-support-v1.md`) - complete
 
 ---
 
@@ -40,8 +45,8 @@ category: "features"
 
 **Criteria Met**:
 - Multi-component: 6 new components + 2 page updates + filter enhancements
-- Task Count: 24 distinct tasks across 5 phases
-- Effort Range: 18-26 hours
+- Task Count: 29 distinct tasks across 6 phases
+- Effort Range: 22-31 hours
 - Architecture Impact: High (page-level separation) but low risk (backward compatible)
 - Scope: Primarily frontend, contained within web layer
 
@@ -63,7 +68,38 @@ Uses Haiku agents for mechanical work + Sonnet agents for component implementati
 
 ## Phase-by-Phase Implementation
 
-### Phase 1: Page Structure & Navigation (4-6 hours)
+### Phase 0: Schema & Cache Extensions (2-3 hours)
+
+**Objective**: Extend ArtifactSummary schema and collection cache to include deployment information, enabling the "Deployed (N)" badge on browse cards.
+
+**Subagent Leads**: python-backend-engineer, data-layer-expert
+
+| Task ID | Task Name | Description | Acceptance Criteria | Est. Hours | Assignee |
+|---------|-----------|-------------|-------------------|-----------|----------|
+| SCHEMA-0.1 | Add deployments to ArtifactSummary schema | Add `deployments: Optional[List[DeploymentInfo]]` to `ArtifactSummary` in `user_collections.py`. DeploymentInfo includes `project_path`, `project_name`, `deployed_at` | 1. Schema updated with deployments field<br>2. Field is optional (backward compatible)<br>3. OpenAPI spec regenerated<br>4. SDK types updated | 0.5 | python-backend-engineer |
+| SCHEMA-0.2 | Add deployments_json to CollectionArtifact cache | Add `deployments_json` column to `CollectionArtifact` model. Create Alembic migration (nullable column) | 1. Migration created and tested<br>2. Column is nullable for backward compat<br>3. Migration reversible | 0.5 | data-layer-expert |
+| SCHEMA-0.3 | Populate deployments in cache | Update `populate_collection_artifact_metadata()` to store deployments from file-based CollectionManager. Update refresh-cache endpoints | 1. Deployments populated from metadata<br>2. Refresh endpoints update deployments<br>3. Cache miss fallback includes deployments | 1 | python-backend-engineer |
+| SCHEMA-0.4 | Emit deployments in API responses | Update collection artifact endpoints to include deployments from cache. Ensure `/user-collections/{id}/artifacts` returns deployments | 1. Deployments appear in API response<br>2. Count matches actual deployments<br>3. No performance regression | 0.5 | python-backend-engineer |
+| SCHEMA-0.5 | Update frontend Artifact type and mapper | Add `deployments` to frontend `Artifact` type. Update `entity-mapper.ts` to map deployments from API response | 1. TypeScript type updated<br>2. Mapper handles deployments<br>3. No type errors in build | 0.5 | frontend-developer |
+
+**Phase 0 Quality Gate**:
+- [ ] ArtifactSummary schema includes optional deployments field
+- [ ] CollectionArtifact cache stores deployments_json
+- [ ] `/user-collections/{id}/artifacts` returns deployments in response
+- [ ] Frontend Artifact type includes deployments
+- [ ] No migration errors, no type errors
+
+**Phase 0 Output Artifacts**:
+- Updated `skillmeat/api/schemas/user_collections.py`
+- New Alembic migration for deployments_json column
+- Updated `skillmeat/api/managers/collection_cache_manager.py`
+- Updated `skillmeat/web/types/artifact.ts`
+- Updated `skillmeat/web/lib/api/entity-mapper.ts`
+- Regenerated SDK types
+
+---
+
+### Phase 1: Page Structure & Navigation (5-7 hours)
 
 **Objective**: Establish clear page identities through navigation, headers, and deep linking infrastructure.
 
@@ -73,14 +109,15 @@ Uses Haiku agents for mechanical work + Sonnet agents for component implementati
 |---------|-----------|-------------|-------------------|-----------|----------|
 | NAV-1.1 | Update sidebar navigation labels | Update sidebar component to show "Health & Sync" (for /manage) and "Collections" (for /collection) with icon changes | 1. Sidebar reflects new labels<br>2. Icons changed appropriately<br>3. Hover states work<br>4. Mobile nav updated | 1 | ui-engineer-enhanced |
 | NAV-1.2 | Add page headers with descriptions | Implement PageHeader components with purpose statements: Collection → "Browse & Discover", Manage → "Health & Sync" | 1. Headers render on both pages<br>2. Icons display correctly<br>3. Description text clear and concise<br>4. Responsive on mobile | 1 | frontend-developer |
-| NAV-1.3 | Implement deep link support for artifacts | Support `?artifact={id}` query param on both pages to open modal with specific artifact | 1. Query param parsed correctly<br>2. Modal opens automatically<br>3. URL updates on modal open<br>4. Browser back button works<br>5. Bookmarkable links work | 2 | frontend-developer |
-| NAV-1.4 | Add cross-navigation buttons to UnifiedEntityModal | Add "Open in Manage →" button (for collection context) and "View Full Details →" button (for manage context) in modal headers | 1. Buttons appear in correct context<br>2. Navigation preserves artifact state<br>3. Modal closes on navigation<br>4. No console errors on click | 1.5 | frontend-developer |
+| NAV-1.3 | Implement deep link + URL state support | **Existing**: `/manage` has `?type=` and `?artifact=`; `/collection` has `?tags=` only with collection selection in React state. **New**: Add `?artifact={id}` to `/collection` for deep linking; add `?collection={id}&group={id}` to move selection from React state to URL; add `?tab=` for modal tab deep linking on both pages | 1. `/collection?artifact={id}` opens modal automatically<br>2. `/collection?collection={id}&group={id}` restores selection<br>3. `?tab=` opens specific modal tab on both pages<br>4. URL updates on modal open/tab change<br>5. Browser back button works<br>6. Bookmarkable links work<br>7. Collection selection migrates from local state to URL | 2.5 | frontend-developer |
+| NAV-1.4 | Add cross-navigation buttons to UnifiedEntityModal | Add "Manage Artifact →" (from discovery) and "Collection Details →" (from operations) in modal headers | 1. Buttons appear in correct context<br>2. Navigation preserves artifact + collection context<br>3. Modal closes on navigation<br>4. No console errors on click | 1.5 | frontend-developer |
 | NAV-1.5 | Create PageHeader component variant | Create reusable PageHeader component with title, description, icon, and optional action button slots | 1. Component accepts title, description, icon<br>2. Renders correctly on multiple pages<br>3. Accessible with semantic HTML<br>4. Responsive layout | 1 | ui-engineer-enhanced |
 
 **Phase 1 Quality Gate**:
 - [ ] Sidebar reflects new navigation labels
 - [ ] Page headers display with correct descriptions
 - [ ] Deep links (`?artifact={id}`) work on both pages
+- [ ] Collection/group selection restores from URL (`?collection=...&group=...`)
 - [ ] Modal cross-navigation buttons appear and function
 - [ ] No accessibility violations in navigation elements
 
@@ -101,14 +138,14 @@ Uses Haiku agents for mechanical work + Sonnet agents for component implementati
 
 | Task ID | Task Name | Description | Acceptance Criteria | Est. Hours | Assignee |
 |---------|-----------|-------------|-------------------|-----------|----------|
-| CARD-2.1 | Create ArtifactBrowseCard component | Discovery-focused card: type icon, name, author, description (truncated), tags, tools, score badge, quick actions menu | 1. All props accepted and rendered<br>2. Description truncates to 2-3 lines<br>3. Quick actions menu functional<br>4. Hover/focus states work<br>5. No drift/sync indicators | 2 | ui-engineer-enhanced |
+| CARD-2.1 | Create ArtifactBrowseCard component | Discovery-focused card: type icon, name, author, description (truncated), tags, tools, score badge, quick actions menu; **"Deployed" badge with project count when applicable** (no sync/drift indicators - those belong on /manage) | 1. All props accepted and rendered<br>2. Description truncates to 2-3 lines<br>3. Quick actions menu functional<br>4. Hover/focus states work<br>5. "Deployed (N)" badge shown when artifact has deployments | 2 | ui-engineer-enhanced |
 | CARD-2.2 | Create ArtifactOperationsCard component | Operations-focused card: checkbox, type icon, name, version arrows, deployments, badges (drift/update), sync time, action buttons | 1. Checkbox selection works<br>2. Status badges display correctly<br>3. Deployment badges stack properly<br>4. Health indicator colored correctly<br>5. All action buttons functional | 2 | ui-engineer-enhanced |
-| CARD-2.3 | Create shared status utility components | StatusBadge, HealthIndicator, DeploymentBadgeStack components with proper styling and tooltips | 1. StatusBadge renders all states<br>2. HealthIndicator shows correct health<br>3. DeploymentBadgeStack shows overflow<br>4. All tooltips functional<br>5. Accessible labels present | 1.5 | ui-engineer-enhanced |
+| CARD-2.3 | Create shared status utility components | StatusBadge, HealthIndicator, DeploymentBadgeStack components with proper styling and tooltips. **DeploymentBadgeStack behavior**: hover overflow badge shows tooltip with full project list; click overflow badge opens modal on deployments tab | 1. StatusBadge renders all states<br>2. HealthIndicator shows correct health<br>3. DeploymentBadgeStack shows overflow with hover tooltip<br>4. DeploymentBadgeStack overflow click opens deployments tab<br>5. All tooltips functional<br>6. Accessible labels present | 1.5 | ui-engineer-enhanced |
 | CARD-2.4 | Integrate ArtifactBrowseCard into collection page | Replace existing card rendering with ArtifactBrowseCard; update prop passing and event handlers | 1. Cards render on collection page<br>2. Quick actions work<br>3. Click opens modal<br>4. No visual regressions<br>5. Performance maintained | 1 | frontend-developer |
 | CARD-2.5 | Integrate ArtifactOperationsCard into manage page | Replace existing card rendering with ArtifactOperationsCard; integrate bulk selection, action handlers | 1. Cards render on manage page<br>2. Checkboxes functional<br>3. Action buttons work<br>4. Bulk selection affects button state<br>5. No visual regressions | 1 | frontend-developer |
 
 **Phase 2 Quality Gate**:
-- [ ] ArtifactBrowseCard renders without drift indicators
+- [ ] ArtifactBrowseCard shows "Deployed (N)" badge when applicable; no sync/drift indicators
 - [ ] ArtifactOperationsCard shows health and deployment status
 - [ ] Shared utilities (StatusBadge, HealthIndicator, DeploymentBadgeStack) exported and working
 - [ ] Both cards integrate into pages with no console errors
@@ -125,7 +162,7 @@ Uses Haiku agents for mechanical work + Sonnet agents for component implementati
 
 ---
 
-### Phase 3: Modal Separation (6-8 hours)
+### Phase 3: Modal Separation (7-9 hours)
 
 **Objective**: Create purpose-specific modals that reduce feature confusion and improve task completion flows.
 
@@ -133,17 +170,18 @@ Uses Haiku agents for mechanical work + Sonnet agents for component implementati
 
 | Task ID | Task Name | Description | Acceptance Criteria | Est. Hours | Assignee |
 |---------|-----------|-------------|-------------------|-----------|----------|
-| MODAL-3.1 | Create ArtifactDetailsModal (collection-focused) | Discovery modal with Overview (default), Documentation, Dependencies, Advanced tabs; emphasizes description, tools, tags; includes "Open in Manage" button | 1. All tabs render<br>2. Overview is default tab<br>3. Cross-navigation button works<br>4. Deploy action available<br>5. Add to Group action available<br>6. No sync/drift indicators | 2.5 | ui-engineer-enhanced |
-| MODAL-3.2 | Create ArtifactOperationsModal (manage-focused) | Operations modal with Status (default), Deployments, Version History, Diff tabs; emphasizes health, sync, version tracking | 1. All tabs render<br>2. Status tab is default<br>3. Health indicators display<br>4. Sync actions work<br>5. Cross-navigation button present<br>6. Version history shows correctly | 2.5 | ui-engineer-enhanced |
+| MODAL-3.1 | Create ArtifactDetailsModal (collection-focused) | Discovery modal reusing existing content: Overview + Contents + Links + Collections + Sources + **history** (general artifact timeline); includes "Manage Artifact" button | 1. All tabs render<br>2. Overview + Contents present<br>3. Overview is default tab<br>4. Cross-navigation button works<br>5. Deploy action available<br>6. Add to Group action available<br>7. Upstream status summary shown (if any)<br>8. No project-level sync details | 2.5 | ui-engineer-enhanced |
+| MODAL-3.2 | Create ArtifactOperationsModal (manage-focused) | Operations modal reusing existing content: Overview + Contents + Status + Sync Status + Deployments + **version-history** (version timeline with rollback options) | 1. All tabs render<br>2. Overview + Contents present<br>3. Status tab is default<br>4. Health indicators display<br>5. Sync actions work<br>6. Cross-navigation button present<br>7. Version history shows correctly | 2.5 | ui-engineer-enhanced |
 | MODAL-3.3 | Extract shared modal components | Create reusable modal subcomponents: TabNavigation, ModalHeader, TabContent wrapper | 1. Components are reusable<br>2. No duplication between modals<br>3. Props accept customization<br>4. Accessibility preserved | 1 | frontend-developer |
-| MODAL-3.4 | Update CollectionsTabNavigation component | Implement dual-button navigation showing "View in Collection" and "Open in Manage" for each collection | 1. Buttons appear in modal<br>2. Navigation works correctly<br>3. Collection list renders<br>4. Focus management correct | 1 | ui-engineer-enhanced |
-| MODAL-3.5 | Implement cross-navigation state preservation | Ensure modal context (current page, artifact ID) preserved when navigating between pages | 1. URL state includes origin<br>2. Return navigation possible<br>3. No data loss on navigation<br>4. Modal reopens correctly | 1 | frontend-developer |
+| MODAL-3.4 | Update ModalCollectionsTab component | Add optional "View in Collection" and "Manage Artifact" actions per collection when in operations context | 1. Buttons appear in modal<br>2. Navigation works correctly<br>3. Collection list renders<br>4. Focus management correct | 1 | ui-engineer-enhanced |
+| MODAL-3.5 | Implement cross-navigation state preservation | Ensure modal context preserved when navigating between pages. Implement `?returnTo=` query param: serialize origin URL with filters; show "Return to [origin]" button when returnTo present; handle browser back button correctly | 1. `returnTo` query param serialized on cross-navigation<br>2. Return button appears when `returnTo` is present<br>3. Return navigation restores filters and scroll position<br>4. Browser back button works correctly with returnTo<br>5. Modal reopens correctly after return<br>6. No data loss on navigation | 1.5 | frontend-developer |
 | MODAL-3.6 | Integrate modals into respective pages | Wire ArtifactDetailsModal to collection page, ArtifactOperationsModal to manage page | 1. Correct modal opens on each page<br>2. Artifact data flows correctly<br>3. Modal close handlers work<br>4. No console errors<br>5. No visual regressions | 1 | frontend-developer |
 
 **Phase 3 Quality Gate**:
-- [ ] ArtifactDetailsModal shows discovery-focused content (no drift/sync)
-- [ ] ArtifactOperationsModal shows operations-focused content (health/sync/deployments)
-- [ ] Cross-navigation buttons present in both modals
+- [ ] ArtifactDetailsModal shows discovery-focused content (overview/contents/links/collections/sources/history tab)
+- [ ] ArtifactOperationsModal shows operations-focused content (status/sync/deployments/version-history tab)
+- [ ] Cross-navigation buttons present in both modals with `returnTo` handling
+- [ ] Return button appears when navigated from other page
 - [ ] Modals integrate into pages without errors
 - [ ] All tabs in both modals render and function correctly
 
@@ -152,7 +190,7 @@ Uses Haiku agents for mechanical work + Sonnet agents for component implementati
 - New `skillmeat/web/components/manage/artifact-operations-modal.tsx`
 - New `skillmeat/web/components/shared/modal-header.tsx`
 - New `skillmeat/web/components/shared/cross-navigation-buttons.tsx`
-- Updated `skillmeat/web/components/shared/collections-tab-navigation.tsx`
+- Updated `skillmeat/web/components/entity/modal-collections-tab.tsx`
 - Updated `skillmeat/web/app/collection/page.tsx` (modal integration)
 - Updated `skillmeat/web/app/manage/page.tsx` (modal integration)
 
@@ -166,9 +204,9 @@ Uses Haiku agents for mechanical work + Sonnet agents for component implementati
 
 | Task ID | Task Name | Description | Acceptance Criteria | Est. Hours | Assignee |
 |---------|-----------|-------------|-------------------|-----------|----------|
-| FILTER-4.1 | Create ManagePageFilters component | Project dropdown, Status filter (All, Needs Update, Has Drift, Deployed, Error), Type filter, search input | 1. All filters render<br>2. Project dropdown populated<br>3. Status options functional<br>4. Type filtering works<br>5. Search input functional<br>6. Active filters display | 1.5 | frontend-developer |
-| FILTER-4.2 | Enhance CollectionPageFilters with tools filter | Add Tools multi-select popover to existing filters (Collection, Group, Type, Tags, Search) | 1. Tools filter popover opens<br>2. Tools list displays<br>3. Multi-select works<br>4. Selected tools show in active filters<br>5. Clear all works<br>6. Responsive on mobile | 1 | frontend-developer |
-| FILTER-4.3 | Add filter state to URL for bookmarkability | Serialize filter state to query params, restore on page load, update on filter change | 1. URL updates on filter change<br>2. Filters restore from URL<br>3. Back button works<br>4. Bookmarkable URLs work<br>5. No race conditions<br>6. Deep links work with artifacts | 1.5 | frontend-developer |
+| FILTER-4.1 | Create ManagePageFilters component | Project dropdown (prominent), Status filter (All, Needs Update, Has Drift, Deployed, Error), Type filter, search input, optional tag filter (retained) | 1. All filters render<br>2. Project dropdown populated<br>3. Status options functional<br>4. Type filtering works<br>5. Search input functional<br>6. Tag filter optional and non-blocking<br>7. Active filters display | 1.5 | frontend-developer |
+| FILTER-4.2 | Enhance CollectionPageFilters with tools filter | Add Tools multi-select popover to existing filters (Collection, Group, Type, Tags, Search). **Prerequisite**: Tools API PRD must be complete before this plan begins | 1. Tools filter popover opens<br>2. Tools list populated from API<br>3. Multi-select works<br>4. Selected tools show in active filters<br>5. Clear all works<br>6. Responsive on mobile | 1 | frontend-developer |
+| FILTER-4.3 | Add filter state to URL for bookmarkability | Serialize filter state to query params, restore on page load, update on filter change (including collection/group selection) | 1. URL updates on filter change<br>2. Filters restore from URL<br>3. Back button works<br>4. Bookmarkable URLs work<br>5. No race conditions<br>6. Deep links work with artifacts | 1.5 | frontend-developer |
 
 **Phase 4 Quality Gate**:
 - [ ] ManagePageFilters component renders with all filter types
@@ -262,6 +300,20 @@ Shared Utilities
 
 ## Quality Gates & Validation
 
+### Gate 0: Schema & Cache (End of Phase 0)
+
+**Validator**: python-backend-engineer + data-layer-expert
+
+```checklist
+- [ ] ArtifactSummary schema includes deployments field
+- [ ] Alembic migration runs without errors
+- [ ] Cache population includes deployments data
+- [ ] API response includes deployments array
+- [ ] Frontend Artifact type updated
+- [ ] Entity mapper handles deployments
+- [ ] No type errors in frontend build
+```
+
 ### Gate 1: Navigation & Deep Linking (End of Phase 1)
 
 **Validator**: ui-engineer-enhanced + frontend-developer
@@ -280,7 +332,7 @@ Shared Utilities
 **Validator**: web-accessibility-checker + testing specialist
 
 ```checklist
-- [ ] ArtifactBrowseCard shows no drift/sync indicators
+- [ ] ArtifactBrowseCard shows "Deployed (N)" badge when applicable (no sync/drift)
 - [ ] ArtifactOperationsCard shows health/sync/deployment data
 - [ ] Cards integrate without visual regressions
 - [ ] Quick actions functional
@@ -314,6 +366,7 @@ Shared Utilities
 - [ ] Filters serialize to URL correctly
 - [ ] Filters restore from URL on page load
 - [ ] Deep links with filters work
+- [ ] Collection/group selection persists via URL without breaking local state
 - [ ] No race conditions
 - [ ] No console errors
 ```
@@ -416,12 +469,13 @@ Shared Utilities
 
 | Phase | Duration | Start | End | Primary Resources |
 |-------|----------|-------|-----|------------------|
-| Phase 1: Navigation | 4-6h | Week 1, Day 1 | Week 1, Day 2 | ui-engineer-enhanced (3h), frontend-developer (2h) |
+| Phase 0: Schema/Cache | 2-3h | Week 1, Day 1 | Week 1, Day 1 | python-backend-engineer (2h), data-layer-expert (0.5h), frontend-developer (0.5h) |
+| Phase 1: Navigation | 5-7h | Week 1, Day 1 | Week 1, Day 2 | ui-engineer-enhanced (3h), frontend-developer (3.5h) |
 | Phase 2: Cards | 4-6h | Week 1, Day 2 | Week 1, Day 4 | ui-engineer-enhanced (4h), frontend-developer (2h) |
-| Phase 3: Modals | 6-8h | Week 2, Day 1 | Week 2, Day 3 | ui-engineer-enhanced (5h), frontend-developer (3h) |
+| Phase 3: Modals | 7-9h | Week 2, Day 1 | Week 2, Day 3 | ui-engineer-enhanced (5h), frontend-developer (3.5h) |
 | Phase 4: Filters | 2-4h | Week 2, Day 4 | Week 2, Day 5 | frontend-developer (3h), ui-engineer-enhanced (1h) |
 | Phase 5: Polish | 2-4h | Week 3, Day 1 | Week 3, Day 2 | web-accessibility-checker (1.5h), testing specialist (2h), ui-engineer-enhanced (1h) |
-| **Total** | **18-26h** | | | |
+| **Total** | **22-31h** | | | |
 
 ### Parallelization Opportunities
 
@@ -431,36 +485,20 @@ The following tasks can run in parallel:
 - **Phase 3**: ArtifactDetailsModal and ArtifactOperationsModal development (separate subagents)
 - **Phase 5**: Accessibility audit, unit tests, and dark mode verification (separate subagents)
 
-Estimated time with maximum parallelization: 12-16 hours wall-clock time
+Estimated time with maximum parallelization: 15-20 hours wall-clock time
+
+Note: Phase 0 must complete before Phase 2 (cards need deployments data), but can run in parallel with Phase 1.
 
 ### Resource Requirements
 
 | Role | Hours | Phases | Critical Path |
 |------|-------|--------|---------------|
+| python-backend-engineer | 2-2.5h | 0 | Yes (enables cards) |
+| data-layer-expert | 0.5h | 0 | No |
 | ui-engineer-enhanced | 8-10h | 1, 2, 3, 5 | Yes (modals) |
-| frontend-developer | 8-10h | 1, 2, 3, 4, 5 | Yes (integration) |
+| frontend-developer | 9-11h | 0, 1, 2, 3, 4, 5 | Yes (integration) |
 | web-accessibility-checker | 1.5-2h | 5 | No |
 | testing specialist | 2-3h | 5 | No |
-
----
-
-## Feature Flag Strategy
-
-For safer rollout, implement feature flag: `NEXT_PUBLIC_NEW_PAGE_UI`
-
-```typescript
-// .env.local
-NEXT_PUBLIC_NEW_PAGE_UI=true  // Enable new UI
-```
-
-### Rollout Phases
-
-1. **Staging**: All new features enabled for testing
-2. **Production (Phase 1)**: 10% of users (canary)
-3. **Production (Phase 2)**: 50% of users (rollout)
-4. **Production (Phase 3)**: 100% of users (full release)
-
-Each phase requires successful gate validation before advancing.
 
 ---
 
@@ -491,6 +529,7 @@ Each phase requires successful gate validation before advancing.
 ### Source Documents
 - [Architecture Analysis Report](/docs/project_plans/reports/manage-collection-page-architecture-analysis.md)
 - [UI Component Specifications](/docs/design/ui-component-specs-page-refactor.md)
+- [Tools API Support PRD](/docs/project_plans/PRDs/tools-api-support-v1.md)
 
 ### Reference Documentation
 - [MeatyPrompts Component Patterns](/.claude/context/key-context/component-patterns.md)
@@ -527,9 +566,16 @@ Each phase requires successful gate validation before advancing.
 
 ### Pre-Implementation
 - [ ] Review component specifications document thoroughly
-- [ ] Set up feature flag in environment
 - [ ] Create branch for feature development
 - [ ] Set up local testing environment
+
+### Phase 0: Schema & Cache
+- [ ] Add deployments to ArtifactSummary schema
+- [ ] Create Alembic migration for deployments_json
+- [ ] Update cache population to include deployments
+- [ ] Update API responses to emit deployments
+- [ ] Update frontend Artifact type and mapper
+- [ ] Gate 0: Schema validation
 
 ### Phase 1: Navigation
 - [ ] Update sidebar navigation
@@ -574,12 +620,11 @@ Each phase requires successful gate validation before advancing.
 - [ ] QA testing on staging
 - [ ] Performance baseline established
 - [ ] Documentation complete
-- [ ] Feature flag prepared for rollout
 
 ---
 
-**Document Version**: 1.0
+**Document Version**: 1.1
 **Status**: Ready for Implementation
 **Approved By**: Architecture Review (2026-02-01)
-**Last Updated**: 2026-02-01
-
+**Last Updated**: 2026-02-02
+**Review Notes**: Codex review incorporated; clarifications added for card indicators, tab naming, URL state scope, and cross-navigation returnTo handling

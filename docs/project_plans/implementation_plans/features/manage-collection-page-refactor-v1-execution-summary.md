@@ -110,28 +110,35 @@ skillmeat/web/components/
 ### Modal Purposes (Distinct Content)
 
 **ArtifactDetailsModal** (Collection page):
-- Overview tab (default): Full description, metadata, author, license, tools, tags
-- Documentation tab: Usage examples, getting started
-- Dependencies tab: Required artifacts, external dependencies
-- Advanced tab: Version info, source links
-- Action: "Open in Manage" button in header
+- Overview tab (default): Full description, metadata, author, license, tags, upstream summary
+- Contents tab: File tree + content pane (existing data)
+- Links tab: Linked artifacts + unlinked references
+- Collections tab: Membership + group actions
+- Sources tab: Repository/source details
+- History tab: General artifact history
+- Action: "Manage Artifact" button in header
 
 **ArtifactOperationsModal** (Manage page):
-- Status tab (default): Sync status, version comparison, drift detection
+- Overview tab: Metadata + operational highlights
+- Contents tab: File tree + content pane (existing data)
+- Status tab (default): Detailed operational status
+- Sync Status tab: Drift + sync actions (existing data)
 - Deployments tab: Where deployed, deployment actions
 - Version History tab: Timeline of versions, rollback options
-- Diff tab: File-level changes, accept/revert actions
-- Action: "View Full Details" button in header
+- Action: "Collection Details" button in header
+
+**Dependency Note**: Tools badges and the tools filter rely on Tools API support
+(`/docs/project_plans/PRDs/tools-api-support-v1.md`).
 
 ### Cross-Navigation Patterns
 
 ```
 /collection → Click card → ArtifactDetailsModal
-           ↓ "Open in Manage" button
+           ↓ "Manage Artifact" button
          /manage → ArtifactOperationsModal
 
 /manage → Click card → ArtifactOperationsModal
-        ↓ "View Full Details" button
+        ↓ "Collection Details" button
       /collection → ArtifactDetailsModal
 ```
 
@@ -176,30 +183,6 @@ skillmeat/web/components/
 - Screen reader annotations
 
 **Tool**: axe DevTools
-
----
-
-## Rollout Strategy
-
-### Phase 1: Staging (All Features Enabled)
-- Full internal testing
-- Performance benchmarking
-- Accessibility audit
-
-### Phase 2: Production Canary (10% Users)
-- Monitor error rates, performance
-- Collect feedback
-- 48-hour validation
-
-### Phase 3: Production Rollout (50% Users)
-- Expand user base
-- Continue monitoring
-- 48-hour validation
-
-### Phase 4: Production Full (100% Users)
-- Complete rollout
-- Ongoing monitoring
-- 1-2 week post-launch metrics
 
 ---
 
@@ -322,7 +305,7 @@ With maximum parallelization: 5-7 days wall-clock time
 
 ## Success Metrics (Track Post-Launch)
 
-Monitor for 1-2 weeks after production rollout:
+Monitor for 1-2 weeks after release:
 
 | Metric | Target | Method |
 |--------|--------|--------|
@@ -345,4 +328,3 @@ Monitor for 1-2 weeks after production rollout:
 ---
 
 **This is a high-level execution summary. Refer to `manage-collection-page-refactor-v1.md` for detailed task specifications, acceptance criteria, and risk mitigation strategies.**
-

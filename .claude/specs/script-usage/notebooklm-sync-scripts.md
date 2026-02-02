@@ -10,6 +10,7 @@ Automated synchronization of SkillMeat documentation to Google NotebookLM.
 |----------|--------|---------|
 | Initial setup | `init.py` | `python scripts/notebooklm_sync/init.py` |
 | Update single file | `update.py` | `python scripts/notebooklm_sync/update.py CLAUDE.md` |
+| Batch sync multiple | `batch.py` | `python scripts/notebooklm_sync/batch.py` |
 | Check sync status | `status.py` | `python scripts/notebooklm_sync/status.py` |
 | Find untracked files | `status.py` | `python scripts/notebooklm_sync/status.py --untracked` |
 
@@ -272,6 +273,100 @@ Run 'update.py <file>' to sync stale files.
 
 ---
 
+## batch.py
+
+**Purpose**: Batch sync multiple stale/untracked files to NotebookLM with rate limiting.
+
+**Location**: `scripts/notebooklm_sync/batch.py`
+
+### Basic Usage
+
+```bash
+python scripts/notebooklm_sync/batch.py
+```
+
+**What it does**:
+1. Loads mapping from `~/.notebooklm/skillmeat-sources.json`
+2. Finds all stale files (modified since last sync)
+3. Finds all untracked files (in scope but not yet synced)
+4. Syncs each file with 1-second delay between operations
+5. Updates mapping with new source IDs
+
+### Options
+
+```bash
+# Preview without syncing
+python scripts/notebooklm_sync/batch.py --dry-run
+
+# Detailed progress output
+python scripts/notebooklm_sync/batch.py --verbose
+
+# Only sync stale files (skip untracked)
+python scripts/notebooklm_sync/batch.py --stale-only
+
+# Only sync untracked files (skip stale)
+python scripts/notebooklm_sync/batch.py --untracked-only
+
+# Limit to N files (for rate limiting)
+python scripts/notebooklm_sync/batch.py --limit 10
+
+# Combine options
+python scripts/notebooklm_sync/batch.py --stale-only --limit 5 --verbose
+```
+
+### Output
+
+```
+# Default mode
+Syncing 12 files to NotebookLM...
+  - Stale: 7
+  - Untracked: 5
+
+Completed: 12 synced, 0 failed.
+
+# Verbose mode
+Syncing 12 files to NotebookLM...
+  - Stale: 7
+  - Untracked: 5
+
+[1/12] Syncing CLAUDE.md...
+  OK (stale)
+[2/12] Syncing docs/dev/patterns.md...
+  OK (stale)
+[3/12] Syncing docs/new-guide.md...
+  OK (untracked)
+...
+[12/12] Syncing README.md...
+  OK (stale)
+
+Mapping saved.
+
+Completed: 12 synced, 0 failed.
+
+# Dry run mode
+[DRY RUN] Would sync 12 files:
+  - Stale: 7
+  - Untracked: 5
+
+[DRY RUN] Would sync 12 files.
+```
+
+### Rate Limiting
+
+The script enforces a **1-second delay** between sync operations to avoid rate limiting.
+
+### Error Handling
+
+| Scenario | Behavior |
+|----------|----------|
+| Source delete fails | Warns, continues to add new source |
+| Source add fails | Logs error, continues to next file |
+| Mapping not found | Exits with error (run `init.py` first) |
+| All files fail | Exits with code 1 |
+| Some files fail | Continues, reports failures in summary |
+
+---
+
 ## Mapping File Format
 
 **Location**: `~/.notebooklm/skillmeat-sources.json`
@@ -319,49 +414,218 @@ Run 'update.py <file>' to sync stale files.
 
 ## Claude Code Hook
 
-**File**: `.claude/hooks/post-tool.md/notebooklm_sync.json`
+**Script**: `.claude/hooks/notebooklm-sync-hook.sh`
+**Configuration**: `.claude/settings.json` (lines 91-100)
 
 **Purpose**: Automatically trigger sync when documentation files are modified.
 
 ### Configuration
 
+Configured in `.claude/settings.json` under `hooks.PostToolUse`:
+
 ```json
 {
-  "description": "Sync documentation changes to NotebookLM. Triggers on Write/Edit of markdown files in root or docs/ directories.",
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "FILE_PATH=\"$CLAUDE_TOOL_FILE_PATH\"; if [[ \"$FILE_PATH\" =~ \\.md$ ]] && { [[ \"$FILE_PATH\" =~ ^\\./[^/]+\\.md$ ]] || [[ \"$FILE_PATH\" =~ ^\\./docs/ ]]; }; then python scripts/notebooklm_sync/update.py \"$FILE_PATH\" 2>/dev/null || true; fi"
-          }
-        ]
-      }
-    ]
-  }
+  "_comment": "NotebookLM sync hook - syncs markdown docs to NotebookLM when modified. Logs to ~/.notebooklm/sync.log",
+  "matcher": "Write|Edit",
+  "hooks": [
+    {
+      "type": "command",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/notebooklm-sync-hook.sh"
+    }
+  ]
 }
 ```
 
+### Hook Script
+
+The hook script (`.claude/hooks/notebooklm-sync-hook.sh`):
+- Receives JSON via stdin from Claude Code
+- Parses `tool_input.file_path` (absolute path)
+- Converts absolute path to relative (if within project)
+- Checks if file is markdown
+- Checks if file is in scope (root `*.md` or `docs/**/*.md`, excluding `.claude/`)
+- Calls `update.py` if in scope
+- Logs to `~/.notebooklm/sync.log`
+
 ### Pattern Matching
 
-| File Path | Matches? | Reason |
+**Note**: Hook receives **absolute paths** from Claude Code, converts to relative for scope checking.
+
+| File Path (Relative) | Matches? | Reason |
 |-----------|----------|--------|
-| `./CLAUDE.md` | ✓ | Root markdown |
-| `./README.md` | ✓ | Root markdown |
-| `./docs/dev/patterns.md` | ✓ | In docs/ |
-| `./docs/architecture/overview.md` | ✓ | In docs/ |
-| `./skillmeat/web/README.md` | ✗ | Not root or docs/ |
-| `./.claude/plans/foo.md` | ✗ | Starts with .claude |
-| `./src/main.py` | ✗ | Not markdown |
+| `CLAUDE.md` | ✓ | Root markdown |
+| `README.md` | ✓ | Root markdown |
+| `docs/dev/patterns.md` | ✓ | In docs/ |
+| `docs/architecture/overview.md` | ✓ | In docs/ |
+| `skillmeat/web/README.md` | ✗ | Not root or docs/ |
+| `.claude/plans/foo.md` | ✗ | Starts with .claude |
+| `src/main.py` | ✗ | Not markdown |
 
 ### Disabling the Hook
 
-Temporarily disable by renaming:
+Temporarily disable by commenting out in `.claude/settings.json`:
+
+```json
+// {
+//   "_comment": "NotebookLM sync hook - syncs markdown docs to NotebookLM when modified. Logs to ~/.notebooklm/sync.log",
+//   "matcher": "Write|Edit",
+//   "hooks": [
+//     {
+//       "type": "command",
+//       "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/notebooklm-sync-hook.sh"
+//     }
+//   ]
+// }
+```
+
+---
+
+## Git Hooks
+
+Automatically detect markdown file changes during git operations and mark them for batch sync.
+
+**Installation**: `scripts/notebooklm_sync/install-git-hooks.sh`
+
+### Available Hooks
+
+| Hook | When It Runs | Purpose |
+|------|--------------|---------|
+| `post-merge` | After `git pull` or `git merge` | Detect docs changed from upstream |
+| `post-checkout` | After `git checkout` or `git switch` | Detect docs changed when switching branches |
+
+### Installation
+
 ```bash
-mv .claude/hooks/post-tool.md/notebooklm_sync.json \
-   .claude/hooks/post-tool.md/notebooklm_sync.json.disabled
+# Install hooks
+bash scripts/notebooklm_sync/install-git-hooks.sh
+```
+
+**What it does**:
+- Creates symlinks in `.git/hooks/` to `scripts/notebooklm_sync/hooks/`
+- Preserves existing hooks by creating wrappers
+- Makes hooks executable
+
+### How It Works
+
+1. Git runs the hook after the operation (pull/merge/checkout)
+2. Hook compares file trees (`ORIG_HEAD` vs `HEAD`)
+3. Filters to in-scope markdown files (root `*.md`, `docs/**/*.md`, excluding `.claude/`)
+4. Appends changed files to `~/.notebooklm/pending-sync.txt`
+5. Deduplicates entries
+6. Prints notification
+
+### pending-sync.txt File
+
+**Location**: `~/.notebooklm/pending-sync.txt`
+
+**Format**: One filepath per line (relative to repo root)
+
+```
+CLAUDE.md
+README.md
+docs/dev/patterns.md
+docs/architecture/overview.md
+```
+
+**Usage**: Review pending files, then batch sync:
+
+```bash
+# Review pending files
+cat ~/.notebooklm/pending-sync.txt
+
+# Batch sync all pending
+python scripts/notebooklm_sync/batch.py
+
+# Clear pending list
+> ~/.notebooklm/pending-sync.txt
+```
+
+### Output
+
+```bash
+# After git pull
+remote: Enumerating objects: 5, done.
+...
+Updating abc1234..def5678
+Fast-forward
+ CLAUDE.md           | 12 +++++++-----
+ docs/dev/guide.md   |  8 ++++++++
+ 2 files changed, 15 insertions(+), 5 deletions(-)
+NotebookLM: 2 docs marked for sync (run batch.py)
+```
+
+### Uninstalling
+
+```bash
+# Remove hooks (if symlinks)
+rm .git/hooks/post-merge
+rm .git/hooks/post-checkout
+
+# If wrapped, restore originals
+mv .git/hooks/post-merge.original .git/hooks/post-merge
+mv .git/hooks/post-checkout.original .git/hooks/post-checkout
+```
+
+---
+
+## Pre-commit Hook
+
+Warns about stale NotebookLM docs before commits (**non-blocking**).
+
+**Installation**: Included in `install-git-hooks.sh`
+
+### Purpose
+
+Alert developers when they're about to commit markdown changes without syncing to NotebookLM first.
+
+### Behavior
+
+1. Runs before `git commit`
+2. Gets list of staged markdown files
+3. Filters to in-scope files (root `*.md`, `docs/**/*.md`, excluding `.claude/`, `docs/project_plans/`)
+4. Checks which staged files are stale (via `status.py --stale --json`)
+5. Prints warning if any are stale
+6. **Always exits 0** (does not block commit)
+
+### Output
+
+```bash
+$ git commit -m "Update docs"
+
+Warning: 2 doc(s) are stale and should be synced to NotebookLM
+
+  - CLAUDE.md
+  - docs/dev/patterns.md
+
+Run 'python scripts/notebooklm_sync/batch.py' to sync
+
+[feat/branch abc1234] Update docs
+ 2 files changed, 15 insertions(+), 5 deletions(-)
+```
+
+### Installation
+
+```bash
+# Install all git hooks (includes pre-commit)
+bash scripts/notebooklm_sync/install-git-hooks.sh
+```
+
+The installer:
+- Creates symlink or wrapper for `pre-commit`
+- Preserves existing pre-commit hooks
+- Makes hook executable
+
+### Disabling
+
+```bash
+# Temporarily disable
+chmod -x .git/hooks/pre-commit
+
+# Re-enable
+chmod +x .git/hooks/pre-commit
+
+# Permanently remove
+rm .git/hooks/pre-commit
 ```
 
 ---
@@ -470,9 +734,8 @@ python scripts/notebooklm_sync/init.py
 
 ## Limitations
 
-- **No batch update** - Files updated one at a time
 - **Delete + re-add** - No true "update" in NotebookLM API
 - **Source IDs change** - On each update, source ID changes
 - **Chat history** - Lost when source is replaced
-- **No webhook** - Changes must be detected locally
-- **300 source limit** - Pro account maximum
+- **Limited webhook support** - Git hooks help detect upstream changes, but only for git operations
+- **300 source limit** - Pro account maximum (batch.py respects this)

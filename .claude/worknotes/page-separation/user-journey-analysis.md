@@ -418,16 +418,18 @@ This analysis maps user journeys across SkillMeat's dual-page artifact browsing 
 ### Modal Tab Structure
 
 **Collection Modal Tabs** (Discovery-focused):
-1. **Overview** (default) - Description, metadata, tags
-2. **Files** - View artifact structure/contents
-3. **Collections** - Which collections contain this
-4. **Deploy** - Quick deploy action
+1. **Overview** (default) - Description, metadata, tags, upstream summary
+2. **Contents** - View artifact structure/contents (existing data)
+3. **Links** - Linked artifacts + references
+4. **Collections** - Which collections contain this
+5. **Sources** - Repository/source details
+6. **History** - General artifact timeline
 
 **Manage Modal Tabs** (Operations-focused):
-1. **Status** (default) - Sync status, deployment info
-2. **Diff** - Changes between versions
-3. **History** - Version timeline, rollback options
-4. **Deploy** - Deploy/undeploy controls
+1. **Status** (default) - Detailed operational status
+2. **Sync Status** - Drift + sync actions (existing data)
+3. **Deployments** - Deploy/undeploy controls
+4. **Version History** - Timeline + rollback options
 
 ---
 
@@ -568,9 +570,9 @@ This analysis maps user journeys across SkillMeat's dual-page artifact browsing 
 
 | Trigger Location | Link Text | Destination | When to Show |
 |-----------------|-----------|-------------|--------------|
-| Artifact row | "View Details" | /collection?artifact={id} | Always |
-| Modal header | "View Details" button | /collection?artifact={id} | Always |
-| Modal diff tab | "What's new?" link | /collection?artifact={id}&tab=changelog | When showing diff |
+| Artifact row | "Collection Details" | /collection?artifact={id} | Always |
+| Modal header | "Collection Details" button | /collection?artifact={id} | Always |
+| Sync Status tab | "What's new?" link | /collection?artifact={id}&tab=history | When showing changes |
 | Empty state | "Browse Collection" | /collection | When no artifacts deployed |
 | After undeploy | "Find Replacement" | /collection?type={type} | After removing artifact |
 

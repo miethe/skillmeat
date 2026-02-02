@@ -95,8 +95,8 @@ interface ArtifactBrowseCardProps {
 
 - Uses `cn()` for conditional class merging
 - Type-specific border accent from `artifactTypeBorderAccents`
-- No sync/drift status indicators (managed in operations card)
-- Tool badges extracted from artifact metadata
+- Show "Deployed (N)" badge when artifact has deployments; no sync/drift indicators (those belong on /manage)
+- Tool badges extracted from artifact metadata (Tools API PRD required)
 
 ---
 
@@ -260,8 +260,17 @@ interface ArtifactDetailsModalProps {
 #### Tab Structure
 
 ```typescript
-type DetailsTab = 'overview' | 'documentation' | 'dependencies' | 'advanced';
+type DetailsTab =
+  | 'overview'    // Default tab
+  | 'contents'
+  | 'links'
+  | 'collections'
+  | 'sources'
+  | 'history';    // General artifact timeline
 ```
+
+**Tab policy**: v1 reuses existing UnifiedEntityModal data and tab content. Net-new tabs
+(Documentation/Dependencies/Advanced) are future expansion and explicitly out of scope.
 
 ##### Overview Tab
 
@@ -280,70 +289,66 @@ Content sections:
    - All tags displayed as badges
    - Clickable to filter collection
 
-4. **Tools Section**
+4. **Tools Section (Future API)**
    - Claude Code tools this artifact uses
    - Tool icons with labels
+   - **Depends on Tools API PRD** (see `/docs/project_plans/PRDs/tools-api-support-v1.md`)
 
-5. **Quick Actions**
+5. **Upstream Status Summary**
+   - Update available indicator (if tracking enabled)
+   - Last upstream check timestamp
+   - Keeps discovery view focused on upstream context
+
+6. **Quick Actions**
    - Deploy to Project button
    - Add to Group button
+   - "Manage Artifact →" cross-navigation button
 
-##### Documentation Tab
-
-Content sections:
-1. **Usage Examples**
-   - Code snippets
-   - Configuration examples
-
-2. **Getting Started**
-   - Installation/deployment steps
-   - Prerequisites
-
-3. **Configuration Options**
-   - Available parameters
-   - Environment variables
-
-##### Dependencies Tab
+##### Contents Tab
 
 Content sections:
-1. **Required Artifacts**
-   - List of artifact dependencies
-   - Status of each (installed/missing)
+1. **File Tree**
+   - Tree view of artifact contents (existing file tree)
+2. **Content Pane**
+   - Read-only viewer of selected file contents
 
-2. **External Dependencies**
-   - npm packages
-   - Python packages
-   - System requirements
-
-##### Advanced Tab (Collapsed by Default)
-
-```typescript
-interface AdvancedSectionProps {
-  defaultExpanded?: boolean; // default: false
-}
-```
+##### Links Tab
 
 Content sections:
-1. **Version Information**
-   - Current version
-   - Version history (last 5)
-   - Changelog link
+1. **Linked Artifacts**
+   - Linked artifacts list (existing linked artifacts section)
+2. **Unlinked References**
+   - Unlinked references list for follow-up
 
-2. **Source Information**
-   - Repository URL
-   - File path
-   - Last commit SHA
+##### Collections Tab
 
-3. **Cross-Navigation**
-   - "Open in Manage" button -> navigates to `/manage?artifact=[id]`
+Content sections:
+1. **Collections & Groups**
+   - Collection membership and group badges (existing ModalCollectionsTab)
+2. **Collection Actions**
+   - Add to Collection / Add to Group actions
+
+##### Sources Tab
+
+Content sections:
+1. **Source Information**
+   - Repository URL, source path, commit SHA (existing Source tab data)
+
+##### History Tab (`history`)
+
+Content sections:
+1. **General Artifact History**
+   - Deploy/sync/rollback events (existing history timeline)
+   - Read-only view for discovery context
+   - Note: Distinguished from `version-history` tab on operations modal
 
 #### Visual Layout (Overview Tab)
 
 ```
 +------------------------------------------------------------------+
-| [X Close]                            [Open in Manage ->]         |
+| [X Close]                           [Manage Artifact ->]         |
 +------------------------------------------------------------------+
-| [Tab: Overview] [Tab: Documentation] [Tab: Dependencies] [Tab: Advanced]
+| [Tab: Overview] [Tab: Contents] [Tab: Links] [Tab: Collections] ...
 +------------------------------------------------------------------+
 |                                                                   |
 | [Type Icon]  ARTIFACT NAME                                        |
@@ -357,7 +362,7 @@ Content sections:
 | TAGS                                                              |
 | [tag1] [tag2] [tag3] [tag4] [tag5]                               |
 +------------------------------------------------------------------+
-| TOOLS USED                                                        |
+| TOOLS USED (Tools API)                                            |
 | [Bash] [Read] [Write] [WebSearch]                                |
 +------------------------------------------------------------------+
 |                                                                   |
@@ -408,31 +413,60 @@ interface ArtifactOperationsModalProps {
 #### Tab Structure
 
 ```typescript
-type OperationsTab = 'status' | 'deployments' | 'history' | 'diff';
+type OperationsTab =
+  | 'overview'
+  | 'contents'
+  | 'status'         // Default tab
+  | 'sync'
+  | 'deployments'
+  | 'version-history';  // Version timeline with rollback options
 ```
+
+**Tab policy**: v1 reuses existing UnifiedEntityModal content. Net-new operational
+views are composed from existing status, sync, history, and deployment data.
+
+##### Overview Tab
+
+Content sections:
+1. **Metadata Summary**
+   - Artifact name, type, author, version
+2. **Operational Highlights**
+   - Sync status badge
+   - Update available indicator
+
+##### Contents Tab
+
+Content sections:
+1. **File Tree**
+   - Tree view of artifact contents
+2. **Content Pane**
+   - Read-only viewer of selected file contents
 
 ##### Status Tab
 
 Content sections:
-1. **Current State Summary**
+1. **Detailed Status Overview**
    - Large status indicator (synced/modified/outdated/conflict/error)
    - Current version vs available version
    - Last sync timestamp
-
-2. **Drift Detection**
-   - Drift status badge
-   - Summary of changes (files added/modified/deleted)
-   - "View Diff" button
-
-3. **Quick Actions**
-   - Sync from Upstream button
-   - Pull Latest button (if outdated)
-   - Resolve Conflicts button (if conflict)
-
-4. **Upstream Information**
+2. **Upstream Information**
    - Source repository
    - Tracked branch/version
    - Last upstream check
+
+**Default tab** for operations modal.
+
+##### Sync Status Tab
+
+Content sections:
+1. **Sync Status Detail**
+   - Drift status badge
+   - Summary of changes (files added/modified/deleted)
+   - Diff viewer entry point
+2. **Quick Actions**
+   - Sync from Upstream
+   - Pull Latest (if outdated)
+   - Resolve Conflicts (if conflict)
 
 ##### Deployments Tab
 
@@ -461,7 +495,7 @@ interface DeploymentListItem {
 }
 ```
 
-##### Version History Tab
+##### Version History Tab (`version-history`)
 
 Content sections:
 1. **Version Timeline**
@@ -483,30 +517,17 @@ interface VersionHistoryEntry {
 }
 ```
 
-##### Diff Tab
-
-Content sections:
-1. **Diff Header**
-   - Source selector (collection vs project deployment)
-   - Base vs compare version labels
-
-2. **Diff Viewer**
-   - Unified or split view toggle
-   - File tree navigation
-   - Syntax-highlighted diff content
-
-3. **Actions**
-   - Accept Changes
-   - Revert Changes
-   - Open in Editor
+Note: Diff viewing is accessed through Sync Status (existing diff viewer and file tree),
+keeping the Operations modal focused on operational context without introducing new data.
 
 #### Visual Layout (Status Tab)
 
 ```
 +------------------------------------------------------------------+
-| [X Close]                         [View Full Details ->]          |
+| [X Close]                        [Collection Details ->]          |
 +------------------------------------------------------------------+
-| [Tab: Status] [Tab: Deployments] [Tab: History] [Tab: Diff]      |
+| [Tab: Overview] [Tab: Contents] [Tab: Status] [Tab: Sync Status] |
+| [Tab: Deployments] [Tab: Version History]                        |
 +------------------------------------------------------------------+
 |                                                                   |
 | STATUS: [Modified]                                                |
@@ -533,36 +554,33 @@ Content sections:
 
 #### Cross-Navigation
 
-The modal header includes a "View Full Details" button that:
+The modal header includes a "Collection Details" button that:
 1. Closes the current modal
-2. Navigates to `/collection/[collectionId]?artifact=[id]`
+2. Navigates to `/collection?artifact=[id]` (optionally `&collection=[collectionId]`)
 3. Opens the ArtifactDetailsModal on that page
 
 ---
 
 ## 3. Navigation Components
 
-### 3.1 CollectionsTabInModal
+### 3.1 ModalCollectionsTab
 
-**Purpose**: Navigate between collection view and manage view from within modal context.
+**Purpose**: Show collection and group membership and provide collection actions.
 
-**File Location**: `/skillmeat/web/components/shared/collections-tab-navigation.tsx`
+**File Location**: `/skillmeat/web/components/entity/modal-collections-tab.tsx`
 
 #### Props Interface
 
 ```typescript
-interface CollectionsTabNavigationProps {
-  /** List of collections this artifact belongs to */
-  collections: CollectionRef[];
+interface ModalCollectionsTabProps {
+  /** Artifact to render membership for */
+  artifact: Artifact;
 
-  /** Current artifact ID for navigation */
-  artifactId: string;
+  /** Optional handler to view in collection page */
+  onViewInCollection?: (collectionId: string, artifactId: string) => void;
 
-  /** Handler for viewing in collection page */
-  onViewInCollection: (collectionId: string) => void;
-
-  /** Handler for opening in manage page */
-  onOpenInManage: () => void;
+  /** Optional handler to open in manage page */
+  onOpenInManage?: (artifactId: string) => void;
 }
 ```
 
@@ -570,13 +588,13 @@ interface CollectionsTabNavigationProps {
 
 ```
 +------------------------------------------------------------------+
-| COLLECTIONS                                                       |
+| COLLECTIONS & GROUPS                                              |
 +------------------------------------------------------------------+
 | [Collection Name 1]                                              |
-|   [View in Collection]  [Open in Manage]                         |
+|   [View in Collection]  [Manage Artifact]                        |
 +------------------------------------------------------------------+
 | [Collection Name 2]                                              |
-|   [View in Collection]  [Open in Manage]                         |
+|   [View in Collection]  [Manage Artifact]                        |
 +------------------------------------------------------------------+
 ```
 
@@ -584,8 +602,8 @@ interface CollectionsTabNavigationProps {
 
 | Button | Action | Navigation Target |
 |--------|--------|------------------|
-| View in Collection | Close modal, navigate | `/collection/[id]?artifact=[artifactId]` |
-| Open in Manage | Close modal, navigate | `/manage?artifact=[artifactId]` |
+| View in Collection | Close modal, navigate | `/collection?collection=[id]&artifact=[artifactId]` |
+| Manage Artifact | Close modal, navigate | `/manage?artifact=[artifactId]` |
 
 ---
 
@@ -619,10 +637,10 @@ Positioned in modal header, top-right:
 
 ```
 Collection Page Modal:
-  [Settings Icon] Open in Manage ->
+  [Settings Icon] Manage Artifact ->
 
 Manage Page Modal:
-  [Book Icon] View Full Details ->
+  [Book Icon] Collection Details ->
 ```
 
 #### Styling
@@ -636,6 +654,9 @@ const crossNavButtonStyles = cn(
   'transition-colors'
 );
 ```
+
+**Navigation state**: include `returnTo` query param when switching contexts
+to preserve filters and collection selection (e.g., `/manage?artifact=...&returnTo=/collection?...`).
 
 ---
 
@@ -672,6 +693,12 @@ interface ManagePageFiltersProps {
   /** Available projects for dropdown */
   projects: ProjectOption[];
 
+  /** Optional tag filter (retained from existing manage filters) */
+  tagFilter?: string[];
+
+  /** Handler for tag filter change */
+  onTagFilterChange?: (tags: string[]) => void;
+
   /** Search query */
   searchQuery: string;
 
@@ -695,6 +722,8 @@ interface ProjectOption {
 | [Search: Filter artifacts...]                                     |
 +------------------------------------------------------------------+
 | Project: [All Projects v]  Status: [All v]  Type: [All v]        |
++------------------------------------------------------------------+
+| Tags: [tag-a x] [tag-b x]                                         |
 +------------------------------------------------------------------+
 | Active Filters: [Project: MyApp x] [Status: Needs Update x]      |
 +------------------------------------------------------------------+
@@ -720,6 +749,9 @@ interface ProjectOption {
 - Agents
 - MCP Servers
 - Hooks
+
+**Tags Filter (optional)**:
+- Multi-select chips with clear actions
 
 ---
 
@@ -813,6 +845,10 @@ Uses existing `TagFilterPopover` component with:
 - "Clear All" action
 
 #### Tools Filter (New)
+
+**Dependency**: Tools API support PRD (`/docs/project_plans/PRDs/tools-api-support-v1.md`).
+If tools are not returned by the API, this filter should be hidden or disabled
+with a clear empty state.
 
 ```typescript
 interface ToolFilterProps {
@@ -923,15 +959,19 @@ interface DeploymentBadgeStackProps {
   deployments: ArtifactDeploymentInfo[];
   maxBadges?: number;
   onBadgeClick?: (deployment: ArtifactDeploymentInfo) => void;
+  /** Called when overflow badge is clicked; should open modal on deployments tab */
+  onOverflowClick?: () => void;
 }
 
 export function DeploymentBadgeStack({
   deployments,
   maxBadges = 2,
   onBadgeClick,
+  onOverflowClick,
 }: DeploymentBadgeStackProps) {
   const visible = deployments.slice(0, maxBadges);
   const overflow = deployments.length - maxBadges;
+  const hiddenDeployments = deployments.slice(maxBadges);
 
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -946,13 +986,34 @@ export function DeploymentBadgeStack({
         </Badge>
       ))}
       {overflow > 0 && (
-        <Badge variant="outline" className="text-xs">
-          +{overflow}
-        </Badge>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge
+                variant="outline"
+                className="cursor-pointer text-xs hover:bg-muted"
+                onClick={() => onOverflowClick?.()}
+              >
+                +{overflow}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="space-y-1">
+                {hiddenDeployments.map((d) => (
+                  <div key={d.project_path} className="text-xs">
+                    {extractProjectName(d.project_path)}
+                  </div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
     </div>
   );
 }
+
+// Overflow click handler opens modal on deployments tab
 ```
 
 ---
@@ -1017,9 +1078,8 @@ Each card and modal component must handle:
 ### Migration Path
 
 1. Create new components alongside existing ones
-2. Add feature flag for new UI (`NEXT_PUBLIC_USE_NEW_UI=true`)
-3. Gradually migrate pages to new components
-4. Remove old components after migration complete
+2. Gradually migrate pages to new components (no feature flags)
+3. Remove old components after migration complete
 
 ---
 

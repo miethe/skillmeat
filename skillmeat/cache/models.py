@@ -926,12 +926,33 @@ class CollectionArtifact(Base):
         DateTime, nullable=False, default=datetime.utcnow
     )
 
+    # Cached metadata for DB-backed /collection page
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    author: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    license: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    tags_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON array string
+    tools_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    version: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    origin: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    origin_source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    resolved_sha: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    resolved_version: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
     # Indexes
     __table_args__ = (
         Index("idx_collection_artifacts_collection_id", "collection_id"),
         Index("idx_collection_artifacts_artifact_id", "artifact_id"),
         Index("idx_collection_artifacts_added_at", "added_at"),
     )
+
+    @property
+    def tools(self) -> list[str]:
+        """Parse tools_json into a list of tool names."""
+        if self.tools_json:
+            return json.loads(self.tools_json)
+        return []
 
     def __repr__(self) -> str:
         """Return string representation of CollectionArtifact."""

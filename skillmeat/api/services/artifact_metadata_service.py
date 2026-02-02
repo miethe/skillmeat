@@ -220,16 +220,18 @@ def get_artifact_metadata(session: Session, artifact_id: str) -> ArtifactSummary
         # Extract tags from relationship
         tags = _extract_artifact_tags(artifact)
 
-        # Extract author from metadata if available
+        # Extract author and tools from metadata if available
         author = None
+        tools = None
         if artifact.artifact_metadata:
-            # Check if metadata_json contains author field
+            # Check if metadata_json contains author and tools fields
             if artifact.artifact_metadata.metadata_json:
                 import json
 
                 try:
                     metadata_dict = json.loads(artifact.artifact_metadata.metadata_json)
                     author = metadata_dict.get("author")
+                    tools = metadata_dict.get("tools")
                 except (json.JSONDecodeError, TypeError):
                     pass
 
@@ -242,6 +244,7 @@ def get_artifact_metadata(session: Session, artifact_id: str) -> ArtifactSummary
             description=description,
             author=author,
             tags=tags,
+            tools=tools,
             collections=collections if collections else None,
         )
 
@@ -254,6 +257,7 @@ def get_artifact_metadata(session: Session, artifact_id: str) -> ArtifactSummary
         description = None
         tags = None
         author = None
+        tools = None
         if entry.detected_metadata:
             import json
 
@@ -266,6 +270,7 @@ def get_artifact_metadata(session: Session, artifact_id: str) -> ArtifactSummary
                 description = metadata_dict.get("description")
                 author = metadata_dict.get("author")
                 tags = metadata_dict.get("tags")
+                tools = metadata_dict.get("tools")
             except (json.JSONDecodeError, TypeError):
                 pass
 
@@ -278,6 +283,7 @@ def get_artifact_metadata(session: Session, artifact_id: str) -> ArtifactSummary
             description=description,
             author=author,
             tags=tags,
+            tools=tools,
             collections=collections if collections else None,
         )
 
@@ -293,5 +299,6 @@ def get_artifact_metadata(session: Session, artifact_id: str) -> ArtifactSummary
         description=None,
         author=None,
         tags=None,
+        tools=None,
         collections=collections if collections else None,
     )
