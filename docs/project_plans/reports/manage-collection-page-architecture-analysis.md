@@ -428,12 +428,12 @@ Based on stakeholder review, **Option C** has been selected with the following r
 
 | Tab | Content | Default |
 |-----|---------|---------|
-| Overview | Full description, metadata, tags, tools (Tools API), upstream summary | ✅ Default |
-| Contents | File tree + content pane (existing data) | |
-| Links | Linked artifacts + unlinked references | |
-| Collections | Collection/group membership | |
-| Sources | Repository/source details | |
-| History | General artifact history timeline | |
+| overview | Full description, metadata, tags, tools (Tools API), upstream summary | ✅ Default |
+| contents | File tree + content pane (existing data) | |
+| links | Linked artifacts + unlinked references | |
+| collections | Collection/group membership | |
+| sources | Repository/source details | |
+| history | General artifact history timeline | |
 
 **Header Actions**:
 - Close button (X)
@@ -449,12 +449,12 @@ Based on stakeholder review, **Option C** has been selected with the following r
 
 | Tab | Content | Default |
 |-----|---------|---------|
-| Overview | Metadata + operational highlights | |
-| Contents | File tree + content pane (existing data) | |
-| Status | Detailed operational status overview | ✅ Default |
-| Sync Status | Drift detection + sync actions | |
-| Deployments | List of projects deployed to, deploy/undeploy actions | |
-| Version History | Previous versions, changelogs, rollback options | |
+| overview | Metadata + operational highlights | |
+| contents | File tree + content pane (existing data) | |
+| status | Detailed operational status overview | ✅ Default |
+| sync | Drift detection + sync actions | |
+| deployments | List of projects deployed to, deploy/undeploy actions | |
+| version-history | Previous versions, changelogs, rollback options | |
 
 **Header Actions**:
 - Close button (X)
@@ -481,7 +481,7 @@ Based on stakeholder review, **Option C** has been selected with the following r
 ```
 
 **Quick Actions Menu**: View Details, Quick Deploy, Add to Group, Copy CLI Command
-**Status Indicator**: Subtle deployed/outdated badge only when applicable (links to /manage)
+**Status Indicator**: "Deployed (N)" badge showing project count when applicable (clicking links to /manage)
 
 #### ArtifactOperationsCard (Manage Page)
 

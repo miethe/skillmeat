@@ -95,7 +95,7 @@ interface ArtifactBrowseCardProps {
 
 - Uses `cn()` for conditional class merging
 - Type-specific border accent from `artifactTypeBorderAccents`
-- Avoid full ops indicators; show only a subtle deployed/outdated badge when applicable
+- Show "Deployed (N)" badge when artifact has deployments; no sync/drift indicators (those belong on /manage)
 - Tool badges extracted from artifact metadata (Tools API PRD required)
 
 ---
@@ -261,12 +261,12 @@ interface ArtifactDetailsModalProps {
 
 ```typescript
 type DetailsTab =
-  | 'overview'
+  | 'overview'    // Default tab
   | 'contents'
   | 'links'
   | 'collections'
   | 'sources'
-  | 'history';
+  | 'history';    // General artifact timeline
 ```
 
 **Tab policy**: v1 reuses existing UnifiedEntityModal data and tab content. Net-new tabs
@@ -334,12 +334,13 @@ Content sections:
 1. **Source Information**
    - Repository URL, source path, commit SHA (existing Source tab data)
 
-##### History Tab
+##### History Tab (`history`)
 
 Content sections:
 1. **General Artifact History**
    - Deploy/sync/rollback events (existing history timeline)
    - Read-only view for discovery context
+   - Note: Distinguished from `version-history` tab on operations modal
 
 #### Visual Layout (Overview Tab)
 
@@ -415,10 +416,10 @@ interface ArtifactOperationsModalProps {
 type OperationsTab =
   | 'overview'
   | 'contents'
-  | 'status'
+  | 'status'         // Default tab
   | 'sync'
   | 'deployments'
-  | 'history';
+  | 'version-history';  // Version timeline with rollback options
 ```
 
 **Tab policy**: v1 reuses existing UnifiedEntityModal content. Net-new operational
@@ -494,7 +495,7 @@ interface DeploymentListItem {
 }
 ```
 
-##### Version History Tab
+##### Version History Tab (`version-history`)
 
 Content sections:
 1. **Version Timeline**
@@ -958,15 +959,19 @@ interface DeploymentBadgeStackProps {
   deployments: ArtifactDeploymentInfo[];
   maxBadges?: number;
   onBadgeClick?: (deployment: ArtifactDeploymentInfo) => void;
+  /** Called when overflow badge is clicked; should open modal on deployments tab */
+  onOverflowClick?: () => void;
 }
 
 export function DeploymentBadgeStack({
   deployments,
   maxBadges = 2,
   onBadgeClick,
+  onOverflowClick,
 }: DeploymentBadgeStackProps) {
   const visible = deployments.slice(0, maxBadges);
   const overflow = deployments.length - maxBadges;
+  const hiddenDeployments = deployments.slice(maxBadges);
 
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -981,13 +986,34 @@ export function DeploymentBadgeStack({
         </Badge>
       ))}
       {overflow > 0 && (
-        <Badge variant="outline" className="text-xs">
-          +{overflow}
-        </Badge>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge
+                variant="outline"
+                className="cursor-pointer text-xs hover:bg-muted"
+                onClick={() => onOverflowClick?.()}
+              >
+                +{overflow}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="space-y-1">
+                {hiddenDeployments.map((d) => (
+                  <div key={d.project_path} className="text-xs">
+                    {extractProjectName(d.project_path)}
+                  </div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
     </div>
   );
 }
+
+// Overflow click handler opens modal on deployments tab
 ```
 
 ---
