@@ -290,17 +290,20 @@ function mapCollections(artifact: ApiArtifactResponse): CollectionRef[] {
 }
 
 /**
- * Extract primary collection name from various API response formats.
+ * Extract primary collection identifier from various API response formats.
+ *
+ * Returns the collection `id` (e.g., "default") which matches the filesystem
+ * collection name that the API expects, not the display `name` (e.g., "Default Collection").
  *
  * @param artifact - Raw API response object
- * @returns Primary collection name or undefined
+ * @returns Primary collection id or undefined
  */
 function extractPrimaryCollection(artifact: ApiArtifactResponse): string | undefined {
   // Check collections array first
   if (artifact.collections && artifact.collections.length > 0) {
     const firstCollection = artifact.collections[0];
     if (firstCollection) {
-      return firstCollection.name;
+      return firstCollection.id;
     }
   }
 
@@ -309,7 +312,7 @@ function extractPrimaryCollection(artifact: ApiArtifactResponse): string | undef
     if (typeof artifact.collection === 'string') {
       return artifact.collection;
     }
-    return artifact.collection.name;
+    return artifact.collection.id;
   }
 
   return undefined;
