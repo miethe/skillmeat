@@ -3,8 +3,8 @@ title: "Implementation Plan: /manage vs /collection Page Architecture Refactor"
 description: "Detailed implementation plan for separating and clarifying the purpose of the /manage (Operations Dashboard) and /collection (Browse & Discover) pages with distinct card components, modals, and cross-navigation."
 status: approved
 complexity: Medium
-total_effort: "20-28 hours"
-phases: 5
+total_effort: "22-31 hours"
+phases: 6
 related_specs:
   - /docs/design/ui-component-specs-page-refactor.md
   - /docs/project_plans/reports/manage-collection-page-architecture-analysis.md
@@ -45,8 +45,8 @@ category: "features"
 
 **Criteria Met**:
 - Multi-component: 6 new components + 2 page updates + filter enhancements
-- Task Count: 24 distinct tasks across 5 phases
-- Effort Range: 20-28 hours
+- Task Count: 29 distinct tasks across 6 phases
+- Effort Range: 22-31 hours
 - Architecture Impact: High (page-level separation) but low risk (backward compatible)
 - Scope: Primarily frontend, contained within web layer
 
@@ -67,6 +67,37 @@ Uses Haiku agents for mechanical work + Sonnet agents for component implementati
 ---
 
 ## Phase-by-Phase Implementation
+
+### Phase 0: Schema & Cache Extensions (2-3 hours)
+
+**Objective**: Extend ArtifactSummary schema and collection cache to include deployment information, enabling the "Deployed (N)" badge on browse cards.
+
+**Subagent Leads**: python-backend-engineer, data-layer-expert
+
+| Task ID | Task Name | Description | Acceptance Criteria | Est. Hours | Assignee |
+|---------|-----------|-------------|-------------------|-----------|----------|
+| SCHEMA-0.1 | Add deployments to ArtifactSummary schema | Add `deployments: Optional[List[DeploymentInfo]]` to `ArtifactSummary` in `user_collections.py`. DeploymentInfo includes `project_path`, `project_name`, `deployed_at` | 1. Schema updated with deployments field<br>2. Field is optional (backward compatible)<br>3. OpenAPI spec regenerated<br>4. SDK types updated | 0.5 | python-backend-engineer |
+| SCHEMA-0.2 | Add deployments_json to CollectionArtifact cache | Add `deployments_json` column to `CollectionArtifact` model. Create Alembic migration (nullable column) | 1. Migration created and tested<br>2. Column is nullable for backward compat<br>3. Migration reversible | 0.5 | data-layer-expert |
+| SCHEMA-0.3 | Populate deployments in cache | Update `populate_collection_artifact_metadata()` to store deployments from file-based CollectionManager. Update refresh-cache endpoints | 1. Deployments populated from metadata<br>2. Refresh endpoints update deployments<br>3. Cache miss fallback includes deployments | 1 | python-backend-engineer |
+| SCHEMA-0.4 | Emit deployments in API responses | Update collection artifact endpoints to include deployments from cache. Ensure `/user-collections/{id}/artifacts` returns deployments | 1. Deployments appear in API response<br>2. Count matches actual deployments<br>3. No performance regression | 0.5 | python-backend-engineer |
+| SCHEMA-0.5 | Update frontend Artifact type and mapper | Add `deployments` to frontend `Artifact` type. Update `entity-mapper.ts` to map deployments from API response | 1. TypeScript type updated<br>2. Mapper handles deployments<br>3. No type errors in build | 0.5 | frontend-developer |
+
+**Phase 0 Quality Gate**:
+- [ ] ArtifactSummary schema includes optional deployments field
+- [ ] CollectionArtifact cache stores deployments_json
+- [ ] `/user-collections/{id}/artifacts` returns deployments in response
+- [ ] Frontend Artifact type includes deployments
+- [ ] No migration errors, no type errors
+
+**Phase 0 Output Artifacts**:
+- Updated `skillmeat/api/schemas/user_collections.py`
+- New Alembic migration for deployments_json column
+- Updated `skillmeat/api/managers/collection_cache_manager.py`
+- Updated `skillmeat/web/types/artifact.ts`
+- Updated `skillmeat/web/lib/api/entity-mapper.ts`
+- Regenerated SDK types
+
+---
 
 ### Phase 1: Page Structure & Navigation (5-7 hours)
 
@@ -269,6 +300,20 @@ Shared Utilities
 
 ## Quality Gates & Validation
 
+### Gate 0: Schema & Cache (End of Phase 0)
+
+**Validator**: python-backend-engineer + data-layer-expert
+
+```checklist
+- [ ] ArtifactSummary schema includes deployments field
+- [ ] Alembic migration runs without errors
+- [ ] Cache population includes deployments data
+- [ ] API response includes deployments array
+- [ ] Frontend Artifact type updated
+- [ ] Entity mapper handles deployments
+- [ ] No type errors in frontend build
+```
+
 ### Gate 1: Navigation & Deep Linking (End of Phase 1)
 
 **Validator**: ui-engineer-enhanced + frontend-developer
@@ -287,7 +332,7 @@ Shared Utilities
 **Validator**: web-accessibility-checker + testing specialist
 
 ```checklist
-- [ ] ArtifactBrowseCard shows no drift/sync indicators
+- [ ] ArtifactBrowseCard shows "Deployed (N)" badge when applicable (no sync/drift)
 - [ ] ArtifactOperationsCard shows health/sync/deployment data
 - [ ] Cards integrate without visual regressions
 - [ ] Quick actions functional
@@ -424,12 +469,13 @@ Shared Utilities
 
 | Phase | Duration | Start | End | Primary Resources |
 |-------|----------|-------|-----|------------------|
+| Phase 0: Schema/Cache | 2-3h | Week 1, Day 1 | Week 1, Day 1 | python-backend-engineer (2h), data-layer-expert (0.5h), frontend-developer (0.5h) |
 | Phase 1: Navigation | 5-7h | Week 1, Day 1 | Week 1, Day 2 | ui-engineer-enhanced (3h), frontend-developer (3.5h) |
 | Phase 2: Cards | 4-6h | Week 1, Day 2 | Week 1, Day 4 | ui-engineer-enhanced (4h), frontend-developer (2h) |
 | Phase 3: Modals | 7-9h | Week 2, Day 1 | Week 2, Day 3 | ui-engineer-enhanced (5h), frontend-developer (3.5h) |
 | Phase 4: Filters | 2-4h | Week 2, Day 4 | Week 2, Day 5 | frontend-developer (3h), ui-engineer-enhanced (1h) |
 | Phase 5: Polish | 2-4h | Week 3, Day 1 | Week 3, Day 2 | web-accessibility-checker (1.5h), testing specialist (2h), ui-engineer-enhanced (1h) |
-| **Total** | **20-28h** | | | |
+| **Total** | **22-31h** | | | |
 
 ### Parallelization Opportunities
 
@@ -439,14 +485,18 @@ The following tasks can run in parallel:
 - **Phase 3**: ArtifactDetailsModal and ArtifactOperationsModal development (separate subagents)
 - **Phase 5**: Accessibility audit, unit tests, and dark mode verification (separate subagents)
 
-Estimated time with maximum parallelization: 14-18 hours wall-clock time
+Estimated time with maximum parallelization: 15-20 hours wall-clock time
+
+Note: Phase 0 must complete before Phase 2 (cards need deployments data), but can run in parallel with Phase 1.
 
 ### Resource Requirements
 
 | Role | Hours | Phases | Critical Path |
 |------|-------|--------|---------------|
+| python-backend-engineer | 2-2.5h | 0 | Yes (enables cards) |
+| data-layer-expert | 0.5h | 0 | No |
 | ui-engineer-enhanced | 8-10h | 1, 2, 3, 5 | Yes (modals) |
-| frontend-developer | 8-10h | 1, 2, 3, 4, 5 | Yes (integration) |
+| frontend-developer | 9-11h | 0, 1, 2, 3, 4, 5 | Yes (integration) |
 | web-accessibility-checker | 1.5-2h | 5 | No |
 | testing specialist | 2-3h | 5 | No |
 
@@ -518,6 +568,14 @@ Estimated time with maximum parallelization: 14-18 hours wall-clock time
 - [ ] Review component specifications document thoroughly
 - [ ] Create branch for feature development
 - [ ] Set up local testing environment
+
+### Phase 0: Schema & Cache
+- [ ] Add deployments to ArtifactSummary schema
+- [ ] Create Alembic migration for deployments_json
+- [ ] Update cache population to include deployments
+- [ ] Update API responses to emit deployments
+- [ ] Update frontend Artifact type and mapper
+- [ ] Gate 0: Schema validation
 
 ### Phase 1: Navigation
 - [ ] Update sidebar navigation
