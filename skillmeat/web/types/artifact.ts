@@ -196,6 +196,9 @@ export interface Artifact {
   /** Semantic version string */
   version?: string;
 
+  /** Claude Code tools used by this artifact */
+  tools?: string[];
+
   /** List of artifact dependencies (artifact IDs or package names) */
   dependencies?: string[];
 

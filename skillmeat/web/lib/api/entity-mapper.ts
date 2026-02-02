@@ -44,6 +44,7 @@ export interface ApiArtifactMetadata {
   license?: string | null;
   version?: string | null;
   tags?: string[];
+  tools?: string[];
   dependencies?: string[];
 }
 
@@ -80,6 +81,7 @@ export interface ApiArtifactResponse {
   author?: string;
   license?: string;
   tags?: string[];
+  tools?: string[];
   dependencies?: string[];
 
   // Status fields - various naming conventions
@@ -411,6 +413,11 @@ export function mapArtifactToEntity(
   const metadataTags = artifact.metadata?.tags ?? [];
   const tags = [...new Set([...topLevelTags, ...metadataTags])];
 
+  // Merge tools from both sources, deduplicate
+  const topLevelTools = artifact.tools ?? [];
+  const metadataTools = artifact.metadata?.tools ?? [];
+  const tools = [...new Set([...topLevelTools, ...metadataTools])];
+
   // Resolve version (prefer resolved_version, fall back to version)
   const version = artifact.resolved_version ?? artifact.version ?? artifact.metadata?.version;
 
@@ -497,6 +504,7 @@ export function mapArtifactToEntity(
     // Metadata (flattened)
     ...(description && { description }),
     ...(tags.length > 0 && { tags }),
+    ...(tools.length > 0 && { tools }),
     ...(author && { author }),
     ...(license && { license }),
     ...(version && { version }),

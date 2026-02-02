@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import { Suspense, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Plus, Grid3x3, List, Loader2, RefreshCw, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import {
 import { EntityList } from '@/components/entity/entity-list';
 import { EntityForm } from '@/components/entity/entity-form';
 import { EntityTabs } from './components/entity-tabs';
-import { EntityFilters } from './components/entity-filters';
+import { ManagePageFilters, type ManageStatusFilter } from '@/components/manage/manage-page-filters';
 import { ArtifactOperationsModal, type OperationsModalTab } from '@/components/manage/artifact-operations-modal';
 import { AddEntityDialog } from './components/add-entity-dialog';
 import type { Artifact, ArtifactType } from '@/types';
@@ -30,7 +30,6 @@ function ManagePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const activeEntityType = (searchParams.get('type') as ArtifactType) || 'skill';
   const { returnTo } = useReturnTo();
 
   const {
@@ -41,26 +40,12 @@ function ManagePageContent() {
     setTypeFilter,
     setStatusFilter,
     setSearchQuery,
-    searchQuery,
-    statusFilter,
     deleteEntity,
   } = useEntityLifecycle();
-
-  // Local state
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
-  const [detailPanelOpen, setDetailPanelOpen] = useState(false);
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [editingArtifact, setEditingArtifact] = useState<Artifact | null>(null);
-  const [tagFilter, setTagFilter] = useState<string[]>([]);
 
   // ==========================================================================
   // URL State Management
   // ==========================================================================
-
-  // Get URL params for deep linking
-  const urlArtifactId = searchParams.get('artifact');
-  const urlTab = searchParams.get('tab') as OperationsModalTab | null;
 
   // Helper to update URL params without full page reload
   const updateUrlParams = useCallback(
@@ -81,10 +66,46 @@ function ManagePageContent() {
     [searchParams, pathname, router]
   );
 
-  // Update type filter when tab changes
+  // Get URL params for deep linking - all filter state comes from URL
+  const urlArtifactId = searchParams.get('artifact');
+  const urlTab = searchParams.get('tab') as OperationsModalTab | null;
+  const urlType = (searchParams.get('type') as ArtifactType) || 'skill';
+  const urlSearch = searchParams.get('search') || '';
+  const urlStatus = (searchParams.get('status') as ManageStatusFilter) || 'all';
+  const urlProject = searchParams.get('project') || null;
+  const urlTags = useMemo(() => {
+    return searchParams.get('tags')?.split(',').filter(Boolean) || [];
+  }, [searchParams]);
+
+  // Local state (non-URL)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
+  const [detailPanelOpen, setDetailPanelOpen] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editingArtifact, setEditingArtifact] = useState<Artifact | null>(null);
+
+  // Sync URL state to hook state for API filtering
   useEffect(() => {
-    setTypeFilter(activeEntityType);
-  }, [activeEntityType, setTypeFilter]);
+    setTypeFilter(urlType);
+  }, [urlType, setTypeFilter]);
+
+  useEffect(() => {
+    setSearchQuery(urlSearch);
+  }, [urlSearch, setSearchQuery]);
+
+  useEffect(() => {
+    // Map ManageStatusFilter to EntityStatus for the hook
+    // The hook expects: 'synced' | 'modified' | 'outdated' | 'conflict' | 'error' | null
+    // ManageStatusFilter has: 'all' | 'needs-update' | 'has-drift' | 'deployed' | 'error'
+    const statusMapping: Record<ManageStatusFilter, string | null> = {
+      'all': null,
+      'needs-update': 'outdated',
+      'has-drift': 'modified',
+      'deployed': 'synced',
+      'error': 'error',
+    };
+    setStatusFilter(statusMapping[urlStatus] as any);
+  }, [urlStatus, setStatusFilter]);
 
   // Track pending artifact selection from URL to handle race condition
   // where entities may not be loaded when URL param is first read
@@ -118,11 +139,84 @@ function ManagePageContent() {
     }
   }, [urlArtifactId, entities, selectedArtifact]);
 
-  // Filter entities by tags client-side
-  const filteredEntities =
-    tagFilter.length > 0
-      ? entities.filter((entity) => tagFilter.some((tag) => entity.tags?.includes(tag)))
-      : entities;
+  // Filter entities by tags and project client-side
+  const filteredEntities = useMemo(() => {
+    let result = entities;
+
+    // Filter by tags from URL
+    if (urlTags.length > 0) {
+      result = result.filter((entity) => urlTags.some((tag) => entity.tags?.includes(tag)));
+    }
+
+    // Filter by project from URL
+    if (urlProject) {
+      result = result.filter((entity) => {
+        // Check deployments for project path matching
+        return entity.deployments?.some((d) => d.project_path?.includes(urlProject));
+      });
+    }
+
+    return result;
+  }, [entities, urlTags, urlProject]);
+
+  // Compute available tags from all entities for the filter popover
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    entities.forEach((entity) => {
+      entity.tags?.forEach((tag) => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  }, [entities]);
+
+  // Compute available projects from all entity deployments
+  const availableProjects = useMemo(() => {
+    const projectSet = new Set<string>();
+    entities.forEach((entity) => {
+      entity.deployments?.forEach((d) => {
+        if (d.project_path) {
+          // Extract project name from path (last segment or meaningful name)
+          const segments = d.project_path.split('/').filter(Boolean);
+          const projectName = segments[segments.length - 1] || d.project_path;
+          projectSet.add(projectName);
+        }
+      });
+    });
+    return Array.from(projectSet).sort();
+  }, [entities]);
+
+  // ==========================================================================
+  // Filter Change Handlers (update URL)
+  // ==========================================================================
+
+  const handleSearchChange = useCallback((search: string) => {
+    updateUrlParams({ search: search || null });
+  }, [updateUrlParams]);
+
+  const handleStatusChange = useCallback((status: ManageStatusFilter) => {
+    updateUrlParams({ status: status === 'all' ? null : status });
+  }, [updateUrlParams]);
+
+  const handleTypeChange = useCallback((type: ArtifactType | 'all') => {
+    updateUrlParams({ type: type === 'skill' ? null : type }); // skill is default
+  }, [updateUrlParams]);
+
+  const handleProjectChange = useCallback((project: string | null) => {
+    updateUrlParams({ project });
+  }, [updateUrlParams]);
+
+  const handleTagsChange = useCallback((tags: string[]) => {
+    updateUrlParams({ tags: tags.length > 0 ? tags.join(',') : null });
+  }, [updateUrlParams]);
+
+  const handleClearAllFilters = useCallback(() => {
+    updateUrlParams({
+      search: null,
+      status: null,
+      type: null,
+      project: null,
+      tags: null,
+    });
+  }, [updateUrlParams]);
 
   // ==========================================================================
   // Modal Handlers with URL State
@@ -286,14 +380,21 @@ function ManagePageContent() {
         <EntityTabs>
           {(_entityType) => (
             <div className="flex h-full flex-col">
-              {/* Filters */}
-              <EntityFilters
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                statusFilter={statusFilter}
-                onStatusFilterChange={setStatusFilter}
-                tagFilter={tagFilter}
-                onTagFilterChange={setTagFilter}
+              {/* Filters - URL-driven state */}
+              <ManagePageFilters
+                search={urlSearch}
+                status={urlStatus}
+                type={urlType}
+                project={urlProject}
+                tags={urlTags}
+                onSearchChange={handleSearchChange}
+                onStatusChange={handleStatusChange}
+                onTypeChange={handleTypeChange}
+                onProjectChange={handleProjectChange}
+                onTagsChange={handleTagsChange}
+                onClearAll={handleClearAllFilters}
+                availableProjects={availableProjects}
+                availableTags={availableTags}
               />
 
               {/* Entity count */}
@@ -304,7 +405,7 @@ function ManagePageContent() {
                     Loading...
                   </div>
                 ) : (
-                  `${filteredEntities.length} ${filteredEntities.length === 1 ? 'entity' : 'entities'} found`
+                  `${filteredEntities.length} ${filteredEntities.length === 1 ? 'artifact' : 'artifacts'} found`
                 )}
               </div>
 
@@ -341,7 +442,7 @@ function ManagePageContent() {
 
       {/* Add Dialog */}
       <AddEntityDialog
-        entityType={activeEntityType}
+        entityType={urlType}
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
       />

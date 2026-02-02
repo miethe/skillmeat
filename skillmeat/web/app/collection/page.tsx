@@ -17,6 +17,7 @@ import { AddToGroupDialog } from '@/components/collection/add-to-group-dialog';
 import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
 import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
 import { TagFilterBar } from '@/components/ui/tag-filter-popover';
+import { ToolFilterBar } from '@/components/ui/tool-filter-popover';
 import {
   EntityLifecycleProvider,
   useCollectionContext,
@@ -108,16 +109,39 @@ function CollectionPageContent() {
     }
   }, [viewMode]);
 
-  // Filters, search, sort state
-  const [filters, setFilters] = useState<ArtifactFilters>({});
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortField, setSortField] = useState('confidence');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  // ==========================================================================
+  // URL-Driven Filter State
+  // ==========================================================================
+
+  // Read filter state from URL params (single source of truth)
+  const urlSearch = searchParams.get('search') || '';
+  const urlType = searchParams.get('type') || 'all';
+  const urlStatus = searchParams.get('status') || 'all';
+  const urlScope = searchParams.get('scope') || 'all';
+  const urlSort = searchParams.get('sort') || 'confidence';
+  const urlOrder = (searchParams.get('order') as 'asc' | 'desc') || 'desc';
 
   // Tag filtering from URL
   const selectedTags = useMemo(() => {
     return searchParams.get('tags')?.split(',').filter(Boolean) || [];
   }, [searchParams]);
+
+  // Tool filtering from URL
+  const selectedTools = useMemo(() => {
+    return searchParams.get('tools')?.split(',').filter(Boolean) || [];
+  }, [searchParams]);
+
+  // Derive filters object from URL state
+  const filters: ArtifactFilters = useMemo(() => ({
+    type: urlType !== 'all' ? (urlType as ArtifactFilters['type']) : undefined,
+    status: urlStatus !== 'all' ? (urlStatus as ArtifactFilters['status']) : undefined,
+    scope: urlScope !== 'all' ? (urlScope as ArtifactFilters['scope']) : undefined,
+  }), [urlType, urlStatus, urlScope]);
+
+  // Use URL values directly for search and sort
+  const searchQuery = urlSearch;
+  const sortField = urlSort;
+  const sortOrder = urlOrder;
 
   // Refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -347,12 +371,47 @@ function CollectionPageContent() {
     }
   }, [infiniteCollectionData, infiniteAllArtifactsData, isSpecificCollection, lastUpdated]);
 
+  // ==========================================================================
+  // Filter Change Handlers (update URL - single source of truth)
+  // ==========================================================================
+
+  // Handle search changes
+  const handleSearchChange = useCallback((query: string) => {
+    updateUrlParams({
+      search: query || null, // Don't write empty string to URL
+    });
+  }, [updateUrlParams]);
+
+  // Handle filter object changes (type, status, scope)
+  const handleFiltersChange = useCallback((newFilters: ArtifactFilters) => {
+    updateUrlParams({
+      type: newFilters.type && newFilters.type !== 'all' ? newFilters.type : null,
+      status: newFilters.status && newFilters.status !== 'all' ? newFilters.status : null,
+      scope: newFilters.scope && newFilters.scope !== 'all' ? newFilters.scope : null,
+    });
+  }, [updateUrlParams]);
+
+  // Handle sort changes
+  const handleSortChange = useCallback((field: string, order: 'asc' | 'desc') => {
+    updateUrlParams({
+      sort: field === 'confidence' ? null : field, // confidence is default, don't write to URL
+      order: order === 'desc' ? null : order, // desc is default, don't write to URL
+    });
+  }, [updateUrlParams]);
+
   // Handle tag selection changes
-  const handleTagsChange = (tags: string[]) => {
+  const handleTagsChange = useCallback((tags: string[]) => {
     updateUrlParams({
       tags: tags.length > 0 ? tags.join(',') : null,
     });
-  };
+  }, [updateUrlParams]);
+
+  // Handle tool selection changes
+  const handleToolsChange = useCallback((tools: string[]) => {
+    updateUrlParams({
+      tools: tools.length > 0 ? tools.join(',') : null,
+    });
+  }, [updateUrlParams]);
 
   // Helper function to map API artifact response to Artifact type
   // Uses the centralized mapper from @/lib/api/mappers
@@ -433,6 +492,13 @@ function CollectionPageContent() {
       });
     }
 
+    // Tool filter
+    if (selectedTools.length > 0) {
+      artifacts = artifacts.filter((artifact) => {
+        return artifact.tools?.some((tool: string) => selectedTools.includes(tool)) ?? false;
+      });
+    }
+
     // Apply client-side sorting (confidence sorting requires client-side since backend doesn't support it)
     if (sortField === 'confidence') {
       artifacts = [...artifacts].sort((a, b) => {
@@ -468,6 +534,7 @@ function CollectionPageContent() {
     filters,
     searchQuery,
     selectedTags,
+    selectedTools,
     sortField,
     sortOrder,
   ]);
@@ -507,6 +574,37 @@ function CollectionPageContent() {
     isSpecificCollection,
     currentCollection,
   ]);
+
+  // Compute unique tools with counts from ALL loaded artifacts (before tool filtering)
+  // This is used by ToolFilterPopover
+  const availableTools = useMemo(() => {
+    // Get all artifacts before tool filtering is applied
+    let allArtifacts: Artifact[] = [];
+
+    if (isSpecificCollection && infiniteCollectionData?.pages) {
+      const allSummaries = infiniteCollectionData.pages.flatMap((page) => page.items);
+      // Map summaries to Artifact entities using centralized mapper
+      allArtifacts = mapArtifactsToEntities(allSummaries as any, 'collection');
+    } else if (!isSpecificCollection && infiniteAllArtifactsData?.pages) {
+      allArtifacts = infiniteAllArtifactsData.pages.flatMap((page) =>
+        page.items.map(mapApiArtifactToArtifact)
+      );
+    }
+
+    // Count tools across all artifacts
+    const toolCounts = new Map<string, number>();
+    allArtifacts.forEach((artifact) => {
+      const tools = artifact.tools || [];
+      tools.forEach((tool: string) => {
+        toolCounts.set(tool, (toolCounts.get(tool) || 0) + 1);
+      });
+    });
+
+    // Convert to array format expected by ToolFilterPopover
+    return Array.from(toolCounts.entries())
+      .map(([name, count]) => ({ name, artifact_count: count }))
+      .sort((a, b) => b.artifact_count - a.artifact_count); // Sort by count descending
+  }, [infiniteCollectionData?.pages, infiniteAllArtifactsData?.pages, isSpecificCollection]);
 
   // ==========================================================================
   // Deep Link: Auto-open modal from URL artifact param
@@ -554,11 +652,6 @@ function CollectionPageContent() {
     updateUrlParams({
       tab: tab === 'overview' ? null : tab, // Don't clutter URL with default tab
     });
-  };
-
-  const handleSortChange = (field: string, order: 'asc' | 'desc') => {
-    setSortField(field);
-    setSortOrder(order);
   };
 
   const handleCollectionClick = (collectionId: string) => {
@@ -618,9 +711,9 @@ function CollectionPageContent() {
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         filters={filters}
-        onFiltersChange={setFilters}
+        onFiltersChange={handleFiltersChange}
         searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        onSearchChange={handleSearchChange}
         sortField={sortField}
         sortOrder={sortOrder}
         onSortChange={handleSortChange}
@@ -630,6 +723,9 @@ function CollectionPageContent() {
         selectedTags={selectedTags}
         onTagsChange={handleTagsChange}
         availableTags={availableTags}
+        selectedTools={selectedTools}
+        onToolsChange={handleToolsChange}
+        availableTools={availableTools}
       />
 
       {/* Tag Filter Bar - Shows active tag filters */}
@@ -640,6 +736,13 @@ function CollectionPageContent() {
             onChange={handleTagsChange}
             availableTags={availableTags}
           />
+        </div>
+      )}
+
+      {/* Tool Filter Bar - Shows active tool filters */}
+      {selectedTools.length > 0 && (
+        <div className="border-b bg-muted/10 px-6 py-2">
+          <ToolFilterBar selectedTools={selectedTools} onChange={handleToolsChange} />
         </div>
       )}
 
@@ -666,14 +769,14 @@ function CollectionPageContent() {
         {!error && !isLoadingArtifacts && filteredArtifacts.length === 0 && (
           <EmptyState
             title={
-              searchQuery || selectedTags.length > 0
+              searchQuery || selectedTags.length > 0 || selectedTools.length > 0
                 ? 'No results found'
                 : isSpecificCollection
                   ? 'No artifacts in this collection'
                   : 'No artifacts'
             }
             description={
-              searchQuery || selectedTags.length > 0
+              searchQuery || selectedTags.length > 0 || selectedTools.length > 0
                 ? 'Try adjusting your search or filters'
                 : isSpecificCollection
                   ? 'Add artifacts to this collection to get started'

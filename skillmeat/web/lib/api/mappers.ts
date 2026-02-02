@@ -30,6 +30,7 @@ export interface ApiMetadata {
   author?: string;
   version?: string;
   tags?: string[];
+  tools?: string[];
 }
 
 /**
@@ -112,6 +113,7 @@ export interface ArtifactResponse {
   metadata?: ApiMetadata;
   description?: string;
   tags?: string[];
+  tools?: string[];
   author?: string;
   license?: string;
   version?: string;
@@ -307,6 +309,11 @@ export function mapApiResponseToArtifact(
   const metadataTags = response.metadata?.tags || [];
   const allTags = [...new Set([...topLevelTags, ...metadataTags])];
 
+  // Merge tools from both sources, deduplicate
+  const topLevelTools = response.tools || [];
+  const metadataTools = response.metadata?.tools || [];
+  const allTools = [...new Set([...topLevelTools, ...metadataTools])];
+
   // Resolve scope (default to 'user' for collection context)
   const scope: ArtifactScope =
     (response.scope as ArtifactScope) || (context === 'project' ? 'local' : 'user');
@@ -350,6 +357,7 @@ export function mapApiResponseToArtifact(
     // Metadata (flattened)
     ...(description && { description }),
     ...(allTags.length > 0 && { tags: allTags }),
+    ...(allTools.length > 0 && { tools: allTools }),
     ...(author && { author }),
     ...(license && { license }),
     ...(version && { version }),
