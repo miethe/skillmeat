@@ -167,7 +167,7 @@ describe('mapArtifactToEntity', () => {
       expect(result.collections![0]?.artifact_count).toBeUndefined();
     });
 
-    it('extracts primary collection from collections array', () => {
+    it('extracts primary collection id from collections array', () => {
       const artifact: ApiArtifactResponse = {
         ...minimalArtifact,
         collections: [{ id: 'col1', name: 'Primary Collection' }],
@@ -175,7 +175,8 @@ describe('mapArtifactToEntity', () => {
 
       const result = mapArtifactToEntity(artifact);
 
-      expect(result.collection).toBe('Primary Collection');
+      // Uses id (API identifier) not name (display name)
+      expect(result.collection).toBe('col1');
     });
 
     it('handles string collection field', () => {
@@ -197,7 +198,8 @@ describe('mapArtifactToEntity', () => {
 
       const result = mapArtifactToEntity(artifact);
 
-      expect(result.collection).toBe('My Collection');
+      // Uses id (API identifier) not name (display name)
+      expect(result.collection).toBe('col1');
     });
   });
 
