@@ -50,7 +50,7 @@ Once initialized, the Claude Code hook will automatically update sources when yo
 - **Action**: Updates that file's source in NotebookLM
 - **Silent**: Runs in the background without blocking your workflow
 
-No additional setup needed - the hook is configured in `.claude/hooks/post-tool.md/notebooklm-sync.json`.
+The hook is configured in `.claude/settings.json` (PostToolUse section) and the actual script is `.claude/hooks/notebooklm-sync-hook.sh`.
 
 ## Scripts
 
@@ -156,6 +156,9 @@ python scripts/notebooklm_sync/status.py --list
 # Find files not yet tracked
 python scripts/notebooklm_sync/status.py --untracked
 
+# Find files modified since last sync (RETROACTIVE - catches all past changes)
+python scripts/notebooklm_sync/status.py --stale
+
 # Find orphaned sources (local file deleted)
 python scripts/notebooklm_sync/status.py --orphaned
 
@@ -181,6 +184,186 @@ File Status:
 Stale files:
   - CLAUDE.md (modified 2h ago)
   - docs/dev/patterns.md (modified 30m ago)
+```
+
+---
+
+### batch.py
+
+Batch sync multiple files to NotebookLM. Finds stale (modified since last sync) and untracked (in scope but not synced) files and syncs them with rate limiting.
+
+**Works RETROACTIVELY**: Syncs any files modified since last sync, regardless of when they were modified.
+
+**Usage**:
+
+```bash
+# Sync all stale + untracked files
+python scripts/notebooklm_sync/batch.py
+
+# Only sync stale files (modified since last sync)
+python scripts/notebooklm_sync/batch.py --stale-only
+
+# Only sync untracked files (in scope but not yet synced)
+python scripts/notebooklm_sync/batch.py --untracked-only
+
+# Preview what would be synced without syncing
+python scripts/notebooklm_sync/batch.py --dry-run
+
+# Limit to N files (for rate limiting)
+python scripts/notebooklm_sync/batch.py --limit 10
+
+# Verbose output
+python scripts/notebooklm_sync/batch.py -v
+```
+
+**Options**:
+
+- `--dry-run` - Show what would be synced without making changes
+- `-v, --verbose` - Show detailed progress
+- `--stale-only` - Only sync files modified since last sync
+- `--untracked-only` - Only sync files in scope but not yet tracked
+- `--limit N` - Limit to N files (for rate limiting)
+
+**Sample Output**:
+
+```
+Syncing 15 files to NotebookLM...
+  - Stale: 8
+  - Untracked: 7
+
+[1/15] Syncing CLAUDE.md...
+  OK (stale)
+[2/15] Syncing docs/dev/patterns.md...
+  OK (stale)
+...
+[15/15] Syncing docs/api/endpoints.md...
+  OK (untracked)
+
+Mapping saved.
+
+Completed: 15 synced, 0 failed.
+```
+
+**Rate Limiting**:
+
+- 1 second delay between syncs to avoid rate limits
+- Use `--limit` to cap the number of files synced in one run
+- No delay on the last file or in dry-run mode
+
+---
+
+### cleanup.py
+
+Removes orphaned sources from NotebookLM (sources for files that have been deleted locally).
+
+**Usage**:
+
+```bash
+# Interactive with confirmation prompt
+python scripts/notebooklm_sync/cleanup.py
+
+# Preview what would be deleted
+python scripts/notebooklm_sync/cleanup.py --dry-run
+
+# Skip confirmation (for automation)
+python scripts/notebooklm_sync/cleanup.py --force
+
+# Verbose output
+python scripts/notebooklm_sync/cleanup.py --verbose
+```
+
+**Options**:
+
+- `--dry-run` - Show what would be deleted without making changes
+- `--verbose` / `-v` - Show detailed progress including notebook ID
+- `--force` - Skip confirmation prompt
+
+**Sample Output**:
+
+```
+Found 3 orphaned sources:
+  - CACHE_POPULATION_TRACE.md
+  - TOOLS_FIELD_IMPLEMENTATION_REPORT.md
+  - docs/test-hook-trigger.md
+
+Delete 3 orphaned sources from NotebookLM? [y/N]: y
+
+[1/3] Deleting CACHE_POPULATION_TRACE.md... OK
+[2/3] Deleting TOOLS_FIELD_IMPLEMENTATION_REPORT.md... OK
+[3/3] Deleting docs/test-hook-trigger.md... OK
+
+Mapping saved.
+Completed: 3 deleted, 0 failed.
+```
+
+---
+
+## Git Hooks
+
+Git hooks automatically detect markdown file changes from upstream operations (pull, merge, checkout) and mark them for sync.
+
+### post-merge and post-checkout Hooks
+
+Located in `.git/hooks/`, these hooks:
+
+- Detect markdown file changes after `git pull`, `git merge`, or `git checkout`
+- Filter to in-scope files only (root `*.md` and `docs/**/*.md`, excluding `.claude/`)
+- Mark changed files in `~/.notebooklm/pending-sync.txt`
+- Non-blocking: always exit 0 to not interfere with git operations
+
+**Installation**:
+
+```bash
+./scripts/notebooklm_sync/install-git-hooks.sh
+```
+
+This installer will:
+- Create symlinks to hook scripts (updates propagate automatically)
+- Create wrapper hooks if you have existing git hooks
+- Make hooks executable
+
+**What happens after git pull**:
+
+```bash
+$ git pull
+# ... git output ...
+NotebookLM: 3 docs marked for sync (run batch.py)
+
+$ python scripts/notebooklm_sync/batch.py
+# Syncs the 3 changed files
+```
+
+---
+
+## Pre-commit Hook
+
+Located in `scripts/notebooklm_sync/hooks/pre-commit-notebooklm`, this hook:
+
+- Runs before each commit
+- Checks if any staged `.md` files are stale (modified since last NotebookLM sync)
+- Warns you if stale docs should be synced
+- **Non-blocking**: Always exits 0 (warning only, doesn't prevent commits)
+
+**Installation**:
+
+```bash
+./scripts/notebooklm_sync/install-git-hooks.sh
+```
+
+**Sample Warning**:
+
+```bash
+$ git commit -m "Update docs"
+
+Warning: 2 doc(s) are stale and should be synced to NotebookLM
+
+  - CLAUDE.md
+  - docs/dev/patterns.md
+
+Run 'python scripts/notebooklm_sync/batch.py' to sync
+
+[main abc1234] Update docs
+ 2 files changed, 10 insertions(+), 5 deletions(-)
 ```
 
 ---
@@ -263,7 +446,7 @@ The sync system maintains a mapping file at `~/.notebooklm/skillmeat-sources.jso
 
 ## Hook Behavior
 
-The Claude Code hook (`.claude/hooks/post-tool.md/notebooklm-sync.json`) automatically triggers when:
+The Claude Code hook (configured in `.claude/settings.json`, script at `.claude/hooks/notebooklm-sync-hook.sh`) automatically triggers when:
 
 1. You use the **Write** or **Edit** tool
 2. On a `.md` file
@@ -320,11 +503,14 @@ Check that Claude Code hooks are enabled in `.claude/settings.json`:
 }
 ```
 
-Temporarily disable the hook by renaming it:
+Temporarily disable the hook by commenting out the NotebookLM hook section in `.claude/settings.json` (lines 91-100):
 
-```bash
-mv .claude/hooks/post-tool.md/notebooklm-sync.json \
-   .claude/hooks/post-tool.md/notebooklm-sync.json.disabled
+```json
+// {
+//   "_comment": "NotebookLM sync hook - ...",
+//   "matcher": "Write|Edit",
+//   "hooks": [ ... ]
+// }
 ```
 
 ### Rate limits or source limit exceeded
@@ -334,16 +520,22 @@ mv .claude/hooks/post-tool.md/notebooklm-sync.json \
 
 ### Stale files (local changes not synced)
 
-Use `update.py` to sync specific files:
+Use `batch.py` to sync all stale files at once:
 
 ```bash
-python scripts/notebooklm_sync/update.py docs/dev/patterns.md
+python scripts/notebooklm_sync/batch.py --stale-only
 ```
 
-Or check status:
+Or check status first:
 
 ```bash
 python scripts/notebooklm_sync/status.py --stale
+```
+
+Or sync a specific file:
+
+```bash
+python scripts/notebooklm_sync/update.py docs/dev/patterns.md
 ```
 
 ---
@@ -361,11 +553,10 @@ python scripts/notebooklm_sync/status.py --stale
 
 ## Limitations
 
-- **No batch update** - Files updated one at a time (by design for hook)
 - **Delete + re-add** - NotebookLM doesn't support in-place updates
 - **Source IDs change** - New ID assigned on each update
 - **Chat history lost** - Clearing a source loses conversation history in NotebookLM
-- **No webhook** - Changes detected locally only
+- **Limited upstream detection** - Git hooks help detect changes from pull/merge/checkout, but won't catch direct edits outside git operations
 
 ---
 
@@ -388,9 +579,16 @@ python scripts/notebooklm_sync/init.py
 
 ## Files
 
-- `init.py` - Initial setup (not yet implemented)
-- `update.py` - Single-file update (not yet implemented)
-- `status.py` - Status and diagnostics (not yet implemented)
+- `init.py` - Initial setup (creates notebook and uploads all files)
+- `update.py` - Single-file update (called by Claude Code hook)
+- `status.py` - Status and diagnostics (list tracked, find stale/untracked/orphaned)
+- `batch.py` - Batch sync multiple stale/untracked files
+- `cleanup.py` - Remove orphaned sources (files deleted locally)
 - `config.py` - Configuration constants
 - `utils.py` - Shared utilities
-- `.claude/hooks/post-tool.md/notebooklm-sync.json` - Hook configuration
+- `install-git-hooks.sh` - Install git hooks for upstream change detection
+- `hooks/pre-commit-notebooklm` - Pre-commit hook (warns about stale docs)
+- `.claude/settings.json` - Hook configuration (lines 91-100)
+- `.claude/hooks/notebooklm-sync-hook.sh` - Claude Code hook script
+- `.git/hooks/post-merge` - Git hook for detecting changes after merge/pull
+- `.git/hooks/post-checkout` - Git hook for detecting changes after checkout/switch
