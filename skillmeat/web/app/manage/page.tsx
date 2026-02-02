@@ -1,10 +1,11 @@
 'use client';
 
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Plus, Grid3x3, List, Loader2, RefreshCw } from 'lucide-react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { Plus, Grid3x3, List, Loader2, RefreshCw, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/shared/page-header';
 import {
   EntityLifecycleProvider,
   useEntityLifecycle,
@@ -13,7 +14,7 @@ import { EntityList } from '@/components/entity/entity-list';
 import { EntityForm } from '@/components/entity/entity-form';
 import { EntityTabs } from './components/entity-tabs';
 import { EntityFilters } from './components/entity-filters';
-import { CollectionArtifactModal } from '@/components/shared/CollectionArtifactModal';
+import { CollectionArtifactModal, type ArtifactModalTab } from '@/components/shared/CollectionArtifactModal';
 import { AddEntityDialog } from './components/add-entity-dialog';
 import type { Artifact, ArtifactType } from '@/types';
 import {
@@ -26,6 +27,8 @@ import {
 
 function ManagePageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const activeEntityType = (searchParams.get('type') as ArtifactType) || 'skill';
 
   const {
@@ -49,6 +52,33 @@ function ManagePageContent() {
   const [editingArtifact, setEditingArtifact] = useState<Artifact | null>(null);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
 
+  // ==========================================================================
+  // URL State Management
+  // ==========================================================================
+
+  // Get URL params for deep linking
+  const urlArtifactId = searchParams.get('artifact');
+  const urlTab = searchParams.get('tab') as ArtifactModalTab | null;
+
+  // Helper to update URL params without full page reload
+  const updateUrlParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      const params = new URLSearchParams(searchParams.toString());
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null || value === undefined || value === '') {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      });
+
+      const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+      router.push(newUrl, { scroll: false });
+    },
+    [searchParams, pathname, router]
+  );
+
   // Update type filter when tab changes
   useEffect(() => {
     setTypeFilter(activeEntityType);
@@ -60,7 +90,7 @@ function ManagePageContent() {
 
   // Handle URL-based artifact selection (auto-open modal when navigating with artifact param)
   useEffect(() => {
-    const artifactId = searchParams.get('artifact');
+    const artifactId = urlArtifactId;
 
     // Store pending selection when we have an artifact param that's new
     if (artifactId && artifactId !== pendingArtifactRef.current) {
@@ -84,7 +114,7 @@ function ManagePageContent() {
         pendingArtifactRef.current = null; // Clear pending after successful selection
       }
     }
-  }, [searchParams, entities, selectedArtifact]);
+  }, [urlArtifactId, entities, selectedArtifact]);
 
   // Filter entities by tags client-side
   const filteredEntities =
@@ -92,11 +122,37 @@ function ManagePageContent() {
       ? entities.filter((entity) => tagFilter.some((tag) => entity.tags?.includes(tag)))
       : entities;
 
+  // ==========================================================================
+  // Modal Handlers with URL State
+  // ==========================================================================
+
   // Memoize event handlers to prevent EntityList re-renders
   const handleArtifactClick = useCallback((artifact: Artifact) => {
     setSelectedArtifact(artifact);
     setDetailPanelOpen(true);
-  }, []);
+    // Update URL with artifact ID (clear tab to start at default)
+    updateUrlParams({
+      artifact: artifact.id,
+      tab: null,
+    });
+  }, [updateUrlParams]);
+
+  const handleDetailClose = useCallback(() => {
+    setDetailPanelOpen(false);
+    setSelectedArtifact(null);
+    // Clear artifact and tab from URL
+    updateUrlParams({
+      artifact: null,
+      tab: null,
+    });
+  }, [updateUrlParams]);
+
+  const handleTabChange = useCallback((tab: ArtifactModalTab) => {
+    // Update URL with new tab
+    updateUrlParams({
+      tab: tab === 'overview' ? null : tab, // Don't clutter URL with default tab
+    });
+  }, [updateUrlParams]);
 
   const handleEdit = useCallback((artifact: Artifact) => {
     setEditingArtifact(artifact);
@@ -120,37 +176,52 @@ function ManagePageContent() {
     // Open artifact modal to sync tab for deployment
     setSelectedArtifact(artifact);
     setDetailPanelOpen(true);
-  }, []);
+    updateUrlParams({
+      artifact: artifact.id,
+      tab: 'sync',
+    });
+  }, [updateUrlParams]);
 
   const handleSync = useCallback((artifact: Artifact) => {
     // Open artifact modal to sync tab for sync operations
     setSelectedArtifact(artifact);
     setDetailPanelOpen(true);
-  }, []);
+    updateUrlParams({
+      artifact: artifact.id,
+      tab: 'sync',
+    });
+  }, [updateUrlParams]);
 
   const handleViewDiff = useCallback((artifact: Artifact) => {
     // Open artifact modal to sync tab which shows diff viewer
     setSelectedArtifact(artifact);
     setDetailPanelOpen(true);
-  }, []);
+    updateUrlParams({
+      artifact: artifact.id,
+      tab: 'sync',
+    });
+  }, [updateUrlParams]);
 
   const handleRollback = useCallback((artifact: Artifact) => {
     // Open artifact modal to history tab for rollback
     setSelectedArtifact(artifact);
     setDetailPanelOpen(true);
-  }, []);
+    updateUrlParams({
+      artifact: artifact.id,
+      tab: 'history',
+    });
+  }, [updateUrlParams]);
 
   return (
     <div className="flex h-screen flex-col">
       {/* Header */}
       <div className="border-b p-6">
         <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Entity Management</h1>
-            <p className="mt-1 text-muted-foreground">
-              Manage your skills, commands, agents, MCP servers, and hooks
-            </p>
-          </div>
+          <PageHeader
+            title="Health & Sync"
+            description="Monitor sync status and manage deployments"
+            icon={<Activity className="h-6 w-6" />}
+          />
           <div className="flex items-center gap-2">
             {/* Refresh button */}
             <Button
@@ -244,14 +315,13 @@ function ManagePageContent() {
         </EntityTabs>
       </div>
 
-      {/* Artifact Detail Modal */}
+      {/* Artifact Detail Modal with URL-synced tab */}
       <CollectionArtifactModal
         artifact={selectedArtifact}
         open={detailPanelOpen}
-        onClose={() => {
-          setDetailPanelOpen(false);
-          setSelectedArtifact(null);
-        }}
+        onClose={handleDetailClose}
+        initialTab={urlTab || 'overview'}
+        onTabChange={handleTabChange}
       />
 
       {/* Add Dialog */}

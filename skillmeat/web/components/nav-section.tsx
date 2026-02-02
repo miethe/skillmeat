@@ -95,8 +95,8 @@ function saveExpandedState(storageKey: string, expanded: boolean): void {
  *   storageKey="collections"
  *   defaultExpanded={true}
  *   items={[
- *     { name: 'Browse', href: '/collection', icon: Grid3X3 },
- *     { name: 'Manage', href: '/manage', icon: Settings2 }
+ *     { name: 'Collections', href: '/collection', icon: Library },
+ *     { name: 'Health & Sync', href: '/manage', icon: Activity }
  *   ]}
  * />
  * ```

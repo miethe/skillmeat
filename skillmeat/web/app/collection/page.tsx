@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect, useMemo, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Package, Loader2 } from 'lucide-react';
+import { useState, useEffect, useMemo, Suspense, useCallback } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { Package, Loader2, Library } from 'lucide-react';
+import { PageHeader } from '@/components/shared/page-header';
 import { CollectionHeader } from '@/components/collection/collection-header';
 import { CollectionToolbar } from '@/components/collection/collection-toolbar';
 import { ArtifactGrid } from '@/components/collection/artifact-grid';
 import { ArtifactList } from '@/components/collection/artifact-list';
-import { CollectionArtifactModal } from '@/components/shared/CollectionArtifactModal';
+import { CollectionArtifactModal, type ArtifactModalTab } from '@/components/shared/CollectionArtifactModal';
 import { EditCollectionDialog } from '@/components/collection/edit-collection-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
 import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
@@ -70,12 +71,19 @@ function EmptyState({ title, description }: { title: string; description: string
 }
 
 function CollectionPageContent() {
-  const { selectedCollectionId, currentCollection, isLoadingCollection, setSelectedCollectionId } =
-    useCollectionContext();
+  const {
+    selectedCollectionId,
+    currentCollection,
+    isLoadingCollection,
+    setSelectedCollectionId,
+    selectedGroupId,
+    setSelectedGroupId,
+  } = useCollectionContext();
 
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
 
   // View mode with localStorage persistence
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -134,6 +142,66 @@ function CollectionPageContent() {
 
   // Hook for editing artifact parameters
   const { mutateAsync: updateParameters } = useEditArtifactParameters();
+
+  // ==========================================================================
+  // URL State Management
+  // ==========================================================================
+
+  // Get URL params for deep linking
+  const urlArtifactId = searchParams.get('artifact');
+  const urlCollectionId = searchParams.get('collection');
+  const urlGroupId = searchParams.get('group');
+  const urlTab = searchParams.get('tab') as ArtifactModalTab | null;
+
+  // Helper to update URL params without full page reload
+  const updateUrlParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      const params = new URLSearchParams(searchParams.toString());
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null || value === undefined || value === '') {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      });
+
+      const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+      router.push(newUrl, { scroll: false });
+    },
+    [searchParams, pathname, router]
+  );
+
+  // Sync collection/group selection from URL on initial load
+  useEffect(() => {
+    if (urlCollectionId && urlCollectionId !== selectedCollectionId) {
+      setSelectedCollectionId(urlCollectionId);
+    }
+  }, [urlCollectionId, selectedCollectionId, setSelectedCollectionId]);
+
+  useEffect(() => {
+    if (urlGroupId && urlGroupId !== selectedGroupId) {
+      setSelectedGroupId(urlGroupId);
+    }
+  }, [urlGroupId, selectedGroupId, setSelectedGroupId]);
+
+  // Sync URL when collection/group changes (two-way binding)
+  useEffect(() => {
+    // Only update URL if the values differ from current URL params
+    const currentUrlCollection = searchParams.get('collection');
+    const currentUrlGroup = searchParams.get('group');
+
+    if (selectedCollectionId !== currentUrlCollection || selectedGroupId !== currentUrlGroup) {
+      updateUrlParams({
+        collection: selectedCollectionId,
+        group: selectedGroupId,
+      });
+    }
+  }, [selectedCollectionId, selectedGroupId, searchParams, updateUrlParams]);
+
+  // ==========================================================================
+  // Event Handlers
+  // ==========================================================================
 
   // Handler for Edit action from dropdown
   const handleEditFromDropdown = (artifact: Artifact) => {
@@ -278,13 +346,9 @@ function CollectionPageContent() {
 
   // Handle tag selection changes
   const handleTagsChange = (tags: string[]) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (tags.length > 0) {
-      params.set('tags', tags.join(','));
-    } else {
-      params.delete('tags');
-    }
-    router.push(`?${params.toString()}`);
+    updateUrlParams({
+      tags: tags.length > 0 ? tags.join(',') : null,
+    });
   };
 
   // Helper function to map API artifact response to Artifact type
@@ -441,14 +505,52 @@ function CollectionPageContent() {
     currentCollection,
   ]);
 
+  // ==========================================================================
+  // Deep Link: Auto-open modal from URL artifact param
+  // ==========================================================================
+
+  useEffect(() => {
+    // Only process if we have a URL artifact ID, artifacts are loaded, and modal isn't already open
+    if (urlArtifactId && filteredArtifacts.length > 0 && !isDetailOpen) {
+      const artifact = filteredArtifacts.find(
+        (a) => a.id === urlArtifactId || a.name === urlArtifactId
+      );
+      if (artifact) {
+        setSelectedArtifact(artifact);
+        setIsDetailOpen(true);
+      }
+    }
+  }, [urlArtifactId, filteredArtifacts, isDetailOpen]);
+
+  // ==========================================================================
+  // Modal Handlers with URL State
+  // ==========================================================================
+
   const handleArtifactClick = (artifact: Artifact) => {
     setSelectedArtifact(artifact);
     setIsDetailOpen(true);
+    // Update URL with artifact ID (and clear tab to start at default)
+    updateUrlParams({
+      artifact: artifact.id,
+      tab: null,
+    });
   };
 
   const handleDetailClose = () => {
     setIsDetailOpen(false);
+    // Clear artifact and tab from URL
+    updateUrlParams({
+      artifact: null,
+      tab: null,
+    });
     setTimeout(() => setSelectedArtifact(null), 300);
+  };
+
+  const handleTabChange = (tab: ArtifactModalTab) => {
+    // Update URL with new tab
+    updateUrlParams({
+      tab: tab === 'overview' ? null : tab, // Don't clutter URL with default tab
+    });
   };
 
   const handleSortChange = (field: string, order: 'asc' | 'desc') => {
@@ -458,6 +560,7 @@ function CollectionPageContent() {
 
   const handleCollectionClick = (collectionId: string) => {
     setSelectedCollectionId(collectionId);
+    // URL will update via the effect that watches selectedCollectionId
   };
 
   const handleRefresh = async () => {
@@ -490,6 +593,15 @@ function CollectionPageContent() {
 
   return (
     <div className="flex h-full flex-col">
+      {/* Page Header */}
+      <div className="border-b bg-background px-6 py-4">
+        <PageHeader
+          title="Collections"
+          description="Browse & Discover your artifact collection"
+          icon={<Library className="h-6 w-6" />}
+        />
+      </div>
+
       <CollectionHeader
         collection={currentCollection}
         artifactCount={totalCount}
@@ -636,11 +748,13 @@ function CollectionPageContent() {
         )}
       </div>
 
-      {/* Artifact Detail Modal */}
+      {/* Artifact Detail Modal with URL-synced tab */}
       <CollectionArtifactModal
         artifact={selectedArtifact}
         open={isDetailOpen}
         onClose={handleDetailClose}
+        initialTab={urlTab || 'overview'}
+        onTabChange={handleTabChange}
       />
 
       {/* Edit Collection Dialog */}

@@ -6,9 +6,9 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   FolderOpen,
-  Grid3x3,
+  Library,
   Layers,
-  Settings2,
+  Activity,
   FolderKanban,
   Server,
   Store,
@@ -61,9 +61,9 @@ const navigationConfig: NavigationConfig = {
       storageKey: 'collections',
       defaultExpanded: true,
       items: [
-        { name: 'Browse', href: '/collection', icon: Grid3x3 },
+        { name: 'Collections', href: '/collection', icon: Library },
         { name: 'Groups', href: '/groups', icon: Layers },
-        { name: 'Manage', href: '/manage', icon: Settings2 },
+        { name: 'Health & Sync', href: '/manage', icon: Activity },
         { name: 'Projects', href: '/projects', icon: FolderKanban },
         { name: 'MCP Servers', href: '/mcp', icon: Server },
       ],
