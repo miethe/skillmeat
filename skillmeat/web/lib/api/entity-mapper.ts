@@ -17,6 +17,7 @@ import type {
   ArtifactScope,
   SyncStatus,
   CollectionRef,
+  DeploymentSummary,
 } from '@/types/artifact';
 
 // Re-export Entity type alias for backward compatibility
@@ -44,6 +45,15 @@ export interface ApiArtifactMetadata {
   version?: string | null;
   tags?: string[];
   dependencies?: string[];
+}
+
+/**
+ * Deployment summary from API response.
+ */
+export interface ApiDeploymentSummary {
+  project_path: string;
+  project_name: string;
+  deployed_at: string;
 }
 
 /**
@@ -86,6 +96,9 @@ export interface ApiArtifactResponse {
     artifact_count?: number | null;
   }>;
   collection?: string | { id: string; name: string };
+
+  // Deployments - list of projects where this artifact is deployed
+  deployments?: ApiDeploymentSummary[] | null;
 
   // Scope and project
   scope?: string;
@@ -290,6 +303,28 @@ function mapCollections(artifact: ApiArtifactResponse): CollectionRef[] {
 }
 
 /**
+ * Map deployments array from API response to DeploymentSummary array.
+ *
+ * @param artifact - Raw API response object
+ * @returns Array of DeploymentSummary objects or null
+ */
+function mapDeployments(artifact: ApiArtifactResponse): DeploymentSummary[] | null {
+  if (!artifact.deployments) {
+    return null;
+  }
+
+  if (artifact.deployments.length === 0) {
+    return [];
+  }
+
+  return artifact.deployments.map((d) => ({
+    project_path: d.project_path,
+    project_name: d.project_name,
+    deployed_at: d.deployed_at,
+  }));
+}
+
+/**
  * Extract primary collection identifier from various API response formats.
  *
  * Returns the collection `id` (e.g., "default") which matches the filesystem
@@ -386,6 +421,9 @@ export function mapArtifactToEntity(
   const collections = mapCollections(artifact);
   const collection = extractPrimaryCollection(artifact);
 
+  // Map deployments
+  const deployments = mapDeployments(artifact);
+
   // Determine sync status
   const syncStatus = determineSyncStatus(artifact, context);
 
@@ -454,6 +492,7 @@ export function mapArtifactToEntity(
     ...(collection && { collection }),
     collections, // ALWAYS include collections array (may be empty)
     ...(projectPath && { projectPath }),
+    ...(deployments !== null && { deployments }), // Include if present (even if empty array)
 
     // Metadata (flattened)
     ...(description && { description }),
