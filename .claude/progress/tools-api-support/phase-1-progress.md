@@ -1,11 +1,12 @@
 ---
 # === TOOLS API SUPPORT - PHASE 1 PROGRESS ===
 # Schema & Data Model implementation
+# NOTE: Reduced scope - Tool enum and ArtifactMetadataResponse already exist
 
 type: progress
 prd: "tools-api-support"
 phase: 1
-title: "Schema & Data Model"
+title: "Schema & Data Model (Collection Endpoints)"
 status: "planning"
 started: "2026-02-02"
 completed: null
@@ -22,29 +23,33 @@ at_risk_tasks: 0
 owners: ["python-backend-engineer", "data-layer-expert"]
 contributors: []
 
+# NOTE: Tool enum already exists (skillmeat/core/enums.py:58-135)
+# NOTE: ArtifactMetadataResponse.tools already exists (artifacts.py:189-193)
+# This phase adds tools to ArtifactSummary for COLLECTION endpoints
+
 tasks:
   - id: "TOOLS-1.1"
-    description: "Add tools field to ArtifactSummary in user_collections.py"
+    description: "Add tools field to ArtifactSummary in user_collections.py (after tags field, line ~238)"
     status: "pending"
     assigned_to: ["python-backend-engineer"]
     dependencies: []
-    estimated_effort: "0.5h"
+    estimated_effort: "0.25h"
     priority: "high"
 
   - id: "TOOLS-1.2"
-    description: "Add tools field to ArtifactSummary in collections.py"
+    description: "Add tools field to ArtifactSummary in collections.py (if exists)"
     status: "pending"
     assigned_to: ["python-backend-engineer"]
     dependencies: []
-    estimated_effort: "0.5h"
+    estimated_effort: "0.25h"
     priority: "high"
 
   - id: "TOOLS-1.3"
-    description: "Add tools_json column to CollectionArtifact model"
+    description: "Add tools_json column to CollectionArtifact model (after tags_json, line ~933)"
     status: "pending"
     assigned_to: ["data-layer-expert"]
     dependencies: []
-    estimated_effort: "1h"
+    estimated_effort: "0.5h"
     priority: "high"
 
   - id: "TOOLS-1.4"
@@ -52,7 +57,7 @@ tasks:
     status: "pending"
     assigned_to: ["data-layer-expert"]
     dependencies: ["TOOLS-1.3"]
-    estimated_effort: "1h"
+    estimated_effort: "0.5h"
     priority: "high"
 
   - id: "TOOLS-1.5"
@@ -60,14 +65,14 @@ tasks:
     status: "pending"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["TOOLS-1.3"]
-    estimated_effort: "0.5h"
+    estimated_effort: "0.25h"
     priority: "medium"
 
 parallelization:
   batch_1: ["TOOLS-1.1", "TOOLS-1.2", "TOOLS-1.3"]
   batch_2: ["TOOLS-1.4", "TOOLS-1.5"]
   critical_path: ["TOOLS-1.3", "TOOLS-1.4"]
-  estimated_total_time: "2.5h"
+  estimated_total_time: "1.5h"
 
 blockers: []
 

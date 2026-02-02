@@ -94,7 +94,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FILE_PATH=$(echo \"$TOOL_ARGS\" | jq -r '.file_path // empty' 2>/dev/null) && if [[ -n \"$FILE_PATH\" && \"$FILE_PATH\" =~ \\.md$ ]] && { [[ \"$FILE_PATH\" =~ ^\\./[^/]+\\.md$ ]] || [[ \"$FILE_PATH\" =~ ^\\./docs/ ]] || [[ \"$FILE_PATH\" =~ ^[^/]+\\.md$ ]] || [[ \"$FILE_PATH\" =~ ^docs/ ]]; } && [[ ! \"$FILE_PATH\" =~ ^\\.?/?\\.\\.?claude/ ]]; then mkdir -p ~/.notebooklm && echo \"[$(date '+%Y-%m-%d %H:%M:%S')] Syncing: $FILE_PATH\" >> ~/.notebooklm/sync.log && python scripts/notebooklm_sync/update.py \"$FILE_PATH\" 2>> ~/.notebooklm/sync.log || true; fi"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/notebooklm-sync-hook.sh"
           }
         ]
       }
