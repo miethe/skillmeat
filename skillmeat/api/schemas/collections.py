@@ -67,6 +67,10 @@ class ArtifactSummary(BaseModel):
         description="Source specification",
         examples=["anthropics/skills/pdf"],
     )
+    tools: Optional[List[str]] = Field(
+        default=None,
+        description="Claude Code tools used by this artifact",
+    )
 
 
 class CollectionResponse(BaseModel):

@@ -1,92 +1,100 @@
 ---
-# === TOOLS API SUPPORT - PHASE 1 PROGRESS ===
-# Schema & Data Model implementation
-# NOTE: Reduced scope - Tool enum and ArtifactMetadataResponse already exist
-
 type: progress
-prd: "tools-api-support"
+prd: tools-api-support
 phase: 1
-title: "Schema & Data Model (Collection Endpoints)"
-status: "planning"
-started: "2026-02-02"
+title: Schema & Data Model (Collection Endpoints)
+status: completed
+started: '2026-02-02'
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 0
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer", "data-layer-expert"]
+owners:
+- python-backend-engineer
+- data-layer-expert
 contributors: []
-
-# NOTE: Tool enum already exists (skillmeat/core/enums.py:58-135)
-# NOTE: ArtifactMetadataResponse.tools already exists (artifacts.py:189-193)
-# This phase adds tools to ArtifactSummary for COLLECTION endpoints
-
 tasks:
-  - id: "TOOLS-1.1"
-    description: "Add tools field to ArtifactSummary in user_collections.py (after tags field, line ~238)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "0.25h"
-    priority: "high"
-
-  - id: "TOOLS-1.2"
-    description: "Add tools field to ArtifactSummary in collections.py (if exists)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "0.25h"
-    priority: "high"
-
-  - id: "TOOLS-1.3"
-    description: "Add tools_json column to CollectionArtifact model (after tags_json, line ~933)"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "0.5h"
-    priority: "high"
-
-  - id: "TOOLS-1.4"
-    description: "Create Alembic migration for collection_artifacts.tools_json"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["TOOLS-1.3"]
-    estimated_effort: "0.5h"
-    priority: "high"
-
-  - id: "TOOLS-1.5"
-    description: "Add tools property to CollectionArtifact for JSON parsing"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TOOLS-1.3"]
-    estimated_effort: "0.25h"
-    priority: "medium"
-
+- id: TOOLS-1.1
+  description: Add tools field to ArtifactSummary in user_collections.py (after tags
+    field, line ~238)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 0.25h
+  priority: high
+- id: TOOLS-1.2
+  description: Add tools field to ArtifactSummary in collections.py (if exists)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 0.25h
+  priority: high
+- id: TOOLS-1.3
+  description: Add tools_json column to CollectionArtifact model (after tags_json,
+    line ~933)
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 0.5h
+  priority: high
+- id: TOOLS-1.4
+  description: Create Alembic migration for collection_artifacts.tools_json
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - TOOLS-1.3
+  estimated_effort: 0.5h
+  priority: high
+- id: TOOLS-1.5
+  description: Add tools property to CollectionArtifact for JSON parsing
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TOOLS-1.3
+  estimated_effort: 0.25h
+  priority: medium
 parallelization:
-  batch_1: ["TOOLS-1.1", "TOOLS-1.2", "TOOLS-1.3"]
-  batch_2: ["TOOLS-1.4", "TOOLS-1.5"]
-  critical_path: ["TOOLS-1.3", "TOOLS-1.4"]
-  estimated_total_time: "1.5h"
-
+  batch_1:
+  - TOOLS-1.1
+  - TOOLS-1.2
+  - TOOLS-1.3
+  batch_2:
+  - TOOLS-1.4
+  - TOOLS-1.5
+  critical_path:
+  - TOOLS-1.3
+  - TOOLS-1.4
+  estimated_total_time: 1.5h
 blockers: []
-
 success_criteria:
-  - { id: "SC-1", description: "ArtifactSummary schemas include tools field", status: "pending" }
-  - { id: "SC-2", description: "CollectionArtifact model has tools_json column", status: "pending" }
-  - { id: "SC-3", description: "Migration runs cleanly on dev database", status: "pending" }
-  - { id: "SC-4", description: "No breaking changes to existing API responses", status: "pending" }
-
+- id: SC-1
+  description: ArtifactSummary schemas include tools field
+  status: pending
+- id: SC-2
+  description: CollectionArtifact model has tools_json column
+  status: pending
+- id: SC-3
+  description: Migration runs cleanly on dev database
+  status: pending
+- id: SC-4
+  description: No breaking changes to existing API responses
+  status: pending
 files_modified:
-  - "skillmeat/api/schemas/user_collections.py"
-  - "skillmeat/api/schemas/collections.py"
-  - "skillmeat/cache/models.py"
-  - "skillmeat/cache/migrations/versions/"
+- skillmeat/api/schemas/user_collections.py
+- skillmeat/api/schemas/collections.py
+- skillmeat/cache/models.py
+- skillmeat/cache/migrations/versions/
+progress: 100
+updated: '2026-02-02'
 ---
 
 # tools-api-support - Phase 1: Schema & Data Model
