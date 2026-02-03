@@ -52,7 +52,7 @@ function generateSlug(name: string): string {
 // --- Component ---
 
 export function TagManager() {
-  const { data, isLoading } = useTags(200);
+  const { data, isLoading } = useTags(100);
   const createTag = useCreateTag();
   const updateTag = useUpdateTag();
   const deleteTag = useDeleteTag();
