@@ -353,11 +353,11 @@ describe('mapArtifactToEntity', () => {
     it('flattens metadata from nested object', () => {
       const artifact: ApiArtifactResponse = {
         ...minimalArtifact,
+        tags: ['tag1', 'tag2'],
         metadata: {
           description: 'Nested description',
           author: 'Nested author',
           license: 'MIT',
-          tags: ['tag1', 'tag2'],
           version: '1.0.0',
           dependencies: ['dep1', 'dep2'],
         },
@@ -387,21 +387,15 @@ describe('mapArtifactToEntity', () => {
       expect(result.description).toBe('Top-level description');
     });
 
-    it('merges tags from both top-level and metadata', () => {
+    it('uses tags from top-level field only', () => {
       const artifact: ApiArtifactResponse = {
         ...minimalArtifact,
         tags: ['top1', 'top2'],
-        metadata: {
-          tags: ['meta1', 'top2'], // 'top2' is duplicate
-        },
       };
 
       const result = mapArtifactToEntity(artifact);
 
-      expect(result.tags).toContain('top1');
-      expect(result.tags).toContain('top2');
-      expect(result.tags).toContain('meta1');
-      expect(result.tags?.filter((t) => t === 'top2')).toHaveLength(1); // Deduplication
+      expect(result.tags).toEqual(['top1', 'top2']);
     });
 
     it('handles empty tags array correctly', () => {

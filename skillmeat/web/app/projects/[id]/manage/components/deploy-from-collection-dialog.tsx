@@ -74,7 +74,7 @@ export function DeployFromCollectionDialog({
         collection: collectionId,
         syncStatus: 'synced',
         scope: 'user',
-        tags: item.metadata?.tags || [],
+        tags: item.tags ?? item.metadata?.tags ?? [],
         description: item.metadata?.description || undefined,
         version: item.version || item.metadata?.version || undefined,
         source: item.source,
