@@ -3638,9 +3638,8 @@ async def import_artifacts(
                     detail=f"Entry '{entry_id}' does not belong to source '{source_id}'",
                 )
 
-            # Extract description from metadata_json if available
-            entry_metadata = entry.get_metadata_dict() or {}
-            description = entry_metadata.get("description")
+            # Use the dedicated description column (populated from frontmatter during indexing)
+            description = entry.description
 
             # Extract approved tags from path_segments
             tags = []
@@ -3938,9 +3937,8 @@ async def reimport_catalog_entry(
                 detail="Failed to reset catalog entry status",
             )
 
-        # Extract description and tags from catalog entry metadata
-        entry_metadata = entry.get_metadata_dict() or {}
-        description = entry_metadata.get("description")
+        # Use the dedicated description column (populated from frontmatter during indexing)
+        description = entry.description
 
         tags = []
         if entry.path_segments:
