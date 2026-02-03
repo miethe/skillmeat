@@ -4,6 +4,7 @@ Provides REST API for managing artifacts within collections.
 """
 
 import base64
+import json
 import logging
 import time
 from datetime import datetime, timezone
@@ -6421,6 +6422,23 @@ async def update_artifact_tags(
 
         # Save collection back to disk
         collection_mgr.save_collection(coll)
+
+        # Refresh CollectionArtifact cache to keep tags in sync
+        try:
+            db_session = get_session()
+            cas = (
+                db_session.query(CollectionArtifact)
+                .filter_by(artifact_id=artifact_id)
+                .all()
+            )
+            for ca in cas:
+                ca.tags_json = json.dumps(request.tags) if request.tags else None
+            db_session.commit()
+            db_session.close()
+        except Exception as cache_err:
+            logger.warning(
+                f"Failed to update CollectionArtifact tags cache: {cache_err}"
+            )
 
         logger.info(
             f"Successfully updated tags for artifact {artifact_id}: {artifact.tags}"

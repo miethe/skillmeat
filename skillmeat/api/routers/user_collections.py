@@ -416,10 +416,11 @@ def populate_collection_artifact_metadata(
                 license_val = metadata.license if metadata else None
                 version = metadata.version if metadata else None
 
-                # Convert tags list to JSON string
+                # Convert tags list to JSON string (merge top-level and metadata tags)
                 tags_json = None
-                if metadata and metadata.tags:
-                    tags_json = json.dumps(metadata.tags)
+                all_tags = (artifact.tags or []) + (metadata.tags if metadata and metadata.tags else [])
+                if all_tags:
+                    tags_json = json.dumps(list(dict.fromkeys(all_tags)))
 
                 # Convert tools list to JSON string
                 tools_json = None
@@ -731,10 +732,11 @@ def _refresh_single_collection_cache(
             license_val = metadata.license if metadata else None
             version = metadata.version if metadata else None
 
-            # Convert tags list to JSON string
+            # Convert tags list to JSON string (merge top-level and metadata tags)
             tags_json = None
-            if metadata and metadata.tags:
-                tags_json = json.dumps(metadata.tags)
+            all_tags = (file_artifact.tags or []) + (metadata.tags if metadata and metadata.tags else [])
+            if all_tags:
+                tags_json = json.dumps(list(dict.fromkeys(all_tags)))
 
             # Convert tools list to JSON string
             tools_json = None
@@ -2289,10 +2291,11 @@ async def refresh_collection_cache(
             license_val = metadata.license if metadata else None
             version = metadata.version if metadata else None
 
-            # Convert tags list to JSON string
+            # Convert tags list to JSON string (merge top-level and metadata tags)
             tags_json = None
-            if metadata and metadata.tags:
-                tags_json = json.dumps(metadata.tags)
+            all_tags = (file_artifact.tags or []) + (metadata.tags if metadata and metadata.tags else [])
+            if all_tags:
+                tags_json = json.dumps(list(dict.fromkeys(all_tags)))
 
             # Convert tools list to JSON string
             tools_json = None

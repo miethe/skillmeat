@@ -81,8 +81,11 @@ def refresh_single_artifact_cache(
                 file_artifact.metadata.license if file_artifact.metadata else None
             ),
             "tags_json": (
-                json.dumps(file_artifact.metadata.tags)
-                if file_artifact.metadata and file_artifact.metadata.tags
+                json.dumps(list(dict.fromkeys(
+                    (file_artifact.tags or []) +
+                    (file_artifact.metadata.tags if file_artifact.metadata else [])
+                )))
+                if (file_artifact.tags or (file_artifact.metadata and file_artifact.metadata.tags))
                 else None
             ),
             "tools_json": (
