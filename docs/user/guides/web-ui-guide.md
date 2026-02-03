@@ -698,6 +698,19 @@ The Analytics section provides insights into artifact usage and deployment patte
 - Marketplace API token (if required)
 - Publisher settings
 
+### Tag Management
+
+Access tag management from **Settings** → **Tags** in the sidebar.
+
+**Tag Manager** (`/settings/tags`):
+- View all tags with artifact usage counts
+- Create new tags with name, color, and auto-generated slug
+- Inline editing: click a tag name to rename, click color swatch to recolor
+- Delete tags with confirmation showing affected artifact count
+- Search and filter tags by name or slug
+
+For detailed tag usage instructions, see the [Tags User Guide](./tags-user-guide.md).
+
 ### Data Management
 
 **Backups:**
