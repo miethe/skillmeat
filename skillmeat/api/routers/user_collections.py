@@ -416,11 +416,8 @@ def populate_collection_artifact_metadata(
                 license_val = metadata.license if metadata else None
                 version = metadata.version if metadata else None
 
-                # Convert tags list to JSON string (merge top-level and metadata tags)
-                tags_json = None
-                all_tags = (artifact.tags or []) + (metadata.tags if metadata and metadata.tags else [])
-                if all_tags:
-                    tags_json = json.dumps(list(dict.fromkeys(all_tags)))
+                # Convert tags list to JSON string
+                tags_json = json.dumps(artifact.tags) if artifact.tags else None
 
                 # Convert tools list to JSON string
                 tools_json = None
@@ -732,11 +729,8 @@ def _refresh_single_collection_cache(
             license_val = metadata.license if metadata else None
             version = metadata.version if metadata else None
 
-            # Convert tags list to JSON string (merge top-level and metadata tags)
-            tags_json = None
-            all_tags = (file_artifact.tags or []) + (metadata.tags if metadata and metadata.tags else [])
-            if all_tags:
-                tags_json = json.dumps(list(dict.fromkeys(all_tags)))
+            # Convert tags list to JSON string
+            tags_json = json.dumps(file_artifact.tags) if file_artifact.tags else None
 
             # Convert tools list to JSON string
             tools_json = None
@@ -1557,12 +1551,7 @@ async def list_collection_artifacts(
                                 if file_artifact.metadata
                                 else None
                             ),
-                            tags=(
-                                file_artifact.metadata.tags
-                                if file_artifact.metadata
-                                and file_artifact.metadata.tags
-                                else None
-                            ),
+                            tags=file_artifact.tags or None,
                             tools=(
                                 [
                                     tool.value if hasattr(tool, "value") else str(tool)
@@ -2291,11 +2280,8 @@ async def refresh_collection_cache(
             license_val = metadata.license if metadata else None
             version = metadata.version if metadata else None
 
-            # Convert tags list to JSON string (merge top-level and metadata tags)
-            tags_json = None
-            all_tags = (file_artifact.tags or []) + (metadata.tags if metadata and metadata.tags else [])
-            if all_tags:
-                tags_json = json.dumps(list(dict.fromkeys(all_tags)))
+            # Convert tags list to JSON string
+            tags_json = json.dumps(file_artifact.tags) if file_artifact.tags else None
 
             # Convert tools list to JSON string
             tools_json = None

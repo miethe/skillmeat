@@ -176,11 +176,6 @@ class ArtifactMetadataResponse(BaseModel):
         description="Artifact version from metadata",
         examples=["1.2.3"],
     )
-    tags: List[str] = Field(
-        default_factory=list,
-        description="Artifact tags",
-        examples=[["document", "pdf", "productivity"]],
-    )
     dependencies: List[str] = Field(
         default_factory=list,
         description="Required dependencies",

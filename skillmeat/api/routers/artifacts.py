@@ -523,7 +523,6 @@ def artifact_to_response(
             author=artifact.metadata.author,
             license=artifact.metadata.license,
             version=artifact.metadata.version,
-            tags=artifact.metadata.tags,
             dependencies=artifact.metadata.dependencies,
             tools=(
                 [tool.value for tool in artifact.metadata.tools]
@@ -2399,7 +2398,7 @@ async def update_artifact(
                 artifact.metadata.license = metadata_updates.license
                 updated = True
             if metadata_updates.tags is not None:
-                artifact.metadata.tags = metadata_updates.tags
+                artifact.tags = metadata_updates.tags
                 updated = True
 
             if updated:
