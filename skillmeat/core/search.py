@@ -245,12 +245,12 @@ class SearchManager:
                 score += 5.0
                 match_contexts.append(f"Description: {metadata.description[:100]}")
 
-            # Tags match (high weight)
-            if metadata.tags:
-                for tag in metadata.tags:
-                    if query_lower in tag.lower():
-                        score += 8.0
-                        match_contexts.append(f"Tag: {tag}")
+            # Tags match (high weight) - prefer artifact.tags (single source of truth)
+            tags = artifact.tags if artifact.tags else (metadata.tags or [])
+            for tag in tags:
+                if query_lower in tag.lower():
+                    score += 8.0
+                    match_contexts.append(f"Tag: {tag}")
 
             # Author match
             if metadata.author and query_lower in metadata.author.lower():
@@ -949,12 +949,12 @@ class SearchManager:
                 score += 5.0
                 match_contexts.append(f"Description: {metadata.description[:100]}")
 
-            # Tags match (high weight)
-            if metadata.tags:
-                for tag in metadata.tags:
-                    if query_lower in tag.lower():
-                        score += 8.0
-                        match_contexts.append(f"Tag: {tag}")
+            # Tags match (high weight) - prefer artifact tags (single source of truth)
+            tags = artifact.get("tags") or (metadata.tags or [])
+            for tag in tags:
+                if query_lower in tag.lower():
+                    score += 8.0
+                    match_contexts.append(f"Tag: {tag}")
 
             # Author match
             if metadata.author and query_lower in metadata.author.lower():
@@ -1277,7 +1277,7 @@ class SearchManager:
             structure_hash=structure_hash,
             title=metadata.title,
             description=metadata.description,
-            tags=metadata.tags or [],
+            tags=artifact.get("tags") or metadata.tags or [],
             file_count=file_count,
             total_size=total_size,
         )

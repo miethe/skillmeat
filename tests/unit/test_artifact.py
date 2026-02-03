@@ -74,7 +74,7 @@ class TestArtifactMetadata:
         assert result == {}
 
     def test_to_dict_with_values(self):
-        """Test serializing metadata to dict."""
+        """Test serializing metadata to dict (tags excluded - stored at artifact level)."""
         metadata = ArtifactMetadata(
             title="Test Skill",
             description="A test skill",
@@ -84,7 +84,6 @@ class TestArtifactMetadata:
         assert result == {
             "title": "Test Skill",
             "description": "A test skill",
-            "tags": ["test"],
         }
 
     def test_from_dict_empty(self):
@@ -390,7 +389,11 @@ class TestArtifact:
         assert artifact.metadata.description == "A test"
 
     def test_roundtrip_serialization(self):
-        """Test that artifact can be serialized and deserialized."""
+        """Test that artifact can be serialized and deserialized.
+
+        After __post_init__, metadata.tags are merged into artifact.tags
+        and metadata.tags is cleared. The roundtrip preserves this state.
+        """
         now = datetime(2025, 11, 7, 12, 0, 0)
         metadata = ArtifactMetadata(title="Test", tags=["python"])
         original = Artifact(
@@ -403,6 +406,10 @@ class TestArtifact:
             upstream="https://github.com/user/repo",
             tags=["coding"],
         )
+
+        # After construction, metadata tags are merged into artifact.tags
+        assert original.tags == ["coding", "python"]
+        assert original.metadata.tags == []
 
         # Serialize and deserialize
         data = original.to_dict()
@@ -417,7 +424,7 @@ class TestArtifact:
         assert restored.upstream == original.upstream
         assert restored.tags == original.tags
         assert restored.metadata.title == original.metadata.title
-        assert restored.metadata.tags == original.metadata.tags
+        assert restored.metadata.tags == []
 
     def test_to_dict_marketplace_with_origin_source(self):
         """Test serializing artifact with marketplace origin and origin_source."""
@@ -474,3 +481,48 @@ class TestArtifact:
         # Check origin fields match
         assert restored.origin == original.origin
         assert restored.origin_source == original.origin_source
+
+    def test_post_init_merges_metadata_tags(self):
+        """Tags from metadata are merged into artifact.tags and metadata.tags is cleared."""
+        metadata = ArtifactMetadata(tags=["from-frontmatter", "shared"])
+        artifact = Artifact(
+            name="test",
+            type=ArtifactType.SKILL,
+            path="skills/test/",
+            origin="local",
+            metadata=metadata,
+            added=datetime.utcnow(),
+            tags=["user-tag", "shared"],
+        )
+        assert artifact.tags == ["user-tag", "shared", "from-frontmatter"]
+        assert artifact.metadata.tags == []
+
+    def test_post_init_no_metadata_tags_noop(self):
+        """When metadata has no tags, artifact.tags is unchanged."""
+        metadata = ArtifactMetadata()
+        artifact = Artifact(
+            name="test",
+            type=ArtifactType.SKILL,
+            path="skills/test/",
+            origin="local",
+            metadata=metadata,
+            added=datetime.utcnow(),
+            tags=["user-tag"],
+        )
+        assert artifact.tags == ["user-tag"]
+        assert artifact.metadata.tags == []
+
+    def test_from_dict_merges_legacy_metadata_tags(self):
+        """Artifact.from_dict merges legacy metadata.tags into top-level tags."""
+        data = {
+            "name": "test",
+            "type": "skill",
+            "path": "skills/test/",
+            "origin": "local",
+            "added": "2025-01-01T00:00:00",
+            "metadata": {"tags": ["legacy-tag"]},
+            "tags": ["top-tag"],
+        }
+        artifact = Artifact.from_dict(data)
+        assert artifact.tags == ["top-tag", "legacy-tag"]
+        assert artifact.metadata.tags == []

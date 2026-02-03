@@ -256,7 +256,7 @@ def cmd_list(
             ]
             if tags:
                 tag_str = (
-                    ", ".join(artifact.metadata.tags) if artifact.metadata.tags else ""
+                    ", ".join(artifact.tags) if artifact.tags else ""
                 )
                 row.append(tag_str)
             table.add_row(*row)
