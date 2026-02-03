@@ -410,6 +410,11 @@ export function UnifiedEntityModal({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Reset selectedPath when entity changes or modal closes
+  useEffect(() => {
+    setSelectedPath(null);
+  }, [entity?.id, open]);
+
   // Cross-navigation between /manage and /collection pages
   const pathname = usePathname();
   const router = useRouter();

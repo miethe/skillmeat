@@ -459,6 +459,11 @@ export function ArtifactOperationsModal({
     }
   }, [open, initialTab]);
 
+  // Reset selectedPath when artifact changes or modal closes
+  useEffect(() => {
+    setSelectedPath(null);
+  }, [artifact?.id, open]);
+
   // Get artifact type config
   const config = artifact ? ARTIFACT_TYPES[artifact.type] : null;
   // Type-safe icon lookup with fallback

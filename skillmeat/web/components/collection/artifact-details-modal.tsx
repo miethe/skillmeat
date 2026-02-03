@@ -491,6 +491,11 @@ export function ArtifactDetailsModal({
     }
   }, [open, initialTab]);
 
+  // Reset selectedPath when artifact changes or modal closes
+  useEffect(() => {
+    setSelectedPath(null);
+  }, [artifact?.id, open]);
+
   // Update URL when tab changes
   const handleTabChange = useCallback(
     (tab: string) => {
