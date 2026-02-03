@@ -216,11 +216,14 @@ class GitHubClient:
             Configured Github instance
         """
         if self._github is None:
+            # Disable PyGithub's default retry (GithubRetry(total=10)) which
+            # retries rate-limited requests with exponential backoff, causing
+            # the CLI to hang. SkillMeat handles rate limits in _handle_exception().
             if self._token:
                 auth = Auth.Token(self._token)
-                self._github = Github(auth=auth)
+                self._github = Github(auth=auth, retry=0, timeout=30)
             else:
-                self._github = Github()
+                self._github = Github(retry=0, timeout=30)
         return self._github
 
     def _extract_owner_repo(self, owner_repo: str) -> Tuple[str, str]:
