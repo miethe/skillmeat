@@ -17,8 +17,9 @@ import yaml
 # which is imported by skillmeat.core.__init__.py
 
 if TYPE_CHECKING:
-    from skillmeat.core.artifact import Artifact, LinkedArtifactReference
+    from skillmeat.core.artifact import Artifact, ArtifactMetadata, LinkedArtifactReference
     from skillmeat.core.artifact_detection import ArtifactType
+    from skillmeat.core.github_client import GitHubClient
 
 logger = logging.getLogger(__name__)
 
@@ -825,6 +826,206 @@ def extract_artifact_metadata(
         metadata.description = extract_description_from_content(body_content)
 
     return metadata
+
+
+# =============================================================================
+# Content-Based Metadata Extraction
+# =============================================================================
+
+
+def extract_metadata_from_content(
+    content: str,
+    artifact_type: "ArtifactType",
+) -> "ArtifactMetadata":
+    """Extract metadata from raw file content using the frontmatter pipeline.
+
+    Content-source-agnostic: works with content from GitHub API, local files,
+    or any other source. Delegates to the existing extract_frontmatter() +
+    populate_metadata_from_frontmatter() pipeline for structured extraction,
+    with a fallback to body-text description extraction when frontmatter
+    does not provide a description.
+
+    Args:
+        content: Raw markdown file content (may include YAML frontmatter).
+        artifact_type: Type of artifact being extracted (used for future
+            type-specific extraction logic).
+
+    Returns:
+        ArtifactMetadata instance populated with any extracted fields.
+        Returns an empty ArtifactMetadata if content is empty or contains
+        no extractable metadata.
+
+    Examples:
+        >>> from skillmeat.core.artifact_detection import ArtifactType
+        >>> content = '''---
+        ... description: A useful skill
+        ... tools: [Bash, Read]
+        ... ---
+        ... # My Skill
+        ... '''
+        >>> metadata = extract_metadata_from_content(content, ArtifactType.SKILL)
+        >>> metadata.description
+        'A useful skill'
+    """
+    # Import at function level to avoid circular imports
+    from skillmeat.core.artifact import ArtifactMetadata
+
+    if not content or not content.strip():
+        logger.debug("Empty content provided to extract_metadata_from_content")
+        return ArtifactMetadata()
+
+    metadata = ArtifactMetadata()
+
+    # Step 1: Extract frontmatter and populate metadata
+    try:
+        frontmatter = extract_frontmatter(content)
+        if frontmatter:
+            metadata = populate_metadata_from_frontmatter(metadata, frontmatter)
+            logger.debug(
+                "Extracted frontmatter metadata",
+                extra={"has_description": metadata.description is not None},
+            )
+    except Exception as e:
+        logger.warning(f"Frontmatter extraction failed: {e}")
+
+    # Step 2: Fallback description from body text if frontmatter had none
+    if not metadata.description:
+        body_content = content
+        # Strip frontmatter block to get body text
+        stripped = content.lstrip()
+        if stripped.startswith("---"):
+            lines = stripped.split("\n")
+            for i in range(1, len(lines)):
+                if lines[i].strip() == "---":
+                    body_content = "\n".join(lines[i + 1 :])
+                    break
+        fallback_desc = extract_description_from_content(body_content)
+        if fallback_desc:
+            metadata.description = fallback_desc
+            logger.debug("Used body-text fallback for description")
+
+    return metadata
+
+
+def fetch_and_extract_github_metadata(
+    client: "GitHubClient",
+    owner: str,
+    repo: str,
+    path: str,
+    artifact_type: "ArtifactType",
+    ref: str = "HEAD",
+) -> Optional["ArtifactMetadata"]:
+    """Fetch artifact metadata from GitHub, handling both files and directories.
+
+    For single-file paths (ending in .md): fetches the file directly via
+    the GitHub API and extracts metadata from its content.
+
+    For directory paths: probes for type-appropriate metadata files
+    (SKILL.md, AGENT.md, COMMAND.md, etc.) and extracts metadata from
+    the first one found.
+
+    Args:
+        client: GitHubClient instance for GitHub API access.
+        owner: GitHub repository owner (username or organization).
+        repo: GitHub repository name.
+        path: Path within the repository. Can be a file path ending in .md
+            or a directory path.
+        artifact_type: Type of artifact to extract metadata for. Determines
+            which candidate metadata files to look for in directory paths.
+        ref: Git ref (branch, tag, SHA, or "HEAD"). Defaults to "HEAD",
+            which resolves to the repository's default branch.
+
+    Returns:
+        ArtifactMetadata populated from the first successfully fetched and
+        parsed metadata file, or None if no metadata could be extracted
+        (file not found, empty content, or all candidates exhausted).
+
+    Examples:
+        >>> from skillmeat.core.github_client import GitHubClient
+        >>> from skillmeat.core.artifact_detection import ArtifactType
+        >>> client = GitHubClient()
+        >>> # Single-file artifact (agent or command)
+        >>> meta = fetch_and_extract_github_metadata(
+        ...     client, "user", "repo", "agents/my-agent.md", ArtifactType.AGENT
+        ... )
+        >>> # Directory artifact (skill)
+        >>> meta = fetch_and_extract_github_metadata(
+        ...     client, "user", "repo", "skills/canvas", ArtifactType.SKILL
+        ... )
+    """
+    # Import at function level to avoid circular imports
+    from skillmeat.core.artifact_detection import ArtifactType
+    from skillmeat.core.github_client import GitHubClientError, GitHubNotFoundError
+
+    # Normalize ref: treat "HEAD" and "latest" as None (default branch)
+    ref_param: Optional[str] = ref if ref not in ("HEAD", "latest") else None
+    owner_repo = f"{owner}/{repo}"
+
+    def _fetch_content(file_path: str) -> Optional[str]:
+        """Fetch and decode file content, returning None on not-found."""
+        try:
+            content_bytes = client.get_file_content(
+                owner_repo, file_path, ref=ref_param
+            )
+            return content_bytes.decode("utf-8")
+        except GitHubNotFoundError:
+            logger.debug(f"File not found: {file_path} in {owner_repo}")
+            return None
+        except GitHubClientError as e:
+            logger.warning(
+                f"Failed to fetch {file_path} from {owner_repo}: {e.message}"
+            )
+            return None
+        except Exception as e:
+            logger.warning(
+                f"Unexpected error fetching {file_path} from {owner_repo}: {e}"
+            )
+            return None
+
+    # --- Single-file path (e.g., agents/my-agent.md) ---
+    if path.endswith(".md"):
+        logger.debug(f"Fetching single-file metadata: {path} from {owner_repo}")
+        content = _fetch_content(path)
+        if content:
+            return extract_metadata_from_content(content, artifact_type)
+        return None
+
+    # --- Directory path: probe for type-appropriate metadata files ---
+    candidate_map: Dict[str, List[str]] = {
+        "skill": ["SKILL.md", "README.md"],
+        "agent": ["AGENT.md", "README.md"],
+        "command": ["COMMAND.md", "README.md"],
+        "hook": ["HOOK.md", "README.md"],
+    }
+
+    # Get the artifact type value as a string for lookup
+    type_value = (
+        artifact_type.value
+        if hasattr(artifact_type, "value")
+        else str(artifact_type)
+    )
+    candidates = candidate_map.get(
+        type_value,
+        ["SKILL.md", "COMMAND.md", "AGENT.md", "README.md"],
+    )
+
+    logger.debug(
+        f"Probing directory {path} in {owner_repo} for metadata files: {candidates}"
+    )
+
+    for filename in candidates:
+        file_path = f"{path}/{filename}" if path else filename
+        content = _fetch_content(file_path)
+        if content:
+            metadata = extract_metadata_from_content(content, artifact_type)
+            logger.debug(f"Extracted metadata from {file_path}")
+            return metadata
+
+    logger.debug(
+        f"No metadata file found for {path} in {owner_repo} "
+        f"(tried {candidates})"
+    )
+    return None
 
 
 # =============================================================================
