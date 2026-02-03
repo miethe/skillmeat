@@ -29,7 +29,6 @@ export interface ApiMetadata {
   license?: string;
   author?: string;
   version?: string;
-  tags?: string[];
   tools?: string[];
 }
 
@@ -304,10 +303,8 @@ export function mapApiResponseToArtifact(
   const license = response.license || response.metadata?.license;
   const version = response.version || response.metadata?.version;
 
-  // Merge tags from both sources, deduplicate
-  const topLevelTags = response.tags || [];
-  const metadataTags = response.metadata?.tags || [];
-  const allTags = [...new Set([...topLevelTags, ...metadataTags])];
+  // Tags come from top-level only (backend consolidates into Artifact.tags)
+  const allTags = response.tags || [];
 
   // Merge tools from both sources, deduplicate
   const topLevelTools = response.tools || [];

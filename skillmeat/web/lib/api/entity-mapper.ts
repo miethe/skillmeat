@@ -43,7 +43,6 @@ export interface ApiArtifactMetadata {
   author?: string | null;
   license?: string | null;
   version?: string | null;
-  tags?: string[];
   tools?: string[];
   dependencies?: string[];
 }
@@ -408,10 +407,8 @@ export function mapArtifactToEntity(
   const author = artifact.author ?? artifact.metadata?.author ?? undefined;
   const license = artifact.license ?? artifact.metadata?.license ?? undefined;
 
-  // Merge tags from both sources, deduplicate
-  const topLevelTags = artifact.tags ?? [];
-  const metadataTags = artifact.metadata?.tags ?? [];
-  const tags = [...new Set([...topLevelTags, ...metadataTags])];
+  // Tags come from top-level only (backend consolidates into Artifact.tags)
+  const tags = artifact.tags ?? [];
 
   // Merge tools from both sources, deduplicate
   const topLevelTools = artifact.tools ?? [];

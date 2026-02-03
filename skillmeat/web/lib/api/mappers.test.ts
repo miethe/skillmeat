@@ -156,18 +156,7 @@ describe('mapApiResponseToArtifact', () => {
       expect(artifact.version).toBe('1.2.3');
     });
 
-    it('should merge and deduplicate tags from both sources', () => {
-      const response = createApiResponse({
-        tags: ['frontend', 'design'],
-        metadata: { tags: ['design', 'ui'] },
-      });
-
-      const artifact = mapApiResponseToArtifact(response, 'collection');
-
-      expect(artifact.tags).toEqual(['frontend', 'design', 'ui']);
-    });
-
-    it('should handle tags from top-level only', () => {
+    it('should use tags from top-level field', () => {
       const response = createApiResponse({
         tags: ['frontend', 'design'],
       });
@@ -175,16 +164,6 @@ describe('mapApiResponseToArtifact', () => {
       const artifact = mapApiResponseToArtifact(response, 'collection');
 
       expect(artifact.tags).toEqual(['frontend', 'design']);
-    });
-
-    it('should handle tags from metadata only', () => {
-      const response = createApiResponse({
-        metadata: { tags: ['backend', 'api'] },
-      });
-
-      const artifact = mapApiResponseToArtifact(response, 'collection');
-
-      expect(artifact.tags).toEqual(['backend', 'api']);
     });
 
     it('should not include tags property when no tags exist', () => {
