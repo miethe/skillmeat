@@ -154,17 +154,39 @@ def mock_collection_manager(mock_collection):
 
 @pytest.fixture
 def mock_metadata_extractor():
-    """Create mock metadata extractor."""
+    """Create mock metadata extractor.
+
+    _fetch_repo_metadata returns empty dict by default to match the
+    real behavior when repo-level metadata cannot be fetched. This
+    ensures the new extraction path falls back to the legacy extractor
+    (fetch_metadata) when no artifact file content is found.
+    """
     mock = MagicMock()
+    mock._fetch_repo_metadata.return_value = {}
     return mock
 
 
 @pytest.fixture
-def refresher(mock_collection_manager, mock_metadata_extractor):
+def mock_github_client():
+    """Create mock GitHub client for refresher tests.
+
+    By default, get_file_content raises GitHubNotFoundError so that
+    the new extraction path finds no artifact files and falls back
+    to the legacy extractor (metadata_extractor.fetch_metadata).
+    Tests that need different behavior can override this.
+    """
+    mock = MagicMock()
+    mock.get_file_content.side_effect = GitHubNotFoundError("Not found")
+    return mock
+
+
+@pytest.fixture
+def refresher(mock_collection_manager, mock_metadata_extractor, mock_github_client):
     """Create refresher with mock dependencies."""
     return CollectionRefresher(
         collection_manager=mock_collection_manager,
         metadata_extractor=mock_metadata_extractor,
+        github_client=mock_github_client,
     )
 
 
