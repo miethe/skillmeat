@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, Suspense, useCallback } from 'react';
+import { useState, useEffect, useMemo, Suspense, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Package, Loader2, Library } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
@@ -150,6 +150,8 @@ function CollectionPageContent() {
   // Modal state
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  // Ref to track closing state to prevent race condition with URL-based auto-open
+  const isClosingRef = useRef(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
@@ -611,6 +613,9 @@ function CollectionPageContent() {
   // ==========================================================================
 
   useEffect(() => {
+    // Skip if we're in the process of closing (prevents race condition with async URL update)
+    if (isClosingRef.current) return;
+
     // Only process if we have a URL artifact ID, artifacts are loaded, and modal isn't already open
     if (urlArtifactId && filteredArtifacts.length > 0 && !isDetailOpen) {
       const artifact = filteredArtifacts.find(
@@ -638,6 +643,8 @@ function CollectionPageContent() {
   };
 
   const handleDetailClose = () => {
+    // Set closing flag FIRST to prevent race condition with auto-open useEffect
+    isClosingRef.current = true;
     setIsDetailOpen(false);
     // Clear artifact and tab from URL
     updateUrlParams({
@@ -645,6 +652,10 @@ function CollectionPageContent() {
       tab: null,
     });
     setTimeout(() => setSelectedArtifact(null), 300);
+    // Reset closing flag after a tick to allow URL to update
+    setTimeout(() => {
+      isClosingRef.current = false;
+    }, 0);
   };
 
   const handleTabChange = (tab: ArtifactDetailsTab) => {

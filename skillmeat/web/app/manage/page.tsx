@@ -110,6 +110,8 @@ function ManagePageContent() {
   // Track pending artifact selection from URL to handle race condition
   // where entities may not be loaded when URL param is first read
   const pendingArtifactRef = useRef<string | null>(null);
+  // Ref to track closing state to prevent race condition with URL-based auto-open
+  const isClosingRef = useRef(false);
 
   // Handle URL-based artifact selection (auto-open modal when navigating with artifact param)
   useEffect(() => {
@@ -125,6 +127,9 @@ function ManagePageContent() {
       pendingArtifactRef.current = null;
       return;
     }
+
+    // Skip if we're in the process of closing (prevents race condition with async URL update)
+    if (isClosingRef.current) return;
 
     // Attempt to select when we have entities AND a pending selection AND no current selection
     if (pendingArtifactRef.current && entities.length > 0 && !selectedArtifact) {
@@ -234,6 +239,8 @@ function ManagePageContent() {
   }, [updateUrlParams]);
 
   const handleDetailClose = useCallback(() => {
+    // Set closing flag FIRST to prevent race condition with auto-open useEffect
+    isClosingRef.current = true;
     setDetailPanelOpen(false);
     setSelectedArtifact(null);
     // Clear artifact and tab from URL
@@ -241,6 +248,10 @@ function ManagePageContent() {
       artifact: null,
       tab: null,
     });
+    // Reset closing flag after a tick to allow URL to update
+    setTimeout(() => {
+      isClosingRef.current = false;
+    }, 0);
   }, [updateUrlParams]);
 
   const handleTabChange = useCallback((tab: OperationsModalTab) => {

@@ -36,7 +36,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import * as LucideIcons from 'lucide-react';
 import {
@@ -54,11 +54,13 @@ import {
   User,
   RotateCcw,
   Loader2,
+  FolderOpen,
+  Github,
+  ExternalLink,
 } from 'lucide-react';
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -81,6 +83,8 @@ import { ContentPane } from '@/components/entity/content-pane';
 import { SyncStatusTab } from '@/components/sync-status';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
 import { DeployDialog } from '@/components/collection/deploy-dialog';
+import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
+import { TagEditor } from '@/components/shared/tag-editor';
 
 // Types
 import type { Artifact } from '@/types/artifact';
@@ -95,6 +99,9 @@ import {
   deploymentKeys,
   useProjects,
   useEntityLifecycle,
+  useSources,
+  useTags,
+  useUpdateArtifactTags,
 } from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments';
@@ -109,6 +116,8 @@ export type OperationsModalTab =
   | 'contents'
   | 'sync'
   | 'deployments'
+  | 'collections'
+  | 'sources'
   | 'history';
 
 export interface ArtifactOperationsModalProps {
@@ -292,6 +301,7 @@ interface HistoryEntry {
 
 function getTabs(artifact: Artifact | null): Tab[] {
   const deploymentCount = artifact?.deployments?.length || 0;
+  const collectionsCount = artifact?.collections?.length || 0;
 
   return [
     { value: 'status', label: 'Status', icon: Activity },
@@ -304,6 +314,13 @@ function getTabs(artifact: Artifact | null): Tab[] {
       icon: Rocket,
       badge: deploymentCount > 0 ? deploymentCount : undefined,
     },
+    {
+      value: 'collections',
+      label: 'Collections',
+      icon: FolderOpen,
+      badge: collectionsCount > 0 ? collectionsCount : undefined,
+    },
+    { value: 'sources', label: 'Sources', icon: Github },
     { value: 'history', label: 'Version History', icon: History },
   ];
 }
@@ -412,6 +429,17 @@ function getHistoryTypeColor(type: HistoryEntry['type']) {
   }
 }
 
+/**
+ * Check if entity has a valid upstream source (not local-only)
+ */
+function hasValidUpstreamSource(source: string | undefined | null): boolean {
+  if (!source) return false;
+  if (source === 'local' || source === 'unknown') return false;
+  if (source.startsWith('local:')) return false;
+  const segments = source.split('/').filter(Boolean);
+  return segments.length >= 3 && !source.startsWith('local');
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -451,6 +479,15 @@ export function ArtifactOperationsModal({
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showDeployDialog, setShowDeployDialog] = useState(false);
+  const [localTags, setLocalTags] = useState<string[] | null>(null);
+
+  // Source entry state for Sources tab
+  const [sourceEntry, setSourceEntry] = useState<{
+    sourceId: string;
+    entryPath: string;
+    sourceName: string;
+  } | null>(null);
+  const [isLoadingSource, setIsLoadingSource] = useState(false);
 
   // Sync activeTab with initialTab when modal opens
   useEffect(() => {
@@ -463,6 +500,11 @@ export function ArtifactOperationsModal({
   useEffect(() => {
     setSelectedPath(null);
   }, [artifact?.id, open]);
+
+  // Reset localTags when artifact changes
+  useEffect(() => {
+    setLocalTags(null);
+  }, [artifact?.id]);
 
   // Get artifact type config
   const config = artifact ? ARTIFACT_TYPES[artifact.type] : null;
@@ -573,6 +615,106 @@ export function ArtifactOperationsModal({
     if (!artifact) return [];
     return generateMockHistory(artifact);
   }, [artifact]);
+
+  // Fetch marketplace sources for Sources tab
+  const { data: sourcesData } = useSources(100);
+
+  // Fetch tags for autocomplete
+  const { data: tagsData, isLoading: isTagsLoading } = useTags(100);
+  const availableTags = useMemo(() => {
+    if (!tagsData?.items) return [];
+    return tagsData.items.map((tag) => tag.name);
+  }, [tagsData]);
+
+  // Tag update mutation
+  const { mutate: updateTags, isPending: isUpdatingTags } = useUpdateArtifactTags();
+
+  // Handle tags change
+  const handleTagsChange = useCallback(
+    (newTags: string[]) => {
+      if (!artifact) return;
+
+      setLocalTags(newTags);
+
+      updateTags(
+        { artifactId: artifact.id, tags: newTags },
+        {
+          onSuccess: () => {
+            toast({
+              title: 'Tags updated',
+              description: 'Artifact tags have been updated.',
+            });
+            queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+          },
+          onError: (error) => {
+            setLocalTags(null);
+            toast({
+              title: 'Failed to update tags',
+              description: error instanceof Error ? error.message : 'Unknown error',
+              variant: 'destructive',
+            });
+          },
+        }
+      );
+    },
+    [artifact, updateTags, toast, queryClient]
+  );
+
+  // Find source catalog entry when Sources tab is active
+  useEffect(() => {
+    if (!artifact?.source || !open || activeTab !== 'sources') {
+      return;
+    }
+
+    const findSourceEntry = async () => {
+      setIsLoadingSource(true);
+      try {
+        const allSources = sourcesData?.pages?.flatMap((page) => page.items) || [];
+        const artifactSource = artifact.source || '';
+
+        for (const source of allSources) {
+          const repoPattern = `${source.owner}/${source.repo_name}`;
+          if (
+            artifactSource.includes(repoPattern) ||
+            artifactSource.includes(source.repo_url)
+          ) {
+            try {
+              const catalogResponse = await apiRequest<{
+                items: Array<{ name: string; artifact_type: string; path: string }>;
+              }>(
+                `/marketplace/sources/${source.id}/artifacts?search=${encodeURIComponent(artifact.name)}&limit=10`
+              );
+
+              const entry = catalogResponse.items?.find(
+                (e) => e.name === artifact.name && e.artifact_type === artifact.type
+              );
+
+              if (entry) {
+                setSourceEntry({
+                  sourceId: source.id,
+                  entryPath: entry.path,
+                  sourceName: `${source.owner}/${source.repo_name}`,
+                });
+                setIsLoadingSource(false);
+                return;
+              }
+            } catch {
+              // Continue to next source
+            }
+          }
+        }
+
+        setSourceEntry(null);
+      } catch (error) {
+        console.error('Failed to find source entry:', error);
+        setSourceEntry(null);
+      } finally {
+        setIsLoadingSource(false);
+      }
+    };
+
+    findSourceEntry();
+  }, [artifact, open, activeTab, sourcesData]);
 
   // Handle tab change
   const handleTabChange = (tab: string) => {
@@ -956,21 +1098,19 @@ export function ArtifactOperationsModal({
                 )}
 
                 {/* Tags */}
-                {artifact.tags && artifact.tags.length > 0 && (
-                  <div>
-                    <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
-                      <Tag className="h-4 w-4" aria-hidden="true" />
-                      Tags
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {artifact.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <div>
+                  <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
+                    <Tag className="h-4 w-4" aria-hidden="true" />
+                    Tags
+                  </h3>
+                  <TagEditor
+                    tags={localTags ?? artifact.tags ?? []}
+                    onTagsChange={handleTagsChange}
+                    availableTags={availableTags}
+                    isLoading={isTagsLoading || isUpdatingTags}
+                    disabled={isUpdatingTags}
+                  />
+                </div>
 
                 {/* Timestamps */}
                 <div>
@@ -1118,6 +1258,67 @@ export function ArtifactOperationsModal({
                         }
                       />
                     ))}
+                  </div>
+                )}
+              </div>
+            </TabContentWrapper>
+
+            {/* Collections Tab */}
+            <TabContentWrapper value="collections">
+              <ModalCollectionsTab artifact={artifact} context="operations" />
+            </TabContentWrapper>
+
+            {/* Sources Tab */}
+            <TabContentWrapper value="sources">
+              <div className="space-y-4">
+                <div className="text-sm font-medium text-muted-foreground">Imported From</div>
+
+                {isLoadingSource ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+                    <span className="sr-only">Loading source information</span>
+                  </div>
+                ) : sourceEntry ? (
+                  <div className="rounded-lg border p-4 transition-colors hover:bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <Github className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                      <div className="flex-1">
+                        <div className="font-medium">{sourceEntry.sourceName}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {sourceEntry.entryPath}
+                        </div>
+                        {artifact.version && (
+                          <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                            <Tag className="h-3 w-3" aria-hidden="true" />
+                            <span>{artifact.version}</span>
+                          </div>
+                        )}
+                      </div>
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    </div>
+                  </div>
+                ) : artifact?.source && hasValidUpstreamSource(artifact.source) ? (
+                  <div className="rounded-lg border p-4">
+                    <div className="flex items-center gap-3">
+                      <GitBranch className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                      <div className="flex-1">
+                        <div className="font-medium">Source</div>
+                        <div className="text-sm text-muted-foreground">{artifact.source}</div>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Unable to find the source entry in marketplace sources.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <GitBranch className="h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
+                    <p className="mt-4 text-sm text-muted-foreground">
+                      No upstream source information available.
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      This artifact was created locally or imported without source tracking.
+                    </p>
                   </div>
                 )}
               </div>
