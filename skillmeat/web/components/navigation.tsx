@@ -15,6 +15,7 @@ import {
   GitBranch,
   Share2,
   Settings,
+  Tag,
   FileText,
   FileCode2,
   Github,
@@ -92,10 +93,18 @@ const navigationConfig: NavigationConfig = {
         { name: 'Documentation', href: 'https://github.com/miethe/skillmeat#readme', icon: Book },
       ],
     },
+    {
+      title: 'Settings',
+      icon: Settings,
+      storageKey: 'settings',
+      items: [
+        { name: 'General', href: '/settings', icon: Settings },
+        { name: 'Tags', href: '/settings/tags', icon: Tag },
+      ],
+    },
   ],
   bottomItems: [
     { name: 'Sharing', href: '/sharing', icon: Share2 },
-    { name: 'Settings', href: '/settings', icon: Settings },
   ],
 };
 

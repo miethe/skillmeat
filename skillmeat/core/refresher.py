@@ -37,6 +37,7 @@ from skillmeat.core.github_metadata import (
 )
 from skillmeat.models import DriftDetectionResult
 from skillmeat.sources.base import UpdateInfo
+from skillmeat.utils.metadata import extract_metadata_from_content
 
 
 class RefreshMode(str, Enum):
@@ -668,7 +669,9 @@ class CollectionRefresher:
             return None
 
     def _fetch_upstream_metadata(
-        self, spec: GitHubSourceSpec
+        self,
+        spec: GitHubSourceSpec,
+        artifact_type: Optional[ArtifactType] = None,
     ) -> Optional[GitHubMetadata]:
         """Fetch metadata from GitHub for a single artifact.
 
@@ -676,8 +679,17 @@ class CollectionRefresher:
         - YAML frontmatter from artifact markdown files (SKILL.md, etc.)
         - Repository metadata (topics, license, description)
 
+        When artifact_type is provided, uses the new extraction utilities
+        (fetch_and_extract_github_metadata) for richer metadata extraction
+        from artifact files, combined with repo-level metadata for topics
+        and license. Falls back to the legacy GitHubMetadataExtractor when
+        artifact_type is None for backward compatibility.
+
         Args:
             spec: Parsed GitHub source specification with owner, repo, path
+            artifact_type: Optional artifact type for type-aware extraction.
+                When provided, uses the new extraction utilities for
+                improved metadata extraction from artifact files.
 
         Returns:
             GitHubMetadata if successful, None if not found or error occurred
@@ -696,6 +708,11 @@ class CollectionRefresher:
             >>> metadata = refresher._fetch_upstream_metadata(spec)
             >>> if metadata:
             ...     print(f"Description: {metadata.description}")
+            >>>
+            >>> # With artifact_type for enhanced extraction
+            >>> metadata = refresher._fetch_upstream_metadata(
+            ...     spec, artifact_type=ArtifactType.SKILL
+            ... )
         """
         # Build source string from spec
         source = f"{spec.owner}/{spec.repo}"
@@ -704,10 +721,20 @@ class CollectionRefresher:
         if spec.version and spec.version != "latest":
             source += f"@{spec.version}"
 
-        self._logger.debug(f"Fetching upstream metadata for: {source}")
+        self._logger.debug(
+            f"Fetching upstream metadata for: {source}"
+            + (f" (type={artifact_type.value})" if artifact_type else "")
+        )
 
         try:
-            metadata = self.metadata_extractor.fetch_metadata(source)
+            if artifact_type is not None:
+                metadata = self._fetch_with_new_extractor(spec, artifact_type, source)
+            else:
+                metadata = self._fetch_with_legacy_extractor(source)
+
+            if metadata is None:
+                return None
+
             self._logger.debug(
                 f"Successfully fetched metadata for {source}",
                 extra={
@@ -745,6 +772,205 @@ class CollectionRefresher:
                 exc_info=True,
             )
             return None
+
+    def _fetch_with_new_extractor(
+        self,
+        spec: GitHubSourceSpec,
+        artifact_type: ArtifactType,
+        source: str,
+    ) -> Optional[GitHubMetadata]:
+        """Fetch metadata using the new extraction utilities.
+
+        Fetches artifact file content via the GitHub client (allowing
+        exceptions like rate limit and not found to propagate to the
+        caller's error handling), then extracts metadata from the content
+        using extract_metadata_from_content(). Supplements artifact-level
+        metadata with repo-level metadata (topics, license) from the
+        GitHub API.
+
+        Args:
+            spec: Parsed GitHub source specification
+            artifact_type: Artifact type for type-aware file probing
+            source: Source string for logging
+
+        Returns:
+            GitHubMetadata combining artifact-level and repo-level data,
+            or None if extraction fails completely
+
+        Raises:
+            GitHubRateLimitError: If GitHub API rate limit is exceeded
+            GitHubNotFoundError: If the repository is not found
+            GitHubClientError: If a GitHub API error occurs
+        """
+        from datetime import datetime
+
+        ref = spec.version or "latest"
+        # Normalize ref: treat "HEAD" and "latest" as None (default branch)
+        ref_param: Optional[str] = ref if ref not in ("HEAD", "latest") else None
+        owner_repo = f"{spec.owner}/{spec.repo}"
+
+        # Step 1: Fetch artifact file content from GitHub.
+        # Exceptions (rate limit, not found, etc.) propagate to
+        # _fetch_upstream_metadata's try/except for proper error handling.
+        content = self._fetch_artifact_file_content(
+            owner_repo, spec.path, artifact_type, ref_param
+        )
+
+        # Step 2: Extract metadata from content if found
+        artifact_meta = None
+        if content is not None:
+            artifact_meta = extract_metadata_from_content(content, artifact_type)
+            self._logger.debug(
+                f"Extracted artifact metadata for {source}",
+                extra={
+                    "has_description": artifact_meta.description is not None,
+                    "has_title": artifact_meta.title is not None,
+                },
+            )
+
+        # Step 3: Fetch repo-level metadata (topics, license).
+        # Uses the metadata extractor's method which handles errors internally.
+        repo_metadata = self.metadata_extractor._fetch_repo_metadata(
+            spec.owner, spec.repo
+        )
+
+        # Build the URL
+        url = f"https://github.com/{spec.owner}/{spec.repo}"
+        if spec.path:
+            url += f"/tree/{spec.version}/{spec.path}"
+
+        # Step 4: Combine into GitHubMetadata
+        metadata_dict: Dict[str, Any] = {
+            "url": url,
+            "fetched_at": datetime.now(),
+            "source": "auto-populated",
+            "topics": [],
+        }
+
+        # Apply artifact-level fields if extraction succeeded
+        if artifact_meta is not None:
+            metadata_dict["title"] = artifact_meta.title
+            metadata_dict["description"] = artifact_meta.description
+            metadata_dict["author"] = artifact_meta.author
+            # Use artifact-level license if present
+            if artifact_meta.license:
+                metadata_dict["license"] = artifact_meta.license
+
+        # Apply repo-level fields (must be a dict with actual data)
+        has_repo_metadata = isinstance(repo_metadata, dict) and bool(repo_metadata)
+        if has_repo_metadata:
+            metadata_dict["topics"] = repo_metadata.get("topics", [])
+            # Only use repo license if artifact didn't provide one
+            if not metadata_dict.get("license"):
+                license_info = repo_metadata.get("license")
+                if license_info and isinstance(license_info, dict):
+                    metadata_dict["license"] = license_info.get("spdx_id")
+
+        # If neither extraction yielded anything useful, fall back to legacy
+        if artifact_meta is None and not has_repo_metadata:
+            self._logger.debug(
+                f"New extractor found no metadata for {source}, "
+                "falling back to legacy extractor"
+            )
+            return self._fetch_with_legacy_extractor(source)
+
+        return GitHubMetadata(**metadata_dict)
+
+    def _fetch_artifact_file_content(
+        self,
+        owner_repo: str,
+        path: str,
+        artifact_type: ArtifactType,
+        ref: Optional[str] = None,
+    ) -> Optional[str]:
+        """Fetch artifact metadata file content from GitHub.
+
+        For single-file paths (ending in .md), fetches the file directly.
+        For directory paths, probes for type-appropriate metadata files
+        (SKILL.md, AGENT.md, etc.) and returns the content of the first
+        one found.
+
+        Args:
+            owner_repo: Owner/repo string (e.g., "user/repo")
+            path: Path within the repository
+            artifact_type: Artifact type for determining candidate files
+            ref: Git ref (branch, tag, SHA), or None for default branch
+
+        Returns:
+            File content as string, or None if no metadata file found
+
+        Raises:
+            GitHubRateLimitError: If GitHub API rate limit is exceeded
+            GitHubNotFoundError: If the repository itself is not found
+            GitHubClientError: If a GitHub API error occurs
+        """
+        # Single-file path (e.g., agents/my-agent.md)
+        if path.endswith(".md"):
+            self._logger.debug(
+                f"Fetching single-file metadata: {path} from {owner_repo}"
+            )
+            try:
+                content_bytes = self.github_client.get_file_content(
+                    owner_repo, path, ref=ref
+                )
+                return content_bytes.decode("utf-8")
+            except GitHubNotFoundError:
+                self._logger.debug(f"File not found: {path} in {owner_repo}")
+                return None
+
+        # Directory path: probe for type-appropriate metadata files
+        candidate_map: Dict[str, List[str]] = {
+            "skill": ["SKILL.md", "README.md"],
+            "agent": ["AGENT.md", "README.md"],
+            "command": ["COMMAND.md", "README.md"],
+            "hook": ["HOOK.md", "README.md"],
+        }
+
+        type_value = (
+            artifact_type.value
+            if hasattr(artifact_type, "value")
+            else str(artifact_type)
+        )
+        candidates = candidate_map.get(
+            type_value,
+            ["SKILL.md", "COMMAND.md", "AGENT.md", "README.md"],
+        )
+
+        self._logger.debug(
+            f"Probing directory {path} in {owner_repo} for: {candidates}"
+        )
+
+        for filename in candidates:
+            file_path = f"{path}/{filename}" if path else filename
+            try:
+                content_bytes = self.github_client.get_file_content(
+                    owner_repo, file_path, ref=ref
+                )
+                return content_bytes.decode("utf-8")
+            except GitHubNotFoundError:
+                self._logger.debug(f"File not found: {file_path} in {owner_repo}")
+                continue
+
+        self._logger.debug(
+            f"No metadata file found for {path} in {owner_repo} "
+            f"(tried {candidates})"
+        )
+        return None
+
+    def _fetch_with_legacy_extractor(self, source: str) -> Optional[GitHubMetadata]:
+        """Fetch metadata using the legacy GitHubMetadataExtractor.
+
+        This is the original extraction path using GitHubMetadataExtractor.fetch_metadata().
+        Used as fallback when artifact_type is not provided or when the new
+        extractor finds no metadata.
+
+        Args:
+            source: Source string (e.g., "owner/repo/path@version")
+
+        Returns:
+            GitHubMetadata if successful, None if not found
+        """
+        return self.metadata_extractor.fetch_metadata(source)
 
     def _detect_changes(
         self,
@@ -1114,7 +1340,11 @@ class CollectionRefresher:
             )
 
         # 3. Fetch upstream metadata
-        upstream = self._fetch_upstream_metadata(spec)
+        # Pass artifact type for enhanced extraction when available.
+        # artifact.type is an ArtifactType enum set on all Artifact instances.
+        upstream = self._fetch_upstream_metadata(
+            spec, artifact_type=artifact.type
+        )
         if upstream is None:
             duration_ms = (time.perf_counter() - start_time) * 1000
             self._logger.debug(f"Failed to fetch upstream metadata for {artifact_id}")

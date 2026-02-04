@@ -421,8 +421,8 @@ function CollectionPageContent() {
     return mapApiResponseToArtifact(apiArtifact, 'collection');
   };
 
-  // Apply client-side search, tag filter, and sort
-  const filteredArtifacts = useMemo(() => {
+  // Stage 1: Apply type, status, scope, search filters (BEFORE tags and tools)
+  const preTagFilterArtifacts = useMemo(() => {
     // Handle different response shapes:
     // - Specific collection (infinite scroll): pages array with items (lightweight summaries)
     // - All collections (infinite scroll): pages array with items (full artifacts)
@@ -487,6 +487,33 @@ function CollectionPageContent() {
       });
     }
 
+    return artifacts;
+  }, [
+    isSpecificCollection,
+    infiniteCollectionData,
+    infiniteAllArtifactsData,
+    currentCollection,
+    filters,
+    searchQuery,
+  ]);
+
+  // Compute available tags from artifacts matching current filters (excluding tag filter)
+  const availableTags = useMemo(() => {
+    const tagCounts = new Map<string, number>();
+    preTagFilterArtifacts.forEach((artifact) => {
+      artifact.tags?.forEach((tag: string) => {
+        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      });
+    });
+    return Array.from(tagCounts.entries())
+      .map(([name, count]) => ({ name, artifact_count: count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [preTagFilterArtifacts]);
+
+  // Stage 2: Apply tag, tool filters and sort
+  const filteredArtifacts = useMemo(() => {
+    let artifacts = preTagFilterArtifacts;
+
     // Tag filter
     if (selectedTags.length > 0) {
       artifacts = artifacts.filter((artifact) => {
@@ -528,54 +555,7 @@ function CollectionPageContent() {
     }
 
     return artifacts;
-  }, [
-    isSpecificCollection,
-    infiniteCollectionData,
-    infiniteAllArtifactsData,
-    currentCollection,
-    filters,
-    searchQuery,
-    selectedTags,
-    selectedTools,
-    sortField,
-    sortOrder,
-  ]);
-
-  // Compute unique tags with counts from ALL loaded artifacts (before tag filtering)
-  // This is used by TagFilterPopover instead of fetching from the database Tag table
-  const availableTags = useMemo(() => {
-    // Get all artifacts before tag filtering is applied
-    let allArtifacts: Artifact[] = [];
-
-    if (isSpecificCollection && infiniteCollectionData?.pages) {
-      const allSummaries = infiniteCollectionData.pages.flatMap((page) => page.items);
-      // Map summaries to Artifact entities using centralized mapper
-      allArtifacts = mapArtifactsToEntities(allSummaries as any, 'collection');
-    } else if (!isSpecificCollection && infiniteAllArtifactsData?.pages) {
-      allArtifacts = infiniteAllArtifactsData.pages.flatMap((page) =>
-        page.items.map(mapApiArtifactToArtifact)
-      );
-    }
-
-    // Count tags across all artifacts (using flattened tags property)
-    const tagCounts = new Map<string, number>();
-    allArtifacts.forEach((artifact) => {
-      const tags = artifact.tags || [];
-      tags.forEach((tag: string) => {
-        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
-      });
-    });
-
-    // Convert to array format expected by TagFilterPopover
-    return Array.from(tagCounts.entries())
-      .map(([name, count]) => ({ name, artifact_count: count }))
-      .sort((a, b) => b.artifact_count - a.artifact_count); // Sort by count descending
-  }, [
-    infiniteCollectionData?.pages,
-    infiniteAllArtifactsData?.pages,
-    isSpecificCollection,
-    currentCollection,
-  ]);
+  }, [preTagFilterArtifacts, selectedTags, selectedTools, sortField, sortOrder]);
 
   // Compute unique tools with counts from ALL loaded artifacts (before tool filtering)
   // This is used by ToolFilterPopover
@@ -745,7 +725,6 @@ function CollectionPageContent() {
           <TagFilterBar
             selectedTags={selectedTags}
             onChange={handleTagsChange}
-            availableTags={availableTags}
           />
         </div>
       )}

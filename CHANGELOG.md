@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Tag Manager Settings Page (2026-02-03)
+
+**Tag Management UI**
+- Added dedicated `/settings/tags` page for centralized global tag management
+- List all tags with artifact counts, inline rename, color editing, and delete with cascade confirmation
+- Search/filter tags in real-time by name or slug
+- Create new tags with name, auto-generated slug, and color picker
+
+**Navigation Enhancement**
+- Settings sidebar entry is now an expandable section with "General" and "Tags" sub-items
+- Follows existing NavSection collapsible pattern with localStorage persistence
+
 #### Marketplace Search & Navigation Enhancements (2026-01-28)
 
 **BM25 Weighted Search Ranking**

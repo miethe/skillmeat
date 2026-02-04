@@ -100,9 +100,9 @@ export function ArtifactGrid({
         aria-label="Artifact grid"
         data-testid="artifact-grid"
       >
-        {artifacts.map((artifact) => (
+        {artifacts.map((artifact, index) => (
           <ArtifactBrowseCard
-            key={artifact.id || `${artifact.name}-${artifact.type}`}
+            key={`${artifact.id || artifact.name}-${artifact.type}-${index}`}
             artifact={artifact}
             onClick={() => onArtifactClick(artifact)}
             onQuickDeploy={() => handleDeploy(artifact)}

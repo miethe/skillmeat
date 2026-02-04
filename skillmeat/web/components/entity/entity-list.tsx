@@ -148,10 +148,10 @@ export function EntityList({
 
   // Render EntityCard (default variant)
   const renderEntityCard = useCallback(
-    (artifact: Artifact) => {
+    (artifact: Artifact, index: number) => {
       return (
         <EntityCard
-          key={artifact.id}
+          key={`${artifact.id}-${index}`}
           entity={artifact}
           selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}
@@ -184,10 +184,10 @@ export function EntityList({
 
   // Render ArtifactOperationsCard (operations variant)
   const renderOperationsCard = useCallback(
-    (artifact: Artifact) => {
+    (artifact: Artifact, index: number) => {
       return (
         <ArtifactOperationsCard
-          key={artifact.id}
+          key={`${artifact.id}-${index}`}
           artifact={artifact}
           selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}
@@ -213,10 +213,10 @@ export function EntityList({
   );
 
   const renderEntityRow = useCallback(
-    (artifact: Artifact) => {
+    (artifact: Artifact, index: number) => {
       return (
         <EntityRow
-          key={artifact.id}
+          key={`${artifact.id}-${index}`}
           entity={artifact}
           selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}

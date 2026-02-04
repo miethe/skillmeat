@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Search, X, Filter, FolderKanban, Check } from 'lucide-react';
+import { Search, X, FolderKanban } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,13 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
+import { TagFilterPopover } from '@/components/ui/tag-filter-popover';
 import type { ArtifactType } from '@/types/artifact';
 
 /**
@@ -82,7 +76,7 @@ export interface ManagePageFiltersProps {
 
   // Data
   availableProjects: string[];
-  availableTags: string[];
+  availableTags?: Array<{ name: string; artifact_count: number }>;
 }
 
 /**
@@ -110,7 +104,6 @@ export interface ManagePageFiltersProps {
  *   onTagsChange={setTags}
  *   onClearAll={handleClearAll}
  *   availableProjects={projects}
- *   availableTags={allTags}
  * />
  * ```
  */
@@ -132,10 +125,6 @@ export function ManagePageFilters({
   // Debounced search state
   const [searchInput, setSearchInput] = React.useState(search);
   const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-
-  // Tag popover state
-  const [tagPopoverOpen, setTagPopoverOpen] = React.useState(false);
-  const [tagSearch, setTagSearch] = React.useState('');
 
   // Sync searchInput with search prop when it changes externally
   React.useEffect(() => {
@@ -165,23 +154,6 @@ export function ManagePageFilters({
       }
     };
   }, []);
-
-  // Filter available tags by search
-  const filteredTags = React.useMemo(() => {
-    if (!tagSearch) return availableTags;
-    return availableTags.filter((tag) =>
-      tag.toLowerCase().includes(tagSearch.toLowerCase())
-    );
-  }, [availableTags, tagSearch]);
-
-  // Toggle tag selection
-  const toggleTag = (tagName: string) => {
-    if (tags.includes(tagName)) {
-      onTagsChange(tags.filter((t) => t !== tagName));
-    } else {
-      onTagsChange([...tags, tagName]);
-    }
-  };
 
   // Check if any filters are active
   const hasActiveFilters =
@@ -282,101 +254,12 @@ export function ManagePageFilters({
         </Select>
 
         {/* Tags Filter Popover */}
-        <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="default"
-              className="gap-2"
-              aria-label={`Filter by tags${tags.length > 0 ? `, ${tags.length} selected` : ''}`}
-              aria-expanded={tagPopoverOpen}
-              aria-haspopup="listbox"
-            >
-              <Filter className="h-4 w-4" aria-hidden="true" />
-              Tags
-              {tags.length > 0 && (
-                <Badge variant="secondary" className="ml-1 rounded-full px-2">
-                  {tags.length}
-                </Badge>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-72 p-0" align="start">
-            <div className="border-b p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-medium" id="tag-filter-heading">Filter by tags</span>
-                {tags.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      onTagsChange([]);
-                      setTagSearch('');
-                    }}
-                    className="h-6 px-2 text-xs"
-                  >
-                    Clear all
-                  </Button>
-                )}
-              </div>
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                <Input
-                  placeholder="Search tags..."
-                  value={tagSearch}
-                  onChange={(e) => setTagSearch(e.target.value)}
-                  className="h-9 pl-8"
-                  aria-label="Search available tags"
-                />
-              </div>
-            </div>
-            <ScrollArea className="h-60">
-              <div className="p-2" role="listbox" aria-labelledby="tag-filter-heading" aria-multiselectable="true">
-                {filteredTags.length === 0 ? (
-                  <div className="py-4 text-center text-sm text-muted-foreground">
-                    No tags found
-                  </div>
-                ) : (
-                  filteredTags.map((tagName) => {
-                    const isSelected = tags.includes(tagName);
-                    return (
-                      <div
-                        key={tagName}
-                        className={cn(
-                          'flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 hover:bg-accent',
-                          isSelected && 'bg-accent'
-                        )}
-                        onClick={() => toggleTag(tagName)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            toggleTag(tagName);
-                          }
-                        }}
-                        role="option"
-                        aria-selected={isSelected}
-                        tabIndex={0}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={cn(
-                              'flex h-4 w-4 items-center justify-center rounded border',
-                              isSelected ? 'border-primary bg-primary' : 'border-input'
-                            )}
-                            aria-hidden="true"
-                          >
-                            {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
-                          </div>
-                          <Badge variant="secondary">{tagName}</Badge>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </ScrollArea>
-          </PopoverContent>
-        </Popover>
+        <TagFilterPopover
+          selectedTags={tags}
+          onChange={onTagsChange}
+          availableTags={availableTags}
+          className="h-9 text-sm"
+        />
 
         {/* Clear All Button */}
         {hasActiveFilters && (

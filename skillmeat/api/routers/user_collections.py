@@ -349,13 +349,55 @@ def migrate_artifacts_to_default_collection(
         session.commit()
         logger.info(f"Migrated {migrated_count} artifacts to default collection")
 
-    # 7. Return combined stats including metadata cache results
+    # 7. Sync tags from CollectionArtifact cache to Tag ORM tables
+    tag_sync_count = _sync_all_tags_to_orm(session)
+
+    # 8. Return combined stats including metadata cache results
     return {
         "migrated_count": migrated_count,
         "already_present_count": len(existing_artifact_ids),
         "total_artifacts": len(all_artifact_ids),
         "metadata_cache": metadata_stats,
+        "tag_sync_count": tag_sync_count,
     }
+
+
+def _sync_all_tags_to_orm(session: Session) -> int:
+    """Sync all CollectionArtifact tags to the Tag ORM tables.
+
+    Iterates all CollectionArtifact rows with tags_json and calls
+    TagService.sync_artifact_tags() for each. Tag sync failure does
+    NOT block the caller.
+
+    Returns:
+        Number of artifacts successfully synced.
+    """
+    try:
+        from skillmeat.core.services import TagService
+
+        tag_service = TagService()
+    except Exception as e:
+        logger.warning(f"Failed to initialize TagService for bulk tag sync: {e}")
+        return 0
+
+    all_cas = (
+        session.query(CollectionArtifact)
+        .filter(CollectionArtifact.tags_json.isnot(None))
+        .all()
+    )
+
+    synced = 0
+    for ca in all_cas:
+        try:
+            tags = json.loads(ca.tags_json)
+            if tags:
+                tag_service.sync_artifact_tags(ca.artifact_id, tags)
+                synced += 1
+        except Exception as e:
+            logger.warning(f"Tag ORM sync failed for {ca.artifact_id}: {e}")
+
+    logger.info(f"Synced tags for {synced}/{len(all_cas)} artifacts to Tag ORM")
+    return synced
 
 
 def populate_collection_artifact_metadata(
@@ -671,6 +713,14 @@ def _refresh_single_collection_cache(
     skipped = 0
     errors = []
 
+    try:
+        from skillmeat.core.services import TagService
+
+        tag_service = TagService()
+    except Exception as e:
+        logger.warning(f"Failed to initialize TagService for tag sync: {e}")
+        tag_service = None
+
     logger.debug(f"Refreshing cache for collection '{collection.id}'")
 
     # Get all CollectionArtifact rows for this collection
@@ -758,6 +808,15 @@ def _refresh_single_collection_cache(
             ca.resolved_version = resolved_version
             ca.synced_at = datetime.utcnow()
             updated += 1
+
+            # Sync tags to ORM
+            if tag_service and file_artifact.tags:
+                try:
+                    tag_service.sync_artifact_tags(ca.artifact_id, file_artifact.tags)
+                except Exception as e:
+                    logger.warning(
+                        f"Tag ORM sync failed for {ca.artifact_id}: {e}"
+                    )
 
         except Exception as e:
             error_msg = f"Failed to refresh {ca.artifact_id}: {e}"

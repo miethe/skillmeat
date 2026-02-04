@@ -59,7 +59,7 @@ export function TagFilterPopover({
     if (search) {
       result = result.filter((tag) => tag.name.toLowerCase().includes(search.toLowerCase()));
     }
-    return result;
+    return result.sort((a, b) => a.name.localeCompare(b.name));
   }, [tags, search]);
 
   // Toggle tag by name (not ID) since artifact tags are stored as string names

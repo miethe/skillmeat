@@ -82,7 +82,7 @@ import { FileTree } from '@/components/entity/file-tree';
 import { ContentPane } from '@/components/entity/content-pane';
 import { SyncStatusTab } from '@/components/sync-status';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
-import { DeployDialog } from '@/components/collection/deploy-dialog';
+import { DeployButton } from '@/components/shared/deploy-button';
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
 import { TagEditor } from '@/components/shared/tag-editor';
 
@@ -478,7 +478,6 @@ export function ArtifactOperationsModal({
   const [activeTab, setActiveTab] = useState<OperationsModalTab>(initialTab);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [showDeployDialog, setShowDeployDialog] = useState(false);
   const [localTags, setLocalTags] = useState<string[] | null>(null);
 
   // Source entry state for Sources tab
@@ -799,18 +798,6 @@ export function ArtifactOperationsModal({
     }
   };
 
-  // Prepare artifact for deploy dialog
-  const artifactForDeploy = useMemo((): Artifact | null => {
-    if (!artifact) return null;
-    return {
-      ...artifact,
-      scope: artifact.scope || 'user',
-      syncStatus: artifact.syncStatus || 'synced',
-      createdAt: artifact.createdAt || new Date().toISOString(),
-      updatedAt: artifact.updatedAt || new Date().toISOString(),
-    };
-  }, [artifact]);
-
   // Early return if no artifact and not loading
   if (!artifact && !isLoading) {
     return null;
@@ -858,8 +845,7 @@ export function ArtifactOperationsModal({
   }
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
         <DialogContent className="flex h-[90vh] max-h-[90vh] min-h-0 max-w-5xl flex-col overflow-hidden p-0 lg:max-w-6xl">
           {/* Header */}
           <ModalHeader
@@ -1003,15 +989,18 @@ export function ArtifactOperationsModal({
                       </p>
                     )}
                     <div className="mt-4 flex justify-end">
-                      <Button
+                      <DeployButton
+                        artifact={artifact}
+                        existingDeploymentPaths={artifactDeployments.map(d => `${d.project_path}/${d.artifact_path}`)}
+                        onDeploySuccess={() => {
+                          projects?.forEach(p => {
+                            queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
+                          });
+                        }}
                         variant="outline"
                         size="sm"
-                        onClick={() => setShowDeployDialog(true)}
-                        className="gap-2"
-                      >
-                        <Rocket className="h-4 w-4" aria-hidden="true" />
-                        Deploy to Project
-                      </Button>
+                        label="Deploy to Project"
+                      />
                     </div>
                   </CardContent>
                 </Card>
@@ -1035,14 +1024,17 @@ export function ArtifactOperationsModal({
                       )}
                       Sync All Deployments
                     </Button>
-                    <Button
+                    <DeployButton
+                      artifact={artifact}
+                      existingDeploymentPaths={artifactDeployments.map(d => `${d.project_path}/${d.artifact_path}`)}
+                      onDeploySuccess={() => {
+                        projects?.forEach(p => {
+                          queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
+                        });
+                      }}
                       variant="outline"
                       size="sm"
-                      onClick={() => setShowDeployDialog(true)}
-                    >
-                      <Rocket className="mr-2 h-4 w-4" />
-                      Deploy to New Project
-                    </Button>
+                    />
                     <Button
                       variant="outline"
                       size="sm"
@@ -1205,15 +1197,17 @@ export function ArtifactOperationsModal({
                   <h3 className="text-sm font-medium">
                     Active Deployments ({artifactDeployments.length})
                   </h3>
-                  <Button
+                  <DeployButton
+                    artifact={artifact}
+                    existingDeploymentPaths={artifactDeployments.map(d => `${d.project_path}/${d.artifact_path}`)}
+                    onDeploySuccess={() => {
+                      projects?.forEach(p => {
+                        queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
+                      });
+                    }}
                     variant="outline"
                     size="sm"
-                    onClick={() => setShowDeployDialog(true)}
-                    className="gap-2"
-                  >
-                    <Rocket className="h-4 w-4" aria-hidden="true" />
-                    Add Deployment
-                  </Button>
+                  />
                 </div>
 
                 {isDeploymentsLoading ? (
@@ -1229,15 +1223,18 @@ export function ArtifactOperationsModal({
                       <p className="mt-1 text-sm text-muted-foreground">
                         Deploy this artifact to a project to get started.
                       </p>
-                      <Button
+                      <DeployButton
+                        artifact={artifact}
+                        onDeploySuccess={() => {
+                          projects?.forEach(p => {
+                            queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
+                          });
+                        }}
                         variant="outline"
                         size="sm"
-                        onClick={() => setShowDeployDialog(true)}
-                        className="mt-4 gap-2"
-                      >
-                        <Rocket className="h-4 w-4" aria-hidden="true" />
-                        Deploy Now
-                      </Button>
+                        label="Deploy Now"
+                        className="mt-4"
+                      />
                     </CardContent>
                   </Card>
                 ) : (
@@ -1409,19 +1406,6 @@ export function ArtifactOperationsModal({
             </TabContentWrapper>
           </Tabs>
         </DialogContent>
-      </Dialog>
-
-      {/* Deploy Dialog */}
-      {artifactForDeploy && (
-        <DeployDialog
-          artifact={artifactForDeploy}
-          isOpen={showDeployDialog}
-          onClose={() => setShowDeployDialog(false)}
-          existingDeploymentPaths={artifactDeployments.map(
-            (d) => `${d.project_path}/${d.artifact_path}`
-          )}
-        />
-      )}
-    </>
+    </Dialog>
   );
 }
