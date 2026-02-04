@@ -33,7 +33,6 @@ import {
   Github,
   FileText,
   FolderOpen,
-  Rocket,
   ExternalLink,
   Copy,
   ArrowLeft,
@@ -54,7 +53,8 @@ import { LinkedArtifactsSection, type LinkedArtifactReference } from '@/componen
 import { ArtifactLinkingDialog } from '@/components/entity';
 import { FileTree } from '@/components/entity/file-tree';
 import { ContentPane } from '@/components/entity/content-pane';
-import { DeployDialog } from '@/components/collection/deploy-dialog';
+import { DeployButton } from '@/components/shared/deploy-button';
+import { CliCommandSection } from '@/components/entity/cli-command-section';
 import { ARTIFACT_TYPES, type Artifact, type ArtifactType } from '@/types/artifact';
 import { getCollectionColor } from '@/lib/utils/collection-colors';
 import { apiRequest } from '@/lib/api';
@@ -469,7 +469,6 @@ export function ArtifactDetailsModal({
   // State
   const [activeTab, setActiveTab] = useState<ArtifactDetailsTab>(initialTab);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [showDeployDialog, setShowDeployDialog] = useState(false);
   const [showLinkingDialog, setShowLinkingDialog] = useState(false);
   const [localTags, setLocalTags] = useState<string[] | null>(null);
 
@@ -803,16 +802,19 @@ export function ArtifactDetailsModal({
                   <Copy className="h-4 w-4" aria-hidden="true" />
                 </Button>
 
-                {/* Deploy button */}
-                <Button
+                {/* Deploy button with CLI options */}
+                <DeployButton
+                  artifact={artifact}
+                  onDeploySuccess={() => {
+                    toast({
+                      title: 'Artifact deployed',
+                      description: `${artifact.name} has been deployed successfully.`,
+                    });
+                    queryClient.invalidateQueries({ queryKey: ['deployments'] });
+                  }}
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowDeployDialog(true)}
-                  className="gap-2"
-                >
-                  <Rocket className="h-4 w-4" aria-hidden="true" />
-                  <span>Deploy</span>
-                </Button>
+                />
               </div>
             }
           />
@@ -970,6 +972,12 @@ export function ArtifactDetailsModal({
                       <span>{new Date(artifact.updatedAt).toLocaleString()}</span>
                     </div>
                   </div>
+                </div>
+
+                {/* CLI Deploy Commands */}
+                <div>
+                  <h3 className="mb-2 text-sm font-medium">CLI Deploy Command</h3>
+                  <CliCommandSection artifactName={artifact.name} />
                 </div>
               </div>
             </TabContentWrapper>
@@ -1177,20 +1185,6 @@ export function ArtifactDetailsModal({
           </Tabs>
         </DialogContent>
       </Dialog>
-
-      {/* Deploy Dialog */}
-      <DeployDialog
-        artifact={artifact}
-        isOpen={showDeployDialog}
-        onClose={() => setShowDeployDialog(false)}
-        onSuccess={() => {
-          toast({
-            title: 'Artifact deployed',
-            description: `${artifact.name} has been deployed successfully.`,
-          });
-          queryClient.invalidateQueries({ queryKey: ['deployments'] });
-        }}
-      />
 
       {/* Artifact Linking Dialog */}
       <ArtifactLinkingDialog
