@@ -332,6 +332,78 @@ python scripts/analyze_beta_feedback.py --output report.md
 
 ---
 
+### 2.6 Link Orphan Artifacts
+
+**Script**: `link_orphan_artifacts.py`
+
+**Purpose**: Link collection artifacts imported from marketplace sources to their corresponding `MarketplaceCatalogEntry` records when the link is missing.
+
+**Problem Scenario**:
+- Artifacts were imported before proper catalog linking was implemented
+- Manual imports bypassed the normal import flow
+- Database shows artifacts with `source` field set but no linked catalog entry
+- "Sources" tab in web UI shows no upstream link for marketplace artifacts
+
+**When to Run**:
+- After migrating from older SkillMeat versions
+- When marketplace artifacts show no upstream source in the UI
+- After bulk imports that didn't go through the standard marketplace import flow
+
+**Command**:
+
+```bash
+# Preview changes (default dry-run mode)
+python scripts/link_orphan_artifacts.py
+
+# Verbose output with matching details
+python scripts/link_orphan_artifacts.py -v
+
+# Apply the links
+python scripts/link_orphan_artifacts.py --execute
+```
+
+**What It Does**:
+1. Queries `CollectionArtifact` where `origin` is "marketplace" or "github" and `source` is set
+2. Checks if any `MarketplaceCatalogEntry` has `import_id` referencing the artifact
+3. For unlinked artifacts, parses the `source` field to extract owner/repo/path
+4. Finds matching catalog entries by `upstream_url` pattern or name + source repo
+5. Links by setting `import_id` on the matched catalog entry
+
+**Supported Source Formats**:
+- Short format: `owner/repo/path[@version]` (e.g., `anthropics/skills/pdf@latest`)
+- GitHub tree URLs: `https://github.com/owner/repo/tree/branch/path`
+- GitHub blob URLs: `https://github.com/owner/repo/blob/branch/path.md`
+
+**Example Output**:
+
+```
+Scanning for orphan artifacts...
+Found 104 orphan artifacts with source but no catalog link
+
+Matching artifacts to catalog entries:
+  + agent:ai-staff -> matched to 65622a28...
+      (https://github.com/samhvw8/dot-claude/tree/main/agents/ai-staff.md)
+  + skill:aesthetic -> matched to aad49b3c...
+      (https://github.com/samhvw8/dot-claude/tree/main/skills/aesthetic)
+  x skill:local-custom -> no matching catalog entry found
+
+Summary:
+  Matched: 82
+  No match: 22
+  Parse errors: 0
+  Already linked: 0
+
+[DRY RUN] Would link 82 artifacts. Run with --execute to apply.
+```
+
+**Notes**:
+- Dry-run by default to preview changes safely
+- Artifacts with "no match" are typically from sources not yet scanned into the marketplace catalog
+- Safe to run multiple times (idempotent - won't re-link already-linked artifacts)
+- Commits all links in a single transaction at the end
+
+---
+
 ## 3. Cache Management
 
 SkillMeat uses a SQLite cache (`~/.skillmeat/cache/cache.db`) for fast artifact metadata queries.
