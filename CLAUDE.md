@@ -279,14 +279,15 @@ Track bugs/enhancements via MeatyCapture request-logs.
 ```
 skillmeat/
 ├── cli.py              # Click-based CLI (collection, web commands)
-├── core/               # Business logic (artifact, deployment, sync, analytics)
+├── core/               # Business logic (artifact, deployment, sync, discovery, analytics)
 │   └── github_client.py # Centralized GitHub API client wrapper
+├── cache/              # SQLAlchemy ORM, repositories, Alembic migrations
 ├── api/                # FastAPI backend → See skillmeat/api/CLAUDE.md
 ├── web/                # Next.js 15 frontend → See skillmeat/web/CLAUDE.md
 ├── sources/            # GitHub, local artifact sources
-├── storage/            # Manifest, lockfile, snapshot managers
-├── marketplace/        # Claude marketplace integration
-└── observability/      # Logging, monitoring
+├── storage/            # Manifest, lockfile, snapshot, deployment managers
+├── marketplace/        # Marketplace brokers, compliance, publishing
+└── observability/      # Logging, metrics, tracing
 ```
 
 ### Data Flow Principles
@@ -317,7 +318,7 @@ Projects (.claude/ directories)
 
 **Artifact Types Supported**:
 - Skills (full support)
-- Commands, Agents, MCP servers, Hooks (planned)
+- Commands, Agents, MCP servers, Hooks (partial support)
 
 ---
 
@@ -494,11 +495,10 @@ Never use PyGithub directly; always go through the wrapper.
 ## Domain-Specific Documentation
 
 **Backend/API**: `skillmeat/api/CLAUDE.md`
-- FastAPI server setup
-- SQLAlchemy models
-- Alembic migrations
-- API routers and schemas
-- Middleware patterns
+- FastAPI server setup and configuration
+- API routers (23 endpoints) and schemas
+- Middleware and dependency injection patterns
+- Database integration (via `skillmeat/cache/`)
 
 **Frontend/Web**: `skillmeat/web/CLAUDE.md`
 - Next.js 15 app structure
@@ -529,8 +529,6 @@ Never use PyGithub directly; always go through the wrapper.
 - `.claude/context/api-endpoint-mapping.md` - Full API reference
 - `.claude/context/symbol-usage-guide.md` - Symbol query patterns
 - `.claude/context/stub-patterns.md` - Frontend stubs catalog
-- `.claude/context/key-context/schemas.md` - Schema definitions (76KB)
-- `.claude/context/key-context/hooks.md` - React hooks reference (71KB)
 
 **Staleness Hook**: `.claude/hooks/check-context-staleness.sh` (pre-commit warning)
 

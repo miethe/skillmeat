@@ -11,8 +11,8 @@ web/
 ├── app/              # Next.js App Router (pages, layouts)
 ├── components/       # React components
 │   ├── ui/           # shadcn primitives (DO NOT MODIFY)
-│   ├── shared/       # Cross-feature components
-│   └── [feature]/    # Feature-specific components
+│   ├── shared/       # Cross-feature components (2+ features use)
+│   └── [feature]/    # Feature-specific components (collection, entity, deployments, etc.)
 ├── hooks/            # Custom React hooks (import from @/hooks)
 │   └── index.ts      # Barrel export - canonical import point
 ├── lib/
@@ -77,71 +77,20 @@ NEXT_PUBLIC_API_VERSION=v1
 
 The `Artifact` type is the canonical representation for skills, commands, agents, MCP servers, and hooks throughout the web interface.
 
-```typescript
-interface Artifact {
-  id: string;
-  name: string;
-  type: ArtifactType;      // 'skill' | 'command' | 'agent' | 'mcp' | 'hook'
-  scope: ArtifactScope;    // 'user' | 'local'
-  syncStatus: SyncStatus;  // 'synced' | 'modified' | 'outdated' | 'conflict' | 'error'
+**Core Types**:
+- `ArtifactType` - `'skill' | 'command' | 'agent' | 'mcp' | 'hook'`
+- `ArtifactScope` - `'user' | 'local'`
+- `SyncStatus` - `'synced' | 'modified' | 'outdated' | 'conflict' | 'error'`
 
-  // Flattened metadata (at top level)
-  description?: string;
-  author?: string;
-  license?: string;
-  tags?: string[];
+**Key Principle**: Metadata fields (`description`, `author`, `tags`, `license`) are flattened at the top level, not nested under a `metadata` object.
 
-  // Version information
-  version?: string;
-  sourceUrl?: string;
+**Additional Types**: `CollectionRef`, `DeploymentSummary`, `ArtifactTypeConfig` (see full definition in `types/artifact.ts`)
 
-  // Timestamps
-  createdAt: string;      // ISO 8601 format
-  updatedAt: string;      // ISO 8601 format
-}
-```
+**Full Interface**: Read `types/artifact.ts` for the complete Artifact interface definition.
 
-**Key Features**:
-- **Flattened Structure**: Metadata fields (`description`, `author`, `tags`, `license`) are at the top level, not nested under a `metadata` object
-- **Type Safety**: Use `ArtifactType` enum for artifact types
-- **Sync Tracking**: `SyncStatus` enum tracks synchronization state with upstream sources
-- **Unified Model**: Single type for all artifact categories eliminates type sprawl
+**Deprecation Note**: The legacy `Entity` type is maintained as a type alias to `Artifact` for backward compatibility through Q3 2026. Migration is ONGOING with 21+ active consumers across components, hooks, and tests. All new code should use `Artifact`. See `.claude/guides/entity-to-artifact-migration.md` for migration instructions.
 
-**SyncStatus Values**:
-- `synced` - Local copy matches upstream
-- `modified` - Local changes not yet synced
-- `outdated` - Upstream has newer version
-- `conflict` - Both local and upstream modified
-- `error` - Sync failure or validation error
-
-**Deprecation Note**: The legacy `Entity` type is maintained as a type alias to `Artifact` for backward compatibility through Q3 2026. All new code should use `Artifact`. See the migration guide in `.claude/progress/entity-artifact-consolidation/migration-guide.md` for update instructions.
-
-**Usage Examples**:
-
-```typescript
-// Component props with Artifact type
-interface ArtifactCardProps {
-  artifact: Artifact;
-  onUpdate?: (artifact: Artifact) => void;
-}
-
-export function ArtifactCard({ artifact, onUpdate }: ArtifactCardProps) {
-  return (
-    <div className="p-4 border rounded-lg">
-      <h3 className="font-semibold">{artifact.name}</h3>
-      {artifact.description && (
-        <p className="text-sm text-muted-foreground">{artifact.description}</p>
-      )}
-      <div className="flex gap-2 mt-2">
-        <Badge variant="outline">{artifact.type}</Badge>
-        <Badge variant={artifact.syncStatus === 'synced' ? 'default' : 'secondary'}>
-          {artifact.syncStatus}
-        </Badge>
-      </div>
-    </div>
-  );
-}
-```
+**Component Examples**: See actual component patterns in `components/entity/` and `components/collection/`
 
 ---
 
@@ -153,8 +102,6 @@ Rules in `.claude/rules/web/` auto-load when editing:
 | --------------- | -------------------------- | ---------------------------------------------------- |
 | `pages.md`      | `app/**/*.tsx`             | Server/client components, App Router, dynamic routes |
 | `components.md` | `components/**/*.tsx`      | shadcn usage, accessibility, styling patterns        |
-| `hooks.md`      | `hooks/**/*.ts`            | TanStack Query, stub detection, cache invalidation   |
-| `api-client.md` | `lib/api/**/*.ts`          | Endpoint mapping, error handling, URL building       |
 | `testing.md`    | `__tests__/**`, `tests/**` | Jest, RTL, Playwright patterns                       |
 
 ---
@@ -164,6 +111,9 @@ Rules in `.claude/rules/web/` auto-load when editing:
 | File                                              | Load When                                   |
 | ------------------------------------------------- | ------------------------------------------- |
 | `.claude/context/key-context/data-flow-patterns.md` | Hook stale times, cache invalidation, mutations |
+| `.claude/context/key-context/component-patterns.md` | Component design, spacing, accessibility |
+| `.claude/context/key-context/nextjs-patterns.md` | Layout, loading states, URL state management |
+| `.claude/context/key-context/testing-patterns.md` | Test templates, mock patterns, E2E examples |
 | `.claude/context/api-endpoint-mapping.md`          | API mismatch bugs, endpoint questions       |
 | `.claude/context/stub-patterns.md`                 | "Not implemented" errors                    |
 | `.claude/context/symbol-usage-guide.md`            | Bug investigation, unfamiliar code          |

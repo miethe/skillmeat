@@ -1,6 +1,6 @@
 # CLAUDE.md - API Backend
 
-FastAPI backend for SkillMeat web interface
+FastAPI backend for SkillMeat web interface with SQLAlchemy cache layer.
 
 ## Architecture
 
@@ -10,30 +10,34 @@ FastAPI backend for SkillMeat web interface
 api/
 ├── server.py               # FastAPI app + lifespan
 ├── config.py               # APISettings (Pydantic BaseSettings)
-├── dependencies.py         # Dependency injection
+├── dependencies.py         # AppState, dependency injection
 ├── openapi.py              # OpenAPI spec generation
 ├── project_registry.py     # Project path resolution
-├── routers/                # API endpoints
-│   ├── artifacts.py
-│   ├── collections.py
-│   ├── deployments.py
-│   ├── projects.py
-│   ├── analytics.py
-│   ├── marketplace.py
-│   ├── mcp.py
-│   ├── bundles.py
-│   └── health.py
-├── schemas/                # Pydantic request/response models
-│   ├── artifacts.py
-│   ├── collections.py
-│   ├── deployments.py
-│   └── common.py
 ├── middleware/             # Request/response processing
-│   ├── auth.py             # Token authentication
+│   ├── auth.py             # Token/API key authentication
 │   ├── rate_limit.py       # Rate limiting
-│   └── observability.py    # Logging/monitoring
-├── tests/                  # API integration tests
-└── utils/                  # API utilities
+│   ├── observability.py    # Logging/monitoring
+│   └── burst_detection.py  # Burst detection
+├── routers/                # API endpoints (25 routers)
+│   ├── artifacts.py, user_collections.py, collections.py, groups.py
+│   ├── deployments.py, projects.py, analytics.py, marketplace.py
+│   ├── marketplace_sources.py, marketplace_catalog.py, mcp.py
+│   ├── bundles.py, tags.py, versions.py, context_entities.py
+│   ├── context_sync.py, match.py, merge.py, ratings.py
+│   ├── settings.py, config.py, project_templates.py, cache.py, health.py
+│   └── __init__.py
+├── schemas/                # Pydantic request/response models (26 files)
+├── services/               # Service layer
+│   ├── artifact_cache_service.py
+│   ├── artifact_metadata_service.py
+│   ├── background_tasks.py
+│   └── collection_service.py
+├── utils/                  # Utilities
+│   ├── cache.py
+│   ├── error_handlers.py
+│   ├── fts5.py
+│   └── github_cache.py
+└── tests/                  # Integration tests
 ```
 
 ---
@@ -42,22 +46,17 @@ api/
 
 **File**: `server.py`
 
+**Pattern**: Uses `AppState` container initialized in lifespan function.
+
 ```python
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Startup: Load config, init managers, configure logging"""
-    settings = get_settings()
-    app.state.settings = settings
-    app.state.artifact_manager = ArtifactManager(...)
-    app.state.collection_manager = CollectionManager(...)
-    # ... init other managers
+    """Startup: Initialize AppState with managers from skillmeat.core"""
+    app.state = AppState()
+    app.state.initialize(get_settings())
     yield
-    # Cleanup on shutdown
-```
+    app.state.shutdown()
 
-**App Creation**:
-
-```python
 app = FastAPI(
     title="SkillMeat API",
     version=skillmeat_version,
@@ -69,11 +68,11 @@ app = FastAPI(
 **Run Server**:
 
 ```bash
-# Development
-uvicorn skillmeat.api.server:app --reload --host 0.0.0.0 --port 8000
+# Development (with auto-reload)
+uvicorn skillmeat.api.server:app --reload --host 127.0.0.1 --port 8080
 
 # Production
-uvicorn skillmeat.api.server:app --workers 4 --host 0.0.0.0 --port 8000
+uvicorn skillmeat.api.server:app --workers 4 --host 0.0.0.0 --port 8080
 ```
 
 ---
@@ -82,30 +81,40 @@ uvicorn skillmeat.api.server:app --workers 4 --host 0.0.0.0 --port 8000
 
 **File**: `config.py`
 
-**Environment Variables**:
+**APISettings Class** (Pydantic BaseSettings):
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SKILLMEAT_COLLECTION_PATH` | `~/.skillmeat/collection` | Collection root |
-| `SKILLMEAT_API_HOST` | `0.0.0.0` | API bind address |
-| `SKILLMEAT_API_PORT` | `8000` | API port |
-| `SKILLMEAT_API_RELOAD` | `false` | Auto-reload in dev |
-| `SKILLMEAT_LOG_LEVEL` | `INFO` | Logging level |
-| `SKILLMEAT_CORS_ORIGINS` | `["http://localhost:3000"]` | Allowed origins |
+| Field | Default | Description |
+|-------|---------|-------------|
+| `env` | `development` | Environment: development, production, testing |
+| `host` | `127.0.0.1` | Server bind address |
+| `port` | `8080` | Server port |
+| `reload` | `false` | Auto-reload on code changes |
+| `workers` | `1` | Worker processes |
+| `cors_enabled` | `true` | Enable CORS |
+| `cors_origins` | `["http://localhost:3000", "http://localhost:3001", ...]` | Allowed CORS origins |
+| `api_key_enabled` | `false` | Enable API key authentication |
+| `api_key` | `null` | API key value (if enabled) |
+| `auth_enabled` | `false` | Require bearer token auth |
+| `rate_limit_enabled` | `false` | Enable rate limiting |
+| `rate_limit_requests` | `100` | Max requests per minute |
+| `log_level` | `INFO` | DEBUG, INFO, WARNING, ERROR, CRITICAL |
+| `log_format` | `json` | Log format: json or text |
+| `collection_dir` | `~/.skillmeat/collections` | Override collection path |
+| `github_token` | `null` | GitHub PAT for higher rate limits |
+| `enable_auto_discovery` | `true` | Artifact auto-discovery feature |
+| `enable_auto_population` | `true` | Auto-populate GitHub metadata |
+| `discovery_cache_ttl` | `3600` | Cache TTL in seconds |
 
-**Settings Class**:
+**Environment Variables** (prefix `SKILLMEAT_`):
 
-```python
-class APISettings(BaseSettings):
-    collection_path: Path
-    api_host: str
-    api_port: int
-    cors_origins: List[str]
-    log_level: str
-
-    class Config:
-        env_prefix = "SKILLMEAT_"
-        env_file = ".env"
+```bash
+export SKILLMEAT_ENV=production
+export SKILLMEAT_HOST=0.0.0.0
+export SKILLMEAT_PORT=8080
+export SKILLMEAT_CORS_ORIGINS='["https://example.com"]'
+export SKILLMEAT_API_KEY_ENABLED=true
+export SKILLMEAT_API_KEY=your_key_here
+export SKILLMEAT_GITHUB_TOKEN=ghp_xxx
 ```
 
 ---
@@ -114,23 +123,20 @@ class APISettings(BaseSettings):
 
 **File**: `dependencies.py`
 
-**Pattern**: Use `app.state` for shared managers, Depends() for injection
+**AppState Container**: Holds singleton instances initialized in lifespan.
 
-```python
-# Global state (initialized in lifespan)
-app_state = {"initialized": False}
+**Type Aliases** (for cleaner route signatures):
 
-# Dependency functions
-def get_artifact_manager(request: Request) -> ArtifactManager:
-    return request.app.state.artifact_manager
-
-def get_collection_manager(request: Request) -> CollectionManager:
-    return request.app.state.collection_manager
-
-# Type aliases for cleaner signatures
-ArtifactManagerDep = Annotated[ArtifactManager, Depends(get_artifact_manager)]
-CollectionManagerDep = Annotated[CollectionManager, Depends(get_collection_manager)]
-```
+| Alias | Type | Purpose |
+|-------|------|---------|
+| `ConfigManagerDep` | `Annotated[ConfigManager, Depends(...)]` | Configuration manager |
+| `CollectionManagerDep` | `Annotated[CollectionManager, Depends(...)]` | Collection operations |
+| `ArtifactManagerDep` | `Annotated[ArtifactManager, Depends(...)]` | Artifact operations |
+| `TokenManagerDep` | `Annotated[TokenManager, Depends(...)]` | Token verification |
+| `SyncManagerDep` | `Annotated[SyncManager, Depends(...)]` | Sync operations |
+| `ContextSyncServiceDep` | `Annotated[ContextSyncService, Depends(...)]` | Context sync |
+| `SettingsDep` | `Annotated[APISettings, Depends(get_settings)]` | Configuration settings |
+| `APIKeyDep` | `Annotated[Optional[str], Security(api_key_header)]` | API key auth |
 
 **Usage in Routes**:
 
@@ -138,7 +144,7 @@ CollectionManagerDep = Annotated[CollectionManager, Depends(get_collection_manag
 @router.get("/artifacts")
 async def list_artifacts(
     artifact_mgr: ArtifactManagerDep,
-    token: TokenDep = Depends(verify_api_key),
+    settings: SettingsDep,
 ) -> ArtifactListResponse:
     artifacts = artifact_mgr.list_artifacts()
     return ArtifactListResponse(artifacts=artifacts)
@@ -148,227 +154,222 @@ async def list_artifacts(
 
 ## Routers
 
-**Pattern**: One router per domain, register in `server.py`
+**Pattern**: One router per domain. All registered in `server.py` with `/api/v1/` prefix.
 
-### Router Structure
-
-**File**: `routers/artifacts.py`
-
-```python
-router = APIRouter(
-    prefix="/api/v1/artifacts",
-    tags=["artifacts"],
-)
-
-@router.get("/", response_model=ArtifactListResponse)
-async def list_artifacts(...): ...
-
-@router.post("/", response_model=ArtifactCreateResponse, status_code=201)
-async def create_artifact(...): ...
-
-@router.get("/{artifact_id}", response_model=ArtifactResponse)
-async def get_artifact(...): ...
-
-@router.put("/{artifact_id}", response_model=ArtifactResponse)
-async def update_artifact(...): ...
-
-@router.delete("/{artifact_id}", status_code=204)
-async def delete_artifact(...): ...
-```
-
-### Available Routers
+### Available Routers (25 total)
 
 | Router | Prefix | Purpose |
 |--------|--------|---------|
 | `artifacts` | `/api/v1/artifacts` | Artifact CRUD, deployment |
-| `collections` | `/api/v1/collections` | Collection management (with group filtering) |
+| `user_collections` | `/api/v1/user-collections` | User collection operations |
+| `collections` | `/api/v1/collections` | Collection management (DEPRECATED) |
 | `groups` | `/api/v1/groups` | Group management and filtering |
 | `deployments` | `/api/v1/deployments` | Deployment operations |
 | `projects` | `/api/v1/projects` | Project registry |
 | `analytics` | `/api/v1/analytics` | Usage analytics |
 | `marketplace` | `/api/v1/marketplace` | Claude marketplace |
+| `marketplace_sources` | `/api/v1/marketplace-sources` | Marketplace sources |
+| `marketplace_catalog` | `/api/v1/marketplace-catalog` | Marketplace catalog |
 | `mcp` | `/api/v1/mcp` | MCP server management |
 | `bundles` | `/api/v1/bundles` | Artifact bundles |
+| `tags` | `/api/v1/tags` | Tag management |
+| `versions` | `/api/v1/versions` | Version tracking |
+| `context_entities` | `/api/v1/context-entities` | Context entity management |
+| `context_sync` | `/api/v1/context-sync` | Context synchronization |
+| `match` | `/api/v1/match` | Artifact matching |
+| `merge` | `/api/v1/merge` | Artifact merging |
+| `ratings` | `/api/v1/ratings` | Artifact ratings |
+| `settings` | `/api/v1/settings` | User settings |
+| `config` | `/api/v1/config` | Configuration endpoints |
+| `project_templates` | `/api/v1/project-templates` | Project templates |
+| `cache` | `/api/v1/cache` | Cache management |
 | `health` | `/health` | Health checks |
+
+### Router Pattern
+
+```python
+from fastapi import APIRouter
+from .schemas import ArtifactCreateRequest, ArtifactResponse
+
+router = APIRouter(prefix="/api/v1/artifacts", tags=["artifacts"])
+
+@router.get("/", response_model=List[ArtifactResponse])
+async def list_artifacts(...): ...
+
+@router.post("/", response_model=ArtifactResponse, status_code=201)
+async def create_artifact(request: ArtifactCreateRequest, ...): ...
+
+@router.get("/{artifact_id}", response_model=ArtifactResponse)
+async def get_artifact(artifact_id: str, ...): ...
+
+@router.put("/{artifact_id}", response_model=ArtifactResponse)
+async def update_artifact(artifact_id: str, request: ArtifactCreateRequest, ...): ...
+
+@router.delete("/{artifact_id}", status_code=204)
+async def delete_artifact(artifact_id: str, ...): ...
+```
+
+See `.claude/rules/api/routers.md` for layer contract and HTTP patterns.
+
+---
 
 ## Schemas (Pydantic Models)
 
-**File**: `schemas/artifacts.py`
+**Location**: `schemas/` directory (26 files)
 
-**Pattern**: Separate request/response models
+**Pattern**: Separate request/response models with ORM mode enabled.
 
 ```python
-# Request models
 class ArtifactCreateRequest(BaseModel):
     name: str
     artifact_type: ArtifactType
     source: str
     version: str = "latest"
-    scope: ScopeType = "user"
-    aliases: List[str] = []
 
-# Response models
 class ArtifactResponse(BaseModel):
     id: str
     name: str
     artifact_type: ArtifactType
     source: str
     version: str
-    scope: ScopeType
-    aliases: List[str]
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True  # ORM mode
-
-# List responses
-class ArtifactListResponse(BaseModel):
-    artifacts: List[ArtifactResponse]
-    total: int
-    page: int = 1
-    page_size: int = 50
+    model_config = ConfigDict(from_attributes=True)
 ```
 
-**Common Types** (`schemas/common.py`):
+**Schema Files**:
+- `artifacts.py`, `user_collections.py`, `collections.py`, `groups.py`
+- `deployments.py`, `projects.py`, `analytics.py`, `marketplace.py`
+- `tags.py`, `versions.py`, `context_entity.py`, `context_sync.py`
+- `settings.py`, `config.py`, `project_template.py`, `mcp.py`
+- `bundles.py`, `match.py`, `merge.py`, `ratings.py`
+- `discovery.py`, `drift.py`, `errors.py`, `scoring.py`, `cache.py`, `common.py`
 
-```python
-class ArtifactType(str, Enum):
-    SKILL = "skill"
-    COMMAND = "command"
-    AGENT = "agent"
-    MCP = "mcp"
-    HOOK = "hook"
-
-class ScopeType(str, Enum):
-    USER = "user"
-    LOCAL = "local"
-
-class ArtifactSourceType(str, Enum):
-    GITHUB = "github"
-    LOCAL = "local"
-```
+See actual files for complete schema definitions.
 
 ---
 
 ## Middleware
 
-**Registration** (in `server.py`):
+**File**: `middleware/`
+
+**Registration Order** (in `server.py`):
 
 ```python
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 app.add_middleware(ObservabilityMiddleware)
-app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)
+app.add_middleware(RateLimitMiddleware, burst_threshold=10, window_seconds=60)
+app.add_middleware(CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=settings.cors_allow_credentials,
+    allow_methods=settings.cors_allow_methods,
+    allow_headers=settings.cors_allow_headers,
+)
 ```
 
-### Authentication Middleware
+### Authentication
 
 **File**: `middleware/auth.py`
 
-```python
-# Token dependency
-TokenDep = Annotated[str, Depends(get_token)]
-
-def get_token(authorization: Optional[str] = Header(None)) -> str:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(401, "Missing or invalid token")
-    return authorization.removeprefix("Bearer ")
-
-async def verify_api_key(token: TokenDep) -> bool:
-    # Verify token against config/database
-    if not is_valid_token(token):
-        raise HTTPException(401, "Invalid API key")
-    return True
-```
+- `APIKeyHeader` security scheme (optional)
+- Bearer token validation via `verify_api_key()`
+- Configurable via `api_key_enabled` and `auth_enabled` settings
 
 ### Rate Limiting
 
 **File**: `middleware/rate_limit.py`
 
-```python
-class RateLimitMiddleware:
-    def __init__(self, app, max_requests: int = 100, window_seconds: int = 60):
-        self.app = app
-        self.max_requests = max_requests
-        self.window_seconds = window_seconds
-        self.requests = {}  # IP -> [(timestamp, count)]
+- IP-based rate limiting
+- Configurable via `rate_limit_enabled` and `rate_limit_requests` settings
+- Returns 429 when exceeded
 
-    async def __call__(self, scope, receive, send):
-        client_ip = scope["client"][0]
-        # Check rate limit, raise 429 if exceeded
-```
+### Burst Detection
+
+**File**: `middleware/burst_detection.py`
+
+- Detects sudden traffic spikes
+- Configurable burst threshold
+- Helps identify attack patterns
 
 ### Observability
 
 **File**: `middleware/observability.py`
 
-```python
-class ObservabilityMiddleware:
-    async def __call__(self, scope, receive, send):
-        start_time = time.time()
-        # Process request
-        await self.app(scope, receive, send)
-        # Log request duration, status, etc.
-        duration = time.time() - start_time
-        logger.info(f"{method} {path} {status} {duration:.2f}s")
-```
+- Request/response timing
+- Structured JSON logging
+- Status code tracking
 
 ---
 
 ## Error Handling
 
-**Pattern**: Use HTTPException with appropriate status codes
+**Pattern**: Use HTTPException with appropriate status codes and logging.
 
 ```python
-# 400 Bad Request
-raise HTTPException(
-    status_code=400,
-    detail="Invalid artifact source format"
-)
+# Before raising HTTPException, always log
+logger.exception(f"Operation failed: {e}")
+raise HTTPException(status_code=500, detail="Internal server error")
 
-# 404 Not Found
-raise HTTPException(
-    status_code=404,
-    detail=f"Artifact '{artifact_id}' not found"
-)
+# Validation errors (automatic via Pydantic)
+# 422 Unprocessable Entity
 
-# 422 Unprocessable Entity (validation errors)
-# Automatically handled by Pydantic
+# Authorization
+raise HTTPException(status_code=401, detail="Unauthorized")
 
-# 500 Internal Server Error
-try:
-    result = dangerous_operation()
-except Exception as e:
-    logger.exception(f"Operation failed: {e}")
-    raise HTTPException(500, "Internal server error")
+# Not found
+raise HTTPException(status_code=404, detail=f"Resource '{id}' not found")
+
+# Validation
+raise HTTPException(status_code=400, detail="Invalid request")
 ```
 
-**Global Exception Handler** (optional):
+See `utils/error_handlers.py` for centralized error handling patterns.
 
-```python
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.exception(f"Unhandled exception: {exc}")
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error"}
-    )
+---
+
+## Database Layer
+
+**Location**: `skillmeat/cache/` module
+
+**Architecture**:
+
 ```
+Routers → Dependencies → Managers (core/)
+    ↓
+Services (api/services/)
+    ↓
+SQLAlchemy ORM (cache/models.py)
+    ↓
+Repositories (cache/repositories.py)
+    ↓
+SQLite Database
+```
+
+**Components**:
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| **Models** | `cache/models.py` | SQLAlchemy ORM models (15+ entities) |
+| **Repositories** | `cache/repositories.py` | Data access layer |
+| **Manager** | `cache/manager.py` | Cache lifecycle management |
+| **Migrations** | `cache/migrations/` | Alembic schema version control |
+| **Refresh** | `cache/refresh.py` | Cache sync mechanism |
+
+**Write-Through Pattern**:
+
+1. Write to filesystem first
+2. Call `refresh_single_artifact_cache()` to sync database
+3. Return to client
+
+See root `CLAUDE.md` → "Data Flow Principles" for full pattern.
 
 ---
 
 ## Testing
 
-**File**: `tests/test_artifacts_routes.py`
+**File**: `tests/`
 
-**Pattern**: Use TestClient, mock managers
+**Pattern**: Use TestClient with mocked dependencies.
 
 ```python
 from fastapi.testclient import TestClient
@@ -377,25 +378,13 @@ from skillmeat.api.server import app
 client = TestClient(app)
 
 def test_list_artifacts(monkeypatch):
-    # Mock artifact manager
     mock_artifacts = [...]
     monkeypatch.setattr(
         "skillmeat.api.dependencies.get_artifact_manager",
         lambda: MockArtifactManager(artifacts=mock_artifacts)
     )
-
     response = client.get("/api/v1/artifacts")
     assert response.status_code == 200
-    assert len(response.json()["artifacts"]) == len(mock_artifacts)
-
-def test_create_artifact():
-    response = client.post("/api/v1/artifacts", json={
-        "name": "test-skill",
-        "artifact_type": "skill",
-        "source": "user/repo/skill",
-    })
-    assert response.status_code == 201
-    assert response.json()["name"] == "test-skill"
 ```
 
 **Run Tests**:
@@ -410,32 +399,11 @@ pytest skillmeat/api/tests/ -v
 
 **Auto-Generated**: Available at `/docs` (Swagger UI) and `/redoc` (ReDoc)
 
-**Custom OpenAPI Schema** (`openapi.py`):
+**Custom OpenAPI** (`openapi.py`):
 
-```python
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-
-    openapi_schema = get_openapi(
-        title="SkillMeat API",
-        version=skillmeat_version,
-        description="Personal collection manager for Claude Code artifacts",
-        routes=app.routes,
-    )
-
-    # Add custom tags, security schemes, etc.
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
-
-app.openapi = custom_openapi
-```
-
-**Export OpenAPI JSON**:
-
-```bash
-python -c "from skillmeat.api.server import app; import json; print(json.dumps(app.openapi()))" > openapi.json
-```
+- Custom tags and security schemes
+- API version and description configuration
+- Schema modifications for better documentation
 
 ---
 
@@ -443,62 +411,57 @@ python -c "from skillmeat.api.server import app; import json; print(json.dumps(a
 
 ### GitHub API
 
-Use the centralized GitHub client for all GitHub API operations:
+Use centralized client for all GitHub operations:
 
 ```python
 from skillmeat.core.github_client import get_github_client
 
-@router.get("/artifacts/from-github/{owner}/{repo}")
-async def fetch_from_github(
-    owner: str,
-    repo: str,
-) -> ArtifactMetadataResponse:
+@router.get("/metadata/{owner}/{repo}")
+async def get_metadata(owner: str, repo: str) -> MetadataResponse:
     client = get_github_client()
     metadata = client.get_repo_metadata(f"{owner}/{repo}")
-    return ArtifactMetadataResponse(**metadata)
+    return MetadataResponse(**metadata)
 ```
 
-See `CLAUDE.md` → "GitHub Client" section for full API and error handling patterns.
+See root `CLAUDE.md` → "GitHub Client" section for full API reference and error handling.
 
 ---
 
 ## Data Flow Standard
 
-All API endpoints must comply with the canonical data flow principles. See root `CLAUDE.md` for the 6 principles.
+All endpoints must comply with canonical data flow principles. See root `CLAUDE.md` for 6 principles.
 
 ### Backend Rules
 
-- **Read endpoints**: Must read from DB cache (`CollectionArtifact` table) with filesystem fallback, not filesystem-first
-- **Write-through**: FS-backed mutations must write filesystem first, then call `refresh_single_artifact_cache()` to sync DB cache
-- **File mutations**: `create/update/delete` on artifact files must also call `refresh_single_artifact_cache()` (metadata may change)
-- **DB-native writes**: Collections, groups, tags write DB first; tags write-back to filesystem where applicable
+- **Read endpoints**: Query DB cache (`CollectionArtifact` table) with filesystem fallback
+- **Write-through**: Mutations write filesystem first, then call `refresh_single_artifact_cache()` to sync
+- **File mutations**: create/update/delete on artifact files must call `refresh_single_artifact_cache()`
+- **DB-native writes**: Collections, groups, tags write DB first; tags write back to filesystem where applicable
 
 ### Cache Refresh Triggers
 
 | Trigger | Scope | Mechanism |
 |---------|-------|-----------|
-| Server startup | Full | FS -> DB sync in `lifespan()` |
-| Single artifact mutation | Targeted | `refresh_single_artifact_cache()` |
-| Manual refresh | Full | `POST /cache/refresh` |
+| Server startup | Full | FS → DB sync in `lifespan()` |
+| Single mutation | Targeted | `refresh_single_artifact_cache()` |
+| Manual refresh | Full | `POST /api/v1/cache/refresh` |
 
-**Full invalidation graph + stale time table**:
+**Stale times & invalidation graph**:
 **Read**: `.claude/context/key-context/data-flow-patterns.md`
 
 ---
 
 ## Key Patterns
 
-### Async Handlers
+### Status Codes
 
-All route handlers should be async:
-
-```python
-@router.get("/artifacts")
-async def list_artifacts(...) -> ArtifactListResponse:
-    # Even if not using await, mark as async for consistency
-    artifacts = artifact_mgr.list_artifacts()
-    return ArtifactListResponse(artifacts=artifacts)
-```
+| Method | Code | Meaning |
+|--------|------|---------|
+| GET | 200 | Success |
+| POST | 201 | Created |
+| PUT | 200 | Updated |
+| DELETE | 204 | Deleted (no content) |
+| Errors | 400, 401, 404, 422, 500 | See error handling |
 
 ### Query Parameters
 
@@ -506,11 +469,9 @@ async def list_artifacts(...) -> ArtifactListResponse:
 @router.get("/artifacts")
 async def list_artifacts(
     artifact_type: Optional[ArtifactType] = Query(None),
-    scope: Optional[ScopeType] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
-) -> ArtifactListResponse:
-    ...
+) -> ArtifactListResponse: ...
 ```
 
 ### Path Parameters
@@ -520,11 +481,7 @@ async def list_artifacts(
 async def get_artifact(
     artifact_id: str,
     artifact_mgr: ArtifactManagerDep,
-) -> ArtifactResponse:
-    artifact = artifact_mgr.get_artifact(artifact_id)
-    if not artifact:
-        raise HTTPException(404, f"Artifact '{artifact_id}' not found")
-    return ArtifactResponse.from_orm(artifact)
+) -> ArtifactResponse: ...
 ```
 
 ### Request Body
@@ -534,73 +491,20 @@ async def get_artifact(
 async def create_artifact(
     request: ArtifactCreateRequest,
     artifact_mgr: ArtifactManagerDep,
-) -> ArtifactCreateResponse:
-    artifact = artifact_mgr.create_artifact(
-        name=request.name,
-        artifact_type=request.artifact_type,
-        source=request.source,
-    )
-    return ArtifactCreateResponse.from_orm(artifact)
-```
-
----
-
-## Database (Future)
-
-**Note**: Currently using file-based storage. SQLAlchemy + Alembic integration planned.
-
-**When Implemented**:
-
-```python
-# models.py (SQLAlchemy models)
-class Artifact(Base):
-    __tablename__ = "artifacts"
-
-    id = Column(String, primary_key=True)
-    name = Column(String, nullable=False)
-    artifact_type = Column(Enum(ArtifactType), nullable=False)
-    # ...
-
-# Alembic migrations
-alembic init migrations
-alembic revision --autogenerate -m "Create artifacts table"
-alembic upgrade head
-```
-
----
-
-## Production Deployment
-
-**Docker** (future):
-
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY . .
-RUN pip install -e .
-CMD ["uvicorn", "skillmeat.api.server:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-**Environment**:
-
-```bash
-export SKILLMEAT_COLLECTION_PATH=/data/collection
-export SKILLMEAT_LOG_LEVEL=INFO
-export SKILLMEAT_CORS_ORIGINS='["https://skillmeat.example.com"]'
-uvicorn skillmeat.api.server:app --workers 4 --host 0.0.0.0 --port 8000
+) -> ArtifactResponse: ...
 ```
 
 ---
 
 ## Path-Specific Rules
 
-Rules in `.claude/rules/api/` auto-load when editing this directory:
+Rule file in `.claude/rules/api/` auto-loaded when editing this directory:
 
-| Rule File | Applies To | Contains |
-|-----------|-----------|----------|
-| routers.md | `routers/**/*.py` | Layered architecture, HTTP patterns, HTTPException usage |
-| schemas.md | `schemas/**/*.py` | DTO patterns, Pydantic conventions (Phase 3) |
-| services.md | `core/**/*.py` | Business logic, repository integration (Phase 3) |
+| File | Scope | Contains |
+|------|-------|----------|
+| `routers.md` | `routers/**/*.py` | Layered architecture, HTTP patterns, HTTPException usage |
+
+---
 
 ## Context Files
 
@@ -608,16 +512,17 @@ Rules in `.claude/rules/api/` auto-load when editing this directory:
 |------|-----------|
 | `.claude/context/key-context/data-flow-patterns.md` | Cache sync, write-through, invalidation rules |
 | `.claude/context/api-endpoint-mapping.md` | Adding/debugging endpoints |
-| `.claude/context/symbol-usage-guide.md` | Bug investigation, tracing code paths |
 
 ---
 
 ## Important Notes
 
-- **Stateless**: API should be stateless; state in collection/filesystem
-- **Thread Safety**: Use locks when modifying collection files
-- **Error Logging**: Always log exceptions before raising HTTPException
-- **CORS**: Configure origins carefully in production
-- **API Versioning**: Use `/api/v1` prefix for future compatibility
-- **Rate Limiting**: Adjust limits based on usage patterns
-- **Authentication**: Currently basic token auth; consider OAuth2 for production
+- **AppState Pattern**: Shared manager instances initialized in lifespan, not stateless
+- **Default Port**: 8080 (not 8000)
+- **Default Host**: 127.0.0.1 (dev) or 0.0.0.0 (production)
+- **Cache Layer**: SQLAlchemy + Alembic fully implemented in `skillmeat/cache/`
+- **Write-Through**: All mutations must sync filesystem first, then database
+- **Error Logging**: Always log before raising HTTPException
+- **API Versioning**: `/api/v1` prefix for future compatibility
+- **Authentication**: Configurable via `api_key_enabled` and `auth_enabled` settings
+- **Rate Limiting**: IP-based, configurable per-minute requests
