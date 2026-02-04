@@ -1066,23 +1066,30 @@ export function ArtifactOperationsModal({
       </TabsContent>
 
       {/* Sync Status Tab */}
-      <TabContentWrapper value="sync" scrollable={false}>
+      <TabsContent
+        value="sync"
+        className="mt-0 flex h-[calc(90vh-12rem)] flex-col overflow-hidden focus-visible:outline-none focus-visible:ring-0"
+      >
         {artifact.collection && (
-          <ProjectSelectorForDiff
-            entityId={artifact.id}
-            entityName={artifact.name}
-            entityType={artifact.type as ArtifactType}
-            collection={artifact.collection}
-            onProjectSelected={(path) => setSelectedProjectForDiff(path)}
-          />
+          <div className="flex-shrink-0 px-6 pt-4">
+            <ProjectSelectorForDiff
+              entityId={artifact.id}
+              entityName={artifact.name}
+              entityType={artifact.type as ArtifactType}
+              collection={artifact.collection}
+              onProjectSelected={(path) => setSelectedProjectForDiff(path)}
+            />
+          </div>
         )}
-        <SyncStatusTab
-          entity={artifact}
-          mode="collection"
-          projectPath={selectedProjectForDiff || undefined}
-          onClose={onClose}
-        />
-      </TabContentWrapper>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <SyncStatusTab
+            entity={artifact}
+            mode="collection"
+            projectPath={selectedProjectForDiff || undefined}
+            onClose={onClose}
+          />
+        </div>
+      </TabsContent>
 
       {/* Deployments Tab */}
       <TabContentWrapper value="deployments">

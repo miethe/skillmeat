@@ -123,7 +123,7 @@ function SyncStatusTabSkeleton() {
         </div>
 
         {/* Diff Content Skeleton */}
-        <div className="flex-1 space-y-2 p-6">
+        <div className="min-h-0 flex-1 space-y-2 overflow-auto p-6">
           {[...Array(12)].map((_, i) => (
             <Skeleton key={i} className="h-5" style={{ width: `${60 + Math.random() * 30}%` }} />
           ))}
@@ -733,10 +733,8 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
             <ComparisonSelector {...comparisonProps} />
             <DriftAlertBanner {...alertProps} />
           </div>
-          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            <div className="h-full max-h-[55vh] min-h-[320px] overflow-hidden">
-              <DiffViewer {...diffProps} />
-            </div>
+          <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+            <DiffViewer {...diffProps} />
           </div>
         </div>
 

@@ -9,6 +9,8 @@ import {
   Clock,
   Loader2,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Calendar,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -148,6 +150,7 @@ export function ProjectSelectorForDiff({
   onProjectSelected,
 }: ProjectSelectorForDiffProps) {
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Fetch artifact details with deployment statistics
   const {
@@ -183,6 +186,7 @@ export function ProjectSelectorForDiff({
 
   const handleProjectClick = (projectPath: string) => {
     setSelectedProject(projectPath);
+    setIsCollapsed(true);
     onProjectSelected(projectPath);
   };
 
@@ -232,14 +236,59 @@ export function ProjectSelectorForDiff({
     );
   }
 
+  // Collapsed view - compact summary bar
+  if (isCollapsed && selectedProject) {
+    const selected = deployments.find((d) => d.projectPath === selectedProject);
+    if (selected) {
+      return (
+        <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            <Folder className="h-4 w-4 text-primary" />
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">{selected.projectName}</span>
+              <Badge variant={getStatusVariant(selected.status)} className="text-xs">
+                {getStatusLabel(selected.status)}
+              </Badge>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsCollapsed(false);
+            }}
+            className="h-7 gap-1 text-xs text-muted-foreground"
+          >
+            Change
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+        </div>
+      );
+    }
+  }
+
   // Main content - project list
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="mb-1 text-sm font-medium">Select Project for Comparison</h3>
-        <p className="text-xs text-muted-foreground">
-          Choose a project to compare the collection version of {entityName} against
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="mb-1 text-sm font-medium">Select Project for Comparison</h3>
+          <p className="text-xs text-muted-foreground">
+            Choose a project to compare the collection version of {entityName} against
+          </p>
+        </div>
+        {selectedProject && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsCollapsed(true)}
+            className="h-7 gap-1 text-xs text-muted-foreground"
+          >
+            Collapse
+            <ChevronUp className="h-3 w-3" />
+          </Button>
+        )}
       </div>
 
       <ScrollArea className="max-h-[400px]">
