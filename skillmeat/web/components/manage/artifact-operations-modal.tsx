@@ -505,19 +505,19 @@ export function ArtifactOperationsModal({
   }, [artifact?.id, open]);
 
   // Auto-detect project for diff when artifact has exactly one deployment
+  const deployments = artifact?.deployments;
   useEffect(() => {
     if (
-      artifact &&
       !selectedProjectForDiff &&
-      artifact.deployments &&
-      artifact.deployments.length > 0
+      deployments &&
+      deployments.length > 0
     ) {
-      const firstProjectPath = artifact.deployments[0]?.project_path;
+      const firstProjectPath = deployments[0]?.project_path;
       if (firstProjectPath) {
         setSelectedProjectForDiff(firstProjectPath);
       }
     }
-  }, [artifact?.id, selectedProjectForDiff, artifact?.deployments]);
+  }, [selectedProjectForDiff, deployments]);
 
   // Get artifact type config
   const config = artifact ? ARTIFACT_TYPES[artifact.type] : null;
