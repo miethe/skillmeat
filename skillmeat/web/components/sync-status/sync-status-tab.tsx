@@ -11,8 +11,18 @@ import { useToast } from '@/hooks';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api';
-import { pullChanges, pushChanges } from '@/lib/api/context-sync';
+import type { ArtifactSyncResponse } from '@/sdk/models/ArtifactSyncResponse';
 import { hasValidUpstreamSource } from '@/lib/sync-utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 // Phase 1 components
 import { ArtifactFlowBanner } from './artifact-flow-banner';
@@ -255,7 +265,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   // Sync mutation (pull from source)
   const syncMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest(`/artifacts/${encodeURIComponent(entity.id)}/sync`, {
+      return await apiRequest<ArtifactSyncResponse>(`/artifacts/${encodeURIComponent(entity.id)}/sync`, {
         method: 'POST',
         body: JSON.stringify({
           // Empty body syncs from upstream source (not project)
@@ -263,14 +273,20 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
         }),
       });
     },
-    onSuccess: () => {
+    onSuccess: (data: ArtifactSyncResponse) => {
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
       queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
-      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
-      toast({
-        title: 'Sync Successful',
-        description: 'Pulled latest changes from source',
-      });
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+      if (data.conflicts && data.conflicts.length > 0) {
+        toast({ title: 'Pull completed with conflicts', description: `${data.conflicts.length} conflict(s) detected`, variant: 'destructive' });
+      } else {
+        toast({
+          title: 'Sync Successful',
+          description: data.message || 'Pulled latest changes from source',
+        });
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -364,26 +380,33 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     },
   });
 
-  // Push to collection mutation (pull from project back to collection)
+  // Push to collection mutation (push project changes back to collection)
   const pushToCollectionMutation = useMutation({
     mutationFn: async () => {
-      if (!projectPath) {
-        throw new Error('No project path available');
-      }
-      return await pullChanges(projectPath, [entity.id]);
+      if (!projectPath) throw new Error('No project path available');
+      return await apiRequest<ArtifactSyncResponse>(
+        `/artifacts/${encodeURIComponent(entity.id)}/sync`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            project_path: projectPath,
+            force: false,
+            strategy: 'theirs',
+          }),
+        }
+      );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['context-sync-status'] });
-      queryClient.invalidateQueries({ queryKey: ['artifact-files'] });
-      queryClient.invalidateQueries({ queryKey: ['context-entities'] });
+    onSuccess: (data: ArtifactSyncResponse) => {
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
       queryClient.invalidateQueries({ queryKey: ['deployments'] });
       queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
-      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
-      toast({
-        title: 'Push Successful',
-        description: 'Project changes pushed to collection',
-      });
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+      if (data.conflicts && data.conflicts.length > 0) {
+        toast({ title: 'Push completed with conflicts', description: `${data.conflicts.length} conflict(s) detected`, variant: 'destructive' });
+      } else {
+        toast({ title: 'Push Successful', description: data.message || 'Project changes pushed to collection' });
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -394,75 +417,25 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     },
   });
 
-  // Batch push mutation (push collection to project for multiple entities)
-  const batchPushMutation = useMutation({
-    mutationFn: async (entityIds: string[]) => {
-      if (!projectPath) {
-        throw new Error('No project path available');
-      }
-      return await pushChanges(projectPath, entityIds);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['context-sync-status'] });
-      queryClient.invalidateQueries({ queryKey: ['artifact-files'] });
-      queryClient.invalidateQueries({ queryKey: ['context-entities'] });
-      queryClient.invalidateQueries({ queryKey: ['deployments'] });
-      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
-      queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
-      toast({
-        title: 'Batch Push Successful',
-        description: 'Collection changes pushed to project',
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Batch Push Failed',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
-
-  // Batch pull mutation (pull from project to collection for multiple entities)
-  const batchPullMutation = useMutation({
-    mutationFn: async (entityIds: string[]) => {
-      if (!projectPath) {
-        throw new Error('No project path available');
-      }
-      return await pullChanges(projectPath, entityIds);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['context-sync-status'] });
-      queryClient.invalidateQueries({ queryKey: ['artifact-files'] });
-      queryClient.invalidateQueries({ queryKey: ['context-entities'] });
-      queryClient.invalidateQueries({ queryKey: ['deployments'] });
-      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
-      queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
-      toast({
-        title: 'Batch Pull Successful',
-        description: 'Project changes pulled to collection',
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Batch Pull Failed',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
-
   // ============================================================================
   // Event Handlers
   // ============================================================================
+
+  const [showPushConfirm, setShowPushConfirm] = useState(false);
+  const [showPullConfirm, setShowPullConfirm] = useState(false);
 
   const handleComparisonChange = (scope: ComparisonScope) => {
     setComparisonScope(scope);
   };
 
-  const handlePullFromSource = () => {
+  const handlePullFromSource = useCallback(() => {
+    setShowPullConfirm(true);
+  }, []);
+
+  const confirmPullFromSource = useCallback(() => {
+    setShowPullConfirm(false);
     syncMutation.mutate();
-  };
+  }, [syncMutation]);
 
   const handleDeployToProject = () => {
     if (!projectPath) {
@@ -489,8 +462,13 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       toast({ title: 'Error', description: 'No project path available', variant: 'destructive' });
       return;
     }
+    setShowPushConfirm(true);
+  }, [projectPath, toast]);
+
+  const confirmPushToCollection = useCallback(() => {
+    setShowPushConfirm(false);
     pushToCollectionMutation.mutate();
-  }, [projectPath, pushToCollectionMutation, toast]);
+  }, [pushToCollectionMutation]);
 
   const handleApplyActions = () => {
     if (pendingActions.length === 0) return;
@@ -499,18 +477,16 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       return;
     }
 
-    // Group pending actions by type and execute batch operations
+    // Execute single-artifact mutations based on pending action types
     const pushActions = pendingActions.filter((a) => a.type === 'push');
     const pullActions = pendingActions.filter((a) => a.type === 'pull');
 
     if (pushActions.length > 0) {
-      const entityIds = pushActions.map(() => entity.id);
-      batchPushMutation.mutate(entityIds);
+      pushToCollectionMutation.mutate();
     }
 
     if (pullActions.length > 0) {
-      const entityIds = pullActions.map(() => entity.id);
-      batchPullMutation.mutate(entityIds);
+      syncMutation.mutate();
     }
 
     // Deploy actions go through the existing deploy mutation
@@ -646,9 +622,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       deployMutation.isPending ||
       takeUpstreamMutation.isPending ||
       keepLocalMutation.isPending ||
-      pushToCollectionMutation.isPending ||
-      batchPushMutation.isPending ||
-      batchPullMutation.isPending,
+      pushToCollectionMutation.isPending,
   };
 
   // ============================================================================
@@ -762,6 +736,38 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
           setShowSyncDialog(false);
         }}
       />
+
+      {/* Push confirmation dialog */}
+      <AlertDialog open={showPushConfirm} onOpenChange={setShowPushConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Push to Collection</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will overwrite the collection version of &quot;{entity.name}&quot; with the project version. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPushToCollection}>Push Changes</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Pull confirmation dialog */}
+      <AlertDialog open={showPullConfirm} onOpenChange={setShowPullConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pull from Source</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will update the collection version of &quot;{entity.name}&quot; with the latest upstream source. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPullFromSource}>Pull Changes</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
