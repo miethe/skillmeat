@@ -289,6 +289,20 @@ skillmeat/
 └── observability/      # Logging, monitoring
 ```
 
+### Data Flow Principles
+
+Dual-stack: **filesystem** (CLI source of truth) + **DB cache** (web source of truth). Six canonical principles govern all data flow:
+
+1. **DB Cache = Web's Source of Truth** -- Frontend reads from DB-backed API endpoints, never filesystem directly (exception: individual file content)
+2. **Filesystem = CLI's Source of Truth** -- CLI reads/writes filesystem directly; DB cache is a derived view
+3. **Write-Through for Web Mutations** -- Write FS first, sync to DB via `refresh_single_artifact_cache()`, invalidate frontend caches
+4. **Cache Refresh = Sync Mechanism** -- Full sync at startup, targeted per mutation, manual via `POST /cache/refresh`
+5. **Standardized Stale Times** -- 5min browsing, 30sec interactive/monitoring, 2min deployments
+6. **Mutations Invalidate Related Caches** -- Every mutation must invalidate all affected query keys per the invalidation graph
+
+**Detailed reference** (stale time table, invalidation graph, flow diagrams):
+**Read**: `.claude/context/key-context/data-flow-patterns.md`
+
 **Collection-Based Architecture** (Active):
 
 ```
@@ -504,6 +518,7 @@ Never use PyGithub directly; always go through the wrapper.
 - `.claude/rules/web/` - Component, page, testing conventions (~130 lines)
 
 **Key Context** (read when working in domain):
+- `.claude/context/key-context/data-flow-patterns.md` - Stale times, cache invalidation graph, write-through patterns
 - `.claude/context/key-context/debugging-patterns.md` - Bug categories, delegation patterns
 - `.claude/context/key-context/router-patterns.md` - Full FastAPI examples
 - `.claude/context/key-context/component-patterns.md` - React/shadcn patterns

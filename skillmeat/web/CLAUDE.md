@@ -161,11 +161,37 @@ Rules in `.claude/rules/web/` auto-load when editing:
 
 ## Context Files (Load When Needed)
 
-| File                                      | Load When                             |
-| ----------------------------------------- | ------------------------------------- |
-| `.claude/context/api-endpoint-mapping.md` | API mismatch bugs, endpoint questions |
-| `.claude/context/stub-patterns.md`        | "Not implemented" errors              |
-| `.claude/context/symbol-usage-guide.md`   | Bug investigation, unfamiliar code    |
+| File                                              | Load When                                   |
+| ------------------------------------------------- | ------------------------------------------- |
+| `.claude/context/key-context/data-flow-patterns.md` | Hook stale times, cache invalidation, mutations |
+| `.claude/context/api-endpoint-mapping.md`          | API mismatch bugs, endpoint questions       |
+| `.claude/context/stub-patterns.md`                 | "Not implemented" errors                    |
+| `.claude/context/symbol-usage-guide.md`            | Bug investigation, unfamiliar code          |
+
+---
+
+## Data Flow Standard
+
+All hooks must comply with the canonical data flow principles. See root `CLAUDE.md` for the 6 principles.
+
+### Frontend Rules
+
+- **Reads**: Always from DB-backed API endpoints (never filesystem endpoints for listable data)
+- **Stale times**: Must match the domain standard (5min browsing, 30sec interactive, 2min deployments)
+- **Mutations**: Must invalidate all related query keys per the invalidation graph
+- **Write-through**: Frontend calls API; backend handles FS write + cache sync; frontend invalidates queries
+
+### Quick Stale Time Guide
+
+| Category | Stale Time | Domains |
+|----------|-----------|---------|
+| Standard browsing | 5 min | Artifacts, Collections, Tags, Groups, Projects, Snapshots, Context Entities |
+| Interactive/monitoring | 30 sec | Tag search, Artifact search, Analytics summary, Cache/Sync status |
+| Deployments | 2 min | All deployment hooks |
+| Marketplace listings | 1 min | Listing list only; detail uses 5min |
+
+**Full stale time table + invalidation graph**:
+**Read**: `.claude/context/key-context/data-flow-patterns.md`
 
 ---
 
@@ -174,7 +200,7 @@ Rules in `.claude/rules/web/` auto-load when editing:
 ### TanStack Query Setup
 
 **Provider**: `components/providers.tsx` wraps app with QueryClientProvider
-**Stale time**: 5 minutes default
+**Stale time**: 5 minutes default (see Data Flow Standard for domain-specific values)
 **Pattern**: Query key factories in each hook file
 
 ### shadcn/ui

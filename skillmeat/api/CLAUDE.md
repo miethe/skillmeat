@@ -462,6 +462,30 @@ See `CLAUDE.md` → "GitHub Client" section for full API and error handling patt
 
 ---
 
+## Data Flow Standard
+
+All API endpoints must comply with the canonical data flow principles. See root `CLAUDE.md` for the 6 principles.
+
+### Backend Rules
+
+- **Read endpoints**: Must read from DB cache (`CollectionArtifact` table) with filesystem fallback, not filesystem-first
+- **Write-through**: FS-backed mutations must write filesystem first, then call `refresh_single_artifact_cache()` to sync DB cache
+- **File mutations**: `create/update/delete` on artifact files must also call `refresh_single_artifact_cache()` (metadata may change)
+- **DB-native writes**: Collections, groups, tags write DB first; tags write-back to filesystem where applicable
+
+### Cache Refresh Triggers
+
+| Trigger | Scope | Mechanism |
+|---------|-------|-----------|
+| Server startup | Full | FS -> DB sync in `lifespan()` |
+| Single artifact mutation | Targeted | `refresh_single_artifact_cache()` |
+| Manual refresh | Full | `POST /cache/refresh` |
+
+**Full invalidation graph + stale time table**:
+**Read**: `.claude/context/key-context/data-flow-patterns.md`
+
+---
+
 ## Key Patterns
 
 ### Async Handlers
@@ -582,6 +606,7 @@ Rules in `.claude/rules/api/` auto-load when editing this directory:
 
 | File | Load When |
 |------|-----------|
+| `.claude/context/key-context/data-flow-patterns.md` | Cache sync, write-through, invalidation rules |
 | `.claude/context/api-endpoint-mapping.md` | Adding/debugging endpoints |
 | `.claude/context/symbol-usage-guide.md` | Bug investigation, tracing code paths |
 
