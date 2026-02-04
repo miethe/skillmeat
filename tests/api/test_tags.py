@@ -69,10 +69,40 @@ def mock_tag():
     }
 
 
+@pytest.fixture(autouse=True)
+def mock_collection_manager(app):
+    """Override CollectionManagerDep for all tests."""
+    from skillmeat.api.dependencies import get_collection_manager
+
+    mock_mgr = MagicMock()
+    app.dependency_overrides[get_collection_manager] = lambda: mock_mgr
+    yield mock_mgr
+    app.dependency_overrides.pop(get_collection_manager, None)
+
+
+@pytest.fixture(autouse=True)
+def mock_tag_write_service():
+    """Mock TagWriteService for all tests."""
+    with patch(
+        "skillmeat.core.services.tag_write_service.TagWriteService"
+    ) as MockWriteService:
+        mock_ws = MockWriteService.return_value
+        mock_ws.rename_tag.return_value = {
+            "affected_artifacts": [],
+            "files_updated": 0,
+        }
+        mock_ws.delete_tag.return_value = {
+            "affected_artifacts": [],
+            "files_updated": 0,
+        }
+        mock_ws.update_tags_json_cache.return_value = 0
+        yield mock_ws
+
+
 @pytest.fixture
 def mock_tag_service(mock_tag):
     """Create mock TagService."""
-    with patch("skillmeat.api.routers.tags.TagService") as MockService:
+    with patch("skillmeat.core.services.TagService") as MockService:
         mock_service = MockService.return_value
 
         # Create a proper Mock that will work with Pydantic validation
@@ -335,7 +365,7 @@ class TestDeleteTag:
 
     def test_delete_tag_not_found(self, client, mock_tag_service):
         """Test deleting non-existent tag returns 404."""
-        mock_tag_service.delete_tag.return_value = False
+        mock_tag_service.get_tag.return_value = None
 
         response = client.delete("/api/v1/tags/nonexistent")
 
