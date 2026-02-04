@@ -54,7 +54,6 @@ import { ArtifactLinkingDialog } from '@/components/entity';
 import { FileTree } from '@/components/entity/file-tree';
 import { ContentPane } from '@/components/entity/content-pane';
 import { DeployButton } from '@/components/shared/deploy-button';
-import { CliCommandSection } from '@/components/entity/cli-command-section';
 import { ARTIFACT_TYPES, type Artifact, type ArtifactType } from '@/types/artifact';
 import { getCollectionColor } from '@/lib/utils/collection-colors';
 import { apiRequest } from '@/lib/api';
@@ -972,12 +971,6 @@ export function ArtifactDetailsModal({
                       <span>{new Date(artifact.updatedAt).toLocaleString()}</span>
                     </div>
                   </div>
-                </div>
-
-                {/* CLI Deploy Commands */}
-                <div>
-                  <h3 className="mb-2 text-sm font-medium">CLI Deploy Command</h3>
-                  <CliCommandSection artifactName={artifact.name} />
                 </div>
               </div>
             </TabContentWrapper>
