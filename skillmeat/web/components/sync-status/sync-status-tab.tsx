@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
 import type { Artifact } from '@/types/artifact';
@@ -11,6 +11,7 @@ import { useToast } from '@/hooks';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api';
+import { pullChanges, pushChanges } from '@/lib/api/context-sync';
 import { hasValidUpstreamSource } from '@/lib/sync-utils';
 
 // Phase 1 components
@@ -203,6 +204,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   );
   const [pendingActions] = useState<PendingAction[]>([]);
   const [showSyncDialog, setShowSyncDialog] = useState(false);
+  const [dismissedDriftIds, setDismissedDriftIds] = useState<Set<string>>(new Set());
 
   // ============================================================================
   // Queries
@@ -344,17 +346,108 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     },
   });
 
-  // Keep local mutation (dismiss drift alert)
+  // Keep local mutation (dismiss drift alert via local state)
   const keepLocalMutation = useMutation({
     mutationFn: async () => {
-      // This is a no-op for now - just a UI acknowledgment
-      // In the future, this could mark the drift as "acknowledged"
-      return Promise.resolve();
+      // Dismiss the drift banner for this entity by adding to dismissed set.
+      // This is a local UI acknowledgment - no API call needed.
+      setDismissedDriftIds((prev) => new Set(prev).add(entity.id));
     },
     onSuccess: () => {
+      // Invalidate drift-related queries so UI re-evaluates after dismissal
+      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
+      queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
       toast({
         title: 'Local Version Kept',
-        description: 'Local changes preserved',
+        description: 'Drift dismissed - local changes preserved',
+      });
+    },
+  });
+
+  // Push to collection mutation (pull from project back to collection)
+  const pushToCollectionMutation = useMutation({
+    mutationFn: async () => {
+      if (!projectPath) {
+        throw new Error('No project path available');
+      }
+      return await pullChanges(projectPath, [entity.id]);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['context-sync-status'] });
+      queryClient.invalidateQueries({ queryKey: ['artifact-files'] });
+      queryClient.invalidateQueries({ queryKey: ['context-entities'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
+      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
+      queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      toast({
+        title: 'Push Successful',
+        description: 'Project changes pushed to collection',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Push Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Batch push mutation (push collection to project for multiple entities)
+  const batchPushMutation = useMutation({
+    mutationFn: async (entityIds: string[]) => {
+      if (!projectPath) {
+        throw new Error('No project path available');
+      }
+      return await pushChanges(projectPath, entityIds);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['context-sync-status'] });
+      queryClient.invalidateQueries({ queryKey: ['artifact-files'] });
+      queryClient.invalidateQueries({ queryKey: ['context-entities'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
+      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
+      queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
+      toast({
+        title: 'Batch Push Successful',
+        description: 'Collection changes pushed to project',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Batch Push Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Batch pull mutation (pull from project to collection for multiple entities)
+  const batchPullMutation = useMutation({
+    mutationFn: async (entityIds: string[]) => {
+      if (!projectPath) {
+        throw new Error('No project path available');
+      }
+      return await pullChanges(projectPath, entityIds);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['context-sync-status'] });
+      queryClient.invalidateQueries({ queryKey: ['artifact-files'] });
+      queryClient.invalidateQueries({ queryKey: ['context-entities'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
+      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
+      queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
+      toast({
+        title: 'Batch Pull Successful',
+        description: 'Project changes pulled to collection',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Batch Pull Failed',
+        description: error.message,
+        variant: 'destructive',
       });
     },
   });
@@ -391,9 +484,40 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     setShowSyncDialog(true);
   };
 
+  const handlePushToCollection = useCallback(() => {
+    if (!projectPath) {
+      toast({ title: 'Error', description: 'No project path available', variant: 'destructive' });
+      return;
+    }
+    pushToCollectionMutation.mutate();
+  }, [projectPath, pushToCollectionMutation, toast]);
+
   const handleApplyActions = () => {
     if (pendingActions.length === 0) return;
-    toast({ title: 'Info', description: 'Batch actions not yet implemented' });
+    if (!projectPath) {
+      toast({ title: 'Error', description: 'No project path available', variant: 'destructive' });
+      return;
+    }
+
+    // Group pending actions by type and execute batch operations
+    const pushActions = pendingActions.filter((a) => a.type === 'push');
+    const pullActions = pendingActions.filter((a) => a.type === 'pull');
+
+    if (pushActions.length > 0) {
+      const entityIds = pushActions.map(() => entity.id);
+      batchPushMutation.mutate(entityIds);
+    }
+
+    if (pullActions.length > 0) {
+      const entityIds = pullActions.map(() => entity.id);
+      batchPullMutation.mutate(entityIds);
+    }
+
+    // Deploy actions go through the existing deploy mutation
+    const deployActions = pendingActions.filter((a) => a.type === 'deploy');
+    if (deployActions.length > 0) {
+      deployMutation.mutate();
+    }
   };
 
   const handleViewDiffs = () => {
@@ -420,8 +544,11 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     }
   }, [comparisonScope, upstreamDiff, projectDiff]);
 
-  // Drift status
-  const driftStatus = useMemo(() => computeDriftStatus(currentDiff), [currentDiff]);
+  // Drift status (suppressed when entity has been dismissed)
+  const driftStatus = useMemo(() => {
+    if (dismissedDriftIds.has(entity.id)) return 'none' as DriftStatus;
+    return computeDriftStatus(currentDiff);
+  }, [currentDiff, dismissedDriftIds, entity.id]);
 
   // ============================================================================
   // Early Return: Discovered Artifacts
@@ -471,10 +598,10 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       : null,
     onPullFromSource: handlePullFromSource,
     onDeployToProject: handleDeployToProject,
-    onPushToCollection: () => toast({ title: 'Coming Soon' }),
+    onPushToCollection: handlePushToCollection,
     isPulling: syncMutation.isPending,
     isDeploying: deployMutation.isPending,
-    isPushing: false,
+    isPushing: pushToCollectionMutation.isPending,
   };
 
   const comparisonProps = {
@@ -507,7 +634,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
 
   const footerProps = {
     onPullCollectionUpdates: handlePullFromSource,
-    onPushLocalChanges: () => toast({ title: 'Coming Soon' }),
+    onPushLocalChanges: handlePushToCollection,
     onMergeConflicts: handleMerge,
     onResolveAll: () => toast({ title: 'Coming Soon' }),
     onCancel: onClose,
@@ -518,7 +645,10 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       syncMutation.isPending ||
       deployMutation.isPending ||
       takeUpstreamMutation.isPending ||
-      keepLocalMutation.isPending,
+      keepLocalMutation.isPending ||
+      pushToCollectionMutation.isPending ||
+      batchPushMutation.isPending ||
+      batchPullMutation.isPending,
   };
 
   // ============================================================================

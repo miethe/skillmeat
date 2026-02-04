@@ -39,9 +39,8 @@ export function SyncActionsFooter({
           variant="ghost"
           size="sm"
           onClick={onPushLocalChanges}
-          disabled={true}
-          className="opacity-60"
-          title="Coming Soon: Push local changes to collection"
+          disabled={isApplying}
+          title="Push local changes to collection"
         >
           <ArrowUp className="mr-2 h-4 w-4" />
           Push Local Changes

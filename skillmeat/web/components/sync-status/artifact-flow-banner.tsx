@@ -245,7 +245,7 @@ export function ArtifactFlowBanner({
           )}
         </div>
 
-        {/* CONNECTOR 3: Project → Collection (Coming Soon) */}
+        {/* CONNECTOR 3: Project → Collection */}
         <div className="flex flex-1 flex-col items-center gap-2">
           <svg width="100%" height="40" className="overflow-visible">
             <path
@@ -253,27 +253,36 @@ export function ArtifactFlowBanner({
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
-              strokeDasharray="4 4"
-              className="text-muted"
+              strokeDasharray={projectInfo ? undefined : '4 4'}
+              className={projectInfo ? 'text-muted-foreground' : 'text-muted'}
             />
             <path
               d={`M ${5} 15 L ${10} 20 L ${5} 25`}
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
-              className="text-muted"
+              className={projectInfo ? 'text-muted-foreground' : 'text-muted'}
             />
           </svg>
           <Button
             size="sm"
             variant="ghost"
             onClick={onPushToCollection}
-            disabled={true}
-            className="h-7 text-xs opacity-60"
-            title="Coming Soon: Push local changes back to collection"
+            disabled={!projectInfo || isPushing}
+            className="h-7 text-xs"
+            title={!projectInfo ? 'No project deployment found' : 'Push local changes back to collection'}
           >
-            <ArrowRight className="mr-1 h-3 w-3 rotate-180" />
-            Push to Collection
+            {isPushing ? (
+              <>
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                Pushing...
+              </>
+            ) : (
+              <>
+                <ArrowRight className="mr-1 h-3 w-3 rotate-180" />
+                Push to Collection
+              </>
+            )}
           </Button>
         </div>
       </div>
