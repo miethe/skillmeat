@@ -891,13 +891,14 @@ class SyncManager:
                     current_project_sha = self._compute_artifact_hash(
                         project_artifact_path
                     )
-                    # Compare with deployed SHA (drift.project_sha)
+                    # Compare with baseline (deployed) SHA
                     # If they differ, project has local modifications to pull
-                    if current_project_sha != drift.project_sha:
+                    baseline = drift.baseline_hash or drift.collection_sha
+                    if current_project_sha != baseline:
                         pullable_drift.append(drift)
                         logger.debug(
                             f"Artifact {drift.artifact_name} has local modifications "
-                            f"(deployed: {drift.project_sha[:12]}..., "
+                            f"(baseline: {baseline[:12] if baseline else 'unknown'}..., "
                             f"current: {current_project_sha[:12]}...)"
                         )
 
