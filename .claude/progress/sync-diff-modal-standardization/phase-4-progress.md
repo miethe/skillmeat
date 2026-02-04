@@ -1,77 +1,90 @@
 ---
 type: progress
-prd: "sync-diff-modal-standardization-v1"
+prd: sync-diff-modal-standardization-v1
 phase: 4
-title: "Wire Up Missing Mutations"
-status: "planning"
+title: Wire Up Missing Mutations
+status: completed
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 4
-completed_tasks: 0
+completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["ui-engineer-enhanced"]
+owners:
+- ui-engineer-enhanced
 contributors: []
-
 tasks:
-  - id: "TASK-4.1"
-    description: "Implement keepLocalMutation - dismiss drift via local state"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2 pts"
-    priority: "medium"
-    model: "opus"
-
-  - id: "TASK-4.2"
-    description: "Implement batch actions with context-sync endpoints"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "3 pts"
-    priority: "medium"
-    model: "opus"
-
-  - id: "TASK-4.3"
-    description: "Implement push-to-collection mutation with context-sync/pull"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2 pts"
-    priority: "medium"
-    model: "opus"
-
-  - id: "TASK-4.4"
-    description: "Verify all mutations work end-to-end on both pages"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-4.1", "TASK-4.2", "TASK-4.3"]
-    estimated_effort: "1 pt"
-    priority: "high"
-    model: "opus"
-
+- id: TASK-4.1
+  description: Implement keepLocalMutation - dismiss drift via local state
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 2 pts
+  priority: medium
+  model: opus
+- id: TASK-4.2
+  description: Implement batch actions with context-sync endpoints
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 3 pts
+  priority: medium
+  model: opus
+- id: TASK-4.3
+  description: Implement push-to-collection mutation with context-sync/pull
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 2 pts
+  priority: medium
+  model: opus
+- id: TASK-4.4
+  description: Verify all mutations work end-to-end on both pages
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-4.1
+  - TASK-4.2
+  - TASK-4.3
+  estimated_effort: 1 pt
+  priority: high
+  model: opus
 parallelization:
-  batch_1: ["TASK-4.1", "TASK-4.2", "TASK-4.3"]
-  batch_2: ["TASK-4.4"]
-  critical_path: ["TASK-4.2", "TASK-4.4"]
-  estimated_total_time: "8 pts"
-
+  batch_1:
+  - TASK-4.1
+  - TASK-4.2
+  - TASK-4.3
+  batch_2:
+  - TASK-4.4
+  critical_path:
+  - TASK-4.2
+  - TASK-4.4
+  estimated_total_time: 8 pts
 blockers: []
-
 success_criteria:
-  - { id: "SC-1", description: "No 'coming soon' or 'not yet implemented' toasts", status: "pending" }
-  - { id: "SC-2", description: "All mutations call correct endpoints", status: "pending" }
-  - { id: "SC-3", description: "Cache invalidation follows data-flow-patterns graph", status: "pending" }
-  - { id: "SC-4", description: "Mutations work on both /manage and /projects pages", status: "pending" }
-
+- id: SC-1
+  description: No 'coming soon' or 'not yet implemented' toasts
+  status: pending
+- id: SC-2
+  description: All mutations call correct endpoints
+  status: pending
+- id: SC-3
+  description: Cache invalidation follows data-flow-patterns graph
+  status: pending
+- id: SC-4
+  description: Mutations work on both /manage and /projects pages
+  status: pending
 files_modified:
-  - "web/components/sync-status/sync-status-tab.tsx"
+- web/components/sync-status/sync-status-tab.tsx
+progress: 100
+updated: '2026-02-04'
 ---
 
 # sync-diff-modal-standardization-v1 - Phase 4: Wire Up Missing Mutations
