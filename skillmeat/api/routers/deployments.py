@@ -23,6 +23,7 @@ from skillmeat.api.schemas.deployments import (
     UndeployRequest,
     UndeployResponse,
 )
+from skillmeat.cache.deployment_stats_cache import get_deployment_stats_cache
 from skillmeat.core.artifact import ArtifactType
 from skillmeat.core.deployment import DeploymentManager
 
@@ -64,6 +65,7 @@ def validate_dest_path(dest_path: Optional[str]) -> Optional[str]:
 
     # Normalize: ensure trailing slash for directory path
     return dest_path.rstrip("/") + "/"
+
 
 router = APIRouter(
     prefix="/deploy",
@@ -223,6 +225,10 @@ async def deploy_artifact(
                 f"Deployment successful: {deployment.artifact_name} "
                 f"({deployment.artifact_type}) to {project_path}"
             )
+
+            # Invalidate deployment stats cache
+            get_deployment_stats_cache().invalidate_all()
+
             return response
 
         except ValueError as e:
@@ -320,6 +326,10 @@ async def undeploy_artifact(
                 f"Undeploy successful: {request.artifact_name} "
                 f"({request.artifact_type}) from {project_path}"
             )
+
+            # Invalidate deployment stats cache
+            get_deployment_stats_cache().invalidate_all()
+
             return response
 
         except ValueError as e:

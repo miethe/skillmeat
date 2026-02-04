@@ -186,6 +186,10 @@ class CacheFileEventHandler(FileSystemEventHandler):
         if filename == "manifest.toml":
             return True
 
+        # Check for deployment tracking files
+        if filename == ".skillmeat-deployed.toml":
+            return True
+
         # Check for artifact definition files (case-insensitive)
         filename_upper = filename.upper()
         if filename_upper in [
@@ -513,6 +517,16 @@ class FileWatcher:
 
         if filename == "manifest.toml":
             self.on_manifest_modified(path)
+        elif filename == ".skillmeat-deployed.toml":
+            # Invalidate deployment stats cache when deployment tracking file changes
+            from skillmeat.cache.deployment_stats_cache import (
+                get_deployment_stats_cache,
+            )
+
+            get_deployment_stats_cache().invalidate_all()
+            logger.info(
+                f"Deployment tracking file changed, invalidated stats cache: {path}"
+            )
         elif filename.upper() in [
             "SKILL.md",
             "COMMAND.md",

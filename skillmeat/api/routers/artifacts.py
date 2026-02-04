@@ -262,13 +262,23 @@ async def build_deployment_statistics(
         DeploymentStatistics with per-project information
 
     Note:
-        This function scans the filesystem for projects, which may be slow
-        for large directory structures. Consider implementing caching.
+        Uses DeploymentStatsCache for performance optimization.
     """
     from skillmeat.api.routers.projects import discover_projects
+    from skillmeat.cache.deployment_stats_cache import get_deployment_stats_cache
 
-    # Discover all projects
-    project_paths = discover_projects()
+    cache = get_deployment_stats_cache()
+
+    # Fast path: full cache hit
+    cached = cache.get_stats(artifact_name, artifact_type.value)
+    if cached is not None:
+        return cached
+
+    # Medium path: reuse cached project discovery
+    project_paths = cache.get_discovered_projects()
+    if project_paths is None:
+        project_paths = discover_projects()
+        cache.set_discovered_projects(project_paths)
 
     total_deployments = 0
     modified_deployments = 0
@@ -319,11 +329,13 @@ async def build_deployment_statistics(
             logger.warning(f"Error processing project {project_path}: {e}")
             continue
 
-    return DeploymentStatistics(
+    result = DeploymentStatistics(
         total_deployments=total_deployments,
         modified_deployments=modified_deployments,
         projects=projects_info,
     )
+    cache.set_stats(artifact_name, artifact_type.value, result)
+    return result
 
 
 async def build_version_graph(
