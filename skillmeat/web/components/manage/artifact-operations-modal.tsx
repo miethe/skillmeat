@@ -105,6 +105,7 @@ import {
 } from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments';
+import { hasValidUpstreamSource } from '@/lib/sync-utils';
 
 // ============================================================================
 // Types
@@ -427,17 +428,6 @@ function getHistoryTypeColor(type: HistoryEntry['type']) {
     default:
       return 'text-gray-600 dark:text-gray-400';
   }
-}
-
-/**
- * Check if entity has a valid upstream source (not local-only)
- */
-function hasValidUpstreamSource(source: string | undefined | null): boolean {
-  if (!source) return false;
-  if (source === 'local' || source === 'unknown') return false;
-  if (source.startsWith('local:')) return false;
-  const segments = source.split('/').filter(Boolean);
-  return segments.length >= 3 && !source.startsWith('local');
 }
 
 // ============================================================================
@@ -1294,7 +1284,7 @@ export function ArtifactOperationsModal({
                       <ExternalLink className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     </div>
                   </div>
-                ) : artifact?.source && hasValidUpstreamSource(artifact.source) ? (
+                ) : hasValidUpstreamSource(artifact) ? (
                   <div className="rounded-lg border p-4">
                     <div className="flex items-center gap-3">
                       <GitBranch className="h-5 w-5 text-muted-foreground" aria-hidden="true" />

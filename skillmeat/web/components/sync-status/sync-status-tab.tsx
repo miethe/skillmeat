@@ -11,6 +11,7 @@ import { useToast } from '@/hooks';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api';
+import { hasValidUpstreamSource } from '@/lib/sync-utils';
 
 // Phase 1 components
 import { ArtifactFlowBanner } from './artifact-flow-banner';
@@ -91,17 +92,6 @@ function getRightLabel(scope: ComparisonScope): string {
   }
 }
 
-/**
- * Check if entity has a valid upstream source (not local-only)
- * Returns false for: undefined, null, empty, 'local', 'local:*', 'unknown'
- */
-function hasValidUpstreamSource(source: string | undefined | null): boolean {
-  if (!source) return false;
-  if (source === 'local' || source === 'unknown') return false;
-  if (source.startsWith('local:')) return false;
-  // Must look like a remote source (GitHub pattern with '/')
-  return source.includes('/') && !source.startsWith('local');
-}
 
 // ============================================================================
 // Loading Skeleton
@@ -236,7 +226,8 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       );
     },
     enabled:
-      !!entity.id && entity.collection !== 'discovered' && hasValidUpstreamSource(entity.source),
+      !!entity.id && entity.collection !== 'discovered' && hasValidUpstreamSource(entity),
+    retry: false,
   });
 
   // Project diff (collection vs project)
@@ -547,7 +538,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   const shouldBlockWithError =
     (projectError && !hasUpstreamData) || // Project failed and no upstream
     (upstreamError && projectError) || // Both failed
-    (!hasValidUpstreamSource(entity.source) && projectError); // Local artifact and project failed
+    (!hasValidUpstreamSource(entity) && projectError); // Local artifact and project failed
 
   if (shouldBlockWithError) {
     const errorToShow = projectError || upstreamError;
