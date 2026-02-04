@@ -5,6 +5,10 @@
  * sync state, and deployment management. Opens when clicking an artifact
  * on the manage page.
  *
+ * Built on BaseArtifactModal for consistent dialog structure, header, and
+ * tab navigation. This component provides the operations-specific tab
+ * content and business logic.
+ *
  * Key differences from the collection-focused modal:
  * - Status tab is the default (not Overview)
  * - Emphasizes health indicators and sync status
@@ -38,7 +42,6 @@
 import * as React from 'react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import * as LucideIcons from 'lucide-react';
 import {
   Activity,
   Info,
@@ -46,8 +49,6 @@ import {
   RefreshCcw,
   Rocket,
   History,
-  ArrowLeft,
-  AlertCircle,
   GitBranch,
   Calendar,
   Tag,
@@ -60,7 +61,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -69,13 +70,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
 // Shared components
-import { ModalHeader } from '@/components/shared/modal-header';
-import { TabNavigation, type Tab } from '@/components/shared/tab-navigation';
+import { BaseArtifactModal } from '@/components/shared/base-artifact-modal';
 import { TabContentWrapper } from '@/components/shared/tab-content-wrapper';
 import { CrossNavigationButtons } from '@/components/shared/cross-navigation-buttons';
 import { HealthIndicator } from '@/components/shared/health-indicator';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { DeploymentBadgeStack } from '@/components/shared/deployment-badge-stack';
+import type { Tab } from '@/components/shared/tab-navigation';
 
 // Entity components (reused)
 import { FileTree } from '@/components/entity/file-tree';
@@ -89,7 +90,6 @@ import { TagEditor } from '@/components/shared/tag-editor';
 
 // Types
 import type { Artifact, ArtifactType } from '@/types/artifact';
-import { ARTIFACT_TYPES } from '@/types/artifact';
 import type { FileListResponse, FileContentResponse } from '@/types/files';
 import type { ArtifactDeploymentInfo } from '@/types/deployments';
 import type { Deployment } from '@/components/deployments/deployment-card';
@@ -172,7 +172,6 @@ function OperationsModalHeaderSkeleton() {
 function StatusTabSkeleton() {
   return (
     <div className="grid gap-6 p-6 md:grid-cols-2">
-      {/* Health Summary Card Skeleton */}
       <div className="rounded-lg border p-4">
         <Skeleton className="mb-4 h-5 w-32" />
         <div className="space-y-4">
@@ -186,8 +185,6 @@ function StatusTabSkeleton() {
           </div>
         </div>
       </div>
-
-      {/* Sync Summary Card Skeleton */}
       <div className="rounded-lg border p-4">
         <Skeleton className="mb-4 h-5 w-32" />
         <div className="space-y-4">
@@ -201,8 +198,6 @@ function StatusTabSkeleton() {
           </div>
         </div>
       </div>
-
-      {/* Deployments Summary Card Skeleton */}
       <div className="rounded-lg border p-4 md:col-span-2">
         <Skeleton className="mb-4 h-5 w-36" />
         <div className="flex gap-2">
@@ -213,8 +208,6 @@ function StatusTabSkeleton() {
           <Skeleton className="h-9 w-36 rounded-md" />
         </div>
       </div>
-
-      {/* Quick Actions Card Skeleton */}
       <div className="rounded-lg border p-4 md:col-span-2">
         <Skeleton className="mb-4 h-5 w-28" />
         <div className="flex flex-wrap gap-2">
@@ -222,66 +215,6 @@ function StatusTabSkeleton() {
           <Skeleton className="h-9 w-44 rounded-md" />
           <Skeleton className="h-9 w-28 rounded-md" />
         </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * DeploymentsTabSkeleton - Loading skeleton for deployments tab
- */
-function DeploymentsTabSkeleton() {
-  return (
-    <div className="space-y-4 p-6">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-5 w-40" />
-        <Skeleton className="h-9 w-36 rounded-md" />
-      </div>
-      <div className="space-y-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="rounded-lg border p-4">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="h-3 w-32" />
-              </div>
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-6 w-20 rounded-full" />
-                <Skeleton className="h-8 w-8 rounded-md" />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
- * VersionHistoryTabSkeleton - Loading skeleton for version history tab
- */
-function VersionHistoryTabSkeleton() {
-  return (
-    <div className="space-y-4 p-6">
-      <Skeleton className="h-5 w-32" />
-      <div className="relative space-y-4 border-l-2 border-muted pl-6">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="relative">
-            <Skeleton className="absolute -left-[1.625rem] h-4 w-4 rounded-full" />
-            <div className="rounded-lg border p-4">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-3 w-40" />
-                </div>
-                <div className="space-y-1 text-right">
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-3 w-12" />
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -372,7 +305,6 @@ function generateMockHistory(artifact: Artifact): HistoryEntry[] {
     });
   }
 
-  // Sort by timestamp (most recent first)
   return history.sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
@@ -438,11 +370,9 @@ function getHistoryTypeColor(type: HistoryEntry['type']) {
 /**
  * ArtifactOperationsModal - Operations-focused modal for manage page
  *
- * Provides comprehensive artifact management with emphasis on:
- * - Health status and sync indicators
- * - Deployment management across projects
- * - Version history with rollback options
- * - Quick sync and deploy actions
+ * Uses BaseArtifactModal for consistent dialog structure, header with
+ * artifact icon, and tab navigation. Provides operations-specific
+ * tab content including status, sync, deployments, and history.
  *
  * @param artifact - The artifact to display
  * @param open - Whether the modal is open
@@ -470,11 +400,7 @@ export function ArtifactOperationsModal({
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [localTags, setLocalTags] = useState<string[] | null>(null);
-
-  // Selected project for diff comparison (collection mode has no inherent projectPath)
   const [selectedProjectForDiff, setSelectedProjectForDiff] = useState<string | null>(null);
-
-  // Source entry state for Sources tab
   const [sourceEntry, setSourceEntry] = useState<{
     sourceId: string;
     entryPath: string;
@@ -504,7 +430,7 @@ export function ArtifactOperationsModal({
     setSelectedProjectForDiff(null);
   }, [artifact?.id, open]);
 
-  // Auto-detect project for diff when artifact has exactly one deployment
+  // Auto-detect project for diff when artifact has deployments
   const deployments = artifact?.deployments;
   useEffect(() => {
     if (
@@ -519,14 +445,9 @@ export function ArtifactOperationsModal({
     }
   }, [selectedProjectForDiff, deployments]);
 
-  // Get artifact type config
-  const config = artifact ? ARTIFACT_TYPES[artifact.type] : null;
-  // Type-safe icon lookup with fallback
-  const iconName = config?.icon ?? 'FileText';
-  const IconLookup = (LucideIcons as any)[iconName] as
-    | React.ComponentType<{ className?: string }>
-    | undefined;
-  const IconComponent = IconLookup || LucideIcons.FileText;
+  // ========================================================================
+  // Queries
+  // ========================================================================
 
   // Fetch file list from API
   const {
@@ -587,7 +508,6 @@ export function ArtifactOperationsModal({
     })),
   });
 
-  // Combine deployment results
   const isDeploymentsLoading =
     isProjectsLoading || deploymentQueries.some((q) => q.isLoading);
 
@@ -602,7 +522,6 @@ export function ArtifactOperationsModal({
     return combined;
   }, [deploymentQueries, projects]);
 
-  // Filter deployments by artifact
   const artifactDeployments = useMemo(() => {
     if (!allDeployments || allDeployments.length === 0 || !artifact) return [];
     const filtered = allDeployments.filter(
@@ -623,7 +542,6 @@ export function ArtifactOperationsModal({
     });
   }, [allDeployments, artifact]);
 
-  // Generate history entries
   const historyEntries = useMemo(() => {
     if (!artifact) return [];
     return generateMockHistory(artifact);
@@ -642,7 +560,10 @@ export function ArtifactOperationsModal({
   // Tag update mutation
   const { mutate: updateTags, isPending: isUpdatingTags } = useUpdateArtifactTags();
 
-  // Handle tags change
+  // ========================================================================
+  // Handlers
+  // ========================================================================
+
   const handleTagsChange = useCallback(
     (newTags: string[]) => {
       if (!artifact) return;
@@ -729,25 +650,21 @@ export function ArtifactOperationsModal({
     findSourceEntry();
   }, [artifact, open, activeTab, sourcesData]);
 
-  // Handle tab change
   const handleTabChange = (tab: string) => {
     const typedTab = tab as OperationsModalTab;
     setActiveTab(typedTab);
     onTabChange?.(typedTab);
   };
 
-  // Handle file selection
   const handleFileSelect = (path: string) => {
     setSelectedPath(path);
   };
 
-  // Handle sync all action
   const handleSyncAll = async () => {
     if (!artifact) return;
 
     setIsSyncing(true);
     try {
-      // Sync to all deployments
       for (const deployment of artifactDeployments) {
         if (deployment.project_path) {
           await syncEntity(artifact.id, deployment.project_path);
@@ -770,7 +687,6 @@ export function ArtifactOperationsModal({
     }
   };
 
-  // Handle deployment remove
   const encodeProjectId = (projectPath: string): string => btoa(projectPath);
 
   const handleDeploymentRemove = async (
@@ -804,13 +720,16 @@ export function ArtifactOperationsModal({
     }
   };
 
-  // Handle return navigation
   const handleReturn = () => {
     if (returnTo) {
       onClose();
       router.push(returnTo);
     }
   };
+
+  // ========================================================================
+  // Render
+  // ========================================================================
 
   // Early return if no artifact and not loading
   if (!artifact && !isLoading) {
@@ -837,600 +756,548 @@ export function ArtifactOperationsModal({
     );
   }
 
-  // Fallback for unknown artifact type
-  if (!config) {
-    return (
-      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-        <DialogContent className="max-w-md">
-          <ModalHeader
-            icon={AlertCircle}
-            iconClassName="text-yellow-500"
-            title={artifact.name}
-            description={`Artifact type "${artifact.type}" is not supported.`}
-          />
-          <div className="flex justify-end p-4">
-            <Button variant="outline" onClick={onClose}>
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+  // Header actions for BaseArtifactModal
+  const headerActions = (
+    <div className="flex items-center gap-2">
+      <HealthIndicator artifact={artifact} size="lg" />
+      <StatusBadge status={artifact.syncStatus} size="md" />
+      <CrossNavigationButtons
+        currentPage="manage"
+        artifactId={artifact.id}
+        collectionId={artifact.collection}
+        onNavigate={onClose}
+      />
+      <Button
+        variant="default"
+        size="sm"
+        onClick={handleSyncAll}
+        disabled={isSyncing || artifactDeployments.length === 0}
+        className="gap-2"
+      >
+        {isSyncing ? (
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <RefreshCcw className="h-4 w-4" aria-hidden="true" />
+        )}
+        Sync All
+      </Button>
+    </div>
+  );
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-        <DialogContent className="flex h-[90vh] max-h-[90vh] min-h-0 max-w-5xl flex-col overflow-hidden p-0 lg:max-w-6xl">
-          {/* Header */}
-          <ModalHeader
-            icon={IconComponent}
-            iconClassName={config.color}
-            title={artifact.name}
-            description={artifact.description}
-            actions={
-              <div className="flex items-center gap-2">
-                <HealthIndicator artifact={artifact} size="lg" />
-                <StatusBadge status={artifact.syncStatus} size="md" />
-                <CrossNavigationButtons
-                  currentPage="manage"
-                  artifactId={artifact.id}
-                  collectionId={artifact.collection}
-                  onNavigate={onClose}
-                />
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleSyncAll}
-                  disabled={isSyncing || artifactDeployments.length === 0}
-                  className="gap-2"
-                >
-                  {isSyncing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <RefreshCcw className="h-4 w-4" aria-hidden="true" />
-                  )}
-                  Sync All
-                </Button>
+    <BaseArtifactModal
+      artifact={artifact}
+      open={open}
+      onClose={onClose}
+      activeTab={activeTab}
+      onTabChange={handleTabChange}
+      tabs={getTabs(artifact)}
+      headerActions={headerActions}
+      returnTo={returnTo}
+      onReturn={handleReturn}
+    >
+      {/* Status Tab (Default) */}
+      <TabContentWrapper value="status">
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Health Summary Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Activity className="h-4 w-4" aria-hidden="true" />
+                Health Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Overall Health</span>
+                <HealthIndicator artifact={artifact} size="lg" showTooltip />
               </div>
-            }
-          />
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Sync Status</span>
+                <StatusBadge status={artifact.syncStatus} size="md" />
+              </div>
+              {artifact.upstream?.updateAvailable && (
+                <Alert>
+                  <GitBranch className="h-4 w-4" />
+                  <AlertDescription>
+                    A newer version is available upstream.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
 
-          {/* Return button if returnTo is present */}
-          {returnTo && (
-            <div className="border-b px-6 py-2">
+          {/* Sync Summary Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <RefreshCcw className="h-4 w-4" aria-hidden="true" />
+                Sync Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Last Synced</span>
+                <span className="text-sm">
+                  {artifact.upstream?.lastChecked
+                    ? formatRelativeTime(new Date(artifact.upstream.lastChecked))
+                    : 'Never'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Current Version</span>
+                <code className="rounded bg-muted px-2 py-1 text-xs">
+                  {artifact.version || 'unknown'}
+                </code>
+              </div>
+              {artifact.upstream?.version && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Upstream Version</span>
+                  <code className="rounded bg-muted px-2 py-1 text-xs">
+                    {artifact.upstream.version}
+                  </code>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Deployments Summary Card */}
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Rocket className="h-4 w-4" aria-hidden="true" />
+                Deployments ({artifactDeployments.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {artifactDeployments.length > 0 ? (
+                <DeploymentBadgeStack
+                  deployments={artifact.deployments || []}
+                  maxBadges={5}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Not deployed to any projects yet.
+                </p>
+              )}
+              <div className="mt-4 flex justify-end">
+                <DeployButton
+                  artifact={artifact}
+                  existingDeploymentPaths={artifactDeployments.map(d => `${d.project_path}/${d.artifact_path}`)}
+                  onDeploySuccess={() => {
+                    projects?.forEach(p => {
+                      queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
+                    });
+                  }}
+                  variant="outline"
+                  size="sm"
+                  label="Deploy to Project"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions Card */}
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-base">Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                onClick={handleReturn}
-                className="gap-2 text-muted-foreground hover:text-foreground"
+                onClick={handleSyncAll}
+                disabled={isSyncing || artifactDeployments.length === 0}
               >
-                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                Return to previous page
+                {isSyncing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCcw className="mr-2 h-4 w-4" />
+                )}
+                Sync All Deployments
               </Button>
+              <DeployButton
+                artifact={artifact}
+                existingDeploymentPaths={artifactDeployments.map(d => `${d.project_path}/${d.artifact_path}`)}
+                onDeploySuccess={() => {
+                  projects?.forEach(p => {
+                    queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
+                  });
+                }}
+                variant="outline"
+                size="sm"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleTabChange('history')}
+              >
+                <History className="mr-2 h-4 w-4" />
+                View History
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </TabContentWrapper>
+
+      {/* Overview Tab */}
+      <TabContentWrapper value="overview">
+        <div className="space-y-6">
+          {artifact.description && (
+            <div>
+              <h3 className="mb-2 text-sm font-medium">Description</h3>
+              <p className="text-sm text-muted-foreground">{artifact.description}</p>
             </div>
           )}
 
-          {/* Tabs */}
-          <Tabs
-            value={activeTab}
-            onValueChange={handleTabChange}
-            className="flex h-full min-h-0 flex-1 flex-col px-6"
-          >
-            <TabNavigation tabs={getTabs(artifact)} />
+          <div>
+            <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
+              <GitBranch className="h-4 w-4" aria-hidden="true" />
+              Source
+            </h3>
+            <p className="rounded bg-muted px-3 py-2 font-mono text-sm">
+              {artifact.source || 'Local'}
+            </p>
+          </div>
 
-            {/* Status Tab (Default) */}
-            <TabContentWrapper value="status">
-              <div className="grid gap-6 md:grid-cols-2">
-                {/* Health Summary Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Activity className="h-4 w-4" aria-hidden="true" />
-                      Health Summary
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Overall Health</span>
-                      <HealthIndicator artifact={artifact} size="lg" showTooltip />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Sync Status</span>
-                      <StatusBadge status={artifact.syncStatus} size="md" />
-                    </div>
-                    {artifact.upstream?.updateAvailable && (
-                      <Alert>
-                        <GitBranch className="h-4 w-4" />
-                        <AlertDescription>
-                          A newer version is available upstream.
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </CardContent>
-                </Card>
+          {artifact.version && (
+            <div>
+              <h3 className="mb-2 text-sm font-medium">Version</h3>
+              <p className="text-sm text-muted-foreground">{artifact.version}</p>
+            </div>
+          )}
 
-                {/* Sync Summary Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <RefreshCcw className="h-4 w-4" aria-hidden="true" />
-                      Sync Summary
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Last Synced</span>
-                      <span className="text-sm">
-                        {artifact.upstream?.lastChecked
-                          ? formatRelativeTime(new Date(artifact.upstream.lastChecked))
-                          : 'Never'}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Current Version</span>
-                      <code className="rounded bg-muted px-2 py-1 text-xs">
-                        {artifact.version || 'unknown'}
-                      </code>
-                    </div>
-                    {artifact.upstream?.version && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Upstream Version</span>
-                        <code className="rounded bg-muted px-2 py-1 text-xs">
-                          {artifact.upstream.version}
-                        </code>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+          {artifact.author && (
+            <div>
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
+                <User className="h-4 w-4" aria-hidden="true" />
+                Author
+              </h3>
+              <p className="text-sm text-muted-foreground">{artifact.author}</p>
+            </div>
+          )}
 
-                {/* Deployments Summary Card */}
-                <Card className="md:col-span-2">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Rocket className="h-4 w-4" aria-hidden="true" />
-                      Deployments ({artifactDeployments.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {artifactDeployments.length > 0 ? (
-                      <DeploymentBadgeStack
-                        deployments={artifact.deployments || []}
-                        maxBadges={5}
-                      />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        Not deployed to any projects yet.
-                      </p>
-                    )}
-                    <div className="mt-4 flex justify-end">
-                      <DeployButton
-                        artifact={artifact}
-                        existingDeploymentPaths={artifactDeployments.map(d => `${d.project_path}/${d.artifact_path}`)}
-                        onDeploySuccess={() => {
-                          projects?.forEach(p => {
-                            queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
-                          });
-                        }}
-                        variant="outline"
-                        size="sm"
-                        label="Deploy to Project"
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
+          <div>
+            <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
+              <Tag className="h-4 w-4" aria-hidden="true" />
+              Tags
+            </h3>
+            <TagEditor
+              tags={localTags ?? artifact.tags ?? []}
+              onTagsChange={handleTagsChange}
+              availableTags={availableTags}
+              isLoading={isTagsLoading || isUpdatingTags}
+              disabled={isUpdatingTags}
+            />
+          </div>
 
-                {/* Quick Actions Card */}
-                <Card className="md:col-span-2">
-                  <CardHeader>
-                    <CardTitle className="text-base">Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSyncAll}
-                      disabled={isSyncing || artifactDeployments.length === 0}
-                    >
-                      {isSyncing ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <RefreshCcw className="mr-2 h-4 w-4" />
-                      )}
-                      Sync All Deployments
-                    </Button>
-                    <DeployButton
-                      artifact={artifact}
-                      existingDeploymentPaths={artifactDeployments.map(d => `${d.project_path}/${d.artifact_path}`)}
-                      onDeploySuccess={() => {
-                        projects?.forEach(p => {
-                          queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
-                        });
-                      }}
-                      variant="outline"
-                      size="sm"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleTabChange('history')}
-                    >
-                      <History className="mr-2 h-4 w-4" />
-                      View History
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabContentWrapper>
-
-            {/* Overview Tab */}
-            <TabContentWrapper value="overview">
-              <div className="space-y-6">
-                {/* Description */}
-                {artifact.description && (
-                  <div>
-                    <h3 className="mb-2 text-sm font-medium">Description</h3>
-                    <p className="text-sm text-muted-foreground">{artifact.description}</p>
-                  </div>
-                )}
-
-                {/* Source */}
-                <div>
-                  <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
-                    <GitBranch className="h-4 w-4" aria-hidden="true" />
-                    Source
-                  </h3>
-                  <p className="rounded bg-muted px-3 py-2 font-mono text-sm">
-                    {artifact.source || 'Local'}
-                  </p>
+          <div>
+            <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
+              <Calendar className="h-4 w-4" aria-hidden="true" />
+              Timestamps
+            </h3>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              {artifact.createdAt && (
+                <div className="flex justify-between">
+                  <span>Created:</span>
+                  <span>{new Date(artifact.createdAt).toLocaleString()}</span>
                 </div>
-
-                {/* Version */}
-                {artifact.version && (
-                  <div>
-                    <h3 className="mb-2 text-sm font-medium">Version</h3>
-                    <p className="text-sm text-muted-foreground">{artifact.version}</p>
-                  </div>
-                )}
-
-                {/* Author */}
-                {artifact.author && (
-                  <div>
-                    <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
-                      <User className="h-4 w-4" aria-hidden="true" />
-                      Author
-                    </h3>
-                    <p className="text-sm text-muted-foreground">{artifact.author}</p>
-                  </div>
-                )}
-
-                {/* Tags */}
-                <div>
-                  <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
-                    <Tag className="h-4 w-4" aria-hidden="true" />
-                    Tags
-                  </h3>
-                  <TagEditor
-                    tags={localTags ?? artifact.tags ?? []}
-                    onTagsChange={handleTagsChange}
-                    availableTags={availableTags}
-                    isLoading={isTagsLoading || isUpdatingTags}
-                    disabled={isUpdatingTags}
-                  />
+              )}
+              {artifact.updatedAt && (
+                <div className="flex justify-between">
+                  <span>Updated:</span>
+                  <span>{new Date(artifact.updatedAt).toLocaleString()}</span>
                 </div>
-
-                {/* Timestamps */}
-                <div>
-                  <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
-                    <Calendar className="h-4 w-4" aria-hidden="true" />
-                    Timestamps
-                  </h3>
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    {artifact.createdAt && (
-                      <div className="flex justify-between">
-                        <span>Created:</span>
-                        <span>{new Date(artifact.createdAt).toLocaleString()}</span>
-                      </div>
-                    )}
-                    {artifact.updatedAt && (
-                      <div className="flex justify-between">
-                        <span>Updated:</span>
-                        <span>{new Date(artifact.updatedAt).toLocaleString()}</span>
-                      </div>
-                    )}
-                    {artifact.deployedAt && (
-                      <div className="flex justify-between">
-                        <span>Deployed:</span>
-                        <span>{new Date(artifact.deployedAt).toLocaleString()}</span>
-                      </div>
-                    )}
-                  </div>
+              )}
+              {artifact.deployedAt && (
+                <div className="flex justify-between">
+                  <span>Deployed:</span>
+                  <span>{new Date(artifact.deployedAt).toLocaleString()}</span>
                 </div>
-              </div>
-            </TabContentWrapper>
+              )}
+            </div>
+          </div>
+        </div>
+      </TabContentWrapper>
 
-            {/* Contents Tab */}
-            <TabsContent
-              value="contents"
-              className="mt-0 h-full min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
-            >
-              <div className="flex h-full min-h-0 flex-1 gap-4 py-4">
-                {/* File Tree */}
-                <div className="w-64 flex-shrink-0 overflow-hidden rounded-lg border">
-                  <div className="flex-shrink-0 border-b bg-muted/30 px-3 py-2">
-                    <p className="text-sm font-medium">Files</p>
-                  </div>
-                  <ScrollArea className="h-[calc(100%-2.5rem)]">
-                    {isFilesLoading ? (
-                      <div className="space-y-2 p-3">
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-4 w-1/2" />
-                      </div>
-                    ) : filesError ? (
-                      <div className="p-3 text-sm text-destructive">
-                        Failed to load files
-                      </div>
-                    ) : (
-                      <FileTree
-                        entityId={artifact.id}
-                        files={filesData?.files || []}
-                        selectedPath={selectedPath}
-                        onSelect={handleFileSelect}
-                        readOnly
-                      />
-                    )}
-                  </ScrollArea>
+      {/* Contents Tab */}
+      <TabsContent
+        value="contents"
+        className="mt-0 h-full min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
+      >
+        <div className="flex h-full min-h-0 flex-1 gap-4 py-4">
+          <div className="w-64 flex-shrink-0 overflow-hidden rounded-lg border">
+            <div className="flex-shrink-0 border-b bg-muted/30 px-3 py-2">
+              <p className="text-sm font-medium">Files</p>
+            </div>
+            <ScrollArea className="h-[calc(100%-2.5rem)]">
+              {isFilesLoading ? (
+                <div className="space-y-2 p-3">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
                 </div>
-
-                {/* Content Pane */}
-                <div className="min-w-0 flex-1 overflow-hidden rounded-lg border">
-                  <ContentPane
-                    path={selectedPath}
-                    content={contentData?.content ?? null}
-                    isLoading={isContentLoading}
-                    error={contentError instanceof Error ? contentError.message : null}
-                    readOnly
-                  />
+              ) : filesError ? (
+                <div className="p-3 text-sm text-destructive">
+                  Failed to load files
                 </div>
-              </div>
-            </TabsContent>
-
-            {/* Sync Status Tab */}
-            <TabContentWrapper value="sync" scrollable={false}>
-              {/* Project selector for collection-vs-project diff comparison */}
-              {artifact.collection && (
-                <ProjectSelectorForDiff
+              ) : (
+                <FileTree
                   entityId={artifact.id}
-                  entityName={artifact.name}
-                  entityType={artifact.type as ArtifactType}
-                  collection={artifact.collection}
-                  onProjectSelected={(path) => setSelectedProjectForDiff(path)}
+                  files={filesData?.files || []}
+                  selectedPath={selectedPath}
+                  onSelect={handleFileSelect}
+                  readOnly
                 />
               )}
-              <SyncStatusTab
-                entity={artifact}
-                mode="collection"
-                projectPath={selectedProjectForDiff || undefined}
-                onClose={onClose}
-              />
-            </TabContentWrapper>
+            </ScrollArea>
+          </div>
 
-            {/* Deployments Tab */}
-            <TabContentWrapper value="deployments">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium">
-                    Active Deployments ({artifactDeployments.length})
-                  </h3>
-                  <DeployButton
-                    artifact={artifact}
-                    existingDeploymentPaths={artifactDeployments.map(d => `${d.project_path}/${d.artifact_path}`)}
-                    onDeploySuccess={() => {
-                      projects?.forEach(p => {
-                        queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
-                      });
-                    }}
-                    variant="outline"
-                    size="sm"
-                  />
+          <div className="min-w-0 flex-1 overflow-hidden rounded-lg border">
+            <ContentPane
+              path={selectedPath}
+              content={contentData?.content ?? null}
+              isLoading={isContentLoading}
+              error={contentError instanceof Error ? contentError.message : null}
+              readOnly
+            />
+          </div>
+        </div>
+      </TabsContent>
+
+      {/* Sync Status Tab */}
+      <TabContentWrapper value="sync" scrollable={false}>
+        {artifact.collection && (
+          <ProjectSelectorForDiff
+            entityId={artifact.id}
+            entityName={artifact.name}
+            entityType={artifact.type as ArtifactType}
+            collection={artifact.collection}
+            onProjectSelected={(path) => setSelectedProjectForDiff(path)}
+          />
+        )}
+        <SyncStatusTab
+          entity={artifact}
+          mode="collection"
+          projectPath={selectedProjectForDiff || undefined}
+          onClose={onClose}
+        />
+      </TabContentWrapper>
+
+      {/* Deployments Tab */}
+      <TabContentWrapper value="deployments">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium">
+              Active Deployments ({artifactDeployments.length})
+            </h3>
+            <DeployButton
+              artifact={artifact}
+              existingDeploymentPaths={artifactDeployments.map(d => `${d.project_path}/${d.artifact_path}`)}
+              onDeploySuccess={() => {
+                projects?.forEach(p => {
+                  queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
+                });
+              }}
+              variant="outline"
+              size="sm"
+            />
+          </div>
+
+          {isDeploymentsLoading ? (
+            <div className="space-y-3">
+              <DeploymentCardSkeleton />
+              <DeploymentCardSkeleton />
+            </div>
+          ) : artifactDeployments.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-8">
+                <Rocket className="mb-4 h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
+                <p className="text-sm font-medium">No deployments yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Deploy this artifact to a project to get started.
+                </p>
+                <DeployButton
+                  artifact={artifact}
+                  onDeploySuccess={() => {
+                    projects?.forEach(p => {
+                      queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
+                    });
+                  }}
+                  variant="outline"
+                  size="sm"
+                  label="Deploy Now"
+                  className="mt-4"
+                />
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {artifactDeployments.map((deployment) => (
+                <DeploymentCard
+                  key={deployment.id}
+                  deployment={deployment}
+                  projects={projects}
+                  projectPath={deployment.project_path}
+                  onUpdate={() => {
+                    if (deployment.project_path) {
+                      syncEntity(artifact.id, deployment.project_path);
+                    }
+                  }}
+                  onRemove={(removeFiles) =>
+                    handleDeploymentRemove(deployment, removeFiles)
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </TabContentWrapper>
+
+      {/* Collections Tab */}
+      <TabContentWrapper value="collections">
+        <ModalCollectionsTab artifact={artifact} context="operations" />
+      </TabContentWrapper>
+
+      {/* Sources Tab */}
+      <TabContentWrapper value="sources">
+        <div className="space-y-4">
+          <div className="text-sm font-medium text-muted-foreground">Imported From</div>
+
+          {isLoadingSource ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+              <span className="sr-only">Loading source information</span>
+            </div>
+          ) : sourceEntry ? (
+            <div className="rounded-lg border p-4 transition-colors hover:bg-muted/50">
+              <div className="flex items-center gap-3">
+                <Github className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                <div className="flex-1">
+                  <div className="font-medium">{sourceEntry.sourceName}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {sourceEntry.entryPath}
+                  </div>
+                  {artifact.version && (
+                    <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                      <Tag className="h-3 w-3" aria-hidden="true" />
+                      <span>{artifact.version}</span>
+                    </div>
+                  )}
                 </div>
-
-                {isDeploymentsLoading ? (
-                  <div className="space-y-3">
-                    <DeploymentCardSkeleton />
-                    <DeploymentCardSkeleton />
-                  </div>
-                ) : artifactDeployments.length === 0 ? (
-                  <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-8">
-                      <Rocket className="mb-4 h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
-                      <p className="text-sm font-medium">No deployments yet</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Deploy this artifact to a project to get started.
-                      </p>
-                      <DeployButton
-                        artifact={artifact}
-                        onDeploySuccess={() => {
-                          projects?.forEach(p => {
-                            queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
-                          });
-                        }}
-                        variant="outline"
-                        size="sm"
-                        label="Deploy Now"
-                        className="mt-4"
-                      />
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="space-y-3">
-                    {artifactDeployments.map((deployment) => (
-                      <DeploymentCard
-                        key={deployment.id}
-                        deployment={deployment}
-                        projects={projects}
-                        projectPath={deployment.project_path}
-                        onUpdate={() => {
-                          if (deployment.project_path) {
-                            syncEntity(artifact.id, deployment.project_path);
-                          }
-                        }}
-                        onRemove={(removeFiles) =>
-                          handleDeploymentRemove(deployment, removeFiles)
-                        }
-                      />
-                    ))}
-                  </div>
-                )}
+                <ExternalLink className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               </div>
-            </TabContentWrapper>
+            </div>
+          ) : hasValidUpstreamSource(artifact) ? (
+            <div className="rounded-lg border p-4">
+              <div className="flex items-center gap-3">
+                <GitBranch className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                <div className="flex-1">
+                  <div className="font-medium">Source</div>
+                  <div className="text-sm text-muted-foreground">{artifact.source}</div>
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Unable to find the source entry in marketplace sources.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <GitBranch className="h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
+              <p className="mt-4 text-sm text-muted-foreground">
+                No upstream source information available.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                This artifact was created locally or imported without source tracking.
+              </p>
+            </div>
+          )}
+        </div>
+      </TabContentWrapper>
 
-            {/* Collections Tab */}
-            <TabContentWrapper value="collections">
-              <ModalCollectionsTab artifact={artifact} context="operations" />
-            </TabContentWrapper>
+      {/* Version History Tab */}
+      <TabContentWrapper value="history">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium">Version History</h3>
+          </div>
 
-            {/* Sources Tab */}
-            <TabContentWrapper value="sources">
-              <div className="space-y-4">
-                <div className="text-sm font-medium text-muted-foreground">Imported From</div>
+          {historyEntries.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-8">
+                <History className="mb-4 h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
+                <p className="text-sm font-medium">No history available</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  History will appear after deployments and syncs.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="relative space-y-0 border-l-2 border-muted pl-6">
+              {historyEntries.map((entry, index) => {
+                const Icon = getHistoryTypeIcon(entry.type);
+                const colorClass = getHistoryTypeColor(entry.type);
 
-                {isLoadingSource ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
-                    <span className="sr-only">Loading source information</span>
-                  </div>
-                ) : sourceEntry ? (
-                  <div className="rounded-lg border p-4 transition-colors hover:bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      <Github className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-                      <div className="flex-1">
-                        <div className="font-medium">{sourceEntry.sourceName}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {sourceEntry.entryPath}
+                return (
+                  <div key={entry.id} className="relative pb-6 last:pb-0">
+                    {/* Timeline dot */}
+                    <div
+                      className={cn(
+                        'absolute -left-[1.625rem] flex h-4 w-4 items-center justify-center rounded-full border-2 bg-background',
+                        colorClass.replace('text-', 'border-')
+                      )}
+                    >
+                      <Icon className={cn('h-2.5 w-2.5', colorClass)} aria-hidden="true" />
+                    </div>
+
+                    {/* Entry content */}
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className={cn('font-medium capitalize', colorClass)}>
+                              {entry.type === 'deploy' && 'Deployed'}
+                              {entry.type === 'sync' && 'Synced'}
+                              {entry.type === 'rollback' && 'Rolled back'}
+                              {entry.type === 'update' && 'Update checked'}
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {entry.user && `By ${entry.user}`}
+                              {entry.filesChanged && ` - ${entry.filesChanged} files changed`}
+                            </p>
+                          </div>
+                          <div className="text-right text-sm text-muted-foreground">
+                            <p>{formatRelativeTime(new Date(entry.timestamp))}</p>
+                            {entry.version && (
+                              <code className="text-xs">{entry.version.substring(0, 7)}</code>
+                            )}
+                          </div>
                         </div>
-                        {artifact.version && (
-                          <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-                            <Tag className="h-3 w-3" aria-hidden="true" />
-                            <span>{artifact.version}</span>
+
+                        {/* Rollback button for past versions */}
+                        {index > 0 && entry.type === 'deploy' && (
+                          <div className="mt-3 flex justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                              disabled
+                              title="Rollback functionality coming soon"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                              Rollback to this version
+                            </Button>
                           </div>
                         )}
-                      </div>
-                      <ExternalLink className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                    </div>
+                      </CardContent>
+                    </Card>
                   </div>
-                ) : hasValidUpstreamSource(artifact) ? (
-                  <div className="rounded-lg border p-4">
-                    <div className="flex items-center gap-3">
-                      <GitBranch className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-                      <div className="flex-1">
-                        <div className="font-medium">Source</div>
-                        <div className="text-sm text-muted-foreground">{artifact.source}</div>
-                      </div>
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Unable to find the source entry in marketplace sources.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <GitBranch className="h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
-                    <p className="mt-4 text-sm text-muted-foreground">
-                      No upstream source information available.
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      This artifact was created locally or imported without source tracking.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </TabContentWrapper>
-
-            {/* Version History Tab */}
-            <TabContentWrapper value="history">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium">Version History</h3>
-                </div>
-
-                {historyEntries.length === 0 ? (
-                  <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-8">
-                      <History className="mb-4 h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
-                      <p className="text-sm font-medium">No history available</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        History will appear after deployments and syncs.
-                      </p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="relative space-y-0 border-l-2 border-muted pl-6">
-                    {historyEntries.map((entry, index) => {
-                      const Icon = getHistoryTypeIcon(entry.type);
-                      const colorClass = getHistoryTypeColor(entry.type);
-
-                      return (
-                        <div key={entry.id} className="relative pb-6 last:pb-0">
-                          {/* Timeline dot */}
-                          <div
-                            className={cn(
-                              'absolute -left-[1.625rem] flex h-4 w-4 items-center justify-center rounded-full border-2 bg-background',
-                              colorClass.replace('text-', 'border-')
-                            )}
-                          >
-                            <Icon className={cn('h-2.5 w-2.5', colorClass)} aria-hidden="true" />
-                          </div>
-
-                          {/* Entry content */}
-                          <Card>
-                            <CardContent className="p-4">
-                              <div className="flex items-start justify-between">
-                                <div>
-                                  <p className={cn('font-medium capitalize', colorClass)}>
-                                    {entry.type === 'deploy' && 'Deployed'}
-                                    {entry.type === 'sync' && 'Synced'}
-                                    {entry.type === 'rollback' && 'Rolled back'}
-                                    {entry.type === 'update' && 'Update checked'}
-                                  </p>
-                                  <p className="mt-1 text-sm text-muted-foreground">
-                                    {entry.user && `By ${entry.user}`}
-                                    {entry.filesChanged && ` - ${entry.filesChanged} files changed`}
-                                  </p>
-                                </div>
-                                <div className="text-right text-sm text-muted-foreground">
-                                  <p>{formatRelativeTime(new Date(entry.timestamp))}</p>
-                                  {entry.version && (
-                                    <code className="text-xs">{entry.version.substring(0, 7)}</code>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Rollback button for past versions */}
-                              {index > 0 && entry.type === 'deploy' && (
-                                <div className="mt-3 flex justify-end">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="gap-2"
-                                    disabled
-                                    title="Rollback functionality coming soon"
-                                  >
-                                    <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                                    Rollback to this version
-                                  </Button>
-                                </div>
-                              )}
-                            </CardContent>
-                          </Card>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </TabContentWrapper>
-          </Tabs>
-        </DialogContent>
-    </Dialog>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </TabContentWrapper>
+    </BaseArtifactModal>
   );
 }
