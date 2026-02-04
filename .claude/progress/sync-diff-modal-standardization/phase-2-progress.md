@@ -1,89 +1,106 @@
 ---
 type: progress
-prd: "sync-diff-modal-standardization-v1"
+prd: sync-diff-modal-standardization-v1
 phase: 2
-title: "Add Project Context to /manage"
-status: "planning"
+title: Add Project Context to /manage
+status: pending
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 0
+completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["ui-engineer-enhanced"]
+owners:
+- ui-engineer-enhanced
 contributors: []
-
 tasks:
-  - id: "TASK-2.1"
-    description: "Add selectedProjectForDiff state to ArtifactOperationsModal with auto-detection"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2 pts"
-    priority: "high"
-    model: "opus"
-
-  - id: "TASK-2.2"
-    description: "Integrate ProjectSelectorForDiff component in /manage sync tab"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.1"]
-    estimated_effort: "3 pts"
-    priority: "high"
-    model: "opus"
-
-  - id: "TASK-2.3"
-    description: "Pass projectPath to SyncStatusTab in ArtifactOperationsModal"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.2"]
-    estimated_effort: "2 pts"
-    priority: "high"
-    model: "opus"
-
-  - id: "TASK-2.4"
-    description: "Update ComparisonSelector enablement for hasProject flag"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.3"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-    model: "opus"
-
-  - id: "TASK-2.5"
-    description: "Verify project context with deployed artifacts on /manage"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.4"]
-    estimated_effort: "1 pt"
-    priority: "high"
-    model: "opus"
-
+- id: TASK-2.1
+  description: Add selectedProjectForDiff state to ArtifactOperationsModal with auto-detection
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 2 pts
+  priority: high
+  model: opus
+- id: TASK-2.2
+  description: Integrate ProjectSelectorForDiff component in /manage sync tab
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.1
+  estimated_effort: 3 pts
+  priority: high
+  model: opus
+- id: TASK-2.3
+  description: Pass projectPath to SyncStatusTab in ArtifactOperationsModal
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.2
+  estimated_effort: 2 pts
+  priority: high
+  model: opus
+- id: TASK-2.4
+  description: Update ComparisonSelector enablement for hasProject flag
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.3
+  estimated_effort: 1 pt
+  priority: medium
+  model: opus
+- id: TASK-2.5
+  description: Verify project context with deployed artifacts on /manage
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.4
+  estimated_effort: 1 pt
+  priority: high
+  model: opus
 parallelization:
-  batch_1: ["TASK-2.1"]
-  batch_2: ["TASK-2.2"]
-  batch_3: ["TASK-2.3", "TASK-2.4"]
-  batch_4: ["TASK-2.5"]
-  critical_path: ["TASK-2.1", "TASK-2.2", "TASK-2.3", "TASK-2.5"]
-  estimated_total_time: "9 pts"
-
+  batch_1:
+  - TASK-2.1
+  batch_2:
+  - TASK-2.2
+  batch_3:
+  - TASK-2.3
+  - TASK-2.4
+  batch_4:
+  - TASK-2.5
+  critical_path:
+  - TASK-2.1
+  - TASK-2.2
+  - TASK-2.3
+  - TASK-2.5
+  estimated_total_time: 9 pts
 blockers: []
-
 success_criteria:
-  - { id: "SC-1", description: "Project selector visible on /manage sync tab", status: "pending" }
-  - { id: "SC-2", description: "Auto-detection works for single-deployment artifacts", status: "pending" }
-  - { id: "SC-3", description: "All three comparison scopes available when applicable", status: "pending" }
-  - { id: "SC-4", description: "Flow banner shows accurate deployment status", status: "pending" }
-
+- id: SC-1
+  description: Project selector visible on /manage sync tab
+  status: pending
+- id: SC-2
+  description: Auto-detection works for single-deployment artifacts
+  status: pending
+- id: SC-3
+  description: All three comparison scopes available when applicable
+  status: pending
+- id: SC-4
+  description: Flow banner shows accurate deployment status
+  status: pending
 files_modified:
-  - "web/components/manage/artifact-operations-modal.tsx"
-  - "web/components/sync-status/comparison-selector.tsx"
+- web/components/manage/artifact-operations-modal.tsx
+- web/components/sync-status/comparison-selector.tsx
+progress: 60
+updated: '2026-02-04'
 ---
 
 # sync-diff-modal-standardization-v1 - Phase 2: Add Project Context to /manage

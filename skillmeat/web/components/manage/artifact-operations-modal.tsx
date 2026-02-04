@@ -84,10 +84,11 @@ import { SyncStatusTab } from '@/components/sync-status';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
 import { DeployButton } from '@/components/shared/deploy-button';
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
+import { ProjectSelectorForDiff } from '@/components/entity/project-selector-for-diff';
 import { TagEditor } from '@/components/shared/tag-editor';
 
 // Types
-import type { Artifact } from '@/types/artifact';
+import type { Artifact, ArtifactType } from '@/types/artifact';
 import { ARTIFACT_TYPES } from '@/types/artifact';
 import type { FileListResponse, FileContentResponse } from '@/types/files';
 import type { ArtifactDeploymentInfo } from '@/types/deployments';
@@ -470,6 +471,9 @@ export function ArtifactOperationsModal({
   const [isSyncing, setIsSyncing] = useState(false);
   const [localTags, setLocalTags] = useState<string[] | null>(null);
 
+  // Selected project for diff comparison (collection mode has no inherent projectPath)
+  const [selectedProjectForDiff, setSelectedProjectForDiff] = useState<string | null>(null);
+
   // Source entry state for Sources tab
   const [sourceEntry, setSourceEntry] = useState<{
     sourceId: string;
@@ -494,6 +498,26 @@ export function ArtifactOperationsModal({
   useEffect(() => {
     setLocalTags(null);
   }, [artifact?.id]);
+
+  // Reset selectedProjectForDiff when artifact changes or modal closes
+  useEffect(() => {
+    setSelectedProjectForDiff(null);
+  }, [artifact?.id, open]);
+
+  // Auto-detect project for diff when artifact has exactly one deployment
+  useEffect(() => {
+    if (
+      artifact &&
+      !selectedProjectForDiff &&
+      artifact.deployments &&
+      artifact.deployments.length > 0
+    ) {
+      const firstProjectPath = artifact.deployments[0]?.project_path;
+      if (firstProjectPath) {
+        setSelectedProjectForDiff(firstProjectPath);
+      }
+    }
+  }, [artifact?.id, selectedProjectForDiff, artifact?.deployments]);
 
   // Get artifact type config
   const config = artifact ? ARTIFACT_TYPES[artifact.type] : null;
@@ -1173,9 +1197,20 @@ export function ArtifactOperationsModal({
 
             {/* Sync Status Tab */}
             <TabContentWrapper value="sync" scrollable={false}>
+              {/* Project selector for collection-vs-project diff comparison */}
+              {artifact.collection && (
+                <ProjectSelectorForDiff
+                  entityId={artifact.id}
+                  entityName={artifact.name}
+                  entityType={artifact.type as ArtifactType}
+                  collection={artifact.collection}
+                  onProjectSelected={(path) => setSelectedProjectForDiff(path)}
+                />
+              )}
               <SyncStatusTab
                 entity={artifact}
                 mode="collection"
+                projectPath={selectedProjectForDiff || undefined}
                 onClose={onClose}
               />
             </TabContentWrapper>
