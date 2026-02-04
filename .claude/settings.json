@@ -59,6 +59,23 @@
       "bun": ["Bash(bun:*)"]
     }
   },
+  "lspServers": {
+    "pyright": {
+      "command": "pyright-langserver",
+      "args": ["--stdio"],
+      "languages": ["python"]
+    },
+    "ruff": {
+      "command": "ruff",
+      "args": ["server", "--preview"],
+      "languages": ["python"]
+    },
+    "typescript": {
+      "command": "typescript-language-server",
+      "args": ["--stdio"],
+      "languages": ["typescript", "typescriptreact", "javascript", "javascriptreact"]
+    }
+  },
   "hooks": {
     "PreToolUse": [
       {

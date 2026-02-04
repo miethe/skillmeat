@@ -75,6 +75,7 @@ from skillmeat.cache.models import (
     Artifact,
     ArtifactTag,
     Base,
+    CollectionArtifact,
     MarketplaceCatalogEntry,
     MarketplaceSource,
     Tag,
@@ -2726,7 +2727,11 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
             # Since bm25() is computed at query time, we need to filter using the
             # same bm25() expression in the WHERE clause
             cursor_filter = ""
-            if cursor_relevance is not None and cursor_confidence is not None and cursor_id:
+            if (
+                cursor_relevance is not None
+                and cursor_confidence is not None
+                and cursor_id
+            ):
                 # Full 3-field cursor: relevance:confidence:id
                 # ORDER BY relevance ASC, confidence_score DESC, id ASC
                 # So "after cursor" means:
@@ -2805,7 +2810,9 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
                 # It's a deep match only if deep content matched but title/desc didn't
                 # This ensures title/description matches rank higher
                 # Use bool() to ensure we get False instead of None when deep_has_match is None
-                deep_match = bool(deep_has_match and not (title_has_match or desc_has_match))
+                deep_match = bool(
+                    deep_has_match and not (title_has_match or desc_has_match)
+                )
 
                 # Extract first matched file from deep_index_files if available
                 matched_file: Optional[str] = None
@@ -2850,7 +2857,9 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
             if items and has_more:
                 last_item = items[-1]
                 last_relevance = relevance_scores.get(last_item.id, 0.0)
-                next_cursor = f"{last_relevance}:{last_item.confidence_score}:{last_item.id}"
+                next_cursor = (
+                    f"{last_relevance}:{last_item.confidence_score}:{last_item.id}"
+                )
 
             logger.debug(
                 f"FTS5 search returned {len(items)} entries "
@@ -3379,9 +3388,16 @@ class TagRepository(BaseRepository[Tag]):
                 )
 
             # Verify artifact and tag exist
-            artifact = session.query(Artifact).filter_by(id=artifact_id).first()
-            if not artifact:
-                raise RepositoryError(f"Artifact {artifact_id} not found")
+            # artifact_id uses "type:name" format, matching collection_artifacts.artifact_id
+            ca = (
+                session.query(CollectionArtifact)
+                .filter_by(artifact_id=artifact_id)
+                .first()
+            )
+            if not ca:
+                raise RepositoryError(
+                    f"Artifact {artifact_id} not found in any collection"
+                )
 
             tag = session.query(Tag).filter_by(id=tag_id).first()
             if not tag:

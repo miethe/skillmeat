@@ -6,15 +6,16 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   FolderOpen,
-  Grid3x3,
+  Library,
   Layers,
-  Settings2,
+  Activity,
   FolderKanban,
   Server,
   Store,
   GitBranch,
   Share2,
   Settings,
+  Tag,
   FileText,
   FileCode2,
   Github,
@@ -61,9 +62,9 @@ const navigationConfig: NavigationConfig = {
       storageKey: 'collections',
       defaultExpanded: true,
       items: [
-        { name: 'Browse', href: '/collection', icon: Grid3x3 },
+        { name: 'Collections', href: '/collection', icon: Library },
         { name: 'Groups', href: '/groups', icon: Layers },
-        { name: 'Manage', href: '/manage', icon: Settings2 },
+        { name: 'Health & Sync', href: '/manage', icon: Activity },
         { name: 'Projects', href: '/projects', icon: FolderKanban },
         { name: 'MCP Servers', href: '/mcp', icon: Server },
       ],
@@ -92,10 +93,18 @@ const navigationConfig: NavigationConfig = {
         { name: 'Documentation', href: 'https://github.com/miethe/skillmeat#readme', icon: Book },
       ],
     },
+    {
+      title: 'Settings',
+      icon: Settings,
+      storageKey: 'settings',
+      items: [
+        { name: 'General', href: '/settings', icon: Settings },
+        { name: 'Tags', href: '/settings/tags', icon: Tag },
+      ],
+    },
   ],
   bottomItems: [
     { name: 'Sharing', href: '/sharing', icon: Share2 },
-    { name: 'Settings', href: '/settings', icon: Settings },
   ],
 };
 

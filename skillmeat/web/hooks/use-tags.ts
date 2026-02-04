@@ -149,6 +149,8 @@ export function useUpdateTag() {
     onSuccess: () => {
       // Invalidate all tag lists to trigger refetch
       queryClient.invalidateQueries({ queryKey: tagKeys.all });
+      // Invalidate artifact queries since artifacts embed tag data
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
     },
   });
 }
@@ -174,6 +176,8 @@ export function useDeleteTag() {
     onSuccess: () => {
       // Invalidate all tag lists to trigger refetch
       queryClient.invalidateQueries({ queryKey: tagKeys.all });
+      // Invalidate artifact queries since artifacts embed tag data
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
     },
   });
 }

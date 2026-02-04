@@ -3,6 +3,7 @@
  *
  * Displays entities in either grid or list view mode.
  * Supports multi-select and empty state.
+ * Supports different card variants: "default" (EntityCard) or "operations" (ArtifactOperationsCard)
  */
 
 'use client';
@@ -13,10 +14,21 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Artifact } from '@/types/artifact';
 import { EntityCard, EntityCardSkeleton } from './entity-card';
 import { EntityRow } from './entity-row';
+import {
+  ArtifactOperationsCard,
+  ArtifactOperationsCardSkeleton,
+} from '@/components/manage/artifact-operations-card';
 import { useEntityLifecycle, useCliCopy } from '@/hooks';
 import { generateBasicDeployCommand } from '@/lib/cli-commands';
 
 const { useCallback } = React;
+
+/**
+ * Card variant determines which card component to use in grid view
+ * - "default": Uses EntityCard (UnifiedCard) - general purpose
+ * - "operations": Uses ArtifactOperationsCard - operations/health focused for manage page
+ */
+export type CardVariant = 'default' | 'operations';
 
 /**
  * Props for EntityList component
@@ -26,6 +38,8 @@ const { useCallback } = React;
 export interface EntityListProps {
   /** Display mode: "grid" for card layout, "list" for table layout */
   viewMode: 'grid' | 'list';
+  /** Card variant for grid view: "default" or "operations" */
+  cardVariant?: CardVariant;
   /** Optional array of artifacts to display. If not provided, uses context. */
   entities?: Artifact[];
   /** Callback when an artifact is clicked (outside of action menu) */
@@ -44,16 +58,18 @@ export interface EntityListProps {
   onViewDiff?: (artifact: Artifact) => void;
   /** Callback to rollback artifact */
   onRollback?: (artifact: Artifact) => void;
+  /** Callback for manage action (used with operations variant) */
+  onManage?: (artifact: Artifact) => void;
 }
 
 /**
  * EntityList - Displays entities in grid or list view mode
  *
- * Renders a collection of entities using either grid layout (EntityCard) or list
- * layout (EntityRow). Integrates with EntityLifecycle context for selection management.
+ * Renders a collection of entities using either grid layout (EntityCard or ArtifactOperationsCard)
+ * or list layout (EntityRow). Integrates with EntityLifecycle context for selection management.
  * Shows empty state when no entities are available.
  *
- * @example
+ * @example Default variant (browse/discovery)
  * ```tsx
  * <EntityList
  *   viewMode="grid"
@@ -65,11 +81,26 @@ export interface EntityListProps {
  * />
  * ```
  *
+ * @example Operations variant (manage page)
+ * ```tsx
+ * <EntityList
+ *   viewMode="grid"
+ *   cardVariant="operations"
+ *   entities={artifacts}
+ *   selectable={bulkMode}
+ *   onSync={handleSync}
+ *   onDeploy={handleDeploy}
+ *   onViewDiff={handleViewDiff}
+ *   onManage={handleManage}
+ * />
+ * ```
+ *
  * @param props - EntityListProps configuration
  * @returns React component displaying entities in selected view mode
  */
 export function EntityList({
   viewMode,
+  cardVariant = 'default',
   entities: entitiesProp,
   onEntityClick,
   selectable = false,
@@ -79,6 +110,7 @@ export function EntityList({
   onSync,
   onViewDiff,
   onRollback,
+  onManage,
 }: EntityListProps) {
   // Use entities from context if not provided
   const context = useEntityLifecycle();
@@ -114,13 +146,12 @@ export function EntityList({
     [selectEntity, deselectEntity]
   );
 
-  // ALL useCallback hooks must be defined BEFORE any early returns
-  // to comply with React's Rules of Hooks (same order on every render)
+  // Render EntityCard (default variant)
   const renderEntityCard = useCallback(
-    (artifact: Artifact) => {
+    (artifact: Artifact, index: number) => {
       return (
         <EntityCard
-          key={artifact.id}
+          key={`${artifact.id}-${index}`}
           entity={artifact}
           selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}
@@ -151,11 +182,41 @@ export function EntityList({
     ]
   );
 
+  // Render ArtifactOperationsCard (operations variant)
+  const renderOperationsCard = useCallback(
+    (artifact: Artifact, index: number) => {
+      return (
+        <ArtifactOperationsCard
+          key={`${artifact.id}-${index}`}
+          artifact={artifact}
+          selected={selectedEntities.includes(artifact.id)}
+          selectable={selectable}
+          onSelect={(selected) => handleSelect(artifact, selected)}
+          onClick={() => handleEntityClick(artifact)}
+          onSync={onSync ? () => onSync(artifact) : undefined}
+          onDeploy={onDeploy ? () => onDeploy(artifact) : undefined}
+          onViewDiff={onViewDiff ? () => onViewDiff(artifact) : undefined}
+          onManage={onManage ? () => onManage(artifact) : undefined}
+        />
+      );
+    },
+    [
+      selectedEntities,
+      selectable,
+      handleSelect,
+      handleEntityClick,
+      onSync,
+      onDeploy,
+      onViewDiff,
+      onManage,
+    ]
+  );
+
   const renderEntityRow = useCallback(
-    (artifact: Artifact) => {
+    (artifact: Artifact, index: number) => {
       return (
         <EntityRow
-          key={artifact.id}
+          key={`${artifact.id}-${index}`}
           entity={artifact}
           selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}
@@ -189,11 +250,17 @@ export function EntityList({
   // Loading state - show skeletons
   if (isLoading) {
     if (viewMode === 'grid') {
+      // Choose skeleton based on card variant
+      const SkeletonComponent =
+        cardVariant === 'operations'
+          ? ArtifactOperationsCardSkeleton
+          : EntityCardSkeleton;
+
       return (
         <ScrollArea className="h-full">
           <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <EntityCardSkeleton key={i} />
+              <SkeletonComponent key={i} selectable={selectable} />
             ))}
           </div>
         </ScrollArea>
@@ -235,12 +302,15 @@ export function EntityList({
     );
   }
 
-  // Grid view
+  // Grid view - choose card renderer based on variant
   if (viewMode === 'grid') {
+    const renderCard =
+      cardVariant === 'operations' ? renderOperationsCard : renderEntityCard;
+
     return (
       <ScrollArea className="h-full">
         <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {entities.map(renderEntityCard)}
+          {entities.map(renderCard)}
         </div>
       </ScrollArea>
     );

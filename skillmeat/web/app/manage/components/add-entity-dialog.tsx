@@ -11,13 +11,17 @@ import { EntityForm } from '@/components/entity/entity-form';
 import { ArtifactType, ARTIFACT_TYPES } from '@/types/artifact';
 
 interface AddEntityDialogProps {
-  entityType: ArtifactType;
+  entityType: ArtifactType | 'all';
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function AddEntityDialog({ entityType, open, onOpenChange }: AddEntityDialogProps) {
-  const config = ARTIFACT_TYPES[entityType];
+  // When entityType is 'all' or invalid, default to 'skill' for the add form
+  const effectiveType: ArtifactType = entityType === 'all' || !ARTIFACT_TYPES[entityType as ArtifactType]
+    ? 'skill'
+    : entityType;
+  const config = ARTIFACT_TYPES[effectiveType];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -31,7 +35,7 @@ export function AddEntityDialog({ entityType, open, onOpenChange }: AddEntityDia
 
         <EntityForm
           mode="create"
-          entityType={entityType}
+          entityType={effectiveType}
           onSuccess={() => onOpenChange(false)}
           onCancel={() => onOpenChange(false)}
         />

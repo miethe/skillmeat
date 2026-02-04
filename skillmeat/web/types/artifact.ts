@@ -74,6 +74,19 @@ export interface CollectionRef {
 }
 
 /**
+ * Summary of a single deployment of an artifact.
+ * Used for tracking where artifacts are deployed.
+ */
+export interface DeploymentSummary {
+  /** Absolute path to the project directory */
+  project_path: string;
+  /** Human-readable project name */
+  project_name: string;
+  /** ISO 8601 timestamp when artifact was deployed to this project */
+  deployed_at: string;
+}
+
+/**
  * Artifact metadata containing descriptive information.
  * @deprecated Metadata is now flattened into the Artifact interface. Kept for backward compatibility.
  */
@@ -161,6 +174,9 @@ export interface Artifact {
   /** Project path when artifact is deployed to a project */
   projectPath?: string;
 
+  /** All deployments of this artifact across projects */
+  deployments?: DeploymentSummary[] | null;
+
   // ============================================================================
   // Metadata (flattened from former nested objects)
   // ============================================================================
@@ -179,6 +195,9 @@ export interface Artifact {
 
   /** Semantic version string */
   version?: string;
+
+  /** Claude Code tools used by this artifact */
+  tools?: string[];
 
   /** List of artifact dependencies (artifact IDs or package names) */
   dependencies?: string[];

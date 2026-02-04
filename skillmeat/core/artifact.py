@@ -72,8 +72,6 @@ class ArtifactMetadata:
             result["license"] = self.license
         if self.version is not None:
             result["version"] = self.version
-        if self.tags:
-            result["tags"] = self.tags
         if self.dependencies:
             result["dependencies"] = self.dependencies
         if self.tools:
@@ -287,6 +285,11 @@ class Artifact:
         # Ensure type is ArtifactType enum
         if isinstance(self.type, str):
             self.type = ArtifactType(self.type)
+
+        # Consolidate: merge metadata.tags into top-level tags (single source of truth)
+        if self.metadata and self.metadata.tags:
+            self.tags = list(dict.fromkeys(self.tags + self.metadata.tags))
+            self.metadata.tags = []
 
     def composite_key(self) -> tuple:
         """Return unique composite key (name, type)."""

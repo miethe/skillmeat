@@ -417,6 +417,86 @@ Content
         assert cached is not None
         assert cached["title"] == "Fresh Data"
 
+    def test_fetch_metadata_single_file_artifact(self, extractor):
+        """Test metadata fetch for single-file artifact (e.g., my-agent.md)."""
+        # Single file with frontmatter
+        agent_content = """---
+title: My Agent
+description: A single-file agent artifact
+author: Test Author
+version: 1.0.0
+---
+
+# My Agent
+
+This is a single-file agent.
+"""
+
+        def mock_get_file_content(owner_repo, path, ref=None):
+            if path == "agents/my-agent.md":
+                return agent_content.encode("utf-8")
+            raise GitHubNotFoundError(f"File not found: {path}")
+
+        mock_repo_metadata = {
+            "topics": ["agents", "automation"],
+            "license": "MIT",
+        }
+
+        with (
+            patch.object(
+                extractor._client, "get_file_content", side_effect=mock_get_file_content
+            ),
+            patch.object(
+                extractor._client, "get_repo_metadata", return_value=mock_repo_metadata
+            ),
+        ):
+            metadata = extractor.fetch_metadata("user/repo/agents/my-agent.md")
+
+        # Verify frontmatter extracted from single file
+        assert metadata.title == "My Agent"
+        assert metadata.description == "A single-file agent artifact"
+        assert metadata.author == "Test Author"
+        # Verify repo metadata still fetched
+        assert metadata.license == "MIT"
+        assert "agents" in metadata.topics
+        assert "automation" in metadata.topics
+
+    def test_fetch_metadata_single_file_no_frontmatter(self, extractor):
+        """Test single-file artifact without frontmatter falls back gracefully."""
+        # Single file without frontmatter
+        agent_content = """# My Agent
+
+This is a single-file agent without frontmatter.
+"""
+
+        def mock_get_file_content(owner_repo, path, ref=None):
+            if path == "agents/simple.md":
+                return agent_content.encode("utf-8")
+            raise GitHubNotFoundError(f"File not found: {path}")
+
+        mock_repo_metadata = {
+            "topics": ["agents"],
+            "license": "Apache-2.0",
+        }
+
+        with (
+            patch.object(
+                extractor._client, "get_file_content", side_effect=mock_get_file_content
+            ),
+            patch.object(
+                extractor._client, "get_repo_metadata", return_value=mock_repo_metadata
+            ),
+        ):
+            metadata = extractor.fetch_metadata("user/repo/agents/simple.md")
+
+        # Frontmatter fields should be None
+        assert metadata.title is None
+        assert metadata.description is None
+        assert metadata.author is None
+        # But repo metadata should be present
+        assert metadata.license == "Apache-2.0"
+        assert "agents" in metadata.topics
+
     def test_fetch_metadata_invalid_source(self, extractor):
         """Test fetching with invalid source format."""
         with pytest.raises(ValueError, match="Invalid GitHub source"):

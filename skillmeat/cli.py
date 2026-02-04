@@ -256,7 +256,7 @@ def cmd_list(
             ]
             if tags:
                 tag_str = (
-                    ", ".join(artifact.metadata.tags) if artifact.metadata.tags else ""
+                    ", ".join(artifact.tags) if artifact.tags else ""
                 )
                 row.append(tag_str)
             table.add_row(*row)
@@ -2721,6 +2721,12 @@ def collection_refresh(
                     f"{snapshot.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
 
+                # Invalidate API cache after rollback to reflect restored state
+                logger.debug(
+                    f"Rolled back collection '{display_name}', invalidating API cache"
+                )
+                _refresh_api_cache(collection_name or "default", output_format="table")
+
                 return
 
             except Exception as e:
@@ -2934,6 +2940,14 @@ def collection_refresh(
                     console.print(f"    [dim]{entry.error}[/dim]")
                 if entry.reason:
                     console.print(f"    [dim]Reason: {entry.reason}[/dim]")
+
+        # Invalidate API cache after successful refresh (not dry-run or check modes)
+        # This ensures the web UI displays updated metadata immediately
+        if not dry_run and not check and result.refreshed_count > 0:
+            logger.debug(
+                f"Refreshed {result.refreshed_count} artifacts, invalidating API cache"
+            )
+            _refresh_api_cache(collection_name or "default", output_format="table")
 
         # Exit with error code if there were errors
         if result.error_count > 0:

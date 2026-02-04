@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect, useMemo, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Package, Loader2 } from 'lucide-react';
+import { useState, useEffect, useMemo, Suspense, useCallback, useRef } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { Package, Loader2, Library } from 'lucide-react';
+import { PageHeader } from '@/components/shared/page-header';
 import { CollectionHeader } from '@/components/collection/collection-header';
 import { CollectionToolbar } from '@/components/collection/collection-toolbar';
 import { ArtifactGrid } from '@/components/collection/artifact-grid';
 import { ArtifactList } from '@/components/collection/artifact-list';
-import { CollectionArtifactModal } from '@/components/shared/CollectionArtifactModal';
+import { ArtifactBrowseCardSkeleton } from '@/components/collection/artifact-browse-card';
+import { ArtifactDetailsModal, type ArtifactDetailsTab } from '@/components/collection/artifact-details-modal';
 import { EditCollectionDialog } from '@/components/collection/edit-collection-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
 import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
@@ -15,6 +17,7 @@ import { AddToGroupDialog } from '@/components/collection/add-to-group-dialog';
 import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
 import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
 import { TagFilterBar } from '@/components/ui/tag-filter-popover';
+import { ToolFilterBar } from '@/components/ui/tool-filter-popover';
 import {
   EntityLifecycleProvider,
   useCollectionContext,
@@ -23,6 +26,7 @@ import {
   useIntersectionObserver,
   useEditArtifactParameters,
   useToast,
+  useReturnTo,
 } from '@/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Artifact, ArtifactFilters } from '@/types/artifact';
@@ -49,7 +53,7 @@ function CollectionPageSkeleton() {
       <div className="flex-1 overflow-auto p-6">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-48 w-full" />
+            <ArtifactBrowseCardSkeleton key={i} />
           ))}
         </div>
       </div>
@@ -70,12 +74,20 @@ function EmptyState({ title, description }: { title: string; description: string
 }
 
 function CollectionPageContent() {
-  const { selectedCollectionId, currentCollection, isLoadingCollection, setSelectedCollectionId } =
-    useCollectionContext();
+  const {
+    selectedCollectionId,
+    currentCollection,
+    isLoadingCollection,
+    setSelectedCollectionId,
+    selectedGroupId,
+    setSelectedGroupId,
+  } = useCollectionContext();
 
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const { returnTo } = useReturnTo();
 
   // View mode with localStorage persistence
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -97,16 +109,39 @@ function CollectionPageContent() {
     }
   }, [viewMode]);
 
-  // Filters, search, sort state
-  const [filters, setFilters] = useState<ArtifactFilters>({});
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortField, setSortField] = useState('confidence');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  // ==========================================================================
+  // URL-Driven Filter State
+  // ==========================================================================
+
+  // Read filter state from URL params (single source of truth)
+  const urlSearch = searchParams.get('search') || '';
+  const urlType = searchParams.get('type') || 'all';
+  const urlStatus = searchParams.get('status') || 'all';
+  const urlScope = searchParams.get('scope') || 'all';
+  const urlSort = searchParams.get('sort') || 'confidence';
+  const urlOrder = (searchParams.get('order') as 'asc' | 'desc') || 'desc';
 
   // Tag filtering from URL
   const selectedTags = useMemo(() => {
     return searchParams.get('tags')?.split(',').filter(Boolean) || [];
   }, [searchParams]);
+
+  // Tool filtering from URL
+  const selectedTools = useMemo(() => {
+    return searchParams.get('tools')?.split(',').filter(Boolean) || [];
+  }, [searchParams]);
+
+  // Derive filters object from URL state
+  const filters: ArtifactFilters = useMemo(() => ({
+    type: urlType !== 'all' ? (urlType as ArtifactFilters['type']) : undefined,
+    status: urlStatus !== 'all' ? (urlStatus as ArtifactFilters['status']) : undefined,
+    scope: urlScope !== 'all' ? (urlScope as ArtifactFilters['scope']) : undefined,
+  }), [urlType, urlStatus, urlScope]);
+
+  // Use URL values directly for search and sort
+  const searchQuery = urlSearch;
+  const sortField = urlSort;
+  const sortOrder = urlOrder;
 
   // Refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -115,6 +150,8 @@ function CollectionPageContent() {
   // Modal state
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  // Ref to track closing state to prevent race condition with URL-based auto-open
+  const isClosingRef = useRef(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
@@ -134,6 +171,66 @@ function CollectionPageContent() {
 
   // Hook for editing artifact parameters
   const { mutateAsync: updateParameters } = useEditArtifactParameters();
+
+  // ==========================================================================
+  // URL State Management
+  // ==========================================================================
+
+  // Get URL params for deep linking
+  const urlArtifactId = searchParams.get('artifact');
+  const urlCollectionId = searchParams.get('collection');
+  const urlGroupId = searchParams.get('group');
+  const urlTab = searchParams.get('tab') as ArtifactDetailsTab | null;
+
+  // Helper to update URL params without full page reload
+  const updateUrlParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      const params = new URLSearchParams(searchParams.toString());
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null || value === undefined || value === '') {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      });
+
+      const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+      router.push(newUrl, { scroll: false });
+    },
+    [searchParams, pathname, router]
+  );
+
+  // Sync collection/group selection from URL on initial load
+  useEffect(() => {
+    if (urlCollectionId && urlCollectionId !== selectedCollectionId) {
+      setSelectedCollectionId(urlCollectionId);
+    }
+  }, [urlCollectionId, selectedCollectionId, setSelectedCollectionId]);
+
+  useEffect(() => {
+    if (urlGroupId && urlGroupId !== selectedGroupId) {
+      setSelectedGroupId(urlGroupId);
+    }
+  }, [urlGroupId, selectedGroupId, setSelectedGroupId]);
+
+  // Sync URL when collection/group changes (two-way binding)
+  useEffect(() => {
+    // Only update URL if the values differ from current URL params
+    const currentUrlCollection = searchParams.get('collection');
+    const currentUrlGroup = searchParams.get('group');
+
+    if (selectedCollectionId !== currentUrlCollection || selectedGroupId !== currentUrlGroup) {
+      updateUrlParams({
+        collection: selectedCollectionId,
+        group: selectedGroupId,
+      });
+    }
+  }, [selectedCollectionId, selectedGroupId, searchParams, updateUrlParams]);
+
+  // ==========================================================================
+  // Event Handlers
+  // ==========================================================================
 
   // Handler for Edit action from dropdown
   const handleEditFromDropdown = (artifact: Artifact) => {
@@ -276,16 +373,47 @@ function CollectionPageContent() {
     }
   }, [infiniteCollectionData, infiniteAllArtifactsData, isSpecificCollection, lastUpdated]);
 
+  // ==========================================================================
+  // Filter Change Handlers (update URL - single source of truth)
+  // ==========================================================================
+
+  // Handle search changes
+  const handleSearchChange = useCallback((query: string) => {
+    updateUrlParams({
+      search: query || null, // Don't write empty string to URL
+    });
+  }, [updateUrlParams]);
+
+  // Handle filter object changes (type, status, scope)
+  const handleFiltersChange = useCallback((newFilters: ArtifactFilters) => {
+    updateUrlParams({
+      type: newFilters.type && newFilters.type !== 'all' ? newFilters.type : null,
+      status: newFilters.status && newFilters.status !== 'all' ? newFilters.status : null,
+      scope: newFilters.scope && newFilters.scope !== 'all' ? newFilters.scope : null,
+    });
+  }, [updateUrlParams]);
+
+  // Handle sort changes
+  const handleSortChange = useCallback((field: string, order: 'asc' | 'desc') => {
+    updateUrlParams({
+      sort: field === 'confidence' ? null : field, // confidence is default, don't write to URL
+      order: order === 'desc' ? null : order, // desc is default, don't write to URL
+    });
+  }, [updateUrlParams]);
+
   // Handle tag selection changes
-  const handleTagsChange = (tags: string[]) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (tags.length > 0) {
-      params.set('tags', tags.join(','));
-    } else {
-      params.delete('tags');
-    }
-    router.push(`?${params.toString()}`);
-  };
+  const handleTagsChange = useCallback((tags: string[]) => {
+    updateUrlParams({
+      tags: tags.length > 0 ? tags.join(',') : null,
+    });
+  }, [updateUrlParams]);
+
+  // Handle tool selection changes
+  const handleToolsChange = useCallback((tools: string[]) => {
+    updateUrlParams({
+      tools: tools.length > 0 ? tools.join(',') : null,
+    });
+  }, [updateUrlParams]);
 
   // Helper function to map API artifact response to Artifact type
   // Uses the centralized mapper from @/lib/api/mappers
@@ -293,8 +421,8 @@ function CollectionPageContent() {
     return mapApiResponseToArtifact(apiArtifact, 'collection');
   };
 
-  // Apply client-side search, tag filter, and sort
-  const filteredArtifacts = useMemo(() => {
+  // Stage 1: Apply type, status, scope, search filters (BEFORE tags and tools)
+  const preTagFilterArtifacts = useMemo(() => {
     // Handle different response shapes:
     // - Specific collection (infinite scroll): pages array with items (lightweight summaries)
     // - All collections (infinite scroll): pages array with items (full artifacts)
@@ -359,10 +487,44 @@ function CollectionPageContent() {
       });
     }
 
+    return artifacts;
+  }, [
+    isSpecificCollection,
+    infiniteCollectionData,
+    infiniteAllArtifactsData,
+    currentCollection,
+    filters,
+    searchQuery,
+  ]);
+
+  // Compute available tags from artifacts matching current filters (excluding tag filter)
+  const availableTags = useMemo(() => {
+    const tagCounts = new Map<string, number>();
+    preTagFilterArtifacts.forEach((artifact) => {
+      artifact.tags?.forEach((tag: string) => {
+        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      });
+    });
+    return Array.from(tagCounts.entries())
+      .map(([name, count]) => ({ name, artifact_count: count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [preTagFilterArtifacts]);
+
+  // Stage 2: Apply tag, tool filters and sort
+  const filteredArtifacts = useMemo(() => {
+    let artifacts = preTagFilterArtifacts;
+
     // Tag filter
     if (selectedTags.length > 0) {
       artifacts = artifacts.filter((artifact) => {
         return artifact.tags?.some((tag: string) => selectedTags.includes(tag)) ?? false;
+      });
+    }
+
+    // Tool filter
+    if (selectedTools.length > 0) {
+      artifacts = artifacts.filter((artifact) => {
+        return artifact.tools?.some((tool: string) => selectedTools.includes(tool)) ?? false;
       });
     }
 
@@ -393,22 +555,12 @@ function CollectionPageContent() {
     }
 
     return artifacts;
-  }, [
-    isSpecificCollection,
-    infiniteCollectionData,
-    infiniteAllArtifactsData,
-    currentCollection,
-    filters,
-    searchQuery,
-    selectedTags,
-    sortField,
-    sortOrder,
-  ]);
+  }, [preTagFilterArtifacts, selectedTags, selectedTools, sortField, sortOrder]);
 
-  // Compute unique tags with counts from ALL loaded artifacts (before tag filtering)
-  // This is used by TagFilterPopover instead of fetching from the database Tag table
-  const availableTags = useMemo(() => {
-    // Get all artifacts before tag filtering is applied
+  // Compute unique tools with counts from ALL loaded artifacts (before tool filtering)
+  // This is used by ToolFilterPopover
+  const availableTools = useMemo(() => {
+    // Get all artifacts before tool filtering is applied
     let allArtifacts: Artifact[] = [];
 
     if (isSpecificCollection && infiniteCollectionData?.pages) {
@@ -421,43 +573,81 @@ function CollectionPageContent() {
       );
     }
 
-    // Count tags across all artifacts (using flattened tags property)
-    const tagCounts = new Map<string, number>();
+    // Count tools across all artifacts
+    const toolCounts = new Map<string, number>();
     allArtifacts.forEach((artifact) => {
-      const tags = artifact.tags || [];
-      tags.forEach((tag: string) => {
-        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      const tools = artifact.tools || [];
+      tools.forEach((tool: string) => {
+        toolCounts.set(tool, (toolCounts.get(tool) || 0) + 1);
       });
     });
 
-    // Convert to array format expected by TagFilterPopover
-    return Array.from(tagCounts.entries())
+    // Convert to array format expected by ToolFilterPopover
+    return Array.from(toolCounts.entries())
       .map(([name, count]) => ({ name, artifact_count: count }))
       .sort((a, b) => b.artifact_count - a.artifact_count); // Sort by count descending
-  }, [
-    infiniteCollectionData?.pages,
-    infiniteAllArtifactsData?.pages,
-    isSpecificCollection,
-    currentCollection,
-  ]);
+  }, [infiniteCollectionData?.pages, infiniteAllArtifactsData?.pages, isSpecificCollection]);
+
+  // ==========================================================================
+  // Deep Link: Auto-open modal from URL artifact param
+  // ==========================================================================
+
+  useEffect(() => {
+    // Skip if we're in the process of closing (prevents race condition with async URL update)
+    if (isClosingRef.current) return;
+
+    // Only process if we have a URL artifact ID, artifacts are loaded, and modal isn't already open
+    if (urlArtifactId && filteredArtifacts.length > 0 && !isDetailOpen) {
+      const artifact = filteredArtifacts.find(
+        (a) => a.id === urlArtifactId || a.name === urlArtifactId
+      );
+      if (artifact) {
+        setSelectedArtifact(artifact);
+        setIsDetailOpen(true);
+      }
+    }
+  }, [urlArtifactId, filteredArtifacts, isDetailOpen]);
+
+  // ==========================================================================
+  // Modal Handlers with URL State
+  // ==========================================================================
 
   const handleArtifactClick = (artifact: Artifact) => {
     setSelectedArtifact(artifact);
     setIsDetailOpen(true);
+    // Update URL with artifact ID (and clear tab to start at default)
+    updateUrlParams({
+      artifact: artifact.id,
+      tab: null,
+    });
   };
 
   const handleDetailClose = () => {
+    // Set closing flag FIRST to prevent race condition with auto-open useEffect
+    isClosingRef.current = true;
     setIsDetailOpen(false);
+    // Clear artifact and tab from URL
+    updateUrlParams({
+      artifact: null,
+      tab: null,
+    });
     setTimeout(() => setSelectedArtifact(null), 300);
+    // Reset closing flag after a tick to allow URL to update
+    setTimeout(() => {
+      isClosingRef.current = false;
+    }, 0);
   };
 
-  const handleSortChange = (field: string, order: 'asc' | 'desc') => {
-    setSortField(field);
-    setSortOrder(order);
+  const handleTabChange = (tab: ArtifactDetailsTab) => {
+    // Update URL with new tab
+    updateUrlParams({
+      tab: tab === 'overview' ? null : tab, // Don't clutter URL with default tab
+    });
   };
 
   const handleCollectionClick = (collectionId: string) => {
     setSelectedCollectionId(collectionId);
+    // URL will update via the effect that watches selectedCollectionId
   };
 
   const handleRefresh = async () => {
@@ -490,6 +680,15 @@ function CollectionPageContent() {
 
   return (
     <div className="flex h-full flex-col">
+      {/* Page Header */}
+      <div className="border-b bg-background px-6 py-4">
+        <PageHeader
+          title="Collections"
+          description="Browse & Discover your artifact collection"
+          icon={<Library className="h-6 w-6" />}
+        />
+      </div>
+
       <CollectionHeader
         collection={currentCollection}
         artifactCount={totalCount}
@@ -503,9 +702,9 @@ function CollectionPageContent() {
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         filters={filters}
-        onFiltersChange={setFilters}
+        onFiltersChange={handleFiltersChange}
         searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        onSearchChange={handleSearchChange}
         sortField={sortField}
         sortOrder={sortOrder}
         onSortChange={handleSortChange}
@@ -515,6 +714,9 @@ function CollectionPageContent() {
         selectedTags={selectedTags}
         onTagsChange={handleTagsChange}
         availableTags={availableTags}
+        selectedTools={selectedTools}
+        onToolsChange={handleToolsChange}
+        availableTools={availableTools}
       />
 
       {/* Tag Filter Bar - Shows active tag filters */}
@@ -523,8 +725,14 @@ function CollectionPageContent() {
           <TagFilterBar
             selectedTags={selectedTags}
             onChange={handleTagsChange}
-            availableTags={availableTags}
           />
+        </div>
+      )}
+
+      {/* Tool Filter Bar - Shows active tool filters */}
+      {selectedTools.length > 0 && (
+        <div className="border-b bg-muted/10 px-6 py-2">
+          <ToolFilterBar selectedTools={selectedTools} onChange={handleToolsChange} />
         </div>
       )}
 
@@ -542,7 +750,7 @@ function CollectionPageContent() {
         {!error && isLoadingArtifacts && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-48 w-full" />
+              <ArtifactBrowseCardSkeleton key={i} />
             ))}
           </div>
         )}
@@ -551,14 +759,14 @@ function CollectionPageContent() {
         {!error && !isLoadingArtifacts && filteredArtifacts.length === 0 && (
           <EmptyState
             title={
-              searchQuery || selectedTags.length > 0
+              searchQuery || selectedTags.length > 0 || selectedTools.length > 0
                 ? 'No results found'
                 : isSpecificCollection
                   ? 'No artifacts in this collection'
                   : 'No artifacts'
             }
             description={
-              searchQuery || selectedTags.length > 0
+              searchQuery || selectedTags.length > 0 || selectedTools.length > 0
                 ? 'Try adjusting your search or filters'
                 : isSpecificCollection
                   ? 'Add artifacts to this collection to get started'
@@ -636,11 +844,14 @@ function CollectionPageContent() {
         )}
       </div>
 
-      {/* Artifact Detail Modal */}
-      <CollectionArtifactModal
+      {/* Artifact Detail Modal - Discovery-focused modal */}
+      <ArtifactDetailsModal
         artifact={selectedArtifact}
         open={isDetailOpen}
         onClose={handleDetailClose}
+        initialTab={urlTab || 'overview'}
+        onTabChange={handleTabChange}
+        returnTo={returnTo || undefined}
       />
 
       {/* Edit Collection Dialog */}

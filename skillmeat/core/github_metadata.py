@@ -253,21 +253,32 @@ class GitHubMetadataExtractor:
         }
 
         # Try to fetch file content and extract frontmatter
-        # Look for standard metadata files in order of preference
-        metadata_files = ["SKILL.md", "COMMAND.md", "AGENT.md", "README.md"]
-
         frontmatter_data = None
-        for filename in metadata_files:
-            file_path = f"{spec.path}/{filename}" if spec.path else filename
-            content = self._fetch_file_content(
-                spec.owner, spec.repo, file_path, spec.version
-            )
 
+        # Handle single-file artifacts (e.g., agents/my-agent.md)
+        if spec.path and spec.path.endswith(".md"):
+            # Fetch the file directly instead of looking for metadata files inside it
+            content = self._fetch_file_content(
+                spec.owner, spec.repo, spec.path, spec.version
+            )
             if content:
-                logger.debug(f"Found {filename} for {source}")
+                logger.debug(f"Found single-file artifact at {spec.path}")
                 frontmatter_data = self._extract_frontmatter(content)
-                if frontmatter_data:
-                    break
+        else:
+            # Look for standard metadata files in order of preference
+            metadata_files = ["SKILL.md", "COMMAND.md", "AGENT.md", "README.md"]
+
+            for filename in metadata_files:
+                file_path = f"{spec.path}/{filename}" if spec.path else filename
+                content = self._fetch_file_content(
+                    spec.owner, spec.repo, file_path, spec.version
+                )
+
+                if content:
+                    logger.debug(f"Found {filename} for {source}")
+                    frontmatter_data = self._extract_frontmatter(content)
+                    if frontmatter_data:
+                        break
 
         # Extract frontmatter fields
         if frontmatter_data:

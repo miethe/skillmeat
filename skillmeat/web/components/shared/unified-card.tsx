@@ -116,7 +116,7 @@ function normalizeCardData(item: Artifact | LegacyArtifact): NormalizedCardData 
       type: item.type,
       title: item.metadata.title,
       description: item.metadata.description,
-      tags: item.metadata.tags,
+      tags: item.metadata?.tags,
       status: item.status as SyncStatus | undefined,
       version: item.version,
       source: item.source,
@@ -126,7 +126,7 @@ function normalizeCardData(item: Artifact | LegacyArtifact): NormalizedCardData 
       confidence: item.score?.confidence,
     };
   } else {
-    // Unified Artifact has flat properties
+    // Unified Artifact has flat properties (tags at top level)
     return {
       id: item.id,
       name: item.name,

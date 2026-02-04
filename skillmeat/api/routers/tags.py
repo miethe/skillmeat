@@ -23,6 +23,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from skillmeat.api.dependencies import CollectionManagerDep
 from skillmeat.api.schemas.common import PageInfo
 from skillmeat.api.schemas.tags import (
     TagCreateRequest,
@@ -341,12 +342,19 @@ async def get_tag_by_slug(slug: str) -> TagResponse:
         500: {"description": "Internal server error"},
     },
 )
-async def update_tag(tag_id: str, request: TagUpdateRequest) -> TagResponse:
+async def update_tag(
+    tag_id: str, request: TagUpdateRequest, collection_mgr: CollectionManagerDep
+) -> TagResponse:
     """Update tag metadata.
+
+    If the tag name is changing, the rename is written back to filesystem
+    sources (collection.toml and artifact frontmatter) so the change
+    persists through cache refreshes.
 
     Args:
         tag_id: Tag identifier
         request: Tag update request with optional name, slug, color
+        collection_mgr: Injected CollectionManager for filesystem write-back
 
     Returns:
         Updated tag details
@@ -358,13 +366,33 @@ async def update_tag(tag_id: str, request: TagUpdateRequest) -> TagResponse:
         HTTPException 500: If update fails
     """
     from skillmeat.core.services import TagService
+    from skillmeat.core.services.tag_write_service import TagWriteService
 
     service = TagService()
+    write_service = TagWriteService()
 
     try:
         logger.info(f"Updating tag: {tag_id}")
 
-        # Update tag via service
+        affected_artifacts = []
+
+        # If name is changing, write-back to filesystem
+        if request.name is not None:
+            existing_tag = service.get_tag(tag_id)
+            if existing_tag and existing_tag.name != request.name:
+                result = write_service.rename_tag(
+                    old_name=existing_tag.name,
+                    new_name=request.name,
+                    collection_manager=collection_mgr,
+                )
+                affected_artifacts = result.get("affected_artifacts", [])
+                if affected_artifacts:
+                    logger.info(
+                        f"Renamed tag '{existing_tag.name}' -> '{request.name}' "
+                        f"in {len(affected_artifacts)} artifacts on filesystem"
+                    )
+
+        # Update tag in DB via service
         tag = service.update_tag(tag_id, request)
 
         if not tag:
@@ -372,6 +400,10 @@ async def update_tag(tag_id: str, request: TagUpdateRequest) -> TagResponse:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Tag '{tag_id}' not found",
             )
+
+        # Update tags_json cache for affected artifacts
+        if affected_artifacts:
+            write_service.update_tags_json_cache(affected_artifacts)
 
         logger.info(f"Updated tag: {tag.id} ('{tag.name}')")
 
@@ -421,11 +453,16 @@ async def update_tag(tag_id: str, request: TagUpdateRequest) -> TagResponse:
         500: {"description": "Internal server error"},
     },
 )
-async def delete_tag(tag_id: str) -> None:
+async def delete_tag(tag_id: str, collection_mgr: CollectionManagerDep) -> None:
     """Delete tag by ID.
+
+    The tag is first removed from filesystem sources (collection.toml and
+    artifact frontmatter) so the deletion persists through cache refreshes,
+    then deleted from the database (CASCADE removes artifact_tags rows).
 
     Args:
         tag_id: Tag identifier
+        collection_mgr: Injected CollectionManager for filesystem write-back
 
     Returns:
         None (204 No Content)
@@ -435,16 +472,44 @@ async def delete_tag(tag_id: str) -> None:
         HTTPException 500: If deletion fails
     """
     from skillmeat.core.services import TagService
+    from skillmeat.core.services.tag_write_service import TagWriteService
 
     service = TagService()
+    write_service = TagWriteService()
 
     try:
         logger.info(f"Deleting tag: {tag_id}")
 
+        # Look up tag name before deleting
+        tag = service.get_tag(tag_id)
+        if not tag:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tag '{tag_id}' not found",
+            )
+
+        # Write-back: remove tag from filesystem sources
+        result = write_service.delete_tag(
+            tag_name=tag.name,
+            collection_manager=collection_mgr,
+        )
+        if result["affected_artifacts"]:
+            logger.info(
+                f"Removed tag '{tag.name}' from {len(result['affected_artifacts'])} "
+                f"artifacts on filesystem"
+            )
+
+        # Delete from DB (CASCADE removes artifact_tags rows)
         service.delete_tag(tag_id)
+
+        # Update tags_json cache for affected artifacts
+        if result["affected_artifacts"]:
+            write_service.update_tags_json_cache(result["affected_artifacts"])
 
         logger.info(f"Deleted tag: {tag_id}")
 
+    except HTTPException:
+        raise
     except LookupError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

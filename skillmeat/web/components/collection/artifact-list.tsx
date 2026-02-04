@@ -241,7 +241,7 @@ export function ArtifactList({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {artifacts.map((artifact) => {
+            {artifacts.map((artifact, index) => {
               const Icon = artifactTypeIcons[artifact.type] || HelpCircle;
               const iconColor =
                 artifactTypeIconColors[artifact.type] || 'text-gray-500 dark:text-gray-400';
@@ -251,7 +251,7 @@ export function ArtifactList({
               const typeLabel = artifactTypeLabels[artifact.type] || artifact.type || 'Unknown';
               return (
                 <TableRow
-                  key={artifact.id}
+                  key={`${artifact.id}-${index}`}
                   className={`cursor-pointer border-l-2 ${borderAccent} ${rowTint}`}
                   onClick={() => onArtifactClick(artifact)}
                   role="button"

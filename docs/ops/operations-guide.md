@@ -4,7 +4,7 @@ description: "Maintenance scripts, cache management, and operational procedures 
 audience: [developers, operators]
 tags: [operations, maintenance, cache, database]
 created: 2026-02-02
-updated: 2026-02-02
+updated: 2026-02-03
 category: operations
 status: active
 related_documents: []
@@ -1008,6 +1008,108 @@ tail -f ~/.skillmeat/logs/skillmeat.log
 # 5. Retry with force
 skillmeat add anthropics/skills/canvas --force
 ```
+
+---
+
+### 7.6 Refreshing Marketplace Artifact Metadata
+
+**Scenario**: Imported artifacts are missing metadata fields (e.g., descriptions, tags) due to bugs or schema changes, and you need to refresh them from upstream sources without deleting and re-importing.
+
+**Option 1: CLI — Targeted Field Refresh (Recommended)**
+
+The `collection refresh` command supports selective field refresh via the `--fields` flag.
+
+Valid fields: `description`, `tags`, `author`, `license`, `origin_source`
+
+```bash
+# Refresh only descriptions for all imported artifacts
+skillmeat collection refresh --fields description
+
+# Preview changes without applying (dry-run)
+skillmeat collection refresh --fields description --dry-run
+
+# Refresh multiple fields
+skillmeat collection refresh --fields description,tags
+
+# Refresh only skills
+skillmeat collection refresh --fields description -t skill
+
+# Refresh by name pattern
+skillmeat collection refresh --fields description -n "canvas-*"
+
+# Check for updates only (no changes applied)
+skillmeat collection refresh --fields description --check
+
+# Full metadata refresh (all fields)
+skillmeat collection refresh
+```
+
+If a refresh introduces issues, rollback to the pre-refresh snapshot:
+
+```bash
+# Rollback to pre-refresh state
+skillmeat collection refresh --rollback
+
+# Skip confirmation
+skillmeat collection refresh --rollback -y
+```
+
+**Option 2: API — Reimport Single Artifact**
+
+Force re-import a specific artifact from upstream. This deletes the local copy and re-downloads from GitHub.
+
+**Endpoint**: `POST /api/v1/marketplace/sources/{source_id}/entries/{entry_id}/reimport`
+
+```bash
+# Reimport with deployment preservation
+curl -X POST "http://localhost:8080/api/v1/marketplace/sources/{source_id}/entries/{entry_id}/reimport" \
+  -H "Content-Type: application/json" \
+  -d '{"keep_deployments": true}'
+
+# Fresh reimport (no deployment preservation)
+curl -X POST "http://localhost:8080/api/v1/marketplace/sources/{source_id}/entries/{entry_id}/reimport" \
+  -H "Content-Type: application/json" \
+  -d '{"keep_deployments": false}'
+```
+
+Parameters:
+- `keep_deployments` (bool, default: false): If true and the artifact exists, saves deployment records before deletion and restores them after re-import.
+
+Response:
+
+```json
+{
+  "success": true,
+  "artifact_id": "skill:canvas-design",
+  "message": "Re-import completed successfully",
+  "deployments_restored": 3
+}
+```
+
+**Option 3: API — Rescan Source (Catalog Refresh)**
+
+Rescan a marketplace source repository to update catalog entries with current frontmatter metadata (titles, descriptions, tags). This updates the catalog but does not re-import artifacts.
+
+**Endpoint**: `POST /api/v1/marketplace/sources/{source_id}/rescan`
+
+```bash
+# Rescan source repository
+curl -X POST "http://localhost:8080/api/v1/marketplace/sources/{source_id}/rescan" \
+  -H "Content-Type: application/json" \
+  -d '{"force": true}'
+```
+
+After rescanning, individual artifacts can be reimported (Option 2) to pull updated metadata into the collection.
+
+**Decision Guide**:
+
+| Scenario | Recommended Approach |
+|----------|---------------------|
+| Missing descriptions/tags on many artifacts | `skillmeat collection refresh --fields description,tags` |
+| Single artifact needs full re-download | API reimport endpoint with `keep_deployments: true` |
+| Catalog metadata is stale (upstream changed) | API rescan, then reimport affected artifacts |
+| Need to preview impact before changes | `skillmeat collection refresh --fields description --dry-run` |
+| Refresh went wrong, need to undo | `skillmeat collection refresh --rollback` |
 
 ---
 

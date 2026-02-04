@@ -1,91 +1,112 @@
 ---
 type: progress
-prd: "manage-collection-page-refactor"
+prd: manage-collection-page-refactor
 phase: 1
-title: "Page Structure & Navigation"
-status: "pending"
+title: Page Structure & Navigation
+status: completed
 started: null
 completed: null
-
-overall_progress: 0
-completion_estimate: "on-track"
-
+overall_progress: 100
+completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 0
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["ui-engineer-enhanced", "frontend-developer"]
+owners:
+- ui-engineer-enhanced
+- frontend-developer
 contributors: []
-
 tasks:
-  - id: "NAV-1.1"
-    description: "Update sidebar navigation labels to 'Health & Sync' (/manage) and 'Collections' (/collection) with icon changes"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "1h"
-    priority: "high"
-    model: "opus"
-
-  - id: "NAV-1.2"
-    description: "Add page headers with descriptions: Collection='Browse & Discover', Manage='Health & Sync'"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["NAV-1.5"]
-    estimated_effort: "1h"
-    priority: "high"
-    model: "sonnet"
-
-  - id: "NAV-1.3"
-    description: "Implement deep link support for artifacts (?artifact={id}) on both pages"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-    model: "opus"
-
-  - id: "NAV-1.4"
-    description: "Add cross-navigation buttons to UnifiedEntityModal ('Open in Manage' and 'View Full Details')"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["NAV-1.3"]
-    estimated_effort: "1.5h"
-    priority: "medium"
-    model: "sonnet"
-
-  - id: "NAV-1.5"
-    description: "Create reusable PageHeader component with title, description, icon, and action button slots"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "1h"
-    priority: "high"
-    model: "opus"
-
+- id: NAV-1.1
+  description: Update sidebar navigation labels to 'Health & Sync' (/manage) and 'Collections'
+    (/collection) with icon changes
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 1h
+  priority: high
+  model: opus
+- id: NAV-1.2
+  description: 'Add page headers with descriptions: Collection=''Browse & Discover'',
+    Manage=''Health & Sync'''
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - NAV-1.5
+  estimated_effort: 1h
+  priority: high
+  model: sonnet
+- id: NAV-1.3
+  description: Implement deep link support for artifacts (?artifact={id}) on both
+    pages
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+  model: opus
+- id: NAV-1.4
+  description: Add cross-navigation buttons to UnifiedEntityModal ('Open in Manage'
+    and 'View Full Details')
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - NAV-1.3
+  estimated_effort: 1.5h
+  priority: medium
+  model: sonnet
+- id: NAV-1.5
+  description: Create reusable PageHeader component with title, description, icon,
+    and action button slots
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 1h
+  priority: high
+  model: opus
 parallelization:
-  batch_1: ["NAV-1.1", "NAV-1.3", "NAV-1.5"]
-  batch_2: ["NAV-1.2", "NAV-1.4"]
-  critical_path: ["NAV-1.5", "NAV-1.2"]
-  estimated_total_time: "4-6h"
-
+  batch_1:
+  - NAV-1.1
+  - NAV-1.3
+  - NAV-1.5
+  batch_2:
+  - NAV-1.2
+  - NAV-1.4
+  critical_path:
+  - NAV-1.5
+  - NAV-1.2
+  estimated_total_time: 4-6h
 blockers: []
-
 success_criteria:
-  - { id: "SC-1.1", description: "Sidebar reflects new navigation labels", status: "pending" }
-  - { id: "SC-1.2", description: "Page headers display with correct descriptions", status: "pending" }
-  - { id: "SC-1.3", description: "Deep links (?artifact={id}) work on both pages", status: "pending" }
-  - { id: "SC-1.4", description: "Modal cross-navigation buttons appear and function", status: "pending" }
-  - { id: "SC-1.5", description: "No accessibility violations in navigation elements", status: "pending" }
-
+- id: SC-1.1
+  description: Sidebar reflects new navigation labels
+  status: pending
+- id: SC-1.2
+  description: Page headers display with correct descriptions
+  status: pending
+- id: SC-1.3
+  description: Deep links (?artifact={id}) work on both pages
+  status: pending
+- id: SC-1.4
+  description: Modal cross-navigation buttons appear and function
+  status: pending
+- id: SC-1.5
+  description: No accessibility violations in navigation elements
+  status: pending
 files_modified:
-  - "skillmeat/web/components/navigation.tsx"
-  - "skillmeat/web/app/manage/page.tsx"
-  - "skillmeat/web/app/collection/page.tsx"
-  - "skillmeat/web/components/entity/unified-entity-modal.tsx"
-  - "skillmeat/web/components/shared/page-header.tsx"
+- skillmeat/web/components/navigation.tsx
+- skillmeat/web/app/manage/page.tsx
+- skillmeat/web/app/collection/page.tsx
+- skillmeat/web/components/entity/unified-entity-modal.tsx
+- skillmeat/web/components/shared/page-header.tsx
+progress: 100
+updated: '2026-02-02'
 ---
 
 # manage-collection-page-refactor - Phase 1: Page Structure & Navigation

@@ -21,10 +21,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { TagFilterPopover } from '@/components/ui/tag-filter-popover';
+import { ToolFilterPopover } from '@/components/ui/tool-filter-popover';
 import { cn } from '@/lib/utils';
 import type { ArtifactFilters } from '@/types/artifact';
 
 interface AvailableTag {
+  name: string;
+  artifact_count: number;
+}
+
+interface AvailableTool {
   name: string;
   artifact_count: number;
 }
@@ -46,6 +52,10 @@ interface CollectionToolbarProps {
   onTagsChange?: (tags: string[]) => void;
   /** Optional: If provided, use these tags instead of fetching from API */
   availableTags?: AvailableTag[];
+  selectedTools?: string[];
+  onToolsChange?: (tools: string[]) => void;
+  /** Optional: If provided, use these tools instead of static list */
+  availableTools?: AvailableTool[];
 }
 
 /**
@@ -97,6 +107,9 @@ export function CollectionToolbar({
   selectedTags = [],
   onTagsChange,
   availableTags,
+  selectedTools = [],
+  onToolsChange,
+  availableTools,
 }: CollectionToolbarProps) {
   // Local search state for immediate UI feedback
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -135,15 +148,19 @@ export function CollectionToolbar({
     onFiltersChange({});
     setLocalSearch('');
     onTagsChange?.([]);
-  }, [onFiltersChange, onTagsChange]);
+    onToolsChange?.([]);
+  }, [onFiltersChange, onTagsChange, onToolsChange]);
 
   // Calculate active filter count
   const activeFilterCount =
     Object.entries(filters).filter(
       ([, value]) => value !== undefined && value !== 'all' && value !== ''
-    ).length + (selectedTags.length > 0 ? 1 : 0);
+    ).length +
+    (selectedTags.length > 0 ? 1 : 0) +
+    (selectedTools.length > 0 ? 1 : 0);
 
-  const hasActiveFilters = activeFilterCount > 0 || localSearch.length > 0;
+  const hasActiveFilters =
+    activeFilterCount > 0 || localSearch.length > 0 || selectedTools.length > 0;
 
   return (
     <div className="border-b bg-muted/30 px-6 py-3">
@@ -169,6 +186,15 @@ export function CollectionToolbar({
               selectedTags={selectedTags}
               onChange={onTagsChange}
               availableTags={availableTags}
+            />
+          )}
+
+          {/* Tool Filter Popover */}
+          {onToolsChange && (
+            <ToolFilterPopover
+              selectedTools={selectedTools}
+              onChange={onToolsChange}
+              availableTools={availableTools}
             />
           )}
 

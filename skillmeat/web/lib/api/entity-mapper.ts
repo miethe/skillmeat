@@ -17,6 +17,7 @@ import type {
   ArtifactScope,
   SyncStatus,
   CollectionRef,
+  DeploymentSummary,
 } from '@/types/artifact';
 
 // Re-export Entity type alias for backward compatibility
@@ -42,8 +43,17 @@ export interface ApiArtifactMetadata {
   author?: string | null;
   license?: string | null;
   version?: string | null;
-  tags?: string[];
+  tools?: string[];
   dependencies?: string[];
+}
+
+/**
+ * Deployment summary from API response.
+ */
+export interface ApiDeploymentSummary {
+  project_path: string;
+  project_name: string;
+  deployed_at: string;
 }
 
 /**
@@ -70,6 +80,7 @@ export interface ApiArtifactResponse {
   author?: string;
   license?: string;
   tags?: string[];
+  tools?: string[];
   dependencies?: string[];
 
   // Status fields - various naming conventions
@@ -86,6 +97,9 @@ export interface ApiArtifactResponse {
     artifact_count?: number | null;
   }>;
   collection?: string | { id: string; name: string };
+
+  // Deployments - list of projects where this artifact is deployed
+  deployments?: ApiDeploymentSummary[] | null;
 
   // Scope and project
   scope?: string;
@@ -290,6 +304,28 @@ function mapCollections(artifact: ApiArtifactResponse): CollectionRef[] {
 }
 
 /**
+ * Map deployments array from API response to DeploymentSummary array.
+ *
+ * @param artifact - Raw API response object
+ * @returns Array of DeploymentSummary objects or null
+ */
+function mapDeployments(artifact: ApiArtifactResponse): DeploymentSummary[] | null {
+  if (!artifact.deployments) {
+    return null;
+  }
+
+  if (artifact.deployments.length === 0) {
+    return [];
+  }
+
+  return artifact.deployments.map((d) => ({
+    project_path: d.project_path,
+    project_name: d.project_name,
+    deployed_at: d.deployed_at,
+  }));
+}
+
+/**
  * Extract primary collection identifier from various API response formats.
  *
  * Returns the collection `id` (e.g., "default") which matches the filesystem
@@ -371,10 +407,13 @@ export function mapArtifactToEntity(
   const author = artifact.author ?? artifact.metadata?.author ?? undefined;
   const license = artifact.license ?? artifact.metadata?.license ?? undefined;
 
-  // Merge tags from both sources, deduplicate
-  const topLevelTags = artifact.tags ?? [];
-  const metadataTags = artifact.metadata?.tags ?? [];
-  const tags = [...new Set([...topLevelTags, ...metadataTags])];
+  // Tags come from top-level only (backend consolidates into Artifact.tags)
+  const tags = artifact.tags ?? [];
+
+  // Merge tools from both sources, deduplicate
+  const topLevelTools = artifact.tools ?? [];
+  const metadataTools = artifact.metadata?.tools ?? [];
+  const tools = [...new Set([...topLevelTools, ...metadataTools])];
 
   // Resolve version (prefer resolved_version, fall back to version)
   const version = artifact.resolved_version ?? artifact.version ?? artifact.metadata?.version;
@@ -385,6 +424,9 @@ export function mapArtifactToEntity(
   // Map collections - CRITICAL: always populate this field
   const collections = mapCollections(artifact);
   const collection = extractPrimaryCollection(artifact);
+
+  // Map deployments
+  const deployments = mapDeployments(artifact);
 
   // Determine sync status
   const syncStatus = determineSyncStatus(artifact, context);
@@ -454,10 +496,12 @@ export function mapArtifactToEntity(
     ...(collection && { collection }),
     collections, // ALWAYS include collections array (may be empty)
     ...(projectPath && { projectPath }),
+    ...(deployments !== null && { deployments }), // Include if present (even if empty array)
 
     // Metadata (flattened)
     ...(description && { description }),
     ...(tags.length > 0 && { tags }),
+    ...(tools.length > 0 && { tools }),
     ...(author && { author }),
     ...(license && { license }),
     ...(version && { version }),

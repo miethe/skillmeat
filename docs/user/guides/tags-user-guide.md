@@ -4,7 +4,7 @@ description: How to use tags to organize and find artifacts in SkillMeat
 audience: users
 tags: [tags, organization, filtering, discovery]
 created: 2025-12-18
-updated: 2025-12-18
+updated: 2026-02-03
 category: guides
 status: published
 related:
@@ -54,13 +54,13 @@ The easiest way to create tags is while editing an artifact:
 
 To create tags separately without assigning them to an artifact:
 
-1. Click **Settings** → **Tags Management**
-2. Click **Create New Tag**
-3. Enter:
+1. Navigate to **Settings** → **Tags** in the sidebar
+2. Click **Create Tag** at the top of the page
+3. An inline form appears with:
    - **Name**: Human-readable name (e.g., "Python Automation")
-   - **Slug**: URL-friendly identifier (e.g., "python-automation", kebab-case)
-   - **Color** (optional): Hex color code (e.g., `#3776ab`) for visual grouping
-4. Click **Create**
+   - **Color**: Click the color swatch to choose a color (auto-assigned if omitted)
+   - **Slug**: Auto-generated from the name (read-only)
+4. Click the checkmark to save, or press **Enter**
 
 **Tag Name Guidelines**:
 - Use title case or descriptive names: "Data Processing", "UI Components"
@@ -145,10 +145,10 @@ https://skillmeat.example.com/collection?tags=python,automation,testing
 
 ### Setting Tag Colors
 
-1. Go to **Settings** → **Tags Management**
-2. Click a tag to edit
-3. Enter a hex color code (e.g., `#3776ab`)
-4. Click **Save**
+1. Navigate to **Settings** → **Tags** in the sidebar
+2. Click the color swatch next to any tag
+3. Use the native color picker to choose a new color
+4. The color is saved automatically
 
 ### Color Best Practices
 
@@ -167,26 +167,21 @@ When multiple tags are visible on an artifact, the colors make it easy to unders
 
 ### Editing Tag Properties
 
-1. Go to **Settings** → **Tags Management**
-2. Click **Edit** on a tag
-3. Modify:
-   - Name
-   - Slug (URL identifier)
-   - Color
-4. Click **Save**
+1. Navigate to **Settings** → **Tags** in the sidebar
+2. Click a tag's name to edit it inline
+3. Press **Enter** or click away to save, **Escape** to cancel
+4. Click the color swatch to change the tag's color
 
-Note: Changing a slug won't affect artifacts already tagged with it; the system updates the mapping.
+Note: The slug is auto-generated from the name and cannot be edited directly.
 
 ### Deleting Tags
 
-1. Go to **Settings** → **Tags Management**
-2. Click **Delete** on a tag
-3. Choose what to do with artifacts using this tag:
-   - **Remove tag from all artifacts**: Keep artifacts, just remove this tag
-   - **Delete tagged artifacts**: Remove this tag and all artifacts using it
-4. Confirm
+1. Navigate to **Settings** → **Tags** in the sidebar
+2. Click the trash icon next to a tag
+3. A confirmation dialog shows the tag name and how many artifacts use it
+4. Click **Delete Tag** to confirm
 
-Warning: Deleting is permanent. Deleting many artifacts cannot be undone.
+Warning: Deleting a tag removes it from all artifacts. This action cannot be undone.
 
 ## Common Tag Patterns
 

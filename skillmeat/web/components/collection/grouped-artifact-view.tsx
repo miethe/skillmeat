@@ -207,9 +207,9 @@ function SortableGroupSection({
               strategy={verticalListSortingStrategy}
             >
               <div className="space-y-2">
-                {artifacts.map((artifact) => (
+                {artifacts.map((artifact, index) => (
                   <SortableArtifactCard
-                    key={artifact.id}
+                    key={`${artifact.id}-${index}`}
                     artifact={artifact}
                     onArtifactClick={onArtifactClick}
                     onMoveToCollection={onMoveToCollection}
@@ -514,9 +514,9 @@ export function GroupedArtifactView({
 
               <CollapsibleContent className="mt-2 space-y-2 pl-4">
                 <div className="space-y-2">
-                  {ungroupedArtifacts.map((artifact) => (
+                  {ungroupedArtifacts.map((artifact, index) => (
                     <UnifiedCard
-                      key={artifact.id}
+                      key={`${artifact.id}-${index}`}
                       item={artifact}
                       onClick={() => onArtifactClick?.(artifact)}
                       onCopyCliCommand={() => handleCopyCliCommand(artifact.name)}

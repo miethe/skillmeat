@@ -161,6 +161,37 @@ class UndeployResponse(BaseModel):
         }
 
 
+class DeploymentSummary(BaseModel):
+    """Lightweight deployment summary for collection artifact responses.
+
+    This schema matches the structure stored in CollectionArtifact.deployments_json
+    and is used for efficient display of deployment counts and basic info.
+    """
+
+    project_path: str = Field(
+        description="Absolute path to the project directory",
+        examples=["/Users/user/project"],
+    )
+    project_name: str = Field(
+        description="Display name of the project",
+        examples=["myproject"],
+    )
+    deployed_at: datetime = Field(
+        description="Deployment timestamp",
+    )
+
+    class Config:
+        """Pydantic config."""
+
+        json_schema_extra = {
+            "example": {
+                "project_path": "/Users/user/project",
+                "project_name": "myproject",
+                "deployed_at": "2026-02-01T10:00:00Z",
+            }
+        }
+
+
 class DeploymentInfo(BaseModel):
     """Information about a single deployment."""
 

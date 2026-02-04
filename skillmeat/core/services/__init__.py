@@ -24,6 +24,7 @@ from skillmeat.core.services.context_sync import (
     SyncResult,
 )
 from skillmeat.core.services.tag_service import TagService
+from skillmeat.core.services.tag_write_service import TagWriteService
 
 __all__ = [
     # Template service
@@ -44,4 +45,6 @@ __all__ = [
     "SyncResult",
     # Tag service
     "TagService",
+    # Tag write service (filesystem persistence)
+    "TagWriteService",
 ]

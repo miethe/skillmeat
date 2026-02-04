@@ -29,7 +29,7 @@ export interface ApiMetadata {
   license?: string;
   author?: string;
   version?: string;
-  tags?: string[];
+  tools?: string[];
 }
 
 /**
@@ -112,6 +112,7 @@ export interface ArtifactResponse {
   metadata?: ApiMetadata;
   description?: string;
   tags?: string[];
+  tools?: string[];
   author?: string;
   license?: string;
   version?: string;
@@ -302,10 +303,13 @@ export function mapApiResponseToArtifact(
   const license = response.license || response.metadata?.license;
   const version = response.version || response.metadata?.version;
 
-  // Merge tags from both sources, deduplicate
-  const topLevelTags = response.tags || [];
-  const metadataTags = response.metadata?.tags || [];
-  const allTags = [...new Set([...topLevelTags, ...metadataTags])];
+  // Tags come from top-level only (backend consolidates into Artifact.tags)
+  const allTags = response.tags || [];
+
+  // Merge tools from both sources, deduplicate
+  const topLevelTools = response.tools || [];
+  const metadataTools = response.metadata?.tools || [];
+  const allTools = [...new Set([...topLevelTools, ...metadataTools])];
 
   // Resolve scope (default to 'user' for collection context)
   const scope: ArtifactScope =
@@ -350,6 +354,7 @@ export function mapApiResponseToArtifact(
     // Metadata (flattened)
     ...(description && { description }),
     ...(allTags.length > 0 && { tags: allTags }),
+    ...(allTools.length > 0 && { tools: allTools }),
     ...(author && { author }),
     ...(license && { license }),
     ...(version && { version }),

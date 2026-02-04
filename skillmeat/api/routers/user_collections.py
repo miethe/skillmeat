@@ -23,6 +23,7 @@ from skillmeat.api.schemas.collections import (
     UpdateCheckResponse,
 )
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
+from skillmeat.api.schemas.deployments import DeploymentSummary
 from skillmeat.api.schemas.user_collections import (
     AddArtifactsRequest,
     ArtifactGroupMembership,
@@ -122,6 +123,52 @@ def decode_cursor(cursor: str) -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid cursor format: {str(e)}",
         )
+
+
+def parse_deployments(deployments_json: Optional[str]) -> Optional[List[DeploymentSummary]]:
+    """Parse deployments_json field from CollectionArtifact into DeploymentSummary list.
+
+    Args:
+        deployments_json: JSON string containing deployment data
+
+    Returns:
+        List of DeploymentSummary objects, or None if empty/invalid
+    """
+    if not deployments_json:
+        return None
+
+    try:
+        deployments_data = json.loads(deployments_json)
+        if not deployments_data or not isinstance(deployments_data, list):
+            return None
+
+        # Parse each deployment dict into DeploymentSummary
+        deployments = []
+        for dep in deployments_data:
+            try:
+                # Parse deployed_at timestamp if it's a string
+                deployed_at = dep.get("deployed_at")
+                if isinstance(deployed_at, str):
+                    deployed_at = datetime.fromisoformat(deployed_at.replace("Z", "+00:00"))
+                elif not isinstance(deployed_at, datetime):
+                    continue  # Skip invalid entries
+
+                deployments.append(
+                    DeploymentSummary(
+                        project_path=dep.get("project_path", ""),
+                        project_name=dep.get("project_name", ""),
+                        deployed_at=deployed_at,
+                    )
+                )
+            except (KeyError, ValueError, TypeError) as e:
+                logger.debug(f"Skipping invalid deployment entry: {e}")
+                continue
+
+        return deployments if deployments else None
+
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.debug(f"Failed to parse deployments_json: {e}")
+        return None
 
 
 def collection_to_response(
@@ -302,13 +349,55 @@ def migrate_artifacts_to_default_collection(
         session.commit()
         logger.info(f"Migrated {migrated_count} artifacts to default collection")
 
-    # 7. Return combined stats including metadata cache results
+    # 7. Sync tags from CollectionArtifact cache to Tag ORM tables
+    tag_sync_count = _sync_all_tags_to_orm(session)
+
+    # 8. Return combined stats including metadata cache results
     return {
         "migrated_count": migrated_count,
         "already_present_count": len(existing_artifact_ids),
         "total_artifacts": len(all_artifact_ids),
         "metadata_cache": metadata_stats,
+        "tag_sync_count": tag_sync_count,
     }
+
+
+def _sync_all_tags_to_orm(session: Session) -> int:
+    """Sync all CollectionArtifact tags to the Tag ORM tables.
+
+    Iterates all CollectionArtifact rows with tags_json and calls
+    TagService.sync_artifact_tags() for each. Tag sync failure does
+    NOT block the caller.
+
+    Returns:
+        Number of artifacts successfully synced.
+    """
+    try:
+        from skillmeat.core.services import TagService
+
+        tag_service = TagService()
+    except Exception as e:
+        logger.warning(f"Failed to initialize TagService for bulk tag sync: {e}")
+        return 0
+
+    all_cas = (
+        session.query(CollectionArtifact)
+        .filter(CollectionArtifact.tags_json.isnot(None))
+        .all()
+    )
+
+    synced = 0
+    for ca in all_cas:
+        try:
+            tags = json.loads(ca.tags_json)
+            if tags:
+                tag_service.sync_artifact_tags(ca.artifact_id, tags)
+                synced += 1
+        except Exception as e:
+            logger.warning(f"Tag ORM sync failed for {ca.artifact_id}: {e}")
+
+    logger.info(f"Synced tags for {synced}/{len(all_cas)} artifacts to Tag ORM")
+    return synced
 
 
 def populate_collection_artifact_metadata(
@@ -370,9 +459,7 @@ def populate_collection_artifact_metadata(
                 version = metadata.version if metadata else None
 
                 # Convert tags list to JSON string
-                tags_json = None
-                if metadata and metadata.tags:
-                    tags_json = json.dumps(metadata.tags)
+                tags_json = json.dumps(artifact.tags) if artifact.tags else None
 
                 # Convert tools list to JSON string
                 tools_json = None
@@ -442,6 +529,67 @@ def populate_collection_artifact_metadata(
                 errors.append(error_msg)
                 skipped_count += 1
                 continue
+
+    # Populate deployments from DeploymentManager (MVP: scan current directory only)
+    try:
+        import os
+        from pathlib import Path
+        from sqlalchemy import update, and_
+        from skillmeat.core.deployment import DeploymentManager
+
+        project_path = Path.cwd()
+        logger.debug(f"Scanning deployments in project: {project_path}")
+
+        deployment_mgr = DeploymentManager()
+        all_deployments = deployment_mgr.list_deployments(project_path=project_path)
+
+        # Group deployments by artifact name
+        deployments_by_artifact = {}
+        for deployment in all_deployments:
+            artifact_name = deployment.artifact_name
+            if artifact_name not in deployments_by_artifact:
+                deployments_by_artifact[artifact_name] = []
+
+            deployments_by_artifact[artifact_name].append(
+                {
+                    "project_path": (
+                        str(deployment.project_path)
+                        if hasattr(deployment, "project_path")
+                        else str(project_path)
+                    ),
+                    "project_name": os.path.basename(str(project_path)),
+                    "deployed_at": (
+                        deployment.deployed_at.isoformat()
+                        if hasattr(deployment.deployed_at, "isoformat")
+                        else str(deployment.deployed_at)
+                    ),
+                }
+            )
+
+        # Update cache entries with deployment data
+        deployment_update_count = 0
+        for artifact_name, deployments_list in deployments_by_artifact.items():
+            stmt = (
+                update(CollectionArtifact)
+                .where(
+                    and_(
+                        CollectionArtifact.collection_id == DEFAULT_COLLECTION_ID,
+                        CollectionArtifact.artifact_id.like(f"%:{artifact_name}"),
+                    )
+                )
+                .values(deployments_json=json.dumps(deployments_list))
+            )
+            result = session.execute(stmt)
+            deployment_update_count += result.rowcount
+
+        if deployment_update_count > 0:
+            logger.info(
+                f"Updated deployment data for {deployment_update_count} artifact(s)"
+            )
+
+    except Exception as e:
+        logger.warning(f"Failed to populate deployment data: {e}")
+        # Non-fatal: cache still works without deployment data
 
     # Batch commit after all artifacts processed
     try:
@@ -565,6 +713,14 @@ def _refresh_single_collection_cache(
     skipped = 0
     errors = []
 
+    try:
+        from skillmeat.core.services import TagService
+
+        tag_service = TagService()
+    except Exception as e:
+        logger.warning(f"Failed to initialize TagService for tag sync: {e}")
+        tag_service = None
+
     logger.debug(f"Refreshing cache for collection '{collection.id}'")
 
     # Get all CollectionArtifact rows for this collection
@@ -624,9 +780,7 @@ def _refresh_single_collection_cache(
             version = metadata.version if metadata else None
 
             # Convert tags list to JSON string
-            tags_json = None
-            if metadata and metadata.tags:
-                tags_json = json.dumps(metadata.tags)
+            tags_json = json.dumps(file_artifact.tags) if file_artifact.tags else None
 
             # Convert tools list to JSON string
             tools_json = None
@@ -654,6 +808,15 @@ def _refresh_single_collection_cache(
             ca.resolved_version = resolved_version
             ca.synced_at = datetime.utcnow()
             updated += 1
+
+            # Sync tags to ORM
+            if tag_service and file_artifact.tags:
+                try:
+                    tag_service.sync_artifact_tags(ca.artifact_id, file_artifact.tags)
+                except Exception as e:
+                    logger.warning(
+                        f"Tag ORM sync failed for {ca.artifact_id}: {e}"
+                    )
 
         except Exception as e:
             error_msg = f"Failed to refresh {ca.artifact_id}: {e}"
@@ -1402,6 +1565,7 @@ async def list_collection_artifacts(
                     tags=tags,
                     tools=assoc.tools,
                     collections=_get_artifact_collections(session, assoc.artifact_id),
+                    deployments=parse_deployments(assoc.deployments_json),
                 )
                 logger.debug(f"Cache hit for {assoc.artifact_id}")
 
@@ -1446,12 +1610,7 @@ async def list_collection_artifacts(
                                 if file_artifact.metadata
                                 else None
                             ),
-                            tags=(
-                                file_artifact.metadata.tags
-                                if file_artifact.metadata
-                                and file_artifact.metadata.tags
-                                else None
-                            ),
+                            tags=file_artifact.tags or None,
                             tools=(
                                 [
                                     tool.value if hasattr(tool, "value") else str(tool)
@@ -1464,6 +1623,7 @@ async def list_collection_artifacts(
                             collections=_get_artifact_collections(
                                 session, assoc.artifact_id
                             ),
+                            deployments=parse_deployments(assoc.deployments_json),
                         )
                         logger.debug(f"File-based lookup for {assoc.artifact_id}")
                 except (ValueError, Exception) as e:
@@ -1476,6 +1636,11 @@ async def list_collection_artifacts(
             if artifact_summary is None:
                 artifact_summary = get_artifact_metadata(session, assoc.artifact_id)
                 logger.debug(f"Marketplace fallback for {assoc.artifact_id}")
+
+            # Add deployments from cache to all artifact summaries
+            # (deployments are always sourced from CollectionArtifact.deployments_json)
+            if artifact_summary and not artifact_summary.deployments:
+                artifact_summary.deployments = parse_deployments(assoc.deployments_json)
 
             # Apply type filter if specified
             if artifact_type is None or artifact_summary.type == artifact_type:
@@ -1495,6 +1660,7 @@ async def list_collection_artifacts(
                             tools=artifact_summary.tools,
                             collections=artifact_summary.collections,
                             groups=groups,
+                            deployments=artifact_summary.deployments,
                         )
                     )
                 else:
@@ -2174,9 +2340,7 @@ async def refresh_collection_cache(
             version = metadata.version if metadata else None
 
             # Convert tags list to JSON string
-            tags_json = None
-            if metadata and metadata.tags:
-                tags_json = json.dumps(metadata.tags)
+            tags_json = json.dumps(file_artifact.tags) if file_artifact.tags else None
 
             # Convert tools list to JSON string
             tools_json = None

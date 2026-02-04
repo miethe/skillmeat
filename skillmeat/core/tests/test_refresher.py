@@ -154,17 +154,39 @@ def mock_collection_manager(mock_collection):
 
 @pytest.fixture
 def mock_metadata_extractor():
-    """Create mock metadata extractor."""
+    """Create mock metadata extractor.
+
+    _fetch_repo_metadata returns empty dict by default to match the
+    real behavior when repo-level metadata cannot be fetched. This
+    ensures the new extraction path falls back to the legacy extractor
+    (fetch_metadata) when no artifact file content is found.
+    """
     mock = MagicMock()
+    mock._fetch_repo_metadata.return_value = {}
     return mock
 
 
 @pytest.fixture
-def refresher(mock_collection_manager, mock_metadata_extractor):
+def mock_github_client():
+    """Create mock GitHub client for refresher tests.
+
+    By default, get_file_content raises GitHubNotFoundError so that
+    the new extraction path finds no artifact files and falls back
+    to the legacy extractor (metadata_extractor.fetch_metadata).
+    Tests that need different behavior can override this.
+    """
+    mock = MagicMock()
+    mock.get_file_content.side_effect = GitHubNotFoundError("Not found")
+    return mock
+
+
+@pytest.fixture
+def refresher(mock_collection_manager, mock_metadata_extractor, mock_github_client):
     """Create refresher with mock dependencies."""
     return CollectionRefresher(
         collection_manager=mock_collection_manager,
         metadata_extractor=mock_metadata_extractor,
+        github_client=mock_github_client,
     )
 
 
@@ -2846,3 +2868,221 @@ class TestUpdateAvailableResultDriftFields:
         assert result.drift_info is None
         assert result.has_local_changes is False
         assert result.merge_strategy == "no_update"
+
+
+# =============================================================================
+# REF-003: TestRefreshMetadataExtraction
+# =============================================================================
+
+
+class TestRefreshMetadataExtraction:
+    """Integration tests for refresher metadata extraction using new pipeline (REF-003).
+
+    Tests verify that the refresher correctly uses fetch_and_extract_github_metadata()
+    through _fetch_upstream_metadata() to extract descriptions from both single-file
+    agents and directory-based skills.
+    """
+
+    def test_refresh_single_file_agent_gets_description(
+        self, refresher, mock_collection_manager
+    ):
+        """Test that refreshing a single-file agent extracts description from frontmatter."""
+        # Create agent artifact (single .md file)
+        agent = Artifact(
+            name="my-agent",
+            type=ArtifactType.AGENT,
+            path="agents/my-agent.md",
+            origin="github",
+            metadata=ArtifactMetadata(
+                title="My Agent",
+                description=None,  # No current description
+            ),
+            added=datetime.now(),
+            upstream="https://github.com/user/repo/tree/main/agents/my-agent.md",
+        )
+
+        # Mock parsing to return valid GitHubSourceSpec
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="agents/my-agent.md", version="latest"
+        )
+        refresher._metadata_extractor._fetch_repo_metadata.return_value = {}
+
+        # Mock GitHub client to return frontmatter content when fetching the .md file
+        agent_content = """---
+title: My Agent
+description: An agent that helps with tasks
+author: Test Author
+---
+
+# My Agent
+
+Agent implementation here.
+"""
+        refresher._github_client = MagicMock()
+        refresher._github_client.get_file_content.return_value = agent_content.encode(
+            "utf-8"
+        )
+
+        # Call refresh_metadata
+        result = refresher.refresh_metadata(agent, mode=RefreshMode.METADATA_ONLY)
+
+        # Assert description was extracted and applied
+        assert result.status == "refreshed"
+        assert "description" in result.changes
+        assert result.new_values["description"] == "An agent that helps with tasks"
+        assert agent.metadata.description == "An agent that helps with tasks"
+
+    def test_refresh_directory_skill_gets_description(
+        self, refresher, mock_collection_manager
+    ):
+        """Test that refreshing a directory skill extracts description from SKILL.md."""
+        # Create skill artifact (directory-based)
+        skill = Artifact(
+            name="my-skill",
+            type=ArtifactType.SKILL,
+            path="skills/my-skill",
+            origin="github",
+            metadata=ArtifactMetadata(
+                title="My Skill",
+                description=None,  # No current description
+            ),
+            added=datetime.now(),
+            upstream="https://github.com/user/repo/tree/main/skills/my-skill",
+        )
+
+        # Mock parsing
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="skills/my-skill", version="latest"
+        )
+        refresher._metadata_extractor._fetch_repo_metadata.return_value = {}
+
+        # Mock GitHub client to:
+        # - Return SKILL.md content when path is "skills/my-skill/SKILL.md"
+        # - Raise GitHubNotFoundError for other files
+        skill_content = """---
+title: My Skill
+description: A skill that does amazing things
+---
+
+# My Skill
+
+Skill implementation here.
+"""
+
+        def mock_get_file_content(owner_repo, path, ref=None):
+            if path == "skills/my-skill/SKILL.md":
+                return skill_content.encode("utf-8")
+            raise GitHubNotFoundError(f"File not found: {path}")
+
+        refresher._github_client = MagicMock()
+        refresher._github_client.get_file_content.side_effect = mock_get_file_content
+
+        # Call refresh_metadata
+        result = refresher.refresh_metadata(skill, mode=RefreshMode.METADATA_ONLY)
+
+        # Assert description was extracted
+        assert result.status == "refreshed"
+        assert "description" in result.changes
+        assert result.new_values["description"] == "A skill that does amazing things"
+        assert skill.metadata.description == "A skill that does amazing things"
+
+    def test_refresh_preserves_existing_description_for_directory_skills(
+        self, refresher, mock_collection_manager
+    ):
+        """Test that changes from upstream are properly detected for directory skills."""
+        # Create skill with existing description
+        skill = Artifact(
+            name="my-skill",
+            type=ArtifactType.SKILL,
+            path="skills/my-skill",
+            origin="github",
+            metadata=ArtifactMetadata(
+                title="My Skill",
+                description="Old description",  # Existing description
+            ),
+            added=datetime.now(),
+            upstream="https://github.com/user/repo/tree/main/skills/my-skill",
+        )
+
+        # Mock parsing
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="skills/my-skill", version="latest"
+        )
+        refresher._metadata_extractor._fetch_repo_metadata.return_value = {}
+
+        # Mock GitHub to return DIFFERENT description
+        skill_content = """---
+title: My Skill
+description: New updated description from upstream
+---
+
+# My Skill
+"""
+
+        def mock_get_file_content(owner_repo, path, ref=None):
+            if path == "skills/my-skill/SKILL.md":
+                return skill_content.encode("utf-8")
+            raise GitHubNotFoundError(f"File not found: {path}")
+
+        refresher._github_client = MagicMock()
+        refresher._github_client.get_file_content.side_effect = mock_get_file_content
+
+        # Call refresh_metadata
+        result = refresher.refresh_metadata(skill, mode=RefreshMode.METADATA_ONLY)
+
+        # Verify change was detected
+        assert result.status == "refreshed"
+        assert "description" in result.changes
+        assert result.old_values["description"] == "Old description"
+        assert result.new_values["description"] == "New updated description from upstream"
+
+    def test_refresh_fallback_to_legacy_when_no_metadata_files(
+        self, refresher, mock_collection_manager, sample_github_metadata
+    ):
+        """Test that refresh falls back to legacy extractor when no metadata files found."""
+        # Create skill artifact
+        skill = Artifact(
+            name="legacy-skill",
+            type=ArtifactType.SKILL,
+            path="skills/legacy-skill",
+            origin="github",
+            metadata=ArtifactMetadata(description="Original"),
+            added=datetime.now(),
+            upstream="https://github.com/user/repo/tree/main/skills/legacy-skill",
+        )
+
+        # Mock parsing
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="skills/legacy-skill", version="latest"
+        )
+
+        # Mock GitHub client to return GitHubNotFoundError for all metadata files
+        # (simulates a legacy artifact structure without SKILL.md)
+        def mock_get_file_content(owner_repo, path, ref=None):
+            raise GitHubNotFoundError(f"File not found: {path}")
+
+        refresher._github_client = MagicMock()
+        refresher._github_client.get_file_content.side_effect = mock_get_file_content
+
+        # Mock repo metadata to return empty (no repo-level metadata either)
+        refresher._metadata_extractor._fetch_repo_metadata.return_value = {}
+
+        # Mock legacy extractor to return metadata
+        refresher._metadata_extractor.fetch_metadata.return_value = sample_github_metadata
+
+        # Call refresh_metadata
+        result = refresher.refresh_metadata(skill, mode=RefreshMode.METADATA_ONLY)
+
+        # Verify new extractor tried to fetch files but found none
+        refresher._github_client.get_file_content.assert_called()
+
+        # Verify legacy path was used as fallback
+        refresher._metadata_extractor.fetch_metadata.assert_called_once()
+
+        # Verify refresh succeeded using legacy path
+        assert result.status == "refreshed"
+        assert "description" in result.changes

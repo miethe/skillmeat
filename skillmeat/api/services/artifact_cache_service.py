@@ -80,16 +80,13 @@ def refresh_single_artifact_cache(
             "license": (
                 file_artifact.metadata.license if file_artifact.metadata else None
             ),
-            "tags_json": (
-                json.dumps(file_artifact.metadata.tags)
-                if file_artifact.metadata and file_artifact.metadata.tags
-                else None
-            ),
+            "tags_json": json.dumps(file_artifact.tags) if file_artifact.tags else None,
             "tools_json": (
                 json.dumps(file_artifact.metadata.tools)
                 if file_artifact.metadata and file_artifact.metadata.tools
                 else None
             ),
+            "deployments_json": None,  # Populated at collection level, not per-artifact
             "version": (
                 file_artifact.metadata.version if file_artifact.metadata else None
             ),
@@ -118,6 +115,16 @@ def refresh_single_artifact_cache(
             logger.debug(f"Created cache entry for artifact: {artifact_id}")
 
         session.commit()
+
+        # Sync tags to Tag ORM tables
+        if file_artifact.tags:
+            try:
+                from skillmeat.core.services import TagService
+
+                TagService().sync_artifact_tags(artifact_id, file_artifact.tags)
+            except Exception as e:
+                logger.warning(f"Tag ORM sync failed for {artifact_id}: {e}")
+
         logger.debug(f"Refreshed cache for artifact: {artifact_id}")
         return True
 

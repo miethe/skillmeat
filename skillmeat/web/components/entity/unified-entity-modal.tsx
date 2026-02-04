@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   Calendar,
@@ -25,6 +26,7 @@ import {
   Trash2,
   Link as LinkIcon,
   ExternalLink,
+  ArrowRight,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
@@ -86,6 +88,9 @@ import type { ArtifactParameters } from '@/types/discovery';
 import type { ArtifactDeploymentInfo } from '@/types/deployments';
 import type { Deployment } from '@/components/deployments/deployment-card';
 
+/** Valid tab values for the artifact modal */
+export type ArtifactModalTab = 'overview' | 'contents' | 'sync' | 'links' | 'history' | 'collections' | 'sources' | 'deployments';
+
 interface UnifiedEntityModalProps {
   /**
    * The artifact to display in the modal.
@@ -103,6 +108,10 @@ interface UnifiedEntityModalProps {
   onNavigateToSource?: (sourceId: string, artifactPath: string) => void;
   /** Handler to navigate to a deployment. Required when artifact has deployments. */
   onNavigateToDeployment?: (projectPath: string, artifactId: string) => void;
+  /** Initial tab to open when modal opens. Defaults to 'overview'. */
+  initialTab?: ArtifactModalTab;
+  /** Callback when tab changes. Useful for URL state synchronization. */
+  onTabChange?: (tab: ArtifactModalTab) => void;
 }
 
 interface HistoryEntry {
@@ -344,12 +353,21 @@ export function UnifiedEntityModal({
   onClose,
   onNavigateToSource,
   onNavigateToDeployment,
+  initialTab = 'overview',
+  onTabChange,
 }: UnifiedEntityModalProps) {
   // Backward compatibility: accept both 'artifact' and 'entity' props
   // 'artifact' takes precedence if both are provided
   // Internal code uses 'entity' variable for minimal refactoring
   const entity = artifact ?? entityProp ?? null;
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState<ArtifactModalTab>(initialTab);
+  
+  // Sync activeTab with initialTab when modal opens or initialTab changes
+  useEffect(() => {
+    if (open && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [open, initialTab]);
   const { deployEntity, syncEntity, refetch } = useEntityLifecycle();
   const [_isDeploying, _setIsDeploying] = useState(false);
   const [_isSyncing, _setIsSyncing] = useState(false);
@@ -391,6 +409,32 @@ export function UnifiedEntityModal({
   const { mutateAsync: updateParameters } = useEditArtifactParameters();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Reset selectedPath when entity changes or modal closes
+  useEffect(() => {
+    setSelectedPath(null);
+  }, [entity?.id, open]);
+
+  // Cross-navigation between /manage and /collection pages
+  const pathname = usePathname();
+  const router = useRouter();
+
+  // Determine current page context
+  const isOnCollectionPage = pathname === "/collection" || pathname?.startsWith("/collection");
+  const isOnManagePage = pathname === "/manage" || pathname?.startsWith("/manage");
+
+  // Handle cross-navigation between pages
+  const handleCrossNavigation = () => {
+    if (!entity) return;
+
+    onClose?.(); // Close current modal
+
+    if (isOnCollectionPage) {
+      router.push(`/manage?artifact=${entity.id}`);
+    } else if (isOnManagePage) {
+      router.push(`/collection?artifact=${entity.id}`);
+    }
+  };
 
   // Runtime warning for missing navigation handlers on artifacts with source
   useEffect(() => {
@@ -1220,11 +1264,13 @@ export function UnifiedEntityModal({
 
   // Handle tab change with unsaved changes guard
   const handleTabChange = (tab: string) => {
+    const typedTab = tab as ArtifactModalTab;
     if (hasUnsavedChanges && activeTab === 'contents') {
       setPendingNavigation({ type: 'tab', target: tab });
       setShowUnsavedChangesDialog(true);
     } else {
-      setActiveTab(tab);
+      setActiveTab(typedTab);
+      onTabChange?.(typedTab);
       if (tab !== 'contents') {
         setIsEditing(false);
         setEditedContent('');
@@ -1238,7 +1284,9 @@ export function UnifiedEntityModal({
       if (pendingNavigation.type === 'file') {
         setSelectedPath(pendingNavigation.target);
       } else {
-        setActiveTab(pendingNavigation.target);
+        const tab = pendingNavigation.target as ArtifactModalTab;
+        setActiveTab(tab);
+        onTabChange?.(tab);
       }
       setIsEditing(false);
       setEditedContent('');
@@ -1253,7 +1301,9 @@ export function UnifiedEntityModal({
       if (pendingNavigation.type === 'file') {
         setSelectedPath(pendingNavigation.target);
       } else {
-        setActiveTab(pendingNavigation.target);
+        const tab = pendingNavigation.target as ArtifactModalTab;
+        setActiveTab(tab);
+        onTabChange?.(tab);
       }
       setIsEditing(false);
       setEditedContent('');
@@ -1690,6 +1740,26 @@ export function UnifiedEntityModal({
                   <Badge variant={entity.syncStatus === 'synced' ? 'default' : 'secondary'}>
                     {getStatusLabel()}
                   </Badge>
+                )}
+                {(pathname === "/collection" || pathname?.startsWith("/collection") || pathname === "/manage" || pathname?.startsWith("/manage")) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (!entity) return;
+                      onClose?.();
+                      if (pathname === "/collection" || pathname?.startsWith("/collection")) {
+                        router.push(`/manage?artifact=${entity.id}`);
+                      } else if (pathname === "/manage" || pathname?.startsWith("/manage")) {
+                        router.push(`/collection?artifact=${entity.id}`);
+                      }
+                    }}
+                    className="gap-1"
+                    aria-label={(pathname === "/collection" || pathname?.startsWith("/collection")) ? "Navigate to manage page" : "Navigate to collection page"}
+                  >
+                    {(pathname === "/collection" || pathname?.startsWith("/collection")) ? "Manage Artifact" : "View Full Details"}
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
                 )}
               </DialogTitle>
             </DialogHeader>

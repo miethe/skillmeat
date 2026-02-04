@@ -23,3 +23,5 @@ export { VersionTreeView } from './version-tree';
 export { CollectionHeader } from './collection-header';
 export { CollectionToolbar } from './collection-toolbar';
 export { GroupedArtifactView } from './grouped-artifact-view';
+export { ArtifactBrowseCard, ArtifactBrowseCardSkeleton } from './artifact-browse-card';
+export type { ArtifactBrowseCardProps } from './artifact-browse-card';

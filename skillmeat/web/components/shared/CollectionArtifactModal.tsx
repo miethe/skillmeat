@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
+import { UnifiedEntityModal, type ArtifactModalTab } from '@/components/entity/unified-entity-modal';
 import type { Artifact } from '@/types/artifact';
 
 /**
@@ -14,6 +14,10 @@ interface CollectionArtifactModalProps {
   open: boolean;
   /** Handler called when the modal should close */
   onClose: () => void;
+  /** Initial tab to open when modal opens. Defaults to 'overview'. */
+  initialTab?: ArtifactModalTab;
+  /** Callback when tab changes. Useful for URL state synchronization. */
+  onTabChange?: (tab: ArtifactModalTab) => void;
 }
 
 /**
@@ -31,6 +35,8 @@ interface CollectionArtifactModalProps {
  *   artifact={selectedArtifact}
  *   open={isDetailOpen}
  *   onClose={() => setIsDetailOpen(false)}
+ *   initialTab="sync"
+ *   onTabChange={(tab) => updateUrlTab(tab)}
  * />
  * ```
  */
@@ -38,6 +44,8 @@ export function CollectionArtifactModal({
   artifact,
   open,
   onClose,
+  initialTab,
+  onTabChange,
 }: CollectionArtifactModalProps) {
   const router = useRouter();
 
@@ -67,6 +75,11 @@ export function CollectionArtifactModal({
       onClose={onClose}
       onNavigateToSource={handleNavigateToSource}
       onNavigateToDeployment={handleNavigateToDeployment}
+      initialTab={initialTab}
+      onTabChange={onTabChange}
     />
   );
 }
+
+// Re-export ArtifactModalTab type for convenience
+export type { ArtifactModalTab };
