@@ -166,6 +166,104 @@ All hooks must comply with the canonical data flow principles. See root `CLAUDE.
 
 ---
 
+## Shared Components
+
+### BaseArtifactModal Composition Pattern
+
+**File**: `components/shared/base-artifact-modal.tsx`
+
+A controlled composition-based modal foundation for artifact-focused dialogs. Encapsulates common structure (dialog wrapper, header, tabs, content area) while delegating domain-specific logic to consumers.
+
+**Key Props**:
+
+| Prop | Type | Purpose |
+|------|------|---------|
+| `artifact` | `Artifact` | Artifact to display; icon resolved from ARTIFACT_TYPES config |
+| `open` | `boolean` | Dialog open state |
+| `onClose` | `() => void` | Close handler |
+| `activeTab` | `string` | Controlled tab value (external state) |
+| `onTabChange` | `(tab: string) => void` | Tab change callback |
+| `tabs` | `Tab[]` | Tab definitions for navigation bar |
+| `headerActions` | `React.ReactNode` | Optional actions rendered in header (right side) |
+| `children` | `React.ReactNode` | Tab content (TabContentWrapper/TabsContent elements) |
+| `aboveTabsContent` | `React.ReactNode` | Optional content between header and tabs (e.g., alerts) |
+| `returnTo` | `string` | Optional URL for return navigation |
+| `onReturn` | `() => void` | Optional handler for return button click |
+
+**Composition Pattern**:
+
+```tsx
+// 1. Define tab config
+const tabs: Tab[] = [
+  { value: 'status', label: 'Status', icon: Activity },
+  { value: 'sync', label: 'Sync', icon: RefreshCcw },
+];
+
+// 2. Pass tabs + children to BaseArtifactModal
+<BaseArtifactModal
+  artifact={artifact}
+  open={isOpen}
+  onClose={handleClose}
+  activeTab={activeTab}
+  onTabChange={setActiveTab}
+  tabs={tabs}
+  headerActions={<HealthIndicator artifact={artifact} />}
+>
+  <TabContentWrapper value="status">
+    <StatusContent artifact={artifact} />
+  </TabContentWrapper>
+  <TabContentWrapper value="sync">
+    <SyncContent artifact={artifact} />
+  </TabContentWrapper>
+</BaseArtifactModal>
+```
+
+**Consumers**: `ArtifactOperationsModal` (manage page), `UnifiedEntityModal` (collection page)
+
+---
+
+## Sync Data Flow
+
+### Upstream Validation & Query Enablement
+
+**File**: `lib/sync-utils.ts` → `hasValidUpstreamSource(artifact)`
+
+Controls when upstream diff queries execute. Returns `true` ONLY when ALL conditions are met:
+
+| Condition | Required | Details |
+|-----------|----------|---------|
+| `origin === 'github'` | Yes | Excludes marketplace (origin: "marketplace"), local, unknown origins |
+| `upstream.enabled` | Yes | Upstream tracking must be explicitly enabled |
+| `source` valid | Yes | Must be a remote path string (contains '/', not 'local' or 'unknown') |
+
+**Key Rules**:
+
+- **Marketplace artifacts** (origin: "marketplace"): Always return `false` — no upstream queries
+- **GitHub origin with tracking disabled**: Return `false` — no upstream queries
+- **Local artifacts**: Return `false` — no upstream queries
+- **Only** github-origin with tracking enabled fire upstream diff queries
+
+### SyncStatusTab Data Flow
+
+**File**: `components/sync-status/sync-status-tab.tsx`
+
+Props:
+
+| Prop | Type | Purpose |
+|------|------|---------|
+| `entity` | `Artifact` | Artifact to sync; passed to `hasValidUpstreamSource()` |
+| `mode` | `'collection' \| 'project'` | Sync scope (collection-wide vs. specific project) |
+| `projectPath` | `string` | Optional project path (required when mode='project') |
+| `onClose` | `() => void` | Handler called after successful sync |
+
+**Query Logic**:
+
+- Upstream diff query **ONLY enabled** if `hasValidUpstreamSource(entity) === true`
+- `ComparisonSelector` enables scope options based on: `hasSource` (from validation) + `hasProject` (artifact has deployments)
+- Marketplace/local artifacts show read-only status (no diff queries, no sync actions)
+
+---
+
 ## Important Notes
 
 - **App Router**: Use Next.js 15 patterns (not Pages Router)

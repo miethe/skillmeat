@@ -13,9 +13,10 @@ references:
   - skillmeat/api/routers/bundles.py
   - skillmeat/api/routers/groups.py
   - skillmeat/api/routers/cache.py
+  - skillmeat/api/routers/context_sync.py
   - skillmeat/api/routers/analytics.py
   - skillmeat/api/routers/health.py
-last_verified: 2025-12-13
+last_verified: 2025-02-04
 ---
 
 # API Endpoint Mapping
@@ -76,44 +77,97 @@ offset: int = Query(0, ge=0)
 **Base**: `/api/v1/artifacts`
 **Purpose**: Artifact management, installation, deployment
 
-| Endpoint | Method | Response Model | Decorator Pattern | Lines |
-|----------|--------|----------------|-------------------|-------|
-| `/api/v1/artifacts/install` | POST | ArtifactInstallResponse | `@router.post("/install", response_model=ArtifactInstallResponse` | ~482 |
-| `/api/v1/artifacts/install/batch` | POST | BatchInstallResponse | `@router.post("/install/batch", response_model=BatchInstallResponse` | ~623 |
-| `/api/v1/artifacts/uninstall` | POST | ArtifactUninstallResponse | `@router.post("/uninstall", response_model=ArtifactUninstallResponse` | ~722 |
-| `/api/v1/artifacts/sync` | POST | SyncResponse | `@router.post("/sync", response_model=SyncResponse` | ~998 |
-| `/api/v1/artifacts` | GET | ArtifactListResponse | `@router.get("", response_model=ArtifactListResponse` | ~1250 |
-| `/api/v1/artifacts/search` | GET | ArtifactSearchResponse | `@router.get("/search", response_model=ArtifactSearchResponse` | ~1480 |
-| `/api/v1/artifacts/{artifact_id}` | GET | ArtifactDetailResponse | `@router.get("/{artifact_id}", response_model=ArtifactDetailResponse` | ~1606 |
-| `/api/v1/artifacts/{artifact_id}` | PUT | ArtifactUpdateResponse | `@router.put("/{artifact_id}", response_model=ArtifactUpdateResponse` | ~1772 |
-| `/api/v1/artifacts/{artifact_id}/metadata` | PUT | ArtifactMetadataResponse | `@router.put("/{artifact_id}/metadata", response_model=ArtifactMetadataResponse` | ~1945 |
-| `/api/v1/artifacts/{artifact_id}` | DELETE | None (204) | `@router.delete("/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT` | ~2178 |
-| `/api/v1/artifacts/validate` | POST | ValidationResponse | `@router.post("/validate", response_model=ValidationResponse` | ~2291 |
-| `/api/v1/artifacts/export` | POST | ExportResponse | `@router.post("/export", response_model=ExportResponse` | ~2441 |
-| `/api/v1/artifacts/import` | POST | ImportResponse | `@router.post("/import", response_model=ImportResponse` | ~2802 |
-| `/api/v1/artifacts/{artifact_id}/versions` | GET | VersionListResponse | `@router.get("/{artifact_id}/versions", response_model=VersionListResponse` | ~2901 |
-| `/api/v1/artifacts/{artifact_id}/dependencies` | GET | DependencyListResponse | `@router.get("/{artifact_id}/dependencies", response_model=DependencyListResponse` | ~3042 |
-| `/api/v1/artifacts/{artifact_id}/deploy-status` | GET | DeployStatusResponse | `@router.get("/{artifact_id}/deploy-status", response_model=DeployStatusResponse` | ~3382 |
-| `/api/v1/artifacts/tags` | GET | TagListResponse | `@router.get("/tags", response_model=TagListResponse` | ~3790 |
-| `/api/v1/artifacts/sources` | GET | SourceListResponse | `@router.get("/sources", response_model=SourceListResponse` | ~4025 |
-| `/api/v1/artifacts/{artifact_id}/clone` | PUT | ArtifactCloneResponse | `@router.put("/{artifact_id}/clone", response_model=ArtifactCloneResponse` | ~4270 |
-| `/api/v1/artifacts/{artifact_id}/fork` | POST | ArtifactForkResponse | `@router.post("/{artifact_id}/fork", response_model=ArtifactForkResponse` | ~4521 |
-| `/api/v1/artifacts/{artifact_id}/snapshot` | DELETE | None (204) | `@router.delete("/{artifact_id}/snapshot", status_code=status.HTTP_204_NO_CONTENT` | ~4782 |
-| `/api/v1/artifacts/metadata/github` | GET | MetadataFetchResponse | `@router.get("/metadata/github", response_model=MetadataFetchResponse)` | ~4991 |
-| `/api/v1/artifacts/stats` | GET | ArtifactStatsResponse | `@router.get("/stats", response_model=ArtifactStatsResponse` | ~5112 |
-| `/api/v1/artifacts/types` | GET | ArtifactTypesResponse | `@router.get("/types", response_model=ArtifactTypesResponse` | ~5151 |
-| `/api/v1/artifacts/batch` | POST | BatchOperationResponse | `@router.post("/batch", response_model=BatchOperationResponse` | ~5213 |
-| `/api/v1/artifacts/orphaned` | DELETE | CleanupResponse | `@router.delete("/orphaned", response_model=CleanupResponse` | ~5301 |
-| `/api/v1/artifacts/cache` | DELETE | CacheClearResponse | `@router.delete("/cache", response_model=CacheClearResponse` | ~5383 |
-| `/api/v1/artifacts/recent` | GET | RecentArtifactsResponse | `@router.get("/recent", response_model=RecentArtifactsResponse` | ~5463 |
+| Endpoint | Method | Response Model | Required Params | Lines |
+|----------|--------|----------------|-----------------|-------|
+| `/api/v1/artifacts/install` | POST | ArtifactInstallResponse | N/A | ~482 |
+| `/api/v1/artifacts/install/batch` | POST | BatchInstallResponse | N/A | ~623 |
+| `/api/v1/artifacts/uninstall` | POST | ArtifactUninstallResponse | N/A | ~722 |
+| `/api/v1/artifacts/{artifact_id}/sync` | POST | ArtifactSyncResponse | `artifact_id` (path), `project_path` (optional body) | ~3038 |
+| `/api/v1/artifacts/{artifact_id}/deploy` | POST | ArtifactDeployResponse | `artifact_id` (path), `project_path` (body), `overwrite` (body) | ~2875 |
+| `/api/v1/artifacts/{artifact_id}/diff` | GET | ArtifactDiffResponse | `artifact_id` (path), `project_path` (query) | ~3668 |
+| `/api/v1/artifacts/{artifact_id}/upstream-diff` | GET | ArtifactUpstreamDiffResponse | `artifact_id` (path), `collection` (query, optional) | ~4027 |
+| `/api/v1/artifacts` | GET | ArtifactListResponse | N/A | ~1250 |
+| `/api/v1/artifacts/search` | GET | ArtifactSearchResponse | N/A | ~1480 |
+| `/api/v1/artifacts/{artifact_id}` | GET | ArtifactDetailResponse | `artifact_id` (path) | ~1606 |
+| `/api/v1/artifacts/{artifact_id}` | PUT | ArtifactUpdateResponse | `artifact_id` (path) | ~1772 |
+| `/api/v1/artifacts/{artifact_id}/metadata` | PUT | ArtifactMetadataResponse | `artifact_id` (path) | ~1945 |
+| `/api/v1/artifacts/{artifact_id}` | DELETE | None (204) | `artifact_id` (path) | ~2178 |
+| `/api/v1/artifacts/validate` | POST | ValidationResponse | N/A | ~2291 |
+| `/api/v1/artifacts/export` | POST | ExportResponse | N/A | ~2441 |
+| `/api/v1/artifacts/import` | POST | ImportResponse | N/A | ~2802 |
+| `/api/v1/artifacts/{artifact_id}/versions` | GET | VersionListResponse | `artifact_id` (path) | ~2901 |
+| `/api/v1/artifacts/{artifact_id}/dependencies` | GET | DependencyListResponse | `artifact_id` (path) | ~3042 |
+| `/api/v1/artifacts/{artifact_id}/deploy-status` | GET | DeployStatusResponse | `artifact_id` (path) | ~3382 |
+| `/api/v1/artifacts/tags` | GET | TagListResponse | N/A | ~3790 |
+| `/api/v1/artifacts/sources` | GET | SourceListResponse | N/A | ~4025 |
+| `/api/v1/artifacts/{artifact_id}/clone` | PUT | ArtifactCloneResponse | `artifact_id` (path) | ~4270 |
+| `/api/v1/artifacts/{artifact_id}/fork` | POST | ArtifactForkResponse | `artifact_id` (path) | ~4521 |
+| `/api/v1/artifacts/{artifact_id}/snapshot` | DELETE | None (204) | `artifact_id` (path) | ~4782 |
+| `/api/v1/artifacts/metadata/github` | GET | MetadataFetchResponse | N/A | ~4991 |
+| `/api/v1/artifacts/stats` | GET | ArtifactStatsResponse | N/A | ~5112 |
+| `/api/v1/artifacts/types` | GET | ArtifactTypesResponse | N/A | ~5151 |
+| `/api/v1/artifacts/batch` | POST | BatchOperationResponse | N/A | ~5213 |
+| `/api/v1/artifacts/orphaned` | DELETE | CleanupResponse | N/A | ~5301 |
+| `/api/v1/artifacts/cache` | DELETE | CacheClearResponse | N/A | ~5383 |
+| `/api/v1/artifacts/recent` | GET | RecentArtifactsResponse | N/A | ~5463 |
 
 **Key Operations**:
 - Installation: `/install`, `/install/batch`, `/uninstall`
 - Search & Browse: `/`, `/search`, `/{artifact_id}`
+- Sync & Deployment: `/{artifact_id}/sync`, `/{artifact_id}/deploy`
+- Diff & Comparison: `/{artifact_id}/diff`, `/{artifact_id}/upstream-diff`
 - Metadata: `/{artifact_id}/metadata`, `/metadata/github`
-- Version Management: `/{artifact_id}/versions`, `/sync`
-- Deployment: `/{artifact_id}/deploy-status`
+- Version Management: `/{artifact_id}/versions`
 - Maintenance: `/orphaned`, `/cache`, `/validate`
+
+## Context Sync API
+
+**Router**: `skillmeat/api/routers/context_sync.py`
+**Base**: `/api/v1/context-sync`
+**Purpose**: Bi-directional synchronization of context entities between collections and projects
+
+| Endpoint | Method | Request Body | Response Model | Required Params | Lines |
+|----------|--------|--------------|----------------|-----------------|-------|
+| `/api/v1/context-sync/pull` | POST | SyncPullRequest | List[SyncResultResponse] | `project_path`, `entity_ids` (optional) | ~76 |
+| `/api/v1/context-sync/push` | POST | SyncPushRequest | List[SyncResultResponse] | `project_path`, `entity_ids` (optional), `overwrite` | ~180 |
+| `/api/v1/context-sync/status` | GET | N/A | SyncStatusResponse | `project_path` (query) | ~281 |
+| `/api/v1/context-sync/resolve` | POST | SyncResolveRequest | SyncResultResponse | `project_path`, `entity_id`, `resolution`, `merged_content` (if merge) | ~396 |
+
+**Request Body Examples**:
+
+**Pull Request** (SyncPullRequest):
+```json
+{
+  "project_path": "/absolute/path/to/project",
+  "entity_ids": ["spec_file:api-patterns", "rule_file:debugging"]
+}
+```
+
+**Push Request** (SyncPushRequest):
+```json
+{
+  "project_path": "/absolute/path/to/project",
+  "entity_ids": ["spec_file:api-patterns"],
+  "overwrite": false
+}
+```
+
+**Resolve Request** (SyncResolveRequest):
+```json
+{
+  "project_path": "/absolute/path/to/project",
+  "entity_id": "spec_file:api-patterns",
+  "resolution": "keep_local",
+  "merged_content": null
+}
+```
+
+**Cache Invalidation Keys** (TanStack Query):
+- `['context-sync-status']` - Invalidate on any pull/push/resolve mutation
+- `['artifact-files']` - Invalidate when entity file content changes
+- `['context-entities']` - Invalidate when entities modified
+- `['deployments']` - Invalidate for deployment-related changes
+- `['artifacts']` - Invalidate for artifact list changes
 
 ## Deployments API
 
@@ -298,6 +352,131 @@ limit: int = Query(50, ge=1, le=100)
 after: Optional[str] = Query(None)    # Cursor for next page
 ```
 
+## Sync & Deployment Patterns
+
+### Artifact Sync Endpoint (`POST /api/v1/artifacts/{artifact_id}/sync`)
+
+**Purpose**: Pull changes from GitHub upstream or deployed project back to collection
+
+**Request Body** (ArtifactSyncRequest):
+```typescript
+{
+  project_path?: string;        // Optional: path to project for project sync
+  force?: boolean;              // Optional: force sync despite conflicts
+  strategy?: 'theirs' | 'ours' | 'manual';  // Conflict resolution strategy
+}
+```
+
+**Response** (ArtifactSyncResponse):
+```typescript
+{
+  success: boolean;
+  message: string;
+  artifact_name: string;
+  artifact_type: string;
+  conflicts?: ConflictInfo[] | null;
+  updated_version?: string | null;
+  synced_files_count?: number | null;
+}
+```
+
+**Behavior**:
+- If `project_path` omitted → syncs from GitHub upstream (requires GitHub origin)
+- If `project_path` provided → syncs from deployed project files
+- Empty body (`{}`) → defaults to upstream sync
+
+**Cache Invalidation** (on success):
+- `['upstream-diff', artifact_id, collection_name]`
+- `['project-diff', artifact_id]`
+- `['artifacts']`
+
+### Artifact Deploy Endpoint (`POST /api/v1/artifacts/{artifact_id}/deploy`)
+
+**Purpose**: Deploy artifact from collection to project's `.claude/` directory
+
+**Request Body** (ArtifactDeployRequest):
+```typescript
+{
+  project_path: string;    // Required: absolute path to project
+  overwrite: boolean;      // Optional: force overwrite if exists (default: false)
+}
+```
+
+**Response** (ArtifactDeployResponse):
+```typescript
+{
+  success: boolean;
+  message: string;
+  artifact_name: string;
+  artifact_type: string;
+  deployed_path?: string;
+  error_message?: string;
+}
+```
+
+**Cache Invalidation** (on success):
+- `['project-diff', artifact_id]`
+- `['upstream-diff', artifact_id, collection_name]`
+- `['artifacts']`
+- `['deployments']`
+
+### Diff Endpoints
+
+**GET `/api/v1/artifacts/{artifact_id}/diff`**:
+- **Params**: `artifact_id` (path), `project_path` (query, required)
+- **Response**: ArtifactDiffResponse (collection vs deployed files)
+- **Purpose**: Compare artifact in collection with deployed version in project
+
+**GET `/api/v1/artifacts/{artifact_id}/upstream-diff`**:
+- **Params**: `artifact_id` (path), `collection` (query, optional)
+- **Response**: ArtifactUpstreamDiffResponse (collection vs GitHub upstream)
+- **Purpose**: Compare artifact in collection with latest GitHub upstream version
+
+### Web Client Usage (React/TanStack Query)
+
+**Pull Changes** (from project to collection):
+```typescript
+const result = await pullChanges(projectPath, entityIds);
+queryClient.invalidateQueries({ queryKey: ['context-sync-status'] });
+queryClient.invalidateQueries({ queryKey: ['artifact-files'] });
+queryClient.invalidateQueries({ queryKey: ['context-entities'] });
+queryClient.invalidateQueries({ queryKey: ['deployments'] });
+queryClient.invalidateQueries({ queryKey: ['upstream-diff', artifactId, collection] });
+queryClient.invalidateQueries({ queryKey: ['project-diff', artifactId] });
+```
+
+**Push Changes** (from collection to project):
+```typescript
+const result = await pushChanges(projectPath, entityIds, overwrite);
+// Same invalidation pattern as pull
+```
+
+**Artifact Sync** (upstream):
+```typescript
+const result = await apiRequest(`/artifacts/${artifactId}/sync`, {
+  method: 'POST',
+  body: JSON.stringify({})  // Empty body for upstream sync
+});
+queryClient.invalidateQueries({ queryKey: ['upstream-diff', artifactId, collection] });
+queryClient.invalidateQueries({ queryKey: ['project-diff', artifactId] });
+queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+```
+
+**Artifact Deploy**:
+```typescript
+const result = await apiRequest(`/artifacts/${artifactId}/deploy`, {
+  method: 'POST',
+  body: JSON.stringify({
+    project_path: projectPath,
+    overwrite: false
+  })
+});
+queryClient.invalidateQueries({ queryKey: ['project-diff', artifactId] });
+queryClient.invalidateQueries({ queryKey: ['upstream-diff', artifactId, collection] });
+queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+queryClient.invalidateQueries({ queryKey: ['deployments'] });
+```
+
 ## Maintenance
 
 ### Verify Endpoint Patterns
@@ -307,16 +486,17 @@ after: Optional[str] = Query(None)    # Cursor for next page
 grep -r "@router\." skillmeat/api/routers/*.py
 
 # Check specific router
-grep -A 3 "@router\." skillmeat/api/routers/user_collections.py
+grep -A 3 "@router\." skillmeat/api/routers/context_sync.py
 
 # Verify response models
-grep "response_model=" skillmeat/api/routers/*.py
+grep "response_model=" skillmeat/api/routers/artifacts.py
 ```
 
 ### Update This File
 
 When adding new endpoints:
 1. Grep for new `@router.*` patterns in target file
-2. Add to appropriate section with decorator pattern
-3. Update last_verified date
-4. Run verification commands to confirm accuracy
+2. Add to appropriate section with required parameters
+3. Document cache invalidation keys from web client mutations
+4. Update last_verified date
+5. Run verification commands to confirm accuracy
