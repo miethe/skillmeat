@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Search, Plus, Trash2, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useTags, useArtifacts, useCreateTag, useUpdateTag, useDeleteTag, useToast } from '@/hooks';
+import { useTags, useCreateTag, useUpdateTag, useDeleteTag, useToast } from '@/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,9 +58,6 @@ export function TagManager() {
   const deleteTag = useDeleteTag();
   const { toast } = useToast();
 
-  // Fetch all artifacts to extract inline tags with accurate counts
-  const { data: artifactsData, isLoading: isLoadingArtifacts } = useArtifacts();
-
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [newTagName, setNewTagName] = useState('');
@@ -77,93 +74,15 @@ export function TagManager() {
   const colorInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const newColorInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Merge database tags with inline artifact tags for complete view
-  const mergedTags = useMemo(() => {
-    // Build map of inline tag usage counts from artifacts
-    const inlineTagCounts = new Map<string, number>();
-    if (artifactsData?.artifacts) {
-      for (const artifact of artifactsData.artifacts) {
-        const tags = artifact.tags || [];
-        for (const tag of tags) {
-          const lower = tag.toLowerCase();
-          inlineTagCounts.set(lower, (inlineTagCounts.get(lower) || 0) + 1);
-        }
-      }
-    }
-
-    // Index database tags by lowercase name for matching
-    const dbTags = data?.items ?? [];
-    const dbTagsByName = new Map<string, (typeof dbTags)[number]>();
-    for (const tag of dbTags) {
-      dbTagsByName.set(tag.name.toLowerCase(), tag);
-    }
-
-    // Start with database tags, using inline counts as source of truth
-    const result: Array<{
-      id: string;
-      name: string;
-      slug: string;
-      color?: string;
-      artifact_count: number;
-      isInlineOnly: boolean;
-    }> = [];
-
-    const seen = new Set<string>();
-
-    // Add all database tags first
-    for (const tag of dbTags) {
-      const lower = tag.name.toLowerCase();
-      seen.add(lower);
-      result.push({
-        id: tag.id,
-        name: tag.name,
-        slug: tag.slug,
-        color: tag.color,
-        artifact_count: inlineTagCounts.get(lower) ?? tag.artifact_count ?? 0,
-        isInlineOnly: false,
-      });
-    }
-
-    // Add inline-only tags (not in database)
-    for (const [lower, count] of inlineTagCounts) {
-      if (!seen.has(lower)) {
-        // Find the original casing from any artifact
-        let originalName = lower;
-        if (artifactsData?.artifacts) {
-          for (const artifact of artifactsData.artifacts) {
-            const match = (artifact.tags || []).find(
-              (t: string) => t.toLowerCase() === lower
-            );
-            if (match) {
-              originalName = match;
-              break;
-            }
-          }
-        }
-        result.push({
-          id: `inline:${lower}`,
-          name: originalName,
-          slug: lower.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-          color: undefined,
-          artifact_count: count,
-          isInlineOnly: true,
-        });
-      }
-    }
-
-    // Sort by artifact count descending, then name ascending
-    result.sort((a, b) => b.artifact_count - a.artifact_count || a.name.localeCompare(b.name));
-
-    return result;
-  }, [data?.items, artifactsData?.artifacts]);
+  const tags = data?.items ?? [];
 
   const filteredTags = searchQuery
-    ? mergedTags.filter(
+    ? tags.filter(
         (tag) =>
           tag.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           tag.slug.toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : mergedTags;
+    : tags;
 
   // --- Create ---
 
@@ -410,7 +329,7 @@ export function TagManager() {
               )}
 
               {/* Loading state */}
-              {(isLoading || isLoadingArtifacts) && (
+              {isLoading && (
                 <>
                   {Array.from({ length: 4 }).map((_, i) => (
                     <TableRow key={`skeleton-${i}`}>
@@ -435,39 +354,32 @@ export function TagManager() {
               )}
 
               {/* Tag rows */}
-              {!(isLoading || isLoadingArtifacts) &&
+              {!isLoading &&
                 filteredTags.map((tag) => (
                   <TableRow key={tag.id}>
                     {/* Color swatch */}
                     <TableCell>
-                      {tag.isInlineOnly ? (
-                        <div
-                          className="flex h-6 w-6 items-center justify-center rounded-full border border-border"
-                          style={{ backgroundColor: getDefaultColor(tag.name) }}
+                      <button
+                        type="button"
+                        className="flex h-6 w-6 items-center justify-center rounded-full border border-border transition-transform hover:scale-110"
+                        style={{ backgroundColor: tag.color || getDefaultColor(tag.name) }}
+                        onClick={() => colorInputRefs.current[tag.id]?.click()}
+                        aria-label={`Change color for ${tag.name}`}
+                      >
+                        <input
+                          ref={(el) => {
+                            colorInputRefs.current[tag.id] = el;
+                          }}
+                          type="color"
+                          value={tag.color || getDefaultColor(tag.name)}
+                          onChange={(e) => handleColorChange(tag.id, e.target.value)}
+                          className="sr-only"
+                          tabIndex={-1}
                         />
-                      ) : (
-                        <button
-                          type="button"
-                          className="flex h-6 w-6 items-center justify-center rounded-full border border-border transition-transform hover:scale-110"
-                          style={{ backgroundColor: tag.color || getDefaultColor(tag.name) }}
-                          onClick={() => colorInputRefs.current[tag.id]?.click()}
-                          aria-label={`Change color for ${tag.name}`}
-                        >
-                          <input
-                            ref={(el) => {
-                              colorInputRefs.current[tag.id] = el;
-                            }}
-                            type="color"
-                            value={tag.color || getDefaultColor(tag.name)}
-                            onChange={(e) => handleColorChange(tag.id, e.target.value)}
-                            className="sr-only"
-                            tabIndex={-1}
-                          />
-                        </button>
-                      )}
+                      </button>
                     </TableCell>
 
-                    {/* Name (inline editable for DB tags, plain text for inline-only) */}
+                    {/* Name (inline editable) */}
                     <TableCell>
                       {editingTagId === tag.id ? (
                         <Input
@@ -478,8 +390,6 @@ export function TagManager() {
                           autoFocus
                           className="h-8"
                         />
-                      ) : tag.isInlineOnly ? (
-                        <span className="px-1 py-0.5 text-sm font-medium">{tag.name}</span>
                       ) : (
                         <button
                           type="button"
@@ -496,11 +406,7 @@ export function TagManager() {
 
                     {/* Slug */}
                     <TableCell className="hidden sm:table-cell">
-                      {tag.isInlineOnly ? (
-                        <span className="text-xs text-muted-foreground/60 italic">from artifacts</span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">{tag.slug}</span>
-                      )}
+                      <span className="text-sm text-muted-foreground">{tag.slug}</span>
                     </TableCell>
 
                     {/* Artifact count */}
@@ -510,23 +416,21 @@ export function TagManager() {
 
                     {/* Actions */}
                     <TableCell>
-                      {!tag.isInlineOnly && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDeleteClick(tag)}
-                          aria-label={`Delete ${tag.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteClick(tag)}
+                        aria-label={`Delete ${tag.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
 
               {/* Empty state */}
-              {!(isLoading || isLoadingArtifacts) && filteredTags.length === 0 && (
+              {!isLoading && filteredTags.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                     {searchQuery
