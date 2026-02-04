@@ -1021,11 +1021,8 @@ export function ArtifactOperationsModal({
       </TabContentWrapper>
 
       {/* Contents Tab */}
-      <TabsContent
-        value="contents"
-        className="mt-0 h-full min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
-      >
-        <div className="flex h-full min-h-0 flex-1 gap-4 py-4">
+      <TabContentWrapper value="contents" scrollable={false}>
+        <div className="flex h-[calc(90vh-16rem)] min-h-0 gap-4">
           <div className="w-64 flex-shrink-0 overflow-hidden rounded-lg border">
             <div className="flex-shrink-0 border-b bg-muted/30 px-3 py-2">
               <p className="text-sm font-medium">Files</p>
@@ -1063,33 +1060,32 @@ export function ArtifactOperationsModal({
             />
           </div>
         </div>
-      </TabsContent>
+      </TabContentWrapper>
 
       {/* Sync Status Tab */}
-      <TabsContent
-        value="sync"
-        className="mt-0 flex h-[calc(90vh-12rem)] flex-col overflow-hidden focus-visible:outline-none focus-visible:ring-0"
-      >
-        {artifact.collection && (
-          <div className="flex-shrink-0 px-6 pt-4">
-            <ProjectSelectorForDiff
-              entityId={artifact.id}
-              entityName={artifact.name}
-              entityType={artifact.type as ArtifactType}
-              collection={artifact.collection}
-              onProjectSelected={(path) => setSelectedProjectForDiff(path)}
+      <TabContentWrapper value="sync" scrollable={false}>
+        <div className="flex h-[calc(90vh-16rem)] flex-col gap-4 overflow-hidden">
+          {artifact.collection && (
+            <div className="flex-shrink-0">
+              <ProjectSelectorForDiff
+                entityId={artifact.id}
+                entityName={artifact.name}
+                entityType={artifact.type as ArtifactType}
+                collection={artifact.collection}
+                onProjectSelected={(path) => setSelectedProjectForDiff(path)}
+              />
+            </div>
+          )}
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <SyncStatusTab
+              entity={artifact}
+              mode="collection"
+              projectPath={selectedProjectForDiff || undefined}
+              onClose={onClose}
             />
           </div>
-        )}
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <SyncStatusTab
-            entity={artifact}
-            mode="collection"
-            projectPath={selectedProjectForDiff || undefined}
-            onClose={onClose}
-          />
         </div>
-      </TabsContent>
+      </TabContentWrapper>
 
       {/* Deployments Tab */}
       <TabContentWrapper value="deployments">
