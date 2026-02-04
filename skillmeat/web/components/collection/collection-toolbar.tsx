@@ -25,6 +25,11 @@ import { ToolFilterPopover } from '@/components/ui/tool-filter-popover';
 import { cn } from '@/lib/utils';
 import type { ArtifactFilters } from '@/types/artifact';
 
+interface AvailableTag {
+  name: string;
+  artifact_count: number;
+}
+
 interface AvailableTool {
   name: string;
   artifact_count: number;
@@ -45,6 +50,8 @@ interface CollectionToolbarProps {
   lastUpdated?: Date | null;
   selectedTags?: string[];
   onTagsChange?: (tags: string[]) => void;
+  /** Optional: If provided, use these tags instead of fetching from API */
+  availableTags?: AvailableTag[];
   selectedTools?: string[];
   onToolsChange?: (tools: string[]) => void;
   /** Optional: If provided, use these tools instead of static list */
@@ -99,6 +106,7 @@ export function CollectionToolbar({
   lastUpdated = null,
   selectedTags = [],
   onTagsChange,
+  availableTags,
   selectedTools = [],
   onToolsChange,
   availableTools,
@@ -177,6 +185,7 @@ export function CollectionToolbar({
             <TagFilterPopover
               selectedTags={selectedTags}
               onChange={onTagsChange}
+              availableTags={availableTags}
             />
           )}
 

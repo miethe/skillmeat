@@ -164,15 +164,6 @@ function ManagePageContent() {
     return result;
   }, [entities, urlTags, urlProject]);
 
-  // Compute available tags from all entities for the filter popover
-  const availableTags = useMemo(() => {
-    const tagSet = new Set<string>();
-    entities.forEach((entity) => {
-      entity.tags?.forEach((tag) => tagSet.add(tag));
-    });
-    return Array.from(tagSet).sort();
-  }, [entities]);
-
   // Compute available projects from all entity deployments
   const availableProjects = useMemo(() => {
     const projectSet = new Set<string>();
@@ -188,6 +179,30 @@ function ManagePageContent() {
     });
     return Array.from(projectSet).sort();
   }, [entities]);
+
+  // Compute context-aware available tags from entities matching current filters
+  // (type/status/search applied by API, project applied here, but NOT tag filter)
+  const availableTags = useMemo(() => {
+    // Apply project filter first (same logic as filteredEntities)
+    let result = entities;
+    if (urlProject) {
+      result = result.filter((entity) => {
+        return entity.deployments?.some((d) => d.project_path?.includes(urlProject));
+      });
+    }
+
+    // Compute tag counts from the filtered set
+    const tagCounts = new Map<string, number>();
+    result.forEach((entity) => {
+      entity.tags?.forEach((tag) => {
+        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      });
+    });
+
+    return Array.from(tagCounts.entries())
+      .map(([name, count]) => ({ name, artifact_count: count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [entities, urlProject]);
 
   // ==========================================================================
   // Filter Change Handlers (update URL)

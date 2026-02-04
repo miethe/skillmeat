@@ -421,8 +421,8 @@ function CollectionPageContent() {
     return mapApiResponseToArtifact(apiArtifact, 'collection');
   };
 
-  // Apply client-side search, tag filter, and sort
-  const filteredArtifacts = useMemo(() => {
+  // Stage 1: Apply type, status, scope, search filters (BEFORE tags and tools)
+  const preTagFilterArtifacts = useMemo(() => {
     // Handle different response shapes:
     // - Specific collection (infinite scroll): pages array with items (lightweight summaries)
     // - All collections (infinite scroll): pages array with items (full artifacts)
@@ -487,6 +487,33 @@ function CollectionPageContent() {
       });
     }
 
+    return artifacts;
+  }, [
+    isSpecificCollection,
+    infiniteCollectionData,
+    infiniteAllArtifactsData,
+    currentCollection,
+    filters,
+    searchQuery,
+  ]);
+
+  // Compute available tags from artifacts matching current filters (excluding tag filter)
+  const availableTags = useMemo(() => {
+    const tagCounts = new Map<string, number>();
+    preTagFilterArtifacts.forEach((artifact) => {
+      artifact.tags?.forEach((tag: string) => {
+        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      });
+    });
+    return Array.from(tagCounts.entries())
+      .map(([name, count]) => ({ name, artifact_count: count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [preTagFilterArtifacts]);
+
+  // Stage 2: Apply tag, tool filters and sort
+  const filteredArtifacts = useMemo(() => {
+    let artifacts = preTagFilterArtifacts;
+
     // Tag filter
     if (selectedTags.length > 0) {
       artifacts = artifacts.filter((artifact) => {
@@ -528,18 +555,7 @@ function CollectionPageContent() {
     }
 
     return artifacts;
-  }, [
-    isSpecificCollection,
-    infiniteCollectionData,
-    infiniteAllArtifactsData,
-    currentCollection,
-    filters,
-    searchQuery,
-    selectedTags,
-    selectedTools,
-    sortField,
-    sortOrder,
-  ]);
+  }, [preTagFilterArtifacts, selectedTags, selectedTools, sortField, sortOrder]);
 
   // Compute unique tools with counts from ALL loaded artifacts (before tool filtering)
   // This is used by ToolFilterPopover
@@ -697,6 +713,7 @@ function CollectionPageContent() {
         lastUpdated={lastUpdated}
         selectedTags={selectedTags}
         onTagsChange={handleTagsChange}
+        availableTags={availableTags}
         selectedTools={selectedTools}
         onToolsChange={handleToolsChange}
         availableTools={availableTools}
