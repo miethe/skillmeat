@@ -244,6 +244,7 @@ export function useProject(id: string) {
       return await fetchProjectFromApi(id);
     },
     enabled: !!id,
+    staleTime: PROJECTS_STALE_TIME, // 5 min - matches useProjects()
   });
 }
 
