@@ -19,6 +19,9 @@ deployed_at = "2026-02-05T12:29:30.006507"
 artifact_path = "skills/meatycapture-capture"
 content_hash = "f8f68504d8e316c02ac25af2e49d31826a9f6a29a478d6e06c826d01abb94572"
 local_modifications = false
+version_lineage = [
+    "f8f68504d8e316c02ac25af2e49d31826a9f6a29a478d6e06c826d01abb94572",
+]
 merge_base_snapshot = "f8f68504d8e316c02ac25af2e49d31826a9f6a29a478d6e06c826d01abb94572"
 collection_sha = "f8f68504d8e316c02ac25af2e49d31826a9f6a29a478d6e06c826d01abb94572"
 
