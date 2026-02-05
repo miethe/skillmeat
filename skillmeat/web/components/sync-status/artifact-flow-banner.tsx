@@ -78,9 +78,14 @@ export function ArtifactFlowBanner({
   const truncateSha = (sha: string): string => sha.slice(0, 7);
 
   if (isCollapsed) {
+    const hasAnyIndicator = sourceInfo?.hasUpdate || projectInfo?.isModified;
+
     return (
       <div
-        className="flex w-full cursor-pointer items-center gap-3 rounded-lg border bg-card px-4 py-2 transition-colors hover:bg-accent/50"
+        className={cn(
+          "flex w-full cursor-pointer items-center gap-3 rounded-lg border bg-card px-4 transition-colors hover:bg-accent/50",
+          hasAnyIndicator ? "py-3" : "py-2"
+        )}
         onClick={() => setIsCollapsed(false)}
         role="button"
         tabIndex={0}
@@ -93,7 +98,10 @@ export function ArtifactFlowBanner({
         aria-label="Expand artifact flow banner"
       >
         {/* Source summary */}
-        <div className="flex items-center gap-1.5">
+        <div className={cn(
+          "flex items-center gap-1.5",
+          sourceInfo?.hasUpdate && "relative rounded-md border border-blue-500 px-2 py-1"
+        )}>
           <Github className="h-3.5 w-3.5 text-muted-foreground" />
           {sourceInfo ? (
             <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono text-muted-foreground">
@@ -101,6 +109,11 @@ export function ArtifactFlowBanner({
             </code>
           ) : (
             <span className="text-[10px] italic text-muted-foreground/50">Not configured</span>
+          )}
+          {sourceInfo?.hasUpdate && (
+            <span className="absolute -right-1 -top-2 rounded-sm bg-blue-500 px-1 text-[9px] leading-tight text-white">
+              New Update
+            </span>
           )}
         </div>
 
@@ -117,7 +130,10 @@ export function ArtifactFlowBanner({
         <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
 
         {/* Project summary */}
-        <div className="flex items-center gap-1.5">
+        <div className={cn(
+          "flex items-center gap-1.5",
+          projectInfo?.isModified && "relative rounded-md border border-amber-500 px-2 py-1"
+        )}>
           <Folder className="h-3.5 w-3.5 text-muted-foreground" />
           {projectInfo ? (
             <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono text-muted-foreground">
@@ -126,22 +142,10 @@ export function ArtifactFlowBanner({
           ) : (
             <span className="text-[10px] italic text-muted-foreground/50">Not deployed</span>
           )}
-        </div>
-
-        {/* Status badges */}
-        <div className="flex items-center gap-1.5">
-          {sourceInfo?.hasUpdate && (
-            <Badge variant="default" className="h-4 bg-blue-500 px-1 py-0 text-[10px] leading-none">
-              New Update
-            </Badge>
-          )}
           {projectInfo?.isModified && (
-            <Badge
-              variant="secondary"
-              className="h-4 bg-yellow-500/20 px-1 py-0 text-[10px] leading-none text-yellow-700 dark:text-yellow-400"
-            >
+            <span className="absolute -right-1 -top-2 rounded-sm bg-amber-500/80 px-1 text-[9px] leading-tight text-amber-950 dark:bg-amber-500/90 dark:text-white">
               Modified
-            </Badge>
+            </span>
           )}
         </div>
 
