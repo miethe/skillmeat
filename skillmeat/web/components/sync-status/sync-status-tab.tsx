@@ -297,18 +297,32 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     },
   });
 
-  // Deploy mutation (deploy to project)
+  // Deploy mutation (deploy to project with overwrite)
   const deployMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest(`/artifacts/${encodeURIComponent(entity.id)}/deploy`, {
+      const params = new URLSearchParams();
+      if (entity.collection) {
+        params.set('collection', entity.collection);
+      }
+      const queryString = params.toString();
+      const url = `/artifacts/${encodeURIComponent(entity.id)}/deploy${queryString ? `?${queryString}` : ''}`;
+      return await apiRequest<{ success: boolean; message: string; error_message?: string }>(url, {
         method: 'POST',
         body: JSON.stringify({
           project_path: projectPath,
-          overwrite: false,
+          overwrite: true, // User confirmed via dialog
         }),
       });
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (!data.success) {
+        toast({
+          title: 'Deploy Failed',
+          description: data.error_message || data.message || 'Deployment was not completed',
+          variant: 'destructive',
+        });
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
       queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
       queryClient.invalidateQueries({ queryKey: ['artifacts'] });
@@ -336,7 +350,13 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
         return syncMutation.mutateAsync();
       } else {
         // Deploy from collection to project (overwrite)
-        return await apiRequest(`/artifacts/${encodeURIComponent(entity.id)}/deploy`, {
+        const params = new URLSearchParams();
+        if (entity.collection) {
+          params.set('collection', entity.collection);
+        }
+        const queryString = params.toString();
+        const url = `/artifacts/${encodeURIComponent(entity.id)}/deploy${queryString ? `?${queryString}` : ''}`;
+        return await apiRequest<{ success: boolean; message: string; error_message?: string }>(url, {
           method: 'POST',
           body: JSON.stringify({
             project_path: projectPath,
@@ -345,7 +365,19 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
         });
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Check if deploy response indicates failure (deploy returns { success, message, error_message })
+      if (data && typeof data === 'object' && 'success' in data) {
+        const deployData = data as { success: boolean; message: string; error_message?: string };
+        if (!deployData.success) {
+          toast({
+            title: 'Failed to Apply Changes',
+            description: deployData.error_message || deployData.message || 'Operation was not completed',
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
       toast({
@@ -423,6 +455,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
 
   const [showPushConfirm, setShowPushConfirm] = useState(false);
   const [showPullConfirm, setShowPullConfirm] = useState(false);
+  const [showDeployConfirm, setShowDeployConfirm] = useState(false);
 
   const handleComparisonChange = (scope: ComparisonScope) => {
     setComparisonScope(scope);
@@ -437,13 +470,18 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     syncMutation.mutate();
   }, [syncMutation]);
 
-  const handleDeployToProject = () => {
+  const handleDeployToProject = useCallback(() => {
     if (!projectPath) {
       toast({ title: 'Error', description: 'No project path', variant: 'destructive' });
       return;
     }
+    setShowDeployConfirm(true);
+  }, [projectPath, toast]);
+
+  const confirmDeployToProject = useCallback(() => {
+    setShowDeployConfirm(false);
     deployMutation.mutate();
-  };
+  }, [deployMutation]);
 
   const handleTakeUpstream = () => {
     takeUpstreamMutation.mutate();
@@ -765,6 +803,22 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmPullFromSource}>Pull Changes</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Deploy confirmation dialog */}
+      <AlertDialog open={showDeployConfirm} onOpenChange={setShowDeployConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deploy to Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will overwrite the project version of &quot;{entity.name}&quot; with the collection version. Any local modifications in the project will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeployToProject}>Deploy Changes</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
