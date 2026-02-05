@@ -752,6 +752,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     files: currentDiff?.files || [],
     leftLabel: getLeftLabel(comparisonScope),
     rightLabel: getRightLabel(comparisonScope),
+    isLoading: isDiffLoading,
   };
 
   const footerProps = {
@@ -783,6 +784,20 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
 
   // Only show loading if we're loading AND don't have any data yet
   const isLoading = (upstreamLoading || projectLoading || sourceProjectLoading) && !canShowAnyData;
+
+  // Scope-specific loading for the DiffViewer — show skeleton when the current scope's data is loading
+  const isDiffLoading = useMemo(() => {
+    switch (comparisonScope) {
+      case 'source-vs-collection':
+        return upstreamLoading;
+      case 'collection-vs-project':
+        return projectLoading;
+      case 'source-vs-project':
+        return sourceProjectLoading;
+      default:
+        return false;
+    }
+  }, [comparisonScope, upstreamLoading, projectLoading, sourceProjectLoading]);
 
   // Only show blocking error if BOTH queries failed or if we can't show anything useful
   // For local-only artifacts: upstreamError is expected, so don't block if projectData is available
