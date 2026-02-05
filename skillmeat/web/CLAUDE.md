@@ -153,6 +153,45 @@ All hooks must comply with the canonical data flow principles. See root `CLAUDE.
 **Stale time**: 5 minutes default (see Data Flow Standard for domain-specific values)
 **Pattern**: Query key factories in each hook file
 
+### TanStack Query Stale Time Strategy
+
+All query hooks follow standardized stale times per the data flow standard:
+
+| Domain | Stale Time | Rationale |
+|--------|-----------|-----------|
+| Artifacts (list/detail) | 5 min | Standard browsing, cache-backed |
+| Collections | 5 min | Standard browsing |
+| Tags (list/detail) | 5 min | Low-frequency changes |
+| Tags (search) | 30 sec | Interactive, needs freshness |
+| Groups | 5 min | Low-frequency changes |
+| Deployments | 2 min | More dynamic, filesystem-backed |
+| Projects | 5 min | Low-frequency changes |
+| Marketplace listings | 1 min | External, moderately dynamic |
+| Marketplace detail | 5 min | Slow-changing |
+| Analytics summary | 30 sec | Monitoring dashboard, needs freshness |
+| Analytics trends | 5 min | Aggregate, slow-changing |
+| Context Entities | 5 min | Low-frequency changes |
+| Artifact Search | 30 sec | Interactive search |
+| Cache/Sync status | 30 sec | Monitoring |
+
+#### Cache Invalidation Graph
+
+Mutations must invalidate all related caches per this graph:
+
+| Mutation | Must Invalidate |
+|----------|----------------|
+| Artifact CRUD | `['artifacts']`, `['collections']`, `['deployments']` |
+| Tag CRUD | `['tags']`, `['artifacts']` |
+| Tag add/remove from artifact | `['tags', 'artifact', artifactId]`, `['artifacts']` |
+| Collection CRUD | `['collections']`, `['artifacts']` |
+| Group CRUD | `['groups']`, `['artifact-groups']` |
+| Deploy/Undeploy | `['deployments']`, `['artifacts']`, `['projects']` |
+| Snapshot rollback | `['snapshots']`, `['artifacts']`, `['deployments']`, `['collections']`, `['projects']` |
+| Context sync | `['context-sync-status']`, `['artifact-files']`, `['context-entities']`, `['deployments']` |
+| Cache refresh | `['projects']`, `['cache']`, `['artifacts']` |
+
+**Reference**: `/docs/project_plans/reports/data-flow-standardization-report.md`
+
 ### shadcn/ui
 
 **Install**: `pnpm dlx shadcn@latest add [component]`
