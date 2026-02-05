@@ -197,6 +197,7 @@ export function EntityList({
           onDeploy={onDeploy ? () => onDeploy(artifact) : undefined}
           onViewDiff={onViewDiff ? () => onViewDiff(artifact) : undefined}
           onManage={onManage ? () => onManage(artifact) : undefined}
+          onDelete={onDelete ? () => onDelete(artifact) : undefined}
         />
       );
     },
@@ -209,6 +210,7 @@ export function EntityList({
       onDeploy,
       onViewDiff,
       onManage,
+      onDelete,
     ]
   );
 
