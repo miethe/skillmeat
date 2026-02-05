@@ -9,9 +9,9 @@ references:
 last_verified: 2026-01-14
 category: testing
 related:
-  - .claude/rules/web/testing.md
-  - .claude/rules/web/hooks.md
-  - .claude/rules/web/components.md
+  - skillmeat/web/CLAUDE.md
+  - skillmeat/web/hooks/CLAUDE.md
+  - skillmeat/web/components/CLAUDE.md
 ---
 
 # Testing Patterns Reference

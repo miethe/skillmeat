@@ -268,7 +268,7 @@ Track bugs/enhancements via MeatyCapture request-logs.
 
 **Quick capture** (~50 tokens): `mc-quick.sh TYPE DOMAIN SUBDOMAIN "Title" "Problem" "Goal"`
 
-**Full guidance**: `.claude/rules/development-tracking.md` — read when capturing bugs, using `/mc`, or working with request-logs.
+**Full guidance**: `.claude/context/development-tracking-playbook.md` — read when capturing bugs, using `/mc` or generally meatycapture, or working with request-logs.
 
 ---
 
@@ -511,13 +511,26 @@ Never use PyGithub directly; always go through the wrapper.
 
 ## Progressive Disclosure Context
 
-**Rules** (always loaded into context):
-- `.claude/rules/debugging.md` - Symbol-first debugging (30 lines)
-- `.claude/rules/development-tracking.md` - MeatyCapture workflow (34 lines)
-- `.claude/rules/api/routers.md` - Router layer contract (44 lines)
-- `.claude/rules/web/` - Component, page, testing conventions (~130 lines)
+**Context loading ladder**:
+1. Runtime truth (`skillmeat/api/openapi.json`, `skillmeat/web/hooks/index.ts`, `ai/symbols-*.json`)
+2. Entry `CLAUDE.md` for scope + invariants
+3. Key-context playbooks for task routing
+4. Deep context docs only when unresolved
+5. Historical plans/reports only for rationale (verify behavior from runtime truth)
+
+**Global rules** (minimal):
+- `.claude/rules/debugging.md` - Universal symbol-first debugging pointer
 
 **Key Context** (read when working in domain):
+- `.claude/context/key-context/context-loading-playbook.md` - Trigger matrix for what to read first
+- `.claude/context/key-context/api-contract-source-of-truth.md` - OpenAPI-first contract workflow
+- `.claude/context/key-context/hook-selection-and-deprecations.md` - Hook selection + deprecation routing
+- `.claude/context/key-context/fe-be-type-sync-playbook.md` - Type/model sync workflow
+- `.claude/context/key-context/symbols-query-playbook.md` - Symbols-first discovery recipes
+- `.claude/context/key-context/codebase-map-query-playbook.md` - Graph artifact usage policy
+- `.claude/context/key-context/notebooklm-usage-policy.md` - NotebookLM verification policy
+- `.claude/context/key-context/deprecation-and-sunset-registry.md` - Active deprecations + sunset dates
+- `.claude/context/key-context/layered-context-governance.md` - Layer policy and token budgets
 - `.claude/context/key-context/data-flow-patterns.md` - Stale times, cache invalidation graph, write-through patterns
 - `.claude/context/key-context/debugging-patterns.md` - Bug categories, delegation patterns
 - `.claude/context/key-context/router-patterns.md` - Full FastAPI examples

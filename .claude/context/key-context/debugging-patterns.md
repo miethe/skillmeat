@@ -16,7 +16,6 @@ references:
   - ai/symbols-backend.json
   - ai/symbols-frontend.json
   - ai/symbols-shared.json
-  - .claude/rules/debugging.md
   - .claude/context/symbol-usage-guide.md
 related_documents:
   - .claude/context/backend-api-patterns.md
@@ -715,7 +714,7 @@ Task("python-backend-engineer", "Fix schema...")
 | `.claude/context/symbol-usage-guide.md` | Symbol query patterns and examples |
 | `.claude/context/backend-api-patterns.md` | Backend architecture and patterns |
 | `.claude/context/frontend-patterns.md` | Frontend architecture and patterns |
-| `.claude/rules/debugging.md` | Source rules file (this reference extracted from) |
+| `.claude/context/key-context/symbols-query-playbook.md` | Symbols-first query recipes |
 | `CLAUDE.md` → Agent Delegation | Model selection and delegation patterns |
 | `.claude/specs/script-usage/bug-automation-scripts.md` | Automated bug tracking workflows |
 

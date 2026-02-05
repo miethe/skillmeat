@@ -94,22 +94,13 @@ The `Artifact` type is the canonical representation for skills, commands, agents
 
 ---
 
-## Path-Specific Rules
-
-Rules in `.claude/rules/web/` auto-load when editing:
-
-| Rule File       | Path Scope                 | Contains                                             |
-| --------------- | -------------------------- | ---------------------------------------------------- |
-| `pages.md`      | `app/**/*.tsx`             | Server/client components, App Router, dynamic routes |
-| `components.md` | `components/**/*.tsx`      | shadcn usage, accessibility, styling patterns        |
-| `testing.md`    | `__tests__/**`, `tests/**` | Jest, RTL, Playwright patterns                       |
-
----
-
 ## Context Files (Load When Needed)
 
 | File                                              | Load When                                   |
 | ------------------------------------------------- | ------------------------------------------- |
+| `.claude/context/key-context/context-loading-playbook.md` | Choose minimal context by task |
+| `.claude/context/key-context/hook-selection-and-deprecations.md` | Canonical hook selection and deprecation routing |
+| `.claude/context/key-context/fe-be-type-sync-playbook.md` | FE/BE payload and type drift fixes |
 | `.claude/context/key-context/data-flow-patterns.md` | Hook stale times, cache invalidation, mutations |
 | `.claude/context/key-context/component-patterns.md` | Component design, spacing, accessibility |
 | `.claude/context/key-context/nextjs-patterns.md` | Layout, loading states, URL state management |

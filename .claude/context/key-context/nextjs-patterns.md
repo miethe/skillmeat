@@ -15,7 +15,7 @@ status: active
 references:
   - skillmeat/web/app/**/*.tsx
   - skillmeat/web/components/**/*.tsx
-  - .claude/rules/web/pages.md
+  - skillmeat/web/app/CLAUDE.md
 last_verified: 2026-01-14
 ---
 
@@ -570,6 +570,6 @@ export default function Page() {
 - **App Router Migration**: https://nextjs.org/docs/app/building-your-application/upgrading/app-router-migration
 - **Data Fetching**: https://nextjs.org/docs/app/building-your-application/data-fetching
 - **Routing**: https://nextjs.org/docs/app/building-your-application/routing
-- **Hooks**: `.claude/rules/web/hooks.md`
-- **API Client**: `.claude/rules/web/api-client.md`
-- **Components**: `.claude/rules/web/components.md`
+- **Hooks**: `skillmeat/web/hooks/CLAUDE.md`
+- **API Client**: `skillmeat/web/lib/api/CLAUDE.md`
+- **Components**: `skillmeat/web/components/CLAUDE.md`

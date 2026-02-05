@@ -731,7 +731,7 @@ async def get_artifact(artifact_id: str, manager: ArtifactManagerDep):
 
 ## Reference
 
-- **Layer Patterns**: `.claude/rules/api/routers.md` (source file)
+- **Layer Patterns**: `skillmeat/api/routers/CLAUDE.md`
 - **Schema Patterns**: `.claude/context/key-context/schema-patterns.md`
 - **Dependency Injection**: `skillmeat/api/dependencies.py`
 - **Error Handling**: `skillmeat/api/schemas/common.py`
