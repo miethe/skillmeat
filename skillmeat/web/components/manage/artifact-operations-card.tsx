@@ -45,6 +45,7 @@ import {
   AlertTriangle,
   ArrowRight,
   Clock,
+  Trash2,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -87,6 +88,9 @@ export interface ArtifactOperationsCardProps {
 
   /** Handler for manage action (opens management menu) */
   onManage?: () => void;
+
+  /** Handler for delete action */
+  onDelete?: (artifact: Artifact) => void;
 
   /** Whether card is selected (for bulk operations) */
   selected?: boolean;
@@ -199,6 +203,7 @@ export function ArtifactOperationsCard({
   onDeploy,
   onViewDiff,
   onManage,
+  onDelete,
   selected = false,
   onSelect,
   selectable = false,
@@ -448,6 +453,21 @@ export function ArtifactOperationsCard({
               <LucideIcons.Copy className="mr-2 h-4 w-4" aria-hidden="true" />
               Copy Sync Command
             </DropdownMenuItem>
+            {onDelete && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(artifact);
+                  }}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Delete Artifact
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

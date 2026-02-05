@@ -18,6 +18,10 @@ interface CollectionArtifactModalProps {
   initialTab?: ArtifactModalTab;
   /** Callback when tab changes. Useful for URL state synchronization. */
   onTabChange?: (tab: ArtifactModalTab) => void;
+  /** Optional URL for return navigation (e.g., when deep-linked from another page). */
+  returnTo?: string;
+  /** Handler for delete action from modal header. When provided, shows a kebab menu with Delete option. */
+  onDelete?: () => void;
 }
 
 /**
@@ -46,6 +50,8 @@ export function CollectionArtifactModal({
   onClose,
   initialTab,
   onTabChange,
+  returnTo,
+  onDelete,
 }: CollectionArtifactModalProps) {
   const router = useRouter();
 
@@ -77,6 +83,8 @@ export function CollectionArtifactModal({
       onNavigateToDeployment={handleNavigateToDeployment}
       initialTab={initialTab}
       onTabChange={onTabChange}
+      returnTo={returnTo}
+      onDelete={onDelete}
     />
   );
 }

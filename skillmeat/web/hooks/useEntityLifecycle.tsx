@@ -142,7 +142,7 @@ export interface EntityLifecycleContextValue {
   // ============================================================================
 
   /** Deploy entity to specified project */
-  deployEntity: (id: string, projectPath: string) => Promise<void>;
+  deployEntity: (id: string, projectPath: string, collection?: string) => Promise<void>;
   /** Sync entity changes between collection and project */
   syncEntity: (id: string, projectPath: string) => Promise<void>;
 
@@ -382,14 +382,22 @@ export function EntityLifecycleProvider({
   });
 
   const deployMutation = useMutation({
-    mutationFn: async ({ id, projectPath }: { id: string; projectPath: string }) => {
+    mutationFn: async ({ id, projectPath, collection }: { id: string; projectPath: string; collection?: string }) => {
       const request: ArtifactDeployRequest = {
         project_path: projectPath,
       };
 
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (collection) {
+        params.set('collection', collection);
+      }
+      const queryString = params.toString();
+      const url = `/artifacts/${encodeURIComponent(id)}/deploy${queryString ? `?${queryString}` : ''}`;
+
       await withMockFallback(
         () =>
-          apiRequest(`/artifacts/${encodeURIComponent(id)}/deploy`, {
+          apiRequest(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request),
@@ -454,8 +462,8 @@ export function EntityLifecycleProvider({
   );
 
   const deployEntity = useCallback(
-    async (id: string, targetProjectPath: string) => {
-      await deployMutation.mutateAsync({ id, projectPath: targetProjectPath });
+    async (id: string, targetProjectPath: string, collection?: string) => {
+      await deployMutation.mutateAsync({ id, projectPath: targetProjectPath, collection });
     },
     [deployMutation]
   );
