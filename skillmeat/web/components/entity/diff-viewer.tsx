@@ -78,7 +78,7 @@ function DiffLine({ content, type, lineNumber }: DiffLineProps) {
 
 function SpacerLine() {
   return (
-    <div className="flex border-b border-border/50 bg-muted/20 font-mono text-sm">
+    <div className="flex bg-muted/40 font-mono text-sm">
       <span className="w-12 flex-shrink-0 select-none border-r border-border/50 pr-2 text-right text-gray-400">
         &nbsp;
       </span>
@@ -364,7 +364,7 @@ export function DiffViewer({
       leftScroll.removeEventListener('scroll', onLeftScroll);
       rightScroll.removeEventListener('scroll', onRightScroll);
     };
-  }, []);
+  }, [selectedFile]);
 
   // Memoize summary calculation
   const summary = useMemo(() => {
