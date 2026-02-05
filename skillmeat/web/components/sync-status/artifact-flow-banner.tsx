@@ -266,7 +266,7 @@ export function ArtifactFlowBanner({
           </svg>
           <Button
             size="sm"
-            variant="ghost"
+            variant={projectInfo?.isModified ? 'default' : 'ghost'}
             onClick={onPushToCollection}
             disabled={!projectInfo || isPushing}
             className="h-7 text-xs"
