@@ -7,7 +7,7 @@ import type { Artifact } from '@/types/artifact';
 import type { ArtifactDiffResponse } from '@/sdk/models/ArtifactDiffResponse';
 import type { ArtifactUpstreamDiffResponse } from '@/sdk/models/ArtifactUpstreamDiffResponse';
 import type { FileDiff } from '@/sdk/models/FileDiff';
-import { useToast } from '@/hooks';
+import { useToast, useDriftDismissal } from '@/hooks';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api';
@@ -228,7 +228,6 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   );
   const [pendingActions] = useState<PendingAction[]>([]);
   const [showSyncDialog, setShowSyncDialog] = useState(false);
-  const [dismissedDriftIds, setDismissedDriftIds] = useState<Set<string>>(new Set());
 
   // Merge workflow state (Phase 3: SYNC-A03)
   const [showMergeWorkflow, setShowMergeWorkflow] = useState(false);
@@ -440,12 +439,11 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     },
   });
 
-  // Keep local mutation (dismiss drift alert via local state)
+  // Keep local mutation (acknowledge local changes are intentional)
   const keepLocalMutation = useMutation({
     mutationFn: async () => {
-      // Dismiss the drift banner for this entity by adding to dismissed set.
       // This is a local UI acknowledgment - no API call needed.
-      setDismissedDriftIds((prev) => new Set(prev).add(entity.id));
+      // The drift banner dismissal is handled by useDriftDismissal hook.
     },
     onSuccess: () => {
       // Invalidate drift-related queries so UI re-evaluates after dismissal
@@ -660,11 +658,17 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     }
   }, [comparisonScope, upstreamDiff, projectDiff, sourceProjectDiff]);
 
-  // Drift status (suppressed when entity has been dismissed)
+  // Drift status computed from current diff data
   const driftStatus = useMemo(() => {
-    if (dismissedDriftIds.has(entity.id)) return 'none' as DriftStatus;
     return computeDriftStatus(currentDiff);
-  }, [currentDiff, dismissedDriftIds, entity.id]);
+  }, [currentDiff]);
+
+  // Persistent drift dismissal (survives page refreshes, 24h expiry)
+  const { isDismissed: isDriftDismissed, dismiss: dismissDrift } = useDriftDismissal({
+    artifactId: entity.id,
+    scope: comparisonScope,
+    driftStatus,
+  });
 
   // ============================================================================
   // Early Return: Discovered Artifacts
@@ -740,6 +744,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     onMerge: handleMerge,
     onTakeUpstream: handleTakeUpstream,
     onKeepLocal: handleKeepLocal,
+    onDismiss: driftStatus !== 'none' ? dismissDrift : undefined,
   };
 
   const diffProps = {
@@ -846,7 +851,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="flex-shrink-0 space-y-2 border-b p-4">
             <ComparisonSelector {...comparisonProps} />
-            <DriftAlertBanner {...alertProps} />
+            {!isDriftDismissed && <DriftAlertBanner {...alertProps} />}
           </div>
           <div className="min-h-0 min-w-0 flex-1 overflow-auto">
             <DiffViewer {...diffProps} />

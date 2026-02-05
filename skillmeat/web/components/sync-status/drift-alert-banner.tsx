@@ -9,6 +9,7 @@ import {
   GitMerge,
   ArrowUp,
   ArrowDown,
+  X,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,8 @@ export interface DriftAlertBannerProps {
   onMerge: () => void;
   onTakeUpstream: () => void;
   onKeepLocal: () => void;
+  /** Optional callback when the user dismisses this banner */
+  onDismiss?: () => void;
 }
 
 /**
@@ -152,6 +155,7 @@ export function DriftAlertBanner({
   onMerge,
   onTakeUpstream,
   onKeepLocal,
+  onDismiss,
 }: DriftAlertBannerProps) {
   const totalChanges = summary.added + summary.modified + summary.deleted;
   const hasChanges = totalChanges > 0;
@@ -172,6 +176,7 @@ export function DriftAlertBanner({
         {getStatusIcon(driftStatus)}
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">
+
           <AlertDescription className="m-0">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-foreground">{getStatusTitle(driftStatus)}</span>
@@ -237,6 +242,18 @@ export function DriftAlertBanner({
             </div>
           )}
         </div>
+
+        {onDismiss && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onDismiss}
+            className="h-6 w-6 flex-shrink-0 rounded-full opacity-70 hover:opacity-100"
+            aria-label="Dismiss drift alert"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        )}
       </div>
     </Alert>
   );

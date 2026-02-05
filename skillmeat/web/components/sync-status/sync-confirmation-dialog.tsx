@@ -12,7 +12,7 @@
  */
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useConflictCheck } from '@/hooks';
 import { DiffViewer } from '@/components/entity/diff-viewer';
 import {
@@ -115,6 +115,13 @@ const DIRECTION_CONFIG: Record<ConflictCheckDirection, DirectionConfig> = {
 };
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** Maximum number of files to display before requiring user to expand */
+const MAX_DISPLAY_FILES = 10;
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -130,6 +137,9 @@ export function SyncConfirmationDialog({
 }: SyncConfirmationDialogProps) {
   const config = DIRECTION_CONFIG[direction];
   const DirectionIcon = config.icon;
+
+  // Track whether the user has expanded beyond the file cap
+  const [showAllFiles, setShowAllFiles] = useState(false);
 
   // Fetch diff data only when dialog is open
   const { diffData, hasChanges, hasConflicts, targetHasChanges, isLoading, error } =
@@ -157,6 +167,13 @@ export function SyncConfirmationDialog({
 
   // Total changed file count
   const changedCount = changedFiles.length;
+
+  // Cap the number of files shown to avoid slow rendering on large diffs
+  const hasFileCap = changedCount > MAX_DISPLAY_FILES;
+  const displayedFiles = useMemo(
+    () => (showAllFiles || !hasFileCap ? changedFiles : changedFiles.slice(0, MAX_DISPLAY_FILES)),
+    [changedFiles, showAllFiles, hasFileCap]
+  );
 
   const handleCancel = () => {
     onCancel?.();
@@ -230,12 +247,25 @@ export function SyncConfirmationDialog({
               {/* Diff viewer */}
               <div className="h-[50vh] min-h-[300px]">
                 <DiffViewer
-                  files={changedFiles}
+                  files={displayedFiles}
                   leftLabel={config.leftLabel}
                   rightLabel={config.rightLabel}
                   previewMode
                 />
               </div>
+
+              {/* Show all files button when capped */}
+              {hasFileCap && !showAllFiles && (
+                <div className="flex justify-center px-4 pb-3">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowAllFiles(true)}
+                    aria-label={`Show all ${changedCount} files`}
+                  >
+                    Show all {changedCount} files
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -386,6 +386,16 @@ export { useAnalyticsStream } from './useAnalyticsStream';
 export { useSSE } from './useSSE';
 
 // ============================================================================
+// DRIFT DISMISSAL (1 hook)
+// ============================================================================
+// Persistent drift alert dismissal with localStorage and 24h expiry
+export {
+  useDriftDismissal,
+  type UseDriftDismissalOptions,
+  type UseDriftDismissalReturn,
+} from './use-drift-dismissal';
+
+// ============================================================================
 // UTILITY HOOKS
 // ============================================================================
 
