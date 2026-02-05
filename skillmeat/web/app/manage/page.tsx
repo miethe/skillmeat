@@ -17,6 +17,7 @@ import { EntityTabs } from './components/entity-tabs';
 import { ManagePageFilters, type ManageStatusFilter } from '@/components/manage/manage-page-filters';
 import { ArtifactOperationsModal, type OperationsModalTab } from '@/components/manage/artifact-operations-modal';
 import { AddEntityDialog } from './components/add-entity-dialog';
+import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
 import type { Artifact, ArtifactType } from '@/types';
 import {
   DropdownMenu,
@@ -40,7 +41,6 @@ function ManagePageContent() {
     setTypeFilter,
     setStatusFilter,
     setSearchQuery,
-    deleteEntity,
   } = useEntityLifecycle();
 
   // ==========================================================================
@@ -83,6 +83,8 @@ function ManagePageContent() {
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingArtifact, setEditingArtifact] = useState<Artifact | null>(null);
+  const [artifactToDelete, setArtifactToDelete] = useState<Artifact | null>(null);
+  const [showDeletionDialog, setShowDeletionDialog] = useState(false);
 
   // Sync URL state to hook state for API filtering
   useEffect(() => {
@@ -280,19 +282,26 @@ function ManagePageContent() {
     setEditingArtifact(artifact);
   }, []);
 
-  const handleDelete = useCallback(
-    async (artifact: Artifact) => {
-      if (confirm(`Are you sure you want to delete ${artifact.name}?`)) {
-        try {
-          await deleteEntity(artifact.id);
-        } catch (error) {
-          console.error('Delete failed:', error);
-          alert('Failed to delete artifact');
-        }
-      }
-    },
-    [deleteEntity]
-  );
+  const handleDeleteArtifact = useCallback((artifact: Artifact) => {
+    setArtifactToDelete(artifact);
+    setShowDeletionDialog(true);
+  }, []);
+
+  // Handler for delete from card - uses deletion dialog
+  const handleDelete = useCallback((artifact: Artifact) => {
+    handleDeleteArtifact(artifact);
+  }, [handleDeleteArtifact]);
+
+  // Handler for delete from modal - closes modal first then shows deletion dialog
+  const handleDeleteFromModal = useCallback(() => {
+    if (selectedArtifact) {
+      // Close the modal first
+      handleDetailClose();
+      // Then open the deletion dialog
+      setArtifactToDelete(selectedArtifact);
+      setShowDeletionDialog(true);
+    }
+  }, [selectedArtifact, handleDetailClose]);
 
   const handleDeploy = useCallback((artifact: Artifact) => {
     // Open artifact modal to deployments tab for deployment
@@ -464,6 +473,7 @@ function ManagePageContent() {
         initialTab={urlTab || 'status'}
         onTabChange={handleTabChange}
         returnTo={returnTo || undefined}
+        onDelete={handleDeleteFromModal}
       />
 
       {/* Add Dialog */}
@@ -485,6 +495,24 @@ function ManagePageContent() {
             />
           </div>
         </div>
+      )}
+
+      {/* Artifact Deletion Dialog */}
+      {artifactToDelete && (
+        <ArtifactDeletionDialog
+          artifact={artifactToDelete}
+          open={showDeletionDialog}
+          onOpenChange={(open) => {
+            setShowDeletionDialog(open);
+            if (!open) setArtifactToDelete(null);
+          }}
+          context="collection"
+          onSuccess={() => {
+            setShowDeletionDialog(false);
+            setArtifactToDelete(null);
+            refetch();
+          }}
+        />
       )}
     </div>
   );

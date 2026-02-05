@@ -58,9 +58,17 @@ import {
   FolderOpen,
   Github,
   ExternalLink,
+  MoreVertical,
+  Trash2,
 } from 'lucide-react';
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -137,6 +145,8 @@ export interface ArtifactOperationsModalProps {
   returnTo?: string;
   /** Whether artifact data is currently loading */
   isLoading?: boolean;
+  /** Handler for delete action from modal header */
+  onDelete?: () => void;
 }
 
 // ============================================================================
@@ -389,6 +399,7 @@ export function ArtifactOperationsModal({
   onTabChange,
   returnTo,
   isLoading = false,
+  onDelete,
 }: ArtifactOperationsModalProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -781,6 +792,29 @@ export function ArtifactOperationsModal({
         )}
         Sync All
       </Button>
+      {onDelete && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              aria-label={`Actions for ${artifact.name}`}
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={onDelete}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Artifact
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   );
 

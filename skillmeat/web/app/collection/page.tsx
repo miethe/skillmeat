@@ -256,6 +256,17 @@ function CollectionPageContent() {
     setShowGroupsDialog(true);
   };
 
+  // Handler for Delete action from modal
+  const handleDeleteFromModal = useCallback(() => {
+    if (selectedArtifact) {
+      // Close the modal first
+      handleDetailClose();
+      // Then open the deletion dialog
+      setArtifactToDelete(selectedArtifact);
+      setShowDeletionDialog(true);
+    }
+  }, [selectedArtifact, handleDetailClose]);
+
   // Handler to save parameters (same pattern as unified-entity-modal.tsx)
   const handleSaveParameters = async (parameters: ArtifactParameters) => {
     if (!artifactToEdit) return;
@@ -852,6 +863,7 @@ function CollectionPageContent() {
         initialTab={urlTab || 'overview'}
         onTabChange={handleTabChange}
         returnTo={returnTo || undefined}
+        onDelete={handleDeleteFromModal}
       />
 
       {/* Edit Collection Dialog */}

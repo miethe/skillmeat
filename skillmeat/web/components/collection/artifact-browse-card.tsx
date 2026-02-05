@@ -51,6 +51,9 @@ export interface ArtifactBrowseCardProps {
   /** Handler for viewing artifact details */
   onViewDetails?: () => void;
 
+  /** Handler for deleting artifact */
+  onDelete?: (artifact: Artifact) => void;
+
   /** Whether to show collection badge (All Collections view) */
   showCollectionBadge?: boolean;
 
@@ -128,6 +131,7 @@ export function ArtifactBrowseCard({
   onQuickDeploy,
   onAddToGroup,
   onViewDetails,
+  onDelete,
   showCollectionBadge = false,
   onCollectionClick,
   className,
@@ -265,6 +269,22 @@ export function ArtifactBrowseCard({
                 <LucideIcons.Terminal className="mr-2 h-4 w-4" aria-hidden="true" />
                 Copy CLI Command
               </DropdownMenuItem>
+
+              {onDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(artifact);
+                    }}
+                  >
+                    <LucideIcons.Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Delete Artifact
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

@@ -27,6 +27,7 @@ import {
   Link as LinkIcon,
   ExternalLink,
   ArrowRight,
+  MoreVertical,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
@@ -39,6 +40,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ARTIFACT_TYPES, type Artifact } from '@/types/artifact';
 import { useEntityLifecycle } from '@/hooks';
 import { DiffViewer } from '@/components/entity/diff-viewer';
@@ -112,6 +119,8 @@ interface UnifiedEntityModalProps {
   initialTab?: ArtifactModalTab;
   /** Callback when tab changes. Useful for URL state synchronization. */
   onTabChange?: (tab: ArtifactModalTab) => void;
+  /** Handler to delete the artifact. When provided, shows a kebab menu with Delete option. */
+  onDelete?: () => void;
 }
 
 interface HistoryEntry {
@@ -355,6 +364,7 @@ export function UnifiedEntityModal({
   onNavigateToDeployment,
   initialTab = 'overview',
   onTabChange,
+  onDelete,
 }: UnifiedEntityModalProps) {
   // Backward compatibility: accept both 'artifact' and 'entity' props
   // 'artifact' takes precedence if both are provided
@@ -991,7 +1001,7 @@ export function UnifiedEntityModal({
 
     _setIsDeploying(true);
     try {
-      await deployEntity(entity.id, entity.projectPath);
+      await deployEntity(entity.id, entity.projectPath, entity.collection);
       toast({
         title: 'Deploy Successful',
         description: `${entity.name} has been deployed to the project.`,
@@ -1760,6 +1770,29 @@ export function UnifiedEntityModal({
                     {(pathname === "/collection" || pathname?.startsWith("/collection")) ? "Manage Artifact" : "View Full Details"}
                     <ArrowRight className="h-4 w-4" />
                   </Button>
+                )}
+                {onDelete && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        aria-label={`Actions for ${entity?.name || 'artifact'}`}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={onDelete}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Artifact
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </DialogTitle>
             </DialogHeader>

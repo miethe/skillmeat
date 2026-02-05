@@ -38,12 +38,20 @@ import {
   ArrowLeft,
   ArrowUp,
   ArrowDown,
+  MoreVertical,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ModalHeader } from '@/components/shared/modal-header';
 import { TabNavigation, type Tab } from '@/components/shared/tab-navigation';
 import { TabContentWrapper } from '@/components/shared/tab-content-wrapper';
@@ -90,6 +98,8 @@ export interface ArtifactDetailsModalProps {
   returnTo?: string;
   /** Whether artifact data is currently loading */
   isLoading?: boolean;
+  /** Handler for delete action from modal header */
+  onDelete?: () => void;
 }
 
 // ============================================================================
@@ -458,6 +468,7 @@ export function ArtifactDetailsModal({
   onTabChange,
   returnTo,
   isLoading = false,
+  onDelete,
 }: ArtifactDetailsModalProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -800,6 +811,31 @@ export function ArtifactDetailsModal({
                 >
                   <Copy className="h-4 w-4" aria-hidden="true" />
                 </Button>
+
+                {/* Kebab menu with Delete option */}
+                {onDelete && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        aria-label={`Actions for ${artifact?.name || 'artifact'}`}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={onDelete}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Artifact
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
 
                 {/* Deploy button with CLI options */}
                 <DeployButton
