@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, X, Loader2 } from 'lucide-react';
 import { FileDiff } from '../../sdk/models/FileDiff';
 import { Badge } from '@/components/ui/badge';
@@ -69,6 +69,17 @@ function DiffLine({ content, type, lineNumber }: DiffLineProps) {
         {lineNumber !== undefined ? lineNumber : ''}
       </span>
       <span className="flex-1 whitespace-pre px-2">{content}</span>
+    </div>
+  );
+}
+
+function SpacerLine() {
+  return (
+    <div className="flex border-b border-border/50 bg-muted/20 font-mono text-sm">
+      <span className="w-12 flex-shrink-0 select-none border-r border-border/50 pr-2 text-right text-gray-400">
+        &nbsp;
+      </span>
+      <span className="flex-1 whitespace-pre px-2">&nbsp;</span>
     </div>
   );
 }
@@ -209,6 +220,39 @@ export function DiffViewer({
   const parsedDiff = useMemo(() => {
     return selectedFile?.unified_diff ? parseDiff(selectedFile.unified_diff) : [];
   }, [selectedFile?.unified_diff]);
+
+  // Refs for synchronized scrolling between left and right panels
+  const leftScrollRef = useRef<HTMLDivElement>(null);
+  const rightScrollRef = useRef<HTMLDivElement>(null);
+
+  // Synchronized scrolling between left and right diff panels
+  useEffect(() => {
+    const leftScroll = leftScrollRef.current;
+    const rightScroll = rightScrollRef.current;
+    if (!leftScroll || !rightScroll) return;
+
+    let isSyncing = false;
+
+    const syncScroll = (source: HTMLDivElement, target: HTMLDivElement) => {
+      if (isSyncing) return;
+      isSyncing = true;
+      target.scrollTop = source.scrollTop;
+      requestAnimationFrame(() => {
+        isSyncing = false;
+      });
+    };
+
+    const onLeftScroll = () => syncScroll(leftScroll, rightScroll);
+    const onRightScroll = () => syncScroll(rightScroll, leftScroll);
+
+    leftScroll.addEventListener('scroll', onLeftScroll);
+    rightScroll.addEventListener('scroll', onRightScroll);
+
+    return () => {
+      leftScroll.removeEventListener('scroll', onLeftScroll);
+      rightScroll.removeEventListener('scroll', onRightScroll);
+    };
+  }, []);
 
   // Memoize summary calculation
   const summary = useMemo(() => {
@@ -352,7 +396,7 @@ export function DiffViewer({
             </div>
           </div>
 
-          {/* Side-by-side diff */}
+          {/* Side-by-side diff with synchronized scrolling and line alignment */}
           {selectedFile?.status === 'modified' && selectedFile.unified_diff ? (
             <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
               {/* Left panel */}
@@ -360,9 +404,11 @@ export function DiffViewer({
                 <div className="flex-shrink-0 border-b bg-muted/50 px-4 py-2 text-sm font-medium">
                   {leftLabel}
                 </div>
-                <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+                <div ref={leftScrollRef} className="min-h-0 min-w-0 flex-1 overflow-auto">
                   {parsedDiff.map((line, idx) => {
-                    if (line.type === 'addition') return null;
+                    if (line.type === 'addition') {
+                      return <SpacerLine key={idx} />;
+                    }
                     if (line.type === 'header') {
                       return (
                         <DiffLine key={idx} content={line.content} type="header" side="left" />
@@ -386,9 +432,11 @@ export function DiffViewer({
                 <div className="flex-shrink-0 border-b bg-muted/50 px-4 py-2 text-sm font-medium">
                   {rightLabel}
                 </div>
-                <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+                <div ref={rightScrollRef} className="min-h-0 min-w-0 flex-1 overflow-auto">
                   {parsedDiff.map((line, idx) => {
-                    if (line.type === 'deletion') return null;
+                    if (line.type === 'deletion') {
+                      return <SpacerLine key={idx} />;
+                    }
                     if (line.type === 'header') {
                       return (
                         <DiffLine key={idx} content={line.content} type="header" side="right" />

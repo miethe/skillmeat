@@ -182,7 +182,7 @@ export function SyncConfirmationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden">
+      <DialogContent className="flex max-h-[90vh] max-w-7xl flex-col overflow-hidden">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <DirectionIcon className="h-5 w-5" />
@@ -245,7 +245,7 @@ export function SyncConfirmationDialog({
               </div>
 
               {/* Diff viewer */}
-              <div className="h-[50vh] min-h-[300px]">
+              <div className="h-[60vh] min-h-[300px]">
                 <DiffViewer
                   files={displayedFiles}
                   leftLabel={config.leftLabel}
