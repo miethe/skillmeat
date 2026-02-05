@@ -53,6 +53,46 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+// Mock SyncConfirmationDialog to avoid useConflictCheck API calls.
+// The dialog is unit-tested separately; here we test the SyncStatusTab integration.
+jest.mock('@/components/sync-status/sync-confirmation-dialog', () => ({
+  SyncConfirmationDialog: ({
+    direction,
+    open,
+    onOpenChange,
+    onOverwrite,
+    onMerge,
+  }: {
+    direction: string;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onOverwrite: () => void;
+    onMerge: () => void;
+    artifact: unknown;
+    projectPath: string;
+  }) => {
+    if (!open) return null;
+    const titles: Record<string, string> = {
+      deploy: 'Deploy to Project',
+      push: 'Push to Collection',
+      pull: 'Pull from Source',
+    };
+    const confirmLabels: Record<string, string> = {
+      deploy: 'Deploy',
+      push: 'Push Changes',
+      pull: 'Pull Changes',
+    };
+    return (
+      <div role="dialog" aria-label={titles[direction]}>
+        <span>{titles[direction]}</span>
+        <button onClick={onOverwrite}>{confirmLabels[direction]}</button>
+        <button onClick={onMerge}>Merge</button>
+        <button onClick={() => onOpenChange(false)}>Cancel</button>
+      </div>
+    );
+  },
+}));
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -784,7 +824,7 @@ describe('SyncStatusTab - Confirmation Dialogs', () => {
 
       // AlertDialog should appear with expected content
       await waitFor(() => {
-        const dialog = screen.getByRole('alertdialog');
+        const dialog = screen.getByRole('dialog');
         expect(dialog).toBeInTheDocument();
         const dialogScope = within(dialog);
         expect(dialogScope.getByText('Pull from Source')).toBeInTheDocument();
@@ -814,7 +854,7 @@ describe('SyncStatusTab - Confirmation Dialogs', () => {
       // Open dialog
       await user.click(screen.getByRole('button', { name: /Pull from Source/i }));
       await waitFor(() => {
-        expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
       });
 
       // Record the number of apiRequest calls before cancel
@@ -823,12 +863,12 @@ describe('SyncStatusTab - Confirmation Dialogs', () => {
       ).length;
 
       // Click Cancel within the dialog
-      const dialog = screen.getByRole('alertdialog');
+      const dialog = screen.getByRole('dialog');
       await user.click(within(dialog).getByText('Cancel'));
 
       // Dialog should close
       await waitFor(() => {
-        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       });
 
       // No new /sync API calls should have been made
@@ -859,10 +899,10 @@ describe('SyncStatusTab - Confirmation Dialogs', () => {
       // Open dialog then confirm
       await user.click(screen.getByRole('button', { name: /Pull from Source/i }));
       await waitFor(() => {
-        expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
       });
 
-      const dialog = screen.getByRole('alertdialog');
+      const dialog = screen.getByRole('dialog');
       await user.click(within(dialog).getByText('Pull Changes'));
 
       // Verify the sync API was called (POST to /artifacts/{id}/sync without project_path)
@@ -914,7 +954,7 @@ describe('SyncStatusTab - Confirmation Dialogs', () => {
 
       // AlertDialog should appear with expected content
       await waitFor(() => {
-        const dialog = screen.getByRole('alertdialog');
+        const dialog = screen.getByRole('dialog');
         expect(dialog).toBeInTheDocument();
         const dialogScope = within(dialog);
         expect(dialogScope.getByText('Push to Collection')).toBeInTheDocument();
@@ -943,7 +983,7 @@ describe('SyncStatusTab - Confirmation Dialogs', () => {
       // Open dialog
       await user.click(screen.getByRole('button', { name: /Push to Collection/i }));
       await waitFor(() => {
-        expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
       });
 
       // Record sync calls before cancel
@@ -955,12 +995,12 @@ describe('SyncStatusTab - Confirmation Dialogs', () => {
       ).length;
 
       // Click Cancel within the dialog
-      const dialog = screen.getByRole('alertdialog');
+      const dialog = screen.getByRole('dialog');
       await user.click(within(dialog).getByText('Cancel'));
 
       // Dialog should close
       await waitFor(() => {
-        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       });
 
       // No new POST /sync calls
@@ -993,10 +1033,10 @@ describe('SyncStatusTab - Confirmation Dialogs', () => {
       // Open dialog then confirm
       await user.click(screen.getByRole('button', { name: /Push to Collection/i }));
       await waitFor(() => {
-        expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
       });
 
-      const dialog = screen.getByRole('alertdialog');
+      const dialog = screen.getByRole('dialog');
       await user.click(within(dialog).getByText('Push Changes'));
 
       // Verify the sync API was called with project_path in body (push)
