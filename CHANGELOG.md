@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Deployment Statistics In-Memory Cache (2026-02-04)
+
+- Added `DeploymentStatsCache` with two-level TTL cache for project discovery and per-artifact deployment stats
+- Sync Status tab now loads near-instantly on successive views (2-minute cache TTL)
+- FileWatcher invalidates cache when `.skillmeat-deployed.toml` changes
+- Deploy/undeploy operations automatically invalidate affected cache entries
+
 #### Tag Manager Settings Page (2026-02-03)
 
 **Tag Management UI**
