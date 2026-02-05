@@ -5197,6 +5197,21 @@ async def update_artifact_file_content(
 
         logger.info(f"Successfully updated file content: {artifact_id}/{file_path}")
 
+        # Refresh DB cache after successful file update (non-blocking)
+        try:
+            db_session = get_session()
+            try:
+                refresh_single_artifact_cache(
+                    db_session, _artifact_mgr, artifact_id, collection_name
+                )
+                logger.debug(f"Refreshed cache after file update: {artifact_id}")
+            finally:
+                db_session.close()
+        except Exception as cache_err:
+            logger.warning(
+                f"Cache refresh failed after file update for {artifact_id}: {cache_err}"
+            )
+
         return FileContentResponse(
             artifact_id=artifact_id,
             artifact_name=artifact_name,
@@ -5482,6 +5497,21 @@ async def create_artifact_file(
 
         logger.info(f"Successfully created file: {artifact_id}/{file_path}")
 
+        # Refresh DB cache after successful file create (non-blocking)
+        try:
+            db_session = get_session()
+            try:
+                refresh_single_artifact_cache(
+                    db_session, _artifact_mgr, artifact_id, collection_name
+                )
+                logger.debug(f"Refreshed cache after file create: {artifact_id}")
+            finally:
+                db_session.close()
+        except Exception as cache_err:
+            logger.warning(
+                f"Cache refresh failed after file create for {artifact_id}: {cache_err}"
+            )
+
         return FileContentResponse(
             artifact_id=artifact_id,
             artifact_name=artifact_name,
@@ -5724,6 +5754,21 @@ async def delete_artifact_file(
             )
 
         logger.info(f"Successfully deleted file: {artifact_id}/{file_path}")
+
+        # Refresh DB cache after successful file delete (non-blocking)
+        try:
+            db_session = get_session()
+            try:
+                refresh_single_artifact_cache(
+                    db_session, _artifact_mgr, artifact_id, collection_name
+                )
+                logger.debug(f"Refreshed cache after file delete: {artifact_id}")
+            finally:
+                db_session.close()
+        except Exception as cache_err:
+            logger.warning(
+                f"Cache refresh failed after file delete for {artifact_id}: {cache_err}"
+            )
 
     except HTTPException:
         raise
