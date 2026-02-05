@@ -178,6 +178,8 @@ export function useDeleteTag() {
       queryClient.invalidateQueries({ queryKey: tagKeys.all });
       // Invalidate artifact queries since artifacts embed tag data
       queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      // Invalidate all per-artifact tag queries (prefix match)
+      queryClient.invalidateQueries({ queryKey: ['tags', 'artifact'] });
     },
   });
 }
@@ -206,6 +208,7 @@ export function useAddTagToArtifact() {
     onSuccess: (_, { artifactId }) => {
       // Invalidate artifact's tags to trigger refetch
       queryClient.invalidateQueries({ queryKey: tagKeys.artifact(artifactId) });
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] }); // Artifact list embeds tags
     },
   });
 }
@@ -234,6 +237,7 @@ export function useRemoveTagFromArtifact() {
     onSuccess: (_, { artifactId }) => {
       // Invalidate artifact's tags to trigger refetch
       queryClient.invalidateQueries({ queryKey: tagKeys.artifact(artifactId) });
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] }); // Artifact list embeds tags
     },
   });
 }

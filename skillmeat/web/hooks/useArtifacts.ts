@@ -342,7 +342,7 @@ export function useArtifacts(
     queryFn: async (): Promise<ArtifactsResponse> => {
       return await fetchArtifactsFromApi(filters, sort);
     },
-    staleTime: 30000, // Consider data fresh for 30 seconds
+    staleTime: 5 * 60 * 1000, // 5 min - standard browsing stale time
   });
 }
 
@@ -356,6 +356,7 @@ export function useArtifact(id: string) {
       return await fetchArtifactFromApi(id);
     },
     enabled: !!id,
+    staleTime: 5 * 60 * 1000, // 5 min - matches useArtifacts()
   });
 }
 
@@ -413,6 +414,10 @@ export function useDeleteArtifact() {
     onSuccess: () => {
       // Invalidate and refetch artifacts
       queryClient.invalidateQueries({ queryKey: artifactKeys.all });
+      // Artifact may have been deployed
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
+      // Collection membership changes
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
     },
   });
 }

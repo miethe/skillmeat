@@ -74,6 +74,8 @@ export function useCacheRefresh(projectId?: string) {
         await queryClient.invalidateQueries({ queryKey: ['projects'] });
         await queryClient.invalidateQueries({ queryKey: ['cache'] });
       }
+      // Cache refresh updates artifact metadata
+      await queryClient.invalidateQueries({ queryKey: ['artifacts'] });
     },
   });
 

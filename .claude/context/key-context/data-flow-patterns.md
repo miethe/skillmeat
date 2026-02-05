@@ -20,7 +20,7 @@ Web mutations on filesystem-backed data:
 - After deploy / undeploy
 - After sync
 - After import
-- After file create/update/delete (required but historically missing)
+- After file create/update/delete
 
 ---
 

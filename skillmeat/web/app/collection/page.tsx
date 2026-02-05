@@ -9,7 +9,7 @@ import { CollectionToolbar } from '@/components/collection/collection-toolbar';
 import { ArtifactGrid } from '@/components/collection/artifact-grid';
 import { ArtifactList } from '@/components/collection/artifact-list';
 import { ArtifactBrowseCardSkeleton } from '@/components/collection/artifact-browse-card';
-import { ArtifactDetailsModal, type ArtifactDetailsTab } from '@/components/collection/artifact-details-modal';
+import { CollectionArtifactModal, type ArtifactModalTab } from '@/components/shared/CollectionArtifactModal';
 import { EditCollectionDialog } from '@/components/collection/edit-collection-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
 import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
@@ -180,7 +180,7 @@ function CollectionPageContent() {
   const urlArtifactId = searchParams.get('artifact');
   const urlCollectionId = searchParams.get('collection');
   const urlGroupId = searchParams.get('group');
-  const urlTab = searchParams.get('tab') as ArtifactDetailsTab | null;
+  const urlTab = searchParams.get('tab') as ArtifactModalTab | null;
 
   // Helper to update URL params without full page reload
   const updateUrlParams = useCallback(
@@ -638,7 +638,18 @@ function CollectionPageContent() {
     }, 0);
   };
 
-  const handleTabChange = (tab: ArtifactDetailsTab) => {
+  // Handler for Delete action from modal (must be after handleDetailClose)
+  const handleDeleteFromModal = useCallback(() => {
+    if (selectedArtifact) {
+      // Close the modal first
+      handleDetailClose();
+      // Then open the deletion dialog
+      setArtifactToDelete(selectedArtifact);
+      setShowDeletionDialog(true);
+    }
+  }, [selectedArtifact, handleDetailClose]);
+
+  const handleTabChange = (tab: ArtifactModalTab) => {
     // Update URL with new tab
     updateUrlParams({
       tab: tab === 'overview' ? null : tab, // Don't clutter URL with default tab
@@ -844,14 +855,15 @@ function CollectionPageContent() {
         )}
       </div>
 
-      {/* Artifact Detail Modal - Discovery-focused modal */}
-      <ArtifactDetailsModal
+      {/* Artifact Detail Modal - Unified modal with deployments tab */}
+      <CollectionArtifactModal
         artifact={selectedArtifact}
         open={isDetailOpen}
         onClose={handleDetailClose}
         initialTab={urlTab || 'overview'}
         onTabChange={handleTabChange}
         returnTo={returnTo || undefined}
+        onDelete={handleDeleteFromModal}
       />
 
       {/* Edit Collection Dialog */}

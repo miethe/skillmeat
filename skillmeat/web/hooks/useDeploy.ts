@@ -50,8 +50,16 @@ export function useDeploy(options: UseDeployOptions = {}) {
       // Construct artifact_id in format "type:name"
       const artifactId = `${request.artifactType}:${request.artifactName}`;
 
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (request.collectionName) {
+        params.set('collection', request.collectionName);
+      }
+      const queryString = params.toString();
+
       // Call backend API
-      const response = await apiRequest<DeployResponse>(`/artifacts/${encodeURIComponent(artifactId)}/deploy`, {
+      const url = `/artifacts/${encodeURIComponent(artifactId)}/deploy${queryString ? `?${queryString}` : ''}`;
+      const response = await apiRequest<DeployResponse>(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

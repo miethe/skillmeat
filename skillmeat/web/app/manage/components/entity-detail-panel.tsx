@@ -192,7 +192,7 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
 
     setIsDeploying(true);
     try {
-      await deployEntity(entity.id, entity.projectPath);
+      await deployEntity(entity.id, entity.projectPath, entity.collection);
     } catch (error) {
       console.error('Deploy failed:', error);
       alert('Failed to deploy entity');
