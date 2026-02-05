@@ -26,6 +26,7 @@ import {
   Trash2,
   Link as LinkIcon,
   ExternalLink,
+  ArrowLeft,
   ArrowRight,
   MoreVertical,
 } from 'lucide-react';
@@ -121,6 +122,8 @@ interface UnifiedEntityModalProps {
   onTabChange?: (tab: ArtifactModalTab) => void;
   /** Handler to delete the artifact. When provided, shows a kebab menu with Delete option. */
   onDelete?: () => void;
+  /** Optional URL for return navigation (e.g., when deep-linked from another page). Shows a Return button in the header. */
+  returnTo?: string;
 }
 
 interface HistoryEntry {
@@ -365,6 +368,7 @@ export function UnifiedEntityModal({
   initialTab = 'overview',
   onTabChange,
   onDelete,
+  returnTo,
 }: UnifiedEntityModalProps) {
   // Backward compatibility: accept both 'artifact' and 'entity' props
   // 'artifact' takes precedence if both are provided
@@ -1750,6 +1754,21 @@ export function UnifiedEntityModal({
                   <Badge variant={entity.syncStatus === 'synced' ? 'default' : 'secondary'}>
                     {getStatusLabel()}
                   </Badge>
+                )}
+                {returnTo && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      onClose?.();
+                      router.push(returnTo);
+                    }}
+                    className="gap-2 text-muted-foreground hover:text-foreground"
+                    aria-label="Return to previous page"
+                  >
+                    <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                    <span>Return</span>
+                  </Button>
                 )}
                 {(pathname === "/collection" || pathname?.startsWith("/collection") || pathname === "/manage" || pathname?.startsWith("/manage")) && (
                   <Button
