@@ -5,7 +5,7 @@ or duplicate behavior.
 
 ## When Picking a Hook
 
-1. Check `.claude/rules/web/hooks.md` inventory for the exact hook name and file.
+1. Check `skillmeat/web/hooks/index.ts` and `.claude/context/key-context/hook-selection-and-deprecations.md` for canonical hook selection.
 2. Prefer hooks exported from `skillmeat/web/hooks/index.ts`.
 3. Avoid hooks marked deprecated in the graph overrides or inline docs.
 4. If multiple hooks map to the same API client, pick the canonical one (see

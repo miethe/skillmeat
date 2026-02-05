@@ -209,7 +209,7 @@ async def update_artifact(artifact_id: str, request: ArtifactCreateRequest, ...)
 async def delete_artifact(artifact_id: str, ...): ...
 ```
 
-See `.claude/rules/api/routers.md` for layer contract and HTTP patterns.
+See `.claude/context/key-context/router-patterns.md` for layer contract and HTTP patterns.
 
 ---
 
@@ -496,20 +496,13 @@ async def create_artifact(
 
 ---
 
-## Path-Specific Rules
-
-Rule file in `.claude/rules/api/` auto-loaded when editing this directory:
-
-| File | Scope | Contains |
-|------|-------|----------|
-| `routers.md` | `routers/**/*.py` | Layered architecture, HTTP patterns, HTTPException usage |
-
----
-
 ## Context Files
 
 | File | Load When |
 |------|-----------|
+| `.claude/context/key-context/context-loading-playbook.md` | Select minimal context by task |
+| `.claude/context/key-context/api-contract-source-of-truth.md` | Endpoint/schema validation and drift checks |
+| `.claude/context/key-context/fe-be-type-sync-playbook.md` | Backend schema changes affecting frontend payloads |
 | `.claude/context/key-context/data-flow-patterns.md` | Cache sync, write-through, invalidation rules |
 | `.claude/context/api-endpoint-mapping.md` | Adding/debugging endpoints |
 
@@ -518,6 +511,7 @@ Rule file in `.claude/rules/api/` auto-loaded when editing this directory:
 ## Important Notes
 
 - **AppState Pattern**: Shared manager instances initialized in lifespan, not stateless
+- **Contract Authority**: `skillmeat/api/openapi.json` is the source of truth for endpoint contracts
 - **Default Port**: 8080 (not 8000)
 - **Default Host**: 127.0.0.1 (dev) or 0.0.0.0 (production)
 - **Cache Layer**: SQLAlchemy + Alembic fully implemented in `skillmeat/cache/`
