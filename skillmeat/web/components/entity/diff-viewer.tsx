@@ -460,7 +460,9 @@ export function DiffViewer({
                       isSelected && 'bg-accent'
                     )}
                   >
-                    <button
+                    <span
+                      role="button"
+                      tabIndex={-1}
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleFileExpansion(index);
@@ -472,7 +474,7 @@ export function DiffViewer({
                       ) : (
                         <ChevronRight className="h-3 w-3" />
                       )}
-                    </button>
+                    </span>
                     <span className="flex-1 truncate font-mono text-xs">{file.file_path}</span>
                     <FileStatusBadge status={file.status} />
                   </button>
