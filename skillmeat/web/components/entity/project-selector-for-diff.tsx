@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Folder,
@@ -151,6 +151,8 @@ export function ProjectSelectorForDiff({
 }: ProjectSelectorForDiffProps) {
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isEmptyCollapsed, setIsEmptyCollapsed] = useState(false);
+  const emptyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch artifact details with deployment statistics
   const {
@@ -183,6 +185,34 @@ export function ProjectSelectorForDiff({
         isModified: project.is_modified,
       };
     }) ?? [];
+
+  // Auto-collapse empty state after 3 seconds; reset when artifact data changes
+  // Use artifactData reference (stable from React Query) instead of deployments
+  // array which is re-created on every render
+  useEffect(() => {
+    // Clear any existing timer
+    if (emptyTimerRef.current) {
+      clearTimeout(emptyTimerRef.current);
+      emptyTimerRef.current = null;
+    }
+
+    // Reset collapsed state when data changes (e.g., rescan)
+    setIsEmptyCollapsed(false);
+
+    // Only set timer when there are no deployments and data has loaded
+    const hasDeployments = (artifactData?.deployment_stats?.projects?.length ?? 0) > 0;
+    if (!hasDeployments && !isLoading && !error) {
+      emptyTimerRef.current = setTimeout(() => {
+        setIsEmptyCollapsed(true);
+      }, 3000);
+    }
+
+    return () => {
+      if (emptyTimerRef.current) {
+        clearTimeout(emptyTimerRef.current);
+      }
+    };
+  }, [artifactData, isLoading, error]);
 
   const handleProjectClick = (projectPath: string) => {
     setSelectedProject(projectPath);
@@ -218,18 +248,43 @@ export function ProjectSelectorForDiff({
     );
   }
 
-  // Empty state - no deployments
+  // Empty state - no deployments (auto-collapses after 3 seconds)
   if (deployments.length === 0) {
     return (
-      <div className="rounded-lg border bg-muted/20 p-8">
-        <div className="flex flex-col items-center justify-center gap-3 text-center">
-          <Folder className="h-12 w-12 text-muted-foreground opacity-50" />
-          <div>
-            <h3 className="mb-2 text-lg font-semibold">No deployments found</h3>
-            <p className="max-w-md text-sm text-muted-foreground">
-              This artifact has not been deployed to any projects yet. Deploy it to a project to
-              view diffs and sync status.
-            </p>
+      <div className="transition-all duration-300 ease-in-out">
+        {/* Collapsed: slim horizontal bar */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            isEmptyCollapsed
+              ? 'max-h-12 opacity-100'
+              : 'max-h-0 opacity-0'
+          }`}
+        >
+          <div className="flex items-center gap-2 rounded-md border bg-muted/10 px-4 py-2">
+            <Folder className="h-4 w-4 text-muted-foreground opacity-50" />
+            <span className="text-sm text-muted-foreground">No deployments found</span>
+          </div>
+        </div>
+
+        {/* Expanded: full empty state message */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            isEmptyCollapsed
+              ? 'max-h-0 opacity-0'
+              : 'max-h-64 opacity-100'
+          }`}
+        >
+          <div className="rounded-lg border bg-muted/20 p-8">
+            <div className="flex flex-col items-center justify-center gap-3 text-center">
+              <Folder className="h-12 w-12 text-muted-foreground opacity-50" />
+              <div>
+                <h3 className="mb-2 text-lg font-semibold">No deployments found</h3>
+                <p className="max-w-md text-sm text-muted-foreground">
+                  This artifact has not been deployed to any projects yet. Deploy it to a project to
+                  view diffs and sync status.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

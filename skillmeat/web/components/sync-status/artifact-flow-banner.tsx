@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Github, Layers, Folder, ArrowRight, Loader2 } from 'lucide-react';
+import { Github, Layers, Folder, ArrowRight, Loader2, ChevronUp, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -74,10 +74,95 @@ export function ArtifactFlowBanner({
   isDeploying,
   isPushing,
 }: ArtifactFlowBannerProps) {
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
   const truncateSha = (sha: string): string => sha.slice(0, 7);
 
+  if (isCollapsed) {
+    return (
+      <div
+        className="flex w-full cursor-pointer items-center gap-3 rounded-lg border bg-card px-4 py-2 transition-colors hover:bg-accent/50"
+        onClick={() => setIsCollapsed(false)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsCollapsed(false);
+          }
+        }}
+        aria-label="Expand artifact flow banner"
+      >
+        {/* Source summary */}
+        <div className="flex items-center gap-1.5">
+          <Github className="h-3.5 w-3.5 text-muted-foreground" />
+          {sourceInfo ? (
+            <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono text-muted-foreground">
+              {truncateSha(sourceInfo.sha)}
+            </code>
+          ) : (
+            <span className="text-[10px] italic text-muted-foreground/50">Not configured</span>
+          )}
+        </div>
+
+        <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+
+        {/* Collection summary */}
+        <div className="flex items-center gap-1.5">
+          <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+          <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono text-muted-foreground">
+            {truncateSha(collectionInfo.sha)}
+          </code>
+        </div>
+
+        <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+
+        {/* Project summary */}
+        <div className="flex items-center gap-1.5">
+          <Folder className="h-3.5 w-3.5 text-muted-foreground" />
+          {projectInfo ? (
+            <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono text-muted-foreground">
+              {truncateSha(projectInfo.sha)}
+            </code>
+          ) : (
+            <span className="text-[10px] italic text-muted-foreground/50">Not deployed</span>
+          )}
+        </div>
+
+        {/* Status badges */}
+        <div className="flex items-center gap-1.5">
+          {sourceInfo?.hasUpdate && (
+            <Badge variant="default" className="h-4 bg-blue-500 px-1 py-0 text-[10px] leading-none">
+              New Update
+            </Badge>
+          )}
+          {projectInfo?.isModified && (
+            <Badge
+              variant="secondary"
+              className="h-4 bg-yellow-500/20 px-1 py-0 text-[10px] leading-none text-yellow-700 dark:text-yellow-400"
+            >
+              Modified
+            </Badge>
+          )}
+        </div>
+
+        {/* Expand indicator */}
+        <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-colors hover:text-foreground" />
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full rounded-lg border bg-card p-6">
+    <div className="relative w-full rounded-lg border bg-card p-6">
+      {/* Collapse button */}
+      <button
+        type="button"
+        onClick={() => setIsCollapsed(true)}
+        className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        aria-label="Collapse artifact flow banner"
+      >
+        <ChevronUp className="h-4 w-4" />
+      </button>
+
       <div className="flex items-center justify-between gap-4">
         {/* SOURCE NODE */}
         <div className="flex flex-col items-center gap-2">
