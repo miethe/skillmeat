@@ -8,6 +8,7 @@ import { useConflictCheck } from '@/hooks/use-conflict-check';
 import { apiRequest } from '@/lib/api';
 import type { ArtifactDiffResponse } from '@/sdk/models/ArtifactDiffResponse';
 import type { ArtifactUpstreamDiffResponse } from '@/sdk/models/ArtifactUpstreamDiffResponse';
+import type { FileDiff } from '@/sdk/models/FileDiff';
 
 // Mock apiRequest
 jest.mock('@/lib/api', () => ({
@@ -15,6 +16,45 @@ jest.mock('@/lib/api', () => ({
 }));
 
 const mockApiRequest = apiRequest as jest.MockedFunction<typeof apiRequest>;
+
+// Helper factories for creating valid mock data
+const createMockFileDiff = (overrides?: Partial<FileDiff>): FileDiff => ({
+  file_path: 'test.txt',
+  status: 'modified',
+  collection_hash: null,
+  project_hash: null,
+  unified_diff: null,
+  ...overrides,
+});
+
+const createMockArtifactDiffResponse = (
+  overrides?: Partial<ArtifactDiffResponse>
+): ArtifactDiffResponse => ({
+  artifact_id: 'test-artifact',
+  artifact_name: 'test-skill',
+  artifact_type: 'skill',
+  collection_name: 'default',
+  project_path: '/path/to/project',
+  has_changes: false,
+  files: [],
+  summary: {},
+  ...overrides,
+});
+
+const createMockUpstreamDiffResponse = (
+  overrides?: Partial<ArtifactUpstreamDiffResponse>
+): ArtifactUpstreamDiffResponse => ({
+  artifact_id: 'test-artifact',
+  artifact_name: 'test-skill',
+  artifact_type: 'skill',
+  collection_name: 'default',
+  upstream_source: 'github/user/repo',
+  upstream_version: 'v1.0.0',
+  has_changes: false,
+  files: [],
+  summary: {},
+  ...overrides,
+});
 
 describe('useConflictCheck', () => {
   let queryClient: QueryClient;
@@ -41,11 +81,11 @@ describe('useConflictCheck', () => {
 
   describe('Deploy direction', () => {
     it('calls /artifacts/{id}/diff endpoint with project_path', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: false,
         files: [],
         summary: {},
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -69,11 +109,11 @@ describe('useConflictCheck', () => {
     });
 
     it('encodes artifact ID in URL', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: false,
         files: [],
         summary: {},
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -96,11 +136,11 @@ describe('useConflictCheck', () => {
     });
 
     it('includes collection parameter when provided', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: false,
         files: [],
         summary: {},
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -126,11 +166,11 @@ describe('useConflictCheck', () => {
 
   describe('Push direction', () => {
     it('calls /artifacts/{id}/diff endpoint with project_path', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: false,
         files: [],
         summary: {},
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -155,11 +195,11 @@ describe('useConflictCheck', () => {
 
   describe('Pull direction', () => {
     it('calls /artifacts/{id}/upstream-diff endpoint', async () => {
-      const mockResponse: ArtifactUpstreamDiffResponse = {
+      const mockResponse = createMockUpstreamDiffResponse({
         has_changes: false,
         files: [],
         summary: {},
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -180,11 +220,11 @@ describe('useConflictCheck', () => {
     });
 
     it('does not require projectPath for pull direction', async () => {
-      const mockResponse: ArtifactUpstreamDiffResponse = {
+      const mockResponse = createMockUpstreamDiffResponse({
         has_changes: false,
         files: [],
         summary: {},
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -200,11 +240,11 @@ describe('useConflictCheck', () => {
     });
 
     it('includes collection parameter when provided for pull', async () => {
-      const mockResponse: ArtifactUpstreamDiffResponse = {
+      const mockResponse = createMockUpstreamDiffResponse({
         has_changes: false,
         files: [],
         summary: {},
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -229,11 +269,11 @@ describe('useConflictCheck', () => {
 
   describe('hasChanges computed property', () => {
     it('returns true when diffData.has_changes is true', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: true,
-        files: [{ path: 'test.txt', status: 'modified' }],
+        files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
         summary: { modified: 1 },
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -252,11 +292,11 @@ describe('useConflictCheck', () => {
     });
 
     it('returns false when diffData.has_changes is false', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: false,
         files: [],
         summary: {},
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -277,17 +317,16 @@ describe('useConflictCheck', () => {
 
   describe('targetHasChanges computed property', () => {
     it('returns true for deploy when files have change_origin "local"', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: true,
         files: [
           {
-            path: 'test.txt',
-            status: 'modified',
+            ...createMockFileDiff({ file_path: 'test.txt', status: 'modified' }),
             change_origin: 'local',
           } as any,
         ],
         summary: { modified: 1 },
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -306,17 +345,16 @@ describe('useConflictCheck', () => {
     });
 
     it('returns true for deploy when files have change_origin "both"', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: true,
         files: [
           {
-            path: 'test.txt',
-            status: 'modified',
+            ...createMockFileDiff({ file_path: 'test.txt', status: 'modified' }),
             change_origin: 'both',
           } as any,
         ],
         summary: { modified: 1 },
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -335,17 +373,16 @@ describe('useConflictCheck', () => {
     });
 
     it('returns false for deploy when files have only change_origin "upstream"', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: true,
         files: [
           {
-            path: 'test.txt',
-            status: 'modified',
+            ...createMockFileDiff({ file_path: 'test.txt', status: 'modified' }),
             change_origin: 'upstream',
           } as any,
         ],
         summary: { modified: 1 },
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -364,17 +401,16 @@ describe('useConflictCheck', () => {
     });
 
     it('returns true for push when files have change_origin "upstream"', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: true,
         files: [
           {
-            path: 'test.txt',
-            status: 'modified',
+            ...createMockFileDiff({ file_path: 'test.txt', status: 'modified' }),
             change_origin: 'upstream',
           } as any,
         ],
         summary: { modified: 1 },
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -393,17 +429,16 @@ describe('useConflictCheck', () => {
     });
 
     it('returns true for pull when files have change_origin "local"', async () => {
-      const mockResponse: ArtifactUpstreamDiffResponse = {
+      const mockResponse = createMockUpstreamDiffResponse({
         has_changes: true,
         files: [
           {
-            path: 'test.txt',
-            status: 'modified',
+            ...createMockFileDiff({ file_path: 'test.txt', status: 'modified' }),
             change_origin: 'local',
           } as any,
         ],
         summary: { modified: 1 },
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -418,14 +453,14 @@ describe('useConflictCheck', () => {
     });
 
     it('falls back to status-based detection when change_origin is missing (deploy)', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: true,
         files: [
-          { path: 'test1.txt', status: 'modified' },
-          { path: 'test2.txt', status: 'deleted' },
+          createMockFileDiff({ file_path: 'test1.txt', status: 'modified' }),
+          createMockFileDiff({ file_path: 'test2.txt', status: 'deleted' }),
         ],
         summary: { modified: 1, deleted: 1 },
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -444,14 +479,14 @@ describe('useConflictCheck', () => {
     });
 
     it('falls back to status-based detection when change_origin is missing (push)', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: true,
         files: [
-          { path: 'test1.txt', status: 'modified' },
-          { path: 'test2.txt', status: 'added' },
+          createMockFileDiff({ file_path: 'test1.txt', status: 'modified' }),
+          createMockFileDiff({ file_path: 'test2.txt', status: 'added' }),
         ],
         summary: { modified: 1, added: 1 },
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -470,11 +505,11 @@ describe('useConflictCheck', () => {
     });
 
     it('returns false when no files have target-side changes', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: true,
-        files: [{ path: 'test.txt', status: 'added' }],
+        files: [createMockFileDiff({ file_path: 'test.txt', status: 'added' })],
         summary: { added: 1 },
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -495,17 +530,16 @@ describe('useConflictCheck', () => {
 
   describe('hasConflicts computed property', () => {
     it('returns true when files have change_origin "both"', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: true,
         files: [
           {
-            path: 'test.txt',
-            status: 'modified',
+            ...createMockFileDiff({ file_path: 'test.txt', status: 'modified' }),
             change_origin: 'both',
           } as any,
         ],
         summary: { modified: 1 },
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -524,11 +558,11 @@ describe('useConflictCheck', () => {
     });
 
     it('returns true when summary.conflicts > 0', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: true,
-        files: [{ path: 'test.txt', status: 'modified' }],
+        files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
         summary: { modified: 1, conflicts: 2 },
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -547,11 +581,11 @@ describe('useConflictCheck', () => {
     });
 
     it('returns false when no conflicts exist', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: true,
-        files: [{ path: 'test.txt', status: 'modified' }],
+        files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
         summary: { modified: 1 },
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -589,11 +623,11 @@ describe('useConflictCheck', () => {
     });
 
     it('returns isLoading false after fetch completes', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: false,
         files: [],
         summary: {},
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -708,11 +742,11 @@ describe('useConflictCheck', () => {
 
   describe('Stale time', () => {
     it('uses 30-second stale time for queries', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: false,
         files: [],
         summary: {},
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -744,11 +778,11 @@ describe('useConflictCheck', () => {
 
   describe('Query key generation', () => {
     it('generates correct query key for deploy', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: false,
         files: [],
         summary: {},
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -776,11 +810,11 @@ describe('useConflictCheck', () => {
     });
 
     it('generates correct query key for pull (no projectPath)', async () => {
-      const mockResponse: ArtifactUpstreamDiffResponse = {
+      const mockResponse = createMockUpstreamDiffResponse({
         has_changes: false,
         files: [],
         summary: {},
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -809,11 +843,11 @@ describe('useConflictCheck', () => {
 
   describe('Edge cases', () => {
     it('handles empty files array', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: false,
         files: [],
         summary: {},
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -836,11 +870,11 @@ describe('useConflictCheck', () => {
     });
 
     it('handles numeric artifact IDs', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: false,
         files: [],
         summary: {},
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 
@@ -863,11 +897,11 @@ describe('useConflictCheck', () => {
     });
 
     it('handles summary with missing conflict field', async () => {
-      const mockResponse: ArtifactDiffResponse = {
+      const mockResponse = createMockArtifactDiffResponse({
         has_changes: true,
-        files: [{ path: 'test.txt', status: 'modified' }],
+        files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
         summary: { modified: 1 },
-      };
+      });
 
       mockApiRequest.mockResolvedValueOnce(mockResponse);
 

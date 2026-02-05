@@ -29,8 +29,34 @@ jest.mock('@/components/ui/skeleton', () => ({
 // Now import the component after mocks are set up
 import { SyncConfirmationDialog } from '@/components/sync-status/sync-confirmation-dialog';
 import { useConflictCheck } from '@/hooks';
+import type { FileDiff } from '@/sdk/models/FileDiff';
+import type { ArtifactDiffResponse } from '@/sdk/models/ArtifactDiffResponse';
 
 const mockUseConflictCheck = useConflictCheck as jest.MockedFunction<typeof useConflictCheck>;
+
+// Helper factories for creating valid mock data
+const createMockFileDiff = (overrides?: Partial<FileDiff>): FileDiff => ({
+  file_path: 'test.txt',
+  status: 'modified',
+  collection_hash: null,
+  project_hash: null,
+  unified_diff: null,
+  ...overrides,
+});
+
+const createMockArtifactDiffResponse = (
+  overrides?: Partial<ArtifactDiffResponse>
+): ArtifactDiffResponse => ({
+  artifact_id: 'test-artifact-1',
+  artifact_name: 'test-skill',
+  artifact_type: 'skill',
+  collection_name: 'default',
+  project_path: '/path/to/project',
+  has_changes: false,
+  files: [],
+  summary: {},
+  ...overrides,
+});
 
 describe('SyncConfirmationDialog', () => {
   const mockArtifact: Artifact = {
@@ -38,9 +64,9 @@ describe('SyncConfirmationDialog', () => {
     name: 'test-skill',
     type: 'skill',
     scope: 'user',
-    path: '/path/to/skill',
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
+    syncStatus: 'synced',
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
   };
 
   const mockOnOpenChange = jest.fn();
@@ -134,11 +160,11 @@ describe('SyncConfirmationDialog', () => {
   describe('No changes state (deploy)', () => {
     it('shows "Safe to proceed" message when hasChanges is false', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: false,
           files: [],
           summary: {},
-        },
+        }),
         hasChanges: false,
         hasConflicts: false,
         targetHasChanges: false,
@@ -154,11 +180,11 @@ describe('SyncConfirmationDialog', () => {
 
     it('shows non-destructive confirm button when no changes', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: false,
           files: [],
           summary: {},
-        },
+        }),
         hasChanges: false,
         hasConflicts: false,
         targetHasChanges: false,
@@ -175,11 +201,11 @@ describe('SyncConfirmationDialog', () => {
 
     it('does not show merge button when no changes', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: false,
           files: [],
           summary: {},
-        },
+        }),
         hasChanges: false,
         hasConflicts: false,
         targetHasChanges: false,
@@ -196,18 +222,16 @@ describe('SyncConfirmationDialog', () => {
   describe('Has changes state (deploy)', () => {
     it('shows DiffViewer with correct labels for deploy direction', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
           files: [
-            {
-              path: 'test.txt',
+            createMockFileDiff({
+              file_path: 'test.txt',
               status: 'modified',
-              content_left: 'old content',
-              content_right: 'new content',
-            },
+            }),
           ],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
@@ -224,11 +248,11 @@ describe('SyncConfirmationDialog', () => {
 
     it('shows destructive Deploy button when has changes', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
@@ -247,11 +271,11 @@ describe('SyncConfirmationDialog', () => {
   describe('Has changes state (push)', () => {
     it('shows correct labels for push direction', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
@@ -267,11 +291,11 @@ describe('SyncConfirmationDialog', () => {
 
     it('shows "Push Changes" button for push direction', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
@@ -290,11 +314,11 @@ describe('SyncConfirmationDialog', () => {
   describe('Has changes state (pull)', () => {
     it('shows correct labels for pull direction', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
@@ -310,11 +334,11 @@ describe('SyncConfirmationDialog', () => {
 
     it('shows "Pull Changes" button for pull direction', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
@@ -333,11 +357,11 @@ describe('SyncConfirmationDialog', () => {
   describe('Merge button gating', () => {
     it('enables merge button with secondary variant when targetHasChanges is true', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
@@ -354,11 +378,11 @@ describe('SyncConfirmationDialog', () => {
 
     it('disables merge button when targetHasChanges is false', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: false,
@@ -378,11 +402,11 @@ describe('SyncConfirmationDialog', () => {
     it('shows tooltip when merge is disabled', async () => {
       const user = userEvent.setup();
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: false,
@@ -409,11 +433,11 @@ describe('SyncConfirmationDialog', () => {
   describe('Conflict warning', () => {
     it('shows conflict alert when hasConflicts is true', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1, conflicts: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: true,
         targetHasChanges: true,
@@ -428,11 +452,11 @@ describe('SyncConfirmationDialog', () => {
 
     it('shows direction-specific conflict warning for push', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1, conflicts: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: true,
         targetHasChanges: true,
@@ -447,11 +471,11 @@ describe('SyncConfirmationDialog', () => {
 
     it('shows direction-specific conflict warning for pull', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1, conflicts: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: true,
         targetHasChanges: true,
@@ -466,11 +490,11 @@ describe('SyncConfirmationDialog', () => {
 
     it('does not show conflict alert when hasConflicts is false', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
@@ -488,11 +512,11 @@ describe('SyncConfirmationDialog', () => {
     it('calls onOverwrite when overwrite button is clicked', async () => {
       const user = userEvent.setup();
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
@@ -511,11 +535,11 @@ describe('SyncConfirmationDialog', () => {
     it('calls onMerge when merge button is clicked', async () => {
       const user = userEvent.setup();
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
@@ -534,11 +558,11 @@ describe('SyncConfirmationDialog', () => {
     it('calls onCancel and onOpenChange when cancel button is clicked', async () => {
       const user = userEvent.setup();
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
@@ -558,11 +582,11 @@ describe('SyncConfirmationDialog', () => {
     it('calls only onOpenChange when cancel is clicked without onCancel prop', async () => {
       const user = userEvent.setup();
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
@@ -632,11 +656,11 @@ describe('SyncConfirmationDialog', () => {
   describe('File count and summary', () => {
     it('shows correct file count for single file', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
-          files: [{ path: 'test.txt', status: 'modified' }],
+          files: [createMockFileDiff({ file_path: 'test.txt', status: 'modified' })],
           summary: { modified: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
@@ -651,15 +675,15 @@ describe('SyncConfirmationDialog', () => {
 
     it('shows correct file count for multiple files', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
           files: [
-            { path: 'test1.txt', status: 'modified' },
-            { path: 'test2.txt', status: 'added' },
-            { path: 'test3.txt', status: 'deleted' },
+            createMockFileDiff({ file_path: 'test1.txt', status: 'modified' }),
+            createMockFileDiff({ file_path: 'test2.txt', status: 'added' }),
+            createMockFileDiff({ file_path: 'test3.txt', status: 'deleted' }),
           ],
           summary: { modified: 1, added: 1, deleted: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
@@ -674,15 +698,15 @@ describe('SyncConfirmationDialog', () => {
 
     it('shows detailed summary with added, modified, deleted counts', () => {
       mockUseConflictCheck.mockReturnValue({
-        diffData: {
+        diffData: createMockArtifactDiffResponse({
           has_changes: true,
           files: [
-            { path: 'test1.txt', status: 'modified' },
-            { path: 'test2.txt', status: 'added' },
-            { path: 'test3.txt', status: 'deleted' },
+            createMockFileDiff({ file_path: 'test1.txt', status: 'modified' }),
+            createMockFileDiff({ file_path: 'test2.txt', status: 'added' }),
+            createMockFileDiff({ file_path: 'test3.txt', status: 'deleted' }),
           ],
           summary: { modified: 1, added: 1, deleted: 1 },
-        },
+        }),
         hasChanges: true,
         hasConflicts: false,
         targetHasChanges: true,
