@@ -13,16 +13,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api';
 import type { ArtifactSyncResponse } from '@/sdk/models/ArtifactSyncResponse';
 import { hasValidUpstreamSource } from '@/lib/sync-utils';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 // Phase 1 components
 import { ArtifactFlowBanner } from './artifact-flow-banner';
@@ -33,6 +23,7 @@ import { SyncActionsFooter } from './sync-actions-footer';
 // Existing components
 import { DiffViewer } from '@/components/entity/diff-viewer';
 import { SyncDialog } from '@/components/collection/sync-dialog';
+import { SyncConfirmationDialog } from './sync-confirmation-dialog';
 
 // ============================================================================
 // Types
@@ -465,11 +456,6 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     setShowPullConfirm(true);
   }, []);
 
-  const confirmPullFromSource = useCallback(() => {
-    setShowPullConfirm(false);
-    syncMutation.mutate();
-  }, [syncMutation]);
-
   const handleDeployToProject = useCallback(() => {
     if (!projectPath) {
       toast({ title: 'Error', description: 'No project path', variant: 'destructive' });
@@ -477,11 +463,6 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     }
     setShowDeployConfirm(true);
   }, [projectPath, toast]);
-
-  const confirmDeployToProject = useCallback(() => {
-    setShowDeployConfirm(false);
-    deployMutation.mutate();
-  }, [deployMutation]);
 
   const handleTakeUpstream = () => {
     takeUpstreamMutation.mutate();
@@ -502,11 +483,6 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     }
     setShowPushConfirm(true);
   }, [projectPath, toast]);
-
-  const confirmPushToCollection = useCallback(() => {
-    setShowPushConfirm(false);
-    pushToCollectionMutation.mutate();
-  }, [pushToCollectionMutation]);
 
   const handleApplyActions = () => {
     if (pendingActions.length === 0) return;
@@ -776,52 +752,55 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       />
 
       {/* Push confirmation dialog */}
-      <AlertDialog open={showPushConfirm} onOpenChange={setShowPushConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Push to Collection</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will overwrite the collection version of &quot;{entity.name}&quot; with the project version. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmPushToCollection}>Push Changes</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <SyncConfirmationDialog
+        direction="push"
+        artifact={entity}
+        projectPath={projectPath || ''}
+        open={showPushConfirm}
+        onOpenChange={setShowPushConfirm}
+        onOverwrite={() => {
+          setShowPushConfirm(false);
+          pushToCollectionMutation.mutate();
+        }}
+        onMerge={() => {
+          setShowPushConfirm(false);
+          setShowSyncDialog(true);
+        }}
+      />
 
       {/* Pull confirmation dialog */}
-      <AlertDialog open={showPullConfirm} onOpenChange={setShowPullConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Pull from Source</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will update the collection version of &quot;{entity.name}&quot; with the latest upstream source. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmPullFromSource}>Pull Changes</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <SyncConfirmationDialog
+        direction="pull"
+        artifact={entity}
+        projectPath={projectPath || ''}
+        open={showPullConfirm}
+        onOpenChange={setShowPullConfirm}
+        onOverwrite={() => {
+          setShowPullConfirm(false);
+          syncMutation.mutate();
+        }}
+        onMerge={() => {
+          setShowPullConfirm(false);
+          setShowSyncDialog(true);
+        }}
+      />
 
       {/* Deploy confirmation dialog */}
-      <AlertDialog open={showDeployConfirm} onOpenChange={setShowDeployConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Deploy to Project</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will overwrite the project version of &quot;{entity.name}&quot; with the collection version. Any local modifications in the project will be lost.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeployToProject}>Deploy Changes</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <SyncConfirmationDialog
+        direction="deploy"
+        artifact={entity}
+        projectPath={projectPath || ''}
+        open={showDeployConfirm}
+        onOpenChange={setShowDeployConfirm}
+        onOverwrite={() => {
+          setShowDeployConfirm(false);
+          deployMutation.mutate();
+        }}
+        onMerge={() => {
+          setShowDeployConfirm(false);
+          setShowSyncDialog(true);
+        }}
+      />
     </>
   );
 }

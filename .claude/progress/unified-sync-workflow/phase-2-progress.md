@@ -4,7 +4,7 @@ prd: unified-sync-workflow
 phase: 2
 phase_name: Unified DiffViewer Confirmation Dialog
 status: pending
-progress: 16
+progress: 83
 created: 2026-02-04
 updated: '2026-02-05'
 tasks:
@@ -19,7 +19,7 @@ tasks:
   model: opus
 - id: SYNC-U02
   name: Integrate for Deploy (Collection→Project)
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -28,7 +28,7 @@ tasks:
   model: opus
 - id: SYNC-U03
   name: Integrate for Push (Project→Collection)
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -37,7 +37,7 @@ tasks:
   model: opus
 - id: SYNC-U04
   name: Integrate for Pull (Source→Collection)
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -46,7 +46,7 @@ tasks:
   model: opus
 - id: SYNC-U05
   name: Merge gating logic
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -83,7 +83,7 @@ quality_gates:
 - No-conflict fast path shows 'Safe to proceed' for all directions
 - Unit tests pass with >85% coverage
 total_tasks: 6
-completed_tasks: 1
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 ---
