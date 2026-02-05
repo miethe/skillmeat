@@ -504,6 +504,60 @@ class ArtifactDeployRequest(BaseModel):
         default=False,
         description="Overwrite existing artifact if already deployed",
     )
+    strategy: Literal["overwrite", "merge"] = Field(
+        default="overwrite",
+        description=(
+            "Deployment strategy. 'overwrite' replaces existing files entirely "
+            "(default, existing behavior). 'merge' performs file-level merge: "
+            "new files are copied, project-only files are preserved, "
+            "and conflicts (files modified on both sides) are reported."
+        ),
+    )
+
+
+class MergeFileAction(BaseModel):
+    """Describes an action taken on a single file during merge deployment."""
+
+    file_path: str = Field(
+        description="Relative file path within the artifact directory",
+    )
+    action: Literal["copied", "skipped", "preserved", "conflict"] = Field(
+        description=(
+            "'copied' = new file from collection copied to project, "
+            "'skipped' = file identical on both sides (no action), "
+            "'preserved' = file exists only in project (kept as-is), "
+            "'conflict' = file modified on both sides (left unchanged in project)"
+        ),
+    )
+    detail: Optional[str] = Field(
+        default=None,
+        description="Additional detail about the action (e.g., conflict description)",
+    )
+
+
+class MergeDeployDetails(BaseModel):
+    """Details of a merge deployment operation."""
+
+    files_copied: int = Field(
+        default=0,
+        description="Number of files copied from collection to project (new files)",
+    )
+    files_skipped: int = Field(
+        default=0,
+        description="Number of identical files skipped (no action needed)",
+    )
+    files_preserved: int = Field(
+        default=0,
+        description="Number of project-only files preserved (not deleted)",
+    )
+    conflicts: int = Field(
+        default=0,
+        description="Number of files modified on both sides (conflicts)",
+    )
+    file_actions: List[MergeFileAction] = Field(
+        default_factory=list,
+        description="Per-file action details",
+    )
 
 
 class ArtifactDeployResponse(BaseModel):
@@ -521,6 +575,14 @@ class ArtifactDeployResponse(BaseModel):
         default=None,
         description="Error details if deployment failed",
     )
+    strategy: Optional[Literal["overwrite", "merge"]] = Field(
+        default=None,
+        description="Deployment strategy that was used",
+    )
+    merge_details: Optional[MergeDeployDetails] = Field(
+        default=None,
+        description="Merge deployment details (only present when strategy='merge')",
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -533,6 +595,8 @@ class ArtifactDeployResponse(BaseModel):
                 "artifact_type": "skill",
                 "deployed_path": "/Users/me/my-project/.claude/skills/pdf",
                 "error_message": None,
+                "strategy": "overwrite",
+                "merge_details": None,
             }
         }
 

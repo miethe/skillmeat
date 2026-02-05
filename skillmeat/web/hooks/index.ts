@@ -309,9 +309,9 @@ export {
 } from './use-templates';
 
 // ============================================================================
-// SYNC (3 hooks)
+// SYNC (4 hooks)
 // ============================================================================
-// Synchronization and upstream change detection
+// Synchronization, upstream change detection, and conflict checking
 export {
   useSync,
   useCheckUpstream,
@@ -321,6 +321,16 @@ export {
   type SyncError,
   type UseSyncOptions,
 } from './useSync';
+
+// Unified pre-operation conflict detection for deploy/push/pull
+export {
+  conflictCheckKeys,
+  useConflictCheck,
+  type ConflictCheckDirection,
+  type ConflictCheckOptions,
+  type ConflictCheckDiffData,
+  type ConflictCheckResult,
+} from './use-conflict-check';
 
 // ============================================================================
 // CONTEXT ENTITIES (6 hooks)

@@ -60,6 +60,8 @@ from skillmeat.api.schemas.artifacts import (
     FileNode,
     FileUpdateRequest,
     LinkedArtifactReferenceSchema,
+    MergeDeployDetails,
+    MergeFileAction,
     ProjectDeploymentInfo,
     VersionGraphNodeResponse,
     VersionGraphResponse,
@@ -2887,7 +2889,10 @@ async def delete_artifact(
     "/{artifact_id}/deploy",
     response_model=ArtifactDeployResponse,
     summary="Deploy artifact to project",
-    description="Deploy artifact from collection to project's .claude/ directory",
+    description=(
+        "Deploy artifact from collection to project's .claude/ directory. "
+        "Supports 'overwrite' (default) and 'merge' strategies."
+    ),
     responses={
         200: {"description": "Artifact deployed successfully"},
         400: {"model": ErrorResponse, "description": "Invalid request"},
@@ -2910,23 +2915,30 @@ async def deploy_artifact(
     Copies the artifact to the project's .claude/ directory and tracks
     the deployment in .skillmeat-deployed.toml.
 
+    Supports two strategies:
+    - 'overwrite' (default): Replace existing deployment entirely.
+    - 'merge': File-level merge. New files are copied, project-only files
+      are preserved, identical files are skipped, and conflicts (files
+      modified on both sides) are reported without overwriting.
+
     Args:
         artifact_id: Artifact identifier (format: "type:name")
-        request: Deployment request with project_path and overwrite flag
+        request: Deployment request with project_path, overwrite flag, and strategy
         artifact_mgr: Artifact manager dependency
         collection_mgr: Collection manager dependency
         token: Authentication token
         collection: Optional collection name
 
     Returns:
-        Deployment result
+        Deployment result with optional merge_details when strategy='merge'
 
     Raises:
         HTTPException: If artifact not found or on error
     """
     try:
         logger.info(
-            f"Deploying artifact: {artifact_id} to {request.project_path} (collection={collection})"
+            f"Deploying artifact: {artifact_id} to {request.project_path} "
+            f"(collection={collection}, strategy={request.strategy})"
         )
 
         # Parse artifact ID
@@ -2974,6 +2986,20 @@ async def deploy_artifact(
                 detail=f"Artifact '{artifact_id}' not found in collection '{collection_name}'",
             )
 
+        # --- Strategy: merge ---
+        if request.strategy == "merge":
+            return await _deploy_merge(
+                artifact_id=artifact_id,
+                artifact_name=artifact_name,
+                artifact_type=artifact_type,
+                artifact=artifact,
+                collection_name=collection_name,
+                collection_mgr=collection_mgr,
+                artifact_mgr=artifact_mgr,
+                project_path=project_path,
+            )
+
+        # --- Strategy: overwrite (default, existing behavior) ---
         # Create deployment manager
         deployment_mgr = DeploymentManager(collection_mgr=collection_mgr)
 
@@ -2995,6 +3021,7 @@ async def deploy_artifact(
                     artifact_name=artifact_name,
                     artifact_type=artifact_type.value,
                     error_message="Deployment cancelled or artifact not found",
+                    strategy="overwrite",
                 )
 
             deployment = deployments[0]
@@ -3006,16 +3033,7 @@ async def deploy_artifact(
             )
 
             # Refresh DB cache after successful deploy (non-blocking)
-            try:
-                db_session = get_session()
-                try:
-                    refresh_single_artifact_cache(
-                        db_session, artifact_mgr, artifact_id, collection_name
-                    )
-                finally:
-                    db_session.close()
-            except Exception as cache_err:
-                logger.warning(f"Cache refresh failed for {artifact_id}: {cache_err}")
+            _refresh_cache_safe(artifact_mgr, artifact_id, collection_name)
 
             return ArtifactDeployResponse(
                 success=True,
@@ -3023,6 +3041,7 @@ async def deploy_artifact(
                 artifact_name=artifact_name,
                 artifact_type=artifact_type.value,
                 deployed_path=str(deployed_path),
+                strategy="overwrite",
             )
 
         except ValueError as e:
@@ -3034,6 +3053,7 @@ async def deploy_artifact(
                 artifact_name=artifact_name,
                 artifact_type=artifact_type.value,
                 error_message=str(e),
+                strategy="overwrite",
             )
 
     except HTTPException:
@@ -3044,6 +3064,268 @@ async def deploy_artifact(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to deploy artifact: {str(e)}",
         )
+
+
+def _refresh_cache_safe(artifact_mgr, artifact_id: str, collection_name: str) -> None:
+    """Refresh DB cache after deploy, swallowing errors to avoid failing the deploy."""
+    try:
+        db_session = get_session()
+        try:
+            refresh_single_artifact_cache(
+                db_session, artifact_mgr, artifact_id, collection_name
+            )
+        finally:
+            db_session.close()
+    except Exception as cache_err:
+        logger.warning(f"Cache refresh failed for {artifact_id}: {cache_err}")
+
+
+async def _deploy_merge(
+    *,
+    artifact_id: str,
+    artifact_name: str,
+    artifact_type: ArtifactType,
+    artifact,
+    collection_name: str,
+    collection_mgr,
+    artifact_mgr,
+    project_path: PathLib,
+) -> ArtifactDeployResponse:
+    """Perform a merge deployment: file-level merge between collection and project.
+
+    Files only in collection (source) are copied to project.
+    Files only in project (target) are preserved (not deleted).
+    Files in both that are identical are skipped.
+    Files in both that differ are reported as conflicts (project version kept).
+
+    Args:
+        artifact_id: Artifact identifier string
+        artifact_name: Artifact name
+        artifact_type: Artifact type enum
+        artifact: Artifact object from collection
+        collection_name: Name of source collection
+        collection_mgr: Collection manager instance
+        artifact_mgr: Artifact manager instance
+        project_path: Path to the target project directory
+
+    Returns:
+        ArtifactDeployResponse with merge_details populated
+    """
+    import hashlib
+    import shutil
+
+    # Resolve source path (collection artifact directory)
+    collection_path = collection_mgr.config.get_collection_path(collection_name)
+    source_path = collection_path / artifact.path
+
+    if not source_path.exists():
+        logger.error(f"Collection artifact path missing: {source_path}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Collection artifact path does not exist: {source_path}",
+        )
+
+    # Resolve target path (project deployment directory)
+    dest_base = project_path / ".claude"
+    if artifact_type == ArtifactType.SKILL:
+        target_path = dest_base / "skills" / artifact_name
+    elif artifact_type == ArtifactType.COMMAND:
+        target_path = dest_base / "commands" / f"{artifact_name}.md"
+    elif artifact_type == ArtifactType.AGENT:
+        target_path = dest_base / "agents" / f"{artifact_name}.md"
+    elif artifact_type == ArtifactType.MCP:
+        target_path = dest_base / "mcp" / artifact_name
+    elif artifact_type == ArtifactType.HOOK:
+        target_path = dest_base / "hooks" / f"{artifact_name}.md"
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported artifact type for merge: {artifact_type.value}",
+        )
+
+    # If target does not exist yet, this is a fresh deploy — copy everything
+    if not target_path.exists():
+        logger.info(
+            f"Merge deploy: target does not exist, performing full copy to {target_path}"
+        )
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        if source_path.is_dir():
+            shutil.copytree(
+                source_path,
+                target_path,
+                ignore=shutil.ignore_patterns(
+                    "__pycache__", "*.pyc", ".DS_Store", ".git"
+                ),
+            )
+        else:
+            shutil.copy2(source_path, target_path)
+
+        # Count files copied
+        if target_path.is_dir():
+            copied_files = sorted(
+                str(f.relative_to(target_path))
+                for f in target_path.rglob("*")
+                if f.is_file()
+            )
+        else:
+            copied_files = [target_path.name]
+
+        file_actions = [
+            MergeFileAction(file_path=fp, action="copied") for fp in copied_files
+        ]
+
+        _refresh_cache_safe(artifact_mgr, artifact_id, collection_name)
+
+        return ArtifactDeployResponse(
+            success=True,
+            message=(
+                f"Artifact '{artifact_name}' deployed successfully "
+                f"(merge, fresh copy of {len(copied_files)} file(s))"
+            ),
+            artifact_name=artifact_name,
+            artifact_type=artifact_type.value,
+            deployed_path=str(target_path),
+            strategy="merge",
+            merge_details=MergeDeployDetails(
+                files_copied=len(copied_files),
+                files_skipped=0,
+                files_preserved=0,
+                conflicts=0,
+                file_actions=file_actions,
+            ),
+        )
+
+    # --- Both source and target exist: perform file-level merge ---
+    def _file_hash(file_path: PathLib) -> str:
+        """Compute SHA-256 hash of a file."""
+        hasher = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            while True:
+                chunk = f.read(8192)
+                if not chunk:
+                    break
+                hasher.update(chunk)
+        return hasher.hexdigest()
+
+    # Collect relative file paths from source and target
+    if source_path.is_dir():
+        source_files = {
+            str(f.relative_to(source_path))
+            for f in source_path.rglob("*")
+            if f.is_file()
+        }
+    else:
+        source_files = {source_path.name}
+
+    if target_path.is_dir():
+        target_files = {
+            str(f.relative_to(target_path))
+            for f in target_path.rglob("*")
+            if f.is_file()
+        }
+    else:
+        target_files = {target_path.name}
+
+    file_actions: List[MergeFileAction] = []
+    files_copied = 0
+    files_skipped = 0
+    files_preserved = 0
+    conflicts = 0
+
+    all_files = sorted(source_files | target_files)
+
+    for rel_path in all_files:
+        in_source = rel_path in source_files
+        in_target = rel_path in target_files
+
+        if in_source and not in_target:
+            # File only in collection — copy to project
+            src_file = source_path / rel_path if source_path.is_dir() else source_path
+            dst_file = target_path / rel_path if target_path.is_dir() else target_path
+            dst_file.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_file, dst_file)
+            file_actions.append(MergeFileAction(file_path=rel_path, action="copied"))
+            files_copied += 1
+
+        elif not in_source and in_target:
+            # File only in project — preserve (do nothing)
+            file_actions.append(
+                MergeFileAction(
+                    file_path=rel_path,
+                    action="preserved",
+                    detail="File exists only in project; kept as-is",
+                )
+            )
+            files_preserved += 1
+
+        else:
+            # File in both — compare hashes
+            src_file = source_path / rel_path if source_path.is_dir() else source_path
+            dst_file = target_path / rel_path if target_path.is_dir() else target_path
+
+            src_hash = _file_hash(src_file)
+            dst_hash = _file_hash(dst_file)
+
+            if src_hash == dst_hash:
+                # Identical — skip
+                file_actions.append(
+                    MergeFileAction(file_path=rel_path, action="skipped")
+                )
+                files_skipped += 1
+            else:
+                # Both sides modified — conflict; keep project version
+                file_actions.append(
+                    MergeFileAction(
+                        file_path=rel_path,
+                        action="conflict",
+                        detail=(
+                            f"File modified on both sides "
+                            f"(collection={src_hash[:8]}, project={dst_hash[:8]}). "
+                            f"Project version kept."
+                        ),
+                    )
+                )
+                conflicts += 1
+
+    merge_details = MergeDeployDetails(
+        files_copied=files_copied,
+        files_skipped=files_skipped,
+        files_preserved=files_preserved,
+        conflicts=conflicts,
+        file_actions=file_actions,
+    )
+
+    has_conflicts = conflicts > 0
+    if has_conflicts:
+        msg = (
+            f"Artifact '{artifact_name}' merge deployed with {conflicts} conflict(s). "
+            f"{files_copied} file(s) copied, {files_preserved} preserved, "
+            f"{files_skipped} skipped."
+        )
+    else:
+        msg = (
+            f"Artifact '{artifact_name}' merge deployed successfully. "
+            f"{files_copied} file(s) copied, {files_preserved} preserved, "
+            f"{files_skipped} skipped."
+        )
+
+    logger.info(
+        f"Merge deploy complete for '{artifact_name}': "
+        f"copied={files_copied}, skipped={files_skipped}, "
+        f"preserved={files_preserved}, conflicts={conflicts}"
+    )
+
+    _refresh_cache_safe(artifact_mgr, artifact_id, collection_name)
+
+    return ArtifactDeployResponse(
+        success=True,
+        message=msg,
+        artifact_name=artifact_name,
+        artifact_type=artifact_type.value,
+        deployed_path=str(target_path),
+        strategy="merge",
+        merge_details=merge_details,
+    )
 
 
 @router.post(
@@ -4442,6 +4724,375 @@ async def get_artifact_upstream_diff(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get artifact upstream diff: {str(e)}",
+        )
+
+
+@router.get(
+    "/{artifact_id}/source-project-diff",
+    response_model=ArtifactDiffResponse,
+    summary="Get source-to-project diff",
+    description="Compare artifact upstream source directly against project deployment",
+    responses={
+        200: {"description": "Successfully retrieved source-project diff"},
+        400: {
+            "model": ErrorResponse,
+            "description": "Invalid request or missing project_path",
+        },
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_artifact_source_project_diff(
+    artifact_id: str,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    project_path: str = Query(
+        ...,
+        description="Path to project deployment directory",
+    ),
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (searches all if not specified)",
+    ),
+) -> ArtifactDiffResponse:
+    """Get diff between upstream source and project deployment, skipping collection.
+
+    Fetches the latest upstream version from GitHub and compares it directly
+    against the deployed version in a project, bypassing the collection copy.
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        artifact_mgr: Artifact manager dependency
+        collection_mgr: Collection manager dependency
+        _token: Authentication token (dependency injection)
+        project_path: Path to project directory containing deployed artifact
+        collection: Optional collection filter
+
+    Returns:
+        ArtifactDiffResponse with file-level diffs and summary
+
+    Raises:
+        HTTPException: If artifact not found, project not found, or on error
+    """
+    import difflib
+    import hashlib
+    import shutil
+
+    try:
+        logger.info(
+            f"Getting source-project diff for artifact: {artifact_id} "
+            f"(project={project_path}, collection={collection})"
+        )
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Validate project path
+        proj_path = PathLib(project_path)
+        if not proj_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Project path does not exist: {project_path}",
+            )
+
+        # Find deployment in project
+        deployment = DeploymentTracker.get_deployment(
+            proj_path, artifact_name, artifact_type.value
+        )
+
+        if deployment:
+            collection_name = collection or deployment.from_collection
+            inferred_artifact_path = deployment.artifact_path
+        else:
+            logger.debug(
+                f"No deployment record for {artifact_id}, attempting to infer paths"
+            )
+            collection_name = collection or "default"
+            possible_paths = _get_possible_artifact_paths(artifact_type, artifact_name)
+            inferred_artifact_path = None
+
+            for path in possible_paths:
+                full_path = proj_path / ".claude" / path
+                if full_path.exists():
+                    inferred_artifact_path = path
+                    break
+
+            if not inferred_artifact_path:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Artifact '{artifact_id}' not found in project {project_path}",
+                )
+
+        # Find artifact in collection (needed for upstream info)
+        artifact = None
+        if collection_name and collection_name in collection_mgr.list_collections():
+            try:
+                coll = collection_mgr.load_collection(collection_name)
+                artifact = coll.find_artifact(artifact_name, artifact_type)
+            except ValueError:
+                pass
+
+        if not artifact:
+            # Search across all collections
+            for coll_name in collection_mgr.list_collections():
+                try:
+                    coll = collection_mgr.load_collection(coll_name)
+                    artifact = coll.find_artifact(artifact_name, artifact_type)
+                    if artifact:
+                        collection_name = coll_name
+                        break
+                except ValueError:
+                    continue
+
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found in any collection",
+            )
+
+        # Check upstream support
+        if artifact.origin != "github":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Artifact origin '{artifact.origin}' does not support source diff. Only GitHub artifacts are supported.",
+            )
+
+        if not artifact.upstream:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Artifact does not have upstream tracking configured",
+            )
+
+        # Fetch latest upstream version
+        logger.info(f"Fetching upstream for source-project diff: {artifact_id}")
+        fetch_result = artifact_mgr.fetch_update(
+            artifact_name=artifact_name,
+            artifact_type=artifact_type,
+            collection_name=collection_name,
+        )
+
+        if fetch_result.error:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch upstream: {fetch_result.error}",
+            )
+
+        # Determine upstream artifact path
+        if fetch_result.has_update and fetch_result.fetch_result:
+            upstream_artifact_path = fetch_result.fetch_result.artifact_path
+        elif not fetch_result.has_update:
+            # No upstream update means collection matches upstream; use collection copy
+            collection_path = collection_mgr.config.get_collection_path(collection_name)
+            upstream_artifact_path = collection_path / artifact.path
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to resolve upstream artifact path",
+            )
+
+        project_artifact_path = proj_path / ".claude" / inferred_artifact_path
+
+        if not upstream_artifact_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Upstream artifact path does not exist: {upstream_artifact_path}",
+            )
+
+        if not project_artifact_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project artifact path does not exist: {project_artifact_path}",
+            )
+
+        # Collect files from both locations
+        source_files = set()
+        project_files = set()
+
+        if upstream_artifact_path.is_dir():
+            source_files = {
+                str(f.relative_to(upstream_artifact_path))
+                for f in upstream_artifact_path.rglob("*")
+                if f.is_file()
+            }
+        else:
+            source_files = {upstream_artifact_path.name}
+
+        if project_artifact_path.is_dir():
+            project_files = {
+                str(f.relative_to(project_artifact_path))
+                for f in project_artifact_path.rglob("*")
+                if f.is_file()
+            }
+        else:
+            project_files = {project_artifact_path.name}
+
+        all_files = sorted(source_files | project_files)
+
+        def compute_file_hash(file_path: PathLib) -> str:
+            hasher = hashlib.sha256()
+            with open(file_path, "rb") as f:
+                while True:
+                    chunk = f.read(8192)
+                    if not chunk:
+                        break
+                    hasher.update(chunk)
+            return hasher.hexdigest()
+
+        def is_binary_file(file_path: PathLib) -> bool:
+            try:
+                with open(file_path, "rb") as f:
+                    chunk = f.read(8192)
+                    return b"\x00" in chunk
+            except Exception:
+                return True
+
+        file_diffs: List[FileDiff] = []
+        summary = {"added": 0, "modified": 0, "deleted": 0, "unchanged": 0}
+
+        for file_rel_path in all_files:
+            in_source = file_rel_path in source_files
+            in_project = file_rel_path in project_files
+
+            if in_source and in_project:
+                src_file = (
+                    upstream_artifact_path / file_rel_path
+                    if upstream_artifact_path.is_dir()
+                    else upstream_artifact_path
+                )
+                proj_file = (
+                    project_artifact_path / file_rel_path
+                    if project_artifact_path.is_dir()
+                    else project_artifact_path
+                )
+
+                src_hash = compute_file_hash(src_file)
+                proj_hash = compute_file_hash(proj_file)
+
+                if src_hash == proj_hash:
+                    file_status = "unchanged"
+                    unified_diff = None
+                    summary["unchanged"] += 1
+                else:
+                    file_status = "modified"
+                    summary["modified"] += 1
+                    unified_diff = None
+                    if not is_binary_file(src_file) and not is_binary_file(proj_file):
+                        try:
+                            with open(src_file, "r", encoding="utf-8") as f:
+                                src_lines = f.readlines()
+                            with open(proj_file, "r", encoding="utf-8") as f:
+                                proj_lines = f.readlines()
+                            diff_lines = difflib.unified_diff(
+                                src_lines,
+                                proj_lines,
+                                fromfile=f"source/{file_rel_path}",
+                                tofile=f"project/{file_rel_path}",
+                                lineterm="",
+                            )
+                            unified_diff = "\n".join(diff_lines)
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to generate diff for {file_rel_path}: {e}"
+                            )
+                            unified_diff = f"[Error generating diff: {str(e)}]"
+
+                file_diffs.append(
+                    FileDiff(
+                        file_path=file_rel_path,
+                        status=file_status,
+                        collection_hash=src_hash,
+                        project_hash=proj_hash,
+                        unified_diff=unified_diff,
+                    )
+                )
+
+            elif in_source and not in_project:
+                file_status = "deleted"
+                summary["deleted"] += 1
+                src_file = (
+                    upstream_artifact_path / file_rel_path
+                    if upstream_artifact_path.is_dir()
+                    else upstream_artifact_path
+                )
+                src_hash = compute_file_hash(src_file)
+                file_diffs.append(
+                    FileDiff(
+                        file_path=file_rel_path,
+                        status=file_status,
+                        collection_hash=src_hash,
+                        project_hash=None,
+                        unified_diff=None,
+                    )
+                )
+
+            elif not in_source and in_project:
+                file_status = "added"
+                summary["added"] += 1
+                proj_file = (
+                    project_artifact_path / file_rel_path
+                    if project_artifact_path.is_dir()
+                    else project_artifact_path
+                )
+                proj_hash = compute_file_hash(proj_file)
+                file_diffs.append(
+                    FileDiff(
+                        file_path=file_rel_path,
+                        status=file_status,
+                        collection_hash=None,
+                        project_hash=proj_hash,
+                        unified_diff=None,
+                    )
+                )
+
+        has_changes = (
+            summary["added"] > 0 or summary["modified"] > 0 or summary["deleted"] > 0
+        )
+
+        logger.info(
+            f"Source-project diff computed for {artifact_id}: {len(file_diffs)} files, "
+            f"has_changes={has_changes}, summary={summary}"
+        )
+
+        # Clean up temp workspace if one was created
+        try:
+            if (
+                fetch_result.temp_workspace
+                and fetch_result.temp_workspace.exists()
+            ):
+                shutil.rmtree(fetch_result.temp_workspace, ignore_errors=True)
+        except Exception as e:
+            logger.warning(f"Failed to clean up temp workspace: {e}")
+
+        return ArtifactDiffResponse(
+            artifact_id=artifact_id,
+            artifact_name=artifact_name,
+            artifact_type=artifact_type.value,
+            collection_name=collection_name,
+            project_path=str(proj_path),
+            has_changes=has_changes,
+            files=file_diffs,
+            summary=summary,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error getting source-project diff for '{artifact_id}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get source-project diff: {str(e)}",
         )
 
 
