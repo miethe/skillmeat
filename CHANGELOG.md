@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Data Flow Standardization (2026-02-04)
+
+**Frontend Hook Compliance**
+- Standardized stale times: `useArtifacts()`, `useArtifact()`, `useProject()` now use 5-minute stale time
+- Added missing cache invalidations to 7 mutation hooks (rollback, context sync, tags, marketplace install, cache refresh, artifact delete)
+- `useSync()` migrated from raw `fetch()` to unified `apiRequest()` client
+
+**Backend Write-Through Compliance**
+- File create/update/delete endpoints now call `refresh_single_artifact_cache()` to sync DB cache
+- Cache refresh is non-blocking (failures logged but don't fail operations)
+
+**Documentation**
+- Updated `web/CLAUDE.md` with Quick Stale Time Guide and context file references
+- Full stale time table and invalidation graph in `.claude/context/key-context/data-flow-patterns.md`
+
 #### Deployment Statistics In-Memory Cache (2026-02-04)
 
 - Added `DeploymentStatsCache` with two-level TTL cache for project discovery and per-artifact deployment stats
