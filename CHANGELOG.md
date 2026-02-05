@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Unified Sync Workflow (2026-02-05)
+
+**Sync Confirmation & Conflict Detection**
+- `SyncConfirmationDialog` component for deploy, push, and pull operations with pre-flight conflict checks
+- `useConflictCheck` hook for unified conflict detection across all sync operations
+- `useDriftDismissal` hook for per-artifact drift alert management with localStorage persistence
+- Source-vs-project direct comparison scope with merge workflow wiring
+
+**DiffViewer Enhancements**
+- VSCode-style synchronized scrolling between left and right panes
+- Skeleton loading states during scope switches
+- Collapsible sections in sync tab for maximized diff viewing area
+- Redesigned collapsed banner indicators with bordered node groups
+
+**Artifact Details Modal**
+- Clickable deployment cards linking to project context
+- Collections data preservation in project artifact modal
+
+**Backend**
+- Artifact comparison and conflict detection API endpoints
+- Marketplace source import: symlink resolution and naming fixes
+
+**Testing**
+- Unit tests for `SyncConfirmationDialog` and `useConflictCheck`
+- Integration tests for sync dialog migration
+- `useDriftDismissal` hook tests
+- Full sync cycle E2E test (Playwright)
+- Accessibility audit and performance cap validation
+
 #### Data Flow Standardization (2026-02-04)
 
 **Frontend Hook Compliance**
@@ -179,6 +208,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Artifact count badge with tooltip for type breakdown
 - Tags display with overflow handling and color consistency
 - Rescan button and last sync time visibility improved
+
+### Fixed
+
+- DiffViewer scroll sync and spacer line visibility
+- Nested `<button>` inside `<button>` HTML violation in DiffViewer file list
+- `isDiffLoading` variable used before declaration in sync tab
+- Marketplace source import: symlink resolution and artifact naming
 
 ### Changed
 

@@ -1,0 +1,13 @@
+model = "gpt-5.3-codex"
+model_reasoning_effort = "medium"
+personality = "pragmatic"
+
+trust_level = "trusted"
+
+[features]
+unified_exec = true
+web_search = true
+steer = true
+
+[sandbox_workspace_write]
+network_access = true

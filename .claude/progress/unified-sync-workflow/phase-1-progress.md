@@ -1,57 +1,65 @@
 ---
 type: progress
-prd: "unified-sync-workflow"
+prd: unified-sync-workflow
 phase: 1
-phase_name: "Backend Enablement + Unified Hook"
-status: pending
-progress: 0
+phase_name: Backend Enablement + Unified Hook
+status: completed
+progress: 100
 created: 2026-02-04
-updated: 2026-02-05
-
+updated: '2026-02-05'
 tasks:
-  - id: "SYNC-B01"
-    name: "Source-vs-project diff endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "1.5 pts"
-    model: "opus"
-
-  - id: "SYNC-B02"
-    name: "Extend deploy with merge strategy"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "2 pts"
-    model: "opus"
-
-  - id: "SYNC-H01"
-    name: "Create unified useConflictCheck hook"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimate: "1.5 pts"
-    model: "opus"
-
-  - id: "SYNC-B03"
-    name: "Backend unit tests"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SYNC-B01", "SYNC-B02"]
-    estimate: "1 pt"
-    model: "sonnet"
-
+- id: SYNC-B01
+  name: Source-vs-project diff endpoint
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 1.5 pts
+  model: opus
+- id: SYNC-B02
+  name: Extend deploy with merge strategy
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 2 pts
+  model: opus
+- id: SYNC-H01
+  name: Create unified useConflictCheck hook
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimate: 1.5 pts
+  model: opus
+- id: SYNC-B03
+  name: Backend unit tests
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SYNC-B01
+  - SYNC-B02
+  estimate: 1 pt
+  model: sonnet
 parallelization:
-  batch_1: ["SYNC-B01", "SYNC-B02", "SYNC-H01"]
-  batch_2: ["SYNC-B03"]
-
+  batch_1:
+  - SYNC-B01
+  - SYNC-B02
+  - SYNC-H01
+  batch_2:
+  - SYNC-B03
 quality_gates:
-  - "Source-project diff endpoint returns accurate file-level diffs"
-  - "Deploy with strategy='merge' performs file merge, reports conflicts"
-  - "useConflictCheck routes to correct API per direction"
-  - "targetHasChanges flag correctly computed for merge gating"
-  - "All backend tests pass"
-  - "No regressions in existing sync/deploy flows"
+- Source-project diff endpoint returns accurate file-level diffs
+- Deploy with strategy='merge' performs file merge, reports conflicts
+- useConflictCheck routes to correct API per direction
+- targetHasChanges flag correctly computed for merge gating
+- All backend tests pass
+- No regressions in existing sync/deploy flows
+total_tasks: 4
+completed_tasks: 4
+in_progress_tasks: 0
+blocked_tasks: 0
 ---
 
 # Phase 1: Backend Enablement + Unified Hook

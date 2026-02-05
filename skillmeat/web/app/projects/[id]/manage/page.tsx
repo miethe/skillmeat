@@ -17,6 +17,7 @@ import { ProjectArtifactModal } from '@/components/shared/ProjectArtifactModal';
 import { DeployFromCollectionDialog } from './components/deploy-from-collection-dialog';
 import { PullToCollectionDialog } from './components/pull-to-collection-dialog';
 import { Entity, EntityType } from '@/types/entity';
+import { parseArtifactId } from '@/types/artifact';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,25 +70,48 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
 
   // Handle URL-based artifact selection (auto-open modal when navigating with artifact param)
   useEffect(() => {
-    const artifactId = searchParams.get('artifact');
-    if (artifactId && entities.length > 0 && !selectedEntity) {
-      // Find the entity matching the artifact ID
-      const entity = entities.find((e) => e.id === artifactId || e.name === artifactId);
-      if (entity) {
-        // Look up matching artifact from collection to get full data
-        const matchingArtifact = artifactsData?.artifacts.find(
-          (artifact) => artifact.name === entity.name && artifact.type === entity.type
-        );
-        // Use centralized mapper with project context
-        // Merge collection artifact data with project entity data
-        const enrichedEntity = matchingArtifact
-          ? mapArtifactToEntity({ ...matchingArtifact, ...entity } as any, 'project')
-          : entity;
-        setSelectedEntity(enrichedEntity);
-        setDetailPanelOpen(true);
-      }
+    const artifactParam = searchParams.get('artifact');
+    if (!artifactParam || selectedEntity) return;
+
+    // Parse the artifact ID to extract type and name
+    const parsed = parseArtifactId(artifactParam);
+    if (!parsed) return;
+
+    // Ensure the type filter matches the artifact's type so entities load correctly
+    if (activeEntityType !== parsed.type) {
+      // Update URL to reflect the correct type tab
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('type', parsed.type);
+      router.replace(`?${params.toString()}`, { scroll: false });
+      return; // Effect will re-fire after URL updates
     }
-  }, [searchParams, entities, selectedEntity, artifactsData]);
+
+    // Still loading entities
+    if (entities.length === 0) return;
+
+    // Now try to find the entity in the loaded list
+    const entity = entities.find((e) => e.id === artifactParam || e.name === parsed.name);
+    if (entity) {
+      // Look up matching artifact from collection to get full data
+      const matchingArtifact = artifactsData?.artifacts.find(
+        (artifact) => artifact.name === entity.name && artifact.type === entity.type
+      );
+      // Use centralized mapper with project context
+      // Merge collection artifact data with project entity data
+      // Preserve collections from collection-level artifact since project entities don't have them
+      const enrichedEntity = matchingArtifact
+        ? (() => {
+            const merged = { ...matchingArtifact, ...entity } as any;
+            if (matchingArtifact.collections?.length && !merged.collections?.length) {
+              merged.collections = matchingArtifact.collections;
+            }
+            return mapArtifactToEntity(merged, 'project');
+          })()
+        : entity;
+      setSelectedEntity(enrichedEntity);
+      setDetailPanelOpen(true);
+    }
+  }, [searchParams, entities, selectedEntity, artifactsData, activeEntityType, router]);
 
   // Filter entities by tags client-side
   const filteredEntities =
@@ -105,8 +129,15 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
 
       // Use centralized mapper with project context
       // Merge collection artifact data with project entity data
+      // Preserve collections from collection-level artifact since project entities don't have them
       const enrichedEntity = matchingArtifact
-        ? mapArtifactToEntity({ ...matchingArtifact, ...entity } as any, 'project')
+        ? (() => {
+            const merged = { ...matchingArtifact, ...entity } as any;
+            if (matchingArtifact.collections?.length && !merged.collections?.length) {
+              merged.collections = matchingArtifact.collections;
+            }
+            return mapArtifactToEntity(merged, 'project');
+          })()
         : entity;
 
       setSelectedEntity(enrichedEntity);

@@ -8,6 +8,9 @@
     "LINTER_COMMAND": "Replace with your linter command (ruff, pylint, flake8, eslint)",
     "PROJECT_STANDARDS": "Replace with your project's core principles"
   },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "permissions": {
     "_comment_deny": "Dangerous operations that are always blocked. Customize based on your security requirements.",
     "deny": [

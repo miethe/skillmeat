@@ -2,27 +2,17 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, GitMerge } from 'lucide-react';
 import type { Artifact } from '@/types/artifact';
 import type { ArtifactDiffResponse } from '@/sdk/models/ArtifactDiffResponse';
 import type { ArtifactUpstreamDiffResponse } from '@/sdk/models/ArtifactUpstreamDiffResponse';
 import type { FileDiff } from '@/sdk/models/FileDiff';
-import { useToast } from '@/hooks';
+import { useToast, useDriftDismissal } from '@/hooks';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api';
 import type { ArtifactSyncResponse } from '@/sdk/models/ArtifactSyncResponse';
 import { hasValidUpstreamSource } from '@/lib/sync-utils';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 // Phase 1 components
 import { ArtifactFlowBanner } from './artifact-flow-banner';
@@ -32,7 +22,16 @@ import { SyncActionsFooter } from './sync-actions-footer';
 
 // Existing components
 import { DiffViewer } from '@/components/entity/diff-viewer';
+import { MergeWorkflow } from '@/components/entity/merge-workflow';
 import { SyncDialog } from '@/components/collection/sync-dialog';
+import { SyncConfirmationDialog } from './sync-confirmation-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 // ============================================================================
 // Types
@@ -49,6 +48,21 @@ interface PendingAction {
   type: 'pull' | 'push' | 'deploy' | 'merge';
   filePath?: string;
   direction?: 'upstream' | 'downstream';
+}
+
+/** Response from the deploy API when using strategy='merge' (SYNC-A03) */
+interface DeployMergeResponse {
+  success: boolean;
+  message: string;
+  error_message?: string;
+  strategy?: string;
+  merge_details?: {
+    files_copied: number;
+    files_skipped: number;
+    files_preserved: number;
+    conflicts: number;
+    file_actions: Array<{ file_path: string; action: string; detail?: string }>;
+  };
 }
 
 // ============================================================================
@@ -214,7 +228,10 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   );
   const [pendingActions] = useState<PendingAction[]>([]);
   const [showSyncDialog, setShowSyncDialog] = useState(false);
-  const [dismissedDriftIds, setDismissedDriftIds] = useState<Set<string>>(new Set());
+
+  // Merge workflow state (Phase 3: SYNC-A03)
+  const [showMergeWorkflow, setShowMergeWorkflow] = useState(false);
+  const [mergeDirection, setMergeDirection] = useState<'upstream' | 'downstream'>('downstream');
 
   // ============================================================================
   // Queries
@@ -258,6 +275,32 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     enabled: !!entity.id && !!projectPath && entity.collection !== 'discovered',
   });
 
+  // Source-project diff (source vs project, bypassing collection)
+  const {
+    data: sourceProjectDiff,
+    isLoading: sourceProjectLoading,
+    error: sourceProjectError,
+  } = useQuery<ArtifactDiffResponse>({
+    queryKey: ['source-project-diff', entity.id, projectPath, entity.collection],
+    queryFn: async () => {
+      const params = new URLSearchParams({ project_path: projectPath! });
+      if (entity.collection) {
+        params.set('collection', entity.collection);
+      }
+      return await apiRequest<ArtifactDiffResponse>(
+        `/artifacts/${encodeURIComponent(entity.id)}/source-project-diff?${params}`
+      );
+    },
+    enabled:
+      !!entity.id &&
+      !!projectPath &&
+      entity.collection !== 'discovered' &&
+      hasValidUpstreamSource(entity) &&
+      comparisonScope === 'source-vs-project',
+    staleTime: 30_000,
+    retry: false,
+  });
+
   // ============================================================================
   // Mutations
   // ============================================================================
@@ -278,6 +321,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       queryClient.invalidateQueries({ queryKey: ['deployments'] });
       queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
+      queryClient.invalidateQueries({ queryKey: ['source-project-diff', entity.id] });
       queryClient.invalidateQueries({ queryKey: ['collections'] });
       if (data.conflicts && data.conflicts.length > 0) {
         toast({ title: 'Pull completed with conflicts', description: `${data.conflicts.length} conflict(s) detected`, variant: 'destructive' });
@@ -325,6 +369,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       }
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
       queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
+      queryClient.invalidateQueries({ queryKey: ['source-project-diff', entity.id] });
       queryClient.invalidateQueries({ queryKey: ['artifacts'] });
       queryClient.invalidateQueries({ queryKey: ['deployments'] });
       toast({
@@ -380,6 +425,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       }
       queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
+      queryClient.invalidateQueries({ queryKey: ['source-project-diff', entity.id] });
       toast({
         title: 'Changes Accepted',
         description: 'Upstream version applied successfully',
@@ -394,17 +440,17 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     },
   });
 
-  // Keep local mutation (dismiss drift alert via local state)
+  // Keep local mutation (acknowledge local changes are intentional)
   const keepLocalMutation = useMutation({
     mutationFn: async () => {
-      // Dismiss the drift banner for this entity by adding to dismissed set.
       // This is a local UI acknowledgment - no API call needed.
-      setDismissedDriftIds((prev) => new Set(prev).add(entity.id));
+      // The drift banner dismissal is handled by useDriftDismissal hook.
     },
     onSuccess: () => {
       // Invalidate drift-related queries so UI re-evaluates after dismissal
       queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
+      queryClient.invalidateQueries({ queryKey: ['source-project-diff', entity.id] });
       toast({
         title: 'Local Version Kept',
         description: 'Drift dismissed - local changes preserved',
@@ -433,6 +479,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       queryClient.invalidateQueries({ queryKey: ['deployments'] });
       queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
+      queryClient.invalidateQueries({ queryKey: ['source-project-diff', entity.id] });
       queryClient.invalidateQueries({ queryKey: ['collections'] });
       if (data.conflicts && data.conflicts.length > 0) {
         toast({ title: 'Push completed with conflicts', description: `${data.conflicts.length} conflict(s) detected`, variant: 'destructive' });
@@ -443,6 +490,67 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     onError: (error: Error) => {
       toast({
         title: 'Push Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Deploy-merge mutation: attempts deploy with strategy='merge', routes to
+  // MergeWorkflow if conflicts are detected (SYNC-A03)
+  const deployMergeMutation = useMutation({
+    mutationFn: async () => {
+      const params = new URLSearchParams();
+      if (entity.collection) {
+        params.set('collection', entity.collection);
+      }
+      const queryString = params.toString();
+      const url = `/artifacts/${encodeURIComponent(entity.id)}/deploy${queryString ? `?${queryString}` : ''}`;
+      return await apiRequest<DeployMergeResponse>(url, {
+        method: 'POST',
+        body: JSON.stringify({
+          project_path: projectPath,
+          overwrite: false,
+          strategy: 'merge',
+        }),
+      });
+    },
+    onSuccess: (data) => {
+      if (!data.success) {
+        toast({
+          title: 'Merge Deploy Failed',
+          description: data.error_message || data.message || 'Merge deployment was not completed',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Check if merge had conflicts — route to full MergeWorkflow
+      const hasConflicts = data.merge_details && data.merge_details.conflicts > 0;
+      if (hasConflicts) {
+        toast({
+          title: 'Conflicts Detected',
+          description: `${data.merge_details!.conflicts} file(s) have conflicting changes. Opening merge workflow.`,
+        });
+        setMergeDirection('downstream');
+        setShowMergeWorkflow(true);
+        return;
+      }
+
+      // No conflicts — merge succeeded cleanly
+      queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
+      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
+      queryClient.invalidateQueries({ queryKey: ['source-project-diff', entity.id] });
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
+      toast({
+        title: 'Merge Deploy Successful',
+        description: data.message || `Merged ${entity.name} to project`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Merge Deploy Failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -465,11 +573,6 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     setShowPullConfirm(true);
   }, []);
 
-  const confirmPullFromSource = useCallback(() => {
-    setShowPullConfirm(false);
-    syncMutation.mutate();
-  }, [syncMutation]);
-
   const handleDeployToProject = useCallback(() => {
     if (!projectPath) {
       toast({ title: 'Error', description: 'No project path', variant: 'destructive' });
@@ -477,11 +580,6 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     }
     setShowDeployConfirm(true);
   }, [projectPath, toast]);
-
-  const confirmDeployToProject = useCallback(() => {
-    setShowDeployConfirm(false);
-    deployMutation.mutate();
-  }, [deployMutation]);
 
   const handleTakeUpstream = () => {
     takeUpstreamMutation.mutate();
@@ -492,7 +590,16 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   };
 
   const handleMerge = () => {
-    setShowSyncDialog(true);
+    // Determine merge direction based on current comparison scope
+    if (comparisonScope === 'source-vs-collection') {
+      // Pull merge: source -> collection (use SyncDialog for upstream sync)
+      setShowSyncDialog(true);
+    } else {
+      // Push or deploy merge: route to MergeWorkflow
+      const direction = comparisonScope === 'collection-vs-project' ? 'downstream' : 'upstream';
+      setMergeDirection(direction);
+      setShowMergeWorkflow(true);
+    }
   };
 
   const handlePushToCollection = useCallback(() => {
@@ -502,11 +609,6 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     }
     setShowPushConfirm(true);
   }, [projectPath, toast]);
-
-  const confirmPushToCollection = useCallback(() => {
-    setShowPushConfirm(false);
-    pushToCollectionMutation.mutate();
-  }, [pushToCollectionMutation]);
 
   const handleApplyActions = () => {
     if (pendingActions.length === 0) return;
@@ -551,18 +653,23 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       case 'collection-vs-project':
         return projectDiff;
       case 'source-vs-project':
-        // TODO: Implement source-vs-project diff query
-        return projectDiff;
+        return sourceProjectDiff;
       default:
         return projectDiff;
     }
-  }, [comparisonScope, upstreamDiff, projectDiff]);
+  }, [comparisonScope, upstreamDiff, projectDiff, sourceProjectDiff]);
 
-  // Drift status (suppressed when entity has been dismissed)
+  // Drift status computed from current diff data
   const driftStatus = useMemo(() => {
-    if (dismissedDriftIds.has(entity.id)) return 'none' as DriftStatus;
     return computeDriftStatus(currentDiff);
-  }, [currentDiff, dismissedDriftIds, entity.id]);
+  }, [currentDiff]);
+
+  // Persistent drift dismissal (survives page refreshes, 24h expiry)
+  const { isDismissed: isDriftDismissed, dismiss: dismissDrift } = useDriftDismissal({
+    artifactId: entity.id,
+    scope: comparisonScope,
+    driftStatus,
+  });
 
   // ============================================================================
   // Early Return: Discovered Artifacts
@@ -638,12 +745,28 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     onMerge: handleMerge,
     onTakeUpstream: handleTakeUpstream,
     onKeepLocal: handleKeepLocal,
+    onDismiss: driftStatus !== 'none' ? dismissDrift : undefined,
   };
+
+  // Scope-specific loading for the DiffViewer — show skeleton when the current scope's data is loading
+  const isDiffLoading = useMemo(() => {
+    switch (comparisonScope) {
+      case 'source-vs-collection':
+        return upstreamLoading;
+      case 'collection-vs-project':
+        return projectLoading;
+      case 'source-vs-project':
+        return sourceProjectLoading;
+      default:
+        return false;
+    }
+  }, [comparisonScope, upstreamLoading, projectLoading, sourceProjectLoading]);
 
   const diffProps = {
     files: currentDiff?.files || [],
     leftLabel: getLeftLabel(comparisonScope),
     rightLabel: getRightLabel(comparisonScope),
+    isLoading: isDiffLoading,
   };
 
   const footerProps = {
@@ -670,16 +793,17 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   // Determine if we have usable data
   const hasUpstreamData = !upstreamError && !!upstreamDiff;
   const hasProjectData = !projectError && !!projectDiff;
-  const canShowAnyData = hasUpstreamData || hasProjectData;
+  const hasSourceProjectData = !sourceProjectError && !!sourceProjectDiff;
+  const canShowAnyData = hasUpstreamData || hasProjectData || hasSourceProjectData;
 
   // Only show loading if we're loading AND don't have any data yet
-  const isLoading = (upstreamLoading || projectLoading) && !canShowAnyData;
+  const isLoading = (upstreamLoading || projectLoading || sourceProjectLoading) && !canShowAnyData;
 
   // Only show blocking error if BOTH queries failed or if we can't show anything useful
   // For local-only artifacts: upstreamError is expected, so don't block if projectData is available
   const shouldBlockWithError =
-    (projectError && !hasUpstreamData) || // Project failed and no upstream
-    (upstreamError && projectError) || // Both failed
+    (projectError && !hasUpstreamData && !hasSourceProjectData) || // Project failed and no upstream/source-project
+    (upstreamError && projectError && (!hasSourceProjectData || sourceProjectError)) || // All failed
     (!hasValidUpstreamSource(entity) && projectError); // Local artifact and project failed
 
   if (shouldBlockWithError) {
@@ -743,7 +867,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="flex-shrink-0 space-y-2 border-b p-4">
             <ComparisonSelector {...comparisonProps} />
-            <DriftAlertBanner {...alertProps} />
+            {!isDriftDismissed && <DriftAlertBanner {...alertProps} />}
           </div>
           <div className="min-h-0 min-w-0 flex-1 overflow-auto">
             <DiffViewer {...diffProps} />
@@ -766,6 +890,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
             queryKey: ['upstream-diff', entity.id, entity.collection],
           });
           queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
+          queryClient.invalidateQueries({ queryKey: ['source-project-diff', entity.id] });
           queryClient.invalidateQueries({ queryKey: ['artifacts'] });
           toast({
             title: 'Sync Complete',
@@ -776,52 +901,98 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       />
 
       {/* Push confirmation dialog */}
-      <AlertDialog open={showPushConfirm} onOpenChange={setShowPushConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Push to Collection</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will overwrite the collection version of &quot;{entity.name}&quot; with the project version. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmPushToCollection}>Push Changes</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <SyncConfirmationDialog
+        direction="push"
+        artifact={entity}
+        projectPath={projectPath || ''}
+        open={showPushConfirm}
+        onOpenChange={setShowPushConfirm}
+        onOverwrite={() => {
+          setShowPushConfirm(false);
+          pushToCollectionMutation.mutate();
+        }}
+        onMerge={() => {
+          setShowPushConfirm(false);
+          setMergeDirection('upstream');
+          setShowMergeWorkflow(true);
+        }}
+      />
 
-      {/* Pull confirmation dialog */}
-      <AlertDialog open={showPullConfirm} onOpenChange={setShowPullConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Pull from Source</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will update the collection version of &quot;{entity.name}&quot; with the latest upstream source. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmPullFromSource}>Pull Changes</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Pull confirmation dialog: merge routes to SyncDialog (source -> collection) */}
+      <SyncConfirmationDialog
+        direction="pull"
+        artifact={entity}
+        projectPath={projectPath || ''}
+        open={showPullConfirm}
+        onOpenChange={setShowPullConfirm}
+        onOverwrite={() => {
+          setShowPullConfirm(false);
+          syncMutation.mutate();
+        }}
+        onMerge={() => {
+          setShowPullConfirm(false);
+          setShowSyncDialog(true);
+        }}
+      />
 
-      {/* Deploy confirmation dialog */}
-      <AlertDialog open={showDeployConfirm} onOpenChange={setShowDeployConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Deploy to Project</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will overwrite the project version of &quot;{entity.name}&quot; with the collection version. Any local modifications in the project will be lost.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeployToProject}>Deploy Changes</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Deploy confirmation dialog: merge attempts merge-deploy, falls back to MergeWorkflow on conflicts */}
+      <SyncConfirmationDialog
+        direction="deploy"
+        artifact={entity}
+        projectPath={projectPath || ''}
+        open={showDeployConfirm}
+        onOpenChange={setShowDeployConfirm}
+        onOverwrite={() => {
+          setShowDeployConfirm(false);
+          deployMutation.mutate();
+        }}
+        onMerge={() => {
+          setShowDeployConfirm(false);
+          deployMergeMutation.mutate();
+        }}
+      />
+
+      {/* Merge Workflow dialog for push/deploy merge operations (SYNC-A03) */}
+      <Dialog open={showMergeWorkflow} onOpenChange={setShowMergeWorkflow}>
+        <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <GitMerge className="h-5 w-5" />
+              <DialogTitle>Merge Workflow</DialogTitle>
+            </div>
+            <DialogDescription>
+              {mergeDirection === 'downstream'
+                ? `Merge ${entity.name} from collection into project`
+                : `Merge ${entity.name} from project into collection`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-auto">
+            {showMergeWorkflow && projectPath && (
+              <MergeWorkflow
+                entityId={entity.id}
+                projectPath={projectPath}
+                direction={mergeDirection}
+                onComplete={() => {
+                  setShowMergeWorkflow(false);
+                  queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
+                  queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
+                  queryClient.invalidateQueries({ queryKey: ['source-project-diff', entity.id] });
+                  queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+                  queryClient.invalidateQueries({ queryKey: ['deployments'] });
+                  queryClient.invalidateQueries({ queryKey: ['collections'] });
+                  toast({
+                    title: 'Merge Complete',
+                    description: 'Changes merged successfully',
+                  });
+                }}
+                onCancel={() => {
+                  setShowMergeWorkflow(false);
+                }}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

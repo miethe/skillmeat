@@ -15,15 +15,15 @@ collection_sha = "2e7442e246b43330c40e3a09313bc002a3c08b28261f35ac64d1f6a4201944
 artifact_name = "meatycapture-capture"
 artifact_type = "skill"
 from_collection = "default"
-deployed_at = "2026-01-05T15:07:49.158515"
+deployed_at = "2026-02-05T12:29:30.006507"
 artifact_path = "skills/meatycapture-capture"
-content_hash = "735b0aa20026876fcb02379c6f87a48913e6bb7310415ad8dc0c8480db835bb9"
+content_hash = "f8f68504d8e316c02ac25af2e49d31826a9f6a29a478d6e06c826d01abb94572"
 local_modifications = false
 version_lineage = [
-    "735b0aa20026876fcb02379c6f87a48913e6bb7310415ad8dc0c8480db835bb9",
+    "f8f68504d8e316c02ac25af2e49d31826a9f6a29a478d6e06c826d01abb94572",
 ]
-modification_detected_at = "2026-02-04T20:46:26.073703"
-collection_sha = "735b0aa20026876fcb02379c6f87a48913e6bb7310415ad8dc0c8480db835bb9"
+merge_base_snapshot = "f8f68504d8e316c02ac25af2e49d31826a9f6a29a478d6e06c826d01abb94572"
+collection_sha = "f8f68504d8e316c02ac25af2e49d31826a9f6a29a478d6e06c826d01abb94572"
 
 [[deployed]]
 artifact_name = "Design Principles"

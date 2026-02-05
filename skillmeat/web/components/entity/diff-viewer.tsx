@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, X, Loader2 } from 'lucide-react';
 import { FileDiff } from '../../sdk/models/FileDiff';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 /**
@@ -38,6 +39,8 @@ interface DiffViewerProps {
   previewMode?: boolean;
   /** Show loading state during resolution */
   isResolving?: boolean;
+  /** Show skeleton loading state while data is being fetched */
+  isLoading?: boolean;
 }
 
 interface DiffLineProps {
@@ -69,6 +72,125 @@ function DiffLine({ content, type, lineNumber }: DiffLineProps) {
         {lineNumber !== undefined ? lineNumber : ''}
       </span>
       <span className="flex-1 whitespace-pre px-2">{content}</span>
+    </div>
+  );
+}
+
+function SpacerLine() {
+  return (
+    <div className="flex bg-muted/40 font-mono text-sm">
+      <span className="w-12 flex-shrink-0 select-none border-r border-border/50 pr-2 text-right text-gray-400">
+        &nbsp;
+      </span>
+      <span className="flex-1 whitespace-pre px-2">&nbsp;</span>
+    </div>
+  );
+}
+
+/** Predetermined widths for skeleton lines to avoid hydration mismatches */
+const LINE_WIDTHS = [72, 55, 88, 43, 65, 80, 50, 95, 60, 75, 48, 83];
+
+/**
+ * DiffViewerSkeleton - Loading skeleton matching the DiffViewer layout
+ *
+ * Mimics the side-by-side diff viewer structure:
+ * - Summary header bar with skeleton badges
+ * - File list sidebar with skeleton entries
+ * - Main diff area with side-by-side skeleton code lines
+ */
+export function DiffViewerSkeleton() {
+  return (
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+      {/* Header with summary skeleton */}
+      <div className="flex flex-shrink-0 items-center justify-between border-b p-4">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-6 w-28" />
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-5 w-12" />
+            <Skeleton className="h-5 w-12" />
+            <Skeleton className="h-5 w-12" />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+        {/* File list sidebar skeleton */}
+        <div className="min-h-0 w-64 flex-shrink-0 overflow-y-auto border-r bg-muted/20">
+          <div className="space-y-1 p-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-2 rounded px-2 py-1.5">
+                <Skeleton className="h-3 w-3 flex-shrink-0" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-5 w-16 flex-shrink-0" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Diff content area skeleton */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {/* File header skeleton */}
+          <div className="flex-shrink-0 border-b bg-muted/30 px-4 py-2">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-5 w-16" />
+            </div>
+          </div>
+
+          {/* Side-by-side panels skeleton */}
+          <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+            {/* Left panel */}
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col border-r">
+              <div className="flex-shrink-0 border-b bg-muted/50 px-4 py-2">
+                <Skeleton className="h-4 w-20" />
+              </div>
+              <div className="min-h-0 min-w-0 flex-1 p-0">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex border-b border-border/50 font-mono text-sm"
+                  >
+                    <span className="w-12 flex-shrink-0 border-r border-border/50 px-2 py-0.5">
+                      <Skeleton className="h-3.5 w-6" />
+                    </span>
+                    <span className="flex-1 px-2 py-0.5">
+                      <Skeleton
+                        className="h-3.5"
+                        style={{ width: `${LINE_WIDTHS[i % LINE_WIDTHS.length]}%` }}
+                      />
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right panel */}
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <div className="flex-shrink-0 border-b bg-muted/50 px-4 py-2">
+                <Skeleton className="h-4 w-20" />
+              </div>
+              <div className="min-h-0 min-w-0 flex-1 p-0">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex border-b border-border/50 font-mono text-sm"
+                  >
+                    <span className="w-12 flex-shrink-0 border-r border-border/50 px-2 py-0.5">
+                      <Skeleton className="h-3.5 w-6" />
+                    </span>
+                    <span className="flex-1 px-2 py-0.5">
+                      <Skeleton
+                        className="h-3.5"
+                        style={{ width: `${LINE_WIDTHS[(i + 5) % LINE_WIDTHS.length]}%` }}
+                      />
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -199,6 +321,7 @@ export function DiffViewer({
   remoteLabel,
   previewMode = false,
   isResolving = false,
+  isLoading = false,
 }: DiffViewerProps) {
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set([0]));
@@ -209,6 +332,39 @@ export function DiffViewer({
   const parsedDiff = useMemo(() => {
     return selectedFile?.unified_diff ? parseDiff(selectedFile.unified_diff) : [];
   }, [selectedFile?.unified_diff]);
+
+  // Refs for synchronized scrolling between left and right panels
+  const leftScrollRef = useRef<HTMLDivElement>(null);
+  const rightScrollRef = useRef<HTMLDivElement>(null);
+
+  // Synchronized scrolling between left and right diff panels
+  useEffect(() => {
+    const leftScroll = leftScrollRef.current;
+    const rightScroll = rightScrollRef.current;
+    if (!leftScroll || !rightScroll) return;
+
+    let isSyncing = false;
+
+    const syncScroll = (source: HTMLDivElement, target: HTMLDivElement) => {
+      if (isSyncing) return;
+      isSyncing = true;
+      target.scrollTop = source.scrollTop;
+      requestAnimationFrame(() => {
+        isSyncing = false;
+      });
+    };
+
+    const onLeftScroll = () => syncScroll(leftScroll, rightScroll);
+    const onRightScroll = () => syncScroll(rightScroll, leftScroll);
+
+    leftScroll.addEventListener('scroll', onLeftScroll);
+    rightScroll.addEventListener('scroll', onRightScroll);
+
+    return () => {
+      leftScroll.removeEventListener('scroll', onLeftScroll);
+      rightScroll.removeEventListener('scroll', onRightScroll);
+    };
+  }, [selectedFile]);
 
   // Memoize summary calculation
   const summary = useMemo(() => {
@@ -244,6 +400,10 @@ export function DiffViewer({
     }
     setExpandedFiles(newExpanded);
   };
+
+  if (isLoading) {
+    return <DiffViewerSkeleton />;
+  }
 
   if (files.length === 0) {
     return (
@@ -300,7 +460,9 @@ export function DiffViewer({
                       isSelected && 'bg-accent'
                     )}
                   >
-                    <button
+                    <span
+                      role="button"
+                      tabIndex={-1}
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleFileExpansion(index);
@@ -312,7 +474,7 @@ export function DiffViewer({
                       ) : (
                         <ChevronRight className="h-3 w-3" />
                       )}
-                    </button>
+                    </span>
                     <span className="flex-1 truncate font-mono text-xs">{file.file_path}</span>
                     <FileStatusBadge status={file.status} />
                   </button>
@@ -352,7 +514,7 @@ export function DiffViewer({
             </div>
           </div>
 
-          {/* Side-by-side diff */}
+          {/* Side-by-side diff with synchronized scrolling and line alignment */}
           {selectedFile?.status === 'modified' && selectedFile.unified_diff ? (
             <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
               {/* Left panel */}
@@ -360,9 +522,11 @@ export function DiffViewer({
                 <div className="flex-shrink-0 border-b bg-muted/50 px-4 py-2 text-sm font-medium">
                   {leftLabel}
                 </div>
-                <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+                <div ref={leftScrollRef} className="min-h-0 min-w-0 flex-1 overflow-auto">
                   {parsedDiff.map((line, idx) => {
-                    if (line.type === 'addition') return null;
+                    if (line.type === 'addition') {
+                      return <SpacerLine key={idx} />;
+                    }
                     if (line.type === 'header') {
                       return (
                         <DiffLine key={idx} content={line.content} type="header" side="left" />
@@ -386,9 +550,11 @@ export function DiffViewer({
                 <div className="flex-shrink-0 border-b bg-muted/50 px-4 py-2 text-sm font-medium">
                   {rightLabel}
                 </div>
-                <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+                <div ref={rightScrollRef} className="min-h-0 min-w-0 flex-1 overflow-auto">
                   {parsedDiff.map((line, idx) => {
-                    if (line.type === 'deletion') return null;
+                    if (line.type === 'deletion') {
+                      return <SpacerLine key={idx} />;
+                    }
                     if (line.type === 'header') {
                       return (
                         <DiffLine key={idx} content={line.content} type="header" side="right" />

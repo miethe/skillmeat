@@ -21,7 +21,7 @@
 import * as React from 'react';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import * as LucideIcons from 'lucide-react';
 import {
   Calendar,
@@ -40,6 +40,8 @@ import {
   ArrowDown,
   MoreVertical,
   Trash2,
+  Rocket,
+  AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -65,9 +67,21 @@ import { DeployButton } from '@/components/shared/deploy-button';
 import { ARTIFACT_TYPES, type Artifact, type ArtifactType } from '@/types/artifact';
 import { getCollectionColor } from '@/lib/utils/collection-colors';
 import { apiRequest } from '@/lib/api';
-import { useToast, useSources, useTags, useUpdateArtifactTags } from '@/hooks';
+import {
+  useToast,
+  useSources,
+  useTags,
+  useUpdateArtifactTags,
+  useProjects,
+  deploymentKeys,
+} from '@/hooks';
 import { TagEditor } from '@/components/shared/tag-editor';
 import type { FileListResponse, FileContentResponse } from '@/types/files';
+import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
+import { DeployDialog } from '@/components/collection/deploy-dialog';
+import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments';
+import type { ArtifactDeploymentInfo } from '@/types/deployments';
+import type { Deployment } from '@/components/deployments/deployment-card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // ============================================================================
@@ -81,7 +95,8 @@ export type ArtifactDetailsTab =
   | 'links'
   | 'collections'
   | 'sources'
-  | 'history';
+  | 'history'
+  | 'deployments';
 
 export interface ArtifactDetailsModalProps {
   /** The artifact to display in the modal */
@@ -443,6 +458,7 @@ const TABS: Tab[] = [
   { value: 'collections', label: 'Collections' },
   { value: 'sources', label: 'Sources' },
   { value: 'history', label: 'History' },
+  { value: 'deployments', label: 'Deployments' },
 ];
 
 // ============================================================================
@@ -489,6 +505,9 @@ export function ArtifactDetailsModal({
     sourceName: string;
   } | null>(null);
   const [isLoadingSource, setIsLoadingSource] = useState(false);
+
+  // Deploy dialog state
+  const [showDeployDialog, setShowDeployDialog] = useState(false);
 
   // Get returnTo from props or URL
   const effectiveReturnTo = returnTo || searchParams.get('returnTo');
@@ -652,6 +671,135 @@ export function ArtifactDetailsModal({
     if (!artifact) return [];
     return generateMockHistory(artifact);
   }, [artifact]);
+
+  // ==========================================================================
+  // Deployment Data Fetching
+  // ==========================================================================
+
+  // Fetch projects for deployment card project name display AND for querying all deployments
+  const { data: projects, isLoading: isProjectsLoading } = useProjects();
+
+  // Fetch deployments for ALL registered projects in parallel
+  const deploymentQueries = useQueries({
+    queries: (projects || []).map((project) => ({
+      queryKey: deploymentKeys.list(project.path),
+      queryFn: () => listDeployments(project.path),
+      staleTime: 2 * 60 * 1000, // 2 minutes
+      enabled: !!projects && projects.length > 0,
+    })),
+  });
+
+  // Combine deployment results from all projects
+  const isDeploymentsLoading = isProjectsLoading || deploymentQueries.some((q) => q.isLoading);
+  const deploymentsError = deploymentQueries.find((q) => q.error)?.error;
+
+  // Combine all deployments from all projects into a single array
+  const allDeployments = useMemo((): ArtifactDeploymentInfo[] => {
+    if (!projects || projects.length === 0) return [];
+
+    const combined: ArtifactDeploymentInfo[] = [];
+
+    deploymentQueries.forEach((query) => {
+      if (query.data?.deployments) {
+        combined.push(...query.data.deployments);
+      }
+    });
+
+    return combined;
+  }, [deploymentQueries, projects]);
+
+  // Filter deployments by artifact name
+  const artifactDeployments = useMemo(() => {
+    if (!allDeployments || allDeployments.length === 0 || !artifact) return [];
+
+    // Filter deployments that match this artifact
+    const filtered = allDeployments.filter(
+      (d) => d.artifact_name === artifact.name && d.artifact_type === artifact.type
+    );
+
+    // Transform to Deployment type with computed status
+    return filtered.map((d): Deployment => {
+      let status: 'current' | 'outdated' | 'error' = 'current';
+      if (d.sync_status === 'outdated') {
+        status = 'outdated';
+      } else if (d.sync_status === 'modified') {
+        status = 'outdated';
+      }
+
+      return {
+        ...d,
+        id: `${d.project_path}::${d.artifact_path}`,
+        status,
+        latest_version: artifact.version,
+        deployed_version: d.collection_sha?.substring(0, 7),
+      };
+    });
+  }, [allDeployments, artifact]);
+
+  // Extract deployment paths for DeployDialog
+  const existingDeploymentPaths = useMemo(() => {
+    return artifactDeployments.map((d) => `${d.project_path}/${d.artifact_path}`);
+  }, [artifactDeployments]);
+
+  // Count unique projects where this artifact is deployed
+  const deploymentProjectCount = useMemo(() => {
+    const projectPaths = new Set(
+      artifactDeployments.map((d) => d.project_path).filter((p): p is string => p != null)
+    );
+    return projectPaths.size;
+  }, [artifactDeployments]);
+
+  // Navigation handler for clicking deployment cards
+  const handleNavigateToDeployment = useCallback(
+    (projectPath: string, artifactId: string) => {
+      onClose();
+      const encodedPath = btoa(projectPath);
+      router.push(`/projects/${encodedPath}/manage?artifact=${encodeURIComponent(artifactId)}`);
+    },
+    [onClose, router]
+  );
+
+  // Handler for removing deployment from a project
+  const handleDeploymentRemove = useCallback(
+    async (deployment: Deployment, removeFiles: boolean) => {
+      if (!artifact) return;
+
+      try {
+        const projectId = btoa(deployment.project_path);
+
+        await removeProjectDeployment(
+          projectId,
+          deployment.artifact_name,
+          deployment.artifact_type,
+          removeFiles
+        );
+
+        // Invalidate deployment queries to refresh the list
+        await queryClient.invalidateQueries({
+          queryKey: deploymentKeys.list(deployment.project_path),
+        });
+
+        // Also invalidate all deployment queries
+        await queryClient.invalidateQueries({
+          predicate: (query) =>
+            Array.isArray(query.queryKey) && query.queryKey[0] === 'deployments',
+        });
+
+        toast({
+          title: 'Deployment Removed',
+          description: `Successfully removed "${deployment.artifact_name}" from project${removeFiles ? ' and deleted files from filesystem' : ''}`,
+        });
+      } catch (error) {
+        console.error('Failed to remove deployment:', error);
+        toast({
+          title: 'Removal Failed',
+          description: error instanceof Error ? error.message : 'Failed to remove deployment',
+          variant: 'destructive',
+        });
+      }
+    },
+    [artifact, queryClient, toast]
+  );
 
   // Fetch file list
   const {
@@ -1211,6 +1359,107 @@ export function ArtifactDetailsModal({
                 )}
               </div>
             </TabContentWrapper>
+
+            {/* Deployments Tab */}
+            <TabContentWrapper value="deployments">
+              <div className="space-y-4">
+                {/* Header with Deploy button and Summary */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    {artifactDeployments.length > 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        {artifactDeployments.length}{' '}
+                        {artifactDeployments.length === 1 ? 'deployment' : 'deployments'} across{' '}
+                        {deploymentProjectCount}{' '}
+                        {deploymentProjectCount === 1 ? 'project' : 'projects'}
+                      </p>
+                    )}
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setShowDeployDialog(true)}>
+                    <Rocket className="mr-2 h-4 w-4" />
+                    Deploy to Project
+                  </Button>
+                </div>
+
+                {/* Loading state */}
+                {isDeploymentsLoading && (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <DeploymentCardSkeleton />
+                    <DeploymentCardSkeleton />
+                    <DeploymentCardSkeleton />
+                  </div>
+                )}
+
+                {/* Error state */}
+                {!isDeploymentsLoading && deploymentsError && (
+                  <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-700 dark:text-red-400" />
+                      <div>
+                        <p className="mb-1 text-sm font-medium text-red-700 dark:text-red-400">
+                          Failed to load deployments
+                        </p>
+                        <p className="text-xs text-red-600/80 dark:text-red-400/80">
+                          {deploymentsError instanceof Error
+                            ? deploymentsError.message
+                            : 'An unknown error occurred'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {!isDeploymentsLoading &&
+                  !deploymentsError &&
+                  artifactDeployments.length === 0 && (
+                    <div className="py-12 text-center">
+                      <Rocket className="mx-auto mb-4 h-12 w-12 text-muted-foreground opacity-50" />
+                      <h3 className="mb-2 text-lg font-semibold">
+                        Not deployed to any projects yet
+                      </h3>
+                      <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+                        Deploy this artifact to a project to see it listed here.
+                      </p>
+                    </div>
+                  )}
+
+                {/* Success state - Grid of deployment cards */}
+                {!isDeploymentsLoading && !deploymentsError && artifactDeployments.length > 0 && (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {artifactDeployments.map((deployment) => (
+                      <div
+                        key={deployment.id}
+                        className="cursor-pointer"
+                        onClick={() =>
+                          handleNavigateToDeployment(
+                            deployment.project_path,
+                            `${deployment.artifact_type}:${deployment.artifact_name}`
+                          )
+                        }
+                      >
+                        <DeploymentCard
+                          deployment={deployment}
+                          projects={projects}
+                          onUpdate={() => {
+                            toast({
+                              title: 'Update Deployment',
+                              description: 'Deployment update functionality coming soon',
+                            });
+                          }}
+                          onRemove={(removeFiles) =>
+                            handleDeploymentRemove(deployment, removeFiles)
+                          }
+                          onViewSource={() => {
+                            onClose();
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabContentWrapper>
           </Tabs>
         </DialogContent>
       </Dialog>
@@ -1221,6 +1470,21 @@ export function ArtifactDetailsModal({
         onOpenChange={setShowLinkingDialog}
         artifactId={artifact.id}
         onSuccess={handleLinkChange}
+      />
+
+      {/* Deploy Dialog */}
+      <DeployDialog
+        artifact={artifact}
+        existingDeploymentPaths={existingDeploymentPaths}
+        isOpen={showDeployDialog}
+        onClose={() => setShowDeployDialog(false)}
+        onSuccess={() => {
+          toast({
+            title: 'Deployment Successful',
+            description: `${artifact.name} has been deployed to the project.`,
+          });
+          queryClient.invalidateQueries({ queryKey: ['deployments'] });
+        }}
       />
     </>
   );

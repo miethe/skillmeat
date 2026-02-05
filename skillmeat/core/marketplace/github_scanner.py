@@ -492,6 +492,13 @@ class GitHubScanner:
     ) -> List[str]:
         """Extract file paths from tree, optionally filtering by root_hint.
 
+        The Git Trees API represents symlinks as blob entries whose content is
+        the symlink target path. These appear as very small blobs (typically
+        under 256 bytes). While we cannot distinguish symlinks from small files
+        at the tree level, we include them in the path list so heuristic
+        detection sees them. The import coordinator handles actual symlink
+        resolution via the Contents API which does expose symlink types.
+
         Args:
             tree: Tree items from GitHub API
             root_hint: Optional subdirectory to filter by
@@ -500,12 +507,16 @@ class GitHubScanner:
             List of file paths
         """
         paths = []
+        # Track potential symlinks for logging (blobs with no file extension
+        # and very small size are likely symlinks, but we include them anyway)
+        potential_symlink_count = 0
 
         for item in tree:
             if item.get("type") != "blob":
                 continue
 
             path = item.get("path", "")
+            size = item.get("size", 0)
 
             # Apply root_hint filter if provided
             if root_hint:
@@ -516,6 +527,19 @@ class GitHubScanner:
                     continue
 
             paths.append(path)
+
+            # Heuristic: blobs under 256 bytes with no file extension are
+            # likely symlinks (their content is just a relative path string).
+            # This is informational only - we still include them in paths.
+            name = path.rsplit("/", 1)[-1] if "/" in path else path
+            if size > 0 and size < 256 and "." not in name:
+                potential_symlink_count += 1
+
+        if potential_symlink_count > 0:
+            logger.debug(
+                f"Detected {potential_symlink_count} potential symlink entries "
+                f"in tree (small blobs without file extensions)"
+            )
 
         # Limit to max_files
         if len(paths) > self.config.max_files:

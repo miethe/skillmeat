@@ -673,6 +673,125 @@ class TestDeleteArtifact:
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+class TestSourceProjectDiff:
+    """Test GET /api/v1/artifacts/{artifact_id}/source-project-diff endpoint."""
+
+    def test_source_project_diff_missing_project_path(self, client):
+        """Test source-project diff without project_path parameter."""
+        response = client.get("/api/v1/artifacts/skill:pdf-skill/source-project-diff")
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_source_project_diff_invalid_project_path(self, client):
+        """Test source-project diff with non-existent project path."""
+        response = client.get(
+            "/api/v1/artifacts/skill:pdf-skill/source-project-diff?project_path=/nonexistent/path"
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_source_project_diff_invalid_artifact_id(self, client, tmp_path):
+        """Test source-project diff with invalid artifact ID format."""
+        project_path = tmp_path / "project"
+        project_path.mkdir()
+
+        response = client.get(
+            f"/api/v1/artifacts/invalid-id/source-project-diff?project_path={project_path}"
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Invalid artifact ID format" in response.json()["detail"]
+
+
+class TestDeployWithMergeStrategy:
+    """Test POST /api/v1/artifacts/{artifact_id}/deploy with merge strategy."""
+
+    def test_deploy_invalid_artifact_id(self, client, tmp_path):
+        """Test deploy with invalid artifact ID format."""
+        project_path = tmp_path / "project"
+        project_path.mkdir()
+
+        response = client.post(
+            "/api/v1/artifacts/invalid-id/deploy",
+            json={
+                "project_path": str(project_path),
+                "strategy": "merge",
+            },
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Invalid artifact ID format" in response.json()["detail"]
+
+    def test_deploy_invalid_project_path(self, client):
+        """Test deploy with non-existent project path."""
+        response = client.post(
+            "/api/v1/artifacts/skill:test/deploy",
+            json={
+                "project_path": "/nonexistent/path",
+                "strategy": "merge",
+            },
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+class TestDeploySchemaValidation:
+    """Test schema validation for deploy endpoint."""
+
+    def test_artifact_deploy_request_default_strategy(self):
+        """Test ArtifactDeployRequest default strategy is 'overwrite'."""
+        from skillmeat.api.schemas.artifacts import ArtifactDeployRequest
+
+        request = ArtifactDeployRequest(project_path="/tmp/test")
+        assert request.strategy == "overwrite"
+
+    def test_artifact_deploy_request_invalid_strategy(self):
+        """Test invalid strategy value is rejected."""
+        from skillmeat.api.schemas.artifacts import ArtifactDeployRequest
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            ArtifactDeployRequest(
+                project_path="/tmp/test",
+                strategy="invalid",
+            )
+
+    def test_artifact_deploy_response_backward_compatibility(self):
+        """Test ArtifactDeployResponse backward compatibility (no strategy field)."""
+        from skillmeat.api.schemas.artifacts import ArtifactDeployResponse
+
+        response = ArtifactDeployResponse(
+            success=True,
+            message="Deployed",
+            artifact_name="test",
+            artifact_type="skill",
+        )
+        assert response.strategy is None
+        assert response.merge_details is None
+
+    def test_merge_deploy_details_serialization(self):
+        """Test MergeDeployDetails serialization."""
+        from skillmeat.api.schemas.artifacts import MergeDeployDetails, MergeFileAction
+
+        details = MergeDeployDetails(
+            files_copied=2,
+            files_skipped=1,
+            files_preserved=1,
+            conflicts=1,
+            file_actions=[
+                MergeFileAction(file_path="test.md", action="copied"),
+                MergeFileAction(file_path="same.md", action="skipped"),
+                MergeFileAction(
+                    file_path="conflict.md",
+                    action="conflict",
+                    detail="Modified on both sides",
+                ),
+            ],
+        )
+
+        data = details.model_dump()
+        assert data["files_copied"] == 2
+        assert data["conflicts"] == 1
+        assert len(data["file_actions"]) == 3
+
+
 class TestArtifactsAuth:
     """Test authentication for artifacts endpoints."""
 

@@ -7,6 +7,7 @@ entries to the user's local collection.
 import base64
 import logging
 import os
+import posixpath
 import re
 import sys
 import time
@@ -553,10 +554,13 @@ class ImportCoordinator:
         remote_path: str,
         local_path: Path,
         retry_count: int = 3,
+        _visited_symlinks: Optional[Set[str]] = None,
     ) -> int:
         """Recursively download directory contents from GitHub.
 
         Uses GitHub Contents API to fetch directory listings and download files.
+        Handles symlinks by resolving their targets and downloading the actual
+        content into the symlink's location.
 
         Args:
             session: Requests session with auth headers
@@ -566,6 +570,8 @@ class ImportCoordinator:
             remote_path: Path within repository
             local_path: Local directory to download into
             retry_count: Number of retries for rate limiting
+            _visited_symlinks: Internal set tracking resolved symlink targets
+                to prevent circular symlink loops. Callers should not set this.
 
         Returns:
             Number of files downloaded
@@ -574,6 +580,8 @@ class ImportCoordinator:
             requests.HTTPError: If API request fails
             RuntimeError: If rate limited and retries exhausted
         """
+        if _visited_symlinks is None:
+            _visited_symlinks = set()
         # Build API URL
         api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{remote_path}"
         params = {"ref": ref}
@@ -649,7 +657,85 @@ class ImportCoordinator:
                     remote_path=item_path,
                     local_path=subdir_path,
                     retry_count=retry_count,
+                    _visited_symlinks=_visited_symlinks,
                 )
+
+            elif item_type == "symlink":
+                # GitHub Contents API returns symlinks with a "target" field
+                # containing the relative path to the actual file/directory.
+                symlink_target = item.get("target", "")
+                if not symlink_target:
+                    logger.warning(f"Symlink {item_name} has no target, skipping")
+                    continue
+
+                # Resolve the relative target path against the current directory
+                resolved_path = posixpath.normpath(
+                    posixpath.join(remote_path, symlink_target)
+                )
+
+                # Guard against paths resolving outside the repository root
+                if resolved_path.startswith("..") or resolved_path.startswith("/"):
+                    logger.warning(
+                        f"Symlink {item_name} resolves outside repo: "
+                        f"{symlink_target} -> {resolved_path}, skipping"
+                    )
+                    continue
+
+                # Circular symlink detection
+                if resolved_path in _visited_symlinks:
+                    logger.warning(
+                        f"Circular symlink detected: {item_name} -> "
+                        f"{resolved_path} (already visited), skipping"
+                    )
+                    continue
+
+                _visited_symlinks.add(resolved_path)
+                logger.info(f"Resolving symlink: {item_name} -> {resolved_path}")
+
+                # Fetch the symlink target from GitHub Contents API
+                try:
+                    target_api_url = (
+                        f"https://api.github.com/repos/{owner}/{repo}"
+                        f"/contents/{resolved_path}"
+                    )
+                    target_params = {"ref": ref}
+                    target_response = session.get(
+                        target_api_url, params=target_params, timeout=30
+                    )
+                    target_response.raise_for_status()
+                    target_data = target_response.json()
+
+                    if isinstance(target_data, list):
+                        # Target is a directory - recursively download
+                        # into the symlink's local location
+                        symlink_local_path = local_path / item_name
+                        files_downloaded += self._download_directory_recursive(
+                            session=session,
+                            owner=owner,
+                            repo=repo,
+                            ref=ref,
+                            remote_path=resolved_path,
+                            local_path=symlink_local_path,
+                            retry_count=retry_count,
+                            _visited_symlinks=_visited_symlinks,
+                        )
+                    elif isinstance(target_data, dict):
+                        # Target is a single file
+                        file_path = local_path / item_name
+                        local_path.mkdir(parents=True, exist_ok=True)
+                        if self._download_file(target_data, file_path):
+                            files_downloaded += 1
+                    else:
+                        logger.warning(
+                            f"Unexpected response for symlink target "
+                            f"{resolved_path}: {type(target_data)}"
+                        )
+
+                except requests.exceptions.RequestException as e:
+                    logger.warning(
+                        f"Failed to resolve symlink {item_name} -> "
+                        f"{resolved_path}: {e}"
+                    )
 
         return files_downloaded
 

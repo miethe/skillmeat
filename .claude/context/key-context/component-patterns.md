@@ -658,4 +658,4 @@ export function ConfirmDialog({ title, message, onConfirm }: Props) {
 - **Tailwind CSS Documentation**: https://tailwindcss.com/docs
 - **WAI-ARIA Practices**: https://www.w3.org/WAI/ARIA/apg/
 - **cn() Utility Source**: `skillmeat/web/lib/utils.ts`
-- **Related Patterns**: `.claude/rules/web/components.md`
+- **Related Patterns**: `skillmeat/web/components/CLAUDE.md`

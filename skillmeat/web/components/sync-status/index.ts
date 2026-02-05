@@ -24,3 +24,6 @@ export type { FilePreviewPaneProps } from './file-preview-pane';
 
 export { SyncActionsFooter } from './sync-actions-footer';
 export type { SyncActionsFooterProps } from './sync-actions-footer';
+
+export { SyncConfirmationDialog } from './sync-confirmation-dialog';
+export type { SyncConfirmationDialogProps } from './sync-confirmation-dialog';
