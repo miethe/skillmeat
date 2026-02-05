@@ -4,8 +4,11 @@ Provides REST API for managing artifacts within collections.
 """
 
 import base64
+import difflib
+import hashlib
 import json
 import logging
+import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path as PathLib
@@ -3111,9 +3114,6 @@ async def _deploy_merge(
     Returns:
         ArtifactDeployResponse with merge_details populated
     """
-    import hashlib
-    import shutil
-
     # Resolve source path (collection artifact directory)
     collection_path = collection_mgr.config.get_collection_path(collection_name)
     source_path = collection_path / artifact.path
@@ -4776,10 +4776,6 @@ async def get_artifact_source_project_diff(
     Raises:
         HTTPException: If artifact not found, project not found, or on error
     """
-    import difflib
-    import hashlib
-    import shutil
-
     try:
         logger.info(
             f"Getting source-project diff for artifact: {artifact_id} "
@@ -4880,208 +4876,209 @@ async def get_artifact_source_project_diff(
             collection_name=collection_name,
         )
 
-        if fetch_result.error:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to fetch upstream: {fetch_result.error}",
-            )
-
-        # Determine upstream artifact path
-        if fetch_result.has_update and fetch_result.fetch_result:
-            upstream_artifact_path = fetch_result.fetch_result.artifact_path
-        elif not fetch_result.has_update:
-            # No upstream update means collection matches upstream; use collection copy
-            collection_path = collection_mgr.config.get_collection_path(collection_name)
-            upstream_artifact_path = collection_path / artifact.path
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to resolve upstream artifact path",
-            )
-
-        project_artifact_path = proj_path / ".claude" / inferred_artifact_path
-
-        if not upstream_artifact_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Upstream artifact path does not exist: {upstream_artifact_path}",
-            )
-
-        if not project_artifact_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project artifact path does not exist: {project_artifact_path}",
-            )
-
-        # Collect files from both locations
-        source_files = set()
-        project_files = set()
-
-        if upstream_artifact_path.is_dir():
-            source_files = {
-                str(f.relative_to(upstream_artifact_path))
-                for f in upstream_artifact_path.rglob("*")
-                if f.is_file()
-            }
-        else:
-            source_files = {upstream_artifact_path.name}
-
-        if project_artifact_path.is_dir():
-            project_files = {
-                str(f.relative_to(project_artifact_path))
-                for f in project_artifact_path.rglob("*")
-                if f.is_file()
-            }
-        else:
-            project_files = {project_artifact_path.name}
-
-        all_files = sorted(source_files | project_files)
-
-        def compute_file_hash(file_path: PathLib) -> str:
-            hasher = hashlib.sha256()
-            with open(file_path, "rb") as f:
-                while True:
-                    chunk = f.read(8192)
-                    if not chunk:
-                        break
-                    hasher.update(chunk)
-            return hasher.hexdigest()
-
-        def is_binary_file(file_path: PathLib) -> bool:
-            try:
-                with open(file_path, "rb") as f:
-                    chunk = f.read(8192)
-                    return b"\x00" in chunk
-            except Exception:
-                return True
-
-        file_diffs: List[FileDiff] = []
-        summary = {"added": 0, "modified": 0, "deleted": 0, "unchanged": 0}
-
-        for file_rel_path in all_files:
-            in_source = file_rel_path in source_files
-            in_project = file_rel_path in project_files
-
-            if in_source and in_project:
-                src_file = (
-                    upstream_artifact_path / file_rel_path
-                    if upstream_artifact_path.is_dir()
-                    else upstream_artifact_path
-                )
-                proj_file = (
-                    project_artifact_path / file_rel_path
-                    if project_artifact_path.is_dir()
-                    else project_artifact_path
-                )
-
-                src_hash = compute_file_hash(src_file)
-                proj_hash = compute_file_hash(proj_file)
-
-                if src_hash == proj_hash:
-                    file_status = "unchanged"
-                    unified_diff = None
-                    summary["unchanged"] += 1
-                else:
-                    file_status = "modified"
-                    summary["modified"] += 1
-                    unified_diff = None
-                    if not is_binary_file(src_file) and not is_binary_file(proj_file):
-                        try:
-                            with open(src_file, "r", encoding="utf-8") as f:
-                                src_lines = f.readlines()
-                            with open(proj_file, "r", encoding="utf-8") as f:
-                                proj_lines = f.readlines()
-                            diff_lines = difflib.unified_diff(
-                                src_lines,
-                                proj_lines,
-                                fromfile=f"source/{file_rel_path}",
-                                tofile=f"project/{file_rel_path}",
-                                lineterm="",
-                            )
-                            unified_diff = "\n".join(diff_lines)
-                        except Exception as e:
-                            logger.warning(
-                                f"Failed to generate diff for {file_rel_path}: {e}"
-                            )
-                            unified_diff = f"[Error generating diff: {str(e)}]"
-
-                file_diffs.append(
-                    FileDiff(
-                        file_path=file_rel_path,
-                        status=file_status,
-                        collection_hash=src_hash,
-                        project_hash=proj_hash,
-                        unified_diff=unified_diff,
-                    )
-                )
-
-            elif in_source and not in_project:
-                file_status = "deleted"
-                summary["deleted"] += 1
-                src_file = (
-                    upstream_artifact_path / file_rel_path
-                    if upstream_artifact_path.is_dir()
-                    else upstream_artifact_path
-                )
-                src_hash = compute_file_hash(src_file)
-                file_diffs.append(
-                    FileDiff(
-                        file_path=file_rel_path,
-                        status=file_status,
-                        collection_hash=src_hash,
-                        project_hash=None,
-                        unified_diff=None,
-                    )
-                )
-
-            elif not in_source and in_project:
-                file_status = "added"
-                summary["added"] += 1
-                proj_file = (
-                    project_artifact_path / file_rel_path
-                    if project_artifact_path.is_dir()
-                    else project_artifact_path
-                )
-                proj_hash = compute_file_hash(proj_file)
-                file_diffs.append(
-                    FileDiff(
-                        file_path=file_rel_path,
-                        status=file_status,
-                        collection_hash=None,
-                        project_hash=proj_hash,
-                        unified_diff=None,
-                    )
-                )
-
-        has_changes = (
-            summary["added"] > 0 or summary["modified"] > 0 or summary["deleted"] > 0
-        )
-
-        logger.info(
-            f"Source-project diff computed for {artifact_id}: {len(file_diffs)} files, "
-            f"has_changes={has_changes}, summary={summary}"
-        )
-
-        # Clean up temp workspace if one was created
         try:
-            if (
-                fetch_result.temp_workspace
-                and fetch_result.temp_workspace.exists()
-            ):
-                shutil.rmtree(fetch_result.temp_workspace, ignore_errors=True)
-        except Exception as e:
-            logger.warning(f"Failed to clean up temp workspace: {e}")
+            if fetch_result.error:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to fetch upstream: {fetch_result.error}",
+                )
 
-        return ArtifactDiffResponse(
-            artifact_id=artifact_id,
-            artifact_name=artifact_name,
-            artifact_type=artifact_type.value,
-            collection_name=collection_name,
-            project_path=str(proj_path),
-            has_changes=has_changes,
-            files=file_diffs,
-            summary=summary,
-        )
+            # Determine upstream artifact path
+            if fetch_result.has_update and fetch_result.fetch_result:
+                upstream_artifact_path = fetch_result.fetch_result.artifact_path
+            elif not fetch_result.has_update:
+                # No upstream update means collection matches upstream; use collection copy
+                collection_path = collection_mgr.config.get_collection_path(collection_name)
+                upstream_artifact_path = collection_path / artifact.path
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to resolve upstream artifact path",
+                )
+
+            project_artifact_path = proj_path / ".claude" / inferred_artifact_path
+
+            if not upstream_artifact_path.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Upstream artifact path does not exist: {upstream_artifact_path}",
+                )
+
+            if not project_artifact_path.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project artifact path does not exist: {project_artifact_path}",
+                )
+
+            # Collect files from both locations
+            source_files = set()
+            project_files = set()
+
+            if upstream_artifact_path.is_dir():
+                source_files = {
+                    str(f.relative_to(upstream_artifact_path))
+                    for f in upstream_artifact_path.rglob("*")
+                    if f.is_file()
+                }
+            else:
+                source_files = {upstream_artifact_path.name}
+
+            if project_artifact_path.is_dir():
+                project_files = {
+                    str(f.relative_to(project_artifact_path))
+                    for f in project_artifact_path.rglob("*")
+                    if f.is_file()
+                }
+            else:
+                project_files = {project_artifact_path.name}
+
+            all_files = sorted(source_files | project_files)
+
+            def compute_file_hash(file_path: PathLib) -> str:
+                hasher = hashlib.sha256()
+                with open(file_path, "rb") as f:
+                    while True:
+                        chunk = f.read(8192)
+                        if not chunk:
+                            break
+                        hasher.update(chunk)
+                return hasher.hexdigest()
+
+            def is_binary_file(file_path: PathLib) -> bool:
+                try:
+                    with open(file_path, "rb") as f:
+                        chunk = f.read(8192)
+                        return b"\x00" in chunk
+                except Exception:
+                    return True
+
+            file_diffs: List[FileDiff] = []
+            summary = {"added": 0, "modified": 0, "deleted": 0, "unchanged": 0}
+
+            for file_rel_path in all_files:
+                in_source = file_rel_path in source_files
+                in_project = file_rel_path in project_files
+
+                if in_source and in_project:
+                    src_file = (
+                        upstream_artifact_path / file_rel_path
+                        if upstream_artifact_path.is_dir()
+                        else upstream_artifact_path
+                    )
+                    proj_file = (
+                        project_artifact_path / file_rel_path
+                        if project_artifact_path.is_dir()
+                        else project_artifact_path
+                    )
+
+                    src_hash = compute_file_hash(src_file)
+                    proj_hash = compute_file_hash(proj_file)
+
+                    if src_hash == proj_hash:
+                        file_status = "unchanged"
+                        unified_diff = None
+                        summary["unchanged"] += 1
+                    else:
+                        file_status = "modified"
+                        summary["modified"] += 1
+                        unified_diff = None
+                        if not is_binary_file(src_file) and not is_binary_file(proj_file):
+                            try:
+                                with open(src_file, "r", encoding="utf-8") as f:
+                                    src_lines = f.readlines()
+                                with open(proj_file, "r", encoding="utf-8") as f:
+                                    proj_lines = f.readlines()
+                                diff_lines = difflib.unified_diff(
+                                    src_lines,
+                                    proj_lines,
+                                    fromfile=f"source/{file_rel_path}",
+                                    tofile=f"project/{file_rel_path}",
+                                    lineterm="",
+                                )
+                                unified_diff = "\n".join(diff_lines)
+                            except Exception as e:
+                                logger.warning(
+                                    f"Failed to generate diff for {file_rel_path}: {e}"
+                                )
+                                unified_diff = f"[Error generating diff: {str(e)}]"
+
+                    file_diffs.append(
+                        FileDiff(
+                            file_path=file_rel_path,
+                            status=file_status,
+                            collection_hash=src_hash,
+                            project_hash=proj_hash,
+                            unified_diff=unified_diff,
+                        )
+                    )
+
+                elif in_source and not in_project:
+                    file_status = "deleted"
+                    summary["deleted"] += 1
+                    src_file = (
+                        upstream_artifact_path / file_rel_path
+                        if upstream_artifact_path.is_dir()
+                        else upstream_artifact_path
+                    )
+                    src_hash = compute_file_hash(src_file)
+                    file_diffs.append(
+                        FileDiff(
+                            file_path=file_rel_path,
+                            status=file_status,
+                            collection_hash=src_hash,
+                            project_hash=None,
+                            unified_diff=None,
+                        )
+                    )
+
+                elif not in_source and in_project:
+                    file_status = "added"
+                    summary["added"] += 1
+                    proj_file = (
+                        project_artifact_path / file_rel_path
+                        if project_artifact_path.is_dir()
+                        else project_artifact_path
+                    )
+                    proj_hash = compute_file_hash(proj_file)
+                    file_diffs.append(
+                        FileDiff(
+                            file_path=file_rel_path,
+                            status=file_status,
+                            collection_hash=None,
+                            project_hash=proj_hash,
+                            unified_diff=None,
+                        )
+                    )
+
+            has_changes = (
+                summary["added"] > 0 or summary["modified"] > 0 or summary["deleted"] > 0
+            )
+
+            logger.info(
+                f"Source-project diff computed for {artifact_id}: {len(file_diffs)} files, "
+                f"has_changes={has_changes}, summary={summary}"
+            )
+
+            return ArtifactDiffResponse(
+                artifact_id=artifact_id,
+                artifact_name=artifact_name,
+                artifact_type=artifact_type.value,
+                collection_name=collection_name,
+                project_path=str(proj_path),
+                has_changes=has_changes,
+                files=file_diffs,
+                summary=summary,
+            )
+        finally:
+            # Clean up temp workspace if one was created
+            try:
+                if (
+                    fetch_result.temp_workspace
+                    and fetch_result.temp_workspace.exists()
+                ):
+                    shutil.rmtree(fetch_result.temp_workspace, ignore_errors=True)
+            except Exception as e:
+                logger.warning(f"Failed to clean up temp workspace: {e}")
 
     except HTTPException:
         raise

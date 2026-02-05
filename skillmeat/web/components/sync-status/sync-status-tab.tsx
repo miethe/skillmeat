@@ -297,6 +297,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       entity.collection !== 'discovered' &&
       hasValidUpstreamSource(entity) &&
       comparisonScope === 'source-vs-project',
+    staleTime: 30_000,
     retry: false,
   });
 
