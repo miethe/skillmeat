@@ -5,6 +5,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { apiRequest } from '@/lib/api';
+
 export interface SyncRequest {
   artifactId: string;
   artifactName: string;
@@ -56,21 +58,16 @@ export function useSync(options: UseSyncOptions = {}) {
 
   return useMutation({
     mutationFn: async (request: SyncRequest): Promise<SyncResponse> => {
-      const response = await fetch(`/api/v1/artifacts/${encodeURIComponent(request.artifactId)}/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          force: request.force,
-          strategy: request.mergeStrategy,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Sync failed' }));
-        throw new Error(errorData.message || 'Sync failed');
-      }
-
-      return await response.json();
+      return apiRequest<SyncResponse>(
+        `/artifacts/${encodeURIComponent(request.artifactId)}/sync`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            force: request.force,
+            strategy: request.mergeStrategy,
+          }),
+        }
+      );
     },
 
     onSuccess: (data, variables) => {
