@@ -2,202 +2,148 @@
 type: progress
 prd: "unified-sync-workflow"
 phase: 1
-phase_name: "Conflict-Aware Deploy Dialog"
+phase_name: "Backend Enablement + Unified Hook"
 status: pending
 progress: 0
 created: 2026-02-04
-updated: 2026-02-04
+updated: 2026-02-05
 
 tasks:
-  - id: "SYNC-001"
-    name: "Create ConflictAwareDeployDialog"
+  - id: "SYNC-B01"
+    name: "Source-vs-project diff endpoint"
     status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
+    assigned_to: ["python-backend-engineer"]
+    dependencies: []
+    estimate: "1.5 pts"
+    model: "opus"
+
+  - id: "SYNC-B02"
+    name: "Extend deploy with merge strategy"
+    status: "pending"
+    assigned_to: ["python-backend-engineer"]
     dependencies: []
     estimate: "2 pts"
     model: "opus"
 
-  - id: "SYNC-002"
-    name: "Add usePreDeployCheck hook"
+  - id: "SYNC-H01"
+    name: "Create unified useConflictCheck hook"
     status: "pending"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
-    estimate: "1 pt"
-    model: "opus"
-
-  - id: "SYNC-003"
-    name: "Integrate with SyncStatusTab"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-001", "SYNC-002"]
-    estimate: "1 pt"
-    model: "opus"
-
-  - id: "SYNC-004"
-    name: "Handle no-conflict fast path"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-003"]
-    estimate: "0.5 pts"
-    model: "sonnet"
-
-  - id: "SYNC-005"
-    name: "Connect to Merge Workflow"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-001"]
-    estimate: "0.5 pts"
-    model: "sonnet"
-
-  - id: "SYNC-006"
-    name: "Unit tests for dialog and hook"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-001", "SYNC-002"]
     estimate: "1.5 pts"
+    model: "opus"
+
+  - id: "SYNC-B03"
+    name: "Backend unit tests"
+    status: "pending"
+    assigned_to: ["python-backend-engineer"]
+    dependencies: ["SYNC-B01", "SYNC-B02"]
+    estimate: "1 pt"
     model: "sonnet"
 
 parallelization:
-  batch_1: ["SYNC-001", "SYNC-002"]
-  batch_2: ["SYNC-003", "SYNC-005", "SYNC-006"]
-  batch_3: ["SYNC-004"]
+  batch_1: ["SYNC-B01", "SYNC-B02", "SYNC-H01"]
+  batch_2: ["SYNC-B03"]
 
 quality_gates:
-  - "ConflictAwareDeployDialog renders with proper loading skeleton"
-  - "DiffViewer correctly displays project vs collection changes"
-  - "Overwrite button triggers deploy with overwrite=true"
-  - "Merge button opens SyncDialog"
-  - "Cancel button closes dialog without action"
-  - "No-conflict path skips dialog and deploys directly"
-  - "Unit tests pass with >85% coverage"
-  - "No TypeScript errors"
+  - "Source-project diff endpoint returns accurate file-level diffs"
+  - "Deploy with strategy='merge' performs file merge, reports conflicts"
+  - "useConflictCheck routes to correct API per direction"
+  - "targetHasChanges flag correctly computed for merge gating"
+  - "All backend tests pass"
+  - "No regressions in existing sync/deploy flows"
 ---
 
-# Phase 1: Conflict-Aware Deploy Dialog
+# Phase 1: Backend Enablement + Unified Hook
 
-**Goal**: Before deploying Collection → Project, check for conflicts. If project has local changes, show diff and ask user to confirm overwrite OR open merge workflow.
+**Goal**: Add missing backend endpoints and create the unified frontend hook for pre-operation conflict detection.
 
-**Duration**: 3-4 days | **Story Points**: 6.5
+**Duration**: 2-3 days | **Story Points**: 6
 
 ## Task Details
 
-### SYNC-001: Create ConflictAwareDeployDialog
+### SYNC-B01: Source-vs-project diff endpoint
 
-**File**: `skillmeat/web/components/sync-status/conflict-aware-deploy-dialog.tsx`
-
-**Requirements**:
-- Props: `artifact`, `projectPath`, `open`, `onOpenChange`, `onSuccess`, `onMergeRequested`
-- Fetch diff using `usePreDeployCheck` hook when dialog opens
-- Show loading skeleton while fetching
-- Display `DiffViewer` when `has_changes=true`
-- Warning alert: "The project has local modifications that will be overwritten"
-- Buttons: Overwrite & Deploy, Merge Changes, Cancel
-- Handle error states
-
-### SYNC-002: Add usePreDeployCheck hook
-
-**File**: `skillmeat/web/hooks/use-pre-deploy-check.ts`
+**File**: `skillmeat/api/routers/artifacts.py`
 
 **Requirements**:
-- TanStack Query `useQuery` wrapper
-- Fetches `GET /artifacts/{id}/diff?project_path=...`
-- Returns `ArtifactDiffResponse` with `has_changes`, `files`, `summary`
-- Stale time: 30 seconds (interactive operation)
+- Add `GET /artifacts/{id}/source-project-diff?project_path=...`
+- Follow `/upstream-diff` endpoint pattern (~line 4055)
+- Use existing DiffEngine to compare upstream source directly against project deployment
+- Return `ArtifactDiffResponse` with file-level diffs
+- ~50 LOC addition
+
+### SYNC-B02: Extend deploy with merge strategy
+
+**File**: `skillmeat/api/routers/artifacts.py` (~line 2898)
+
+**Requirements**:
+- Extend `POST /deploy` request model to accept `strategy: 'overwrite' | 'merge'`
+- Default to `'overwrite'` (no breaking change)
+- When `strategy='merge'`:
+  - Use DiffEngine to compare collection vs project files
+  - Files only in collection: copy to project
+  - Files only in project: keep (don't delete)
+  - Both sides modified same file: attempt merge, return conflict
+  - Return conflicts array in response
+- ~150 LOC addition
+
+### SYNC-H01: Create unified useConflictCheck hook
+
+**File**: `skillmeat/web/hooks/use-conflict-check.ts`
+
+**Requirements**:
+- Signature: `useConflictCheck(direction: 'deploy' | 'push' | 'pull', artifactId, opts)`
+- Direction routing:
+  - `'deploy'`: `GET /artifacts/{id}/diff?project_path=...` (collection vs project)
+  - `'push'`: `GET /artifacts/{id}/diff?project_path=...` (collection vs project)
+  - `'pull'`: `GET /artifacts/{id}/upstream-diff` (source vs collection)
+- Returns: `{ diffData, hasChanges, hasConflicts, targetHasChanges, isLoading, error }`
+- `targetHasChanges` computed from FileDiff statuses (any modified/added in target side)
+- Stale time: 30 seconds
 - Export from `hooks/index.ts`
 
-### SYNC-003: Integrate with SyncStatusTab
+### SYNC-B03: Backend unit tests
 
-**File**: `skillmeat/web/components/sync-status/sync-status-tab.tsx`
-
-**Requirements**:
-- Add state: `showDeployDialog`
-- Update deploy button handler to open dialog instead of direct mutation
-- Pass `artifact`, `projectPath`, handlers to dialog
-- Handle `onSuccess` callback
-- Handle `onMergeRequested` to open SyncDialog
-
-### SYNC-004: Handle no-conflict fast path
-
-**File**: Same as SYNC-003
+**Files**: `tests/test_artifacts_sync.py` (or appropriate test file)
 
 **Requirements**:
-- If diff shows `has_changes=false`, show simplified dialog
-- "No conflicts detected. Safe to deploy." message
-- Single "Deploy" button (no merge option needed)
-
-### SYNC-005: Connect to Merge Workflow
-
-**File**: `conflict-aware-deploy-dialog.tsx`
-
-**Requirements**:
-- "Merge Changes" button calls `onMergeRequested` prop
-- Parent (SyncStatusTab) opens existing SyncDialog with proper context
-- Close ConflictAwareDeployDialog when merge workflow starts
-
-### SYNC-006: Unit tests
-
-**Files**:
-- `skillmeat/web/__tests__/conflict-aware-deploy-dialog.test.tsx`
-- `skillmeat/web/__tests__/use-pre-deploy-check.test.ts`
-
-**Requirements**:
-- Test loading state
-- Test diff display when conflicts exist
-- Test "safe to deploy" when no conflicts
-- Test button actions (Overwrite, Merge, Cancel)
-- Test error states
-- Target >85% coverage
+- Source-project diff: with changes, no changes, error cases
+- Deploy merge strategy: success, conflicts, error, no regression on overwrite
+- Cover edge cases: missing project, missing source, empty diffs
 
 ## Quick Reference
 
 ### Execute Phase
 
 ```text
-# Batch 1: Create dialog and hook (parallel)
-Task("ui-engineer-enhanced", "SYNC-001: Create ConflictAwareDeployDialog component
-  File: skillmeat/web/components/sync-status/conflict-aware-deploy-dialog.tsx
-  See implementation plan for full component spec with props, state, and rendering structure.
-  Key features:
-  - Fetch diff using usePreDeployCheck hook (created in SYNC-002)
-  - Show DiffViewer when has_changes=true
-  - Warning alert for local modifications
-  - Buttons: 'Overwrite & Deploy', 'Merge Changes', 'Cancel'")
+# Batch 1: Backend + Hook (parallel)
+Task("python-backend-engineer", "SYNC-B01: Add source-vs-project diff endpoint
+  File: skillmeat/api/routers/artifacts.py
+  Pattern: Follow /upstream-diff endpoint structure (~line 4055)
+  New: GET /artifacts/{id}/source-project-diff?project_path=...
+  Use existing DiffEngine. Return ArtifactDiffResponse. ~50 LOC.")
 
-Task("ui-engineer-enhanced", "SYNC-002: Create usePreDeployCheck hook
-  File: skillmeat/web/hooks/use-pre-deploy-check.ts
-  TanStack Query wrapper for GET /artifacts/{id}/diff?project_path=...
-  Returns ArtifactDiffResponse with has_changes, files, summary
-  Stale time: 30 seconds
-  Also export from hooks/index.ts")
+Task("python-backend-engineer", "SYNC-B02: Extend deploy endpoint with merge strategy
+  File: skillmeat/api/routers/artifacts.py (~line 2898)
+  Extend POST /deploy to accept strategy: 'overwrite' | 'merge'
+  When merge: DiffEngine comparison, file-level merge, return conflicts.
+  Existing overwrite behavior MUST remain unchanged as default.")
 
-# Batch 2: Integration and tests (after batch 1)
-Task("ui-engineer-enhanced", "SYNC-003: Integrate ConflictAwareDeployDialog with SyncStatusTab
-  File: skillmeat/web/components/sync-status/sync-status-tab.tsx
-  - Add showDeployDialog state
-  - Update handleDeployToProject to open dialog
-  - Handle onSuccess and onMergeRequested callbacks")
+Task("ui-engineer-enhanced", "SYNC-H01: Create unified useConflictCheck hook
+  File: skillmeat/web/hooks/use-conflict-check.ts
+  Export from hooks/index.ts
+  Direction-based routing to appropriate diff API.
+  Returns: { diffData, hasChanges, hasConflicts, targetHasChanges, isLoading }")
 
-Task("ui-engineer-enhanced", "SYNC-006: Write unit tests for dialog and hook
-  Files: __tests__/conflict-aware-deploy-dialog.test.tsx, __tests__/use-pre-deploy-check.test.ts
-  Test loading, diff display, no-conflict path, button actions, error states
-  Target >85% coverage", model="sonnet")
-
-# Batch 3: Polish (after batch 2)
-Task("ui-engineer-enhanced", "SYNC-004 + SYNC-005: Add no-conflict fast path and merge workflow connection
-  - SYNC-004: Simplified dialog when has_changes=false
-  - SYNC-005: Merge button opens SyncDialog with proper context", model="sonnet")
+# Batch 2: Tests (after batch 1)
+Task("python-backend-engineer", "SYNC-B03: Backend tests for new/extended endpoints", model="sonnet")
 ```
 
 ### Update Status (CLI)
 
 ```bash
-# Single task
-python .claude/skills/artifact-tracking/scripts/update-status.py \
-  -f .claude/progress/unified-sync-workflow/phase-1-progress.md \
-  -t SYNC-001 -s completed
-
-# Batch update
 python .claude/skills/artifact-tracking/scripts/update-batch.py \
   -f .claude/progress/unified-sync-workflow/phase-1-progress.md \
-  --updates "SYNC-001:completed,SYNC-002:completed"
+  --updates "SYNC-B01:completed,SYNC-B02:completed,SYNC-H01:completed"
 ```

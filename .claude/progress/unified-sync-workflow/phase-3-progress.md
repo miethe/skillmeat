@@ -2,153 +2,128 @@
 type: progress
 prd: "unified-sync-workflow"
 phase: 3
-phase_name: "Unified Flow Integration & Source vs Project"
+phase_name: "Source vs Project + Merge Integration + Banner"
 status: pending
 progress: 0
 created: 2026-02-04
-updated: 2026-02-04
+updated: 2026-02-05
 
 tasks:
-  - id: "SYNC-013"
-    name: "Extract shared useConflictCheck pattern"
+  - id: "SYNC-A01"
+    name: "Source vs Project comparison option"
     status: "pending"
     assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-002", "SYNC-009"]
-    estimate: "1 pt"
-    model: "sonnet"
-
-  - id: "SYNC-014"
-    name: "Create SyncConfirmationDialog base"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-001", "SYNC-008"]
-    estimate: "1 pt"
-    model: "sonnet"
-
-  - id: "SYNC-015"
-    name: "Add Source vs Project comparison"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
+    dependencies: ["SYNC-B01"]
     estimate: "1.5 pts"
     model: "opus"
 
-  - id: "SYNC-016"
-    name: "Implement source-vs-project diff API call"
+  - id: "SYNC-A02"
+    name: "DiffViewer label config for all scopes"
     status: "pending"
     assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-015"]
-    estimate: "1 pt"
+    dependencies: ["SYNC-A01"]
+    estimate: "0.5 pts"
+    model: "sonnet"
+
+  - id: "SYNC-A03"
+    name: "Wire MergeWorkflowDialog from unified dialog"
+    status: "pending"
+    assigned_to: ["ui-engineer-enhanced"]
+    dependencies: ["SYNC-U01", "SYNC-B02"]
+    estimate: "1.5 pts"
     model: "opus"
 
-  - id: "SYNC-017"
-    name: "Update DiffViewer for all scopes"
+  - id: "SYNC-A04"
+    name: "Banner styling: push arrow + button"
     status: "pending"
     assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-015"]
+    dependencies: []
     estimate: "0.5 pts"
     model: "sonnet"
 
 parallelization:
-  batch_1: ["SYNC-013", "SYNC-014", "SYNC-015"]
-  batch_2: ["SYNC-016", "SYNC-017"]
+  batch_1: ["SYNC-A01", "SYNC-A03", "SYNC-A04"]
+  batch_2: ["SYNC-A02"]
 
 quality_gates:
-  - "All three sync directions use consistent hook and dialog patterns"
-  - "Source vs Project comparison shows transitive changes"
+  - "Source vs Project comparison works with new endpoint"
   - "ComparisonSelector enables all valid combinations"
-  - "DiffViewer displays correct labels for each scope"
-  - "Code duplication reduced by >60%"
+  - "DiffViewer labels correct for all 3 scopes"
+  - "Merge button routes to MergeWorkflowDialog for pull/push"
+  - "Merge-capable deploy works via extended API"
+  - "Banner push arrow reflects project change status"
 ---
 
-# Phase 3: Unified Flow Integration & Source vs Project
+# Phase 3: Source vs Project + Merge Integration + Banner
 
-**Goal**: Extract shared patterns, add Source vs Project direct comparison, ensure all three flows use consistent UX.
+**Goal**: Add Source vs Project direct comparison, wire MergeWorkflowDialog from unified dialog, and polish banner visuals.
 
-**Duration**: 2-3 days | **Story Points**: 5
+**Duration**: 2-3 days | **Story Points**: 4
 
-**Depends on**: Phase 1 and Phase 2 complete
+**Depends on**: Phase 1 (SYNC-B01) and Phase 2 (SYNC-U01)
 
 ## Task Details
 
-### SYNC-013: Extract shared useConflictCheck pattern
-
-**File**: `skillmeat/web/hooks/use-conflict-check.ts`
-
-**Requirements**:
-- Refactor `usePreDeployCheck` and `usePrePushCheck` into single hook
-- Direction parameter: `'deploy' | 'push' | 'pull'`
-- Returns consistent interface for all directions
-- Deprecate individual hooks (keep as wrappers for backwards compat)
-
-### SYNC-014: Create SyncConfirmationDialog base
-
-**File**: `skillmeat/web/components/sync-status/sync-confirmation-dialog.tsx`
-
-**Requirements**:
-- Shared base component for all sync confirmations
-- Configurable: direction, diff data, action handlers
-- Reduces duplication between deploy and push dialogs
-- Composable with direction-specific messaging
-
-### SYNC-015: Add Source vs Project comparison
+### SYNC-A01: Source vs Project comparison option
 
 **File**: `skillmeat/web/components/sync-status/comparison-selector.tsx`
 
 **Requirements**:
-- New option: "Source vs Project"
-- Only enabled when both source and project exist
-- Updates DiffViewer labels appropriately
-- Clear visual distinction from other options
+- Add `'source-vs-project'` to ComparisonScope type
+- Enable only when `hasValidUpstreamSource(entity) && projectPath`
+- Wire to new backend endpoint `GET /artifacts/{id}/source-project-diff`
+- New TanStack Query in SyncStatusTab for this scope
 
-### SYNC-016: Implement source-vs-project diff API call
+### SYNC-A02: DiffViewer label config for all scopes
+
+**File**: `skillmeat/web/components/entity/diff-viewer.tsx` (label configuration)
+
+**Requirements**:
+- Source-vs-collection: "Source" (left), "Collection" (right)
+- Collection-vs-project: "Collection" (left), "Project" (right)
+- Source-vs-project: "Source" (left), "Project" (right)
+- Labels dynamically set based on comparison scope
+
+### SYNC-A03: Wire MergeWorkflowDialog from unified dialog
 
 **File**: `skillmeat/web/components/sync-status/sync-status-tab.tsx`
 
 **Requirements**:
-- New TanStack Query for combined diff
-- Fetches both upstream-diff and project-diff
-- Computes transitive changes (what's in source but not in project)
-- Handles case where collection is intermediate
+- When user clicks "Merge" in SyncConfirmationDialog, close it and open MergeWorkflowDialog
+- MergeWorkflowDialog is already bidirectional (verified)
+- For Pull/Push: route with appropriate snapshot context
+- For Deploy merge: use extended deploy API with `strategy='merge'`
+- Validate MergeWorkflowDialog can accept project-context parameters
 
-### SYNC-017: Update DiffViewer for all scopes
+### SYNC-A04: Banner styling: push arrow + button
 
-**File**: `skillmeat/web/components/entity/diff-viewer.tsx`
+**File**: `skillmeat/web/components/sync-status/artifact-flow-banner.tsx`
 
 **Requirements**:
-- Labels correct for all three comparison scopes
-- Source vs Project: "Source" (left), "Project" (right)
-- No rendering changes needed, just label configuration
+- Arrow already solid when `projectInfo` exists (keep)
+- Update push button variant to `'default'` when project diff shows changes
+- Currently `variant='ghost'` always
 
 ## Quick Reference
 
 ### Execute Phase
 
 ```text
-# Batch 1: Consolidation and new feature (parallel)
-Task("ui-engineer-enhanced", "SYNC-013: Extract shared useConflictCheck hook
-  File: skillmeat/web/hooks/use-conflict-check.ts
-  Single hook with direction parameter handles deploy/push/pull
-  Keep usePreDeployCheck and usePrePushCheck as thin wrappers", model="sonnet")
-
-Task("ui-engineer-enhanced", "SYNC-014: Create SyncConfirmationDialog base component
-  File: skillmeat/web/components/sync-status/sync-confirmation-dialog.tsx
-  Shared dialog component for all sync confirmations
-  Reduces duplication between deploy and push dialogs", model="sonnet")
-
-Task("ui-engineer-enhanced", "SYNC-015: Add Source vs Project comparison to ComparisonSelector
+# Batch 1: Independent tasks (parallel)
+Task("ui-engineer-enhanced", "SYNC-A01: Add source-vs-project comparison to ComparisonSelector
   File: skillmeat/web/components/sync-status/comparison-selector.tsx
-  New option 'source-vs-project'
-  Only enabled when hasValidUpstreamSource AND projectPath exists")
+  New option 'source-vs-project', enabled when hasValidUpstreamSource AND projectPath
+  Wire to GET /artifacts/{id}/source-project-diff endpoint")
 
-# Batch 2: API and viewer updates (after batch 1)
-Task("ui-engineer-enhanced", "SYNC-016: Implement source-vs-project diff query
-  File: skillmeat/web/components/sync-status/sync-status-tab.tsx
-  Query that fetches both diffs and computes transitive changes")
+Task("ui-engineer-enhanced", "SYNC-A03: Wire MergeWorkflowDialog from SyncConfirmationDialog
+  When user clicks Merge, route to MergeWorkflowDialog with direction context.
+  Deploy merge uses extended deploy API. Pull/Push use existing merge endpoints.")
 
-Task("ui-engineer-enhanced", "SYNC-017: Update DiffViewer label configuration for all scopes
-  File: skillmeat/web/components/entity/diff-viewer.tsx
-  Correct labels for source-vs-project scope", model="sonnet")
+Task("ui-engineer-enhanced", "SYNC-A04: Update push button variant in banner
+  File: artifact-flow-banner.tsx. Button variant='default' when changes exist.", model="sonnet")
+
+# Batch 2: After SYNC-A01
+Task("ui-engineer-enhanced", "SYNC-A02: Configure DiffViewer labels for all comparison scopes", model="sonnet")
 ```
 
 ### Update Status (CLI)
@@ -156,5 +131,5 @@ Task("ui-engineer-enhanced", "SYNC-017: Update DiffViewer label configuration fo
 ```bash
 python .claude/skills/artifact-tracking/scripts/update-batch.py \
   -f .claude/progress/unified-sync-workflow/phase-3-progress.md \
-  --updates "SYNC-013:completed,SYNC-014:completed,SYNC-015:completed"
+  --updates "SYNC-A01:completed,SYNC-A03:completed,SYNC-A04:completed"
 ```
