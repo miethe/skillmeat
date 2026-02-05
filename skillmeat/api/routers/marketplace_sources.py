@@ -1347,11 +1347,15 @@ def _extract_frontmatter_batch(
                     artifact_dir = clone_path / Path(artifact_path).parent
                 else:
                     # Directory-based artifact
-                    artifact_dir = clone_path / artifact_path if artifact_path else clone_path
+                    artifact_dir = (
+                        clone_path / artifact_path if artifact_path else clone_path
+                    )
 
                 if artifact_dir.is_dir():
                     try:
-                        deep_text, indexed_files = extract_deep_search_text(artifact_dir)
+                        deep_text, indexed_files = extract_deep_search_text(
+                            artifact_dir
+                        )
                         if deep_text and artifact.name in result:
                             result[artifact.name]["deep_search_text"] = deep_text
                             result[artifact.name]["deep_index_files"] = indexed_files
@@ -1461,11 +1465,18 @@ async def _perform_scan(
 
             # Create synthetic artifact for the entire repo/root_hint
             artifact_path = source.root_hint if source.root_hint else ""
-            artifact_name = (
-                source.repo_name
-                if not source.root_hint
-                else source.root_hint.split("/")[-1]
-            )
+
+            # Derive artifact name: prefer repo_name when root_hint is a
+            # dotfile directory (e.g., ".claude") since those make poor names
+            if not source.root_hint:
+                artifact_name = source.repo_name
+            else:
+                last_segment = source.root_hint.split("/")[-1]
+                if last_segment.startswith("."):
+                    # Dotfile/directory root hints (like ".claude") → use repo name
+                    artifact_name = source.repo_name
+                else:
+                    artifact_name = last_segment
             base_url = f"https://github.com/{source.owner}/{source.repo_name}"
 
             # Get commit SHA for versioning
@@ -1525,6 +1536,15 @@ async def _perform_scan(
                 session=session,
                 manual_mappings=manual_map,
             )
+
+            # Debug log detected artifacts for verification
+            if scan_result.artifacts:
+                for artifact in scan_result.artifacts:
+                    logger.debug(
+                        f"Detected artifact: name={artifact.name}, "
+                        f"path={artifact.path}, type={artifact.artifact_type}, "
+                        f"upstream_url={artifact.upstream_url}"
+                    )
 
             # === Clone-based artifact indexing integration ===
             # After scan, compute and persist CloneTarget for future rapid re-indexing
