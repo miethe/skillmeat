@@ -1,76 +1,91 @@
 ---
 type: progress
-prd: "unified-sync-workflow"
+prd: unified-sync-workflow
 phase: 2
-phase_name: "Unified DiffViewer Confirmation Dialog"
+phase_name: Unified DiffViewer Confirmation Dialog
 status: pending
-progress: 0
+progress: 16
 created: 2026-02-04
-updated: 2026-02-05
-
+updated: '2026-02-05'
 tasks:
-  - id: "SYNC-U01"
-    name: "Create SyncConfirmationDialog"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-H01"]
-    estimate: "3 pts"
-    model: "opus"
-
-  - id: "SYNC-U02"
-    name: "Integrate for Deploy (Collection→Project)"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-U01"]
-    estimate: "1 pt"
-    model: "opus"
-
-  - id: "SYNC-U03"
-    name: "Integrate for Push (Project→Collection)"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-U01"]
-    estimate: "1 pt"
-    model: "opus"
-
-  - id: "SYNC-U04"
-    name: "Integrate for Pull (Source→Collection)"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-U01"]
-    estimate: "1 pt"
-    model: "opus"
-
-  - id: "SYNC-U05"
-    name: "Merge gating logic"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-U01"]
-    estimate: "1 pt"
-    model: "sonnet"
-
-  - id: "SYNC-U06"
-    name: "Unit tests for dialog and hook"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-U01", "SYNC-H01"]
-    estimate: "2 pts"
-    model: "sonnet"
-
+- id: SYNC-U01
+  name: Create SyncConfirmationDialog
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SYNC-H01
+  estimate: 3 pts
+  model: opus
+- id: SYNC-U02
+  name: Integrate for Deploy (Collection→Project)
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SYNC-U01
+  estimate: 1 pt
+  model: opus
+- id: SYNC-U03
+  name: Integrate for Push (Project→Collection)
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SYNC-U01
+  estimate: 1 pt
+  model: opus
+- id: SYNC-U04
+  name: Integrate for Pull (Source→Collection)
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SYNC-U01
+  estimate: 1 pt
+  model: opus
+- id: SYNC-U05
+  name: Merge gating logic
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SYNC-U01
+  estimate: 1 pt
+  model: sonnet
+- id: SYNC-U06
+  name: Unit tests for dialog and hook
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SYNC-U01
+  - SYNC-H01
+  estimate: 2 pts
+  model: sonnet
 parallelization:
-  batch_1: ["SYNC-U01"]
-  batch_2: ["SYNC-U02", "SYNC-U03", "SYNC-U04", "SYNC-U05"]
-  batch_3: ["SYNC-U06"]
-
+  batch_1:
+  - SYNC-U01
+  batch_2:
+  - SYNC-U02
+  - SYNC-U03
+  - SYNC-U04
+  - SYNC-U05
+  batch_3:
+  - SYNC-U06
 quality_gates:
-  - "Single dialog renders correctly for Deploy, Push, and Pull directions"
-  - "DiffViewer displays file changes with direction-appropriate labels"
-  - "Merge button gated: enabled only when target has changes"
-  - "Deploy flow: diff check before overwrite, merge routes to MergeWorkflowDialog"
-  - "Push flow: replaces existing AlertDialog, reuses existing mutation"
-  - "Pull flow: shows upstream diff before confirming sync"
-  - "No-conflict fast path shows 'Safe to proceed' for all directions"
-  - "Unit tests pass with >85% coverage"
+- Single dialog renders correctly for Deploy, Push, and Pull directions
+- DiffViewer displays file changes with direction-appropriate labels
+- 'Merge button gated: enabled only when target has changes'
+- 'Deploy flow: diff check before overwrite, merge routes to MergeWorkflowDialog'
+- 'Push flow: replaces existing AlertDialog, reuses existing mutation'
+- 'Pull flow: shows upstream diff before confirming sync'
+- No-conflict fast path shows 'Safe to proceed' for all directions
+- Unit tests pass with >85% coverage
+total_tasks: 6
+completed_tasks: 1
+in_progress_tasks: 0
+blocked_tasks: 0
 ---
 
 # Phase 2: Unified DiffViewer Confirmation Dialog
