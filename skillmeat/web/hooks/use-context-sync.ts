@@ -59,6 +59,7 @@ export function usePullContextChanges() {
       queryClient.invalidateQueries({ queryKey: ['context-sync-status', variables.projectPath] });
       queryClient.invalidateQueries({ queryKey: ['artifact-files'] });
       queryClient.invalidateQueries({ queryKey: ['context-entities'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] }); // Pull may change deployed state
     },
   });
 }
@@ -82,6 +83,8 @@ export function usePushContextChanges() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['context-sync-status', variables.projectPath] });
       queryClient.invalidateQueries({ queryKey: ['artifact-files'] });
+      queryClient.invalidateQueries({ queryKey: ['context-entities'] }); // Push updates collection
+      queryClient.invalidateQueries({ queryKey: ['deployments'] }); // Push may change deployed state
     },
   });
 }
@@ -108,6 +111,7 @@ export function useResolveContextConflict() {
       queryClient.invalidateQueries({ queryKey: ['context-sync-status', variables.projectPath] });
       queryClient.invalidateQueries({ queryKey: ['artifact-files'] });
       queryClient.invalidateQueries({ queryKey: ['context-entities'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] }); // Resolve may change deployed state
     },
   });
 }

@@ -159,6 +159,8 @@ export function useInstallListing() {
     onSuccess: (data) => {
       // Invalidate listings cache
       queryClient.invalidateQueries({ queryKey: marketplaceKeys.listings() });
+      // Installed artifact appears in collection
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
 
       // Show success toast
       toast({

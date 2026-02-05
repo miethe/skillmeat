@@ -229,6 +229,8 @@ export function useRollback() {
       queryClient.invalidateQueries({ queryKey: snapshotKeys.all });
       queryClient.invalidateQueries({ queryKey: ['collections'] });
       queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] }); // Rollback changes deployed state
+      queryClient.invalidateQueries({ queryKey: ['projects'] }); // Project deployment info may change
     },
   });
 }
