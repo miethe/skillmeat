@@ -102,11 +102,7 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
       const enrichedEntity = matchingArtifact
         ? (() => {
             const merged = { ...matchingArtifact, ...entity } as any;
-            if (
-              matchingArtifact.collections &&
-              (!entity.collections ||
-                (Array.isArray(entity.collections) && entity.collections.length === 0))
-            ) {
+            if (matchingArtifact.collections?.length && !merged.collections?.length) {
               merged.collections = matchingArtifact.collections;
             }
             return mapArtifactToEntity(merged, 'project');
@@ -137,11 +133,7 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
       const enrichedEntity = matchingArtifact
         ? (() => {
             const merged = { ...matchingArtifact, ...entity } as any;
-            if (
-              matchingArtifact.collections &&
-              (!entity.collections ||
-                (Array.isArray(entity.collections) && entity.collections.length === 0))
-            ) {
+            if (matchingArtifact.collections?.length && !merged.collections?.length) {
               merged.collections = matchingArtifact.collections;
             }
             return mapArtifactToEntity(merged, 'project');
