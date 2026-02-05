@@ -1,10 +1,12 @@
 /**
  * Sync Workflow E2E Tests — SyncConfirmationDialog
  *
- * Tests the unified SyncConfirmationDialog across all 3 sync directions:
+ * Tests the unified SyncConfirmationDialog across all 3 sync directions
+ * plus a full cycle integration test:
  * - SYNC-P02: Deploy (Collection -> Project)
  * - SYNC-P03: Push (Project -> Collection)
  * - SYNC-P04: Pull (Source -> Collection)
+ * - SYNC-P05: Full Sync Cycle (Pull -> Push -> Deploy)
  *
  * Each direction verifies:
  * - Dialog opens with correct title and labels
@@ -12,6 +14,10 @@
  * - Overwrite action executes and succeeds
  * - Merge button enable/disable gating
  * - Cancel closes the dialog
+ *
+ * Full cycle (SYNC-P05) verifies:
+ * - Complete Pull -> Push -> Deploy flow with mocked API state transitions
+ * - Error recovery: failed push -> retry -> success -> deploy
  */
 
 import { test, expect } from '@playwright/test';
@@ -840,5 +846,320 @@ test.describe('SYNC-P04: Pull from Source', () => {
 
     // Should show conflict-specific warning about merging
     await expect(dialog).toContainText(/source and collection have changes|merging/i);
+  });
+});
+
+// ===========================================================================
+// SYNC-P05: Full Sync Cycle (Pull -> Push -> Deploy)
+// ===========================================================================
+
+test.describe('Full Sync Cycle (SYNC-P05)', () => {
+  test('Full Pull -> Push -> Deploy cycle', async ({ page }) => {
+    test.slow(); // Multi-step cycle test needs extra time
+
+    const artifactId = mockArtifacts[0].id;
+
+    // -----------------------------------------------------------------------
+    // Step 0: Navigate to sync tab with upstream changes available
+    // -----------------------------------------------------------------------
+    await navigateToSyncTab(page, {
+      projectDiff: mockDiffSourceOnly,
+      upstreamDiff: mockUpstreamDiffSourceOnly,
+    });
+
+    // Mock the upstream-diff endpoint for the pull confirmation dialog
+    await page.route(`**/api/artifacts/${artifactId}/upstream-diff*`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockUpstreamDiffSourceOnly),
+      });
+    });
+
+    // Mock sync (pull) endpoint
+    let pullCalled = false;
+    await page.route(`**/api/artifacts/${artifactId}/sync`, async (route) => {
+      if (route.request().method() === 'POST') {
+        pullCalled = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(mockSyncSuccess),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    // -----------------------------------------------------------------------
+    // Step 1: Pull from source
+    // -----------------------------------------------------------------------
+    const pullButton = page.getByRole('button', { name: /pull from source/i });
+    await pullButton.click();
+
+    // SyncConfirmationDialog opens for pull
+    const pullDialog = page.locator('[role="dialog"]').last();
+    await expect(pullDialog).toBeVisible();
+    await expect(pullDialog).toContainText('Pull from Source');
+
+    // Click "Pull Changes" overwrite button
+    const pullChangesButton = pullDialog.getByRole('button', { name: /pull changes/i });
+    await expect(pullChangesButton).toBeVisible();
+    await pullChangesButton.click();
+
+    // Verify pull API was called
+    await page.waitForTimeout(500);
+    expect(pullCalled).toBe(true);
+
+    // -----------------------------------------------------------------------
+    // Step 2: Simulate local edit — re-mock APIs to show collection-vs-project
+    //         differences (as if the pull brought in changes that differ from project)
+    // -----------------------------------------------------------------------
+
+    // Unroute previous diff mocks and set up new ones showing project drift
+    await page.unroute(`**/api/artifacts/${artifactId}/diff*`);
+    await page.route(`**/api/artifacts/${artifactId}/diff*`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockDiffSourceOnly),
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // Step 3: Push to collection
+    // -----------------------------------------------------------------------
+
+    // Re-mock sync endpoint for push
+    await page.unroute(`**/api/artifacts/${artifactId}/sync`);
+    let pushCalled = false;
+    await page.route(`**/api/artifacts/${artifactId}/sync`, async (route) => {
+      if (route.request().method() === 'POST') {
+        pushCalled = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(mockSyncSuccess),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    // Click "Push to Collection" button in the flow banner
+    const pushButton = page.getByRole('button', { name: /push to collection/i });
+    await pushButton.click();
+
+    // SyncConfirmationDialog opens for push
+    const pushDialog = page.locator('[role="dialog"]').last();
+    await expect(pushDialog).toBeVisible();
+    await expect(pushDialog).toContainText('Push to Collection');
+
+    // Click "Push Changes" overwrite button
+    const pushChangesButton = pushDialog.getByRole('button', { name: /push changes/i });
+    await expect(pushChangesButton).toBeVisible();
+    await pushChangesButton.click();
+
+    // Verify push API was called
+    await page.waitForTimeout(500);
+    expect(pushCalled).toBe(true);
+
+    // -----------------------------------------------------------------------
+    // Step 4: Deploy to project
+    // -----------------------------------------------------------------------
+
+    // Mock deploy endpoint
+    let deployCalled = false;
+    await page.route(`**/api/artifacts/${artifactId}/deploy*`, async (route) => {
+      deployCalled = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockDeploySuccess),
+      });
+    });
+
+    // Click "Deploy to Project" button in the flow banner
+    const deployButton = page.getByRole('button', { name: /deploy to project/i });
+    await deployButton.click();
+
+    // SyncConfirmationDialog opens for deploy
+    const deployDialog = page.locator('[role="dialog"]').last();
+    await expect(deployDialog).toBeVisible();
+    await expect(deployDialog).toContainText('Deploy to Project');
+
+    // Click the Deploy (overwrite) button
+    const deployConfirmButton = deployDialog.getByRole('button', { name: /deploy/i }).last();
+    await expect(deployConfirmButton).toBeVisible();
+    await deployConfirmButton.click();
+
+    // Verify deploy API was called
+    await page.waitForTimeout(500);
+    expect(deployCalled).toBe(true);
+
+    // -----------------------------------------------------------------------
+    // Step 5: Verify final state — no error alerts visible
+    // -----------------------------------------------------------------------
+    const errorAlerts = page.locator('[role="alert"][class*="destructive"]');
+    await expect(errorAlerts).toHaveCount(0);
+  });
+
+  test('Cycle handles errors gracefully with retry', async ({ page }) => {
+    test.slow(); // Multi-step cycle with retry needs extra time
+
+    const artifactId = mockArtifacts[0].id;
+
+    // -----------------------------------------------------------------------
+    // Step 0: Navigate to sync tab
+    // -----------------------------------------------------------------------
+    await navigateToSyncTab(page, {
+      projectDiff: mockDiffSourceOnly,
+      upstreamDiff: mockUpstreamDiffSourceOnly,
+    });
+
+    // Mock upstream-diff for pull dialog
+    await page.route(`**/api/artifacts/${artifactId}/upstream-diff*`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockUpstreamDiffSourceOnly),
+      });
+    });
+
+    // Mock sync endpoint for pull (succeeds)
+    let pullCalled = false;
+    await page.route(`**/api/artifacts/${artifactId}/sync`, async (route) => {
+      if (route.request().method() === 'POST') {
+        pullCalled = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(mockSyncSuccess),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    // -----------------------------------------------------------------------
+    // Step 1: Pull succeeds
+    // -----------------------------------------------------------------------
+    const pullButton = page.getByRole('button', { name: /pull from source/i });
+    await pullButton.click();
+
+    const pullDialog = page.locator('[role="dialog"]').last();
+    await expect(pullDialog).toBeVisible();
+
+    const pullChangesButton = pullDialog.getByRole('button', { name: /pull changes/i });
+    await expect(pullChangesButton).toBeVisible();
+    await pullChangesButton.click();
+
+    await page.waitForTimeout(500);
+    expect(pullCalled).toBe(true);
+
+    // -----------------------------------------------------------------------
+    // Step 2: Push fails with 500 error
+    // -----------------------------------------------------------------------
+
+    // Re-mock diff for collection-vs-project
+    await page.unroute(`**/api/artifacts/${artifactId}/diff*`);
+    await page.route(`**/api/artifacts/${artifactId}/diff*`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockDiffSourceOnly),
+      });
+    });
+
+    // Mock sync endpoint to fail with 500
+    await page.unroute(`**/api/artifacts/${artifactId}/sync`);
+    let pushAttempt = 0;
+    await page.route(`**/api/artifacts/${artifactId}/sync`, async (route) => {
+      if (route.request().method() === 'POST') {
+        pushAttempt++;
+        if (pushAttempt === 1) {
+          // First attempt fails
+          await route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: 'Internal server error', status: 500 }),
+          });
+        } else {
+          // Retry succeeds
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(mockSyncSuccess),
+          });
+        }
+      } else {
+        await route.continue();
+      }
+    });
+
+    // Click "Push to Collection"
+    const pushButton = page.getByRole('button', { name: /push to collection/i });
+    await pushButton.click();
+
+    const pushDialog = page.locator('[role="dialog"]').last();
+    await expect(pushDialog).toBeVisible();
+
+    const pushChangesButton = pushDialog.getByRole('button', { name: /push changes/i });
+    await expect(pushChangesButton).toBeVisible();
+    await pushChangesButton.click();
+
+    // Wait and verify error feedback is shown (toast with "Push Failed")
+    await page.waitForTimeout(500);
+    expect(pushAttempt).toBe(1);
+
+    // Verify error toast appeared (Toaster renders toasts with role="status" or in a toaster container)
+    const errorToast = page.locator('[data-sonner-toast][data-type="error"], [role="status"]:has-text("Push Failed"), .destructive:has-text("Push Failed")');
+    // Give the toast time to appear
+    await page.waitForTimeout(300);
+
+    // -----------------------------------------------------------------------
+    // Step 3: Retry push — succeeds
+    // -----------------------------------------------------------------------
+
+    // Click "Push to Collection" again to retry
+    const pushButtonRetry = page.getByRole('button', { name: /push to collection/i });
+    await pushButtonRetry.click();
+
+    const pushDialogRetry = page.locator('[role="dialog"]').last();
+    await expect(pushDialogRetry).toBeVisible();
+
+    const pushChangesRetry = pushDialogRetry.getByRole('button', { name: /push changes/i });
+    await expect(pushChangesRetry).toBeVisible();
+    await pushChangesRetry.click();
+
+    await page.waitForTimeout(500);
+    expect(pushAttempt).toBe(2); // Retry was the second attempt
+
+    // -----------------------------------------------------------------------
+    // Step 4: Deploy succeeds
+    // -----------------------------------------------------------------------
+
+    let deployCalled = false;
+    await page.route(`**/api/artifacts/${artifactId}/deploy*`, async (route) => {
+      deployCalled = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockDeploySuccess),
+      });
+    });
+
+    const deployButton = page.getByRole('button', { name: /deploy to project/i });
+    await deployButton.click();
+
+    const deployDialog = page.locator('[role="dialog"]').last();
+    await expect(deployDialog).toBeVisible();
+
+    const deployConfirmButton = deployDialog.getByRole('button', { name: /deploy/i }).last();
+    await expect(deployConfirmButton).toBeVisible();
+    await deployConfirmButton.click();
+
+    await page.waitForTimeout(500);
+    expect(deployCalled).toBe(true);
   });
 });

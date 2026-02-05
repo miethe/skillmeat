@@ -1,64 +1,93 @@
 ---
 type: progress
-prd: "unified-sync-workflow-v1"
+prd: unified-sync-workflow-v1
 phase: 4
-status: in_progress
-progress: 0
-
+status: pending
+progress: 75
 tasks:
-  - id: "SYNC-P01"
-    title: "Persistent drift dismissal"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimate: "1pt"
-  - id: "SYNC-P02"
-    title: "E2E: Deploy with conflicts"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimate: "0.75pt"
-  - id: "SYNC-P03"
-    title: "E2E: Push with conflicts"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimate: "0.75pt"
-  - id: "SYNC-P04"
-    title: "E2E: Pull with conflicts"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimate: "0.75pt"
-  - id: "SYNC-P05"
-    title: "E2E: Full sync cycle"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-P02", "SYNC-P03", "SYNC-P04"]
-    estimate: "1pt"
-  - id: "SYNC-P06"
-    title: "Accessibility audit"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimate: "0.5pt"
-  - id: "SYNC-P07"
-    title: "Performance: large diffs"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimate: "0.5pt"
-  - id: "SYNC-P08"
-    title: "Code review and merge"
-    status: "pending"
-    assigned_to: ["code-reviewer"]
-    dependencies: ["SYNC-P01", "SYNC-P02", "SYNC-P03", "SYNC-P04", "SYNC-P05", "SYNC-P06", "SYNC-P07"]
-    estimate: "0.75pt"
-
+- id: SYNC-P01
+  title: Persistent drift dismissal
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimate: 1pt
+- id: SYNC-P02
+  title: 'E2E: Deploy with conflicts'
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimate: 0.75pt
+- id: SYNC-P03
+  title: 'E2E: Push with conflicts'
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimate: 0.75pt
+- id: SYNC-P04
+  title: 'E2E: Pull with conflicts'
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimate: 0.75pt
+- id: SYNC-P05
+  title: 'E2E: Full sync cycle'
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SYNC-P02
+  - SYNC-P03
+  - SYNC-P04
+  estimate: 1pt
+- id: SYNC-P06
+  title: Accessibility audit
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimate: 0.5pt
+- id: SYNC-P07
+  title: 'Performance: large diffs'
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimate: 0.5pt
+- id: SYNC-P08
+  title: Code review and merge
+  status: pending
+  assigned_to:
+  - code-reviewer
+  dependencies:
+  - SYNC-P01
+  - SYNC-P02
+  - SYNC-P03
+  - SYNC-P04
+  - SYNC-P05
+  - SYNC-P06
+  - SYNC-P07
+  estimate: 0.75pt
 parallelization:
-  batch_1: ["SYNC-P01", "SYNC-P02", "SYNC-P03", "SYNC-P04", "SYNC-P06", "SYNC-P07"]
-  batch_2: ["SYNC-P05"]
-  batch_3: ["SYNC-P08"]
+  batch_1:
+  - SYNC-P01
+  - SYNC-P02
+  - SYNC-P03
+  - SYNC-P04
+  - SYNC-P06
+  - SYNC-P07
+  batch_2:
+  - SYNC-P05
+  batch_3:
+  - SYNC-P08
+total_tasks: 8
+completed_tasks: 6
+in_progress_tasks: 0
+blocked_tasks: 0
+updated: '2026-02-05'
 ---
 
 # Phase 4: Tests, Accessibility & Polish
