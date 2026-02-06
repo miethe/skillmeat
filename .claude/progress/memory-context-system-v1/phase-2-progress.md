@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 13
-completed_tasks: 5
+completed_tasks: 11
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -68,7 +68,7 @@ tasks:
   priority: critical
 - id: API-2.6
   description: Memory Items Router - CRUD
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -77,7 +77,7 @@ tasks:
   priority: critical
 - id: API-2.7
   description: Memory Items Router - Lifecycle
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -86,7 +86,7 @@ tasks:
   priority: high
 - id: API-2.8
   description: Memory Items Router - Merge
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -95,7 +95,7 @@ tasks:
   priority: medium
 - id: API-2.9
   description: Context Modules Router
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -104,7 +104,7 @@ tasks:
   priority: high
 - id: API-2.10
   description: Context Packing API
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -113,13 +113,15 @@ tasks:
   priority: critical
 - id: API-2.11
   description: OpenAPI Documentation
-  status: pending
+  status: completed
   assigned_to:
   - api-documenter
   dependencies:
   - API-2.10
   estimated_effort: 1 pt
   priority: medium
+  note: OpenAPI spec successfully regenerated via 'skillmeat web generate-sdk'. All
+    21 endpoints documented with proper tags, descriptions, and schemas.
 - id: TEST-2.12
   description: API Integration Tests
   status: pending
@@ -188,7 +190,7 @@ success_criteria:
   description: Integration tests passing
   status: pending
 files_modified: []
-progress: 38
+progress: 84
 updated: '2026-02-05'
 ---
 

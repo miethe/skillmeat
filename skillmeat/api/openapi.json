@@ -453,6 +453,47 @@
         ]
       }
     },
+    "/api/v1/user-collections/refresh-cache": {
+      "post": {
+        "tags": [
+          "user-collections",
+          "user-collections",
+          "user-collections"
+        ],
+        "summary": "Refresh metadata cache for all collections",
+        "description": "Refresh CollectionArtifact metadata cache across all DB collections. Iterates all collections in the database and refreshes cached metadata from file-based artifacts. This is a bulk operation and may take time for large collections.",
+        "operationId": "refresh_all_collections_cache_api_v1_user_collections_refresh_cache_post",
+        "responses": {
+          "200": {
+            "description": "Cache refresh completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Refresh All Collections Cache Api V1 User Collections Refresh Cache Post"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/user-collections": {
       "get": {
         "tags": [
@@ -1450,6 +1491,78 @@
         }
       }
     },
+    "/api/v1/user-collections/{collection_id}/refresh-cache": {
+      "post": {
+        "tags": [
+          "user-collections",
+          "user-collections",
+          "user-collections"
+        ],
+        "summary": "Refresh collection metadata cache (DB-backed)",
+        "description": "Refresh CollectionArtifact metadata cache for a specific DB collection. This is separate from /{collection_id}/refresh, which refreshes file-based collections. This endpoint targets only the DB cache, reading current file-based artifact metadata and updating CollectionArtifact cache rows.",
+        "operationId": "refresh_collection_cache_api_v1_user_collections__collection_id__refresh_cache_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collection Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cache refresh completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Refresh Collection Cache Api V1 User Collections  Collection Id  Refresh Cache Post"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Collection not found in database",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/user-collections/{collection_id}/refresh": {
       "post": {
         "tags": [
@@ -1561,6 +1674,75 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/user-collections/cache-stats": {
+      "get": {
+        "tags": [
+          "user-collections",
+          "user-collections",
+          "user-collections"
+        ],
+        "summary": "Get artifact cache statistics",
+        "description": "Get statistics about artifact metadata cache health including total artifacts, fresh/stale counts, and staleness percentage.",
+        "operationId": "get_cache_stats_api_v1_user_collections_cache_stats_get",
+        "parameters": [
+          {
+            "name": "ttl_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 86400,
+              "minimum": 60,
+              "description": "Custom TTL in seconds for staleness calculation. Default is 30 minutes (1800 seconds).",
+              "title": "Ttl Seconds"
+            },
+            "description": "Custom TTL in seconds for staleness calculation. Default is 30 minutes (1800 seconds)."
+          },
+          {
+            "name": "collection_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter stats to a specific collection ID. If not provided, stats are for all collections.",
+              "title": "Collection Id"
+            },
+            "description": "Filter stats to a specific collection ID. If not provided, stats are for all collections."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Cache Stats Api V1 User Collections Cache Stats Get"
                 }
               }
             }
@@ -2902,7 +3084,7 @@
           "artifacts"
         ],
         "summary": "Deploy artifact to project",
-        "description": "Deploy artifact from collection to project's .claude/ directory",
+        "description": "Deploy artifact from collection to project's .claude/ directory. Supports 'overwrite' (default) and 'merge' strategies.",
         "operationId": "deploy_artifact_api_v1_artifacts__artifact_id__deploy_post",
         "security": [
           {
@@ -3504,6 +3686,127 @@
           },
           "400": {
             "description": "Invalid request or no upstream source",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts/{artifact_id}/source-project-diff": {
+      "get": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Get source-to-project diff",
+        "description": "Compare artifact upstream source directly against project deployment",
+        "operationId": "get_artifact_source_project_diff_api_v1_artifacts__artifact_id__source_project_diff_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "project_path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Path to project deployment directory",
+              "title": "Project Path"
+            },
+            "description": "Path to project deployment directory"
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (searches all if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (searches all if not specified)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved source-project diff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactDiffResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or missing project_path",
             "content": {
               "application/json": {
                 "schema": {
@@ -7574,6 +7877,617 @@
           },
           "404": {
             "description": "Context entity not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/context-modules": {
+      "get": {
+        "tags": [
+          "context-modules",
+          "context-modules"
+        ],
+        "summary": "List context modules for a project",
+        "description": "Retrieve a paginated list of context modules scoped to a project.\n\n    Results are ordered by module ID and support cursor-based pagination.",
+        "operationId": "list_context_modules_api_v1_context_modules_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Project ID to list modules for",
+              "title": "Project Id"
+            },
+            "description": "Project ID to list modules for"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Number of items per page (max 100)",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Number of items per page (max 100)"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor from previous page for pagination",
+              "title": "Cursor"
+            },
+            "description": "Cursor from previous page for pagination"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved context modules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextModuleListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "context-modules",
+          "context-modules"
+        ],
+        "summary": "Create a new context module",
+        "description": "Create a new context module for a project with optional selector criteria.\n\n    Selectors define how memory items are filtered when the module is used\n    for context packing. Allowed selector keys: memory_types, min_confidence,\n    file_patterns, workflow_stages.",
+        "operationId": "create_context_module_api_v1_context_modules_post",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Project ID to create module in",
+              "title": "Project Id"
+            },
+            "description": "Project ID to create module in"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContextModuleCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Context module created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextModuleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/context-modules/{module_id}": {
+      "get": {
+        "tags": [
+          "context-modules",
+          "context-modules"
+        ],
+        "summary": "Get a context module by ID",
+        "description": "Retrieve detailed information about a specific context module.\n\n    Use include_items=true to also retrieve associated memory items.",
+        "operationId": "get_context_module_api_v1_context_modules__module_id__get",
+        "parameters": [
+          {
+            "name": "module_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Module Id"
+            }
+          },
+          {
+            "name": "include_items",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include associated memory items in response",
+              "default": false,
+              "title": "Include Items"
+            },
+            "description": "Include associated memory items in response"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved context module",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextModuleResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Context module not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "context-modules",
+          "context-modules"
+        ],
+        "summary": "Update a context module",
+        "description": "Update an existing context module. All fields are optional — only\n    provided fields will be updated. Updated selectors are validated.",
+        "operationId": "update_context_module_api_v1_context_modules__module_id__put",
+        "parameters": [
+          {
+            "name": "module_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Module Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContextModuleUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Context module updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextModuleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "404": {
+            "description": "Context module not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "context-modules",
+          "context-modules"
+        ],
+        "summary": "Delete a context module",
+        "description": "Delete a context module and its memory item associations.\n    This is a permanent operation.",
+        "operationId": "delete_context_module_api_v1_context_modules__module_id__delete",
+        "parameters": [
+          {
+            "name": "module_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Module Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Context module deleted successfully"
+          },
+          "404": {
+            "description": "Context module not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/context-modules/{module_id}/memories": {
+      "post": {
+        "tags": [
+          "context-modules",
+          "context-modules"
+        ],
+        "summary": "Add a memory item to a context module",
+        "description": "Associate a memory item with a context module. If the memory is already\n    linked, the operation is idempotent and returns the current state.",
+        "operationId": "add_memory_to_module_api_v1_context_modules__module_id__memories_post",
+        "parameters": [
+          {
+            "name": "module_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Module Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMemoryToModuleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Memory item added (or already linked)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextModuleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error (module or memory not found)"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "context-modules",
+          "context-modules"
+        ],
+        "summary": "List memory items in a context module",
+        "description": "Retrieve all memory items associated with a context module, ordered\n    by their position within the module.",
+        "operationId": "list_module_memories_api_v1_context_modules__module_id__memories_get",
+        "parameters": [
+          {
+            "name": "module_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Module Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Maximum number of items to return",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Maximum number of items to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved module's memory items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Module Memories Api V1 Context Modules  Module Id  Memories Get"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/context-modules/{module_id}/memories/{memory_id}": {
+      "delete": {
+        "tags": [
+          "context-modules",
+          "context-modules"
+        ],
+        "summary": "Remove a memory item from a context module",
+        "description": "Remove the association between a memory item and a context module.\n    The memory item itself is not deleted.",
+        "operationId": "remove_memory_from_module_api_v1_context_modules__module_id__memories__memory_id__delete",
+        "parameters": [
+          {
+            "name": "module_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Module Id"
+            }
+          },
+          {
+            "name": "memory_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Memory Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Memory item removed from module"
+          },
+          "404": {
+            "description": "Association not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/context-packs/preview": {
+      "post": {
+        "tags": [
+          "context-packs",
+          "context-packs"
+        ],
+        "summary": "Preview a context pack (read-only)",
+        "description": "Preview what a context pack would contain without generating markdown.\n\n    Performs read-only selection of memory items based on module selectors,\n    additional filters, and token budget constraints. Items are selected by\n    confidence (descending) then recency (descending).\n\n    Use this to estimate token usage and see which items would be included\n    before committing to a full generation.",
+        "operationId": "preview_context_pack_api_v1_context_packs_preview_post",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Project ID to build pack for",
+              "title": "Project Id"
+            },
+            "description": "Project ID to build pack for"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContextPackPreviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully generated pack preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextPackPreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/context-packs/generate": {
+      "post": {
+        "tags": [
+          "context-packs",
+          "context-packs"
+        ],
+        "summary": "Generate a context pack with markdown",
+        "description": "Generate a full context pack with structured markdown output.\n\n    Performs the same selection as preview, then generates markdown grouped\n    by memory type with confidence annotations. The generated markdown is\n    suitable for direct injection into agent prompts or CLAUDE.md files.\n\n    Confidence tiers in output:\n    - High (>= 0.85): no label\n    - Medium (0.60 - 0.84): [medium confidence]\n    - Low (< 0.60): [low confidence]",
+        "operationId": "generate_context_pack_api_v1_context_packs_generate_post",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Project ID to build pack for",
+              "title": "Project Id"
+            },
+            "description": "Project ID to build pack for"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContextPackGenerateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully generated context pack",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextPackGenerateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters"
           },
           "500": {
             "description": "Internal server error"
@@ -12241,6 +13155,745 @@
         }
       }
     },
+    "/api/v1/memory-items/count": {
+      "get": {
+        "tags": [
+          "memory-items",
+          "memory-items"
+        ],
+        "summary": "Count memory items",
+        "description": "Get a count of memory items for a project with optional filters.",
+        "operationId": "count_memory_items_api_v1_memory_items_count_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Project ID to scope the count",
+              "title": "Project Id"
+            },
+            "description": "Project ID to scope the count"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MemoryStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by status",
+              "title": "Status"
+            },
+            "description": "Filter by status"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MemoryType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by memory type",
+              "title": "Type"
+            },
+            "description": "Filter by memory type"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Count retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Count Memory Items Api V1 Memory Items Count Get"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/memory-items/bulk-promote": {
+      "post": {
+        "tags": [
+          "memory-items",
+          "memory-items"
+        ],
+        "summary": "Bulk promote memory items",
+        "description": "Promote multiple memory items to their next lifecycle stage.",
+        "operationId": "bulk_promote_memory_items_api_v1_memory_items_bulk_promote_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPromoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk promote completed (may contain partial failures)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkActionResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/memory-items/bulk-deprecate": {
+      "post": {
+        "tags": [
+          "memory-items",
+          "memory-items"
+        ],
+        "summary": "Bulk deprecate memory items",
+        "description": "Deprecate multiple memory items in a single request.",
+        "operationId": "bulk_deprecate_memory_items_api_v1_memory_items_bulk_deprecate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkDeprecateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk deprecate completed (may contain partial failures)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkActionResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/memory-items/merge": {
+      "post": {
+        "tags": [
+          "memory-items",
+          "memory-items"
+        ],
+        "summary": "Merge two memory items",
+        "description": "Merge a source memory item into a target item using a specified strategy.\n\n    Strategies:\n    - keep_target: Keep the target's content, deprecate the source.\n    - keep_source: Replace the target's content with the source's, deprecate the source.\n    - combine: Use the provided merged_content for the target, deprecate the source.\n\n    The source item is always deprecated after a successful merge.",
+        "operationId": "merge_memory_items_api_v1_memory_items_merge_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Merge completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MergeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid merge request"
+          },
+          "404": {
+            "description": "Source or target item not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/memory-items": {
+      "get": {
+        "tags": [
+          "memory-items",
+          "memory-items"
+        ],
+        "summary": "List memory items",
+        "description": "Retrieve a paginated list of memory items for a project.\n\n    Supports filtering by status, type, and minimum confidence score.\n    Uses cursor-based pagination for efficient traversal of large result sets.",
+        "operationId": "list_memory_items_api_v1_memory_items_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Project ID to scope the query",
+              "title": "Project Id"
+            },
+            "description": "Project ID to scope the query"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MemoryStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by status",
+              "title": "Status"
+            },
+            "description": "Filter by status"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MemoryType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by memory type",
+              "title": "Type"
+            },
+            "description": "Filter by memory type"
+          },
+          {
+            "name": "min_confidence",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 1.0,
+                  "minimum": 0.0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Minimum confidence threshold",
+              "title": "Min Confidence"
+            },
+            "description": "Minimum confidence threshold"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Number of items per page (max 100)",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Number of items per page (max 100)"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor from previous page for pagination",
+              "title": "Cursor"
+            },
+            "description": "Cursor from previous page for pagination"
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Field to sort by",
+              "default": "created_at",
+              "title": "Sort By"
+            },
+            "description": "Field to sort by"
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction (asc or desc)",
+              "default": "desc",
+              "title": "Sort Order"
+            },
+            "description": "Sort direction (asc or desc)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved memory items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryItemListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "memory-items",
+          "memory-items"
+        ],
+        "summary": "Create a new memory item",
+        "description": "Create a new memory item for a project.\n\n    Includes automatic duplicate detection via content hashing.\n    If a duplicate is detected, returns 409 Conflict with the existing item.",
+        "operationId": "create_memory_item_api_v1_memory_items_post",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Project ID for the new memory item",
+              "title": "Project Id"
+            },
+            "description": "Project ID for the new memory item"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryItemCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Memory item created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "409": {
+            "description": "Duplicate memory item detected"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/memory-items/{item_id}": {
+      "get": {
+        "tags": [
+          "memory-items",
+          "memory-items"
+        ],
+        "summary": "Get a memory item by ID",
+        "description": "Retrieve a single memory item by its ID. Increments access count.",
+        "operationId": "get_memory_item_api_v1_memory_items__item_id__get",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved memory item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryItemResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Memory item not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "memory-items",
+          "memory-items"
+        ],
+        "summary": "Update a memory item",
+        "description": "Update an existing memory item. Only provided fields are changed.\n\n    Updatable fields: type, content, confidence, status, provenance, anchors, ttl_policy.",
+        "operationId": "update_memory_item_api_v1_memory_items__item_id__put",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryItemUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Memory item updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or disallowed field"
+          },
+          "404": {
+            "description": "Memory item not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "memory-items",
+          "memory-items"
+        ],
+        "summary": "Delete a memory item",
+        "description": "Permanently delete a memory item by ID.",
+        "operationId": "delete_memory_item_api_v1_memory_items__item_id__delete",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Memory item deleted successfully"
+          },
+          "404": {
+            "description": "Memory item not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/memory-items/{item_id}/promote": {
+      "post": {
+        "tags": [
+          "memory-items",
+          "memory-items"
+        ],
+        "summary": "Promote a memory item",
+        "description": "Promote a memory item to the next lifecycle stage.\n\n    State machine: candidate -> active -> stable.\n    Items that are already stable or deprecated cannot be promoted.",
+        "operationId": "promote_memory_item_api_v1_memory_items__item_id__promote_post",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Memory item promoted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid promotion (wrong status)"
+          },
+          "404": {
+            "description": "Memory item not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/memory-items/{item_id}/deprecate": {
+      "post": {
+        "tags": [
+          "memory-items",
+          "memory-items"
+        ],
+        "summary": "Deprecate a memory item",
+        "description": "Deprecate a memory item regardless of its current lifecycle stage.\n\n    Any non-deprecated status can transition to deprecated. The deprecated_at\n    timestamp is set automatically by the repository layer.",
+        "operationId": "deprecate_memory_item_api_v1_memory_items__item_id__deprecate_post",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeprecateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Memory item deprecated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Item is already deprecated"
+          },
+          "404": {
+            "description": "Memory item not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/merge/analyze": {
       "post": {
         "tags": [
@@ -15503,6 +17156,25 @@
         "title": "AddGroupArtifactsRequest",
         "description": "Request schema for adding artifacts to a group."
       },
+      "AddMemoryToModuleRequest": {
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "title": "Memory Id"
+          },
+          "ordering": {
+            "type": "integer",
+            "title": "Ordering",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "memory_id"
+        ],
+        "title": "AddMemoryToModuleRequest",
+        "description": "Request body for adding a memory item to a context module.\n\nAttributes:\n    memory_id: ID of the memory item to associate.\n    ordering: Display/priority order within the module (default 0)."
+      },
       "AllServersHealthResponse": {
         "properties": {
           "servers": {
@@ -15875,6 +17547,16 @@
             "title": "Overwrite",
             "description": "Overwrite existing artifact if already deployed",
             "default": false
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "overwrite",
+              "merge"
+            ],
+            "title": "Strategy",
+            "description": "Deployment strategy. 'overwrite' replaces existing files entirely (default, existing behavior). 'merge' performs file-level merge: new files are copied, project-only files are preserved, and conflicts (files modified on both sides) are reported.",
+            "default": "overwrite"
           }
         },
         "type": "object",
@@ -15929,6 +17611,33 @@
             ],
             "title": "Error Message",
             "description": "Error details if deployment failed"
+          },
+          "strategy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "overwrite",
+                  "merge"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy",
+            "description": "Deployment strategy that was used"
+          },
+          "merge_details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MergeDeployDetails"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Merge deployment details (only present when strategy='merge')"
           }
         },
         "type": "object",
@@ -15945,6 +17654,7 @@
           "artifact_type": "skill",
           "deployed_path": "/Users/me/my-project/.claude/skills/pdf",
           "message": "Artifact 'pdf' deployed successfully",
+          "strategy": "overwrite",
           "success": true
         }
       },
@@ -16159,21 +17869,6 @@
             "description": "Artifact version from metadata",
             "examples": [
               "1.2.3"
-            ]
-          },
-          "tags": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Tags",
-            "description": "Artifact tags",
-            "examples": [
-              [
-                "document",
-                "pdf",
-                "productivity"
-              ]
             ]
           },
           "dependencies": {
@@ -17855,6 +19550,34 @@
           ]
         }
       },
+      "BulkActionResponse": {
+        "properties": {
+          "succeeded": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Succeeded"
+          },
+          "failed": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "succeeded",
+          "failed"
+        ],
+        "title": "BulkActionResponse",
+        "description": "Response model for bulk lifecycle operations."
+      },
       "BulkAutoTagRefreshItemResult": {
         "properties": {
           "source_id": {
@@ -18050,6 +19773,34 @@
           "total_requested": 2,
           "total_succeeded": 1
         }
+      },
+      "BulkDeprecateRequest": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Item Ids"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_ids"
+        ],
+        "title": "BulkDeprecateRequest",
+        "description": "Request body for deprecating multiple memory items at once."
       },
       "BulkImportArtifact": {
         "properties": {
@@ -18391,6 +20142,34 @@
           "total_skipped": 2,
           "total_tags_applied": 15
         }
+      },
+      "BulkPromoteRequest": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Item Ids"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_ids"
+        ],
+        "title": "BulkPromoteRequest",
+        "description": "Request body for promoting multiple memory items at once."
       },
       "BulkSyncItemResult": {
         "properties": {
@@ -21998,6 +23777,422 @@
           "total_auto_load_tokens": 2300
         }
       },
+      "ContextModuleCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "selectors": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selectors"
+          },
+          "priority": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Priority",
+            "default": 5
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ContextModuleCreateRequest",
+        "description": "Request body for creating a new context module.\n\nAttributes:\n    name: Human-readable module name (1-255 characters).\n    description: Optional description of the module's purpose.\n    selectors: Optional selector criteria dict. Allowed keys:\n        memory_types (list), min_confidence (float),\n        file_patterns (list), workflow_stages (list).\n    priority: Module priority for ordering (0-100, default 5)."
+      },
+      "ContextModuleListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ContextModuleResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "default": false
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ContextModuleListResponse",
+        "description": "Paginated list response for context modules.\n\nAttributes:\n    items: List of context module responses.\n    next_cursor: Cursor for fetching the next page (None if no more).\n    has_more: Whether more pages are available.\n    total: Total count (None if not computed for performance)."
+      },
+      "ContextModuleResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "selectors": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selectors"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "default": 5
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "memory_items": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "name"
+        ],
+        "title": "ContextModuleResponse",
+        "description": "Response body for a single context module.\n\nAttributes:\n    id: Unique module identifier.\n    project_id: Project this module belongs to.\n    name: Human-readable module name.\n    description: Module purpose description.\n    selectors: Selector criteria dict (parsed from JSON).\n    priority: Module priority for ordering.\n    content_hash: SHA-256 hash for change detection.\n    created_at: ISO 8601 creation timestamp.\n    updated_at: ISO 8601 last-update timestamp.\n    memory_items: Associated memory items (only when include_items=true)."
+      },
+      "ContextModuleUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "selectors": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selectors"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          }
+        },
+        "type": "object",
+        "title": "ContextModuleUpdateRequest",
+        "description": "Request body for updating an existing context module.\n\nAll fields are optional. Only provided fields will be updated.\n\nAttributes:\n    name: Updated module name (1-255 characters).\n    description: Updated description.\n    selectors: Updated selector criteria dict.\n    priority: Updated priority (0-100)."
+      },
+      "ContextPackGenerateRequest": {
+        "properties": {
+          "module_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Module Id"
+          },
+          "budget_tokens": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 100.0,
+            "title": "Budget Tokens",
+            "default": 4000
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filters"
+          }
+        },
+        "type": "object",
+        "title": "ContextPackGenerateRequest",
+        "description": "Request body for generating a full context pack with markdown.\n\nAttributes:\n    module_id: Optional module whose selectors define filter criteria.\n    budget_tokens: Maximum token budget for the pack (100-100000).\n    filters: Optional additional filters dict. Supported keys:\n        type (str), min_confidence (float)."
+      },
+      "ContextPackGenerateResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total_tokens": {
+            "type": "integer",
+            "title": "Total Tokens"
+          },
+          "budget_tokens": {
+            "type": "integer",
+            "title": "Budget Tokens"
+          },
+          "utilization": {
+            "type": "number",
+            "title": "Utilization"
+          },
+          "items_included": {
+            "type": "integer",
+            "title": "Items Included"
+          },
+          "items_available": {
+            "type": "integer",
+            "title": "Items Available"
+          },
+          "markdown": {
+            "type": "string",
+            "title": "Markdown"
+          },
+          "generated_at": {
+            "type": "string",
+            "title": "Generated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total_tokens",
+          "budget_tokens",
+          "utilization",
+          "items_included",
+          "items_available",
+          "markdown",
+          "generated_at"
+        ],
+        "title": "ContextPackGenerateResponse",
+        "description": "Response body for a generated context pack.\n\nExtends the preview response with markdown output and a generation\ntimestamp.\n\nAttributes:\n    items: List of selected item dicts.\n    total_tokens: Sum of estimated tokens for all selected items.\n    budget_tokens: The token budget that was requested.\n    utilization: Fraction of budget used (0.0-1.0).\n    items_included: Number of items that fit within budget.\n    items_available: Total number of candidate items before budget cut.\n    markdown: Formatted markdown context pack grouped by memory type.\n    generated_at: ISO 8601 timestamp of generation."
+      },
+      "ContextPackPreviewRequest": {
+        "properties": {
+          "module_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Module Id"
+          },
+          "budget_tokens": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 100.0,
+            "title": "Budget Tokens",
+            "default": 4000
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filters"
+          }
+        },
+        "type": "object",
+        "title": "ContextPackPreviewRequest",
+        "description": "Request body for previewing a context pack (read-only).\n\nAttributes:\n    module_id: Optional module whose selectors define filter criteria.\n    budget_tokens: Maximum token budget for the pack (100-100000).\n    filters: Optional additional filters dict. Supported keys:\n        type (str), min_confidence (float)."
+      },
+      "ContextPackPreviewResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total_tokens": {
+            "type": "integer",
+            "title": "Total Tokens"
+          },
+          "budget_tokens": {
+            "type": "integer",
+            "title": "Budget Tokens"
+          },
+          "utilization": {
+            "type": "number",
+            "title": "Utilization"
+          },
+          "items_included": {
+            "type": "integer",
+            "title": "Items Included"
+          },
+          "items_available": {
+            "type": "integer",
+            "title": "Items Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total_tokens",
+          "budget_tokens",
+          "utilization",
+          "items_included",
+          "items_available"
+        ],
+        "title": "ContextPackPreviewResponse",
+        "description": "Response body for a context pack preview.\n\nAttributes:\n    items: List of selected item dicts with id, type, content,\n        confidence, and tokens fields.\n    total_tokens: Sum of estimated tokens for all selected items.\n    budget_tokens: The token budget that was requested.\n    utilization: Fraction of budget used (0.0-1.0).\n    items_included: Number of items that fit within budget.\n    items_available: Total number of candidate items before budget cut."
+      },
       "CopyGroupRequest": {
         "properties": {
           "target_collection_id": {
@@ -22977,6 +25172,63 @@
           "last_deployed": "2025-01-15T10:30:00Z",
           "settings_path": "/Users/name/Library/Application Support/Claude/claude_desktop_config.json"
         }
+      },
+      "DeploymentSummary": {
+        "properties": {
+          "project_path": {
+            "type": "string",
+            "title": "Project Path",
+            "description": "Absolute path to the project directory",
+            "examples": [
+              "/Users/user/project"
+            ]
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name",
+            "description": "Display name of the project",
+            "examples": [
+              "myproject"
+            ]
+          },
+          "deployed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Deployed At",
+            "description": "Deployment timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_path",
+          "project_name",
+          "deployed_at"
+        ],
+        "title": "DeploymentSummary",
+        "description": "Lightweight deployment summary for collection artifact responses.\n\nThis schema matches the structure stored in CollectionArtifact.deployments_json\nand is used for efficient display of deployment counts and basic info.",
+        "example": {
+          "deployed_at": "2026-02-01T10:00:00Z",
+          "project_name": "myproject",
+          "project_path": "/Users/user/project"
+        }
+      },
+      "DeprecateRequest": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "title": "DeprecateRequest",
+        "description": "Request body for deprecating a memory item."
       },
       "DetailedHealthStatus": {
         "properties": {
@@ -24550,10 +26802,11 @@
             "type": "string",
             "enum": [
               "file",
-              "tree"
+              "tree",
+              "symlink"
             ],
             "title": "Type",
-            "description": "Entry type: 'file' for files, 'tree' for directories",
+            "description": "Entry type: 'file' for files, 'tree' for directories, 'symlink' for symbolic links",
             "examples": [
               "file"
             ]
@@ -27370,6 +29623,359 @@
           "title": "PDF Processing Tool"
         }
       },
+      "MemoryItemCreateRequest": {
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/MemoryType"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Content"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "default": 0.5
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemoryStatus",
+            "default": "candidate"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance"
+          },
+          "anchors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchors"
+          },
+          "ttl_policy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttl Policy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "content"
+        ],
+        "title": "MemoryItemCreateRequest",
+        "description": "Request body for creating a new memory item."
+      },
+      "MemoryItemListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryItemResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "default": false
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "MemoryItemListResponse",
+        "description": "Response model for paginated memory item listing."
+      },
+      "MemoryItemResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance"
+          },
+          "anchors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchors"
+          },
+          "ttl_policy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttl Policy"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "access_count": {
+            "type": "integer",
+            "title": "Access Count",
+            "default": 0
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "deprecated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deprecated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "type",
+          "content",
+          "confidence",
+          "status"
+        ],
+        "title": "MemoryItemResponse",
+        "description": "Response model for a single memory item."
+      },
+      "MemoryItemUpdateRequest": {
+        "properties": {
+          "type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemoryType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemoryStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance"
+          },
+          "anchors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchors"
+          },
+          "ttl_policy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttl Policy"
+          }
+        },
+        "type": "object",
+        "title": "MemoryItemUpdateRequest",
+        "description": "Request body for updating a memory item. All fields optional."
+      },
+      "MemoryStatus": {
+        "type": "string",
+        "enum": [
+          "candidate",
+          "active",
+          "stable",
+          "deprecated"
+        ],
+        "title": "MemoryStatus",
+        "description": "Allowed memory item lifecycle statuses matching DB CHECK constraint."
+      },
+      "MemoryType": {
+        "type": "string",
+        "enum": [
+          "decision",
+          "constraint",
+          "gotcha",
+          "style_rule",
+          "learning"
+        ],
+        "title": "MemoryType",
+        "description": "Allowed memory item types matching DB CHECK constraint."
+      },
       "MergeAnalyzeRequest": {
         "properties": {
           "base_snapshot_id": {
@@ -27425,6 +30031,45 @@
           "local_collection": "default",
           "remote_snapshot_id": "snap_20241216_150000"
         }
+      },
+      "MergeDeployDetails": {
+        "properties": {
+          "files_copied": {
+            "type": "integer",
+            "title": "Files Copied",
+            "description": "Number of files copied from collection to project (new files)",
+            "default": 0
+          },
+          "files_skipped": {
+            "type": "integer",
+            "title": "Files Skipped",
+            "description": "Number of identical files skipped (no action needed)",
+            "default": 0
+          },
+          "files_preserved": {
+            "type": "integer",
+            "title": "Files Preserved",
+            "description": "Number of project-only files preserved (not deleted)",
+            "default": 0
+          },
+          "conflicts": {
+            "type": "integer",
+            "title": "Conflicts",
+            "description": "Number of files modified on both sides (conflicts)",
+            "default": 0
+          },
+          "file_actions": {
+            "items": {
+              "$ref": "#/components/schemas/MergeFileAction"
+            },
+            "type": "array",
+            "title": "File Actions",
+            "description": "Per-file action details"
+          }
+        },
+        "type": "object",
+        "title": "MergeDeployDetails",
+        "description": "Details of a merge deployment operation."
       },
       "MergeExecuteRequest": {
         "properties": {
@@ -27571,6 +30216,45 @@
           "success": true
         }
       },
+      "MergeFileAction": {
+        "properties": {
+          "file_path": {
+            "type": "string",
+            "title": "File Path",
+            "description": "Relative file path within the artifact directory"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "copied",
+              "skipped",
+              "preserved",
+              "conflict"
+            ],
+            "title": "Action",
+            "description": "'copied' = new file from collection copied to project, 'skipped' = file identical on both sides (no action), 'preserved' = file exists only in project (kept as-is), 'conflict' = file modified on both sides (left unchanged in project)"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail",
+            "description": "Additional detail about the action (e.g., conflict description)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_path",
+          "action"
+        ],
+        "title": "MergeFileAction",
+        "description": "Describes an action taken on a single file during merge deployment."
+      },
       "MergePreviewRequest": {
         "properties": {
           "base_snapshot_id": {
@@ -27706,6 +30390,60 @@
           ],
           "potential_conflicts": []
         }
+      },
+      "MergeRequest": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          },
+          "strategy": {
+            "type": "string",
+            "pattern": "^(keep_target|keep_source|combine)$",
+            "title": "Strategy",
+            "default": "keep_target"
+          },
+          "merged_content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "target_id"
+        ],
+        "title": "MergeRequest",
+        "description": "Request body for merging two memory items."
+      },
+      "MergeResponse": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/MemoryItemResponse"
+          },
+          "merged_source_id": {
+            "type": "string",
+            "title": "Merged Source Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "merged_source_id"
+        ],
+        "title": "MergeResponse",
+        "description": "Response model for a completed merge operation."
       },
       "MergeSafetyResponse": {
         "properties": {
@@ -29165,6 +31903,24 @@
           "description": "Updated project description",
           "name": "renamed-project"
         }
+      },
+      "PromoteRequest": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "title": "PromoteRequest",
+        "description": "Request body for promoting a memory item to the next lifecycle stage."
       },
       "PublishRequest": {
         "properties": {
@@ -33711,6 +36467,21 @@
             "examples": [
               "anthropics/skills/pdf"
             ]
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools",
+            "description": "Claude Code tools used by this artifact"
           }
         },
         "type": "object",
@@ -34147,6 +36918,21 @@
             "title": "Tags",
             "description": "Artifact tags"
           },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools",
+            "description": "Claude Code tools used by this artifact"
+          },
           "collections": {
             "anyOf": [
               {
@@ -34176,6 +36962,21 @@
             ],
             "title": "Groups",
             "description": "Groups this artifact belongs to (only populated when include_groups=true)"
+          },
+          "deployments": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DeploymentSummary"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployments",
+            "description": "Lightweight deployment summaries for this artifact"
           }
         },
         "type": "object",
