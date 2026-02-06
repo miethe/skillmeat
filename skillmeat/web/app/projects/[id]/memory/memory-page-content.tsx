@@ -6,76 +6,48 @@ import {
   Settings,
   Plus,
   ChevronRight,
-  Search,
-  Filter,
-  ArrowUpDown,
-  ChevronDown,
-  Brain,
-  ShieldAlert,
-  GitBranch,
-  Wrench,
-  Puzzle,
-  Lightbulb,
-  Palette,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import {
+  useMemoryItems,
+  useMemoryItemCounts,
+  useMemorySelection,
+  usePromoteMemoryItem,
+  useDeprecateMemoryItem,
+  useBulkPromoteMemoryItems,
+  useBulkDeprecateMemoryItems,
+} from '@/hooks';
+import type { MemoryStatus } from '@/sdk/models/MemoryStatus';
+import type { MemoryType } from '@/sdk/models/MemoryType';
+import { MemoryFilterBar } from '@/components/memory/memory-filter-bar';
+import { MemoryList } from '@/components/memory/memory-list';
+import { BatchActionBar } from '@/components/memory/batch-action-bar';
 
 // ---------------------------------------------------------------------------
-// Constants
+// Sort mapping: UI sort values -> API sort_by + sort_order
 // ---------------------------------------------------------------------------
 
-const MEMORY_TYPES = [
-  { value: 'all', label: 'All', icon: null },
-  { value: 'constraint', label: 'Constraints', icon: ShieldAlert },
-  { value: 'decision', label: 'Decisions', icon: GitBranch },
-  { value: 'fix', label: 'Fixes', icon: Wrench },
-  { value: 'pattern', label: 'Patterns', icon: Puzzle },
-  { value: 'learning', label: 'Learnings', icon: Lightbulb },
-  { value: 'style_rule', label: 'Style Rules', icon: Palette },
-] as const;
-
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'All Statuses' },
-  { value: 'candidate', label: 'Candidate' },
-  { value: 'active', label: 'Active' },
-  { value: 'stable', label: 'Stable' },
-  { value: 'deprecated', label: 'Deprecated' },
-] as const;
-
-const SORT_OPTIONS = [
-  { value: 'newest', label: 'Newest First' },
-  { value: 'oldest', label: 'Oldest First' },
-  { value: 'confidence-desc', label: 'Highest Confidence' },
-  { value: 'confidence-asc', label: 'Lowest Confidence' },
-  { value: 'most-used', label: 'Most Used' },
-] as const;
-
-// ---------------------------------------------------------------------------
-// Placeholder components (to be replaced in subsequent tasks)
-// ---------------------------------------------------------------------------
-
-/** Placeholder for the memory list. Accepts the same onSelect signature that
- *  the real MemoryList (UI-3.2) will use, so wiring is zero-effort later. */
-function MemoryListPlaceholder(_props: { onSelect: (id: string | null) => void }) {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
-      <Brain className="h-12 w-12 opacity-30" />
-      <p className="text-sm font-medium">Memory list will appear here</p>
-      <p className="text-xs">Extracted knowledge items from AI sessions</p>
-    </div>
-  );
+function parseSortValue(sortBy: string): { sortBy?: string; sortOrder?: 'asc' | 'desc' } {
+  switch (sortBy) {
+    case 'newest':
+      return { sortBy: 'created_at', sortOrder: 'desc' };
+    case 'oldest':
+      return { sortBy: 'created_at', sortOrder: 'asc' };
+    case 'confidence-desc':
+      return { sortBy: 'confidence', sortOrder: 'desc' };
+    case 'confidence-asc':
+      return { sortBy: 'confidence', sortOrder: 'asc' };
+    case 'most-used':
+      return { sortBy: 'access_count', sortOrder: 'desc' };
+    default:
+      return {};
+  }
 }
+
+// ---------------------------------------------------------------------------
+// Placeholder component (detail panel -- replaced in UI-3.4)
+// ---------------------------------------------------------------------------
 
 function DetailPanelPlaceholder() {
   return (
@@ -84,18 +56,6 @@ function DetailPanelPlaceholder() {
       <p className="text-xs">Click on any memory item in the list</p>
     </div>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function getStatusLabel(value: string): string {
-  return STATUS_OPTIONS.find((opt) => opt.value === value)?.label ?? 'All Statuses';
-}
-
-function getSortLabel(value: string): string {
-  return SORT_OPTIONS.find((opt) => opt.value === value)?.label ?? 'Newest First';
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +68,7 @@ interface MemoryPageContentProps {
 
 export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   // ---------------------------------------------------------------------------
-  // State
+  // Filter & sort state
   // ---------------------------------------------------------------------------
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -120,26 +80,110 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   // later task when useProject is wired up.
   const projectName = projectId;
 
-  // Placeholder counts (will be replaced with real data from API queries)
-  const counts: Record<string, number> = {
-    all: 0,
-    constraint: 0,
-    decision: 0,
-    fix: 0,
-    pattern: 0,
-    learning: 0,
-    style_rule: 0,
+  // ---------------------------------------------------------------------------
+  // Selection state
+  // ---------------------------------------------------------------------------
+  const {
+    selectedIds,
+    focusedIndex,
+    toggleSelect,
+    clearSelection,
+  } = useMemorySelection();
+
+  // ---------------------------------------------------------------------------
+  // Build API filter params from UI state
+  // ---------------------------------------------------------------------------
+  const { sortBy: apiSortBy, sortOrder: apiSortOrder } = parseSortValue(sortBy);
+
+  const memoryFilters = {
+    projectId,
+    status: statusFilter !== 'all' ? (statusFilter as MemoryStatus) : undefined,
+    type: typeFilter !== 'all' ? (typeFilter as MemoryType) : undefined,
+    search: searchQuery || undefined,
+    sortBy: apiSortBy,
+    sortOrder: apiSortOrder,
   };
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-  }, []);
+  // ---------------------------------------------------------------------------
+  // Data hooks
+  // ---------------------------------------------------------------------------
+  const {
+    data: memoryData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useMemoryItems(memoryFilters);
 
-  // Handler for selecting a memory item from the list. Passed to
-  // MemoryListPlaceholder now and the real MemoryList in UI-3.2.
-  const handleMemorySelect = useCallback((memoryId: string | null) => {
+  const { data: counts } = useMemoryItemCounts({ projectId });
+
+  const memories = memoryData?.items ?? [];
+
+  // ---------------------------------------------------------------------------
+  // Mutation hooks
+  // ---------------------------------------------------------------------------
+  const promoteItem = usePromoteMemoryItem();
+  const deprecateItem = useDeprecateMemoryItem();
+  const bulkPromote = useBulkPromoteMemoryItems();
+  const bulkDeprecate = useBulkDeprecateMemoryItems();
+
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
+
+  /** Select a memory card to open detail panel. */
+  const handleCardClick = useCallback((memoryId: string) => {
     setSelectedMemoryId(memoryId);
   }, []);
+
+  /** Approve (promote) a single memory item. */
+  const handleApprove = useCallback(
+    (id: string) => {
+      promoteItem.mutate({ itemId: id, data: { reason: 'Approved via memory inbox' } });
+    },
+    [promoteItem]
+  );
+
+  /** Reject (deprecate) a single memory item. */
+  const handleReject = useCallback(
+    (id: string) => {
+      deprecateItem.mutate({ itemId: id, data: { reason: 'Rejected via memory inbox' } });
+    },
+    [deprecateItem]
+  );
+
+  /** Placeholder for edit -- will open edit panel/dialog in UI-3.4. */
+  const handleEdit = useCallback((_id: string) => {
+    // TODO: Open edit dialog (UI-3.4)
+  }, []);
+
+  /** Placeholder for merge -- will open merge dialog in a future task. */
+  const handleMerge = useCallback((_id: string) => {
+    // TODO: Open merge dialog
+  }, []);
+
+  /** Open create memory flow. */
+  const handleCreateMemory = useCallback(() => {
+    // TODO: Open create memory dialog
+  }, []);
+
+  /** Batch approve all selected items. */
+  const handleBatchApprove = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    bulkPromote.mutate(
+      { item_ids: [...selectedIds], reason: 'Batch approved via memory inbox' },
+      { onSuccess: () => clearSelection() }
+    );
+  }, [selectedIds, bulkPromote, clearSelection]);
+
+  /** Batch reject all selected items. */
+  const handleBatchReject = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    bulkDeprecate.mutate(
+      { item_ids: [...selectedIds], reason: 'Batch rejected via memory inbox' },
+      { onSuccess: () => clearSelection() }
+    );
+  }, [selectedIds, bulkDeprecate, clearSelection]);
 
   // ---------------------------------------------------------------------------
   // Render
@@ -189,7 +233,7 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
               <Settings className="mr-2 h-4 w-4" />
               Settings
             </Button>
-            <Button size="sm">
+            <Button size="sm" onClick={handleCreateMemory}>
               <Plus className="mr-2 h-4 w-4" />
               Create Memory
             </Button>
@@ -198,86 +242,19 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
       </div>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Type Tabs                                                          */}
+      {/* Filter Bar (Type Tabs + Controls)                                  */}
       {/* ------------------------------------------------------------------ */}
-      <div className="border-b px-6 py-2">
-        <Tabs value={typeFilter} onValueChange={setTypeFilter}>
-          <TabsList className="h-9 bg-transparent p-0" aria-label="Filter by memory type">
-            {MEMORY_TYPES.map((type) => (
-              <TabsTrigger
-                key={type.value}
-                value={type.value}
-                className="data-[state=active]:bg-muted"
-              >
-                {type.icon && <type.icon className="mr-1.5 h-3.5 w-3.5" />}
-                {type.label}
-                <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
-                  {counts[type.value] ?? 0}
-                </Badge>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-      </div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Filter / Controls Bar                                              */}
-      {/* ------------------------------------------------------------------ */}
-      <div className="flex items-center gap-3 border-b px-6 py-2" role="toolbar" aria-label="Memory filters">
-        {/* Status filter */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8">
-              <Filter className="mr-2 h-3.5 w-3.5" />
-              {getStatusLabel(statusFilter)}
-              <ChevronDown className="ml-2 h-3.5 w-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuRadioGroup value={statusFilter} onValueChange={setStatusFilter}>
-              {STATUS_OPTIONS.map((opt) => (
-                <DropdownMenuRadioItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Sort control */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8">
-              <ArrowUpDown className="mr-2 h-3.5 w-3.5" />
-              {getSortLabel(sortBy)}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuRadioGroup value={sortBy} onValueChange={setSortBy}>
-              {SORT_OPTIONS.map((opt) => (
-                <DropdownMenuRadioItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Search */}
-        <div className="relative w-64">
-          <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Search memories..."
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="h-8 pl-8 text-sm"
-            aria-label="Search memories"
-          />
-        </div>
-      </div>
+      <MemoryFilterBar
+        typeFilter={typeFilter}
+        onTypeFilterChange={setTypeFilter}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        sortBy={sortBy}
+        onSortByChange={setSortBy}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        counts={counts}
+      />
 
       {/* ------------------------------------------------------------------ */}
       {/* Main Content: List + Detail Panel                                  */}
@@ -289,8 +266,22 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
           role="region"
           aria-label="Memory list"
         >
-          {/* TODO: Replace with MemoryList in UI-3.2 */}
-          <MemoryListPlaceholder onSelect={handleMemorySelect} />
+          <MemoryList
+            memories={memories}
+            isLoading={isLoading}
+            isError={isError}
+            error={error}
+            refetch={refetch}
+            selectedIds={selectedIds}
+            focusedIndex={focusedIndex}
+            onToggleSelect={toggleSelect}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onEdit={handleEdit}
+            onMerge={handleMerge}
+            onCardClick={handleCardClick}
+            onCreateMemory={handleCreateMemory}
+          />
         </div>
 
         {/* Detail panel (conditional, right sidebar) */}
@@ -310,17 +301,14 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
       </div>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Batch Action Bar (fixed bottom, conditional)                       */}
+      {/* Batch Action Bar (fixed bottom, slides up when items selected)     */}
       {/* ------------------------------------------------------------------ */}
-      {/* TODO: Replace with BatchActionBar component when batch selection is implemented */}
-      <div
-        className="hidden"
-        role="toolbar"
-        aria-label="Batch actions"
-        data-placeholder="batch-action-bar"
-      >
-        {/* Batch action bar will appear here when items are selected */}
-      </div>
+      <BatchActionBar
+        selectedCount={selectedIds.size}
+        onApproveAll={handleBatchApprove}
+        onRejectAll={handleBatchReject}
+        onClearSelection={clearSelection}
+      />
     </div>
   );
 }
