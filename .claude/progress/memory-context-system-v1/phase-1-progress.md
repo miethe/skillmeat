@@ -1,116 +1,131 @@
 ---
-# === PROGRESS TRACKING ===
-# Phase-level task tracking optimized for AI agent orchestration
-# REQUIRED FIELDS: assigned_to, dependencies for EVERY task
-
-# Metadata: Identification and Classification
 type: progress
-prd: "memory-context-system-v1"
+prd: memory-context-system-v1
 phase: 1
-title: "Database + Repository Layer"
-status: "planning"
-started: "2026-02-05"
+title: Database + Repository Layer
+status: in-progress
+started: '2026-02-05'
 completed: null
-
-# Overall Progress: Status and Estimates
 overall_progress: 0
-completion_estimate: "on-track"
-
-# Task Counts: Machine-readable task state
+completion_estimate: on-track
 total_tasks: 7
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-# Ownership: Primary and secondary agents
-owners: ["data-layer-expert", "python-backend-engineer"]
+owners:
+- data-layer-expert
+- python-backend-engineer
 contributors: []
-
-# === TASKS (SOURCE OF TRUTH) ===
 tasks:
-  - id: "DB-1.1"
-    description: "Schema Design"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["PREP-0.1"]
-    estimated_effort: "2 pts"
-    priority: "critical"
-
-  - id: "DB-1.2"
-    description: "ORM Models"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DB-1.1"]
-    estimated_effort: "2 pts"
-    priority: "critical"
-
-  - id: "DB-1.3"
-    description: "Indexes & Constraints"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["DB-1.2"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "REPO-1.4"
-    description: "MemoryItemRepository"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DB-1.3"]
-    estimated_effort: "3 pts"
-    priority: "critical"
-
-  - id: "REPO-1.5"
-    description: "ContextModuleRepository"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DB-1.3"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "REPO-1.6"
-    description: "Transaction Handling"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["REPO-1.4"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "TEST-1.7"
-    description: "Repository Tests"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-1.6"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-# Parallelization Strategy
+- id: DB-1.1
+  description: Schema Design
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - PREP-0.1
+  estimated_effort: 2 pts
+  priority: critical
+- id: DB-1.2
+  description: ORM Models
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DB-1.1
+  estimated_effort: 2 pts
+  priority: critical
+- id: DB-1.3
+  description: Indexes & Constraints
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DB-1.2
+  estimated_effort: 1 pt
+  priority: high
+- id: REPO-1.4
+  description: MemoryItemRepository
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DB-1.3
+  estimated_effort: 3 pts
+  priority: critical
+- id: REPO-1.5
+  description: ContextModuleRepository
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DB-1.3
+  estimated_effort: 2 pts
+  priority: high
+- id: REPO-1.6
+  description: Transaction Handling
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - REPO-1.4
+  estimated_effort: 1 pt
+  priority: high
+- id: TEST-1.7
+  description: Repository Tests
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-1.6
+  estimated_effort: 2 pts
+  priority: high
 parallelization:
-  batch_1: ["DB-1.1"]
-  batch_2: ["DB-1.2"]
-  batch_3: ["DB-1.3"]
-  batch_4: ["REPO-1.4", "REPO-1.5"]
-  batch_5: ["REPO-1.6"]
-  batch_6: ["TEST-1.7"]
-  critical_path: ["DB-1.1", "DB-1.2", "DB-1.3", "REPO-1.4", "REPO-1.6", "TEST-1.7"]
-  estimated_total_time: "8 pts"
-
-# Critical Blockers
+  batch_1:
+  - DB-1.1
+  batch_2:
+  - DB-1.2
+  batch_3:
+  - DB-1.3
+  batch_4:
+  - REPO-1.4
+  - REPO-1.5
+  batch_5:
+  - REPO-1.6
+  batch_6:
+  - TEST-1.7
+  critical_path:
+  - DB-1.1
+  - DB-1.2
+  - DB-1.3
+  - REPO-1.4
+  - REPO-1.6
+  - TEST-1.7
+  estimated_total_time: 8 pts
 blockers: []
-
-# Success Criteria
-success_criteria: [
-  { id: "SC-1.1", description: "Alembic migration passes forward/backward tests", status: "pending" },
-  { id: "SC-1.2", description: "All 3 ORM models correctly mapped", status: "pending" },
-  { id: "SC-1.3", description: "Indexes created and verified", status: "pending" },
-  { id: "SC-1.4", description: "Repository CRUD operations working", status: "pending" },
-  { id: "SC-1.5", description: "Cursor pagination implemented", status: "pending" },
-  { id: "SC-1.6", description: "Test coverage >85%", status: "pending" }
-]
-
-# Files Modified
+success_criteria:
+- id: SC-1.1
+  description: Alembic migration passes forward/backward tests
+  status: pending
+- id: SC-1.2
+  description: All 3 ORM models correctly mapped
+  status: pending
+- id: SC-1.3
+  description: Indexes created and verified
+  status: pending
+- id: SC-1.4
+  description: Repository CRUD operations working
+  status: pending
+- id: SC-1.5
+  description: Cursor pagination implemented
+  status: pending
+- id: SC-1.6
+  description: Test coverage >85%
+  status: pending
 files_modified: []
+progress: 0
+updated: '2026-02-05'
 ---
 
 # memory-context-system-v1 - Phase 1: Database + Repository Layer
