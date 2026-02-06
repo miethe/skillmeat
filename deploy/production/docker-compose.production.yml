@@ -1,6 +1,6 @@
 # Docker Compose configuration for SkillMeat Production Environment
 # This configuration includes the API server and full monitoring stack
-# Memory & Context Intelligence System is deployed but disabled by default
+# Memory & Context Intelligence System is deployed and enabled
 
 version: '3.8'
 
@@ -22,8 +22,8 @@ services:
       - SKILLMEAT_LOG_LEVEL=WARNING
       - SKILLMEAT_LOG_FORMAT=json
 
-      # Feature flags -- memory system OFF for graduated rollout
-      - SKILLMEAT_MEMORY_CONTEXT_ENABLED=false
+      # Feature flags -- memory system ENABLED
+      - SKILLMEAT_MEMORY_CONTEXT_ENABLED=true
       - SKILLMEAT_MEMORY_AUTO_EXTRACT=false
       - SKILLMEAT_ENABLE_AUTO_DISCOVERY=true
       - SKILLMEAT_ENABLE_AUTO_POPULATION=true
