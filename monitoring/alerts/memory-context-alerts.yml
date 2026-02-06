@@ -1,0 +1,195 @@
+# Memory & Context Intelligence System Alert Rules
+# Prometheus-compatible alerting rules for monitoring system health and performance
+
+groups:
+  - name: memory_context_latency
+    interval: 30s
+    rules:
+      # Memory List Query Latency Alerts
+      - alert: MemoryListLatencyWarning
+        expr: histogram_quantile(0.95, rate(skillmeat_api_request_duration_seconds_bucket{endpoint=~"/api/v1/memory-items.*", method="GET"}[5m])) > 0.2
+        for: 2m
+        labels:
+          severity: warning
+          component: memory_list
+          system: memory-context
+        annotations:
+          summary: "Memory list query latency is elevated"
+          description: "Memory list query p95 latency is {{ $value | humanizeDuration }} (threshold: 200ms). Endpoint: {{ $labels.endpoint }}"
+          runbook: "https://github.com/skillmeat/skillmeat/blob/main/docs/operations/memory-context-runbook.md#memory-list-latency-warning"
+
+      - alert: MemoryListLatencyCritical
+        expr: histogram_quantile(0.95, rate(skillmeat_api_request_duration_seconds_bucket{endpoint=~"/api/v1/memory-items.*", method="GET"}[5m])) > 1.0
+        for: 2m
+        labels:
+          severity: critical
+          component: memory_list
+          system: memory-context
+        annotations:
+          summary: "Memory list query latency is critically high"
+          description: "Memory list query p95 latency is {{ $value | humanizeDuration }} (threshold: 1000ms). Endpoint: {{ $labels.endpoint }}. Immediate attention required."
+          runbook: "https://github.com/skillmeat/skillmeat/blob/main/docs/operations/memory-context-runbook.md#memory-list-latency-critical"
+
+      # Context Pack Generation Latency Alerts
+      - alert: ContextPackLatencyWarning
+        expr: histogram_quantile(0.95, rate(skillmeat_api_request_duration_seconds_bucket{endpoint=~"/api/v1/context-packs.*"}[5m])) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          component: context_packer
+          system: memory-context
+        annotations:
+          summary: "Context pack generation latency is elevated"
+          description: "Context pack p95 latency is {{ $value | humanizeDuration }} (threshold: 500ms). Endpoint: {{ $labels.endpoint }}"
+          runbook: "https://github.com/skillmeat/skillmeat/blob/main/docs/operations/memory-context-runbook.md#context-pack-latency-warning"
+
+      - alert: ContextPackLatencyCritical
+        expr: histogram_quantile(0.95, rate(skillmeat_api_request_duration_seconds_bucket{endpoint=~"/api/v1/context-packs.*"}[5m])) > 1.0
+        for: 2m
+        labels:
+          severity: critical
+          component: context_packer
+          system: memory-context
+        annotations:
+          summary: "Context pack generation latency is critically high"
+          description: "Context pack p95 latency is {{ $value | humanizeDuration }} (threshold: 1000ms). Endpoint: {{ $labels.endpoint }}. Immediate attention required."
+          runbook: "https://github.com/skillmeat/skillmeat/blob/main/docs/operations/memory-context-runbook.md#context-pack-latency-critical"
+
+  - name: memory_context_errors
+    interval: 30s
+    rules:
+      # Error Rate Alerts
+      - alert: MemorySystemErrorRateWarning
+        expr: |
+          sum(rate(skillmeat_api_errors_total{endpoint=~"/api/v1/memory-items.*|/api/v1/context-packs.*|/api/v1/context-modules.*"}[5m]))
+          /
+          sum(rate(skillmeat_api_requests_total{endpoint=~"/api/v1/memory-items.*|/api/v1/context-packs.*|/api/v1/context-modules.*"}[5m]))
+          * 100 > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          component: memory_system
+          system: memory-context
+        annotations:
+          summary: "Memory system error rate is elevated"
+          description: "Error rate is {{ $value | printf \"%.2f\" }}% (threshold: 1%). This may indicate issues with data validation, database access, or business logic."
+          runbook: "https://github.com/skillmeat/skillmeat/blob/main/docs/operations/memory-context-runbook.md#error-rate-warning"
+
+      - alert: MemorySystemErrorRateCritical
+        expr: |
+          sum(rate(skillmeat_api_errors_total{endpoint=~"/api/v1/memory-items.*|/api/v1/context-packs.*|/api/v1/context-modules.*"}[5m]))
+          /
+          sum(rate(skillmeat_api_requests_total{endpoint=~"/api/v1/memory-items.*|/api/v1/context-packs.*|/api/v1/context-modules.*"}[5m]))
+          * 100 > 5.0
+        for: 5m
+        labels:
+          severity: critical
+          component: memory_system
+          system: memory-context
+        annotations:
+          summary: "Memory system error rate is critically high"
+          description: "Error rate is {{ $value | printf \"%.2f\" }}% (threshold: 5%). System may be experiencing widespread failures. Immediate attention required."
+          runbook: "https://github.com/skillmeat/skillmeat/blob/main/docs/operations/memory-context-runbook.md#error-rate-critical"
+
+      # Memory Operation Failure Rate
+      - alert: MemoryOperationFailureRate
+        expr: |
+          sum(rate(skillmeat_api_requests_total{endpoint=~"/api/v1/memory-items.*", status=~"5.."}[5m]))
+          /
+          sum(rate(skillmeat_api_requests_total{endpoint=~"/api/v1/memory-items.*"}[5m]))
+          * 100 > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: memory_operations
+          system: memory-context
+        annotations:
+          summary: "Memory operation failure rate is elevated"
+          description: "Memory operation 5xx failure rate is {{ $value | printf \"%.2f\" }}% (threshold: 0.5%). Check database connectivity and service health."
+          runbook: "https://github.com/skillmeat/skillmeat/blob/main/docs/operations/memory-context-runbook.md#operation-failure-rate"
+
+  - name: memory_context_capacity
+    interval: 1m
+    rules:
+      # Inbox Size Alert
+      - alert: MemoryInboxSizeHigh
+        expr: sum(skillmeat_memory_items_total{status="candidate"}) > 200
+        for: 10m
+        labels:
+          severity: warning
+          component: memory_inbox
+          system: memory-context
+        annotations:
+          summary: "Memory inbox has accumulated many candidate items"
+          description: "Inbox contains {{ $value }} candidate items (threshold: 200). Consider reviewing and promoting or deprecating items to maintain system performance."
+          runbook: "https://github.com/skillmeat/skillmeat/blob/main/docs/operations/memory-context-runbook.md#inbox-size-warning"
+
+      # Database Size Growth (if metric available)
+      - alert: MemoryDatabaseGrowthRapid
+        expr: rate(skillmeat_memory_items_total[1h]) > 100
+        for: 15m
+        labels:
+          severity: info
+          component: memory_database
+          system: memory-context
+        annotations:
+          summary: "Memory database is growing rapidly"
+          description: "Memory items are being created at {{ $value | printf \"%.0f\" }} per hour. Monitor for potential spam or automated creation issues."
+          runbook: "https://github.com/skillmeat/skillmeat/blob/main/docs/operations/memory-context-runbook.md#database-growth-rapid"
+
+  - name: memory_context_availability
+    interval: 30s
+    rules:
+      # Feature Flag Status
+      - alert: MemorySystemDisabled
+        expr: up{job="skillmeat-api", feature="memory_context"} == 0
+        for: 1m
+        labels:
+          severity: info
+          component: feature_flags
+          system: memory-context
+        annotations:
+          summary: "Memory & Context Intelligence System is disabled"
+          description: "The SKILLMEAT_MEMORY_CONTEXT_ENABLED feature flag is set to false. Memory endpoints will return 503."
+          runbook: "https://github.com/skillmeat/skillmeat/blob/main/docs/operations/memory-context-runbook.md#feature-disabled"
+
+      # Service Health
+      - alert: MemorySystemUnhealthy
+        expr: up{job="skillmeat-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: api_server
+          system: memory-context
+        annotations:
+          summary: "SkillMeat API server is down"
+          description: "The API server is not responding to health checks. Memory system is unavailable."
+          runbook: "https://github.com/skillmeat/skillmeat/blob/main/docs/operations/memory-context-runbook.md#service-down"
+
+  - name: memory_context_performance
+    interval: 1m
+    rules:
+      # Token Utilization Alerts
+      - alert: ContextPackTokenUtilizationLow
+        expr: avg(skillmeat_context_pack_token_utilization) < 0.3
+        for: 15m
+        labels:
+          severity: info
+          component: context_packer
+          system: memory-context
+        annotations:
+          summary: "Context pack token utilization is consistently low"
+          description: "Average token utilization is {{ $value | humanizePercentage }}. This may indicate insufficient memory items or overly restrictive filters."
+          runbook: "https://github.com/skillmeat/skillmeat/blob/main/docs/operations/memory-context-runbook.md#low-token-utilization"
+
+      - alert: ContextPackTokenUtilizationHigh
+        expr: avg(skillmeat_context_pack_token_utilization) > 0.95
+        for: 15m
+        labels:
+          severity: info
+          component: context_packer
+          system: memory-context
+        annotations:
+          summary: "Context pack token utilization is consistently at capacity"
+          description: "Average token utilization is {{ $value | humanizePercentage }}. Consider increasing token budgets or improving item selection criteria."
+          runbook: "https://github.com/skillmeat/skillmeat/blob/main/docs/operations/memory-context-runbook.md#high-token-utilization"

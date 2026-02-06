@@ -19,6 +19,7 @@ from skillmeat.api.dependencies import (
     ConfigManagerDep,
     SettingsDep,
 )
+from skillmeat.core.services.memory_service import MemoryService
 
 logger = logging.getLogger(__name__)
 
@@ -219,6 +220,36 @@ async def detailed_health_check(
             "details": str(e),
         }
         overall_status = "unhealthy"
+
+    # Check memory system (if enabled)
+    memory_enabled = getattr(settings, "memory_context_enabled", True)
+    if memory_enabled:
+        try:
+            memory_service = MemoryService(db_path=None)
+            # Quick health check: attempt to count items (should work even if 0)
+            test_count = memory_service.repo.count_by_project("__health_check__")
+            # Get inbox size (candidate items across all projects)
+            inbox_query = memory_service.repo.list_items(
+                project_id=None, status="candidate", limit=1
+            )
+            inbox_size = len(inbox_query.items) if hasattr(inbox_query, "items") else 0
+
+            components["memory_system"] = {
+                "status": "healthy",
+                "details": f"database accessible, inbox_size={inbox_size}",
+            }
+        except Exception as e:
+            logger.error(f"Memory system health check failed: {e}")
+            components["memory_system"] = {
+                "status": "unhealthy",
+                "details": str(e),
+            }
+            overall_status = "degraded"
+    else:
+        components["memory_system"] = {
+            "status": "disabled",
+            "details": "SKILLMEAT_MEMORY_CONTEXT_ENABLED=false",
+        }
 
     # System information
     system_info = {
