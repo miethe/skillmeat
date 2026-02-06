@@ -1,164 +1,195 @@
 ---
-# === PROGRESS TRACKING ===
-# Phase-level task tracking optimized for AI agent orchestration
-# REQUIRED FIELDS: assigned_to, dependencies for EVERY task
-
-# Metadata: Identification and Classification
 type: progress
-prd: "memory-context-system-v1"
+prd: memory-context-system-v1
 phase: 2
-title: "Service + API Layer"
-status: "planning"
-started: "2026-02-05"
+title: Service + API Layer
+status: pending
+started: '2026-02-05'
 completed: null
-
-# Overall Progress: Status and Estimates
 overall_progress: 0
-completion_estimate: "on-track"
-
-# Task Counts: Machine-readable task state
+completion_estimate: on-track
 total_tasks: 13
-completed_tasks: 0
+completed_tasks: 2
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-# Ownership: Primary and secondary agents
-owners: ["backend-architect", "python-backend-engineer"]
-contributors: ["api-documenter", "api-librarian"]
-
-# === TASKS (SOURCE OF TRUTH) ===
+owners:
+- backend-architect
+- python-backend-engineer
+contributors:
+- api-documenter
+- api-librarian
 tasks:
-  - id: "SVC-2.1"
-    description: "MemoryService - Core"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["REPO-1.6"]
-    estimated_effort: "3 pts"
-    priority: "critical"
-
-  - id: "SVC-2.2"
-    description: "MemoryService - Lifecycle"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["SVC-2.1"]
-    estimated_effort: "3 pts"
-    priority: "critical"
-
-  - id: "SVC-2.3"
-    description: "MemoryService - Merge"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SVC-2.1"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "SVC-2.4"
-    description: "ContextModuleService"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-1.5"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "SVC-2.5"
-    description: "ContextPackerService"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["SVC-2.1", "SVC-2.4"]
-    estimated_effort: "3 pts"
-    priority: "critical"
-
-  - id: "API-2.6"
-    description: "Memory Items Router - CRUD"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SVC-2.1"]
-    estimated_effort: "2 pts"
-    priority: "critical"
-
-  - id: "API-2.7"
-    description: "Memory Items Router - Lifecycle"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SVC-2.2"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "API-2.8"
-    description: "Memory Items Router - Merge"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SVC-2.3"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
-  - id: "API-2.9"
-    description: "Context Modules Router"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SVC-2.4"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "API-2.10"
-    description: "Context Packing API"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SVC-2.5"]
-    estimated_effort: "2 pts"
-    priority: "critical"
-
-  - id: "API-2.11"
-    description: "OpenAPI Documentation"
-    status: "pending"
-    assigned_to: ["api-documenter"]
-    dependencies: ["API-2.10"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
-  - id: "TEST-2.12"
-    description: "API Integration Tests"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["API-2.10"]
-    estimated_effort: "3 pts"
-    priority: "high"
-
-  - id: "TEST-2.13"
-    description: "End-to-End Service Test"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TEST-2.12"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
-# Parallelization Strategy
+- id: SVC-2.1
+  description: MemoryService - Core
+  status: completed
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - REPO-1.6
+  estimated_effort: 3 pts
+  priority: critical
+- id: SVC-2.2
+  description: MemoryService - Lifecycle
+  status: pending
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - SVC-2.1
+  estimated_effort: 3 pts
+  priority: critical
+- id: SVC-2.3
+  description: MemoryService - Merge
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SVC-2.1
+  estimated_effort: 2 pts
+  priority: high
+- id: SVC-2.4
+  description: ContextModuleService
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-1.5
+  estimated_effort: 2 pts
+  priority: high
+- id: SVC-2.5
+  description: ContextPackerService
+  status: pending
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - SVC-2.1
+  - SVC-2.4
+  estimated_effort: 3 pts
+  priority: critical
+- id: API-2.6
+  description: Memory Items Router - CRUD
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SVC-2.1
+  estimated_effort: 2 pts
+  priority: critical
+- id: API-2.7
+  description: Memory Items Router - Lifecycle
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SVC-2.2
+  estimated_effort: 2 pts
+  priority: high
+- id: API-2.8
+  description: Memory Items Router - Merge
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SVC-2.3
+  estimated_effort: 1 pt
+  priority: medium
+- id: API-2.9
+  description: Context Modules Router
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SVC-2.4
+  estimated_effort: 2 pts
+  priority: high
+- id: API-2.10
+  description: Context Packing API
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SVC-2.5
+  estimated_effort: 2 pts
+  priority: critical
+- id: API-2.11
+  description: OpenAPI Documentation
+  status: pending
+  assigned_to:
+  - api-documenter
+  dependencies:
+  - API-2.10
+  estimated_effort: 1 pt
+  priority: medium
+- id: TEST-2.12
+  description: API Integration Tests
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - API-2.10
+  estimated_effort: 3 pts
+  priority: high
+- id: TEST-2.13
+  description: End-to-End Service Test
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TEST-2.12
+  estimated_effort: 1 pt
+  priority: medium
 parallelization:
-  batch_1: ["SVC-2.1", "SVC-2.4"]
-  batch_2: ["SVC-2.2", "SVC-2.3", "SVC-2.5"]
-  batch_3: ["API-2.6", "API-2.7", "API-2.8", "API-2.9", "API-2.10"]
-  batch_4: ["API-2.11", "TEST-2.12"]
-  batch_5: ["TEST-2.13"]
-  critical_path: ["SVC-2.1", "SVC-2.5", "API-2.10", "TEST-2.12", "TEST-2.13"]
-  estimated_total_time: "18 pts"
-
-# Critical Blockers
+  batch_1:
+  - SVC-2.1
+  - SVC-2.4
+  batch_2:
+  - SVC-2.2
+  - SVC-2.3
+  - SVC-2.5
+  batch_3:
+  - API-2.6
+  - API-2.7
+  - API-2.8
+  - API-2.9
+  - API-2.10
+  batch_4:
+  - API-2.11
+  - TEST-2.12
+  batch_5:
+  - TEST-2.13
+  critical_path:
+  - SVC-2.1
+  - SVC-2.5
+  - API-2.10
+  - TEST-2.12
+  - TEST-2.13
+  estimated_total_time: 18 pts
 blockers: []
-
-# Success Criteria
-success_criteria: [
-  { id: "SC-2.1", description: "All services passing unit tests (80%+ coverage)", status: "pending" },
-  { id: "SC-2.2", description: "All API endpoints returning correct responses", status: "pending" },
-  { id: "SC-2.3", description: "Cursor pagination working", status: "pending" },
-  { id: "SC-2.4", description: "DTOs never expose ORM models", status: "pending" },
-  { id: "SC-2.5", description: "ErrorResponse envelope consistent", status: "pending" },
-  { id: "SC-2.6", description: "OpenAPI documentation complete", status: "pending" },
-  { id: "SC-2.7", description: "Integration tests passing", status: "pending" }
-]
-
-# Files Modified
+success_criteria:
+- id: SC-2.1
+  description: All services passing unit tests (80%+ coverage)
+  status: pending
+- id: SC-2.2
+  description: All API endpoints returning correct responses
+  status: pending
+- id: SC-2.3
+  description: Cursor pagination working
+  status: pending
+- id: SC-2.4
+  description: DTOs never expose ORM models
+  status: pending
+- id: SC-2.5
+  description: ErrorResponse envelope consistent
+  status: pending
+- id: SC-2.6
+  description: OpenAPI documentation complete
+  status: pending
+- id: SC-2.7
+  description: Integration tests passing
+  status: pending
 files_modified: []
+progress: 15
+updated: '2026-02-05'
 ---
 
 # memory-context-system-v1 - Phase 2: Service + API Layer

@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from skillmeat.cache.memory_repositories import MemoryItemRepository
@@ -330,6 +331,339 @@ class MemoryService:
             limit=10000,
         )
         return len(result.items)
+
+    # =========================================================================
+    # Lifecycle State Management
+    # =========================================================================
+
+    # Valid promote transitions: current_status -> next_status
+    _PROMOTE_TRANSITIONS: Dict[str, str] = {
+        "candidate": "active",
+        "active": "stable",
+    }
+
+    def promote(self, item_id: str, reason: Optional[str] = None) -> Dict[str, Any]:
+        """Promote a memory item to the next lifecycle stage.
+
+        Implements the state machine: candidate -> active -> stable.
+        Items that are already stable or deprecated cannot be promoted.
+
+        Args:
+            item_id: The memory item ID to promote.
+            reason: Optional reason for the transition, recorded in provenance.
+
+        Returns:
+            Dict representation of the promoted memory item.
+
+        Raises:
+            ValueError: If the item is not found, already at the highest
+                promotable state (stable), or is deprecated.
+        """
+        item = self.repo.get_by_id(item_id)
+        if not item:
+            raise ValueError(f"Memory item not found: {item_id}")
+
+        old_status = item.status
+        new_status = self._PROMOTE_TRANSITIONS.get(old_status)
+
+        if new_status is None:
+            raise ValueError(
+                f"Cannot promote item with status '{old_status}'. "
+                f"Valid promote transitions: candidate -> active -> stable"
+            )
+
+        update_data: Dict[str, Any] = {"status": new_status}
+
+        if reason is not None:
+            provenance = item.provenance or {}
+            transitions = provenance.get("transitions", [])
+            transitions.append({
+                "from": old_status,
+                "to": new_status,
+                "reason": reason,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+            provenance["transitions"] = transitions
+            update_data["provenance_json"] = json.dumps(provenance)
+
+        updated = self.repo.update(item_id, update_data)
+        logger.info(
+            "Promoted memory item %s: %s -> %s",
+            item_id,
+            old_status,
+            new_status,
+        )
+        return self._item_to_dict(updated)
+
+    def deprecate(self, item_id: str, reason: Optional[str] = None) -> Dict[str, Any]:
+        """Deprecate a memory item regardless of current lifecycle stage.
+
+        Any non-deprecated status can transition to deprecated. The repository
+        layer automatically sets ``deprecated_at`` when status becomes
+        ``"deprecated"``.
+
+        Args:
+            item_id: The memory item ID to deprecate.
+            reason: Optional reason for deprecation, recorded in provenance.
+
+        Returns:
+            Dict representation of the deprecated memory item.
+
+        Raises:
+            ValueError: If the item is not found or already deprecated.
+        """
+        item = self.repo.get_by_id(item_id)
+        if not item:
+            raise ValueError(f"Memory item not found: {item_id}")
+
+        old_status = item.status
+
+        if old_status == "deprecated":
+            raise ValueError(
+                f"Memory item {item_id} is already deprecated"
+            )
+
+        update_data: Dict[str, Any] = {"status": "deprecated"}
+
+        if reason is not None:
+            provenance = item.provenance or {}
+            transitions = provenance.get("transitions", [])
+            transitions.append({
+                "from": old_status,
+                "to": "deprecated",
+                "reason": reason,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+            provenance["transitions"] = transitions
+            update_data["provenance_json"] = json.dumps(provenance)
+
+        updated = self.repo.update(item_id, update_data)
+        logger.info("Deprecated memory item %s (was %s)", item_id, old_status)
+        return self._item_to_dict(updated)
+
+    def bulk_promote(
+        self,
+        item_ids: List[str],
+        reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Promote multiple memory items, continuing on individual failures.
+
+        Each item is promoted independently. If an individual promotion fails,
+        the error is captured and processing continues with the next item.
+
+        Args:
+            item_ids: List of memory item IDs to promote.
+            reason: Optional reason applied to all successful promotions.
+
+        Returns:
+            Summary dict with keys:
+                - ``promoted``: List of successfully promoted item dicts.
+                - ``failed``: List of dicts with ``id`` and ``error`` keys.
+        """
+        promoted: List[Dict[str, Any]] = []
+        failed: List[Dict[str, str]] = []
+
+        for item_id in item_ids:
+            try:
+                result = self.promote(item_id, reason=reason)
+                promoted.append(result)
+            except (ValueError, Exception) as exc:
+                failed.append({"id": item_id, "error": str(exc)})
+                logger.warning("Bulk promote failed for %s: %s", item_id, exc)
+
+        logger.info(
+            "Bulk promote complete: %d promoted, %d failed",
+            len(promoted),
+            len(failed),
+        )
+        return {"promoted": promoted, "failed": failed}
+
+    def bulk_deprecate(
+        self,
+        item_ids: List[str],
+        reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Deprecate multiple memory items, continuing on individual failures.
+
+        Each item is deprecated independently. If an individual deprecation
+        fails, the error is captured and processing continues with the next item.
+
+        Args:
+            item_ids: List of memory item IDs to deprecate.
+            reason: Optional reason applied to all successful deprecations.
+
+        Returns:
+            Summary dict with keys:
+                - ``deprecated``: List of successfully deprecated item dicts.
+                - ``failed``: List of dicts with ``id`` and ``error`` keys.
+        """
+        deprecated: List[Dict[str, Any]] = []
+        failed: List[Dict[str, str]] = []
+
+        for item_id in item_ids:
+            try:
+                result = self.deprecate(item_id, reason=reason)
+                deprecated.append(result)
+            except (ValueError, Exception) as exc:
+                failed.append({"id": item_id, "error": str(exc)})
+                logger.warning("Bulk deprecate failed for %s: %s", item_id, exc)
+
+        logger.info(
+            "Bulk deprecate complete: %d deprecated, %d failed",
+            len(deprecated),
+            len(failed),
+        )
+        return {"deprecated": deprecated, "failed": failed}
+
+    # =========================================================================
+    # Merge Operations
+    # =========================================================================
+
+    def merge(
+        self,
+        source_id: str,
+        target_id: str,
+        strategy: str = "keep_target",
+        merged_content: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Merge two memory items using the specified strategy.
+
+        Combines two related memory items into one, deprecating the source
+        item and optionally updating the target's content. The merge is
+        recorded in both items' provenance for audit trail purposes.
+
+        If the target's confidence is lower than the source's, the target
+        is promoted to the maximum of both values.
+
+        Strategies:
+            - ``"keep_target"``: Keep the target item's content unchanged
+              and deprecate the source.
+            - ``"keep_source"``: Replace the target's content with the
+              source's content, then deprecate the source.
+            - ``"combine"``: Replace the target's content with the provided
+              ``merged_content``, then deprecate the source.
+
+        Args:
+            source_id: ID of the memory item to merge from (will be deprecated).
+            target_id: ID of the memory item to merge into (will be kept).
+            strategy: Merge strategy, one of ``"keep_target"``, ``"keep_source"``,
+                or ``"combine"`` (default ``"keep_target"``).
+            merged_content: Required when strategy is ``"combine"``. The new
+                content text for the target item.
+
+        Returns:
+            Dict representation of the updated target item with an extra key
+            ``"merged_source_id"`` indicating which item was merged in.
+
+        Raises:
+            ValueError: If either item is not found, if source and target are
+                the same, if either item is already deprecated, if strategy is
+                invalid, or if ``merged_content`` is missing for the combine
+                strategy.
+            ConstraintError: If updating the target's content would produce a
+                content hash that collides with another existing memory item.
+        """
+        valid_strategies = {"keep_target", "keep_source", "combine"}
+        if strategy not in valid_strategies:
+            raise ValueError(
+                f"Invalid merge strategy '{strategy}'. "
+                f"Must be one of: {sorted(valid_strategies)}"
+            )
+
+        if source_id == target_id:
+            raise ValueError("Cannot merge a memory item into itself")
+
+        if strategy == "combine" and not merged_content:
+            raise ValueError(
+                "merged_content is required when strategy is 'combine'"
+            )
+
+        # Fetch both items
+        source = self.repo.get_by_id(source_id)
+        if not source:
+            raise ValueError(f"Source memory item not found: {source_id}")
+
+        target = self.repo.get_by_id(target_id)
+        if not target:
+            raise ValueError(f"Target memory item not found: {target_id}")
+
+        # Validate neither is already deprecated
+        if source.status == "deprecated":
+            raise ValueError(
+                f"Source item {source_id} is already deprecated"
+            )
+        if target.status == "deprecated":
+            raise ValueError(
+                f"Target item {target_id} is already deprecated"
+            )
+
+        now = datetime.now(timezone.utc).isoformat()
+
+        # --- Build target update payload ---
+        target_update: Dict[str, Any] = {}
+
+        if strategy == "keep_source":
+            from skillmeat.cache.memory_repositories import _compute_content_hash
+
+            target_update["content"] = source.content
+            target_update["content_hash"] = _compute_content_hash(source.content)
+        elif strategy == "combine":
+            from skillmeat.cache.memory_repositories import _compute_content_hash
+
+            target_update["content"] = merged_content
+            target_update["content_hash"] = _compute_content_hash(merged_content)
+
+        # Promote target confidence to max of both
+        if target.confidence < source.confidence:
+            target_update["confidence"] = source.confidence
+
+        # Record merge in target provenance
+        target_provenance = target.provenance or {}
+        merge_history = target_provenance.get("merges", [])
+        merge_history.append({
+            "merged_from": source_id,
+            "strategy": strategy,
+            "timestamp": now,
+        })
+        target_provenance["merges"] = merge_history
+        target_update["provenance_json"] = json.dumps(target_provenance)
+
+        # Apply target updates
+        try:
+            self.repo.update(target_id, target_update)
+        except ConstraintError:
+            raise ConstraintError(
+                f"Cannot merge: the resulting content hash for target "
+                f"{target_id} conflicts with another existing memory item"
+            )
+
+        # --- Deprecate source with provenance ---
+        source_provenance = source.provenance or {}
+        source_merge_history = source_provenance.get("merges", [])
+        source_merge_history.append({
+            "merged_into": target_id,
+            "strategy": strategy,
+            "timestamp": now,
+        })
+        source_provenance["merges"] = source_merge_history
+
+        self.repo.update(source_id, {
+            "status": "deprecated",
+            "provenance_json": json.dumps(source_provenance),
+        })
+
+        logger.info(
+            "Merged memory item %s into %s (strategy=%s)",
+            source_id,
+            target_id,
+            strategy,
+        )
+
+        # Return updated target with merge metadata
+        updated_target = self.repo.get_by_id(target_id)
+        result = self._item_to_dict(updated_target)
+        result["merged_source_id"] = source_id
+        return result
 
     # =========================================================================
     # Helpers

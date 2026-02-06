@@ -26,6 +26,7 @@ from skillmeat.core.services.context_sync import (
 from skillmeat.core.services.tag_service import TagService
 from skillmeat.core.services.tag_write_service import TagWriteService
 from skillmeat.core.services.context_module_service import ContextModuleService
+from skillmeat.core.services.context_packer_service import ContextPackerService
 from skillmeat.core.services.memory_service import MemoryService
 
 __all__ = [
@@ -51,6 +52,8 @@ __all__ = [
     "TagWriteService",
     # Context module service (memory system)
     "ContextModuleService",
+    # Context packer service (memory system)
+    "ContextPackerService",
     # Memory service (memory system)
     "MemoryService",
 ]
