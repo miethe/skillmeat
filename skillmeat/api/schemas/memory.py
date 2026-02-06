@@ -100,6 +100,56 @@ class MemoryItemListResponse(BaseModel):
     total: Optional[int] = None
 
 
+class MemorySearchResponse(BaseModel):
+    """Response model for memory search operations."""
+
+    items: List[MemoryItemResponse]
+    next_cursor: Optional[str] = None
+    has_more: bool = False
+    total: Optional[int] = None
+
+
+class ExtractionCandidate(BaseModel):
+    """A preview extraction candidate."""
+
+    type: MemoryType
+    content: str
+    confidence: float
+    status: MemoryStatus = MemoryStatus.CANDIDATE
+    duplicate_of: Optional[str] = None
+    provenance: Optional[Dict[str, Any]] = None
+
+
+class MemoryExtractionPreviewRequest(BaseModel):
+    """Request for extraction preview."""
+
+    text_corpus: str = Field(min_length=1, max_length=500000)
+    profile: str = Field(default="balanced", pattern="^(strict|balanced|aggressive)$")
+    min_confidence: float = Field(default=0.6, ge=0.0, le=1.0)
+    run_id: Optional[str] = None
+    session_id: Optional[str] = None
+    commit_sha: Optional[str] = None
+
+
+class MemoryExtractionPreviewResponse(BaseModel):
+    """Preview response for extraction."""
+
+    candidates: List[ExtractionCandidate]
+    total_candidates: int
+
+
+class MemoryExtractionApplyRequest(MemoryExtractionPreviewRequest):
+    """Request for applying extraction output."""
+
+
+class MemoryExtractionApplyResponse(BaseModel):
+    """Apply response for extraction."""
+
+    created: List[MemoryItemResponse]
+    skipped_duplicates: List[ExtractionCandidate]
+    preview_total: int
+
+
 # =============================================================================
 # Lifecycle Schemas
 # =============================================================================

@@ -309,6 +309,41 @@ class TestMemoryServiceCRUD:
         assert len(result["items"]) == 2
         assert all("sql" in item["content"].lower() for item in result["items"])
 
+    def test_search_global_across_projects(self, seeded_db_path):
+        """search() supports global query when project_id is omitted."""
+        # Seed second project and memory directly through service
+        service = MemoryService(db_path=seeded_db_path)
+        service.create(
+            project_id=PROJECT_ID,
+            type="decision",
+            content="Global search token alpha",
+        )
+
+        # Add another project for cross-project search coverage
+        engine = create_db_engine(seeded_db_path)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        session.add(
+            Project(
+                id="proj-other",
+                name="Other Project",
+                path="/tmp/other-project",
+                status="active",
+            )
+        )
+        session.commit()
+        session.close()
+        engine.dispose()
+
+        service.create(
+            project_id="proj-other",
+            type="learning",
+            content="Global search token beta",
+        )
+
+        result = service.search(query="global search token", project_id=None)
+        assert len(result["items"]) == 2
+
     def test_list_items_pagination(self, memory_service):
         """list_items supports cursor-based pagination."""
         for i in range(5):

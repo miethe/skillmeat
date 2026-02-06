@@ -186,7 +186,7 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
 
     def list_items(
         self,
-        project_id: str,
+        project_id: Optional[str],
         *,
         status: Optional[str] = None,
         type: Optional[str] = None,
@@ -214,9 +214,9 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
         """
         session = self._get_session()
         try:
-            query = session.query(MemoryItem).filter(
-                MemoryItem.project_id == project_id
-            )
+            query = session.query(MemoryItem)
+            if project_id is not None:
+                query = query.filter(MemoryItem.project_id == project_id)
 
             # Apply optional filters
             if status is not None:
@@ -376,7 +376,7 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
             session.close()
 
     def count_by_project(
-        self, project_id: str, *, status: Optional[str] = None
+        self, project_id: Optional[str], *, status: Optional[str] = None
     ) -> int:
         """Count memory items for a project with optional status filter.
 
@@ -389,9 +389,9 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
         """
         session = self._get_session()
         try:
-            query = session.query(MemoryItem).filter(
-                MemoryItem.project_id == project_id
-            )
+            query = session.query(MemoryItem)
+            if project_id is not None:
+                query = query.filter(MemoryItem.project_id == project_id)
             if status is not None:
                 query = query.filter(MemoryItem.status == status)
             return query.count()

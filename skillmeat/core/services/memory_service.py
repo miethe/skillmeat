@@ -225,7 +225,7 @@ class MemoryService:
 
     def list_items(
         self,
-        project_id: str,
+        project_id: Optional[str],
         status: Optional[str] = None,
         type: Optional[str] = None,
         search: Optional[str] = None,
@@ -383,6 +383,37 @@ class MemoryService:
             limit=10000,
         )
         return len(result.items)
+
+    def search(
+        self,
+        query: str,
+        project_id: Optional[str] = None,
+        status: Optional[str] = None,
+        type: Optional[str] = None,
+        limit: int = 50,
+        cursor: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Search memory content globally or within a project."""
+        if not query or not query.strip():
+            raise ValueError("query must be a non-empty string")
+
+        result = self.repo.list_items(
+            project_id=project_id,
+            status=status,
+            type=type,
+            search=query.strip(),
+            limit=limit,
+            cursor=cursor,
+            sort_by="created_at",
+            sort_order="desc",
+        )
+
+        return {
+            "items": [self._item_to_dict(item) for item in result.items],
+            "next_cursor": result.next_cursor,
+            "has_more": result.has_more,
+            "total": None,
+        }
 
     # =========================================================================
     # Lifecycle State Management
