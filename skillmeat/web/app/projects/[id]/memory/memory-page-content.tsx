@@ -15,6 +15,7 @@ import {
   useMemorySelection,
   usePromoteMemoryItem,
   useDeprecateMemoryItem,
+  useUpdateMemoryItem,
   useBulkPromoteMemoryItems,
   useBulkDeprecateMemoryItems,
   useKeyboardShortcuts,
@@ -144,6 +145,7 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   const deprecateItem = useDeprecateMemoryItem({
     onSuccess: () => setConfirmAction(null),
   });
+  const updateItem = useUpdateMemoryItem();
   const bulkPromote = useBulkPromoteMemoryItems();
   const bulkDeprecate = useBulkDeprecateMemoryItems();
 
@@ -206,6 +208,28 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
       });
     },
     []
+  );
+
+  /** Reactivate a deprecated memory item by setting status to candidate. */
+  const handleReactivate = useCallback(
+    (id: string) => {
+      updateItem.mutate({
+        itemId: id,
+        data: { status: 'candidate' },
+      });
+    },
+    [updateItem]
+  );
+
+  /** Set a memory item's status directly (bypasses promote/deprecate flow). */
+  const handleSetStatus = useCallback(
+    (id: string, status: MemoryStatus) => {
+      updateItem.mutate({
+        itemId: id,
+        data: { status },
+      });
+    },
+    [updateItem]
   );
 
   /** Execute the confirmed action (reject or deprecate). */
@@ -421,6 +445,8 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
             onMerge={handleMerge}
             onCardClick={handleCardClick}
             onCreateMemory={handleCreateMemory}
+            onReactivate={handleReactivate}
+            onDeprecate={handleDeprecate}
           />
         </div>
 
@@ -438,6 +464,8 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
         onReject={handleReject}
         onMerge={handleMerge}
         onDeprecate={handleDeprecate}
+        onReactivate={handleReactivate}
+        onSetStatus={handleSetStatus}
       />
 
       {/* ------------------------------------------------------------------ */}
