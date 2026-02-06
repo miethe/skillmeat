@@ -581,6 +581,7 @@ class GitHubClient:
 
             # Second pass: resolve symlinks to their target types
             symlink_resolved_types: Dict[str, str] = {}
+            symlink_resolved_targets: Dict[str, str] = {}  # symlink_path -> target
             for item, symlink_path in symlinks:
                 try:
                     # Get symlink target by fetching blob content
@@ -598,7 +599,12 @@ class GitHubClient:
 
                     # Look up resolved path in tree
                     if resolved_path in path_types:
-                        symlink_resolved_types[symlink_path] = path_types[resolved_path]
+                        resolved_type = path_types[resolved_path]
+                        symlink_resolved_types[symlink_path] = resolved_type
+                        # Store target path for directory symlinks so we
+                        # can mirror children in the third pass
+                        if resolved_type == "tree":
+                            symlink_resolved_targets[symlink_path] = resolved_path
                     else:
                         # Target not in tree (external symlink or broken)
                         symlink_resolved_types[symlink_path] = "symlink"
@@ -631,6 +637,25 @@ class GitHubClient:
                             "size": item.size if item.type == "blob" else None,
                         }
                     )
+
+            # Third pass: add virtual entries for directory symlink children.
+            # When a symlink resolves to a directory, the target's children
+            # need to appear under the symlink path as well so that
+            # prefix-filtered views (e.g. ".claude/") see the full subtree.
+            for symlink_path, target_path in symlink_resolved_targets.items():
+                target_prefix = target_path + "/"
+                for item in git_tree.tree:
+                    if item.path.startswith(target_prefix):
+                        relative = item.path[len(target_prefix) :]
+                        virtual_path = f"{symlink_path}/{relative}"
+                        result.append(
+                            {
+                                "path": virtual_path,
+                                "type": item.type,
+                                "sha": item.sha,
+                                "size": (item.size if item.type == "blob" else None),
+                            }
+                        )
 
             return result
         except GithubException as e:
