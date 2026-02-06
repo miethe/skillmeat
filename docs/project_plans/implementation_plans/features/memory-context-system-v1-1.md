@@ -6,7 +6,7 @@ tags: [implementation, planning, memory, context, auto-extraction, cli, navigati
 created: 2026-02-06
 updated: 2026-02-06
 category: "product-planning"
-status: draft
+status: superseded
 related:
   - /docs/project_plans/PRDs/features/memory-context-system-v1-1.md
   - /docs/project_plans/design-specs/memory-context-system-v1-1-ui-spec.md
@@ -16,12 +16,14 @@ related:
 
 # Implementation Plan: Memory & Context Intelligence System v1.1
 
-**Plan ID**: `IMPL-2026-02-06-memory-context-system-v1-1`  
-**Date**: 2026-02-06  
-**Author**: Implementation Planner Agent  
-**Complexity**: XL  
-**Estimated Effort**: 44 story points  
+**Plan ID**: `IMPL-2026-02-06-memory-context-system-v1-1`
+**Date**: 2026-02-06
+**Author**: Implementation Planner Agent
+**Complexity**: XL
+**Estimated Effort**: 44 story points
 **Target Timeline**: 5-6 weeks
+
+**Note**: partially superseded by v1.2; retained for historical deferred-scope context.
 
 ---
 
@@ -57,7 +59,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Phase 0: Design Lock & Contract Alignment
 
-**Duration**: 0.5 week  
+**Duration**: 0.5 week
 **Dependencies**: PRD + Design Spec draft
 
 | Task ID | Task | Description | Acceptance Criteria | Estimate |
@@ -70,7 +72,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Phase 1: Auto-Extraction Service (Deferred v1 Phase 5)
 
-**Duration**: 1.5 weeks  
+**Duration**: 1.5 weeks
 **Dependencies**: Phase 0
 
 | Task ID | Task | Description | Acceptance Criteria | Estimate |
@@ -91,7 +93,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Phase 2: Full Memory CLI Surface
 
-**Duration**: 1.5 weeks  
+**Duration**: 1.5 weeks
 **Dependencies**: Phase 1 API finalized
 
 | Task ID | Task | Description | Acceptance Criteria | Estimate |
@@ -115,7 +117,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Phase 3: Global Visibility + Navigation
 
-**Duration**: 1 week  
+**Duration**: 1 week
 **Dependencies**: Phase 0
 
 | Task ID | Task | Description | Acceptance Criteria | Estimate |
@@ -134,7 +136,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Phase 4: Skill Documentation & Automation Flows
 
-**Duration**: 0.75 week  
+**Duration**: 0.75 week
 **Dependencies**: Phase 2
 
 | Task ID | Task | Description | Acceptance Criteria | Estimate |
@@ -148,7 +150,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Phase 5: Cross-Project Foundations (v1.1 scope)
 
-**Duration**: 0.75 week  
+**Duration**: 0.75 week
 **Dependencies**: Phase 2/3
 
 | Task ID | Task | Description | Acceptance Criteria | Estimate |
@@ -161,7 +163,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Phase 6: Testing, Docs, and Rollout
 
-**Duration**: 1 week  
+**Duration**: 1 week
 **Dependencies**: Phases 1-5
 
 | Task ID | Task | Description | Acceptance Criteria | Estimate |
