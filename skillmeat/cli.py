@@ -11564,6 +11564,561 @@ def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: b
 
 
 # ====================
+# Memory Commands
+# ====================
+
+
+def _memory_api_base() -> str:
+    return f"{config_mgr.get_api_base_url()}/api/v1"
+
+
+def _memory_request(method: str, path: str, **kwargs):
+    url = f"{_memory_api_base()}{path}"
+    response = requests.request(method=method, url=url, timeout=30, **kwargs)
+    response.raise_for_status()
+    return response
+
+
+def _memory_output(data: Any, as_json: bool = False, title: Optional[str] = None) -> None:
+    if as_json:
+        console.print(json.dumps(data, indent=2))
+        return
+    if isinstance(data, list):
+        table = Table(title=title or f"Items ({len(data)})")
+        table.add_column("ID", style="cyan")
+        table.add_column("Type", style="magenta")
+        table.add_column("Status", style="yellow")
+        table.add_column("Confidence", justify="right")
+        table.add_column("Content", style="white")
+        for item in data:
+            table.add_row(
+                item.get("id", ""),
+                item.get("type", ""),
+                item.get("status", ""),
+                f"{item.get('confidence', 0):.2f}",
+                str(item.get("content", ""))[:80],
+            )
+        console.print(table)
+        return
+    console.print_json(data=data)
+
+
+@main.group()
+def memory():
+    """Manage memory items, modules, packs, extraction, and search."""
+    pass
+
+
+@memory.group("item")
+def memory_item():
+    """Memory item CRUD and lifecycle operations."""
+    pass
+
+
+@memory_item.command("create")
+@click.option("--project", "project_id", required=True)
+@click.option("--type", "memory_type", required=True)
+@click.option("--content", required=True)
+@click.option("--confidence", type=float, default=0.5)
+@click.option("--status", "memory_status", default="candidate")
+@click.option("--json", "as_json", is_flag=True)
+def memory_item_create(project_id, memory_type, content, confidence, memory_status, as_json):
+    payload = {
+        "type": memory_type,
+        "content": content,
+        "confidence": confidence,
+        "status": memory_status,
+    }
+    try:
+        response = _memory_request(
+            "POST",
+            "/memory-items",
+            params={"project_id": project_id},
+            json=payload,
+        )
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error creating memory item: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_item.command("list")
+@click.option("--project", "project_id", required=True)
+@click.option("--status", "memory_status", default=None)
+@click.option("--type", "memory_type", default=None)
+@click.option("--search", default=None)
+@click.option("--limit", default=50, type=int)
+@click.option("--json", "as_json", is_flag=True)
+def memory_item_list(project_id, memory_status, memory_type, search, limit, as_json):
+    params = {"project_id": project_id, "limit": limit}
+    if memory_status:
+        params["status"] = memory_status
+    if memory_type:
+        params["type"] = memory_type
+    if search:
+        params["search"] = search
+    try:
+        response = _memory_request("GET", "/memory-items", params=params)
+        data = response.json()
+        _memory_output(data.get("items", []), as_json, title="Memory Items")
+    except Exception as e:
+        console.print(f"[red]Error listing memory items: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_item.command("show")
+@click.argument("item_id")
+@click.option("--json", "as_json", is_flag=True)
+def memory_item_show(item_id, as_json):
+    try:
+        response = _memory_request("GET", f"/memory-items/{item_id}")
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error showing memory item: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_item.command("update")
+@click.argument("item_id")
+@click.option("--content", default=None)
+@click.option("--confidence", type=float, default=None)
+@click.option("--type", "memory_type", default=None)
+@click.option("--status", "memory_status", default=None)
+@click.option("--json", "as_json", is_flag=True)
+def memory_item_update(item_id, content, confidence, memory_type, memory_status, as_json):
+    payload = {}
+    if content is not None:
+        payload["content"] = content
+    if confidence is not None:
+        payload["confidence"] = confidence
+    if memory_type is not None:
+        payload["type"] = memory_type
+    if memory_status is not None:
+        payload["status"] = memory_status
+    if not payload:
+        console.print("[red]No updates specified[/red]")
+        sys.exit(1)
+    try:
+        response = _memory_request("PUT", f"/memory-items/{item_id}", json=payload)
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error updating memory item: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_item.command("delete")
+@click.argument("item_id")
+def memory_item_delete(item_id):
+    try:
+        _memory_request("DELETE", f"/memory-items/{item_id}")
+        console.print(f"[green]Deleted memory item {item_id}[/green]")
+    except Exception as e:
+        console.print(f"[red]Error deleting memory item: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_item.command("promote")
+@click.argument("item_id")
+@click.option("--reason", default=None)
+@click.option("--json", "as_json", is_flag=True)
+def memory_item_promote(item_id, reason, as_json):
+    try:
+        response = _memory_request(
+            "POST", f"/memory-items/{item_id}/promote", json={"reason": reason}
+        )
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error promoting memory item: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_item.command("deprecate")
+@click.argument("item_id")
+@click.option("--reason", default=None)
+@click.option("--json", "as_json", is_flag=True)
+def memory_item_deprecate(item_id, reason, as_json):
+    try:
+        response = _memory_request(
+            "POST", f"/memory-items/{item_id}/deprecate", json={"reason": reason}
+        )
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error deprecating memory item: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_item.command("merge")
+@click.option("--source", "source_id", required=True)
+@click.option("--target", "target_id", required=True)
+@click.option(
+    "--strategy",
+    type=click.Choice(["keep_target", "keep_source", "combine"]),
+    default="keep_target",
+)
+@click.option("--merged-content", default=None)
+@click.option("--json", "as_json", is_flag=True)
+def memory_item_merge(source_id, target_id, strategy, merged_content, as_json):
+    payload = {
+        "source_id": source_id,
+        "target_id": target_id,
+        "strategy": strategy,
+        "merged_content": merged_content,
+    }
+    try:
+        response = _memory_request("POST", "/memory-items/merge", json=payload)
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error merging memory items: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_item.command("bulk-promote")
+@click.option("--ids", required=True, help="Comma-separated memory item IDs")
+@click.option("--reason", default=None)
+@click.option("--json", "as_json", is_flag=True)
+def memory_item_bulk_promote(ids, reason, as_json):
+    payload = {"item_ids": [x.strip() for x in ids.split(",") if x.strip()], "reason": reason}
+    try:
+        response = _memory_request("POST", "/memory-items/bulk-promote", json=payload)
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error bulk promoting memory items: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_item.command("bulk-deprecate")
+@click.option("--ids", required=True, help="Comma-separated memory item IDs")
+@click.option("--reason", default=None)
+@click.option("--json", "as_json", is_flag=True)
+def memory_item_bulk_deprecate(ids, reason, as_json):
+    payload = {"item_ids": [x.strip() for x in ids.split(",") if x.strip()], "reason": reason}
+    try:
+        response = _memory_request("POST", "/memory-items/bulk-deprecate", json=payload)
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error bulk deprecating memory items: {e}[/red]")
+        sys.exit(1)
+
+
+@memory.group("module")
+def memory_module():
+    """Memory context module operations."""
+    pass
+
+
+@memory_module.command("create")
+@click.option("--project", "project_id", required=True)
+@click.option("--name", required=True)
+@click.option("--description", default=None)
+@click.option("--types", default=None, help="Comma-separated memory types")
+@click.option("--min-confidence", type=float, default=None)
+@click.option("--priority", type=int, default=5)
+@click.option("--json", "as_json", is_flag=True)
+def memory_module_create(project_id, name, description, types, min_confidence, priority, as_json):
+    selectors = {}
+    if types:
+        selectors["memory_types"] = [t.strip() for t in types.split(",") if t.strip()]
+    if min_confidence is not None:
+        selectors["min_confidence"] = min_confidence
+    payload = {
+        "name": name,
+        "description": description,
+        "selectors": selectors or None,
+        "priority": priority,
+    }
+    try:
+        response = _memory_request(
+            "POST", "/context-modules", params={"project_id": project_id}, json=payload
+        )
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error creating memory module: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_module.command("list")
+@click.option("--project", "project_id", required=True)
+@click.option("--json", "as_json", is_flag=True)
+def memory_module_list(project_id, as_json):
+    try:
+        response = _memory_request("GET", "/context-modules", params={"project_id": project_id})
+        data = response.json()
+        _memory_output(data.get("items", []), as_json, title="Memory Modules")
+    except Exception as e:
+        console.print(f"[red]Error listing memory modules: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_module.command("show")
+@click.argument("module_id")
+@click.option("--json", "as_json", is_flag=True)
+def memory_module_show(module_id, as_json):
+    try:
+        response = _memory_request("GET", f"/context-modules/{module_id}", params={"include_items": "true"})
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error showing memory module: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_module.command("update")
+@click.argument("module_id")
+@click.option("--name", default=None)
+@click.option("--description", default=None)
+@click.option("--priority", type=int, default=None)
+@click.option("--json", "as_json", is_flag=True)
+def memory_module_update(module_id, name, description, priority, as_json):
+    payload = {}
+    if name is not None:
+        payload["name"] = name
+    if description is not None:
+        payload["description"] = description
+    if priority is not None:
+        payload["priority"] = priority
+    if not payload:
+        console.print("[red]No updates specified[/red]")
+        sys.exit(1)
+    try:
+        response = _memory_request("PUT", f"/context-modules/{module_id}", json=payload)
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error updating memory module: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_module.command("delete")
+@click.argument("module_id")
+def memory_module_delete(module_id):
+    try:
+        _memory_request("DELETE", f"/context-modules/{module_id}")
+        console.print(f"[green]Deleted module {module_id}[/green]")
+    except Exception as e:
+        console.print(f"[red]Error deleting module: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_module.command("add-item")
+@click.argument("module_id")
+@click.option("--item", "item_id", required=True)
+@click.option("--ordering", type=int, default=0)
+@click.option("--json", "as_json", is_flag=True)
+def memory_module_add_item(module_id, item_id, ordering, as_json):
+    payload = {"memory_id": item_id, "ordering": ordering}
+    try:
+        response = _memory_request("POST", f"/context-modules/{module_id}/memories", json=payload)
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error adding item to module: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_module.command("remove-item")
+@click.argument("module_id")
+@click.option("--item", "item_id", required=True)
+def memory_module_remove_item(module_id, item_id):
+    try:
+        _memory_request("DELETE", f"/context-modules/{module_id}/memories/{item_id}")
+        console.print(f"[green]Removed memory {item_id} from module {module_id}[/green]")
+    except Exception as e:
+        console.print(f"[red]Error removing item from module: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_module.command("list-items")
+@click.argument("module_id")
+@click.option("--limit", type=int, default=100)
+@click.option("--json", "as_json", is_flag=True)
+def memory_module_list_items(module_id, limit, as_json):
+    try:
+        response = _memory_request("GET", f"/context-modules/{module_id}/memories", params={"limit": limit})
+        _memory_output(response.json(), as_json, title="Module Memories")
+    except Exception as e:
+        console.print(f"[red]Error listing module items: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_module.command("duplicate")
+@click.argument("module_id")
+@click.option("--name", "new_name", default=None)
+@click.option("--json", "as_json", is_flag=True)
+def memory_module_duplicate(module_id, new_name, as_json):
+    try:
+        source = _memory_request("GET", f"/context-modules/{module_id}", params={"include_items": "true"}).json()
+        payload = {
+            "name": new_name or f"{source['name']} Copy",
+            "description": source.get("description"),
+            "selectors": source.get("selectors"),
+            "priority": source.get("priority", 5),
+        }
+        created = _memory_request(
+            "POST",
+            "/context-modules",
+            params={"project_id": source["project_id"]},
+            json=payload,
+        ).json()
+        for idx, item in enumerate(source.get("memory_items") or []):
+            _memory_request(
+                "POST",
+                f"/context-modules/{created['id']}/memories",
+                json={"memory_id": item["id"], "ordering": idx},
+            )
+        _memory_output(created, as_json)
+    except Exception as e:
+        console.print(f"[red]Error duplicating module: {e}[/red]")
+        sys.exit(1)
+
+
+@memory.group("pack")
+def memory_pack():
+    """Memory context pack commands."""
+    pass
+
+
+@memory_pack.command("preview")
+@click.option("--project", "project_id", required=True)
+@click.option("--module", "module_id", default=None)
+@click.option("--budget", "budget_tokens", type=int, default=4000)
+@click.option("--json", "as_json", is_flag=True)
+def memory_pack_preview(project_id, module_id, budget_tokens, as_json):
+    payload = {"module_id": module_id, "budget_tokens": budget_tokens}
+    try:
+        response = _memory_request("POST", "/context-packs/preview", params={"project_id": project_id}, json=payload)
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error previewing pack: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_pack.command("generate")
+@click.option("--project", "project_id", required=True)
+@click.option("--module", "module_id", default=None)
+@click.option("--budget", "budget_tokens", type=int, default=4000)
+@click.option("--output", default=None, type=click.Path())
+@click.option("--json", "as_json", is_flag=True)
+def memory_pack_generate(project_id, module_id, budget_tokens, output, as_json):
+    payload = {"module_id": module_id, "budget_tokens": budget_tokens}
+    try:
+        data = _memory_request(
+            "POST",
+            "/context-packs/generate",
+            params={"project_id": project_id},
+            json=payload,
+        ).json()
+        if output:
+            Path(output).write_text(data.get("markdown", ""), encoding="utf-8")
+            console.print(f"[green]Wrote context pack to {output}[/green]")
+        if not output or as_json:
+            _memory_output(data, as_json)
+    except Exception as e:
+        console.print(f"[red]Error generating pack: {e}[/red]")
+        sys.exit(1)
+
+
+@memory.group("extract")
+def memory_extract():
+    """Memory extraction commands."""
+    pass
+
+
+@memory_extract.command("preview")
+@click.option("--project", "project_id", required=True)
+@click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True))
+@click.option("--profile", type=click.Choice(["strict", "balanced", "aggressive"]), default="balanced")
+@click.option("--min-confidence", type=float, default=0.6)
+@click.option("--json", "as_json", is_flag=True)
+def memory_extract_preview(project_id, run_log_path, profile, min_confidence, as_json):
+    text_corpus = Path(run_log_path).read_text(encoding="utf-8")
+    payload = {
+        "text_corpus": text_corpus,
+        "profile": profile,
+        "min_confidence": min_confidence,
+    }
+    try:
+        response = _memory_request(
+            "POST",
+            "/memory-items/extract/preview",
+            params={"project_id": project_id},
+            json=payload,
+        )
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error previewing extraction: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_extract.command("apply")
+@click.option("--project", "project_id", required=True)
+@click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True))
+@click.option("--profile", type=click.Choice(["strict", "balanced", "aggressive"]), default="balanced")
+@click.option("--min-confidence", type=float, default=0.6)
+@click.option("--json", "as_json", is_flag=True)
+def memory_extract_apply(project_id, run_log_path, profile, min_confidence, as_json):
+    text_corpus = Path(run_log_path).read_text(encoding="utf-8")
+    payload = {
+        "text_corpus": text_corpus,
+        "profile": profile,
+        "min_confidence": min_confidence,
+    }
+    try:
+        response = _memory_request(
+            "POST",
+            "/memory-items/extract/apply",
+            params={"project_id": project_id},
+            json=payload,
+        )
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error applying extraction: {e}[/red]")
+        sys.exit(1)
+
+
+@memory_extract.command("run")
+@click.option("--project", "project_id", required=True)
+@click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True))
+@click.option("--profile", type=click.Choice(["strict", "balanced", "aggressive"]), default="balanced")
+@click.option("--min-confidence", type=float, default=0.6)
+@click.option("--json", "as_json", is_flag=True)
+def memory_extract_run(project_id, run_log_path, profile, min_confidence, as_json):
+    """Alias for extract apply."""
+    text_corpus = Path(run_log_path).read_text(encoding="utf-8")
+    payload = {
+        "text_corpus": text_corpus,
+        "profile": profile,
+        "min_confidence": min_confidence,
+    }
+    try:
+        response = _memory_request(
+            "POST",
+            "/memory-items/extract/apply",
+            params={"project_id": project_id},
+            json=payload,
+        )
+        _memory_output(response.json(), as_json)
+    except Exception as e:
+        console.print(f"[red]Error running extraction: {e}[/red]")
+        sys.exit(1)
+
+
+@memory.command("search")
+@click.argument("query")
+@click.option("--project", "project_id", default=None)
+@click.option("--all-projects", is_flag=True, default=False)
+@click.option("--limit", type=int, default=50)
+@click.option("--json", "as_json", is_flag=True)
+def memory_search(query, project_id, all_projects, limit, as_json):
+    params = {"query": query, "limit": limit}
+    if project_id and not all_projects:
+        params["project_id"] = project_id
+    try:
+        response = _memory_request("GET", "/memory-items/search", params=params)
+        data = response.json()
+        _memory_output(data.get("items", []), as_json, title=f"Search Results: {query}")
+    except Exception as e:
+        console.print(f"[red]Error searching memories: {e}[/red]")
+        sys.exit(1)
+
+
+# ====================
 # Scores Commands
 # ====================
 
