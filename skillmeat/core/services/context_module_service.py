@@ -37,6 +37,7 @@ from skillmeat.cache.memory_repositories import (
     MemoryItemRepository,
 )
 from skillmeat.cache.repositories import ConstraintError, NotFoundError
+from skillmeat.observability.tracing import trace_operation
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -111,33 +112,47 @@ class ContextModuleService:
         Raises:
             ValueError: If name or project_id is empty, or selectors are invalid.
         """
-        # Validate required fields
-        if not project_id or not project_id.strip():
-            raise ValueError("project_id must be a non-empty string")
-        if not name or not name.strip():
-            raise ValueError("name must be a non-empty string")
+        with trace_operation(
+            "context_module.create",
+            project_id=project_id,
+            module_name=name,
+            priority=priority,
+        ) as span:
+            # Validate required fields
+            if not project_id or not project_id.strip():
+                raise ValueError("project_id must be a non-empty string")
+            if not name or not name.strip():
+                raise ValueError("name must be a non-empty string")
 
-        # Validate and serialize selectors
-        selectors_json = None
-        if selectors is not None:
-            self._validate_selectors(selectors)
-            selectors_json = json.dumps(selectors)
+            # Validate and serialize selectors
+            selectors_json = None
+            if selectors is not None:
+                self._validate_selectors(selectors)
+                selectors_json = json.dumps(selectors)
+                span.set_attribute("has_selectors", True)
 
-        data = {
-            "project_id": project_id.strip(),
-            "name": name.strip(),
-            "description": description,
-            "selectors_json": selectors_json,
-            "priority": priority,
-        }
+            data = {
+                "project_id": project_id.strip(),
+                "name": name.strip(),
+                "description": description,
+                "selectors_json": selectors_json,
+                "priority": priority,
+            }
 
-        module = self.module_repo.create(data)
-        logger.info(f"Created context module: {module.id} (name={name!r})")
-        return self._module_to_dict(module)
+            module = self.module_repo.create(data)
+            span.set_attribute("module_id", module.id)
+            logger.info(
+                f"Created context module: {module.id} (name={name!r})",
+                extra={
+                    "module_id": module.id,
+                    "project_id": project_id,
+                    "module_name": name,
+                    "priority": priority,
+                },
+            )
+            return self._module_to_dict(module)
 
-    def get(
-        self, module_id: str, include_items: bool = False
-    ) -> Dict[str, Any]:
+    def get(self, module_id: str, include_items: bool = False) -> Dict[str, Any]:
         """Get a context module by ID.
 
         Args:
@@ -150,9 +165,7 @@ class ContextModuleService:
         Raises:
             ValueError: If the module is not found.
         """
-        module = self.module_repo.get_by_id(
-            module_id, eager_load_items=include_items
-        )
+        module = self.module_repo.get_by_id(module_id, eager_load_items=include_items)
         if not module:
             raise ValueError(f"Context module not found: {module_id}")
 
@@ -281,33 +294,50 @@ class ContextModuleService:
         Raises:
             ValueError: If the module or memory item does not exist.
         """
-        # Verify module exists
-        module = self.module_repo.get_by_id(module_id)
-        if not module:
-            raise ValueError(f"Context module not found: {module_id}")
+        with trace_operation(
+            "context_module.add_memory",
+            module_id=module_id,
+            memory_id=memory_id,
+            ordering=ordering,
+        ) as span:
+            # Verify module exists
+            module = self.module_repo.get_by_id(module_id)
+            if not module:
+                raise ValueError(f"Context module not found: {module_id}")
 
-        # Verify memory item exists
-        memory = self.memory_repo.get_by_id(memory_id)
-        if not memory:
-            raise ValueError(f"Memory item not found: {memory_id}")
+            # Verify memory item exists
+            memory = self.memory_repo.get_by_id(memory_id)
+            if not memory:
+                raise ValueError(f"Memory item not found: {memory_id}")
 
-        already_linked = False
-        try:
-            self.module_repo.add_memory_item(module_id, memory_id, ordering)
-            logger.info(
-                f"Added memory {memory_id} to module {module_id} "
-                f"(ordering={ordering})"
-            )
-        except ConstraintError:
-            already_linked = True
-            logger.info(
-                f"Memory {memory_id} already linked to module {module_id}"
-            )
+            already_linked = False
+            try:
+                self.module_repo.add_memory_item(module_id, memory_id, ordering)
+                logger.info(
+                    f"Added memory {memory_id} to module {module_id} "
+                    f"(ordering={ordering})",
+                    extra={
+                        "module_id": module_id,
+                        "memory_id": memory_id,
+                        "ordering": ordering,
+                    },
+                )
+            except ConstraintError:
+                already_linked = True
+                span.set_attribute("already_linked", True)
+                logger.info(
+                    f"Memory {memory_id} already linked to module {module_id}",
+                    extra={
+                        "module_id": module_id,
+                        "memory_id": memory_id,
+                        "already_linked": True,
+                    },
+                )
 
-        # Return updated module with items
-        result = self.get(module_id, include_items=True)
-        result["already_linked"] = already_linked
-        return result
+            # Return updated module with items
+            result = self.get(module_id, include_items=True)
+            result["already_linked"] = already_linked
+            return result
 
     def remove_memory(self, module_id: str, memory_id: str) -> bool:
         """Remove a memory item from a context module.
@@ -383,9 +413,7 @@ class ContextModuleService:
             if not isinstance(conf, (int, float)):
                 raise ValueError("selectors.min_confidence must be a number")
             if conf < 0.0 or conf > 1.0:
-                raise ValueError(
-                    "selectors.min_confidence must be between 0.0 and 1.0"
-                )
+                raise ValueError("selectors.min_confidence must be between 0.0 and 1.0")
 
         # Validate file_patterns
         if "file_patterns" in selectors:
@@ -393,9 +421,7 @@ class ContextModuleService:
             if not isinstance(patterns, list):
                 raise ValueError("selectors.file_patterns must be a list")
             if not all(isinstance(p, str) for p in patterns):
-                raise ValueError(
-                    "selectors.file_patterns must contain only strings"
-                )
+                raise ValueError("selectors.file_patterns must contain only strings")
 
         # Validate workflow_stages
         if "workflow_stages" in selectors:
@@ -403,18 +429,14 @@ class ContextModuleService:
             if not isinstance(stages, list):
                 raise ValueError("selectors.workflow_stages must be a list")
             if not all(isinstance(s, str) for s in stages):
-                raise ValueError(
-                    "selectors.workflow_stages must contain only strings"
-                )
+                raise ValueError("selectors.workflow_stages must contain only strings")
 
     # =========================================================================
     # Serialization Helpers
     # =========================================================================
 
     @staticmethod
-    def _module_to_dict(
-        module, include_items: bool = False
-    ) -> Dict[str, Any]:
+    def _module_to_dict(module, include_items: bool = False) -> Dict[str, Any]:
         """Convert a ContextModule ORM instance to a dict.
 
         Args:

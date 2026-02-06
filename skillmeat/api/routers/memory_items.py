@@ -28,8 +28,9 @@ import json
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from skillmeat.api.dependencies import require_memory_context_enabled
 from skillmeat.api.schemas.memory import (
     BulkActionResponse,
     BulkDeprecateRequest,
@@ -52,6 +53,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/memory-items",
     tags=["memory-items"],
+    dependencies=[Depends(require_memory_context_enabled)],
 )
 
 

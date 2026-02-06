@@ -40,6 +40,7 @@ from typing import Any, Dict, List, Optional
 
 from skillmeat.cache.memory_repositories import MemoryItemRepository
 from skillmeat.cache.repositories import ConstraintError, NotFoundError
+from skillmeat.observability.tracing import trace_operation
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -121,56 +122,78 @@ class MemoryService:
             ValueError: If any validation check fails (type, confidence,
                 project_id, status).
         """
-        # Validate inputs
-        self._validate_project_id(project_id)
-        self._validate_type(type)
-        self._validate_confidence(confidence)
-        self._validate_status(status)
+        with trace_operation(
+            "memory.create",
+            project_id=project_id,
+            memory_type=type,
+            status=status,
+            confidence=confidence,
+        ) as span:
+            # Validate inputs
+            self._validate_project_id(project_id)
+            self._validate_type(type)
+            self._validate_confidence(confidence)
+            self._validate_status(status)
 
-        # Build the data dict for the repository
-        data: Dict[str, Any] = {
-            "project_id": project_id,
-            "type": type,
-            "content": content,
-            "confidence": confidence,
-            "status": status,
-        }
+            # Build the data dict for the repository
+            data: Dict[str, Any] = {
+                "project_id": project_id,
+                "type": type,
+                "content": content,
+                "confidence": confidence,
+                "status": status,
+            }
 
-        if provenance is not None:
-            data["provenance_json"] = json.dumps(provenance)
-        if anchors is not None:
-            data["anchors_json"] = json.dumps(anchors)
-        if ttl_policy is not None:
-            data["ttl_policy_json"] = json.dumps(ttl_policy)
+            if provenance is not None:
+                data["provenance_json"] = json.dumps(provenance)
+            if anchors is not None:
+                data["anchors_json"] = json.dumps(anchors)
+            if ttl_policy is not None:
+                data["ttl_policy_json"] = json.dumps(ttl_policy)
 
-        try:
-            item = self.repo.create(data)
-            logger.info(
-                "Created memory item %s (project=%s, type=%s)",
-                item.id,
-                project_id,
-                type,
-            )
-            return self._item_to_dict(item)
-
-        except ConstraintError:
-            # Duplicate content_hash -- look up the existing item and return it
-            from skillmeat.cache.memory_repositories import _compute_content_hash
-
-            content_hash = _compute_content_hash(content)
-            existing = self.repo.get_by_content_hash(content_hash)
-            if existing:
+            try:
+                item = self.repo.create(data)
+                span.set_attribute("memory_id", item.id)
                 logger.info(
-                    "Duplicate memory item detected (hash=%s), returning existing %s",
-                    content_hash,
-                    existing.id,
+                    "Created memory item %s (project=%s, type=%s)",
+                    item.id,
+                    project_id,
+                    type,
+                    extra={
+                        "memory_id": item.id,
+                        "project_id": project_id,
+                        "memory_type": type,
+                        "status": status,
+                        "confidence": confidence,
+                    },
                 )
-                return {"duplicate": True, "item": self._item_to_dict(existing)}
+                return self._item_to_dict(item)
 
-            # Should not happen, but handle gracefully
-            raise ValueError(
-                "Duplicate content detected but existing item could not be found"
-            )
+            except ConstraintError:
+                # Duplicate content_hash -- look up the existing item and return it
+                from skillmeat.cache.memory_repositories import _compute_content_hash
+
+                content_hash = _compute_content_hash(content)
+                existing = self.repo.get_by_content_hash(content_hash)
+                if existing:
+                    span.set_attribute("duplicate", True)
+                    span.set_attribute("memory_id", existing.id)
+                    logger.info(
+                        "Duplicate memory item detected (hash=%s), returning existing %s",
+                        content_hash,
+                        existing.id,
+                        extra={
+                            "memory_id": existing.id,
+                            "content_hash": content_hash,
+                            "duplicate": True,
+                        },
+                    )
+                    return {"duplicate": True, "item": self._item_to_dict(existing)}
+
+                # Should not happen, but handle gracefully
+                raise ValueError(
+                    "Duplicate content detected but existing item could not be found"
+                )
 
     def get(self, item_id: str) -> Dict[str, Any]:
         """Get a memory item by ID and increment its access count.
@@ -193,7 +216,9 @@ class MemoryService:
 
         # Re-fetch to reflect the incremented count
         item = self.repo.get_by_id(item_id)
-        logger.debug("Retrieved memory item %s (access_count=%s)", item_id, item.access_count)
+        logger.debug(
+            "Retrieved memory item %s (access_count=%s)", item_id, item.access_count
+        )
         return self._item_to_dict(item)
 
     def list_items(
@@ -260,30 +285,43 @@ class MemoryService:
             NotFoundError: If no memory item exists with the given ID
                 (propagated from repository).
         """
-        # Filter to only allowed fields that were actually provided
-        update_data: Dict[str, Any] = {}
-        for key, value in fields.items():
-            if key not in UPDATABLE_FIELDS:
-                raise ValueError(
-                    f"Field '{key}' is not updatable. "
-                    f"Allowed: {sorted(UPDATABLE_FIELDS)}"
-                )
-            update_data[key] = value
+        with trace_operation("memory.update", memory_id=item_id) as span:
+            # Filter to only allowed fields that were actually provided
+            update_data: Dict[str, Any] = {}
+            for key, value in fields.items():
+                if key not in UPDATABLE_FIELDS:
+                    raise ValueError(
+                        f"Field '{key}' is not updatable. "
+                        f"Allowed: {sorted(UPDATABLE_FIELDS)}"
+                    )
+                update_data[key] = value
 
-        if not update_data:
-            raise ValueError("No updatable fields provided")
+            if not update_data:
+                raise ValueError("No updatable fields provided")
 
-        # Validate values if present
-        if "confidence" in update_data:
-            self._validate_confidence(update_data["confidence"])
-        if "type" in update_data:
-            self._validate_type(update_data["type"])
-        if "status" in update_data:
-            self._validate_status(update_data["status"])
+            # Validate values if present
+            if "confidence" in update_data:
+                self._validate_confidence(update_data["confidence"])
+            if "type" in update_data:
+                self._validate_type(update_data["type"])
+            if "status" in update_data:
+                self._validate_status(update_data["status"])
 
-        item = self.repo.update(item_id, update_data)
-        logger.info("Updated memory item %s (fields=%s)", item_id, list(update_data.keys()))
-        return self._item_to_dict(item)
+            span.set_attribute("fields_updated", list(update_data.keys()))
+            if "status" in update_data:
+                span.set_attribute("new_status", update_data["status"])
+
+            item = self.repo.update(item_id, update_data)
+            logger.info(
+                "Updated memory item %s (fields=%s)",
+                item_id,
+                list(update_data.keys()),
+                extra={
+                    "memory_id": item_id,
+                    "fields_updated": list(update_data.keys()),
+                },
+            )
+            return self._item_to_dict(item)
 
     def delete(self, item_id: str) -> bool:
         """Delete a memory item by ID.
@@ -294,12 +332,22 @@ class MemoryService:
         Returns:
             True if the item was deleted, False if it was not found.
         """
-        deleted = self.repo.delete(item_id)
-        if deleted:
-            logger.info("Deleted memory item %s", item_id)
-        else:
-            logger.warning("Memory item not found for deletion: %s", item_id)
-        return deleted
+        with trace_operation("memory.delete", memory_id=item_id) as span:
+            deleted = self.repo.delete(item_id)
+            span.set_attribute("deleted", deleted)
+            if deleted:
+                logger.info(
+                    "Deleted memory item %s",
+                    item_id,
+                    extra={"memory_id": item_id, "deleted": True},
+                )
+            else:
+                logger.warning(
+                    "Memory item not found for deletion: %s",
+                    item_id,
+                    extra={"memory_id": item_id, "deleted": False},
+                )
+            return deleted
 
     def count(
         self,
@@ -359,41 +407,55 @@ class MemoryService:
             ValueError: If the item is not found, already at the highest
                 promotable state (stable), or is deprecated.
         """
-        item = self.repo.get_by_id(item_id)
-        if not item:
-            raise ValueError(f"Memory item not found: {item_id}")
+        with trace_operation("memory.promote", memory_id=item_id) as span:
+            item = self.repo.get_by_id(item_id)
+            if not item:
+                raise ValueError(f"Memory item not found: {item_id}")
 
-        old_status = item.status
-        new_status = self._PROMOTE_TRANSITIONS.get(old_status)
+            old_status = item.status
+            new_status = self._PROMOTE_TRANSITIONS.get(old_status)
 
-        if new_status is None:
-            raise ValueError(
-                f"Cannot promote item with status '{old_status}'. "
-                f"Valid promote transitions: candidate -> active -> stable"
+            if new_status is None:
+                raise ValueError(
+                    f"Cannot promote item with status '{old_status}'. "
+                    f"Valid promote transitions: candidate -> active -> stable"
+                )
+
+            span.set_attribute("from_status", old_status)
+            span.set_attribute("to_status", new_status)
+            if reason:
+                span.set_attribute("reason", reason)
+
+            update_data: Dict[str, Any] = {"status": new_status}
+
+            if reason is not None:
+                provenance = item.provenance or {}
+                transitions = provenance.get("transitions", [])
+                transitions.append(
+                    {
+                        "from": old_status,
+                        "to": new_status,
+                        "reason": reason,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
+                provenance["transitions"] = transitions
+                update_data["provenance_json"] = json.dumps(provenance)
+
+            updated = self.repo.update(item_id, update_data)
+            logger.info(
+                "Promoted memory item %s: %s -> %s",
+                item_id,
+                old_status,
+                new_status,
+                extra={
+                    "memory_id": item_id,
+                    "from_status": old_status,
+                    "to_status": new_status,
+                    "reason": reason,
+                },
             )
-
-        update_data: Dict[str, Any] = {"status": new_status}
-
-        if reason is not None:
-            provenance = item.provenance or {}
-            transitions = provenance.get("transitions", [])
-            transitions.append({
-                "from": old_status,
-                "to": new_status,
-                "reason": reason,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            })
-            provenance["transitions"] = transitions
-            update_data["provenance_json"] = json.dumps(provenance)
-
-        updated = self.repo.update(item_id, update_data)
-        logger.info(
-            "Promoted memory item %s: %s -> %s",
-            item_id,
-            old_status,
-            new_status,
-        )
-        return self._item_to_dict(updated)
+            return self._item_to_dict(updated)
 
     def deprecate(self, item_id: str, reason: Optional[str] = None) -> Dict[str, Any]:
         """Deprecate a memory item regardless of current lifecycle stage.
@@ -412,34 +474,50 @@ class MemoryService:
         Raises:
             ValueError: If the item is not found or already deprecated.
         """
-        item = self.repo.get_by_id(item_id)
-        if not item:
-            raise ValueError(f"Memory item not found: {item_id}")
+        with trace_operation("memory.deprecate", memory_id=item_id) as span:
+            item = self.repo.get_by_id(item_id)
+            if not item:
+                raise ValueError(f"Memory item not found: {item_id}")
 
-        old_status = item.status
+            old_status = item.status
 
-        if old_status == "deprecated":
-            raise ValueError(
-                f"Memory item {item_id} is already deprecated"
+            if old_status == "deprecated":
+                raise ValueError(f"Memory item {item_id} is already deprecated")
+
+            span.set_attribute("from_status", old_status)
+            span.set_attribute("to_status", "deprecated")
+            if reason:
+                span.set_attribute("reason", reason)
+
+            update_data: Dict[str, Any] = {"status": "deprecated"}
+
+            if reason is not None:
+                provenance = item.provenance or {}
+                transitions = provenance.get("transitions", [])
+                transitions.append(
+                    {
+                        "from": old_status,
+                        "to": "deprecated",
+                        "reason": reason,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
+                provenance["transitions"] = transitions
+                update_data["provenance_json"] = json.dumps(provenance)
+
+            updated = self.repo.update(item_id, update_data)
+            logger.info(
+                "Deprecated memory item %s (was %s)",
+                item_id,
+                old_status,
+                extra={
+                    "memory_id": item_id,
+                    "from_status": old_status,
+                    "to_status": "deprecated",
+                    "reason": reason,
+                },
             )
-
-        update_data: Dict[str, Any] = {"status": "deprecated"}
-
-        if reason is not None:
-            provenance = item.provenance or {}
-            transitions = provenance.get("transitions", [])
-            transitions.append({
-                "from": old_status,
-                "to": "deprecated",
-                "reason": reason,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            })
-            provenance["transitions"] = transitions
-            update_data["provenance_json"] = json.dumps(provenance)
-
-        updated = self.repo.update(item_id, update_data)
-        logger.info("Deprecated memory item %s (was %s)", item_id, old_status)
-        return self._item_to_dict(updated)
+            return self._item_to_dict(updated)
 
     def bulk_promote(
         self,
@@ -563,107 +641,123 @@ class MemoryService:
             ConstraintError: If updating the target's content would produce a
                 content hash that collides with another existing memory item.
         """
-        valid_strategies = {"keep_target", "keep_source", "combine"}
-        if strategy not in valid_strategies:
-            raise ValueError(
-                f"Invalid merge strategy '{strategy}'. "
-                f"Must be one of: {sorted(valid_strategies)}"
+        with trace_operation(
+            "memory.merge",
+            source_id=source_id,
+            target_id=target_id,
+            strategy=strategy,
+        ) as span:
+            valid_strategies = {"keep_target", "keep_source", "combine"}
+            if strategy not in valid_strategies:
+                raise ValueError(
+                    f"Invalid merge strategy '{strategy}'. "
+                    f"Must be one of: {sorted(valid_strategies)}"
+                )
+
+            if source_id == target_id:
+                raise ValueError("Cannot merge a memory item into itself")
+
+            if strategy == "combine" and not merged_content:
+                raise ValueError(
+                    "merged_content is required when strategy is 'combine'"
+                )
+
+            # Fetch both items
+            source = self.repo.get_by_id(source_id)
+            if not source:
+                raise ValueError(f"Source memory item not found: {source_id}")
+
+            target = self.repo.get_by_id(target_id)
+            if not target:
+                raise ValueError(f"Target memory item not found: {target_id}")
+
+            # Validate neither is already deprecated
+            if source.status == "deprecated":
+                raise ValueError(f"Source item {source_id} is already deprecated")
+            if target.status == "deprecated":
+                raise ValueError(f"Target item {target_id} is already deprecated")
+
+            now = datetime.now(timezone.utc).isoformat()
+
+            # --- Build target update payload ---
+            target_update: Dict[str, Any] = {}
+
+            if strategy == "keep_source":
+                from skillmeat.cache.memory_repositories import _compute_content_hash
+
+                target_update["content"] = source.content
+                target_update["content_hash"] = _compute_content_hash(source.content)
+            elif strategy == "combine":
+                from skillmeat.cache.memory_repositories import _compute_content_hash
+
+                target_update["content"] = merged_content
+                target_update["content_hash"] = _compute_content_hash(merged_content)
+
+            # Promote target confidence to max of both
+            if target.confidence < source.confidence:
+                target_update["confidence"] = source.confidence
+
+            # Record merge in target provenance
+            target_provenance = target.provenance or {}
+            merge_history = target_provenance.get("merges", [])
+            merge_history.append(
+                {
+                    "merged_from": source_id,
+                    "strategy": strategy,
+                    "timestamp": now,
+                }
+            )
+            target_provenance["merges"] = merge_history
+            target_update["provenance_json"] = json.dumps(target_provenance)
+
+            # Apply target updates
+            try:
+                self.repo.update(target_id, target_update)
+            except ConstraintError:
+                raise ConstraintError(
+                    f"Cannot merge: the resulting content hash for target "
+                    f"{target_id} conflicts with another existing memory item"
+                )
+
+            # --- Deprecate source with provenance ---
+            source_provenance = source.provenance or {}
+            source_merge_history = source_provenance.get("merges", [])
+            source_merge_history.append(
+                {
+                    "merged_into": target_id,
+                    "strategy": strategy,
+                    "timestamp": now,
+                }
+            )
+            source_provenance["merges"] = source_merge_history
+
+            self.repo.update(
+                source_id,
+                {
+                    "status": "deprecated",
+                    "provenance_json": json.dumps(source_provenance),
+                },
             )
 
-        if source_id == target_id:
-            raise ValueError("Cannot merge a memory item into itself")
+            # Return updated target with merge metadata
+            updated_target = self.repo.get_by_id(target_id)
+            result = self._item_to_dict(updated_target)
+            result["merged_source_id"] = source_id
 
-        if strategy == "combine" and not merged_content:
-            raise ValueError(
-                "merged_content is required when strategy is 'combine'"
+            span.add_event("merge_complete")
+            logger.info(
+                "Merged memory item %s into %s (strategy=%s)",
+                source_id,
+                target_id,
+                strategy,
+                extra={
+                    "source_id": source_id,
+                    "target_id": target_id,
+                    "strategy": strategy,
+                },
             )
 
-        # Fetch both items
-        source = self.repo.get_by_id(source_id)
-        if not source:
-            raise ValueError(f"Source memory item not found: {source_id}")
-
-        target = self.repo.get_by_id(target_id)
-        if not target:
-            raise ValueError(f"Target memory item not found: {target_id}")
-
-        # Validate neither is already deprecated
-        if source.status == "deprecated":
-            raise ValueError(
-                f"Source item {source_id} is already deprecated"
-            )
-        if target.status == "deprecated":
-            raise ValueError(
-                f"Target item {target_id} is already deprecated"
-            )
-
-        now = datetime.now(timezone.utc).isoformat()
-
-        # --- Build target update payload ---
-        target_update: Dict[str, Any] = {}
-
-        if strategy == "keep_source":
-            from skillmeat.cache.memory_repositories import _compute_content_hash
-
-            target_update["content"] = source.content
-            target_update["content_hash"] = _compute_content_hash(source.content)
-        elif strategy == "combine":
-            from skillmeat.cache.memory_repositories import _compute_content_hash
-
-            target_update["content"] = merged_content
-            target_update["content_hash"] = _compute_content_hash(merged_content)
-
-        # Promote target confidence to max of both
-        if target.confidence < source.confidence:
-            target_update["confidence"] = source.confidence
-
-        # Record merge in target provenance
-        target_provenance = target.provenance or {}
-        merge_history = target_provenance.get("merges", [])
-        merge_history.append({
-            "merged_from": source_id,
-            "strategy": strategy,
-            "timestamp": now,
-        })
-        target_provenance["merges"] = merge_history
-        target_update["provenance_json"] = json.dumps(target_provenance)
-
-        # Apply target updates
-        try:
-            self.repo.update(target_id, target_update)
-        except ConstraintError:
-            raise ConstraintError(
-                f"Cannot merge: the resulting content hash for target "
-                f"{target_id} conflicts with another existing memory item"
-            )
-
-        # --- Deprecate source with provenance ---
-        source_provenance = source.provenance or {}
-        source_merge_history = source_provenance.get("merges", [])
-        source_merge_history.append({
-            "merged_into": target_id,
-            "strategy": strategy,
-            "timestamp": now,
-        })
-        source_provenance["merges"] = source_merge_history
-
-        self.repo.update(source_id, {
-            "status": "deprecated",
-            "provenance_json": json.dumps(source_provenance),
-        })
-
-        logger.info(
-            "Merged memory item %s into %s (strategy=%s)",
-            source_id,
-            target_id,
-            strategy,
-        )
-
-        # Return updated target with merge metadata
-        updated_target = self.repo.get_by_id(target_id)
-        result = self._item_to_dict(updated_target)
-        result["merged_source_id"] = source_id
-        return result
+            return result
 
     # =========================================================================
     # Helpers

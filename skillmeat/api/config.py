@@ -185,6 +185,17 @@ class APISettings(BaseSettings):
         description="GitHub personal access token for higher API rate limits (5000/hr vs 60/hr)",
     )
 
+    # Memory & Context Intelligence System feature flags
+    memory_context_enabled: bool = Field(
+        default=True,
+        description="Enable Memory & Context Intelligence System (memory items, context modules, context packing)",
+    )
+
+    memory_auto_extract: bool = Field(
+        default=False,
+        description="Enable automatic memory extraction from conversations (Phase 5 feature)",
+    )
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, v: str) -> str:

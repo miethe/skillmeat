@@ -34,6 +34,7 @@ from typing import Any, Dict, List, Optional
 
 from skillmeat.core.services.context_module_service import ContextModuleService
 from skillmeat.core.services.memory_service import MemoryService
+from skillmeat.observability.tracing import trace_operation
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -140,47 +141,71 @@ class ContextPackerService:
             Dict with keys: items (list of item preview dicts), total_tokens,
             budget_tokens, utilization, items_included, items_available.
         """
-        candidates = self._get_candidates(project_id, module_id, filters)
-        items_available = len(candidates)
+        with trace_operation(
+            "context_pack.preview",
+            project_id=project_id,
+            budget_tokens=budget_tokens,
+        ) as span:
+            if module_id:
+                span.set_attribute("module_id", module_id)
 
-        # Select items within budget
-        selected: List[Dict[str, Any]] = []
-        total_tokens = 0
+            candidates = self._get_candidates(project_id, module_id, filters)
+            items_available = len(candidates)
+            span.set_attribute("items_available", items_available)
 
-        for item in candidates:
-            tokens = self.estimate_tokens(item["content"])
-            if total_tokens + tokens > budget_tokens:
-                break
-            selected.append({
-                "id": item["id"],
-                "type": item["type"],
-                "content": item["content"],
-                "confidence": item["confidence"],
-                "tokens": tokens,
-            })
-            total_tokens += tokens
+            # Select items within budget
+            selected: List[Dict[str, Any]] = []
+            total_tokens = 0
 
-        utilization = total_tokens / budget_tokens if budget_tokens > 0 else 0.0
+            for item in candidates:
+                tokens = self.estimate_tokens(item["content"])
+                if total_tokens + tokens > budget_tokens:
+                    break
+                selected.append(
+                    {
+                        "id": item["id"],
+                        "type": item["type"],
+                        "content": item["content"],
+                        "confidence": item["confidence"],
+                        "tokens": tokens,
+                    }
+                )
+                total_tokens += tokens
 
-        logger.info(
-            "Preview pack: %d/%d items, %d/%d tokens (%.1f%% utilization) "
-            "for project=%s",
-            len(selected),
-            items_available,
-            total_tokens,
-            budget_tokens,
-            utilization * 100,
-            project_id,
-        )
+            utilization = total_tokens / budget_tokens if budget_tokens > 0 else 0.0
 
-        return {
-            "items": selected,
-            "total_tokens": total_tokens,
-            "budget_tokens": budget_tokens,
-            "utilization": utilization,
-            "items_included": len(selected),
-            "items_available": items_available,
-        }
+            span.set_attribute("items_included", len(selected))
+            span.set_attribute("total_tokens", total_tokens)
+            span.set_attribute("utilization", round(utilization, 3))
+
+            logger.info(
+                "Preview pack: %d/%d items, %d/%d tokens (%.1f%% utilization) "
+                "for project=%s",
+                len(selected),
+                items_available,
+                total_tokens,
+                budget_tokens,
+                utilization * 100,
+                project_id,
+                extra={
+                    "project_id": project_id,
+                    "module_id": module_id,
+                    "items_included": len(selected),
+                    "items_available": items_available,
+                    "total_tokens": total_tokens,
+                    "budget_tokens": budget_tokens,
+                    "utilization": utilization,
+                },
+            )
+
+            return {
+                "items": selected,
+                "total_tokens": total_tokens,
+                "budget_tokens": budget_tokens,
+                "utilization": utilization,
+                "items_included": len(selected),
+                "items_available": items_available,
+            }
 
     def generate_pack(
         self,
@@ -209,26 +234,45 @@ class ContextPackerService:
                 - ``markdown`` (str): Formatted markdown context pack.
                 - ``generated_at`` (str): ISO 8601 timestamp of generation.
         """
-        # Get the preview data (selection + stats)
-        result = self.preview_pack(project_id, module_id, budget_tokens, filters)
+        with trace_operation(
+            "context_pack.generate",
+            project_id=project_id,
+            budget_tokens=budget_tokens,
+        ) as span:
+            if module_id:
+                span.set_attribute("module_id", module_id)
 
-        # Generate markdown from the selected items
-        markdown = self._generate_markdown(result["items"])
-        generated_at = datetime.now(timezone.utc).isoformat()
+            # Get the preview data (selection + stats)
+            result = self.preview_pack(project_id, module_id, budget_tokens, filters)
 
-        result["markdown"] = markdown
-        result["generated_at"] = generated_at
+            # Generate markdown from the selected items
+            markdown = self._generate_markdown(result["items"])
+            generated_at = datetime.now(timezone.utc).isoformat()
 
-        logger.info(
-            "Generated pack: %d items, %d tokens, markdown=%d chars "
-            "for project=%s",
-            result["items_included"],
-            result["total_tokens"],
-            len(markdown),
-            project_id,
-        )
+            result["markdown"] = markdown
+            result["generated_at"] = generated_at
 
-        return result
+            span.set_attribute("markdown_length", len(markdown))
+            span.set_attribute("items_included", result["items_included"])
+            span.set_attribute("total_tokens", result["total_tokens"])
+
+            logger.info(
+                "Generated pack: %d items, %d tokens, markdown=%d chars "
+                "for project=%s",
+                result["items_included"],
+                result["total_tokens"],
+                len(markdown),
+                project_id,
+                extra={
+                    "project_id": project_id,
+                    "module_id": module_id,
+                    "items_included": result["items_included"],
+                    "total_tokens": result["total_tokens"],
+                    "markdown_length": len(markdown),
+                },
+            )
+
+            return result
 
     # =========================================================================
     # Module Selector Application
@@ -339,7 +383,10 @@ class ContextPackerService:
                 if "type" in filters and filters["type"]:
                     # Override or narrow memory_types
                     selectors["memory_types"] = [filters["type"]]
-                if "min_confidence" in filters and filters["min_confidence"] is not None:
+                if (
+                    "min_confidence" in filters
+                    and filters["min_confidence"] is not None
+                ):
                     # Use the stricter (higher) min_confidence
                     existing_min = selectors.get("min_confidence", 0.0)
                     selectors["min_confidence"] = max(
@@ -353,7 +400,10 @@ class ContextPackerService:
             if filters:
                 if "type" in filters and filters["type"]:
                     selectors["memory_types"] = [filters["type"]]
-                if "min_confidence" in filters and filters["min_confidence"] is not None:
+                if (
+                    "min_confidence" in filters
+                    and filters["min_confidence"] is not None
+                ):
                     selectors["min_confidence"] = filters["min_confidence"]
 
             candidates = self.apply_module_selectors(project_id, selectors)
@@ -453,9 +503,7 @@ def _sort_key_confidence_desc_created_desc(item: Dict[str, Any]) -> tuple:
 
     # Invert character ordinals so ascending sort yields descending order
     inverted_created = (
-        "".join(chr(0xFFFF - ord(c)) for c in created_at)
-        if created_at
-        else ""
+        "".join(chr(0xFFFF - ord(c)) for c in created_at) if created_at else ""
     )
 
     return (-confidence, inverted_created)

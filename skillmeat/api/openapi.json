@@ -7955,6 +7955,34 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContextModuleListResponse"
+                },
+                "examples": {
+                  "list": {
+                    "summary": "List of context modules",
+                    "value": {
+                      "items": [
+                        {
+                          "id": "ctx_mod_abc123",
+                          "project_id": "skillmeat",
+                          "name": "api-development",
+                          "description": "Context for API development workflows",
+                          "priority": 10,
+                          "created_at": "2025-02-10T10:00:00Z"
+                        },
+                        {
+                          "id": "ctx_mod_def456",
+                          "project_id": "skillmeat",
+                          "name": "frontend-patterns",
+                          "description": "React/Next.js component patterns",
+                          "priority": 5,
+                          "created_at": "2025-02-09T14:30:00Z"
+                        }
+                      ],
+                      "next_cursor": "ctx_mod_ghi789",
+                      "has_more": false,
+                      "total": 2
+                    }
+                  }
                 }
               }
             }
@@ -8004,6 +8032,30 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ContextModuleCreateRequest"
+              },
+              "examples": {
+                "create_module": {
+                  "summary": "Create context module with selectors",
+                  "value": {
+                    "name": "api-development",
+                    "description": "Context for API development workflows",
+                    "selectors": {
+                      "memory_types": [
+                        "decision",
+                        "gotcha"
+                      ],
+                      "min_confidence": 0.8,
+                      "file_patterns": [
+                        "skillmeat/api/**"
+                      ],
+                      "workflow_stages": [
+                        "development",
+                        "review"
+                      ]
+                    },
+                    "priority": 10
+                  }
+                }
               }
             }
           }
@@ -8015,6 +8067,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContextModuleResponse"
+                },
+                "examples": {
+                  "created": {
+                    "summary": "Successfully created module",
+                    "value": {
+                      "id": "ctx_mod_abc123",
+                      "project_id": "skillmeat",
+                      "name": "api-development",
+                      "description": "Context for API development workflows",
+                      "selectors": {
+                        "memory_types": [
+                          "decision",
+                          "gotcha"
+                        ],
+                        "min_confidence": 0.8,
+                        "file_patterns": [
+                          "skillmeat/api/**"
+                        ],
+                        "workflow_stages": [
+                          "development",
+                          "review"
+                        ]
+                      },
+                      "priority": 10,
+                      "content_hash": "sha256_xyz789",
+                      "created_at": "2025-02-10T10:00:00Z",
+                      "updated_at": "2025-02-10T10:00:00Z",
+                      "memory_items": null
+                    }
+                  }
                 }
               }
             }
@@ -8077,6 +8159,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContextModuleResponse"
+                },
+                "examples": {
+                  "with_items": {
+                    "summary": "Module with associated memory items",
+                    "value": {
+                      "id": "ctx_mod_abc123",
+                      "project_id": "skillmeat",
+                      "name": "api-development",
+                      "description": "Context for API development workflows",
+                      "selectors": {
+                        "memory_types": [
+                          "decision",
+                          "gotcha"
+                        ],
+                        "min_confidence": 0.8
+                      },
+                      "priority": 10,
+                      "content_hash": "sha256_xyz789",
+                      "created_at": "2025-02-10T10:00:00Z",
+                      "updated_at": "2025-02-10T10:00:00Z",
+                      "memory_items": [
+                        {
+                          "id": "mem_abc123",
+                          "type": "decision",
+                          "content": "Use FastAPI for all new API endpoints.",
+                          "confidence": 0.9
+                        }
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -8124,6 +8236,21 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ContextModuleUpdateRequest"
+              },
+              "examples": {
+                "update_selectors": {
+                  "summary": "Update module selectors",
+                  "value": {
+                    "selectors": {
+                      "memory_types": [
+                        "decision",
+                        "gotcha",
+                        "style_rule"
+                      ],
+                      "min_confidence": 0.85
+                    }
+                  }
+                }
               }
             }
           }
@@ -8135,6 +8262,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContextModuleResponse"
+                },
+                "examples": {
+                  "updated": {
+                    "summary": "Successfully updated",
+                    "value": {
+                      "id": "ctx_mod_abc123",
+                      "project_id": "skillmeat",
+                      "name": "api-development",
+                      "selectors": {
+                        "memory_types": [
+                          "decision",
+                          "gotcha",
+                          "style_rule"
+                        ],
+                        "min_confidence": 0.85
+                      },
+                      "priority": 10,
+                      "updated_at": "2025-02-10T11:00:00Z"
+                    }
+                  }
                 }
               }
             }
@@ -8228,6 +8375,15 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AddMemoryToModuleRequest"
+              },
+              "examples": {
+                "add_memory": {
+                  "summary": "Add memory to module",
+                  "value": {
+                    "memory_id": "mem_abc123",
+                    "ordering": 5
+                  }
+                }
               }
             }
           }
@@ -8239,6 +8395,24 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContextModuleResponse"
+                },
+                "examples": {
+                  "added": {
+                    "summary": "Memory added to module",
+                    "value": {
+                      "id": "ctx_mod_abc123",
+                      "project_id": "skillmeat",
+                      "name": "api-development",
+                      "memory_items": [
+                        {
+                          "id": "mem_abc123",
+                          "type": "decision",
+                          "content": "Use FastAPI for all new API endpoints.",
+                          "ordering": 5
+                        }
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -8306,6 +8480,27 @@
                     "additionalProperties": true
                   },
                   "title": "Response List Module Memories Api V1 Context Modules  Module Id  Memories Get"
+                },
+                "examples": {
+                  "memories_list": {
+                    "summary": "List of module's memories",
+                    "value": [
+                      {
+                        "id": "mem_abc123",
+                        "type": "decision",
+                        "content": "Use FastAPI for all new API endpoints.",
+                        "confidence": 0.9,
+                        "ordering": 5
+                      },
+                      {
+                        "id": "mem_def456",
+                        "type": "gotcha",
+                        "content": "Cache refresh must be called after filesystem writes.",
+                        "confidence": 0.95,
+                        "ordering": 10
+                      }
+                    ]
+                  }
                 }
               }
             }
@@ -8409,6 +8604,19 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ContextPackPreviewRequest"
+              },
+              "examples": {
+                "with_budget": {
+                  "summary": "Preview pack with token budget",
+                  "value": {
+                    "module_id": "ctx_mod_abc123",
+                    "budget_tokens": 4000,
+                    "filters": {
+                      "type": "decision",
+                      "min_confidence": 0.85
+                    }
+                  }
+                }
               }
             }
           }
@@ -8420,6 +8628,34 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContextPackPreviewResponse"
+                },
+                "examples": {
+                  "preview": {
+                    "summary": "Pack preview with statistics",
+                    "value": {
+                      "items": [
+                        {
+                          "id": "mem_abc123",
+                          "type": "decision",
+                          "content": "Use FastAPI for all new API endpoints.",
+                          "confidence": 0.9,
+                          "tokens": 15
+                        },
+                        {
+                          "id": "mem_def456",
+                          "type": "decision",
+                          "content": "Prefer async handlers for I/O operations.",
+                          "confidence": 0.88,
+                          "tokens": 12
+                        }
+                      ],
+                      "total_tokens": 27,
+                      "budget_tokens": 4000,
+                      "utilization": 0.00675,
+                      "items_included": 2,
+                      "items_available": 2
+                    }
+                  }
                 }
               }
             }
@@ -8471,6 +8707,18 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ContextPackGenerateRequest"
+              },
+              "examples": {
+                "generate_pack": {
+                  "summary": "Generate full context pack",
+                  "value": {
+                    "module_id": "ctx_mod_abc123",
+                    "budget_tokens": 4000,
+                    "filters": {
+                      "min_confidence": 0.8
+                    }
+                  }
+                }
               }
             }
           }
@@ -8482,6 +8730,29 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContextPackGenerateResponse"
+                },
+                "examples": {
+                  "generated": {
+                    "summary": "Generated context pack with markdown",
+                    "value": {
+                      "items": [
+                        {
+                          "id": "mem_abc123",
+                          "type": "decision",
+                          "content": "Use FastAPI for all new API endpoints.",
+                          "confidence": 0.9,
+                          "tokens": 15
+                        }
+                      ],
+                      "total_tokens": 15,
+                      "budget_tokens": 4000,
+                      "utilization": 0.00375,
+                      "items_included": 1,
+                      "items_available": 1,
+                      "markdown": "# Context Pack\\n\\n## Decisions\\n\\n- Use FastAPI for all new API endpoints.\\n\\n---\\nGenerated at: 2025-02-10T15:30:00Z",
+                      "generated_at": "2025-02-10T15:30:00Z"
+                    }
+                  }
                 }
               }
             }
@@ -13222,6 +13493,14 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Count Memory Items Api V1 Memory Items Count Get"
+                },
+                "examples": {
+                  "count": {
+                    "summary": "Count of filtered items",
+                    "value": {
+                      "count": 127
+                    }
+                  }
                 }
               }
             }
@@ -13259,6 +13538,19 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/BulkPromoteRequest"
+              },
+              "examples": {
+                "bulk_promote": {
+                  "summary": "Promote multiple items",
+                  "value": {
+                    "item_ids": [
+                      "mem_abc123",
+                      "mem_def456",
+                      "mem_ghi789"
+                    ],
+                    "reason": "Batch validation after sprint review"
+                  }
+                }
               }
             }
           },
@@ -13271,6 +13563,23 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BulkActionResponse"
+                },
+                "examples": {
+                  "partial_success": {
+                    "summary": "Bulk operation with partial failures",
+                    "value": {
+                      "succeeded": [
+                        "mem_abc123",
+                        "mem_def456"
+                      ],
+                      "failed": [
+                        {
+                          "id": "mem_ghi789",
+                          "error": "Item not found"
+                        }
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -13305,6 +13614,18 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/BulkDeprecateRequest"
+              },
+              "examples": {
+                "bulk_deprecate": {
+                  "summary": "Deprecate multiple items",
+                  "value": {
+                    "item_ids": [
+                      "mem_old123",
+                      "mem_old456"
+                    ],
+                    "reason": "Cleanup of obsolete memories"
+                  }
+                }
               }
             }
           },
@@ -13317,6 +13638,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BulkActionResponse"
+                },
+                "examples": {
+                  "all_success": {
+                    "summary": "All items deprecated successfully",
+                    "value": {
+                      "succeeded": [
+                        "mem_old123",
+                        "mem_old456"
+                      ],
+                      "failed": []
+                    }
+                  }
                 }
               }
             }
@@ -13351,6 +13684,17 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/MergeRequest"
+              },
+              "examples": {
+                "combine_strategy": {
+                  "summary": "Merge with combine strategy",
+                  "value": {
+                    "source_id": "mem_source123",
+                    "target_id": "mem_target456",
+                    "strategy": "combine",
+                    "merged_content": "Use FastAPI for all new API endpoints. Prefer async handlers for I/O operations."
+                  }
+                }
               }
             }
           },
@@ -13363,6 +13707,25 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MergeResponse"
+                },
+                "examples": {
+                  "merged": {
+                    "summary": "Successfully merged",
+                    "value": {
+                      "item": {
+                        "id": "mem_target456",
+                        "project_id": "skillmeat",
+                        "type": "decision",
+                        "content": "Use FastAPI for all new API endpoints. Prefer async handlers for I/O operations.",
+                        "confidence": 0.92,
+                        "status": "active",
+                        "access_count": 25,
+                        "created_at": "2025-02-05T10:30:00Z",
+                        "updated_at": "2025-02-10T15:30:00Z"
+                      },
+                      "merged_source_id": "mem_source123"
+                    }
+                  }
                 }
               }
             }
@@ -13530,6 +13893,40 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MemoryItemListResponse"
+                },
+                "examples": {
+                  "paginated_list": {
+                    "summary": "Paginated list of memory items",
+                    "value": {
+                      "items": [
+                        {
+                          "id": "mem_abc123",
+                          "project_id": "skillmeat",
+                          "type": "decision",
+                          "content": "Use FastAPI for all new API endpoints.",
+                          "confidence": 0.9,
+                          "status": "active",
+                          "access_count": 15,
+                          "created_at": "2025-02-06T10:30:00Z",
+                          "updated_at": "2025-02-06T10:30:00Z"
+                        },
+                        {
+                          "id": "mem_def456",
+                          "project_id": "skillmeat",
+                          "type": "gotcha",
+                          "content": "Cache refresh must be called after filesystem writes.",
+                          "confidence": 0.95,
+                          "status": "stable",
+                          "access_count": 42,
+                          "created_at": "2025-02-05T14:20:00Z",
+                          "updated_at": "2025-02-06T09:15:00Z"
+                        }
+                      ],
+                      "next_cursor": "mem_ghi789",
+                      "has_more": true,
+                      "total": 127
+                    }
+                  }
                 }
               }
             }
@@ -13579,6 +13976,43 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/MemoryItemCreateRequest"
+              },
+              "examples": {
+                "create_decision": {
+                  "summary": "Create a decision memory item",
+                  "value": {
+                    "type": "decision",
+                    "content": "Use FastAPI for all new API endpoints to maintain consistency with existing backend architecture.",
+                    "confidence": 0.9,
+                    "status": "active",
+                    "provenance": {
+                      "source": "architecture-review",
+                      "date": "2025-01-15"
+                    },
+                    "anchors": [
+                      "skillmeat/api/",
+                      "fastapi"
+                    ],
+                    "ttl_policy": null
+                  }
+                },
+                "create_gotcha": {
+                  "summary": "Create a gotcha memory item",
+                  "value": {
+                    "type": "gotcha",
+                    "content": "Cache refresh must be called after filesystem writes to keep DB in sync.",
+                    "confidence": 0.95,
+                    "status": "stable",
+                    "provenance": {
+                      "source": "bug-fix",
+                      "issue_id": "BUG-123"
+                    },
+                    "anchors": [
+                      "cache/refresh.py",
+                      "write-through pattern"
+                    ]
+                  }
+                }
               }
             }
           }
@@ -13590,6 +14024,33 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MemoryItemResponse"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "Successfully created memory item",
+                    "value": {
+                      "id": "mem_abc123",
+                      "project_id": "skillmeat",
+                      "type": "decision",
+                      "content": "Use FastAPI for all new API endpoints to maintain consistency with existing backend architecture.",
+                      "confidence": 0.9,
+                      "status": "active",
+                      "provenance": {
+                        "source": "architecture-review",
+                        "date": "2025-01-15"
+                      },
+                      "anchors": [
+                        "skillmeat/api/",
+                        "fastapi"
+                      ],
+                      "ttl_policy": null,
+                      "content_hash": "sha256_abc123",
+                      "access_count": 0,
+                      "created_at": "2025-02-06T10:30:00Z",
+                      "updated_at": "2025-02-06T10:30:00Z",
+                      "deprecated_at": null
+                    }
+                  }
                 }
               }
             }
@@ -13643,6 +14104,33 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MemoryItemResponse"
+                },
+                "examples": {
+                  "single_item": {
+                    "summary": "Retrieved memory item",
+                    "value": {
+                      "id": "mem_abc123",
+                      "project_id": "skillmeat",
+                      "type": "decision",
+                      "content": "Use FastAPI for all new API endpoints to maintain consistency with existing backend architecture.",
+                      "confidence": 0.9,
+                      "status": "active",
+                      "provenance": {
+                        "source": "architecture-review",
+                        "date": "2025-01-15"
+                      },
+                      "anchors": [
+                        "skillmeat/api/",
+                        "fastapi"
+                      ],
+                      "ttl_policy": null,
+                      "content_hash": "sha256_abc123",
+                      "access_count": 16,
+                      "created_at": "2025-02-06T10:30:00Z",
+                      "updated_at": "2025-02-06T10:30:00Z",
+                      "deprecated_at": null
+                    }
+                  }
                 }
               }
             }
@@ -13690,6 +14178,14 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/MemoryItemUpdateRequest"
+              },
+              "examples": {
+                "update_confidence": {
+                  "summary": "Update confidence score",
+                  "value": {
+                    "confidence": 0.95
+                  }
+                }
               }
             }
           }
@@ -13701,6 +14197,22 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MemoryItemResponse"
+                },
+                "examples": {
+                  "updated": {
+                    "summary": "Successfully updated",
+                    "value": {
+                      "id": "mem_abc123",
+                      "project_id": "skillmeat",
+                      "type": "decision",
+                      "content": "Use FastAPI for all new API endpoints.",
+                      "confidence": 0.95,
+                      "status": "active",
+                      "access_count": 16,
+                      "created_at": "2025-02-06T10:30:00Z",
+                      "updated_at": "2025-02-06T11:00:00Z"
+                    }
+                  }
                 }
               }
             }
@@ -13794,6 +14306,14 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PromoteRequest"
+              },
+              "examples": {
+                "with_reason": {
+                  "summary": "Promote with reason",
+                  "value": {
+                    "reason": "Validated in production for 2 weeks"
+                  }
+                }
               }
             }
           }
@@ -13805,6 +14325,22 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MemoryItemResponse"
+                },
+                "examples": {
+                  "promoted": {
+                    "summary": "Promoted to next stage",
+                    "value": {
+                      "id": "mem_abc123",
+                      "project_id": "skillmeat",
+                      "type": "decision",
+                      "content": "Use FastAPI for all new API endpoints.",
+                      "confidence": 0.9,
+                      "status": "stable",
+                      "access_count": 20,
+                      "created_at": "2025-02-06T10:30:00Z",
+                      "updated_at": "2025-02-08T14:00:00Z"
+                    }
+                  }
                 }
               }
             }
@@ -13857,6 +14393,14 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/DeprecateRequest"
+              },
+              "examples": {
+                "with_reason": {
+                  "summary": "Deprecate with reason",
+                  "value": {
+                    "reason": "Superseded by mem_xyz999"
+                  }
+                }
               }
             }
           }
@@ -13868,6 +14412,23 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MemoryItemResponse"
+                },
+                "examples": {
+                  "deprecated": {
+                    "summary": "Successfully deprecated",
+                    "value": {
+                      "id": "mem_abc123",
+                      "project_id": "skillmeat",
+                      "type": "decision",
+                      "content": "Use FastAPI for all new API endpoints.",
+                      "confidence": 0.9,
+                      "status": "deprecated",
+                      "access_count": 20,
+                      "created_at": "2025-02-06T10:30:00Z",
+                      "updated_at": "2025-02-10T09:00:00Z",
+                      "deprecated_at": "2025-02-10T09:00:00Z"
+                    }
+                  }
                 }
               }
             }

@@ -302,6 +302,25 @@ def verify_api_key(
         )
 
 
+def require_memory_context_enabled(
+    settings: Annotated[APISettings, Depends(get_settings)],
+) -> None:
+    """Verify that Memory & Context Intelligence System is enabled.
+
+    Args:
+        settings: API settings
+
+    Raises:
+        HTTPException: If memory_context_enabled is False
+    """
+    if not settings.memory_context_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Memory & Context Intelligence System is currently disabled. "
+            "Set SKILLMEAT_MEMORY_CONTEXT_ENABLED=true to enable this feature.",
+        )
+
+
 # Type aliases for cleaner dependency injection
 ConfigManagerDep = Annotated[ConfigManager, Depends(get_config_manager)]
 CollectionManagerDep = Annotated[CollectionManager, Depends(get_collection_manager)]
@@ -311,3 +330,4 @@ SyncManagerDep = Annotated[SyncManager, Depends(get_sync_manager)]
 ContextSyncServiceDep = Annotated[ContextSyncService, Depends(get_context_sync_service)]
 SettingsDep = Annotated[APISettings, Depends(get_settings)]
 APIKeyDep = Annotated[None, Depends(verify_api_key)]
+MemoryContextEnabledDep = Annotated[None, Depends(require_memory_context_enabled)]

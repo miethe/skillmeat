@@ -17,8 +17,9 @@ API Endpoints:
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from skillmeat.api.dependencies import require_memory_context_enabled
 from skillmeat.api.schemas.context_module import (
     ContextPackGenerateRequest,
     ContextPackGenerateResponse,
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/context-packs",
     tags=["context-packs"],
+    dependencies=[Depends(require_memory_context_enabled)],
 )
 
 
