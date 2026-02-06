@@ -538,6 +538,31 @@ export { useCollectionContext } from './use-collection-context';
 export { EntityLifecycleProvider, useEntityLifecycle } from './useEntityLifecycle';
 
 // ============================================================================
+// CONTEXT MODULES (8 hooks)
+// ============================================================================
+// Context module CRUD, memory association, and listing
+export {
+  contextModuleKeys,
+  useContextModules,
+  useContextModule,
+  useModuleMemories,
+  useCreateContextModule,
+  useUpdateContextModule,
+  useDeleteContextModule,
+  useAddMemoryToModule,
+  useRemoveMemoryFromModule,
+} from './use-context-modules';
+
+// ============================================================================
+// CONTEXT PACKS (2 hooks)
+// ============================================================================
+// Context pack preview and generation
+export {
+  usePreviewContextPack,
+  useGenerateContextPack,
+} from './use-context-packs';
+
+// ============================================================================
 // KEYBOARD SHORTCUTS (1 hook)
 // ============================================================================
 // Container-scoped keyboard shortcut handler for triage workflows

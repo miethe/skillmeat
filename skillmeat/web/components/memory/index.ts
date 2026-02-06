@@ -37,6 +37,12 @@ export type { MergeModalProps } from './merge-modal';
 export { KeyboardHelpModal } from './keyboard-help-modal';
 export type { KeyboardHelpModalProps } from './keyboard-help-modal';
 
+export { ContextModulesTab } from './context-modules-tab';
+export type { ContextModulesTabProps } from './context-modules-tab';
+
+export { ModuleEditor } from './module-editor';
+export type { ModuleEditorProps } from './module-editor';
+
 export {
   getConfidenceTier,
   getConfidenceColorClasses,
