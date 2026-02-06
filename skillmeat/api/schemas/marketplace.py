@@ -2125,8 +2125,8 @@ class FileTreeEntry(BaseModel):
         description="File path relative to artifact root",
         examples=["README.md", "src/main.py"],
     )
-    type: Literal["file", "tree"] = Field(
-        description="Entry type: 'file' for files, 'tree' for directories",
+    type: Literal["file", "tree", "symlink"] = Field(
+        description="Entry type: 'file' for files, 'tree' for directories, 'symlink' for symbolic links",
         examples=["file"],
     )
     size: Optional[int] = Field(

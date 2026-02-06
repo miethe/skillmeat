@@ -492,12 +492,11 @@ class GitHubScanner:
     ) -> List[str]:
         """Extract file paths from tree, optionally filtering by root_hint.
 
-        The Git Trees API represents symlinks as blob entries whose content is
-        the symlink target path. These appear as very small blobs (typically
-        under 256 bytes). While we cannot distinguish symlinks from small files
-        at the tree level, we include them in the path list so heuristic
-        detection sees them. The import coordinator handles actual symlink
-        resolution via the Contents API which does expose symlink types.
+        Includes both regular files (type="blob") and symlinks (type="symlink")
+        from the tree. Symlinks are identified by get_repo_tree() using Git's
+        mode 120000. They are included in the path list so heuristic detection
+        can see them as part of the artifact structure. The import coordinator
+        handles actual symlink resolution via the Contents API.
 
         Args:
             tree: Tree items from GitHub API
@@ -507,16 +506,14 @@ class GitHubScanner:
             List of file paths
         """
         paths = []
-        # Track potential symlinks for logging (blobs with no file extension
-        # and very small size are likely symlinks, but we include them anyway)
-        potential_symlink_count = 0
+        symlink_count = 0
 
         for item in tree:
-            if item.get("type") != "blob":
+            item_type = item.get("type", "")
+            if item_type not in ("blob", "symlink"):
                 continue
 
             path = item.get("path", "")
-            size = item.get("size", 0)
 
             # Apply root_hint filter if provided
             if root_hint:
@@ -528,18 +525,11 @@ class GitHubScanner:
 
             paths.append(path)
 
-            # Heuristic: blobs under 256 bytes with no file extension are
-            # likely symlinks (their content is just a relative path string).
-            # This is informational only - we still include them in paths.
-            name = path.rsplit("/", 1)[-1] if "/" in path else path
-            if size > 0 and size < 256 and "." not in name:
-                potential_symlink_count += 1
+            if item_type == "symlink":
+                symlink_count += 1
 
-        if potential_symlink_count > 0:
-            logger.debug(
-                f"Detected {potential_symlink_count} potential symlink entries "
-                f"in tree (small blobs without file extensions)"
-            )
+        if symlink_count > 0:
+            logger.debug(f"Included {symlink_count} symlink entries in file paths")
 
         # Limit to max_files
         if len(paths) > self.config.max_files:
@@ -725,6 +715,13 @@ class GitHubScanner:
         except GitHubNotFoundError:
             logger.debug(f"File not found: {owner_repo}/{path}")
             return None
+        except GitHubClientError as e:
+            # Symlinks to directories or unresolvable symlinks
+            error_msg = str(e).lower()
+            if "is a directory" in error_msg or "symlink" in error_msg:
+                logger.debug(f"Path is not a regular file: {owner_repo}/{path}: {e}")
+                return None
+            raise
 
         size = len(content_bytes)
 

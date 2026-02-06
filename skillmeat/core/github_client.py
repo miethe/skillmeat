@@ -480,6 +480,30 @@ class GitHubClient:
             )
 
             if isinstance(content_file, ContentFile):
+                if content_file.type == "symlink":
+                    # Symlink detected - resolve target and fetch actual content
+                    import posixpath
+
+                    symlink_target = getattr(content_file, "target", None)
+                    if symlink_target:
+                        # Resolve relative path against parent directory
+                        parent_dir = posixpath.dirname(path)
+                        resolved_path = posixpath.normpath(
+                            posixpath.join(parent_dir, symlink_target)
+                        )
+                        # Validate resolved path stays within repo
+                        if not resolved_path.startswith(
+                            ".."
+                        ) and not resolved_path.startswith("/"):
+                            # Recursive call to get content at the resolved path
+                            return self.get_file_with_metadata(
+                                owner_repo, resolved_path, ref=ref
+                            )
+                    raise GitHubClientError(
+                        f"Cannot resolve symlink at '{path}' "
+                        f"(target: {symlink_target})"
+                    )
+
                 if content_file.type != "file":
                     raise GitHubClientError(
                         f"Path '{path}' is not a file (type: {content_file.type})"
@@ -497,7 +521,9 @@ class GitHubClient:
             raise GitHubClientError(f"Unexpected content type for '{path}'")
 
         except GithubException as e:
-            self._handle_exception(e, context=f"get_file_with_metadata({owner_repo}, {path})")
+            self._handle_exception(
+                e, context=f"get_file_with_metadata({owner_repo}, {path})"
+            )
             raise
 
     def get_repo_tree(
@@ -513,7 +539,7 @@ class GitHubClient:
         Returns:
             List of dictionaries, each containing:
                 - path: str - File/directory path
-                - type: str - "blob" (file) or "tree" (directory)
+                - type: str - "blob" (file), "tree" (directory), or "symlink"
                 - sha: str - Object SHA
                 - size: int | None - File size (None for directories)
 
@@ -536,7 +562,11 @@ class GitHubClient:
             return [
                 {
                     "path": item.path,
-                    "type": item.type,
+                    "type": (
+                        "symlink"
+                        if item.type == "blob" and getattr(item, "mode", "") == "120000"
+                        else item.type
+                    ),
                     "sha": item.sha,
                     "size": item.size if item.type == "blob" else None,
                 }

@@ -107,6 +107,7 @@ from skillmeat.cache.repositories import (
 )
 from skillmeat.core.artifact import ArtifactType
 from skillmeat.core.manifest_extractors import extract_deep_search_text
+from skillmeat.core.github_client import GitHubClientError
 from skillmeat.core.marketplace.github_scanner import (
     GitHubScanner,
     RateLimitError,
@@ -4774,6 +4775,22 @@ async def update_path_tag_status(
 # =============================================================================
 
 
+def _map_tree_entry_type(entry_type: str) -> str:
+    """Map Git tree entry types to FileTreeEntry types.
+
+    Args:
+        entry_type: Raw type from get_repo_tree() - "blob", "tree", or "symlink"
+
+    Returns:
+        Mapped type for FileTreeEntry: "file", "tree", or "symlink"
+    """
+    if entry_type == "blob":
+        return "file"
+    elif entry_type == "symlink":
+        return "symlink"
+    return entry_type
+
+
 @router.get(
     "/{source_id}/artifacts/{artifact_path:path}/files",
     response_model=FileTreeResponse,
@@ -4855,7 +4872,7 @@ async def get_artifact_file_tree(
                         if entry["path"].startswith(path_prefix)
                         else entry["path"]
                     ),
-                    type="file" if entry["type"] == "blob" else entry["type"],
+                    type=_map_tree_entry_type(entry["type"]),
                     size=entry.get("size"),
                     sha=entry["sha"],
                 )
@@ -4924,7 +4941,7 @@ async def get_artifact_file_tree(
                     if entry["path"].startswith(path_prefix)
                     else entry["path"]
                 ),
-                type="file" if entry["type"] == "blob" else entry["type"],
+                type=_map_tree_entry_type(entry["type"]),
                 size=entry.get("size"),
                 sha=entry["sha"],
             )
@@ -5139,6 +5156,22 @@ async def get_artifact_file_content(
                 "detail": f"GitHub rate limit exceeded. Please retry after {retry_after} seconds."
             },
             headers={"Retry-After": str(retry_after)},
+        )
+    except GitHubClientError as e:
+        error_msg = str(e).lower()
+        if "is a directory" in error_msg or "symlink" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Path '{file_path}' is a directory or unresolvable symlink, not a regular file",
+            )
+        logger.error(
+            f"GitHub client error for file content {file_path} in {artifact_path} "
+            f"from source {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch file content: {e}",
         )
     except Exception as e:
         logger.error(
