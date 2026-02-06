@@ -43,6 +43,12 @@ export type { ContextModulesTabProps } from './context-modules-tab';
 export { ModuleEditor } from './module-editor';
 export type { ModuleEditorProps } from './module-editor';
 
+export { EffectiveContextPreview } from './effective-context-preview';
+export type { EffectiveContextPreviewProps } from './effective-context-preview';
+
+export { ContextPackGenerator } from './context-pack-generator';
+export type { ContextPackGeneratorProps } from './context-pack-generator';
+
 export {
   getConfidenceTier,
   getConfidenceColorClasses,
