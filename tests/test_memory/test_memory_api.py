@@ -1550,3 +1550,381 @@ class TestCrossServiceIntegration:
         pack_after = packer_service.preview_pack(PROJECT_ID, budget_tokens=4000)
         assert pack_after["items_available"] == 1
         assert pack_after["items"][0]["content"] == "Target keeps content after merge"
+
+
+# =============================================================================
+# End-to-End Workflow Test
+# =============================================================================
+
+
+class TestMemoryE2EWorkflow:
+    """End-to-end test exercising the complete memory lifecycle.
+
+    Validates the realistic user workflow: an agent captures learnings as
+    candidates, a human triages the inbox, promotes or deprecates items,
+    organizes them into a context module, generates a token-budgeted context
+    pack, merges duplicate items, and verifies the final system state.
+
+    This complements TestCrossServiceIntegration by testing a more holistic
+    multi-step scenario rather than isolated cross-service interactions.
+    """
+
+    def test_complete_memory_lifecycle(
+        self, memory_service, module_service, packer_service
+    ):
+        """Exercise the full create -> triage -> approve -> compose -> pack -> merge workflow."""
+
+        # =====================================================================
+        # Step 1: CREATE -- Agent captures learnings as candidates
+        # =====================================================================
+        items = []
+        items.append(
+            memory_service.create(
+                project_id=PROJECT_ID,
+                type="decision",
+                content="Use SQLAlchemy ORM for all database operations",
+                confidence=0.85,
+            )
+        )
+        items.append(
+            memory_service.create(
+                project_id=PROJECT_ID,
+                type="constraint",
+                content="All API endpoints must return within 200ms p95",
+                confidence=0.9,
+            )
+        )
+        items.append(
+            memory_service.create(
+                project_id=PROJECT_ID,
+                type="gotcha",
+                content="SQLite WAL mode must be enabled for concurrent writes",
+                confidence=0.75,
+            )
+        )
+        items.append(
+            memory_service.create(
+                project_id=PROJECT_ID,
+                type="learning",
+                content="Cursor pagination is more efficient than offset for large datasets",
+                confidence=0.6,
+            )
+        )
+        items.append(
+            memory_service.create(
+                project_id=PROJECT_ID,
+                type="style_rule",
+                content="Use snake_case for all Python function names",
+                confidence=0.95,
+            )
+        )
+
+        # All items start as candidates
+        for item in items:
+            assert item["status"] == "candidate"
+
+        # =====================================================================
+        # Step 2: TRIAGE -- Human reviews inbox of candidates
+        # =====================================================================
+        inbox = memory_service.list_items(PROJECT_ID, status="candidate")
+        assert len(inbox["items"]) == 5
+
+        # =====================================================================
+        # Step 3: APPROVE / DEPRECATE -- Promote high-value items
+        # =====================================================================
+        # Promote the first 4 items to active
+        for item in items[:4]:
+            promoted = memory_service.promote(
+                item["id"], reason="Validated by team review"
+            )
+            assert promoted["status"] == "active"
+
+        # Deprecate the style rule (covered by linting tools)
+        deprecated = memory_service.deprecate(
+            items[4]["id"], reason="Covered by linting rules"
+        )
+        assert deprecated["status"] == "deprecated"
+        assert deprecated["deprecated_at"] is not None
+
+        # Promote the decision further to stable
+        stable = memory_service.promote(
+            items[0]["id"], reason="Battle-tested in production"
+        )
+        assert stable["status"] == "stable"
+
+        # Verify provenance records both transitions for the decision
+        assert stable["provenance"] is not None
+        transitions = stable["provenance"].get("transitions", [])
+        assert len(transitions) == 2
+        assert transitions[0]["from"] == "candidate"
+        assert transitions[0]["to"] == "active"
+        assert transitions[1]["from"] == "active"
+        assert transitions[1]["to"] == "stable"
+
+        # =====================================================================
+        # Step 4: COMPOSE -- Create a context module with selectors
+        # =====================================================================
+        module = module_service.create(
+            project_id=PROJECT_ID,
+            name="Backend Development Context",
+            description="Key memories for backend development tasks",
+            selectors={
+                "memory_types": ["decision", "constraint", "gotcha"],
+                "min_confidence": 0.7,
+            },
+            priority=1,
+        )
+        assert module["name"] == "Backend Development Context"
+        assert module["selectors"]["memory_types"] == [
+            "decision",
+            "constraint",
+            "gotcha",
+        ]
+
+        # Add specific memories to the module (manual curation)
+        module_service.add_memory(module["id"], items[0]["id"], ordering=1)
+        module_service.add_memory(module["id"], items[1]["id"], ordering=2)
+        module_service.add_memory(module["id"], items[2]["id"], ordering=3)
+
+        # Verify module has the linked items
+        memories = module_service.get_memories(module["id"])
+        assert len(memories) == 3
+
+        # =====================================================================
+        # Step 5: PACK (preview) -- Check what fits in token budget
+        # =====================================================================
+        preview = packer_service.preview_pack(
+            PROJECT_ID,
+            module_id=module["id"],
+            budget_tokens=2000,
+        )
+        # Module selectors filter to decision/constraint/gotcha with
+        # min_confidence >= 0.7.  The learning (0.6) and deprecated style_rule
+        # should be excluded.
+        assert preview["items_included"] > 0
+        assert preview["total_tokens"] <= preview["budget_tokens"]
+        assert preview["utilization"] > 0
+
+        # Verify excluded items are not in the preview
+        preview_types = {item["type"] for item in preview["items"]}
+        assert "style_rule" not in preview_types
+        assert "learning" not in preview_types
+
+        # =====================================================================
+        # Step 6: GENERATE -- Produce deployable markdown
+        # =====================================================================
+        pack = packer_service.generate_pack(
+            PROJECT_ID,
+            module_id=module["id"],
+            budget_tokens=4000,
+        )
+        assert "markdown" in pack
+        assert len(pack["markdown"]) > 0
+        assert "generated_at" in pack
+        assert "# Context Pack" in pack["markdown"]
+
+        markdown = pack["markdown"]
+
+        # Verify markdown contains our promoted memories
+        assert "SQLAlchemy ORM" in markdown
+        assert "200ms p95" in markdown
+
+        # =====================================================================
+        # Step 7: VERIFY -- Deprecated items are NOT in pack
+        # =====================================================================
+        # The style_rule was deprecated, should not appear in the pack output.
+        # The packer only includes active/stable items, and the module selectors
+        # further restrict to decision/constraint/gotcha types.
+        assert "snake_case" not in markdown
+
+        # =====================================================================
+        # Step 8: MERGE -- Combine similar items
+        # =====================================================================
+        # Create a similar decision item
+        similar = memory_service.create(
+            project_id=PROJECT_ID,
+            type="decision",
+            content="SQLAlchemy should be the default ORM for the project",
+            confidence=0.7,
+        )
+        memory_service.promote(similar["id"])  # candidate -> active
+
+        # Merge into the existing stable decision (keep_target strategy)
+        merged = memory_service.merge(
+            source_id=similar["id"],
+            target_id=items[0]["id"],
+            strategy="keep_target",
+        )
+        assert merged["merged_source_id"] == similar["id"]
+        assert merged["content"] == "Use SQLAlchemy ORM for all database operations"
+
+        # Verify source is deprecated after merge
+        source_after = memory_service.get(similar["id"])
+        assert source_after["status"] == "deprecated"
+
+        # Verify target provenance records the merge
+        assert merged["provenance"] is not None
+        merges = merged["provenance"].get("merges", [])
+        assert len(merges) == 1
+        assert merges[0]["merged_from"] == similar["id"]
+
+        # =====================================================================
+        # Step 9: POST-MERGE PACK -- Verify merged source is excluded
+        # =====================================================================
+        pack_after = packer_service.generate_pack(
+            PROJECT_ID,
+            module_id=module["id"],
+            budget_tokens=4000,
+        )
+        # The merged source should not appear (it is now deprecated)
+        assert "default ORM for the project" not in pack_after["markdown"]
+        # The target (stable decision) should still appear
+        assert "SQLAlchemy ORM" in pack_after["markdown"]
+
+        # =====================================================================
+        # Step 10: FINAL STATE CHECK -- Verify expected counts
+        # =====================================================================
+        # Expected final state:
+        #   - items[0]: decision, stable (promoted twice)
+        #   - items[1]: constraint, active
+        #   - items[2]: gotcha, active
+        #   - items[3]: learning, active
+        #   - items[4]: style_rule, deprecated (manually deprecated)
+        #   - similar:  decision, deprecated (merged into items[0])
+        stable_count = memory_service.count(PROJECT_ID, status="stable")
+        active_count = memory_service.count(PROJECT_ID, status="active")
+        deprecated_count = memory_service.count(PROJECT_ID, status="deprecated")
+
+        assert stable_count == 1, f"Expected 1 stable item, got {stable_count}"
+        assert active_count == 3, f"Expected 3 active items, got {active_count}"
+        assert deprecated_count == 2, f"Expected 2 deprecated items, got {deprecated_count}"
+
+        # Candidate inbox should be empty (all triaged)
+        candidate_count = memory_service.count(PROJECT_ID, status="candidate")
+        assert candidate_count == 0, "All candidates should have been triaged"
+
+        # Total item count
+        total = memory_service.count(PROJECT_ID)
+        assert total == 6, f"Expected 6 total items (5 original + 1 merge source), got {total}"
+
+    def test_module_selector_filtering_in_pack(
+        self, memory_service, module_service, packer_service
+    ):
+        """Verify that module selectors correctly filter pack contents across types."""
+
+        # Create items of different types and promote them all to active
+        decision = memory_service.create(
+            project_id=PROJECT_ID,
+            type="decision",
+            content="Architecture: use event sourcing for audit trail",
+            confidence=0.9,
+        )
+        memory_service.promote(decision["id"])
+
+        constraint = memory_service.create(
+            project_id=PROJECT_ID,
+            type="constraint",
+            content="Must support PostgreSQL 14+ in production",
+            confidence=0.85,
+        )
+        memory_service.promote(constraint["id"])
+
+        gotcha = memory_service.create(
+            project_id=PROJECT_ID,
+            type="gotcha",
+            content="Connection pool exhaustion under high concurrency",
+            confidence=0.8,
+        )
+        memory_service.promote(gotcha["id"])
+
+        learning = memory_service.create(
+            project_id=PROJECT_ID,
+            type="learning",
+            content="Read replicas reduce query latency by 40%",
+            confidence=0.7,
+        )
+        memory_service.promote(learning["id"])
+
+        style_rule = memory_service.create(
+            project_id=PROJECT_ID,
+            type="style_rule",
+            content="All imports must be sorted with isort",
+            confidence=0.95,
+        )
+        memory_service.promote(style_rule["id"])
+
+        # Create module that ONLY includes decisions and constraints
+        module = module_service.create(
+            project_id=PROJECT_ID,
+            name="Architecture Decisions Only",
+            selectors={
+                "memory_types": ["decision", "constraint"],
+                "min_confidence": 0.8,
+            },
+        )
+
+        pack = packer_service.generate_pack(
+            PROJECT_ID,
+            module_id=module["id"],
+            budget_tokens=4000,
+        )
+
+        # Only decision and constraint items should be included
+        assert pack["items_included"] == 2
+        included_types = {item["type"] for item in pack["items"]}
+        assert included_types == {"decision", "constraint"}
+
+        # Excluded types should not appear in the markdown
+        assert "Connection pool exhaustion" not in pack["markdown"]
+        assert "Read replicas" not in pack["markdown"]
+        assert "isort" not in pack["markdown"]
+
+        # Included types should appear
+        assert "event sourcing" in pack["markdown"]
+        assert "PostgreSQL 14" in pack["markdown"]
+
+    def test_confidence_tiered_labeling_in_pack(
+        self, memory_service, packer_service
+    ):
+        """Verify that confidence tiers produce correct labels in generated markdown."""
+
+        # High confidence (>= 0.85) -- no label
+        high = memory_service.create(
+            project_id=PROJECT_ID,
+            type="decision",
+            content="E2E_HIGH_CONF: use connection pooling",
+            confidence=0.9,
+        )
+        memory_service.promote(high["id"])
+
+        # Medium confidence (0.60 - 0.84) -- [medium confidence] label
+        medium = memory_service.create(
+            project_id=PROJECT_ID,
+            type="gotcha",
+            content="E2E_MED_CONF: watch for timezone drift",
+            confidence=0.7,
+        )
+        memory_service.promote(medium["id"])
+
+        # Low confidence (< 0.60) -- items below 0.6 still appear if active
+        low = memory_service.create(
+            project_id=PROJECT_ID,
+            type="learning",
+            content="E2E_LOW_CONF: CQRS might reduce complexity",
+            confidence=0.5,
+        )
+        memory_service.promote(low["id"])
+
+        pack = packer_service.generate_pack(PROJECT_ID, budget_tokens=4000)
+        markdown = pack["markdown"]
+
+        # High confidence item should appear without a confidence label
+        assert "E2E_HIGH_CONF: use connection pooling" in markdown
+
+        # Medium confidence item should have [medium confidence] label
+        assert "[medium confidence]" in markdown
+        assert "E2E_MED_CONF: watch for timezone drift" in markdown
+
+        # Low confidence item should have [low confidence] label
+        assert "[low confidence]" in markdown
+        assert "E2E_LOW_CONF: CQRS might reduce complexity" in markdown
