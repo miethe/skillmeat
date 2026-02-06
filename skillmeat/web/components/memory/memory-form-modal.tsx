@@ -297,12 +297,20 @@ export function MemoryFormModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Type selector */}
           <div className="space-y-2">
-            <Label htmlFor="memory-type">Type</Label>
+            <Label htmlFor="memory-type">
+              Type <span className="text-destructive" aria-hidden="true">*</span>
+            </Label>
             <Select
               value={form.type}
               onValueChange={(value) => updateField('type', value as MemoryType)}
+              required
             >
-              <SelectTrigger id="memory-type" aria-label="Memory type">
+              <SelectTrigger
+                id="memory-type"
+                aria-label="Memory type"
+                aria-required="true"
+                aria-describedby={errors.type ? 'type-error' : undefined}
+              >
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent>
@@ -314,13 +322,15 @@ export function MemoryFormModal({
               </SelectContent>
             </Select>
             {errors.type && (
-              <p className="text-xs text-destructive">{errors.type}</p>
+              <p id="type-error" className="text-xs text-destructive" role="alert">{errors.type}</p>
             )}
           </div>
 
           {/* Content textarea */}
           <div className="space-y-2">
-            <Label htmlFor="memory-content">Content</Label>
+            <Label htmlFor="memory-content">
+              Content <span className="text-destructive" aria-hidden="true">*</span>
+            </Label>
             <Textarea
               id="memory-content"
               placeholder="Describe the memory (decision, constraint, learning, etc.)..."
@@ -328,19 +338,24 @@ export function MemoryFormModal({
               onChange={(e) => updateField('content', e.target.value)}
               rows={4}
               className={cn(errors.content && 'border-destructive')}
-              aria-describedby={errors.content ? 'content-error' : undefined}
+              aria-required="true"
+              aria-describedby={[
+                errors.content ? 'content-error' : 'content-hint',
+                'content-count',
+              ].join(' ')}
+              aria-invalid={!!errors.content}
             />
             <div className="flex items-center justify-between">
               {errors.content ? (
-                <p id="content-error" className="text-xs text-destructive">
+                <p id="content-error" className="text-xs text-destructive" role="alert">
                   {errors.content}
                 </p>
               ) : (
-                <p className="text-xs text-muted-foreground">
+                <p id="content-hint" className="text-xs text-muted-foreground">
                   Minimum {MIN_CONTENT_LENGTH} characters
                 </p>
               )}
-              <p className="text-xs text-muted-foreground">
+              <p id="content-count" className="text-xs text-muted-foreground" aria-live="polite">
                 {form.content.length} chars
               </p>
             </div>
@@ -361,6 +376,11 @@ export function MemoryFormModal({
                 }
                 className="flex-1 accent-current"
                 aria-label="Confidence percentage"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={form.confidence}
+                aria-valuetext={`${form.confidence}%`}
+                aria-describedby={errors.confidence ? 'confidence-error' : undefined}
               />
               <span
                 className={cn(
@@ -373,7 +393,7 @@ export function MemoryFormModal({
               </span>
             </div>
             {errors.confidence && (
-              <p className="text-xs text-destructive">{errors.confidence}</p>
+              <p id="confidence-error" className="text-xs text-destructive" role="alert">{errors.confidence}</p>
             )}
           </div>
 
@@ -423,7 +443,7 @@ export function MemoryFormModal({
 
           {/* Mutation error display */}
           {(createMutation.error || updateMutation.error) && (
-            <p className="text-sm text-destructive">
+            <p className="text-sm text-destructive" role="alert">
               {createMutation.error?.message ||
                 updateMutation.error?.message ||
                 'An error occurred. Please try again.'}
@@ -440,9 +460,9 @@ export function MemoryFormModal({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting}>
               {isSubmitting && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
               )}
               {isEditMode ? 'Save Changes' : 'Create Memory'}
             </Button>

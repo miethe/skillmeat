@@ -24,7 +24,7 @@ import * as React from 'react';
  */
 export function MemoryCardSkeleton() {
   return (
-    <div className="flex items-stretch gap-3 px-6 py-3 animate-pulse">
+    <div className="flex items-stretch gap-3 px-6 py-3 animate-pulse" aria-hidden="true">
       {/* Checkbox placeholder */}
       <div className="h-4 w-4 rounded bg-muted mt-1" />
 

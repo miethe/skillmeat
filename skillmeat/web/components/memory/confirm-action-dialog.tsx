@@ -97,12 +97,13 @@ export function ConfirmActionDialog({
           <AlertDialogAction
             onClick={handleConfirm}
             disabled={isLoading}
+            aria-busy={isLoading}
             className={cn(
               confirmVariant === 'destructive' &&
                 buttonVariants({ variant: 'destructive' })
             )}
           >
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
             {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

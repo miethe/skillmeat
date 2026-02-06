@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Settings,
@@ -17,6 +17,7 @@ import {
   useDeprecateMemoryItem,
   useBulkPromoteMemoryItems,
   useBulkDeprecateMemoryItems,
+  useKeyboardShortcuts,
 } from '@/hooks';
 import type { MemoryStatus } from '@/sdk/models/MemoryStatus';
 import type { MemoryType } from '@/sdk/models/MemoryType';
@@ -28,6 +29,7 @@ import { MemoryDetailPanel } from '@/components/memory/memory-detail-panel';
 import { ConfirmActionDialog } from '@/components/memory/confirm-action-dialog';
 import { MemoryFormModal } from '@/components/memory/memory-form-modal';
 import { MergeModal } from '@/components/memory/merge-modal';
+import { KeyboardHelpModal } from '@/components/memory/keyboard-help-modal';
 
 // ---------------------------------------------------------------------------
 // Sort mapping: UI sort values -> API sort_by + sort_order
@@ -78,7 +80,9 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   const {
     selectedIds,
     focusedIndex,
+    setFocusedIndex,
     toggleSelect,
+    selectAll,
     clearSelection,
   } = useMemorySelection();
 
@@ -94,6 +98,12 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
     title: string;
     description: string;
   } | null>(null);
+  const [helpModalOpen, setHelpModalOpen] = useState(false);
+
+  // ---------------------------------------------------------------------------
+  // Container ref for keyboard shortcut scope
+  // ---------------------------------------------------------------------------
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // ---------------------------------------------------------------------------
   // Build API filter params from UI state
@@ -241,10 +251,85 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   }, [selectedIds, bulkDeprecate, clearSelection]);
 
   // ---------------------------------------------------------------------------
+  // Keyboard shortcuts (A11Y-3.12)
+  // ---------------------------------------------------------------------------
+  const anyModalOpen =
+    createModalOpen ||
+    !!editingMemory ||
+    !!mergingMemoryId ||
+    !!confirmAction ||
+    helpModalOpen;
+
+  useKeyboardShortcuts(
+    containerRef,
+    {
+      onNavigateDown: () => {
+        setFocusedIndex((prev) => Math.min(prev + 1, memories.length - 1));
+      },
+      onNavigateUp: () => {
+        setFocusedIndex((prev) => Math.max(prev - 1, 0));
+      },
+      onApprove: () => {
+        const item = memories[focusedIndex];
+        if (item) handleApprove(item.id);
+      },
+      onEdit: () => {
+        const item = memories[focusedIndex];
+        if (item) handleEdit(item.id);
+      },
+      onReject: () => {
+        const item = memories[focusedIndex];
+        if (item) handleReject(item.id);
+      },
+      onMerge: () => {
+        const item = memories[focusedIndex];
+        if (item) handleMerge(item.id);
+      },
+      onToggleSelect: () => {
+        const item = memories[focusedIndex];
+        if (item) toggleSelect(item.id);
+      },
+      onOpenDetail: () => {
+        const item = memories[focusedIndex];
+        if (item) handleCardClick(item.id);
+      },
+      onDismiss: () => {
+        if (selectedMemoryId) {
+          handleCloseDetail();
+        } else if (selectedIds.size > 0) {
+          clearSelection();
+        }
+      },
+      onSelectAll: () => {
+        selectAll(memories.map((m) => m.id));
+      },
+      onShowHelp: () => {
+        setHelpModalOpen(true);
+      },
+      itemCount: memories.length,
+    },
+    !anyModalOpen
+  );
+
+  // ---------------------------------------------------------------------------
+  // Scroll focused card into view on j/k navigation
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (focusedIndex < 0) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const rows = container.querySelectorAll('[role="row"]');
+    const target = rows[focusedIndex];
+    if (target) {
+      target.scrollIntoView({ block: 'nearest' });
+    }
+  }, [focusedIndex]);
+
+  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <div className="flex h-screen flex-col">
+    <div ref={containerRef} tabIndex={-1} className="flex h-screen flex-col outline-none">
       {/* ------------------------------------------------------------------ */}
       {/* Page Header                                                        */}
       {/* ------------------------------------------------------------------ */}
@@ -285,11 +370,11 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm">
-              <Settings className="mr-2 h-4 w-4" />
+              <Settings className="mr-2 h-4 w-4" aria-hidden="true" />
               Settings
             </Button>
             <Button size="sm" onClick={handleCreateMemory}>
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
               Create Memory
             </Button>
           </div>
@@ -404,6 +489,12 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
         confirmVariant="destructive"
         onConfirm={handleConfirmAction}
         isLoading={deprecateItem.isPending}
+      />
+
+      {/* Keyboard shortcuts help modal */}
+      <KeyboardHelpModal
+        open={helpModalOpen}
+        onOpenChange={setHelpModalOpen}
       />
     </div>
   );

@@ -150,6 +150,7 @@ function ProvenanceSection({
       <CollapsibleTrigger asChild>
         <button
           className="flex w-full items-center justify-between py-1 text-sm font-semibold hover:text-foreground transition-colors"
+          aria-expanded={isOpen}
           aria-label="Toggle provenance section"
         >
           Provenance
@@ -158,6 +159,7 @@ function ProvenanceSection({
               'h-4 w-4 text-muted-foreground transition-transform duration-200',
               isOpen && 'rotate-180'
             )}
+            aria-hidden="true"
           />
         </button>
       </CollapsibleTrigger>
@@ -178,7 +180,7 @@ function ProvenanceSection({
 
             return (
               <div key={key} className="flex items-start gap-2">
-                <Icon className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                <Icon className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <dt className="text-xs font-medium text-muted-foreground">
                     {label}
@@ -201,7 +203,7 @@ function ProvenanceSection({
                 : String(value);
               return (
                 <div key={key} className="flex items-start gap-2">
-                  <Hash className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                  <Hash className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
                   <div className="min-w-0 flex-1">
                     <dt className="text-xs font-medium text-muted-foreground">
                       {key}
@@ -306,7 +308,7 @@ export function MemoryDetailPanel({
             onClick={onClose}
             aria-label="Back to list"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           </Button>
           <h2 className="text-sm font-semibold">Memory Detail</h2>
         </div>
@@ -317,7 +319,7 @@ export function MemoryDetailPanel({
           onClick={onClose}
           aria-label="Close detail panel"
         >
-          <X className="h-4 w-4" />
+          <X className="h-4 w-4" aria-hidden="true" />
         </Button>
       </div>
 
@@ -343,6 +345,7 @@ export function MemoryDetailPanel({
                       'h-1.5 w-1.5 rounded-full',
                       getStatusDotClass(memory.status)
                     )}
+                    aria-hidden="true"
                   />
                   {memory.status}
                 </span>
@@ -435,7 +438,7 @@ export function MemoryDetailPanel({
                 className="gap-1.5"
                 onClick={() => onEdit(memory.id)}
               >
-                <Pencil className="h-3.5 w-3.5" />
+                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                 Edit
               </Button>
               <Button
@@ -444,7 +447,7 @@ export function MemoryDetailPanel({
                 className="gap-1.5"
                 onClick={() => onApprove(memory.id)}
               >
-                <Check className="h-3.5 w-3.5" />
+                <Check className="h-3.5 w-3.5" aria-hidden="true" />
                 Approve
               </Button>
               <Button
@@ -453,7 +456,7 @@ export function MemoryDetailPanel({
                 className="gap-1.5 text-destructive hover:text-destructive"
                 onClick={() => onReject(memory.id)}
               >
-                <Ban className="h-3.5 w-3.5" />
+                <Ban className="h-3.5 w-3.5" aria-hidden="true" />
                 Reject
               </Button>
 
@@ -466,16 +469,16 @@ export function MemoryDetailPanel({
                     className="ml-auto h-8 w-8"
                     aria-label="More actions"
                   >
-                    <MoreHorizontal className="h-4 w-4" />
+                    <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => onMerge(memory.id)}>
-                    <GitMerge className="mr-2 h-4 w-4" />
+                    <GitMerge className="mr-2 h-4 w-4" aria-hidden="true" />
                     Merge
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onDeprecate(memory.id)}>
-                    <Archive className="mr-2 h-4 w-4" />
+                    <Archive className="mr-2 h-4 w-4" aria-hidden="true" />
                     Deprecate
                   </DropdownMenuItem>
                 </DropdownMenuContent>

@@ -160,7 +160,7 @@ export function MemoryFilterBar({
                 value={type.value}
                 className="data-[state=active]:bg-muted"
               >
-                {type.icon && <type.icon className="mr-1.5 h-3.5 w-3.5" />}
+                {type.icon && <type.icon className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />}
                 {type.label}
                 <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
                   {counts?.[type.value] ?? 0}
@@ -182,10 +182,10 @@ export function MemoryFilterBar({
         {/* Status filter */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8">
-              <Filter className="mr-2 h-3.5 w-3.5" />
+            <Button variant="outline" size="sm" className="h-8" aria-label={`Filter by status: ${getStatusLabel(statusFilter)}`}>
+              <Filter className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
               {getStatusLabel(statusFilter)}
-              <ChevronDown className="ml-2 h-3.5 w-3.5" />
+              <ChevronDown className="ml-2 h-3.5 w-3.5" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
@@ -202,8 +202,8 @@ export function MemoryFilterBar({
         {/* Sort control */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8">
-              <ArrowUpDown className="mr-2 h-3.5 w-3.5" />
+            <Button variant="outline" size="sm" className="h-8" aria-label={`Sort by: ${getSortLabel(sortBy)}`}>
+              <ArrowUpDown className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
               {getSortLabel(sortBy)}
             </Button>
           </DropdownMenuTrigger>
@@ -223,7 +223,7 @@ export function MemoryFilterBar({
 
         {/* Search */}
         <div className="relative w-64">
-          <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+          <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
           <Input
             placeholder="Search memories..."
             value={searchQuery}

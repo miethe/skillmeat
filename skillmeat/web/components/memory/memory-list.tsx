@@ -124,16 +124,16 @@ export function MemoryList({
   // ---------------------------------------------------------------------------
   if (isError) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="flex flex-col items-center justify-center py-16 text-center" role="alert">
         <div className="rounded-full bg-destructive/10 p-4 mb-4">
-          <AlertTriangle className="h-8 w-8 text-destructive" />
+          <AlertTriangle className="h-8 w-8 text-destructive" aria-hidden="true" />
         </div>
         <h3 className="text-lg font-semibold">Failed to load memories</h3>
         <p className="mt-2 max-w-sm text-sm text-muted-foreground">
           {error?.message ?? 'An unexpected error occurred.'}
         </p>
         <Button variant="outline" className="mt-4" size="sm" onClick={refetch}>
-          <RefreshCw className="mr-2 h-4 w-4" />
+          <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
           Retry
         </Button>
       </div>
@@ -147,7 +147,7 @@ export function MemoryList({
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <div className="rounded-full bg-muted p-4 mb-4">
-          <Brain className="h-8 w-8 text-muted-foreground" />
+          <Brain className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
         </div>
         <h3 className="text-lg font-semibold">No memories yet</h3>
         <p className="mt-2 max-w-sm text-sm text-muted-foreground">
@@ -155,7 +155,7 @@ export function MemoryList({
           create them manually.
         </p>
         <Button className="mt-4" size="sm" onClick={onCreateMemory}>
-          <Plus className="mr-2 h-4 w-4" />
+          <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
           Create First Memory
         </Button>
       </div>
@@ -166,26 +166,31 @@ export function MemoryList({
   // Default: Scrollable List
   // ---------------------------------------------------------------------------
   return (
-    <div
-      role="grid"
-      aria-label="Memory items"
-      aria-rowcount={memories.length}
-      className="flex-1 overflow-y-auto divide-y"
-    >
-      {memories.map((memory, index) => (
-        <MemoryCard
-          key={memory.id}
-          memory={memory}
-          selected={selectedIds.has(memory.id)}
-          focused={focusedIndex === index}
-          onToggleSelect={onToggleSelect}
-          onApprove={onApprove}
-          onReject={onReject}
-          onEdit={onEdit}
-          onMerge={onMerge}
-          onClick={onCardClick}
-        />
-      ))}
-    </div>
+    <>
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {memories.length} {memories.length === 1 ? 'memory item' : 'memory items'} displayed
+      </div>
+      <div
+        role="grid"
+        aria-label="Memory items"
+        aria-rowcount={memories.length}
+        className="flex-1 overflow-y-auto divide-y"
+      >
+        {memories.map((memory, index) => (
+          <MemoryCard
+            key={memory.id}
+            memory={memory}
+            selected={selectedIds.has(memory.id)}
+            focused={focusedIndex === index}
+            onToggleSelect={onToggleSelect}
+            onApprove={onApprove}
+            onReject={onReject}
+            onEdit={onEdit}
+            onMerge={onMerge}
+            onClick={onCardClick}
+          />
+        ))}
+      </div>
+    </>
   );
 }

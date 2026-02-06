@@ -86,10 +86,10 @@ function MemoryPane({
   const colors = getConfidenceColorClasses(tier);
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+    <div className="space-y-2" role="group" aria-label={label}>
+      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
         {label}
-      </p>
+      </h3>
       <div className="rounded-md border p-3 space-y-2">
         <MemoryTypeBadge type={memory.type} />
         <p className="text-sm leading-relaxed line-clamp-4">
@@ -227,7 +227,7 @@ export function MergeModal({
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <GitMerge className="h-5 w-5" />
+            <GitMerge className="h-5 w-5" aria-hidden="true" />
             Merge Memories
           </DialogTitle>
           <DialogDescription>
@@ -242,10 +242,10 @@ export function MergeModal({
           <MemoryPane memory={sourceMemory} label="Source Memory" />
 
           {/* Target pane */}
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="space-y-2" role="group" aria-label="Target Memory">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Target Memory
-            </p>
+            </h3>
 
             {/* Target selector */}
             <Select value={targetId} onValueChange={setTargetId}>
@@ -309,6 +309,7 @@ export function MergeModal({
                 value={strategy}
                 onValueChange={(v) => setStrategy(v as MergeStrategy)}
                 className="flex flex-wrap gap-4"
+                aria-label="Merge strategy"
               >
                 <div className="flex items-center gap-2">
                   <RadioGroupItem value="keep_target" id="strategy-keep-target" />
@@ -355,7 +356,7 @@ export function MergeModal({
 
         {/* Mutation error */}
         {mergeMutation.error && (
-          <p className="text-sm text-destructive">
+          <p className="text-sm text-destructive" role="alert">
             {mergeMutation.error.message || 'Merge failed. Please try again.'}
           </p>
         )}
@@ -372,9 +373,10 @@ export function MergeModal({
           <Button
             onClick={handleMerge}
             disabled={!canMerge}
+            aria-busy={mergeMutation.isPending}
           >
             {mergeMutation.isPending && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
             )}
             Merge Memories
           </Button>

@@ -34,6 +34,9 @@ export type { MemoryFormModalProps } from './memory-form-modal';
 export { MergeModal } from './merge-modal';
 export type { MergeModalProps } from './merge-modal';
 
+export { KeyboardHelpModal } from './keyboard-help-modal';
+export type { KeyboardHelpModalProps } from './keyboard-help-modal';
+
 export {
   getConfidenceTier,
   getConfidenceColorClasses,

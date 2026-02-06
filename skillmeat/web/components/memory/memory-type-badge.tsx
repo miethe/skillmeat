@@ -129,7 +129,7 @@ export function MemoryTypeBadge({ type, className }: MemoryTypeBadgeProps) {
         className
       )}
     >
-      <Icon className="h-2.5 w-2.5" />
+      <Icon className="h-2.5 w-2.5" aria-hidden="true" />
       {config.label}
     </Badge>
   );

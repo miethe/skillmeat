@@ -97,7 +97,7 @@ export function MemoryCard({
   return (
     <div
       role="row"
-      tabIndex={0}
+      tabIndex={focused ? 0 : -1}
       aria-selected={selected}
       aria-label={`Memory item: ${memory.type}, ${confidencePercent}% confidence, ${memory.status}`}
       className={cn(
@@ -171,6 +171,7 @@ export function MemoryCard({
                 'h-1.5 w-1.5 rounded-full',
                 getStatusDotClass(memory.status)
               )}
+              aria-hidden="true"
             />
             {memory.status}
           </span>
@@ -192,9 +193,9 @@ export function MemoryCard({
             e.stopPropagation();
             onApprove(memory.id);
           }}
-          aria-label="Approve memory"
+          aria-label={`Approve memory: ${memory.content.slice(0, 40)}`}
         >
-          <Check className="h-3.5 w-3.5 text-emerald-600" />
+          <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
         </Button>
         <Button
           variant="ghost"
@@ -204,9 +205,9 @@ export function MemoryCard({
             e.stopPropagation();
             onEdit(memory.id);
           }}
-          aria-label="Edit memory"
+          aria-label={`Edit memory: ${memory.content.slice(0, 40)}`}
         >
-          <Pencil className="h-3.5 w-3.5" />
+          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
         </Button>
         <Button
           variant="ghost"
@@ -216,9 +217,9 @@ export function MemoryCard({
             e.stopPropagation();
             onReject(memory.id);
           }}
-          aria-label="Reject memory"
+          aria-label={`Reject memory: ${memory.content.slice(0, 40)}`}
         >
-          <X className="h-3.5 w-3.5 text-red-500" />
+          <X className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />
         </Button>
       </div>
     </div>

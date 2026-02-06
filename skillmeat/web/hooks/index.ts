@@ -536,3 +536,12 @@ export { useCollectionContext } from './use-collection-context';
  * Manages entity creation, updates, and deletion in React context
  */
 export { EntityLifecycleProvider, useEntityLifecycle } from './useEntityLifecycle';
+
+// ============================================================================
+// KEYBOARD SHORTCUTS (1 hook)
+// ============================================================================
+// Container-scoped keyboard shortcut handler for triage workflows
+export {
+  useKeyboardShortcuts,
+  type KeyboardShortcutActions,
+} from './use-keyboard-shortcuts';

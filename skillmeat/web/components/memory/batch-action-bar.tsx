@@ -81,7 +81,7 @@ export function BatchActionBar({
         </span>
 
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={onClearSelection}>
+          <Button size="sm" variant="outline" onClick={onClearSelection} aria-label="Clear selection">
             Clear
           </Button>
           <Button
@@ -89,12 +89,13 @@ export function BatchActionBar({
             variant="outline"
             className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
             onClick={onRejectAll}
+            aria-label={`Reject ${selectedCount} selected ${selectedCount === 1 ? 'item' : 'items'}`}
           >
-            <X className="mr-2 h-3.5 w-3.5" />
+            <X className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
             Reject
           </Button>
-          <Button size="sm" onClick={onApproveAll}>
-            <Check className="mr-2 h-3.5 w-3.5" />
+          <Button size="sm" onClick={onApproveAll} aria-label={`Approve ${selectedCount} selected ${selectedCount === 1 ? 'item' : 'items'}`}>
+            <Check className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
             Approve
           </Button>
         </div>
