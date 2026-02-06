@@ -29,7 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Backend**
 - Artifact comparison and conflict detection API endpoints
-- Marketplace source import: symlink resolution and naming fixes
+- Marketplace source import: comprehensive symlink support
+  - Symlink resolution in `get_repo_tree()`: resolves symlinks to their target type (file or directory) by fetching blob content and looking up target path in tree
+  - Virtual entry mirroring: files inside symlinked directories are mirrored under the symlink path for complete artifact file tree representation
+  - Symlink ancestor resolution in `get_file_with_metadata()`: fetches content for virtual paths by walking up parent directories to find and resolve through symlink ancestors
+  - Single-artifact source naming: dotfile root hints (e.g., `.claude`) now use repository name instead of dotfile directory name
+  - Import-time symlink following: `_download_directory_recursive()` detects and follows symlinks during artifact import with circular symlink detection
 
 **Testing**
 - Unit tests for `SyncConfirmationDialog` and `useConflictCheck`
