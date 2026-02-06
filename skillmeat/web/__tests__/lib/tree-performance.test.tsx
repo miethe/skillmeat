@@ -39,37 +39,15 @@ function generateMockEntries(count: number): CatalogEntry[] {
 
   // Simulate realistic folder structures
   const owners = ['anthropics', 'openai', 'user', 'community', 'enterprise'];
-  const categories = [
-    'tools',
-    'utilities',
-    'dev',
-    'testing',
-    'automation',
-    'analysis',
-  ];
-  const subcategories = [
-    'core',
-    'advanced',
-    'experimental',
-    'stable',
-    'beta',
-    'alpha',
-  ];
-  const artifactTypes: ArtifactType[] = [
-    'skill',
-    'command',
-    'agent',
-    'mcp',
-    'hook',
-  ];
+  const categories = ['tools', 'utilities', 'dev', 'testing', 'automation', 'analysis'];
+  const subcategories = ['core', 'advanced', 'experimental', 'stable', 'beta', 'alpha'];
+  const artifactTypes: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook'];
 
   for (let i = 0; i < count; i++) {
     const owner = owners[i % owners.length];
     const category = categories[Math.floor(i / owners.length) % categories.length];
     const subcategory =
-      subcategories[
-        Math.floor(i / (owners.length * categories.length)) % subcategories.length
-      ];
+      subcategories[Math.floor(i / (owners.length * categories.length)) % subcategories.length];
     const depth = (i % 4) + 2; // 2-5 levels deep
 
     // Build path based on depth
@@ -194,12 +172,7 @@ function MinimalTreeBranch({
   return (
     <div role="group">
       {nodes.map((node) => (
-        <MinimalTreeNode
-          key={node.fullPath}
-          node={node}
-          depth={depth}
-          expanded={expanded}
-        />
+        <MinimalTreeNode key={node.fullPath} node={node} depth={depth} expanded={expanded} />
       ))}
     </div>
   );
@@ -225,9 +198,7 @@ describe('Tree Building Performance', () => {
   it('builds tree from 500 entries in <50ms', () => {
     const entries = generateMockEntries(500);
 
-    const { durationMs, result } = measurePerformance(() =>
-      buildFolderTree(entries, 0)
-    );
+    const { durationMs, result } = measurePerformance(() => buildFolderTree(entries, 0));
 
     // Log for debugging
     console.log(`[PERF] buildFolderTree(500): ${durationMs.toFixed(2)}ms`);
@@ -242,9 +213,7 @@ describe('Tree Building Performance', () => {
   it('builds tree from 1000 entries in <100ms', () => {
     const entries = generateMockEntries(1000);
 
-    const { durationMs, result } = measurePerformance(() =>
-      buildFolderTree(entries, 0)
-    );
+    const { durationMs, result } = measurePerformance(() => buildFolderTree(entries, 0));
 
     console.log(`[PERF] buildFolderTree(1000): ${durationMs.toFixed(2)}ms`);
 
@@ -255,9 +224,7 @@ describe('Tree Building Performance', () => {
   it('builds tree from 2000 entries in <200ms', () => {
     const entries = generateMockEntries(2000);
 
-    const { durationMs, result } = measurePerformance(() =>
-      buildFolderTree(entries, 0)
-    );
+    const { durationMs, result } = measurePerformance(() => buildFolderTree(entries, 0));
 
     console.log(`[PERF] buildFolderTree(2000): ${durationMs.toFixed(2)}ms`);
 
@@ -275,9 +242,7 @@ describe('Tree Filtering Performance', () => {
     const entries = generateMockEntries(500);
     const tree = buildFolderTree(entries, 0);
 
-    const { durationMs, result } = measurePerformance(() =>
-      filterSemanticTree(tree)
-    );
+    const { durationMs, result } = measurePerformance(() => filterSemanticTree(tree));
 
     console.log(`[PERF] filterSemanticTree(500): ${durationMs.toFixed(2)}ms`);
 
@@ -290,9 +255,7 @@ describe('Tree Filtering Performance', () => {
     const entries = generateMockEntries(1000);
     const tree = buildFolderTree(entries, 0);
 
-    const { durationMs, result } = measurePerformance(() =>
-      filterSemanticTree(tree)
-    );
+    const { durationMs, result } = measurePerformance(() => filterSemanticTree(tree));
 
     console.log(`[PERF] filterSemanticTree(1000): ${durationMs.toFixed(2)}ms`);
 
@@ -429,9 +392,7 @@ describe('Incremental Update Performance', () => {
 
     // Initial render with all collapsed
     const expanded = new Set<string>();
-    const { rerender } = render(
-      <MinimalTree tree={filteredTree} expanded={expanded} />
-    );
+    const { rerender } = render(<MinimalTree tree={filteredTree} expanded={expanded} />);
 
     // Measure re-render when expanding first folder
     const firstFolderPath = Object.values(filteredTree)[0]?.fullPath;
@@ -457,9 +418,7 @@ describe('Incremental Update Performance', () => {
     const folderPaths = Object.values(filteredTree).map((n) => n.fullPath);
 
     let expanded = new Set<string>();
-    const { rerender } = render(
-      <MinimalTree tree={filteredTree} expanded={expanded} />
-    );
+    const { rerender } = render(<MinimalTree tree={filteredTree} expanded={expanded} />);
 
     // Simulate rapid toggling of 10 different folders
     const durations: number[] = [];

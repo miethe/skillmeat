@@ -57,7 +57,10 @@ function generateMockFiles(count: number): FileDiff[] {
     status: i % 3 === 0 ? 'added' : i % 3 === 1 ? 'modified' : 'deleted',
     collection_hash: `hash-coll-${i}`,
     project_hash: `hash-proj-${i}`,
-    unified_diff: i % 3 === 1 ? `--- a/file-${i}.tsx\n+++ b/file-${i}.tsx\n@@ -1,3 +1,4 @@\n context\n-old line ${i}\n+new line ${i}\n context` : null,
+    unified_diff:
+      i % 3 === 1
+        ? `--- a/file-${i}.tsx\n+++ b/file-${i}.tsx\n@@ -1,3 +1,4 @@\n context\n-old line ${i}\n+new line ${i}\n context`
+        : null,
   }));
 }
 
@@ -153,9 +156,7 @@ describe('SyncConfirmationDialog — performance (file cap)', () => {
       await user.click(showAllButton);
 
       // Now all files should be passed to DiffViewer
-      expect(screen.getByTestId('diff-viewer-file-count')).toHaveTextContent(
-        String(FILE_COUNT)
-      );
+      expect(screen.getByTestId('diff-viewer-file-count')).toHaveTextContent(String(FILE_COUNT));
     });
 
     it('hides "Show all" button after expanding', async () => {
@@ -231,9 +232,7 @@ describe('SyncConfirmationDialog — performance (file cap)', () => {
       render(<SyncConfirmationDialog {...defaultProps} direction="deploy" />);
 
       expect(screen.getByTestId('diff-viewer-file-count')).toHaveTextContent('10');
-      expect(
-        screen.getByRole('button', { name: 'Show all 11 files' })
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Show all 11 files' })).toBeInTheDocument();
     });
   });
 

@@ -4,7 +4,10 @@
 import { render, screen, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ManagePageFilters, type ManageStatusFilter } from '@/components/manage/manage-page-filters';
+import {
+  ManagePageFilters,
+  type ManageStatusFilter,
+} from '@/components/manage/manage-page-filters';
 import type { ArtifactType } from '@/types/artifact';
 
 // Polyfill scrollIntoView for Radix UI components
@@ -39,9 +42,7 @@ function renderWithQueryClient(ui: React.ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
-  );
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
 // Default props factory
@@ -352,7 +353,9 @@ describe('ManagePageFilters', () => {
       // Multiple 'tag-1' text nodes exist (popover + active filter chip).
       // The popover is rendered in a portal, so find the tag inside the
       // popover content area (which has the "Filter by tags" heading).
-      const popoverContent = screen.getByText('Filter by tags').closest('[data-radix-popper-content-wrapper]');
+      const popoverContent = screen
+        .getByText('Filter by tags')
+        .closest('[data-radix-popper-content-wrapper]');
       // eslint-disable-next-line testing-library/no-node-access
       const tag1InPopover = within(popoverContent as HTMLElement).getByText('tag-1');
       await user.click(tag1InPopover);
@@ -512,7 +515,9 @@ describe('ManagePageFilters', () => {
     it('calls onClearAll when clicked', async () => {
       const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
       const props = createDefaultProps();
-      renderWithQueryClient(<ManagePageFilters {...props} search="test" status="error" type="skill" />);
+      renderWithQueryClient(
+        <ManagePageFilters {...props} search="test" status="error" type="skill" />
+      );
 
       const clearAllButton = screen.getByRole('button', { name: 'Clear All' });
       await user.click(clearAllButton);

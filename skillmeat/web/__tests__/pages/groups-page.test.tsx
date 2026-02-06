@@ -6,7 +6,14 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GroupsPageClient } from '@/app/groups/components/groups-page-client';
-import { useCollectionContext, useGroup, useGroups, useGroupArtifacts, useArtifact, useToast } from '@/hooks';
+import {
+  useCollectionContext,
+  useGroup,
+  useGroups,
+  useGroupArtifacts,
+  useArtifact,
+  useToast,
+} from '@/hooks';
 import type { Collection } from '@/types/collections';
 import type { Group } from '@/types/groups';
 
@@ -53,7 +60,9 @@ jest.mock('next/link', () => {
   );
 });
 
-const mockUseCollectionContext = useCollectionContext as jest.MockedFunction<typeof useCollectionContext>;
+const mockUseCollectionContext = useCollectionContext as jest.MockedFunction<
+  typeof useCollectionContext
+>;
 const mockUseGroup = useGroup as jest.MockedFunction<typeof useGroup>;
 const mockUseGroups = useGroups as jest.MockedFunction<typeof useGroups>;
 const mockUseGroupArtifacts = useGroupArtifacts as jest.MockedFunction<typeof useGroupArtifacts>;

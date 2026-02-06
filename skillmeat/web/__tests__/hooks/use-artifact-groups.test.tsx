@@ -114,10 +114,9 @@ describe('useArtifactGroups', () => {
         total: mockGroups.length,
       });
 
-      const { result } = renderHook(
-        () => useArtifactGroups('artifact-1', 'collection-1'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useArtifactGroups('artifact-1', 'collection-1'), {
+        wrapper,
+      });
 
       // Initially loading
       expect(result.current.isLoading).toBe(true);
@@ -135,10 +134,9 @@ describe('useArtifactGroups', () => {
     it('returns empty array on API error (graceful degradation)', async () => {
       mockApiRequest.mockRejectedValueOnce(new Error('API Error'));
 
-      const { result } = renderHook(
-        () => useArtifactGroups('artifact-1', 'collection-1'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useArtifactGroups('artifact-1', 'collection-1'), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isSuccess).toBe(true);
@@ -149,10 +147,9 @@ describe('useArtifactGroups', () => {
     });
 
     it('query is disabled when artifactId is undefined', () => {
-      const { result } = renderHook(
-        () => useArtifactGroups(undefined, 'collection-1'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useArtifactGroups(undefined, 'collection-1'), {
+        wrapper,
+      });
 
       // Query should not be enabled
       expect(result.current.fetchStatus).toBe('idle');
@@ -160,10 +157,7 @@ describe('useArtifactGroups', () => {
     });
 
     it('query is disabled when collectionId is undefined', () => {
-      const { result } = renderHook(
-        () => useArtifactGroups('artifact-1', undefined),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useArtifactGroups('artifact-1', undefined), { wrapper });
 
       // Query should not be enabled
       expect(result.current.fetchStatus).toBe('idle');
@@ -171,10 +165,7 @@ describe('useArtifactGroups', () => {
     });
 
     it('query is disabled when both params are undefined', () => {
-      const { result } = renderHook(
-        () => useArtifactGroups(undefined, undefined),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useArtifactGroups(undefined, undefined), { wrapper });
 
       expect(result.current.fetchStatus).toBe('idle');
       expect(mockApiRequest).not.toHaveBeenCalled();
@@ -186,10 +177,9 @@ describe('useArtifactGroups', () => {
         total: mockGroups.length,
       });
 
-      const { result } = renderHook(
-        () => useArtifactGroups('artifact-1', 'collection-1'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useArtifactGroups('artifact-1', 'collection-1'), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isSuccess).toBe(true);
@@ -213,10 +203,9 @@ describe('useArtifactGroups', () => {
         total: unsortedGroups.length,
       });
 
-      const { result } = renderHook(
-        () => useArtifactGroups('artifact-1', 'collection-1'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useArtifactGroups('artifact-1', 'collection-1'), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isSuccess).toBe(true);
@@ -240,10 +229,9 @@ describe('useArtifactGroups', () => {
         total: groupsWithSamePosition.length,
       });
 
-      const { result } = renderHook(
-        () => useArtifactGroups('artifact-1', 'collection-1'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useArtifactGroups('artifact-1', 'collection-1'), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isSuccess).toBe(true);
@@ -264,10 +252,9 @@ describe('useArtifactGroups', () => {
         total: mockGroups.length,
       });
 
-      const { result } = renderHook(
-        () => useArtifactGroups('artifact-123', 'collection-456'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useArtifactGroups('artifact-123', 'collection-456'), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isSuccess).toBe(true);
@@ -337,10 +324,9 @@ describe('useArtifactGroups', () => {
         total: 0,
       });
 
-      const { result } = renderHook(
-        () => useArtifactGroups('artifact-1', 'collection-1'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useArtifactGroups('artifact-1', 'collection-1'), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isSuccess).toBe(true);

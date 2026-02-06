@@ -147,7 +147,9 @@ export function FolderDetailPane({
 
   // Check if folder/root has any artifacts to display (direct + promoted from leaf containers)
   const hasDisplayableArtifacts = folderArtifacts.length > 0;
-  const hasSubfolders = isAtRoot ? (rootFolders?.length ?? 0) > 0 : folder?.hasSubfolders ?? false;
+  const hasSubfolders = isAtRoot
+    ? (rootFolders?.length ?? 0) > 0
+    : (folder?.hasSubfolders ?? false);
 
   // PERFORMANCE: Memoize handlers passed to child components
   const handleImport = useCallback(
@@ -174,9 +176,7 @@ export function FolderDetailPane({
   // Display name and description for header
   const displayName = isAtRoot ? 'Source Root' : folder.name;
   const displayPath = isAtRoot ? '' : folder.fullPath;
-  const displayDescription = isAtRoot
-    ? 'Root-level artifacts and top-level folders'
-    : displayPath;
+  const displayDescription = isAtRoot ? 'Root-level artifacts and top-level folders' : displayPath;
 
   // Empty state: no artifacts match filters (but folder/root has artifacts to show without filters)
   if (filteredArtifacts.length === 0 && hasDisplayableArtifacts) {
@@ -266,24 +266,22 @@ export function FolderDetailPane({
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Artifacts</h3>
             <div className="space-y-4">
-              {(Object.keys(artifactsByType) as ArtifactType[])
-                .sort()
-                .map((type) => {
-                  const entries = artifactsByType[type] || [];
-                  return (
-                    <ArtifactTypeSection
-                      key={type}
-                      type={type}
-                      artifacts={entries}
-                      defaultExpanded={true}
-                      onImport={handleImport}
-                      onExclude={handleExclude}
-                      onArtifactClick={onArtifactClick}
-                      sourceId={sourceId}
-                      isImporting={isImporting}
-                    />
-                  );
-                })}
+              {(Object.keys(artifactsByType) as ArtifactType[]).sort().map((type) => {
+                const entries = artifactsByType[type] || [];
+                return (
+                  <ArtifactTypeSection
+                    key={type}
+                    type={type}
+                    artifacts={entries}
+                    defaultExpanded={true}
+                    onImport={handleImport}
+                    onExclude={handleExclude}
+                    onArtifactClick={onArtifactClick}
+                    sourceId={sourceId}
+                    isImporting={isImporting}
+                  />
+                );
+              })}
             </div>
           </div>
         )}

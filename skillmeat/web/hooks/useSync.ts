@@ -58,16 +58,13 @@ export function useSync(options: UseSyncOptions = {}) {
 
   return useMutation({
     mutationFn: async (request: SyncRequest): Promise<SyncResponse> => {
-      return apiRequest<SyncResponse>(
-        `/artifacts/${encodeURIComponent(request.artifactId)}/sync`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            force: request.force,
-            strategy: request.mergeStrategy,
-          }),
-        }
-      );
+      return apiRequest<SyncResponse>(`/artifacts/${encodeURIComponent(request.artifactId)}/sync`, {
+        method: 'POST',
+        body: JSON.stringify({
+          force: request.force,
+          strategy: request.mergeStrategy,
+        }),
+      });
     },
 
     onSuccess: (data, variables) => {

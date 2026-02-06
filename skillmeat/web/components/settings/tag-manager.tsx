@@ -22,9 +22,20 @@ import { TagDeleteDialog } from './tag-delete-dialog';
 // --- Color utilities ---
 
 const TAG_COLORS = [
-  '#6366f1', '#8b5cf6', '#d946ef', '#ec4899', '#f43f5e',
-  '#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e',
-  '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6',
+  '#6366f1',
+  '#8b5cf6',
+  '#d946ef',
+  '#ec4899',
+  '#f43f5e',
+  '#ef4444',
+  '#f97316',
+  '#eab308',
+  '#84cc16',
+  '#22c55e',
+  '#14b8a6',
+  '#06b6d4',
+  '#0ea5e9',
+  '#3b82f6',
 ] as const;
 
 function hashString(str: string): number {
@@ -230,11 +241,7 @@ export function TagManager() {
               className="pl-8"
             />
           </div>
-          <Button
-            size="sm"
-            onClick={() => setIsCreating(true)}
-            disabled={isCreating}
-          >
+          <Button size="sm" onClick={() => setIsCreating(true)} disabled={isCreating}>
             <Plus className="mr-1 h-4 w-4" />
             Create Tag
           </Button>
@@ -395,7 +402,7 @@ export function TagManager() {
                           type="button"
                           className={cn(
                             'cursor-pointer rounded px-1 py-0.5 text-left text-sm font-medium',
-                            'hover:bg-muted transition-colors'
+                            'transition-colors hover:bg-muted'
                           )}
                           onClick={() => startEditing(tag.id, tag.name)}
                         >

@@ -408,9 +408,9 @@ export function EditSourceModal({ source, open, onOpenChange, onSuccess }: EditS
                               <TooltipContent side="top" className="max-w-xs">
                                 <p>
                                   Indexes the full text content of artifact files (code,
-                                  documentation, etc.) for deeper search capabilities. This uses more
-                                  storage and processing time. Only enable if you need to search
-                                  within artifact file contents.
+                                  documentation, etc.) for deeper search capabilities. This uses
+                                  more storage and processing time. Only enable if you need to
+                                  search within artifact file contents.
                                 </p>
                               </TooltipContent>
                             </Tooltip>

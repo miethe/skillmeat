@@ -172,9 +172,7 @@ describe('GroupSelector', () => {
     it('calls onGroupSelect when selection changes', async () => {
       const mockOnGroupSelect = jest.fn();
 
-      render(
-        <GroupSelector collectionId="collection-1" onGroupSelect={mockOnGroupSelect} />
-      );
+      render(<GroupSelector collectionId="collection-1" onGroupSelect={mockOnGroupSelect} />);
 
       const trigger = screen.getByRole('combobox');
       fireEvent.click(trigger);
@@ -205,12 +203,7 @@ describe('GroupSelector', () => {
       // Set initial group in URL
       mockSearchParams.set('group', 'group-1');
 
-      render(
-        <GroupSelector
-          collectionId="collection-1"
-          selectedGroupId="group-1"
-        />
-      );
+      render(<GroupSelector collectionId="collection-1" selectedGroupId="group-1" />);
 
       const trigger = screen.getByRole('combobox');
       fireEvent.click(trigger);

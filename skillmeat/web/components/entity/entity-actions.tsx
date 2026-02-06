@@ -12,7 +12,15 @@
 'use client';
 
 import * as React from 'react';
-import { MoreHorizontal, Pencil, Trash2, Rocket, RefreshCw, FileText, RotateCcw } from 'lucide-react';
+import {
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Rocket,
+  RefreshCw,
+  FileText,
+  RotateCcw,
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -105,7 +113,8 @@ export function EntityActions({
   };
 
   const showViewDiff = entity.syncStatus === 'modified' && onViewDiff;
-  const showRollback = (entity.syncStatus === 'modified' || entity.syncStatus === 'conflict') && onRollback;
+  const showRollback =
+    (entity.syncStatus === 'modified' || entity.syncStatus === 'conflict') && onRollback;
 
   // Determine which actions are available to show
   const hasPrimaryActions = onDeploy || onSync;

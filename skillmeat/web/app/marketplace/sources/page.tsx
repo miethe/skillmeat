@@ -49,7 +49,14 @@ import { useSources, sourceKeys, useArtifactSearch, type ArtifactSearchResult } 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks';
 import { apiRequest } from '@/lib/api';
-import type { ScanResult, CatalogListResponse, GitHubSource, CatalogEntry, ArtifactType, CatalogStatus } from '@/types/marketplace';
+import type {
+  ScanResult,
+  CatalogListResponse,
+  GitHubSource,
+  CatalogEntry,
+  ArtifactType,
+  CatalogStatus,
+} from '@/types/marketplace';
 import { useState } from 'react';
 
 // ============================================================================
@@ -708,11 +715,7 @@ function MarketplaceSourcesPageInner() {
       {/* Search Mode Toggle and Search Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         {/* Search Mode Toggle */}
-        <SearchModeToggle
-          mode={searchMode}
-          onModeChange={handleModeChange}
-          disabled={isLoading}
-        />
+        <SearchModeToggle mode={searchMode} onModeChange={handleModeChange} disabled={isLoading} />
 
         {/* Search Bar - different behavior based on mode */}
         <div className="flex flex-1 items-center gap-2">
@@ -742,9 +745,7 @@ function MarketplaceSourcesPageInner() {
             {(searchMode === 'sources' ? searchQuery : artifactSearch.query) && (
               <button
                 onClick={() =>
-                  searchMode === 'sources'
-                    ? handleSearchChange('')
-                    : handleArtifactSearchChange('')
+                  searchMode === 'sources' ? handleSearchChange('') : handleArtifactSearchChange('')
                 }
                 className="absolute right-3 top-1/2 -translate-y-1/2 rounded-sm text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 aria-label="Clear search"
@@ -784,9 +785,7 @@ function MarketplaceSourcesPageInner() {
       {searchMode === 'artifacts' ? (
         <>
           {/* Artifact Search Results */}
-          {artifactSearch.isFetching && !artifactSearch.data && (
-            <ArtifactSearchResultsSkeleton />
-          )}
+          {artifactSearch.isFetching && !artifactSearch.data && <ArtifactSearchResultsSkeleton />}
 
           {/* Loading indicator when fetching with existing data */}
           {artifactSearch.isFetching && artifactSearch.data && (
@@ -813,13 +812,8 @@ function MarketplaceSourcesPageInner() {
           {/* Prompt to enter search query */}
           {!artifactSearch.query && !artifactSearch.data && (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <SearchIcon
-                className="mb-4 h-12 w-12 text-muted-foreground/50"
-                aria-hidden="true"
-              />
-              <h3 className="mb-2 text-lg font-medium text-muted-foreground">
-                Search artifacts
-              </h3>
+              <SearchIcon className="mb-4 h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
+              <h3 className="mb-2 text-lg font-medium text-muted-foreground">Search artifacts</h3>
               <p className="max-w-md text-sm text-muted-foreground/80">
                 Enter a search term to find artifacts across all indexed sources.
               </p>
@@ -835,9 +829,7 @@ function MarketplaceSourcesPageInner() {
                   className="mb-4 h-12 w-12 text-muted-foreground/50"
                   aria-hidden="true"
                 />
-                <h3 className="mb-2 text-lg font-medium text-muted-foreground">
-                  Keep typing...
-                </h3>
+                <h3 className="mb-2 text-lg font-medium text-muted-foreground">Keep typing...</h3>
                 <p className="max-w-md text-sm text-muted-foreground/80">
                   Enter at least 2 characters to search.
                 </p>
@@ -865,8 +857,8 @@ function MarketplaceSourcesPageInner() {
                     No results found
                   </h3>
                   <p className="max-w-md text-sm text-muted-foreground/80">
-                    No artifacts match your search. Artifact search requires indexing to be
-                    enabled on sources. Switch to Sources mode to manage indexing settings.
+                    No artifacts match your search. Artifact search requires indexing to be enabled
+                    on sources. Switch to Sources mode to manage indexing settings.
                   </p>
                   <Button
                     variant="outline"

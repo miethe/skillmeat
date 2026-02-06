@@ -24,12 +24,16 @@ describe('DeploymentBadgeStack', () => {
     });
 
     it('returns null for undefined deployments', () => {
-      const { container } = render(<DeploymentBadgeStack deployments={undefined as unknown as DeploymentSummary[]} />);
+      const { container } = render(
+        <DeploymentBadgeStack deployments={undefined as unknown as DeploymentSummary[]} />
+      );
       expect(container.firstChild).toBeNull();
     });
 
     it('returns null for null deployments', () => {
-      const { container } = render(<DeploymentBadgeStack deployments={null as unknown as DeploymentSummary[]} />);
+      const { container } = render(
+        <DeploymentBadgeStack deployments={null as unknown as DeploymentSummary[]} />
+      );
       expect(container.firstChild).toBeNull();
     });
   });
@@ -53,7 +57,10 @@ describe('DeploymentBadgeStack', () => {
 
     it('extracts project name from path when project_name is empty', () => {
       const deployments = [
-        createTestDeployment({ project_name: '', project_path: '/Users/test/projects/extracted-name' }),
+        createTestDeployment({
+          project_name: '',
+          project_path: '/Users/test/projects/extracted-name',
+        }),
       ];
       render(<DeploymentBadgeStack deployments={deployments} />);
 

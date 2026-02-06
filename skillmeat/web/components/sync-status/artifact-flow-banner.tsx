@@ -83,8 +83,8 @@ export function ArtifactFlowBanner({
     return (
       <div
         className={cn(
-          "flex w-full cursor-pointer items-center gap-3 rounded-lg border bg-card px-4 transition-colors hover:bg-accent/50",
-          hasAnyIndicator ? "py-3" : "py-2"
+          'flex w-full cursor-pointer items-center gap-3 rounded-lg border bg-card px-4 transition-colors hover:bg-accent/50',
+          hasAnyIndicator ? 'py-3' : 'py-2'
         )}
         onClick={() => setIsCollapsed(false)}
         role="button"
@@ -98,13 +98,15 @@ export function ArtifactFlowBanner({
         aria-label="Expand artifact flow banner"
       >
         {/* Source summary */}
-        <div className={cn(
-          "flex items-center gap-1.5",
-          sourceInfo?.hasUpdate && "relative rounded-md border border-blue-500 px-2 py-1"
-        )}>
+        <div
+          className={cn(
+            'flex items-center gap-1.5',
+            sourceInfo?.hasUpdate && 'relative rounded-md border border-blue-500 px-2 py-1'
+          )}
+        >
           <Github className="h-3.5 w-3.5 text-muted-foreground" />
           {sourceInfo ? (
-            <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono text-muted-foreground">
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
               {truncateSha(sourceInfo.sha)}
             </code>
           ) : (
@@ -122,7 +124,7 @@ export function ArtifactFlowBanner({
         {/* Collection summary */}
         <div className="flex items-center gap-1.5">
           <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-          <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono text-muted-foreground">
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
             {truncateSha(collectionInfo.sha)}
           </code>
         </div>
@@ -130,13 +132,15 @@ export function ArtifactFlowBanner({
         <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
 
         {/* Project summary */}
-        <div className={cn(
-          "flex items-center gap-1.5",
-          projectInfo?.isModified && "relative rounded-md border border-amber-500 px-2 py-1"
-        )}>
+        <div
+          className={cn(
+            'flex items-center gap-1.5',
+            projectInfo?.isModified && 'relative rounded-md border border-amber-500 px-2 py-1'
+          )}
+        >
           <Folder className="h-3.5 w-3.5 text-muted-foreground" />
           {projectInfo ? (
-            <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono text-muted-foreground">
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
               {truncateSha(projectInfo.sha)}
             </code>
           ) : (
@@ -359,7 +363,9 @@ export function ArtifactFlowBanner({
             onClick={onPushToCollection}
             disabled={!projectInfo || isPushing}
             className="h-7 text-xs"
-            title={!projectInfo ? 'No project deployment found' : 'Push local changes back to collection'}
+            title={
+              !projectInfo ? 'No project deployment found' : 'Push local changes back to collection'
+            }
           >
             {isPushing ? (
               <>

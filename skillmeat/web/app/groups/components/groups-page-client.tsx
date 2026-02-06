@@ -61,11 +61,7 @@ export function GroupsPageClient() {
   const { data: selectedGroup } = useGroup(groupId ?? undefined);
 
   // Access collection context for collection-aware operations
-  const {
-    selectedCollectionId,
-    collections,
-    isLoadingCollections,
-  } = useCollectionContext();
+  const { selectedCollectionId, collections, isLoadingCollections } = useCollectionContext();
 
   // Handler to update URL when group selection changes
   // The collection ID is maintained by the CollectionSwitcher via context
@@ -230,9 +226,7 @@ export function GroupsPageClient() {
           description="Use the group dropdown above to browse artifacts organized by group within this collection."
           action={
             <Button variant="outline" asChild>
-              <Link href={`/collection?collection=${effectiveCollectionId}`}>
-                Go to Collection
-              </Link>
+              <Link href={`/collection?collection=${effectiveCollectionId}`}>Go to Collection</Link>
             </Button>
           }
         />

@@ -286,16 +286,9 @@ export function mapApiResponseToArtifact(
 
   // Resolve timestamps (API may use various field names)
   const createdAt =
-    response.createdAt ||
-    response.created_at ||
-    response.added ||
-    new Date().toISOString();
+    response.createdAt || response.created_at || response.added || new Date().toISOString();
 
-  const updatedAt =
-    response.updatedAt ||
-    response.updated_at ||
-    response.updated ||
-    createdAt;
+  const updatedAt = response.updatedAt || response.updated_at || response.updated || createdAt;
 
   // Flatten metadata - prefer top-level, fall back to nested
   const description = response.description || response.metadata?.description;
@@ -386,10 +379,8 @@ export function mapApiResponseToArtifact(
     ...(response.usage_stats || response.usageStats
       ? {
           usageStats: {
-            totalDeployments:
-              (response.usage_stats || response.usageStats)!.total_deployments,
-            activeProjects:
-              (response.usage_stats || response.usageStats)!.active_projects,
+            totalDeployments: (response.usage_stats || response.usageStats)!.total_deployments,
+            activeProjects: (response.usage_stats || response.usageStats)!.active_projects,
             ...((response.usage_stats || response.usageStats)!.last_used && {
               lastUsed: (response.usage_stats || response.usageStats)!.last_used,
             }),

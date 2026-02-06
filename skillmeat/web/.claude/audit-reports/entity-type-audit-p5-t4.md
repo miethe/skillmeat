@@ -10,15 +10,15 @@ Comprehensive audit of Entity type usages completed. The Entity→Artifact conso
 
 ### Findings Overview
 
-| Metric | Count | Status |
-|--------|-------|--------|
-| TypeScript Files Scanned | 782 | ✅ Complete |
-| Files with Entity Imports | 19 | ✅ Intentional |
-| Entity Type Usages | ~90+ | ✅ Acceptable |
-| ENTITY_TYPES Usages | 4 | ✅ All Documented |
-| getEntityTypeConfig Usages | 3 | ✅ All Tests/Docs |
-| Old Conversion Functions | 0 | ✅ Removed |
-| Deprecation Notices | All | ✅ In Place |
+| Metric                     | Count | Status            |
+| -------------------------- | ----- | ----------------- |
+| TypeScript Files Scanned   | 782   | ✅ Complete       |
+| Files with Entity Imports  | 19    | ✅ Intentional    |
+| Entity Type Usages         | ~90+  | ✅ Acceptable     |
+| ENTITY_TYPES Usages        | 4     | ✅ All Documented |
+| getEntityTypeConfig Usages | 3     | ✅ All Tests/Docs |
+| Old Conversion Functions   | 0     | ✅ Removed        |
+| Deprecation Notices        | All   | ✅ In Place       |
 
 ## Detailed Results
 
@@ -27,6 +27,7 @@ Comprehensive audit of Entity type usages completed. The Entity→Artifact conso
 **Status**: ✅ ACCEPTABLE - These are intentional architectural patterns
 
 #### Core Infrastructure Files (Intentional)
+
 - `types/entity.ts` - Deprecation stub (23 exports)
 - `types/index.ts` - Re-exports for public API
 - `hooks/useEntityLifecycle.tsx` - Lifecycle management hook
@@ -35,6 +36,7 @@ Comprehensive audit of Entity type usages completed. The Entity→Artifact conso
 - `components/entity/index.ts` - Component barrel export
 
 #### Feature Components (Intentional - Component Naming Pattern)
+
 - `app/manage/page.tsx` - Uses Entity type in lifecycle
 - `app/manage/components/add-entity-dialog.tsx` - Entity management dialog
 - `app/manage/components/entity-detail-panel.tsx` - Detail view component
@@ -51,22 +53,22 @@ Comprehensive audit of Entity type usages completed. The Entity→Artifact conso
 
 ### 2. ENTITY_TYPES Registry Usages (4 total)
 
-| File | Usage | Status | Notes |
-|------|-------|--------|-------|
-| `types/entity.ts` | Definition (export) | ✅ Correct | Deprecation stub |
-| `types/__tests__/backward-compat.test.ts` | Import + Tests | ✅ Correct | Backward compatibility tests |
-| `types/index.ts` | Re-export comment | ✅ Correct | Public API documentation |
-| `components/context/context-entity-filters.tsx` | **Local definition** | ✅ Correct | Context-specific, unrelated |
+| File                                            | Usage                | Status     | Notes                        |
+| ----------------------------------------------- | -------------------- | ---------- | ---------------------------- |
+| `types/entity.ts`                               | Definition (export)  | ✅ Correct | Deprecation stub             |
+| `types/__tests__/backward-compat.test.ts`       | Import + Tests       | ✅ Correct | Backward compatibility tests |
+| `types/index.ts`                                | Re-export comment    | ✅ Correct | Public API documentation     |
+| `components/context/context-entity-filters.tsx` | **Local definition** | ✅ Correct | Context-specific, unrelated  |
 
 **Note**: The local `ENTITY_TYPES` in `context-entity-filters.tsx` uses `ContextEntityType` (domain-specific), not the deprecated global Entity type registry.
 
 ### 3. getEntityTypeConfig Usages (3 total)
 
-| File | Usage | Status | Notes |
-|------|-------|--------|-------|
-| `types/entity.ts` | Definition (export) | ✅ Correct | Deprecation stub |
-| `types/__tests__/backward-compat.test.ts` | Import + Tests | ✅ Correct | Backward compatibility tests |
-| `types/index.ts` | Re-export comment | ✅ Correct | Public API documentation |
+| File                                      | Usage               | Status     | Notes                        |
+| ----------------------------------------- | ------------------- | ---------- | ---------------------------- |
+| `types/entity.ts`                         | Definition (export) | ✅ Correct | Deprecation stub             |
+| `types/__tests__/backward-compat.test.ts` | Import + Tests      | ✅ Correct | Backward compatibility tests |
+| `types/index.ts`                          | Re-export comment   | ✅ Correct | Public API documentation     |
 
 **Status**: ✅ Zero production usage, all documented and tested.
 
@@ -75,12 +77,14 @@ Comprehensive audit of Entity type usages completed. The Entity→Artifact conso
 **Status**: ✅ COMPLETELY REMOVED
 
 Searched for:
+
 - `mapApiArtifact` (old version) - NOT FOUND ✅
 - `mapApiArtifactToEntity` - NOT FOUND ✅
 - `artifactToEntity` - NOT FOUND ✅
 - `entityToArtifact` - NOT FOUND ✅
 
 **New Converter in Place**:
+
 - `mapApiArtifactToArtifact` - Modern function (4 usages in `app/collection/page.tsx`)
   - Properly typed with Artifact type
   - Correct transformation logic
@@ -93,12 +97,14 @@ Searched for:
 All 12 exports in `types/entity.ts` include:
 
 ✅ **Clear @deprecated JSDoc notices** with:
+
 - Migration instructions for each type
 - Link to migration guide: `.claude/guides/entity-to-artifact-migration.md`
 - Removal date: Q3 2026
 - Before/after code examples
 
 **Verified exports**:
+
 1. `Entity` type - Full migration example
 2. `EntityType` type - Full migration example
 3. `EntityStatus` type - Full migration example
@@ -117,16 +123,19 @@ All 12 exports in `types/entity.ts` include:
 ### Intentional Usages (100% of non-test usage)
 
 **Pattern 1: Component Names**
+
 - These reflect the domain of entity lifecycle management
 - Still appropriate post-consolidation
 - Examples: `EntityLifecycleProvider`, `entity-list`, `entity-form`
 
 **Pattern 2: Type Usage**
+
 - Primarily in component props and hooks
 - Acceptable during deprecation period (until Q3 2026)
 - No new code introducing Entity usages
 
 **Pattern 3: Infrastructure**
+
 - Deprecation stub exports (by design)
 - Backward compatibility tests (by design)
 - Public API re-exports (by design)
@@ -134,6 +143,7 @@ All 12 exports in `types/entity.ts` include:
 ### Code Quality Assessment
 
 ✅ **Strengths**:
+
 1. All old conversion functions removed
 2. New mappers in place and working correctly
 3. Deprecation notices are comprehensive and helpful
@@ -142,6 +152,7 @@ All 12 exports in `types/entity.ts` include:
 6. No orphaned references to old architecture
 
 ✅ **No Issues Found**:
+
 - No accidental usages
 - No orphaned code paths
 - No incomplete migrations
@@ -164,6 +175,7 @@ All usages follow the documented deprecation timeline (Q3 2026 removal), and the
 ## Future Work (Q3 2026)
 
 When deprecating Entity types:
+
 1. Rename components: `entity-*` → `artifact-*` (20+ files)
 2. Remove `types/entity.ts` entirely
 3. Update imports to point to `types/artifact` directly

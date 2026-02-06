@@ -397,9 +397,7 @@ function generateMockHistory(artifact: Artifact): HistoryEntry[] {
   }
 
   if (artifact.syncStatus === 'conflict' && artifact.modifiedAt) {
-    const rollbackDate = new Date(
-      new Date(artifact.modifiedAt).getTime() + 1 * 60 * 60 * 1000
-    );
+    const rollbackDate = new Date(new Date(artifact.modifiedAt).getTime() + 1 * 60 * 60 * 1000);
     history.push({
       id: `rollback-${rollbackDate.toISOString()}`,
       type: 'rollback',
@@ -410,9 +408,7 @@ function generateMockHistory(artifact: Artifact): HistoryEntry[] {
     });
   }
 
-  return history.sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  );
+  return history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }
 
 /**
@@ -624,10 +620,7 @@ export function ArtifactDetailsModal({
 
         for (const source of allSources) {
           const repoPattern = `${source.owner}/${source.repo_name}`;
-          if (
-            artifactSource.includes(repoPattern) ||
-            artifactSource.includes(source.repo_url)
-          ) {
+          if (artifactSource.includes(repoPattern) || artifactSource.includes(source.repo_url)) {
             try {
               const catalogResponse = await apiRequest<{
                 items: Array<{ name: string; artifact_type: string; path: string }>;
@@ -1231,9 +1224,7 @@ export function ArtifactDetailsModal({
                       <Github className="h-5 w-5 text-muted-foreground" />
                       <div className="flex-1">
                         <div className="font-medium">{sourceEntry.sourceName}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {sourceEntry.entryPath}
-                        </div>
+                        <div className="text-sm text-muted-foreground">{sourceEntry.entryPath}</div>
                         {artifact.version && (
                           <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
                             <Tag className="h-3 w-3" />
@@ -1352,8 +1343,8 @@ export function ArtifactDetailsModal({
                     <Clock className="mx-auto mb-4 h-12 w-12 text-muted-foreground opacity-50" />
                     <h3 className="mb-2 text-lg font-semibold">No activity yet</h3>
                     <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-                      Activity such as deployments and syncs will appear here once you start
-                      using this artifact.
+                      Activity such as deployments and syncs will appear here once you start using
+                      this artifact.
                     </p>
                   </div>
                 )}
@@ -1410,19 +1401,15 @@ export function ArtifactDetailsModal({
                 )}
 
                 {/* Empty state */}
-                {!isDeploymentsLoading &&
-                  !deploymentsError &&
-                  artifactDeployments.length === 0 && (
-                    <div className="py-12 text-center">
-                      <Rocket className="mx-auto mb-4 h-12 w-12 text-muted-foreground opacity-50" />
-                      <h3 className="mb-2 text-lg font-semibold">
-                        Not deployed to any projects yet
-                      </h3>
-                      <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-                        Deploy this artifact to a project to see it listed here.
-                      </p>
-                    </div>
-                  )}
+                {!isDeploymentsLoading && !deploymentsError && artifactDeployments.length === 0 && (
+                  <div className="py-12 text-center">
+                    <Rocket className="mx-auto mb-4 h-12 w-12 text-muted-foreground opacity-50" />
+                    <h3 className="mb-2 text-lg font-semibold">Not deployed to any projects yet</h3>
+                    <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+                      Deploy this artifact to a project to see it listed here.
+                    </p>
+                  </div>
+                )}
 
                 {/* Success state - Grid of deployment cards */}
                 {!isDeploymentsLoading && !deploymentsError && artifactDeployments.length > 0 && (

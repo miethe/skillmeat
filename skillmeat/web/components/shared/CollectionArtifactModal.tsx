@@ -1,7 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { UnifiedEntityModal, type ArtifactModalTab } from '@/components/entity/unified-entity-modal';
+import {
+  UnifiedEntityModal,
+  type ArtifactModalTab,
+} from '@/components/entity/unified-entity-modal';
 import type { Artifact } from '@/types/artifact';
 
 /**

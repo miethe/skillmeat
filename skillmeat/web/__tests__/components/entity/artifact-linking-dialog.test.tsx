@@ -71,9 +71,7 @@ describe('ArtifactLinkingDialog', () => {
       );
 
       expect(screen.getByText('Link Artifact')).toBeInTheDocument();
-      expect(
-        screen.getByText(/Search for an artifact to link/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Search for an artifact to link/i)).toBeInTheDocument();
     });
 
     it('does not render dialog when open is false', () => {
@@ -191,15 +189,16 @@ describe('ArtifactLinkingDialog', () => {
       const Wrapper = createWrapper();
 
       // Mock a slow fetch to ensure we catch the call
-      (global.fetch as jest.Mock).mockImplementation(() =>
-        new Promise((resolve) =>
-          setTimeout(() => {
-            resolve({
-              ok: true,
-              json: () => Promise.resolve({ items: [], page_info: { total_count: 0 } }),
-            });
-          }, 100)
-        )
+      (global.fetch as jest.Mock).mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => {
+              resolve({
+                ok: true,
+                json: () => Promise.resolve({ items: [], page_info: { total_count: 0 } }),
+              });
+            }, 100)
+          )
       );
 
       render(

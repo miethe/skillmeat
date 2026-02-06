@@ -127,11 +127,7 @@ function OverflowBadge({ hiddenGroups }: OverflowBadgeProps) {
  * @param maxBadges - Maximum badges to show before overflow indicator (default: 2)
  * @param className - Additional CSS classes for the container
  */
-export function GroupBadgeRow({
-  groups,
-  maxBadges = 2,
-  className,
-}: GroupBadgeRowProps) {
+export function GroupBadgeRow({ groups, maxBadges = 2, className }: GroupBadgeRowProps) {
   // Handle edge cases
   const validGroups = React.useMemo(() => {
     if (!groups || !Array.isArray(groups)) {

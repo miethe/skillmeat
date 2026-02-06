@@ -112,9 +112,7 @@ const createTestQueryClient = () =>
 
 const renderWithProviders = (component: React.ReactNode) => {
   const queryClient = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>{component}</QueryClientProvider>
-  );
+  return render(<QueryClientProvider client={queryClient}>{component}</QueryClientProvider>);
 };
 
 // ============================================================================
@@ -301,13 +299,7 @@ describe('SyncStatusTab - Collection Mode (/manage)', () => {
     it('does NOT call upstream-diff API for marketplace artifacts', async () => {
       const artifact = makeMarketplaceArtifact();
 
-      renderWithProviders(
-        <SyncStatusTab
-          entity={artifact}
-          mode="collection"
-          onClose={onClose}
-        />
-      );
+      renderWithProviders(<SyncStatusTab entity={artifact} mode="collection" onClose={onClose} />);
 
       // Wait for the component to settle after initial render
       await waitFor(() => {
@@ -328,13 +320,7 @@ describe('SyncStatusTab - Collection Mode (/manage)', () => {
     it('does not render upstream source info when upstream is not valid', async () => {
       const artifact = makeMarketplaceArtifact();
 
-      renderWithProviders(
-        <SyncStatusTab
-          entity={artifact}
-          mode="collection"
-          onClose={onClose}
-        />
-      );
+      renderWithProviders(<SyncStatusTab entity={artifact} mode="collection" onClose={onClose} />);
 
       // Marketplace artifacts have no upstream, so "No comparison data" or
       // similar state should appear since no project path is provided either
@@ -378,13 +364,7 @@ describe('SyncStatusTab - Collection Mode (/manage)', () => {
         };
       });
 
-      renderWithProviders(
-        <SyncStatusTab
-          entity={artifact}
-          mode="collection"
-          onClose={onClose}
-        />
-      );
+      renderWithProviders(<SyncStatusTab entity={artifact} mode="collection" onClose={onClose} />);
 
       // Wait for the upstream-diff query to fire
       await waitFor(() => {
@@ -406,13 +386,7 @@ describe('SyncStatusTab - Collection Mode (/manage)', () => {
         summary: { added: 0, modified: 0, deleted: 0, unchanged: 0 },
       });
 
-      renderWithProviders(
-        <SyncStatusTab
-          entity={artifact}
-          mode="collection"
-          onClose={onClose}
-        />
-      );
+      renderWithProviders(<SyncStatusTab entity={artifact} mode="collection" onClose={onClose} />);
 
       await waitFor(() => {
         const upstreamDiffCalls = mockApiRequest.mock.calls.filter((call) =>
@@ -475,9 +449,7 @@ describe('SyncStatusTab - Collection Mode (/manage)', () => {
       // Wait for the project diff query to fire
       await waitFor(() => {
         const projectDiffCalls = mockApiRequest.mock.calls.filter(
-          (call) =>
-            String(call[0]).includes('/diff') &&
-            !String(call[0]).includes('upstream-diff')
+          (call) => String(call[0]).includes('/diff') && !String(call[0]).includes('upstream-diff')
         );
         expect(projectDiffCalls.length).toBeGreaterThan(0);
       });
@@ -485,9 +457,7 @@ describe('SyncStatusTab - Collection Mode (/manage)', () => {
       // Verify the project_path query parameter is included
       await waitFor(() => {
         const projectDiffCalls = mockApiRequest.mock.calls.filter(
-          (call) =>
-            String(call[0]).includes('/diff') &&
-            !String(call[0]).includes('upstream-diff')
+          (call) => String(call[0]).includes('/diff') && !String(call[0]).includes('upstream-diff')
         );
         const url = String(projectDiffCalls[0]![0]);
         expect(url).toContain('project_path=');
@@ -505,13 +475,7 @@ describe('SyncStatusTab - Collection Mode (/manage)', () => {
         summary: { added: 0, modified: 0, deleted: 0, unchanged: 0 },
       });
 
-      renderWithProviders(
-        <SyncStatusTab
-          entity={artifact}
-          mode="collection"
-          onClose={onClose}
-        />
-      );
+      renderWithProviders(<SyncStatusTab entity={artifact} mode="collection" onClose={onClose} />);
 
       // Wait for any queries to settle
       await waitFor(() => {
@@ -520,9 +484,7 @@ describe('SyncStatusTab - Collection Mode (/manage)', () => {
 
       // Verify no project diff calls were made (only upstream-diff)
       const projectDiffCalls = mockApiRequest.mock.calls.filter(
-        (call) =>
-          String(call[0]).includes('/diff') &&
-          !String(call[0]).includes('upstream-diff')
+        (call) => String(call[0]).includes('/diff') && !String(call[0]).includes('upstream-diff')
       );
       expect(projectDiffCalls).toHaveLength(0);
     });
@@ -590,9 +552,7 @@ describe('SyncStatusTab - Project Mode (/projects)', () => {
           String(call[0]).includes('upstream-diff')
         );
         const projectCalls = mockApiRequest.mock.calls.filter(
-          (call) =>
-            String(call[0]).includes('/diff') &&
-            !String(call[0]).includes('upstream-diff')
+          (call) => String(call[0]).includes('/diff') && !String(call[0]).includes('upstream-diff')
         );
 
         expect(upstreamCalls.length).toBeGreaterThan(0);
@@ -644,9 +604,7 @@ describe('SyncStatusTab - Project Mode (/projects)', () => {
       // The project diff query must fire since we have a projectPath.
       await waitFor(() => {
         const projectCalls = mockApiRequest.mock.calls.filter(
-          (call) =>
-            String(call[0]).includes('/diff') &&
-            !String(call[0]).includes('upstream-diff')
+          (call) => String(call[0]).includes('/diff') && !String(call[0]).includes('upstream-diff')
         );
         expect(projectCalls.length).toBeGreaterThan(0);
       });
@@ -682,19 +640,11 @@ describe('SyncStatusTab - Project Mode (/projects)', () => {
         origin: 'github',
       };
 
-      renderWithProviders(
-        <SyncStatusTab
-          entity={artifact}
-          mode="project"
-          onClose={onClose}
-        />
-      );
+      renderWithProviders(<SyncStatusTab entity={artifact} mode="project" onClose={onClose} />);
 
       // Discovered artifacts should show the import message
       await waitFor(() => {
-        expect(
-          screen.getByText(/not available for discovered artifacts/i)
-        ).toBeInTheDocument();
+        expect(screen.getByText(/not available for discovered artifacts/i)).toBeInTheDocument();
       });
 
       // No API calls should have been made for discovered artifacts

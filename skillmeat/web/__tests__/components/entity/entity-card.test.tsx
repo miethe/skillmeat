@@ -26,9 +26,7 @@ const createTestQueryClient = () =>
 
 const renderWithProviders = (component: React.ReactElement) => {
   const queryClient = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>{component}</QueryClientProvider>
-  );
+  return render(<QueryClientProvider client={queryClient}>{component}</QueryClientProvider>);
 };
 
 const mockEntity: Entity = {
@@ -159,7 +157,9 @@ describe('EntityCard', () => {
 
   it('calls onSelect when checkbox is checked', () => {
     const handleSelect = jest.fn();
-    renderWithProviders(<EntityCard entity={mockEntity} selectable={true} onSelect={handleSelect} />);
+    renderWithProviders(
+      <EntityCard entity={mockEntity} selectable={true} onSelect={handleSelect} />
+    );
 
     const checkbox = screen.getByRole('checkbox');
     fireEvent.click(checkbox);

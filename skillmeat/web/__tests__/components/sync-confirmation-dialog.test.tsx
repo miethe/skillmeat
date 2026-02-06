@@ -447,7 +447,9 @@ describe('SyncConfirmationDialog', () => {
 
       render(<SyncConfirmationDialog {...defaultProps} direction="deploy" />);
 
-      expect(screen.getByText(/Consider merging to avoid losing project modifications/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Consider merging to avoid losing project modifications/)
+      ).toBeInTheDocument();
     });
 
     it('shows direction-specific conflict warning for push', () => {
@@ -466,7 +468,9 @@ describe('SyncConfirmationDialog', () => {
 
       render(<SyncConfirmationDialog {...defaultProps} direction="push" />);
 
-      expect(screen.getByText(/Consider merging to preserve collection changes/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Consider merging to preserve collection changes/)
+      ).toBeInTheDocument();
     });
 
     it('shows direction-specific conflict warning for pull', () => {
@@ -485,7 +489,9 @@ describe('SyncConfirmationDialog', () => {
 
       render(<SyncConfirmationDialog {...defaultProps} direction="pull" />);
 
-      expect(screen.getByText(/Consider merging to preserve your local modifications/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Consider merging to preserve your local modifications/)
+      ).toBeInTheDocument();
     });
 
     it('does not show conflict alert when hasConflicts is false', () => {
@@ -570,7 +576,9 @@ describe('SyncConfirmationDialog', () => {
         error: null,
       });
 
-      render(<SyncConfirmationDialog {...defaultProps} onCancel={mockOnCancel} direction="deploy" />);
+      render(
+        <SyncConfirmationDialog {...defaultProps} onCancel={mockOnCancel} direction="deploy" />
+      );
 
       const cancelButton = screen.getByRole('button', { name: /Cancel sync operation/ });
       await user.click(cancelButton);

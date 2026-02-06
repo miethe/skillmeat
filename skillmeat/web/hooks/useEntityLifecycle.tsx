@@ -8,10 +8,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, apiConfig } from '@/lib/api';
-import {
-  mapArtifactsToEntities,
-  type ApiArtifactResponse,
-} from '@/lib/api/entity-mapper';
+import { mapArtifactsToEntities, type ApiArtifactResponse } from '@/lib/api/entity-mapper';
 import type { SyncStatus } from '@/types/artifact';
 import type { Entity, EntityType, EntityStatus } from '@/types/entity';
 import type {
@@ -382,7 +379,15 @@ export function EntityLifecycleProvider({
   });
 
   const deployMutation = useMutation({
-    mutationFn: async ({ id, projectPath, collection }: { id: string; projectPath: string; collection?: string }) => {
+    mutationFn: async ({
+      id,
+      projectPath,
+      collection,
+    }: {
+      id: string;
+      projectPath: string;
+      collection?: string;
+    }) => {
       const request: ArtifactDeployRequest = {
         project_path: projectPath,
       };

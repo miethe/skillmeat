@@ -1,15 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Package,
-  Terminal,
-  Bot,
-  Server,
-  Webhook,
-  AlertCircle,
-  HelpCircle,
-} from 'lucide-react';
+import { Package, Terminal, Bot, Server, Webhook, AlertCircle, HelpCircle } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -97,7 +89,6 @@ const statusColors: Record<string, string> = {
   conflict: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
   error: 'bg-red-500/10 text-red-600 border-red-500/20',
 };
-
 
 function ArtifactListSkeleton({ showCollectionColumn }: { showCollectionColumn?: boolean }) {
   return (

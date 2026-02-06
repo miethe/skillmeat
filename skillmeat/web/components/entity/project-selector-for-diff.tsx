@@ -65,9 +65,7 @@ function formatRelativeTime(date: Date): string {
 /**
  * Get status badge variant based on sync status
  */
-function getStatusVariant(
-  status: SyncStatus
-): 'default' | 'secondary' | 'destructive' | 'outline' {
+function getStatusVariant(status: SyncStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (status) {
     case 'synced':
       return 'default';
@@ -255,9 +253,7 @@ export function ProjectSelectorForDiff({
         {/* Collapsed: slim horizontal bar */}
         <div
           className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            isEmptyCollapsed
-              ? 'max-h-12 opacity-100'
-              : 'max-h-0 opacity-0'
+            isEmptyCollapsed ? 'max-h-12 opacity-100' : 'max-h-0 opacity-0'
           }`}
         >
           <div className="flex items-center gap-2 rounded-md border bg-muted/10 px-4 py-2">
@@ -269,9 +265,7 @@ export function ProjectSelectorForDiff({
         {/* Expanded: full empty state message */}
         <div
           className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            isEmptyCollapsed
-              ? 'max-h-0 opacity-0'
-              : 'max-h-64 opacity-100'
+            isEmptyCollapsed ? 'max-h-0 opacity-0' : 'max-h-64 opacity-100'
           }`}
         >
           <div className="rounded-lg border bg-muted/20 p-8">

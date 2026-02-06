@@ -64,7 +64,9 @@ describe('StatusBadge', () => {
 
   describe('returns null when both icon and label are hidden', () => {
     it('returns null when showIcon=false and showLabel=false', () => {
-      const { container } = render(<StatusBadge status="synced" showIcon={false} showLabel={false} />);
+      const { container } = render(
+        <StatusBadge status="synced" showIcon={false} showLabel={false} />
+      );
       expect(container.firstChild).toBeNull();
     });
   });

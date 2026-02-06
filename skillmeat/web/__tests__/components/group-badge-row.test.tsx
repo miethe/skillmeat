@@ -8,10 +8,7 @@
 import React from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {
-  GroupBadgeRow,
-  type GroupInfo,
-} from '@/components/shared/group-badge-row';
+import { GroupBadgeRow, type GroupInfo } from '@/components/shared/group-badge-row';
 
 // ============================================================================
 // Test Data
@@ -181,9 +178,7 @@ describe('GroupBadgeRow', () => {
     it('overflow badge has aria-label listing hidden groups', () => {
       render(<GroupBadgeRow groups={mockGroups} />);
 
-      const overflowBadge = screen.getByLabelText(
-        '2 more groups: Archive, Favorites'
-      );
+      const overflowBadge = screen.getByLabelText('2 more groups: Archive, Favorites');
       expect(overflowBadge).toBeInTheDocument();
     });
 
@@ -269,10 +264,7 @@ describe('GroupBadgeRow', () => {
     });
 
     it('handles groups with missing id gracefully', () => {
-      const groupsWithMissingId = [
-        { name: 'No ID' } as GroupInfo,
-        { id: '2', name: 'Valid' },
-      ];
+      const groupsWithMissingId = [{ name: 'No ID' } as GroupInfo, { id: '2', name: 'Valid' }];
 
       render(<GroupBadgeRow groups={groupsWithMissingId} />);
 
@@ -281,10 +273,7 @@ describe('GroupBadgeRow', () => {
     });
 
     it('handles groups with missing name gracefully', () => {
-      const groupsWithMissingName = [
-        { id: '1' } as GroupInfo,
-        { id: '2', name: 'Valid' },
-      ];
+      const groupsWithMissingName = [{ id: '1' } as GroupInfo, { id: '2', name: 'Valid' }];
 
       render(<GroupBadgeRow groups={groupsWithMissingName} />);
 
@@ -302,9 +291,7 @@ describe('GroupBadgeRow', () => {
 
       render(<GroupBadgeRow groups={longNameGroup} />);
 
-      const badge = screen.getByText(
-        'This is a very long group name that should be truncated'
-      );
+      const badge = screen.getByText('This is a very long group name that should be truncated');
       expect(badge).toBeInTheDocument();
       // Badge should have truncate class for CSS truncation
       expect(badge).toHaveClass('truncate');

@@ -325,11 +325,14 @@ export function MergeWorkflow({
         strategy: determineStrategy(),
       };
 
-      const response = await apiRequest<ArtifactSyncResponse>(`/artifacts/${encodeURIComponent(entityId)}/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(syncRequest),
-      });
+      const response = await apiRequest<ArtifactSyncResponse>(
+        `/artifacts/${encodeURIComponent(entityId)}/sync`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(syncRequest),
+        }
+      );
 
       setSyncResult(response);
 

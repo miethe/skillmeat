@@ -61,7 +61,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { StatusBadge } from '@/components/shared/status-badge';
-import { HealthIndicator, deriveHealthStatus, type HealthStatus } from '@/components/shared/health-indicator';
+import {
+  HealthIndicator,
+  deriveHealthStatus,
+  type HealthStatus,
+} from '@/components/shared/health-indicator';
 import { DeploymentBadgeStack } from '@/components/shared/deployment-badge-stack';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 import { getArtifactTypeConfig } from '@/types/artifact';
@@ -323,10 +327,7 @@ export function ArtifactOperationsCard({
         <div className="border-t px-4 py-2">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Deployed to:</span>
-            <DeploymentBadgeStack
-              deployments={artifact.deployments}
-              maxBadges={2}
-            />
+            <DeploymentBadgeStack deployments={artifact.deployments} maxBadges={2} />
           </div>
         </div>
       )}
@@ -337,7 +338,7 @@ export function ArtifactOperationsCard({
         {artifact.syncStatus === 'modified' && (
           <Badge
             variant="outline"
-            className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20 dark:text-yellow-400"
+            className="border-yellow-500/20 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
           >
             <AlertTriangle className="mr-1 h-3 w-3" aria-hidden="true" />
             Has Drift
@@ -348,7 +349,7 @@ export function ArtifactOperationsCard({
         {versionInfo.hasUpdate && (
           <Badge
             variant="outline"
-            className="bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400"
+            className="border-orange-500/20 bg-orange-500/10 text-orange-600 dark:text-orange-400"
           >
             Update Available
           </Badge>
@@ -421,10 +422,7 @@ export function ArtifactOperationsCard({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => onManage?.()}
-              disabled={!onManage}
-            >
+            <DropdownMenuItem onClick={() => onManage?.()} disabled={!onManage}>
               <LucideIcons.Settings className="mr-2 h-4 w-4" aria-hidden="true" />
               Manage Settings
             </DropdownMenuItem>
@@ -435,9 +433,7 @@ export function ArtifactOperationsCard({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {
-                navigator.clipboard.writeText(
-                  `skillmeat deploy ${artifact.name}`
-                );
+                navigator.clipboard.writeText(`skillmeat deploy ${artifact.name}`);
               }}
             >
               <LucideIcons.Copy className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -445,9 +441,7 @@ export function ArtifactOperationsCard({
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {
-                navigator.clipboard.writeText(
-                  `skillmeat sync ${artifact.name}`
-                );
+                navigator.clipboard.writeText(`skillmeat sync ${artifact.name}`);
               }}
             >
               <LucideIcons.Copy className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -487,16 +481,14 @@ export function ArtifactOperationsCard({
  *
  * @param selectable - Whether to show checkbox skeleton
  */
-export function ArtifactOperationsCardSkeleton({
-  selectable = false,
-}: {
-  selectable?: boolean;
-}) {
+export function ArtifactOperationsCardSkeleton({ selectable = false }: { selectable?: boolean }) {
   return (
     <Card className="border-l-4" aria-busy="true" aria-label="Loading artifact card">
       {/* Header Row */}
       <div className="flex items-start gap-3 p-4 pb-2">
-        {selectable && <Skeleton className="mt-1 h-4 w-4 flex-shrink-0 rounded" aria-hidden="true" />}
+        {selectable && (
+          <Skeleton className="mt-1 h-4 w-4 flex-shrink-0 rounded" aria-hidden="true" />
+        )}
         <Skeleton className="h-8 w-8 flex-shrink-0 rounded-md" aria-hidden="true" />
         <div className="min-w-0 flex-1 space-y-1">
           <Skeleton className="h-4 w-32" aria-hidden="true" />

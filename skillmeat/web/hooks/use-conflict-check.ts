@@ -67,11 +67,8 @@ export interface ConflictCheckResult {
 
 export const conflictCheckKeys = {
   all: ['conflict-check'] as const,
-  check: (
-    direction: ConflictCheckDirection,
-    artifactId: string | number,
-    projectPath?: string
-  ) => [...conflictCheckKeys.all, direction, artifactId, projectPath] as const,
+  check: (direction: ConflictCheckDirection, artifactId: string | number, projectPath?: string) =>
+    [...conflictCheckKeys.all, direction, artifactId, projectPath] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -154,9 +151,7 @@ function computeTargetHasChanges(
  *
  * Uses change_origin 'both' when available; otherwise infers from summary.
  */
-function computeHasConflicts(
-  diffData: ConflictCheckDiffData
-): boolean {
+function computeHasConflicts(diffData: ConflictCheckDiffData): boolean {
   const files = diffData.files;
 
   // Check for explicit conflict markers via change_origin
@@ -265,9 +260,7 @@ export function useConflictCheck(
   // Derive computed state from response data
   const hasChanges = diffData?.has_changes ?? false;
   const hasConflicts = diffData ? computeHasConflicts(diffData) : false;
-  const targetHasChanges = diffData
-    ? computeTargetHasChanges(direction, diffData.files)
-    : false;
+  const targetHasChanges = diffData ? computeTargetHasChanges(direction, diffData.files) : false;
 
   return {
     diffData,

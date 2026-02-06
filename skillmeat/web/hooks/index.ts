@@ -498,11 +498,7 @@ export { versionKeys, useVersionGraph } from './useVersionGraph';
  *   return <Button onClick={navigateBack}>Return to {returnToLabel}</Button>
  * }
  */
-export {
-  useReturnTo,
-  type UseReturnToOptions,
-  type UseReturnToReturn,
-} from './use-return-to';
+export { useReturnTo, type UseReturnToOptions, type UseReturnToReturn } from './use-return-to';
 
 // ============================================================================
 // CONTEXT HOOKS

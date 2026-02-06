@@ -16,9 +16,7 @@ describe('ToolFilterPopover', () => {
     });
 
     it('renders Wrench icon in trigger button', () => {
-      const { container } = render(
-        <ToolFilterPopover selectedTools={[]} onChange={jest.fn()} />
-      );
+      const { container } = render(<ToolFilterPopover selectedTools={[]} onChange={jest.fn()} />);
 
       // Check for SVG icon
       const button = screen.getByRole('button');
@@ -34,12 +32,7 @@ describe('ToolFilterPopover', () => {
     });
 
     it('shows badge with count when tools are selected', () => {
-      render(
-        <ToolFilterPopover
-          selectedTools={['Read', 'Write', 'Edit']}
-          onChange={jest.fn()}
-        />
-      );
+      render(<ToolFilterPopover selectedTools={['Read', 'Write', 'Edit']} onChange={jest.fn()} />);
 
       // Badge should show count
       expect(screen.getByText('3')).toBeInTheDocument();
@@ -105,11 +98,7 @@ describe('ToolFilterPopover', () => {
       ];
 
       render(
-        <ToolFilterPopover
-          selectedTools={[]}
-          onChange={jest.fn()}
-          availableTools={customTools}
-        />
+        <ToolFilterPopover selectedTools={[]} onChange={jest.fn()} availableTools={customTools} />
       );
 
       await user.click(screen.getByRole('button', { name: /Tools/i }));
@@ -163,9 +152,7 @@ describe('ToolFilterPopover', () => {
 
     it('shows checked checkbox for selected tools', async () => {
       const user = userEvent.setup();
-      render(
-        <ToolFilterPopover selectedTools={['Read']} onChange={jest.fn()} />
-      );
+      render(<ToolFilterPopover selectedTools={['Read']} onChange={jest.fn()} />);
 
       await user.click(screen.getByRole('button', { name: /Tools/i }));
 
@@ -182,9 +169,7 @@ describe('ToolFilterPopover', () => {
       const user = userEvent.setup();
       const handleChange = jest.fn();
 
-      render(
-        <ToolFilterPopover selectedTools={[]} onChange={handleChange} />
-      );
+      render(<ToolFilterPopover selectedTools={[]} onChange={handleChange} />);
 
       await user.click(screen.getByRole('button', { name: /Tools/i }));
 
@@ -199,12 +184,7 @@ describe('ToolFilterPopover', () => {
       const user = userEvent.setup();
       const handleChange = jest.fn();
 
-      render(
-        <ToolFilterPopover
-          selectedTools={['Read', 'Write']}
-          onChange={handleChange}
-        />
-      );
+      render(<ToolFilterPopover selectedTools={['Read', 'Write']} onChange={handleChange} />);
 
       await user.click(screen.getByRole('button', { name: /Tools/i }));
 
@@ -216,17 +196,13 @@ describe('ToolFilterPopover', () => {
     });
 
     it('updates badge count when selection changes', async () => {
-      const { rerender } = render(
-        <ToolFilterPopover selectedTools={[]} onChange={jest.fn()} />
-      );
+      const { rerender } = render(<ToolFilterPopover selectedTools={[]} onChange={jest.fn()} />);
 
       // Initially no badge
       expect(screen.queryByText('1')).not.toBeInTheDocument();
 
       // Update selection
-      rerender(
-        <ToolFilterPopover selectedTools={['Read']} onChange={jest.fn()} />
-      );
+      rerender(<ToolFilterPopover selectedTools={['Read']} onChange={jest.fn()} />);
 
       expect(screen.getByText('1')).toBeInTheDocument();
     });
@@ -277,12 +253,7 @@ describe('ToolFilterPopover', () => {
       const user = userEvent.setup();
       const handleChange = jest.fn();
 
-      render(
-        <ToolFilterPopover
-          selectedTools={['Read', 'Write']}
-          onChange={handleChange}
-        />
-      );
+      render(<ToolFilterPopover selectedTools={['Read', 'Write']} onChange={handleChange} />);
 
       await user.click(screen.getByRole('button', { name: /Tools/i }));
 
@@ -311,9 +282,7 @@ describe('ToolFilterPopover', () => {
 
     it('shows Clear all button when tools are selected', async () => {
       const user = userEvent.setup();
-      render(
-        <ToolFilterPopover selectedTools={['Read']} onChange={jest.fn()} />
-      );
+      render(<ToolFilterPopover selectedTools={['Read']} onChange={jest.fn()} />);
 
       await user.click(screen.getByRole('button', { name: /Tools/i }));
 
@@ -325,10 +294,7 @@ describe('ToolFilterPopover', () => {
       const handleChange = jest.fn();
 
       render(
-        <ToolFilterPopover
-          selectedTools={['Read', 'Write', 'Edit']}
-          onChange={handleChange}
-        />
+        <ToolFilterPopover selectedTools={['Read', 'Write', 'Edit']} onChange={handleChange} />
       );
 
       await user.click(screen.getByRole('button', { name: /Tools/i }));
@@ -341,11 +307,7 @@ describe('ToolFilterPopover', () => {
   describe('Custom Styling', () => {
     it('applies custom className to trigger button', () => {
       render(
-        <ToolFilterPopover
-          selectedTools={[]}
-          onChange={jest.fn()}
-          className="custom-class"
-        />
+        <ToolFilterPopover selectedTools={[]} onChange={jest.fn()} className="custom-class" />
       );
 
       expect(screen.getByRole('button')).toHaveClass('custom-class');
@@ -356,29 +318,20 @@ describe('ToolFilterPopover', () => {
 describe('ToolFilterBar', () => {
   describe('Rendering', () => {
     it('returns null when no tools selected', () => {
-      const { container } = render(
-        <ToolFilterBar selectedTools={[]} onChange={jest.fn()} />
-      );
+      const { container } = render(<ToolFilterBar selectedTools={[]} onChange={jest.fn()} />);
 
       expect(container.firstChild).toBeNull();
     });
 
     it('renders when tools are selected', () => {
-      render(
-        <ToolFilterBar selectedTools={['Read']} onChange={jest.fn()} />
-      );
+      render(<ToolFilterBar selectedTools={['Read']} onChange={jest.fn()} />);
 
       expect(screen.getByText('Tools:')).toBeInTheDocument();
       expect(screen.getByText('Read')).toBeInTheDocument();
     });
 
     it('displays all selected tools as badges', () => {
-      render(
-        <ToolFilterBar
-          selectedTools={['Read', 'Write', 'Edit']}
-          onChange={jest.fn()}
-        />
-      );
+      render(<ToolFilterBar selectedTools={['Read', 'Write', 'Edit']} onChange={jest.fn()} />);
 
       expect(screen.getByText('Read')).toBeInTheDocument();
       expect(screen.getByText('Write')).toBeInTheDocument();
@@ -391,12 +344,7 @@ describe('ToolFilterBar', () => {
       const user = userEvent.setup();
       const handleChange = jest.fn();
 
-      render(
-        <ToolFilterBar
-          selectedTools={['Read', 'Write']}
-          onChange={handleChange}
-        />
-      );
+      render(<ToolFilterBar selectedTools={['Read', 'Write']} onChange={handleChange} />);
 
       // Find the X icon in the Read badge and click it
       const readBadge = screen.getByText('Read').closest('div');
@@ -409,12 +357,7 @@ describe('ToolFilterBar', () => {
 
   describe('Clear All', () => {
     it('shows Clear all button', () => {
-      render(
-        <ToolFilterBar
-          selectedTools={['Read', 'Write']}
-          onChange={jest.fn()}
-        />
-      );
+      render(<ToolFilterBar selectedTools={['Read', 'Write']} onChange={jest.fn()} />);
 
       expect(screen.getByRole('button', { name: /Clear all/i })).toBeInTheDocument();
     });
@@ -423,12 +366,7 @@ describe('ToolFilterBar', () => {
       const user = userEvent.setup();
       const handleChange = jest.fn();
 
-      render(
-        <ToolFilterBar
-          selectedTools={['Read', 'Write', 'Edit']}
-          onChange={handleChange}
-        />
-      );
+      render(<ToolFilterBar selectedTools={['Read', 'Write', 'Edit']} onChange={handleChange} />);
 
       await user.click(screen.getByRole('button', { name: /Clear all/i }));
 
@@ -439,11 +377,7 @@ describe('ToolFilterBar', () => {
   describe('Custom Styling', () => {
     it('applies custom className', () => {
       const { container } = render(
-        <ToolFilterBar
-          selectedTools={['Read']}
-          onChange={jest.fn()}
-          className="custom-bar-class"
-        />
+        <ToolFilterBar selectedTools={['Read']} onChange={jest.fn()} className="custom-bar-class" />
       );
 
       expect(container.firstChild).toHaveClass('custom-bar-class');

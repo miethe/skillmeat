@@ -145,14 +145,7 @@ export interface UseArtifactSearchReturn {
  * query length meets minimum threshold.
  */
 export function useArtifactSearch(options: UseArtifactSearchOptions = {}): UseArtifactSearchReturn {
-  const {
-    type,
-    minConfidence,
-    tags,
-    limit,
-    debounceMs = 300,
-    minQueryLength = 2,
-  } = options;
+  const { type, minConfidence, tags, limit, debounceMs = 300, minQueryLength = 2 } = options;
 
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query, debounceMs);

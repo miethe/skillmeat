@@ -117,7 +117,6 @@ function getRightLabel(scope: ComparisonScope): string {
   }
 }
 
-
 // ============================================================================
 // Loading Skeleton
 // ============================================================================
@@ -254,8 +253,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
         `/artifacts/${encodeURIComponent(entity.id)}/upstream-diff${queryString ? `?${queryString}` : ''}`
       );
     },
-    enabled:
-      !!entity.id && entity.collection !== 'discovered' && hasValidUpstreamSource(entity),
+    enabled: !!entity.id && entity.collection !== 'discovered' && hasValidUpstreamSource(entity),
     retry: false,
   });
 
@@ -308,13 +306,16 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   // Sync mutation (pull from source)
   const syncMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest<ArtifactSyncResponse>(`/artifacts/${encodeURIComponent(entity.id)}/sync`, {
-        method: 'POST',
-        body: JSON.stringify({
-          // Empty body syncs from upstream source (not project)
-          // project_path is omitted to trigger upstream sync
-        }),
-      });
+      return await apiRequest<ArtifactSyncResponse>(
+        `/artifacts/${encodeURIComponent(entity.id)}/sync`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            // Empty body syncs from upstream source (not project)
+            // project_path is omitted to trigger upstream sync
+          }),
+        }
+      );
     },
     onSuccess: (data: ArtifactSyncResponse) => {
       queryClient.invalidateQueries({ queryKey: ['artifacts'] });
@@ -324,7 +325,11 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       queryClient.invalidateQueries({ queryKey: ['source-project-diff', entity.id] });
       queryClient.invalidateQueries({ queryKey: ['collections'] });
       if (data.conflicts && data.conflicts.length > 0) {
-        toast({ title: 'Pull completed with conflicts', description: `${data.conflicts.length} conflict(s) detected`, variant: 'destructive' });
+        toast({
+          title: 'Pull completed with conflicts',
+          description: `${data.conflicts.length} conflict(s) detected`,
+          variant: 'destructive',
+        });
       } else {
         toast({
           title: 'Sync Successful',
@@ -401,13 +406,16 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
         }
         const queryString = params.toString();
         const url = `/artifacts/${encodeURIComponent(entity.id)}/deploy${queryString ? `?${queryString}` : ''}`;
-        return await apiRequest<{ success: boolean; message: string; error_message?: string }>(url, {
-          method: 'POST',
-          body: JSON.stringify({
-            project_path: projectPath,
-            overwrite: true,
-          }),
-        });
+        return await apiRequest<{ success: boolean; message: string; error_message?: string }>(
+          url,
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              project_path: projectPath,
+              overwrite: true,
+            }),
+          }
+        );
       }
     },
     onSuccess: (data) => {
@@ -417,7 +425,8 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
         if (!deployData.success) {
           toast({
             title: 'Failed to Apply Changes',
-            description: deployData.error_message || deployData.message || 'Operation was not completed',
+            description:
+              deployData.error_message || deployData.message || 'Operation was not completed',
             variant: 'destructive',
           });
           return;
@@ -482,9 +491,16 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       queryClient.invalidateQueries({ queryKey: ['source-project-diff', entity.id] });
       queryClient.invalidateQueries({ queryKey: ['collections'] });
       if (data.conflicts && data.conflicts.length > 0) {
-        toast({ title: 'Push completed with conflicts', description: `${data.conflicts.length} conflict(s) detected`, variant: 'destructive' });
+        toast({
+          title: 'Push completed with conflicts',
+          description: `${data.conflicts.length} conflict(s) detected`,
+          variant: 'destructive',
+        });
       } else {
-        toast({ title: 'Push Successful', description: data.message || 'Project changes pushed to collection' });
+        toast({
+          title: 'Push Successful',
+          description: data.message || 'Project changes pushed to collection',
+        });
       }
     },
     onError: (error: Error) => {
@@ -975,7 +991,9 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
                 onComplete={() => {
                   setShowMergeWorkflow(false);
                   queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
-                  queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
+                  queryClient.invalidateQueries({
+                    queryKey: ['upstream-diff', entity.id, entity.collection],
+                  });
                   queryClient.invalidateQueries({ queryKey: ['source-project-diff', entity.id] });
                   queryClient.invalidateQueries({ queryKey: ['artifacts'] });
                   queryClient.invalidateQueries({ queryKey: ['deployments'] });

@@ -9,7 +9,10 @@ import { CollectionToolbar } from '@/components/collection/collection-toolbar';
 import { ArtifactGrid } from '@/components/collection/artifact-grid';
 import { ArtifactList } from '@/components/collection/artifact-list';
 import { ArtifactBrowseCardSkeleton } from '@/components/collection/artifact-browse-card';
-import { ArtifactDetailsModal, type ArtifactDetailsTab } from '@/components/collection/artifact-details-modal';
+import {
+  ArtifactDetailsModal,
+  type ArtifactDetailsTab,
+} from '@/components/collection/artifact-details-modal';
 import { EditCollectionDialog } from '@/components/collection/edit-collection-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
 import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
@@ -132,11 +135,14 @@ function CollectionPageContent() {
   }, [searchParams]);
 
   // Derive filters object from URL state
-  const filters: ArtifactFilters = useMemo(() => ({
-    type: urlType !== 'all' ? (urlType as ArtifactFilters['type']) : undefined,
-    status: urlStatus !== 'all' ? (urlStatus as ArtifactFilters['status']) : undefined,
-    scope: urlScope !== 'all' ? (urlScope as ArtifactFilters['scope']) : undefined,
-  }), [urlType, urlStatus, urlScope]);
+  const filters: ArtifactFilters = useMemo(
+    () => ({
+      type: urlType !== 'all' ? (urlType as ArtifactFilters['type']) : undefined,
+      status: urlStatus !== 'all' ? (urlStatus as ArtifactFilters['status']) : undefined,
+      scope: urlScope !== 'all' ? (urlScope as ArtifactFilters['scope']) : undefined,
+    }),
+    [urlType, urlStatus, urlScope]
+  );
 
   // Use URL values directly for search and sort
   const searchQuery = urlSearch;
@@ -378,42 +384,57 @@ function CollectionPageContent() {
   // ==========================================================================
 
   // Handle search changes
-  const handleSearchChange = useCallback((query: string) => {
-    updateUrlParams({
-      search: query || null, // Don't write empty string to URL
-    });
-  }, [updateUrlParams]);
+  const handleSearchChange = useCallback(
+    (query: string) => {
+      updateUrlParams({
+        search: query || null, // Don't write empty string to URL
+      });
+    },
+    [updateUrlParams]
+  );
 
   // Handle filter object changes (type, status, scope)
-  const handleFiltersChange = useCallback((newFilters: ArtifactFilters) => {
-    updateUrlParams({
-      type: newFilters.type && newFilters.type !== 'all' ? newFilters.type : null,
-      status: newFilters.status && newFilters.status !== 'all' ? newFilters.status : null,
-      scope: newFilters.scope && newFilters.scope !== 'all' ? newFilters.scope : null,
-    });
-  }, [updateUrlParams]);
+  const handleFiltersChange = useCallback(
+    (newFilters: ArtifactFilters) => {
+      updateUrlParams({
+        type: newFilters.type && newFilters.type !== 'all' ? newFilters.type : null,
+        status: newFilters.status && newFilters.status !== 'all' ? newFilters.status : null,
+        scope: newFilters.scope && newFilters.scope !== 'all' ? newFilters.scope : null,
+      });
+    },
+    [updateUrlParams]
+  );
 
   // Handle sort changes
-  const handleSortChange = useCallback((field: string, order: 'asc' | 'desc') => {
-    updateUrlParams({
-      sort: field === 'confidence' ? null : field, // confidence is default, don't write to URL
-      order: order === 'desc' ? null : order, // desc is default, don't write to URL
-    });
-  }, [updateUrlParams]);
+  const handleSortChange = useCallback(
+    (field: string, order: 'asc' | 'desc') => {
+      updateUrlParams({
+        sort: field === 'confidence' ? null : field, // confidence is default, don't write to URL
+        order: order === 'desc' ? null : order, // desc is default, don't write to URL
+      });
+    },
+    [updateUrlParams]
+  );
 
   // Handle tag selection changes
-  const handleTagsChange = useCallback((tags: string[]) => {
-    updateUrlParams({
-      tags: tags.length > 0 ? tags.join(',') : null,
-    });
-  }, [updateUrlParams]);
+  const handleTagsChange = useCallback(
+    (tags: string[]) => {
+      updateUrlParams({
+        tags: tags.length > 0 ? tags.join(',') : null,
+      });
+    },
+    [updateUrlParams]
+  );
 
   // Handle tool selection changes
-  const handleToolsChange = useCallback((tools: string[]) => {
-    updateUrlParams({
-      tools: tools.length > 0 ? tools.join(',') : null,
-    });
-  }, [updateUrlParams]);
+  const handleToolsChange = useCallback(
+    (tools: string[]) => {
+      updateUrlParams({
+        tools: tools.length > 0 ? tools.join(',') : null,
+      });
+    },
+    [updateUrlParams]
+  );
 
   // Helper function to map API artifact response to Artifact type
   // Uses the centralized mapper from @/lib/api/mappers
@@ -733,10 +754,7 @@ function CollectionPageContent() {
       {/* Tag Filter Bar - Shows active tag filters */}
       {selectedTags.length > 0 && (
         <div className="border-b bg-muted/10 px-6 py-2">
-          <TagFilterBar
-            selectedTags={selectedTags}
-            onChange={handleTagsChange}
-          />
+          <TagFilterBar selectedTags={selectedTags} onChange={handleTagsChange} />
         </div>
       )}
 

@@ -97,7 +97,7 @@ export interface ArtifactMetadata {
   author?: string;
   version?: string;
   tags?: string[];
-  tools?: Tool[];  // Claude Code tools used by this artifact
+  tools?: Tool[]; // Claude Code tools used by this artifact
 }
 
 /**

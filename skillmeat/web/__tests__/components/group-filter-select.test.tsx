@@ -99,12 +99,7 @@ describe('GroupFilterSelect', () => {
         refetch: jest.fn(),
       } as any);
 
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       // Skeleton should be present
       const skeleton = document.querySelector('.h-9');
@@ -146,12 +141,7 @@ describe('GroupFilterSelect', () => {
         refetch: jest.fn(),
       } as any);
 
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
       expect(trigger).toBeDisabled();
@@ -168,12 +158,7 @@ describe('GroupFilterSelect', () => {
         refetch: jest.fn(),
       } as any);
 
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
       expect(trigger).toBeDisabled();
@@ -191,12 +176,7 @@ describe('GroupFilterSelect', () => {
         refetch: jest.fn(),
       } as any);
 
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
       expect(trigger).toBeDisabled();
@@ -213,12 +193,7 @@ describe('GroupFilterSelect', () => {
         refetch: jest.fn(),
       } as any);
 
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
       expect(trigger).toBeDisabled();
@@ -234,12 +209,7 @@ describe('GroupFilterSelect', () => {
         refetch: jest.fn(),
       } as any);
 
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
       expect(trigger).toBeDisabled();
@@ -248,12 +218,7 @@ describe('GroupFilterSelect', () => {
 
   describe('success state', () => {
     it('renders "All Groups" placeholder initially when no value', () => {
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
       expect(trigger).toHaveTextContent('All Groups');
@@ -261,12 +226,7 @@ describe('GroupFilterSelect', () => {
     });
 
     it('renders all groups when data loads successfully', async () => {
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
       fireEvent.click(trigger);
@@ -279,12 +239,7 @@ describe('GroupFilterSelect', () => {
     });
 
     it('displays "All Groups" option in dropdown', async () => {
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
       fireEvent.click(trigger);
@@ -325,12 +280,7 @@ describe('GroupFilterSelect', () => {
 
   describe('user interactions', () => {
     it('calls onChange with groupId when selecting a group', async () => {
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
       fireEvent.click(trigger);
@@ -358,9 +308,7 @@ describe('GroupFilterSelect', () => {
       await waitFor(() => {
         const allGroupsOptions = screen.getAllByText('All Groups');
         // Click the one in the dropdown content (not the trigger)
-        const dropdownOption = allGroupsOptions.find((el) =>
-          el.closest('[role="option"]')
-        );
+        const dropdownOption = allGroupsOptions.find((el) => el.closest('[role="option"]'));
         if (dropdownOption) {
           fireEvent.click(dropdownOption);
         }
@@ -391,12 +339,7 @@ describe('GroupFilterSelect', () => {
     });
 
     it('works with userEvent interactions', async () => {
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
 
@@ -522,32 +465,19 @@ describe('GroupFilterSelect', () => {
 
   describe('collectionId prop', () => {
     it('passes collectionId to useGroups hook', () => {
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       expect(mockUseGroups).toHaveBeenCalledWith(mockCollectionId);
     });
 
     it('updates when collectionId changes', () => {
       const { rerender } = render(
-        <GroupFilterSelect
-          collectionId="collection-1"
-          onChange={mockOnChange}
-        />
+        <GroupFilterSelect collectionId="collection-1" onChange={mockOnChange} />
       );
 
       expect(mockUseGroups).toHaveBeenCalledWith('collection-1');
 
-      rerender(
-        <GroupFilterSelect
-          collectionId="collection-2"
-          onChange={mockOnChange}
-        />
-      );
+      rerender(<GroupFilterSelect collectionId="collection-2" onChange={mockOnChange} />);
 
       expect(mockUseGroups).toHaveBeenCalledWith('collection-2');
     });
@@ -555,12 +485,7 @@ describe('GroupFilterSelect', () => {
 
   describe('accessibility', () => {
     it('select is keyboard accessible', () => {
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
       expect(trigger).toBeInTheDocument();
@@ -577,24 +502,14 @@ describe('GroupFilterSelect', () => {
         refetch: jest.fn(),
       } as any);
 
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
       expect(trigger).toBeDisabled();
     });
 
     it('maintains focus management in dropdown', async () => {
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
       fireEvent.click(trigger);
@@ -612,12 +527,7 @@ describe('GroupFilterSelect', () => {
 
   describe('edge cases', () => {
     it('handles rapid successive onChange calls', async () => {
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
 
@@ -699,12 +609,7 @@ describe('GroupFilterSelect', () => {
         refetch: jest.fn(),
       } as any);
 
-      render(
-        <GroupFilterSelect
-          collectionId={mockCollectionId}
-          onChange={mockOnChange}
-        />
-      );
+      render(<GroupFilterSelect collectionId={mockCollectionId} onChange={mockOnChange} />);
 
       const trigger = screen.getByRole('combobox');
       fireEvent.click(trigger);

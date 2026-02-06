@@ -62,19 +62,10 @@ export interface PageHeaderProps {
  * @param actions - Optional React node for action buttons
  * @param className - Additional CSS classes
  */
-export function PageHeader({
-  title,
-  description,
-  icon,
-  actions,
-  className,
-}: PageHeaderProps) {
+export function PageHeader({ title, description, icon, actions, className }: PageHeaderProps) {
   return (
     <header
-      className={cn(
-        'flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between',
-        className
-      )}
+      className={cn('flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between', className)}
     >
       {/* Title section with icon */}
       <div className="flex flex-col gap-1">
@@ -84,23 +75,13 @@ export function PageHeader({
               {icon}
             </span>
           )}
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            {title}
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
         </div>
-        {description && (
-          <p className="text-sm text-muted-foreground sm:text-base">
-            {description}
-          </p>
-        )}
+        {description && <p className="text-sm text-muted-foreground sm:text-base">{description}</p>}
       </div>
 
       {/* Actions slot */}
-      {actions && (
-        <div className="flex flex-shrink-0 items-center gap-2">
-          {actions}
-        </div>
-      )}
+      {actions && <div className="flex flex-shrink-0 items-center gap-2">{actions}</div>}
     </header>
   );
 }

@@ -800,11 +800,7 @@ describe('mapArtifactsToEntitiesSafe', () => {
   };
 
   it('maps valid artifacts and filters invalid ones', () => {
-    const results = mapArtifactsToEntitiesSafe([
-      validArtifact1,
-      invalidArtifact,
-      validArtifact2,
-    ]);
+    const results = mapArtifactsToEntitiesSafe([validArtifact1, invalidArtifact, validArtifact2]);
 
     expect(results).toHaveLength(2);
     expect(results[0]?.id).toBe('id1');

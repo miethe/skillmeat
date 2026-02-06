@@ -55,11 +55,7 @@ function GroupsDisplaySkeleton({ className }: { className?: string }) {
  * Empty state when artifact has no groups
  */
 function GroupsDisplayEmpty({ className }: { className?: string }) {
-  return (
-    <span className={cn('text-xs text-muted-foreground italic', className)}>
-      No groups
-    </span>
-  );
+  return <span className={cn('text-xs italic text-muted-foreground', className)}>No groups</span>;
 }
 
 // ============================================================================
@@ -108,11 +104,5 @@ export function GroupsDisplay({
   }));
 
   // Success state - render badges using GroupBadgeRow
-  return (
-    <GroupBadgeRow
-      groups={groupInfos}
-      maxBadges={maxBadges}
-      className={className}
-    />
-  );
+  return <GroupBadgeRow groups={groupInfos} maxBadges={maxBadges} className={className} />;
 }

@@ -61,8 +61,7 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
   };
 
   // Determine if we're in a specific collection context (not "All Collections")
-  const isSpecificCollectionContext =
-    selectedCollectionId && selectedCollectionId !== 'all';
+  const isSpecificCollectionContext = selectedCollectionId && selectedCollectionId !== 'all';
 
   return (
     <div className="space-y-4">

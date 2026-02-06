@@ -18,9 +18,8 @@ interface AddEntityDialogProps {
 
 export function AddEntityDialog({ entityType, open, onOpenChange }: AddEntityDialogProps) {
   // When entityType is 'all' or invalid, default to 'skill' for the add form
-  const effectiveType: ArtifactType = entityType === 'all' || !ARTIFACT_TYPES[entityType as ArtifactType]
-    ? 'skill'
-    : entityType;
+  const effectiveType: ArtifactType =
+    entityType === 'all' || !ARTIFACT_TYPES[entityType as ArtifactType] ? 'skill' : entityType;
   const config = ARTIFACT_TYPES[effectiveType];
 
   return (

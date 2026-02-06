@@ -48,10 +48,7 @@ export function generateDeployWithOverwriteCommand(artifactName: string): string
  * @param projectPath - Target project directory (defaults to current directory)
  * @returns CLI command string with --project flag
  */
-export function generateDeployWithProjectCommand(
-  artifactName: string,
-  projectPath = '.'
-): string {
+export function generateDeployWithProjectCommand(artifactName: string, projectPath = '.'): string {
   return `skillmeat deploy ${artifactName.trim()} --project ${projectPath}`;
 }
 

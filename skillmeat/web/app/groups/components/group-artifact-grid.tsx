@@ -113,11 +113,7 @@ function ArtifactWithData({
  * />
  * ```
  */
-export function GroupArtifactGrid({
-  groupId,
-  collectionId,
-  className,
-}: GroupArtifactGridProps) {
+export function GroupArtifactGrid({ groupId, collectionId, className }: GroupArtifactGridProps) {
   // Note: collectionId is used for empty state link and reserved for future filter features
   const { toast } = useToast();
   const { copy } = useCliCopy();
@@ -156,12 +152,7 @@ export function GroupArtifactGrid({
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
   // Fetch group artifacts using the group-specific hook
-  const {
-    data: groupArtifacts,
-    isLoading,
-    error,
-    refetch,
-  } = useGroupArtifacts(groupId);
+  const { data: groupArtifacts, isLoading, error, refetch } = useGroupArtifacts(groupId);
 
   // Infinite scroll state - we'll paginate client-side for now
   // since useGroupArtifacts returns all artifacts in the group
@@ -273,7 +264,9 @@ export function GroupArtifactGrid({
   // Error state
   if (error) {
     return (
-      <div className={cn('rounded-lg border border-destructive/50 bg-destructive/10 p-6', className)}>
+      <div
+        className={cn('rounded-lg border border-destructive/50 bg-destructive/10 p-6', className)}
+      >
         <div className="flex flex-col items-center justify-center gap-4 text-center">
           <AlertCircle className="h-12 w-12 text-destructive" />
           <div>
@@ -327,10 +320,7 @@ export function GroupArtifactGrid({
           </span>
 
           {/* Sort selector */}
-          <Select
-            value={sortField}
-            onValueChange={(value) => handleSortChange(value as SortField)}
-          >
+          <Select value={sortField} onValueChange={(value) => handleSortChange(value as SortField)}>
             <SelectTrigger className="w-[140px]" aria-label="Sort by">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>

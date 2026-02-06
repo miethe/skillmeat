@@ -143,13 +143,16 @@ export function useUndeploy(options: UseDeployOptions = {}) {
       }
 
       // Call backend API
-      const response = await apiRequest<DeployResponse>(`/artifacts/${encodeURIComponent(artifactId)}/undeploy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          project_path: request.projectPath,
-        }),
-      });
+      const response = await apiRequest<DeployResponse>(
+        `/artifacts/${encodeURIComponent(artifactId)}/undeploy`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project_path: request.projectPath,
+          }),
+        }
+      );
 
       // Check if undeploy was successful
       if (!response.success) {

@@ -238,7 +238,12 @@ function SearchPlus({ className }: { className?: string }) {
   );
 }
 
-function IndexingBadge({ indexingEnabled, deepIndexingEnabled, lastIndexedTreeSha, lastIndexedAt }: IndexingBadgeProps) {
+function IndexingBadge({
+  indexingEnabled,
+  deepIndexingEnabled,
+  lastIndexedTreeSha,
+  lastIndexedAt,
+}: IndexingBadgeProps) {
   // Determine indexing state
   let state: 'disabled' | 'pending' | 'indexed' | 'deep_indexed' | 'default';
   if (indexingEnabled === false) {

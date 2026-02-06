@@ -167,10 +167,7 @@ export function DeployButton({
               )}
               aria-label="Deploy options"
             >
-              <ChevronDown
-                className={isSmall ? 'h-3 w-3' : 'h-3.5 w-3.5'}
-                aria-hidden="true"
-              />
+              <ChevronDown className={isSmall ? 'h-3 w-3' : 'h-3.5 w-3.5'} aria-hidden="true" />
             </button>
           </DropdownMenuTrigger>
 
@@ -213,9 +210,7 @@ export function DeployButton({
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
             <DialogTitle>CLI Deploy Commands</DialogTitle>
-            <DialogDescription>
-              Copy deployment commands for {artifactName}
-            </DialogDescription>
+            <DialogDescription>Copy deployment commands for {artifactName}</DialogDescription>
           </DialogHeader>
 
           <div className="py-4">

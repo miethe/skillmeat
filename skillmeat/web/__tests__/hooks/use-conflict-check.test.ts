@@ -891,9 +891,7 @@ describe('useConflictCheck', () => {
         expect(mockApiRequest).toHaveBeenCalled();
       });
 
-      expect(mockApiRequest).toHaveBeenCalledWith(
-        expect.stringContaining('/artifacts/12345/diff')
-      );
+      expect(mockApiRequest).toHaveBeenCalledWith(expect.stringContaining('/artifacts/12345/diff'));
     });
 
     it('handles summary with missing conflict field', async () => {

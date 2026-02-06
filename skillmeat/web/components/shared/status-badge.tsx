@@ -148,10 +148,7 @@ export function StatusBadge({
       aria-label={`Status: ${config.label}`}
     >
       {showIcon && (
-        <Icon
-          className={cn(sizeConfig.icon, showLabel && '-ml-0.5')}
-          aria-hidden="true"
-        />
+        <Icon className={cn(sizeConfig.icon, showLabel && '-ml-0.5')} aria-hidden="true" />
       )}
       {showLabel && config.label}
     </Badge>

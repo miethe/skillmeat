@@ -247,9 +247,7 @@ describe('buildFolderTree', () => {
     });
 
     it('handles deep nesting (5+ levels)', () => {
-      const entries = [
-        createEntry('plugins/category/subcategory/group/subgroup/tool/artifact'),
-      ];
+      const entries = [createEntry('plugins/category/subcategory/group/subgroup/tool/artifact')];
       const tree = buildFolderTree(entries, 0);
 
       let node = tree.plugins;
@@ -423,10 +421,7 @@ describe('buildFolderTree', () => {
     });
 
     it('handles duplicate entries in same folder', () => {
-      const entries = [
-        createEntry('plugins/tool', 'id1'),
-        createEntry('plugins/tool', 'id2'),
-      ];
+      const entries = [createEntry('plugins/tool', 'id1'), createEntry('plugins/tool', 'id2')];
       const tree = buildFolderTree(entries, 0);
 
       const pluginsNode = tree.plugins;

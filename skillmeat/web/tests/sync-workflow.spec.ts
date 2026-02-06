@@ -21,16 +21,8 @@
  */
 
 import { test, expect } from '@playwright/test';
-import {
-  mockApiRoute,
-  navigateToPage,
-  waitForElement,
-  pressKey,
-} from './helpers/test-utils';
-import {
-  buildApiResponse,
-  mockArtifacts,
-} from './helpers/fixtures';
+import { mockApiRoute, navigateToPage, waitForElement, pressKey } from './helpers/test-utils';
+import { buildApiResponse, mockArtifacts } from './helpers/fixtures';
 
 // ---------------------------------------------------------------------------
 // Shared mock data
@@ -1113,7 +1105,9 @@ test.describe('Full Sync Cycle (SYNC-P05)', () => {
     expect(pushAttempt).toBe(1);
 
     // Verify error toast appeared (Toaster renders toasts with role="status" or in a toaster container)
-    const errorToast = page.locator('[data-sonner-toast][data-type="error"], [role="status"]:has-text("Push Failed"), .destructive:has-text("Push Failed")');
+    const errorToast = page.locator(
+      '[data-sonner-toast][data-type="error"], [role="status"]:has-text("Push Failed"), .destructive:has-text("Push Failed")'
+    );
     // Give the toast time to appear
     await page.waitForTimeout(300);
 

@@ -118,9 +118,7 @@ export function SourceFolderLayout({
   const rootNodes = Object.values(tree);
 
   // Get the selected folder node from the tree
-  const selectedFolderNode = selectedFolder
-    ? findFolderByPath(rootNodes, selectedFolder)
-    : null;
+  const selectedFolderNode = selectedFolder ? findFolderByPath(rootNodes, selectedFolder) : null;
 
   /**
    * Handle subfolder selection - navigate to folder with tree expansion,

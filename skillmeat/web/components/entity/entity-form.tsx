@@ -3,12 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Loader2, CheckCircle2 } from 'lucide-react';
-import {
-  ArtifactType,
-  ArtifactFormField,
-  ARTIFACT_TYPES,
-  Artifact,
-} from '@/types/artifact';
+import { ArtifactType, ArtifactFormField, ARTIFACT_TYPES, Artifact } from '@/types/artifact';
 import {
   useEntityLifecycle,
   useGitHubMetadata,

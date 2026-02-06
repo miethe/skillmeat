@@ -130,7 +130,8 @@ export function buildFolderTree(entries: CatalogEntry[], maxDepth: number): Fold
     if (isLeaf && folderSegments.length > 0) {
       const parentFolderName = folderSegments[folderSegments.length - 1];
       if (parentFolderName) {
-        const parentLevel = folderSegments.length === 1 ? root : getNodeAtPath(root, folderSegments.slice(0, -1));
+        const parentLevel =
+          folderSegments.length === 1 ? root : getNodeAtPath(root, folderSegments.slice(0, -1));
 
         if (parentLevel && parentLevel[parentFolderName]) {
           parentLevel[parentFolderName].directArtifacts.push(entry);

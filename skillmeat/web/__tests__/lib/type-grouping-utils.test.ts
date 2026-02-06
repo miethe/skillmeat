@@ -105,10 +105,7 @@ describe('groupArtifactsByType', () => {
 
   describe('mcp_server alias handling', () => {
     it('normalizes mcp_server to mcp', () => {
-      const entries = [
-        createEntry('mcp-alpha', 'mcp_server'),
-        createEntry('mcp-beta', 'mcp'),
-      ];
+      const entries = [createEntry('mcp-alpha', 'mcp_server'), createEntry('mcp-beta', 'mcp')];
 
       const result = groupArtifactsByType(entries);
 
@@ -167,10 +164,7 @@ describe('groupArtifactsByType', () => {
 
   describe('purity', () => {
     it('does not mutate input array', () => {
-      const entries = [
-        createEntry('skill-charlie', 'skill'),
-        createEntry('skill-alpha', 'skill'),
-      ];
+      const entries = [createEntry('skill-charlie', 'skill'), createEntry('skill-alpha', 'skill')];
       const originalOrder = entries.map((e) => e.name);
 
       groupArtifactsByType(entries);
@@ -316,10 +310,7 @@ describe('sortEntriesWithinType', () => {
 
   describe('purity', () => {
     it('does not mutate input array', () => {
-      const entries = [
-        createEntry('charlie', 'skill'),
-        createEntry('alpha', 'skill'),
-      ];
+      const entries = [createEntry('charlie', 'skill'), createEntry('alpha', 'skill')];
       const originalOrder = entries.map((e) => e.name);
 
       sortEntriesWithinType(entries);

@@ -3,7 +3,11 @@
  */
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { HealthIndicator, deriveHealthStatus, type HealthStatus } from '@/components/shared/health-indicator';
+import {
+  HealthIndicator,
+  deriveHealthStatus,
+  type HealthStatus,
+} from '@/components/shared/health-indicator';
 import type { Artifact, SyncStatus } from '@/types/artifact';
 
 // Factory function for creating test artifacts
@@ -282,12 +286,7 @@ describe('HealthIndicator', () => {
     it('renders with all props', () => {
       const artifact = createTestArtifact({ syncStatus: 'error' });
       render(
-        <HealthIndicator
-          artifact={artifact}
-          size="sm"
-          showTooltip={true}
-          className="extra-class"
-        />
+        <HealthIndicator artifact={artifact} size="sm" showTooltip={true} className="extra-class" />
       );
       const status = screen.getByRole('status');
       expect(status).toBeInTheDocument();

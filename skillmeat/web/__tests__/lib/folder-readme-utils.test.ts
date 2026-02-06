@@ -246,7 +246,8 @@ ${exactText}`;
     });
 
     it('should not truncate paragraphs under 300 characters', () => {
-      const text = 'This is a paragraph with exactly one hundred characters to test the length constraint properly yes.';
+      const text =
+        'This is a paragraph with exactly one hundred characters to test the length constraint properly yes.';
       const content = `# Heading
 
 ${text}`;
@@ -334,18 +335,14 @@ describe('extractFolderReadme', () => {
 
   describe('input validation', () => {
     it('should return null for empty folder path', () => {
-      const entries: CatalogEntry[] = [
-        createMockEntry({ path: 'README.md' }),
-      ];
+      const entries: CatalogEntry[] = [createMockEntry({ path: 'README.md' })];
 
       expect(extractFolderReadme('', entries)).toBeNull();
       expect(extractFolderReadme('   ', entries)).toBeNull();
     });
 
     it('should return null for invalid folder path', () => {
-      const entries: CatalogEntry[] = [
-        createMockEntry({ path: 'plugins/README.md' }),
-      ];
+      const entries: CatalogEntry[] = [createMockEntry({ path: 'plugins/README.md' })];
 
       expect(extractFolderReadme('/', entries)).toBeNull();
     });

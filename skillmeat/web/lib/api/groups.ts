@@ -110,9 +110,12 @@ export async function addArtifactToGroup(
  * Remove artifact from group
  */
 export async function removeArtifactFromGroup(groupId: string, artifactId: string): Promise<void> {
-  const response = await fetch(buildUrl(`/groups/${encodeURIComponent(groupId)}/artifacts/${encodeURIComponent(artifactId)}`), {
-    method: 'DELETE',
-  });
+  const response = await fetch(
+    buildUrl(`/groups/${encodeURIComponent(groupId)}/artifacts/${encodeURIComponent(artifactId)}`),
+    {
+      method: 'DELETE',
+    }
+  );
   if (!response.ok) {
     throw new Error(`Failed to remove artifact from group: ${response.statusText}`);
   }
@@ -151,11 +154,16 @@ export async function moveArtifactToGroup(
   targetGroupId: string,
   position?: number
 ): Promise<GroupArtifact> {
-  const response = await fetch(buildUrl(`/groups/${encodeURIComponent(sourceGroupId)}/artifacts/${encodeURIComponent(artifactId)}/move`), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ target_group_id: targetGroupId, position }),
-  });
+  const response = await fetch(
+    buildUrl(
+      `/groups/${encodeURIComponent(sourceGroupId)}/artifacts/${encodeURIComponent(artifactId)}/move`
+    ),
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_group_id: targetGroupId, position }),
+    }
+  );
   if (!response.ok) {
     throw new Error(`Failed to move artifact: ${response.statusText}`);
   }

@@ -40,7 +40,16 @@
  * - Focus is retained when selecting folders via Enter/Space
  */
 
-import { useMemo, useCallback, useRef, useState, useEffect, useImperativeHandle, forwardRef, memo } from 'react';
+import {
+  useMemo,
+  useCallback,
+  useRef,
+  useState,
+  useEffect,
+  useImperativeHandle,
+  forwardRef,
+  memo,
+} from 'react';
 import { Home } from 'lucide-react';
 import type { FolderTree } from '@/lib/tree-builder';
 import { filterSemanticTree } from '@/lib/tree-filter-utils';
@@ -105,9 +114,7 @@ function getVisibleItems(
   const items: VisibleTreeItem[] = [];
 
   // Sort nodes alphabetically for consistent ordering
-  const sortedNodes = Object.values(tree).sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
+  const sortedNodes = Object.values(tree).sort((a, b) => a.name.localeCompare(b.name));
 
   for (const node of sortedNodes) {
     const hasChildren = Object.keys(node.children).length > 0;
@@ -203,7 +210,7 @@ const TreeBranch = memo(function TreeBranch({
 
   // Use semantic <ul>/<li> structure for proper ARIA tree pattern
   return (
-    <ul role="group" className="list-none m-0 p-0">
+    <ul role="group" className="m-0 list-none p-0">
       {sortedNodes.map((node, index) => {
         const isSelected = selectedFolder === node.fullPath;
         const isExpanded = expanded.has(node.fullPath);
@@ -365,13 +372,10 @@ export const SemanticTree = forwardRef<SemanticTreeHandle, SemanticTreeProps>(fu
     }
 
     const totalPossibleNodes = countTotalTreeNodes(filteredTree);
-    const renderedNodes =
-      treeRef.current?.querySelectorAll('[role="treeitem"]').length ?? 0;
+    const renderedNodes = treeRef.current?.querySelectorAll('[role="treeitem"]').length ?? 0;
     const expandedCount = expanded.size;
     const reductionPercent =
-      totalPossibleNodes > 0
-        ? Math.round((1 - renderedNodes / totalPossibleNodes) * 100)
-        : 0;
+      totalPossibleNodes > 0 ? Math.round((1 - renderedNodes / totalPossibleNodes) * 100) : 0;
 
     console.log('[SemanticTree] DOM Stats:', {
       totalPossibleNodes,
@@ -397,9 +401,7 @@ export const SemanticTree = forwardRef<SemanticTreeHandle, SemanticTreeProps>(fu
     (e: React.KeyboardEvent) => {
       if (visibleItems.length === 0 || !focusedPath) return;
 
-      const currentIndex = visibleItems.findIndex(
-        (item) => item.path === focusedPath
-      );
+      const currentIndex = visibleItems.findIndex((item) => item.path === focusedPath);
       const currentItem = visibleItems[currentIndex];
 
       if (currentIndex === -1) return;
@@ -518,9 +520,7 @@ export const SemanticTree = forwardRef<SemanticTreeHandle, SemanticTreeProps>(fu
   if (!hasContent) {
     return (
       <nav aria-label="Folder navigation" className={cn('overflow-y-auto', className)}>
-        <p className="py-4 text-center text-sm text-muted-foreground">
-          No folders to display
-        </p>
+        <p className="py-4 text-center text-sm text-muted-foreground">No folders to display</p>
       </nav>
     );
   }
@@ -532,11 +532,11 @@ export const SemanticTree = forwardRef<SemanticTreeHandle, SemanticTreeProps>(fu
         type="button"
         onClick={() => onSelectFolder(null)}
         className={cn(
-          'w-full text-left px-2 py-2 rounded-md text-sm mb-2',
+          'mb-2 w-full rounded-md px-2 py-2 text-left text-sm',
           'flex items-center gap-2 transition-colors',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
           selectedFolder === null
-            ? 'bg-accent text-accent-foreground font-medium'
+            ? 'bg-accent font-medium text-accent-foreground'
             : 'bg-transparent hover:bg-accent/50'
         )}
         aria-current={selectedFolder === null ? 'true' : undefined}
@@ -545,12 +545,7 @@ export const SemanticTree = forwardRef<SemanticTreeHandle, SemanticTreeProps>(fu
         <span>Source Root</span>
       </button>
 
-      <div
-        ref={treeRef}
-        role="tree"
-        aria-label="Folder tree"
-        onKeyDown={handleKeyDown}
-      >
+      <div ref={treeRef} role="tree" aria-label="Folder tree" onKeyDown={handleKeyDown}>
         <TreeBranch
           nodes={filteredTree}
           depth={0}

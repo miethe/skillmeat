@@ -146,10 +146,7 @@ export function DiffViewerSkeleton() {
               </div>
               <div className="min-h-0 min-w-0 flex-1 p-0">
                 {Array.from({ length: 12 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex border-b border-border/50 font-mono text-sm"
-                  >
+                  <div key={i} className="flex border-b border-border/50 font-mono text-sm">
                     <span className="w-12 flex-shrink-0 border-r border-border/50 px-2 py-0.5">
                       <Skeleton className="h-3.5 w-6" />
                     </span>
@@ -171,10 +168,7 @@ export function DiffViewerSkeleton() {
               </div>
               <div className="min-h-0 min-w-0 flex-1 p-0">
                 {Array.from({ length: 12 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex border-b border-border/50 font-mono text-sm"
-                  >
+                  <div key={i} className="flex border-b border-border/50 font-mono text-sm">
                     <span className="w-12 flex-shrink-0 border-r border-border/50 px-2 py-0.5">
                       <Skeleton className="h-3.5 w-6" />
                     </span>

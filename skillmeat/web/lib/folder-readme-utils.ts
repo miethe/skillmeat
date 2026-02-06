@@ -16,10 +16,7 @@ import { CatalogEntry } from '@/types/marketplace';
  * // Returns: "A collection of development tools for..."
  * ```
  */
-export function extractFolderReadme(
-  folderPath: string,
-  entries: CatalogEntry[]
-): string | null {
+export function extractFolderReadme(folderPath: string, entries: CatalogEntry[]): string | null {
   // Validate inputs
   if (!folderPath || !entries || entries.length === 0) {
     return null;

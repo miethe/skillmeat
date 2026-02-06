@@ -33,11 +33,7 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import {
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 // ============================================================================
 // Types
@@ -90,24 +86,11 @@ export function ModalHeader({
   return (
     <DialogHeader className={cn('border-b px-6 pb-4 pt-6', className)}>
       <DialogTitle className="flex items-center gap-3">
-        {Icon && (
-          <Icon
-            className={cn('h-5 w-5 flex-shrink-0', iconClassName)}
-            aria-hidden="true"
-          />
-        )}
+        {Icon && <Icon className={cn('h-5 w-5 flex-shrink-0', iconClassName)} aria-hidden="true" />}
         <span className="flex-1 truncate">{title}</span>
-        {actions && (
-          <div className="flex flex-shrink-0 items-center gap-2">
-            {actions}
-          </div>
-        )}
+        {actions && <div className="flex flex-shrink-0 items-center gap-2">{actions}</div>}
       </DialogTitle>
-      {description && (
-        <DialogDescription className="mt-1.5 pl-8">
-          {description}
-        </DialogDescription>
-      )}
+      {description && <DialogDescription className="mt-1.5 pl-8">{description}</DialogDescription>}
     </DialogHeader>
   );
 }

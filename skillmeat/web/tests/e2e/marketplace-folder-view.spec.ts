@@ -52,7 +52,8 @@ const mockCatalogEntries = [
     path: '.claude/skills/canvas-design.md',
     status: 'new',
     confidence_score: 95,
-    upstream_url: 'https://github.com/anthropics/skills-repo/blob/main/.claude/skills/canvas-design.md',
+    upstream_url:
+      'https://github.com/anthropics/skills-repo/blob/main/.claude/skills/canvas-design.md',
     detected_at: '2024-12-08T10:00:00Z',
   },
   // Development tools folder (semantic folder - should show)
@@ -64,7 +65,8 @@ const mockCatalogEntries = [
     path: '.claude/skills/dev-tools/code-review.md',
     status: 'new',
     confidence_score: 90,
-    upstream_url: 'https://github.com/anthropics/skills-repo/blob/main/.claude/skills/dev-tools/code-review.md',
+    upstream_url:
+      'https://github.com/anthropics/skills-repo/blob/main/.claude/skills/dev-tools/code-review.md',
     detected_at: '2024-12-08T10:00:00Z',
   },
   {
@@ -75,7 +77,8 @@ const mockCatalogEntries = [
     path: '.claude/skills/dev-tools/linter.md',
     status: 'updated',
     confidence_score: 88,
-    upstream_url: 'https://github.com/anthropics/skills-repo/blob/main/.claude/skills/dev-tools/linter.md',
+    upstream_url:
+      'https://github.com/anthropics/skills-repo/blob/main/.claude/skills/dev-tools/linter.md',
     detected_at: '2024-12-08T10:00:00Z',
   },
   // Dev tools subfolder: formatters (semantic subfolder)
@@ -87,7 +90,8 @@ const mockCatalogEntries = [
     path: '.claude/skills/dev-tools/formatters/prettier.md',
     status: 'new',
     confidence_score: 92,
-    upstream_url: 'https://github.com/anthropics/skills-repo/blob/main/.claude/skills/dev-tools/formatters/prettier.md',
+    upstream_url:
+      'https://github.com/anthropics/skills-repo/blob/main/.claude/skills/dev-tools/formatters/prettier.md',
     detected_at: '2024-12-08T10:00:00Z',
   },
   {
@@ -98,7 +102,8 @@ const mockCatalogEntries = [
     path: '.claude/skills/dev-tools/formatters/eslint.md',
     status: 'new',
     confidence_score: 91,
-    upstream_url: 'https://github.com/anthropics/skills-repo/blob/main/.claude/skills/dev-tools/formatters/eslint.md',
+    upstream_url:
+      'https://github.com/anthropics/skills-repo/blob/main/.claude/skills/dev-tools/formatters/eslint.md',
     detected_at: '2024-12-08T10:00:00Z',
   },
   // Data science folder (semantic folder)
@@ -110,7 +115,8 @@ const mockCatalogEntries = [
     path: '.claude/skills/data-science/data-analysis.md',
     status: 'imported',
     confidence_score: 94,
-    upstream_url: 'https://github.com/anthropics/skills-repo/blob/main/.claude/skills/data-science/data-analysis.md',
+    upstream_url:
+      'https://github.com/anthropics/skills-repo/blob/main/.claude/skills/data-science/data-analysis.md',
     import_date: '2024-12-07T10:00:00Z',
     detected_at: '2024-12-08T10:00:00Z',
   },
@@ -122,7 +128,8 @@ const mockCatalogEntries = [
     path: '.claude/skills/data-science/visualization.md',
     status: 'new',
     confidence_score: 89,
-    upstream_url: 'https://github.com/anthropics/skills-repo/blob/main/.claude/skills/data-science/visualization.md',
+    upstream_url:
+      'https://github.com/anthropics/skills-repo/blob/main/.claude/skills/data-science/visualization.md',
     detected_at: '2024-12-08T10:00:00Z',
   },
   // Commands in different type folder (for type filter testing)
@@ -224,7 +231,11 @@ test.describe('Folder View - Toggle and Layout', () => {
 
   test('can toggle to folder view mode', async ({ page }) => {
     // Verify initial view (grid or list)
-    await expect(page.locator('[data-testid="artifact-grid"]').or(page.locator('[data-testid="artifact-list"]'))).toBeVisible();
+    await expect(
+      page
+        .locator('[data-testid="artifact-grid"]')
+        .or(page.locator('[data-testid="artifact-list"]'))
+    ).toBeVisible();
 
     // Click folder view toggle button
     await toggleToFolderView(page);
@@ -594,7 +605,9 @@ test.describe('Folder View - Subfolder Navigation', () => {
     // Check subfolder card shows count
     const subfoldersSection = detailPane.locator('[data-testid="subfolders-section"]');
     if (await subfoldersSection.isVisible()) {
-      const formattersCard = subfoldersSection.locator('[data-testid="subfolder-card"]').filter({ hasText: /formatters/i });
+      const formattersCard = subfoldersSection
+        .locator('[data-testid="subfolder-card"]')
+        .filter({ hasText: /formatters/i });
 
       // Should show artifact count (2 items: prettier, eslint)
       await expect(formattersCard).toContainText(/2/);
@@ -681,7 +694,7 @@ test.describe('Folder View - Import All Bulk Action', () => {
     const detailPane = page.locator('[data-testid="folder-detail-pane"]');
 
     const importAllButton = detailPane.getByRole('button', { name: /import all/i });
-    if (await importAllButton.isVisible() && await importAllButton.isEnabled()) {
+    if ((await importAllButton.isVisible()) && (await importAllButton.isEnabled())) {
       await importAllButton.click();
 
       // Either shows confirmation dialog or starts import
@@ -932,19 +945,15 @@ test.describe('Folder View - Performance and Edge Cases', () => {
 
   test('handles empty catalog gracefully', async ({ page }) => {
     // Mock empty catalog
-    await mockApiRoute(
-      page,
-      `/api/v1/marketplace/sources/${mockSource.id}/catalog*`,
-      {
-        items: [],
-        total: 0,
-        page: 1,
-        page_size: 50,
-        has_next: false,
-        counts_by_type: {},
-        counts_by_status: {},
-      }
-    );
+    await mockApiRoute(page, `/api/v1/marketplace/sources/${mockSource.id}/catalog*`, {
+      items: [],
+      total: 0,
+      page: 1,
+      page_size: 50,
+      has_next: false,
+      counts_by_type: {},
+      counts_by_status: {},
+    });
 
     await page.reload();
     await waitForPageLoad(page);

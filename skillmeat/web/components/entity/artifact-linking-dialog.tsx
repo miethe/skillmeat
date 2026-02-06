@@ -151,16 +151,19 @@ export function ArtifactLinkingDialog({
       targetArtifactId: string;
       linkType: LinkType;
     }) => {
-      const response = await fetch(buildUrl(`/artifacts/${encodeURIComponent(artifactId)}/linked-artifacts`), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          target_artifact_id: targetArtifactId,
-          link_type: linkType,
-        }),
-      });
+      const response = await fetch(
+        buildUrl(`/artifacts/${encodeURIComponent(artifactId)}/linked-artifacts`),
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            target_artifact_id: targetArtifactId,
+            link_type: linkType,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({}));
@@ -322,7 +325,7 @@ export function ArtifactLinkingDialog({
                           </Badge>
                         </div>
                         {artifact.source && (
-                          <div className="mt-1 text-xs text-muted-foreground truncate">
+                          <div className="mt-1 truncate text-xs text-muted-foreground">
                             {artifact.source}
                           </div>
                         )}
@@ -332,13 +335,12 @@ export function ArtifactLinkingDialog({
                 </RadioGroup>
               )}
             </div>
-            {searchResults?.page_info?.total_count &&
-              searchResults.page_info.total_count > 20 && (
-                <p className="text-xs text-muted-foreground">
-                  Showing 20 of {searchResults.page_info.total_count} results. Refine your search
-                  for more specific results.
-                </p>
-              )}
+            {searchResults?.page_info?.total_count && searchResults.page_info.total_count > 20 && (
+              <p className="text-xs text-muted-foreground">
+                Showing 20 of {searchResults.page_info.total_count} results. Refine your search for
+                more specific results.
+              </p>
+            )}
           </div>
 
           {/* Link Type Selector */}

@@ -195,7 +195,9 @@ export const EntityRow = React.memo(
               <span
                 className={cn('inline-block h-2 w-2 rounded-full', statusColors[entity.syncStatus])}
               />
-              <span className="text-sm text-muted-foreground">{statusLabels[entity.syncStatus]}</span>
+              <span className="text-sm text-muted-foreground">
+                {statusLabels[entity.syncStatus]}
+              </span>
             </div>
           ) : (
             <span className="text-sm text-muted-foreground">-</span>

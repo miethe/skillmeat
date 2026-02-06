@@ -78,6 +78,7 @@ NEXT_PUBLIC_API_VERSION=v1
 The `Artifact` type is the canonical representation for skills, commands, agents, MCP servers, and hooks throughout the web interface.
 
 **Core Types**:
+
 - `ArtifactType` - `'skill' | 'command' | 'agent' | 'mcp' | 'hook'`
 - `ArtifactScope` - `'user' | 'local'`
 - `SyncStatus` - `'synced' | 'modified' | 'outdated' | 'conflict' | 'error'`
@@ -96,18 +97,18 @@ The `Artifact` type is the canonical representation for skills, commands, agents
 
 ## Context Files (Load When Needed)
 
-| File                                              | Load When                                   |
-| ------------------------------------------------- | ------------------------------------------- |
-| `.claude/context/key-context/context-loading-playbook.md` | Choose minimal context by task |
+| File                                                             | Load When                                        |
+| ---------------------------------------------------------------- | ------------------------------------------------ |
+| `.claude/context/key-context/context-loading-playbook.md`        | Choose minimal context by task                   |
 | `.claude/context/key-context/hook-selection-and-deprecations.md` | Canonical hook selection and deprecation routing |
-| `.claude/context/key-context/fe-be-type-sync-playbook.md` | FE/BE payload and type drift fixes |
-| `.claude/context/key-context/data-flow-patterns.md` | Hook stale times, cache invalidation, mutations |
-| `.claude/context/key-context/component-patterns.md` | Component design, spacing, accessibility |
-| `.claude/context/key-context/nextjs-patterns.md` | Layout, loading states, URL state management |
-| `.claude/context/key-context/testing-patterns.md` | Test templates, mock patterns, E2E examples |
-| `.claude/context/api-endpoint-mapping.md`          | API mismatch bugs, endpoint questions       |
-| `.claude/context/stub-patterns.md`                 | "Not implemented" errors                    |
-| `.claude/context/symbol-usage-guide.md`            | Bug investigation, unfamiliar code          |
+| `.claude/context/key-context/fe-be-type-sync-playbook.md`        | FE/BE payload and type drift fixes               |
+| `.claude/context/key-context/data-flow-patterns.md`              | Hook stale times, cache invalidation, mutations  |
+| `.claude/context/key-context/component-patterns.md`              | Component design, spacing, accessibility         |
+| `.claude/context/key-context/nextjs-patterns.md`                 | Layout, loading states, URL state management     |
+| `.claude/context/key-context/testing-patterns.md`                | Test templates, mock patterns, E2E examples      |
+| `.claude/context/api-endpoint-mapping.md`                        | API mismatch bugs, endpoint questions            |
+| `.claude/context/stub-patterns.md`                               | "Not implemented" errors                         |
+| `.claude/context/symbol-usage-guide.md`                          | Bug investigation, unfamiliar code               |
 
 ---
 
@@ -124,12 +125,12 @@ All hooks must comply with the canonical data flow principles. See root `CLAUDE.
 
 ### Quick Stale Time Guide
 
-| Category | Stale Time | Domains |
-|----------|-----------|---------|
-| Standard browsing | 5 min | Artifacts, Collections, Tags, Groups, Projects, Snapshots, Context Entities |
-| Interactive/monitoring | 30 sec | Tag search, Artifact search, Analytics summary, Cache/Sync status |
-| Deployments | 2 min | All deployment hooks |
-| Marketplace listings | 1 min | Listing list only; detail uses 5min |
+| Category               | Stale Time | Domains                                                                     |
+| ---------------------- | ---------- | --------------------------------------------------------------------------- |
+| Standard browsing      | 5 min      | Artifacts, Collections, Tags, Groups, Projects, Snapshots, Context Entities |
+| Interactive/monitoring | 30 sec     | Tag search, Artifact search, Analytics summary, Cache/Sync status           |
+| Deployments            | 2 min      | All deployment hooks                                                        |
+| Marketplace listings   | 1 min      | Listing list only; detail uses 5min                                         |
 
 **Full stale time table + invalidation graph**:
 **Read**: `.claude/context/key-context/data-flow-patterns.md`
@@ -167,19 +168,19 @@ A controlled composition-based modal foundation for artifact-focused dialogs. En
 
 **Key Props**:
 
-| Prop | Type | Purpose |
-|------|------|---------|
-| `artifact` | `Artifact` | Artifact to display; icon resolved from ARTIFACT_TYPES config |
-| `open` | `boolean` | Dialog open state |
-| `onClose` | `() => void` | Close handler |
-| `activeTab` | `string` | Controlled tab value (external state) |
-| `onTabChange` | `(tab: string) => void` | Tab change callback |
-| `tabs` | `Tab[]` | Tab definitions for navigation bar |
-| `headerActions` | `React.ReactNode` | Optional actions rendered in header (right side) |
-| `children` | `React.ReactNode` | Tab content (TabContentWrapper/TabsContent elements) |
-| `aboveTabsContent` | `React.ReactNode` | Optional content between header and tabs (e.g., alerts) |
-| `returnTo` | `string` | Optional URL for return navigation |
-| `onReturn` | `() => void` | Optional handler for return button click |
+| Prop               | Type                    | Purpose                                                       |
+| ------------------ | ----------------------- | ------------------------------------------------------------- |
+| `artifact`         | `Artifact`              | Artifact to display; icon resolved from ARTIFACT_TYPES config |
+| `open`             | `boolean`               | Dialog open state                                             |
+| `onClose`          | `() => void`            | Close handler                                                 |
+| `activeTab`        | `string`                | Controlled tab value (external state)                         |
+| `onTabChange`      | `(tab: string) => void` | Tab change callback                                           |
+| `tabs`             | `Tab[]`                 | Tab definitions for navigation bar                            |
+| `headerActions`    | `React.ReactNode`       | Optional actions rendered in header (right side)              |
+| `children`         | `React.ReactNode`       | Tab content (TabContentWrapper/TabsContent elements)          |
+| `aboveTabsContent` | `React.ReactNode`       | Optional content between header and tabs (e.g., alerts)       |
+| `returnTo`         | `string`                | Optional URL for return navigation                            |
+| `onReturn`         | `() => void`            | Optional handler for return button click                      |
 
 **Composition Pattern**:
 
@@ -206,7 +207,7 @@ const tabs: Tab[] = [
   <TabContentWrapper value="sync">
     <SyncContent artifact={artifact} />
   </TabContentWrapper>
-</BaseArtifactModal>
+</BaseArtifactModal>;
 ```
 
 **Consumers**: `ArtifactOperationsModal` (manage page), `UnifiedEntityModal` (collection page)
@@ -221,11 +222,11 @@ const tabs: Tab[] = [
 
 Controls when upstream diff queries execute. Returns `true` ONLY when ALL conditions are met:
 
-| Condition | Required | Details |
-|-----------|----------|---------|
-| `origin === 'github'` | Yes | Excludes marketplace (origin: "marketplace"), local, unknown origins |
-| `upstream.enabled` | Yes | Upstream tracking must be explicitly enabled |
-| `source` valid | Yes | Must be a remote path string (contains '/', not 'local' or 'unknown') |
+| Condition             | Required | Details                                                               |
+| --------------------- | -------- | --------------------------------------------------------------------- |
+| `origin === 'github'` | Yes      | Excludes marketplace (origin: "marketplace"), local, unknown origins  |
+| `upstream.enabled`    | Yes      | Upstream tracking must be explicitly enabled                          |
+| `source` valid        | Yes      | Must be a remote path string (contains '/', not 'local' or 'unknown') |
 
 **Key Rules**:
 
@@ -240,12 +241,12 @@ Controls when upstream diff queries execute. Returns `true` ONLY when ALL condit
 
 Props:
 
-| Prop | Type | Purpose |
-|------|------|---------|
-| `entity` | `Artifact` | Artifact to sync; passed to `hasValidUpstreamSource()` |
-| `mode` | `'collection' \| 'project'` | Sync scope (collection-wide vs. specific project) |
-| `projectPath` | `string` | Optional project path (required when mode='project') |
-| `onClose` | `() => void` | Handler called after successful sync |
+| Prop          | Type                        | Purpose                                                |
+| ------------- | --------------------------- | ------------------------------------------------------ |
+| `entity`      | `Artifact`                  | Artifact to sync; passed to `hasValidUpstreamSource()` |
+| `mode`        | `'collection' \| 'project'` | Sync scope (collection-wide vs. specific project)      |
+| `projectPath` | `string`                    | Optional project path (required when mode='project')   |
+| `onClose`     | `() => void`                | Handler called after successful sync                   |
 
 **Query Logic**:
 

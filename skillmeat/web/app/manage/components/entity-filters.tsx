@@ -54,8 +54,7 @@ export function EntityFilters({
   const { selectedCollectionId } = useCollectionContext();
 
   // Only show group filter when in specific collection context
-  const isSpecificCollectionContext =
-    selectedCollectionId && selectedCollectionId !== 'all';
+  const isSpecificCollectionContext = selectedCollectionId && selectedCollectionId !== 'all';
 
   const handleStatusChange = (value: string) => {
     if (value === 'all') {
@@ -128,16 +127,14 @@ export function EntityFilters({
         </DropdownMenu>
 
         {/* Group Filter - Only shown in specific collection context */}
-        {isSpecificCollectionContext &&
-          selectedCollectionId &&
-          onGroupFilterChange && (
-            <GroupFilterSelect
-              collectionId={selectedCollectionId}
-              value={groupId}
-              onChange={onGroupFilterChange}
-              className="w-48"
-            />
-          )}
+        {isSpecificCollectionContext && selectedCollectionId && onGroupFilterChange && (
+          <GroupFilterSelect
+            collectionId={selectedCollectionId}
+            value={groupId}
+            onChange={onGroupFilterChange}
+            className="w-48"
+          />
+        )}
       </div>
 
       {/* Tag Filter */}

@@ -42,8 +42,8 @@ interface TreeNodeProps {
  * - All other nodes have tabIndex=-1 (skipped by Tab, but focusable programmatically)
  * - Arrow keys handle navigation between nodes (handled by parent SemanticTree)
  */
-export const TreeNode = memo(forwardRef<HTMLDivElement, TreeNodeProps>(
-  function TreeNode(
+export const TreeNode = memo(
+  forwardRef<HTMLDivElement, TreeNodeProps>(function TreeNode(
     {
       name,
       fullPath,
@@ -69,12 +69,8 @@ export const TreeNode = memo(forwardRef<HTMLDivElement, TreeNodeProps>(
     // Generate accessible label with comprehensive information
     const ariaLabel = [
       `${name} folder`,
-      directCount > 0
-        ? `${directCount} direct artifact${directCount !== 1 ? 's' : ''}`
-        : null,
-      totalCount > 0
-        ? `${totalCount} total descendant${totalCount !== 1 ? 's' : ''}`
-        : null,
+      directCount > 0 ? `${directCount} direct artifact${directCount !== 1 ? 's' : ''}` : null,
+      totalCount > 0 ? `${totalCount} total descendant${totalCount !== 1 ? 's' : ''}` : null,
       hasSubfolders ? (isExpanded ? 'expanded' : 'collapsed') : null,
     ]
       .filter(Boolean)
@@ -106,11 +102,9 @@ export const TreeNode = memo(forwardRef<HTMLDivElement, TreeNodeProps>(
         tabIndex={isFocused ? 0 : -1}
         onFocus={onFocus}
         className={cn(
-          'flex items-center gap-2 py-2 pr-2 rounded-md cursor-pointer transition-colors',
+          'flex cursor-pointer items-center gap-2 rounded-md py-2 pr-2 transition-colors',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
-          isSelected
-            ? 'bg-accent text-accent-foreground'
-            : 'bg-transparent hover:bg-accent/50'
+          isSelected ? 'bg-accent text-accent-foreground' : 'bg-transparent hover:bg-accent/50'
         )}
         style={{ paddingLeft: `${depth * 24 + 8}px` }}
         onClick={onSelect}
@@ -124,7 +118,7 @@ export const TreeNode = memo(forwardRef<HTMLDivElement, TreeNodeProps>(
             // Remove from tab order - tree handles keyboard navigation
             tabIndex={-1}
             className={cn(
-              'flex-shrink-0 p-0.5 rounded transition-transform duration-200',
+              'flex-shrink-0 rounded p-0.5 transition-transform duration-200',
               'hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
               isExpanded && 'rotate-90'
             )}
@@ -144,9 +138,7 @@ export const TreeNode = memo(forwardRef<HTMLDivElement, TreeNodeProps>(
         <TooltipProvider delayDuration={500}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="truncate text-sm font-medium flex-1 min-w-0">
-                {name}
-              </span>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">{name}</span>
             </TooltipTrigger>
             <TooltipContent side="right">
               <p className="text-xs">
@@ -159,7 +151,7 @@ export const TreeNode = memo(forwardRef<HTMLDivElement, TreeNodeProps>(
 
         {/* Direct count badge - aria-hidden since count is in aria-label */}
         {directCount > 0 && (
-          <Badge variant="secondary" className="text-xs px-1.5 py-0" aria-hidden="true">
+          <Badge variant="secondary" className="px-1.5 py-0 text-xs" aria-hidden="true">
             {directCount}
           </Badge>
         )}
@@ -169,7 +161,7 @@ export const TreeNode = memo(forwardRef<HTMLDivElement, TreeNodeProps>(
           <TooltipProvider delayDuration={300}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+                <div className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-500" />
               </TooltipTrigger>
               <TooltipContent side="right">
                 <p className="text-xs">Mixed content: artifacts and subfolders</p>
@@ -179,5 +171,5 @@ export const TreeNode = memo(forwardRef<HTMLDivElement, TreeNodeProps>(
         )}
       </div>
     );
-  }
-));
+  })
+);
