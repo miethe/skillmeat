@@ -10,33 +10,32 @@ import type { ScoreBreakdown } from './ScoreBreakdown';
  * relevance score and optional breakdown.
  */
 export type MatchedArtifact = {
-    /**
-     * Artifact composite key (type:name)
-     */
-    artifact_id: string;
-    /**
-     * Artifact name
-     */
-    name: string;
-    /**
-     * Type of artifact (skill, command, agent, etc.)
-     */
-    artifact_type: string;
-    /**
-     * Composite confidence score (0-100)
-     */
-    confidence: number;
-    /**
-     * Human-readable title from artifact metadata
-     */
-    title?: (string | null);
-    /**
-     * Brief description from artifact metadata
-     */
-    description?: (string | null);
-    /**
-     * Detailed score breakdown (only if requested)
-     */
-    breakdown?: (ScoreBreakdown | null);
+  /**
+   * Artifact composite key (type:name)
+   */
+  artifact_id: string;
+  /**
+   * Artifact name
+   */
+  name: string;
+  /**
+   * Type of artifact (skill, command, agent, etc.)
+   */
+  artifact_type: string;
+  /**
+   * Composite confidence score (0-100)
+   */
+  confidence: number;
+  /**
+   * Human-readable title from artifact metadata
+   */
+  title?: string | null;
+  /**
+   * Brief description from artifact metadata
+   */
+  description?: string | null;
+  /**
+   * Detailed score breakdown (only if requested)
+   */
+  breakdown?: ScoreBreakdown | null;
 };
-

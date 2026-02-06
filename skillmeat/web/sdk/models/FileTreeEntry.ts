@@ -9,21 +9,20 @@
  * used for browsing artifact file structures in the catalog modal.
  */
 export type FileTreeEntry = {
-    /**
-     * File path relative to artifact root
-     */
-    path: string;
-    /**
-     * Entry type: 'file' for files, 'tree' for directories
-     */
-    type: 'file' | 'tree';
-    /**
-     * File size in bytes (only for blobs/files)
-     */
-    size?: (number | null);
-    /**
-     * Git SHA for the blob or tree
-     */
-    sha: string;
+  /**
+   * File path relative to artifact root
+   */
+  path: string;
+  /**
+   * Entry type: 'file' for files, 'tree' for directories, 'symlink' for symbolic links
+   */
+  type: 'file' | 'tree' | 'symlink';
+  /**
+   * File size in bytes (only for blobs/files)
+   */
+  size?: number | null;
+  /**
+   * Git SHA for the blob or tree
+   */
+  sha: string;
 };
-

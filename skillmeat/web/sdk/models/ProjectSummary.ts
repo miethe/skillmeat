@@ -10,29 +10,28 @@ import type { CacheInfo } from './CacheInfo';
  * and last deployment time.
  */
 export type ProjectSummary = {
-    /**
-     * Base64-encoded project path (unique identifier)
-     */
-    id: string;
-    /**
-     * Absolute filesystem path to project
-     */
-    path: string;
-    /**
-     * Project name (directory name)
-     */
-    name: string;
-    /**
-     * Total number of deployed artifacts
-     */
-    deployment_count: number;
-    /**
-     * Timestamp of most recent deployment
-     */
-    last_deployment?: (string | null);
-    /**
-     * Cache metadata (only present when served from cache)
-     */
-    cache_info?: (CacheInfo | null);
+  /**
+   * Base64-encoded project path (unique identifier)
+   */
+  id: string;
+  /**
+   * Absolute filesystem path to project
+   */
+  path: string;
+  /**
+   * Project name (directory name)
+   */
+  name: string;
+  /**
+   * Total number of deployed artifacts
+   */
+  deployment_count: number;
+  /**
+   * Timestamp of most recent deployment
+   */
+  last_deployment?: string | null;
+  /**
+   * Cache metadata (only present when served from cache)
+   */
+  cache_info?: CacheInfo | null;
 };
-

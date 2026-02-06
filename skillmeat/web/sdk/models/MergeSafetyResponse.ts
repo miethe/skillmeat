@@ -10,25 +10,24 @@ import type { ConflictMetadataResponse } from './ConflictMetadataResponse';
  * and warnings.
  */
 export type MergeSafetyResponse = {
-    /**
-     * Whether merge can be performed automatically
-     */
-    can_auto_merge: boolean;
-    /**
-     * Number of files that can auto-merge
-     */
-    auto_mergeable_count: number;
-    /**
-     * Number of files with conflicts
-     */
-    conflict_count: number;
-    /**
-     * List of conflict metadata for files requiring resolution
-     */
-    conflicts?: Array<ConflictMetadataResponse>;
-    /**
-     * List of warning messages about the merge
-     */
-    warnings?: Array<string>;
+  /**
+   * Whether merge can be performed automatically
+   */
+  can_auto_merge: boolean;
+  /**
+   * Number of files that can auto-merge
+   */
+  auto_mergeable_count: number;
+  /**
+   * Number of files with conflicts
+   */
+  conflict_count: number;
+  /**
+   * List of conflict metadata for files requiring resolution
+   */
+  conflicts?: Array<ConflictMetadataResponse>;
+  /**
+   * List of warning messages about the merge
+   */
+  warnings?: Array<string>;
 };
-

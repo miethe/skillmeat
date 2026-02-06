@@ -8,17 +8,16 @@
  * All fields are optional. Only provided fields will be updated.
  */
 export type GroupUpdateRequest = {
-    /**
-     * New group name
-     */
-    name?: (string | null);
-    /**
-     * New description
-     */
-    description?: (string | null);
-    /**
-     * New position in collection
-     */
-    position?: (number | null);
+  /**
+   * New group name
+   */
+  name?: string | null;
+  /**
+   * New description
+   */
+  description?: string | null;
+  /**
+   * New position in collection
+   */
+  position?: number | null;
 };
-

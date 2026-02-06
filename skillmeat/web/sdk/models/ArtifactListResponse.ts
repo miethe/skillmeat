@@ -8,13 +8,12 @@ import type { PageInfo } from './PageInfo';
  * Paginated response for artifact listings.
  */
 export type ArtifactListResponse = {
-    /**
-     * List of items for this page
-     */
-    items: Array<ArtifactResponse>;
-    /**
-     * Pagination metadata
-     */
-    page_info: PageInfo;
+  /**
+   * List of items for this page
+   */
+  items: Array<ArtifactResponse>;
+  /**
+   * Pagination metadata
+   */
+  page_info: PageInfo;
 };
-

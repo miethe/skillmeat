@@ -10,25 +10,24 @@ import type { ConflictMetadataResponse } from './ConflictMetadataResponse';
  * unresolved conflicts.
  */
 export type MergeExecuteResponse = {
-    /**
-     * True if merge completed successfully
-     */
-    success: boolean;
-    /**
-     * List of file paths that were merged
-     */
-    files_merged?: Array<string>;
-    /**
-     * List of conflict metadata for unresolved conflicts
-     */
-    conflicts?: Array<ConflictMetadataResponse>;
-    /**
-     * ID of safety snapshot created before merge
-     */
-    pre_merge_snapshot_id?: (string | null);
-    /**
-     * Error message if merge failed
-     */
-    error?: (string | null);
+  /**
+   * True if merge completed successfully
+   */
+  success: boolean;
+  /**
+   * List of file paths that were merged
+   */
+  files_merged?: Array<string>;
+  /**
+   * List of conflict metadata for unresolved conflicts
+   */
+  conflicts?: Array<ConflictMetadataResponse>;
+  /**
+   * ID of safety snapshot created before merge
+   */
+  pre_merge_snapshot_id?: string | null;
+  /**
+   * Error message if merge failed
+   */
+  error?: string | null;
 };
-

@@ -19,49 +19,48 @@
  * baseline_hash: Hash at deployment time (baseline for three-way merge)
  */
 export type SyncConflictResponse = {
-    /**
-     * Entity identifier
-     */
-    entity_id: string;
-    /**
-     * Entity name
-     */
-    entity_name: string;
-    /**
-     * Entity type
-     */
-    entity_type: string;
-    /**
-     * Content hash in collection
-     */
-    collection_hash: string;
-    /**
-     * Content hash of deployed file
-     */
-    deployed_hash: string;
-    /**
-     * Current content in collection
-     */
-    collection_content: string;
-    /**
-     * Current content in deployed file
-     */
-    deployed_content: string;
-    /**
-     * Path to entity in collection
-     */
-    collection_path: string;
-    /**
-     * Path to deployed file in project
-     */
-    deployed_path: string;
-    /**
-     * Origin of the change (deployment/sync/local_modification)
-     */
-    change_origin?: (string | null);
-    /**
-     * Hash at deployment time (baseline for three-way merge)
-     */
-    baseline_hash?: (string | null);
+  /**
+   * Entity identifier
+   */
+  entity_id: string;
+  /**
+   * Entity name
+   */
+  entity_name: string;
+  /**
+   * Entity type
+   */
+  entity_type: string;
+  /**
+   * Content hash in collection
+   */
+  collection_hash: string;
+  /**
+   * Content hash of deployed file
+   */
+  deployed_hash: string;
+  /**
+   * Current content in collection
+   */
+  collection_content: string;
+  /**
+   * Current content in deployed file
+   */
+  deployed_content: string;
+  /**
+   * Path to entity in collection
+   */
+  collection_path: string;
+  /**
+   * Path to deployed file in project
+   */
+  deployed_path: string;
+  /**
+   * Origin of the change (deployment/sync/local_modification)
+   */
+  change_origin?: string | null;
+  /**
+   * Hash at deployment time (baseline for three-way merge)
+   */
+  baseline_hash?: string | null;
 };
-

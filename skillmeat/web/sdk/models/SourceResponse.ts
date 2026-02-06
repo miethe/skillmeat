@@ -8,101 +8,128 @@
  * Contains source metadata, scan status, and artifact statistics.
  */
 export type SourceResponse = {
-    /**
-     * Unique identifier for the source
-     */
-    id: string;
-    /**
-     * Full GitHub repository URL
-     */
-    repo_url: string;
-    /**
-     * Repository owner username
-     */
-    owner: string;
-    /**
-     * Repository name
-     */
-    repo_name: string;
-    /**
-     * Branch, tag, or SHA being tracked
-     */
-    ref: string;
-    /**
-     * Subdirectory path for scanning
-     */
-    root_hint?: (string | null);
-    /**
-     * Trust level for artifacts from this source
-     */
-    trust_level: string;
-    /**
-     * Repository visibility (public/private)
-     */
-    visibility: string;
-    /**
-     * Current scan status
-     */
-    scan_status: 'pending' | 'scanning' | 'success' | 'error';
-    /**
-     * Number of artifacts detected in this source
-     */
-    artifact_count: number;
-    /**
-     * Timestamp of last successful scan
-     */
-    last_sync_at?: (string | null);
-    /**
-     * Last error message if scan failed
-     */
-    last_error?: (string | null);
-    /**
-     * Timestamp when source was added
-     */
-    created_at: string;
-    /**
-     * Timestamp when source was last modified
-     */
-    updated_at: string;
-    /**
-     * User-provided description for this source
-     */
-    description?: (string | null);
-    /**
-     * Internal notes/documentation for this source
-     */
-    notes?: (string | null);
-    /**
-     * Whether frontmatter detection is enabled for this source
-     */
-    enable_frontmatter_detection: boolean;
-    /**
-     * Manual directory-to-type mappings (directory path → artifact_type). None if no manual mapping configured.
-     */
-    manual_map?: (Record<string, string> | null);
-    /**
-     * Repository description from GitHub API
-     */
-    repo_description?: (string | null);
-    /**
-     * README content from GitHub (up to 50KB)
-     */
-    repo_readme?: (string | null);
-    /**
-     * Source tags for categorization
-     */
-    tags?: Array<string>;
-    /**
-     * Artifact counts by type (e.g., {'skill': 5, 'command': 3})
-     */
-    counts_by_type?: Record<string, number>;
-    /**
-     * Whether the source treats the entire repository (or root_hint directory) as a single artifact
-     */
-    single_artifact_mode?: boolean;
-    /**
-     * Artifact type when single_artifact_mode is enabled
-     */
-    single_artifact_type?: ('skill' | 'command' | 'agent' | 'mcp_server' | 'hook' | null);
+  /**
+   * Unique identifier for the source
+   */
+  id: string;
+  /**
+   * Full GitHub repository URL
+   */
+  repo_url: string;
+  /**
+   * Repository owner username
+   */
+  owner: string;
+  /**
+   * Repository name
+   */
+  repo_name: string;
+  /**
+   * Branch, tag, or SHA being tracked
+   */
+  ref: string;
+  /**
+   * Subdirectory path for scanning
+   */
+  root_hint?: string | null;
+  /**
+   * Trust level for artifacts from this source
+   */
+  trust_level: string;
+  /**
+   * Repository visibility (public/private)
+   */
+  visibility: string;
+  /**
+   * Current scan status
+   */
+  scan_status: 'pending' | 'scanning' | 'success' | 'error';
+  /**
+   * Number of artifacts detected in this source
+   */
+  artifact_count: number;
+  /**
+   * Timestamp of last successful scan
+   */
+  last_sync_at?: string | null;
+  /**
+   * Last error message if scan failed
+   */
+  last_error?: string | null;
+  /**
+   * Timestamp when source was added
+   */
+  created_at: string;
+  /**
+   * Timestamp when source was last modified
+   */
+  updated_at: string;
+  /**
+   * User-provided description for this source
+   */
+  description?: string | null;
+  /**
+   * Internal notes/documentation for this source
+   */
+  notes?: string | null;
+  /**
+   * Whether frontmatter detection is enabled for this source
+   */
+  enable_frontmatter_detection: boolean;
+  /**
+   * Manual directory-to-type mappings (directory path → artifact_type). None if no manual mapping configured.
+   */
+  manual_map?: Record<string, string> | null;
+  /**
+   * Repository description from GitHub API
+   */
+  repo_description?: string | null;
+  /**
+   * README content from GitHub (up to 50KB)
+   */
+  repo_readme?: string | null;
+  /**
+   * Source tags for categorization
+   */
+  tags?: Array<string>;
+  /**
+   * Artifact counts by type (e.g., {'skill': 5, 'command': 3})
+   */
+  counts_by_type?: Record<string, number>;
+  /**
+   * Whether the source treats the entire repository (or root_hint directory) as a single artifact
+   */
+  single_artifact_mode?: boolean;
+  /**
+   * Artifact type when single_artifact_mode is enabled
+   */
+  single_artifact_type?: 'skill' | 'command' | 'agent' | 'mcp_server' | 'hook' | null;
+  /**
+   * Whether indexing is enabled for this source. None indicates default indexing behavior (typically enabled).
+   */
+  indexing_enabled?: boolean | null;
+  /**
+   * Whether deep indexing is enabled for this source. When enabled, clones entire artifact directories instead of just manifest files. May significantly increase scan time for large repositories.
+   */
+  deep_indexing_enabled?: boolean;
+  /**
+   * Common ancestor directory path of all artifacts in this source. None if artifacts are scattered or source has never been indexed.
+   */
+  artifacts_root?: string | null;
+  /**
+   * Number of artifacts from last indexing run (cached in clone_target). May differ from artifact_count if source has been re-scanned. None if source has never been indexed.
+   */
+  artifact_count_from_cache?: number | null;
+  /**
+   * Clone/indexing strategy computed for this source. 'api' = direct GitHub API (small repos), 'sparse_manifest' = clone manifest files only (medium repos), 'sparse_directory' = clone artifact directory (large repos). None if source has never been indexed.
+   */
+  indexing_strategy?: 'api' | 'sparse_manifest' | 'sparse_directory' | null;
+  /**
+   * Git tree SHA from last successful indexing run. Used for cache invalidation - if current tree SHA differs, re-indexing needed. None if source has never been indexed.
+   */
+  last_indexed_tree_sha?: string | null;
+  /**
+   * Timestamp of last successful indexing run. None if source has never been indexed.
+   */
+  last_indexed_at?: string | null;
 };
-

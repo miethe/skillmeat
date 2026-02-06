@@ -8,21 +8,20 @@
  * Supports partial updates - only provided fields will be modified.
  */
 export type UserCollectionUpdateRequest = {
-    /**
-     * New collection name
-     */
-    name?: (string | null);
-    /**
-     * New collection description
-     */
-    description?: (string | null);
-    /**
-     * Collection type
-     */
-    collection_type?: (string | null);
-    /**
-     * Context category
-     */
-    context_category?: (string | null);
+  /**
+   * New collection name
+   */
+  name?: string | null;
+  /**
+   * New collection description
+   */
+  description?: string | null;
+  /**
+   * Collection type
+   */
+  collection_type?: string | null;
+  /**
+   * Context category
+   */
+  context_category?: string | null;
 };
-
