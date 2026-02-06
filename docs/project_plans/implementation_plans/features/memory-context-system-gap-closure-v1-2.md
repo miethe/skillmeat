@@ -171,18 +171,18 @@ Delivery is split into 3 tracks:
 ## Phase 5: Auto-Extraction Delivery (1.5 weeks)
 
 ### Objectives
-- Ship deferred extraction path behind feature flag.
+- Ship deferred extraction path with direct deployment semantics.
 
 ### Tasks
 - `GC-5.1` Implement `MemoryExtractorService` (parse -> candidate detect -> dedupe -> score).
 - `GC-5.2` Add extraction endpoints (`preview` + `apply`) and payload schema.
 - `GC-5.3` Enforce candidate-only writes (no auto-promotion).
-- `GC-5.4` Wire and test `SKILLMEAT_MEMORY_AUTO_EXTRACT` flag behavior.
+- `GC-5.4` Validate extraction endpoint availability and candidate-only safety behavior.
 - `GC-5.5` Add extraction quality and deterministic replay tests.
 
 ### Acceptance Criteria
 - Same input corpus yields stable extraction output.
-- Extraction disabled state returns explicit, documented response.
+- Extraction endpoints are available without runtime feature gating.
 - Applied extraction writes candidate memories with complete provenance.
 
 ---
@@ -204,22 +204,20 @@ Delivery is split into 3 tracks:
 
 ---
 
-## Phase 7: Docs, Flags, Observability, and Release Hardening (0.75 week)
+## Phase 7: Docs, Observability, and Release Hardening (0.75 week)
 
 ### Objectives
-- Align documentation with actual shipped behavior and harden rollout controls.
+- Align documentation with actual shipped behavior and harden release controls.
 
 ### Tasks
 - `GC-7.1` Update user docs to match final UI structure and feature availability.
-- `GC-7.2` Resolve feature-flag default policy:
-  - keep dev-friendly default true, document production override strategy; or
-  - set conservative default false and require opt-in.
+- `GC-7.2` Document direct deployment posture (no runtime memory/extraction gating).
 - `GC-7.3` Add missing observability counters/spans for new flows (search, module actions, extraction).
 - `GC-7.4` Finalize rollout checklist and smoke tests.
 
 ### Acceptance Criteria
 - No doc path instructs unavailable UI behavior.
-- Flag behavior is explicit and validated in tests.
+- Direct deployment behavior is explicit and validated in tests.
 - Operational runbook reflects new routes/endpoints.
 
 ---
@@ -241,7 +239,7 @@ Delivery is split into 3 tracks:
 
 1. Ship **Phase 1** independently as hotfix release (stabilization).
 2. Ship **Phases 2-3** as feature completion release.
-3. Ship **Phases 4-5** behind flags for controlled CLI/extraction rollout.
+3. Ship **Phases 4-5** directly with test-gated release checks.
 4. Ship **Phase 6** IA update with route regression tests.
 5. Ship **Phase 7** docs + operations update as release gate.
 
@@ -254,6 +252,13 @@ Delivery is split into 3 tracks:
   - explicitly deferred with approved follow-up plan and tracked issue.
 - Memory UI, API, and CLI behaviors are contract-consistent.
 - Context modules and pack generation are fully operable in production UI.
-- Extraction is available and safely gated.
+- Extraction is available with review-first candidate-only writes.
 - Documentation and navigation accurately reflect shipped product.
 
+## 7. Execution Notes (Current Pass)
+
+- G11 (Memory CLI): Implemented `skillmeat memory` command tree for items/modules/packs/extract/search.
+- G12 (Auto-extraction): Implemented preview/apply extraction endpoints and extraction service with candidate-only writes.
+- G13 (Global memories IA): Backend global list/search support implemented; `/memories` page + sidebar IA deferred as UI-heavy follow-up.
+- G14 (Docs): Updated user/developer docs to reflect current memory/context behavior and APIs.
+- G15 (Flags): Memory/context endpoint gating removed; memory features deploy directly without runtime feature toggles.

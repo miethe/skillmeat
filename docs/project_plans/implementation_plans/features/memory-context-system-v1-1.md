@@ -23,7 +23,7 @@ related:
 **Estimated Effort**: 44 story points
 **Target Timeline**: 5-6 weeks
 
-**Note**: partially superseded by v1.2; retained for historical deferred-scope context.
+**Note**: superseded by v1.2 execution notes. Runtime feature-flag rollout assumptions below are historical and not current shipped behavior.
 
 ---
 
@@ -81,7 +81,7 @@ The plan preserves existing route contracts while introducing a global memories 
 | V11-P1.2 | Extraction Pipeline | Implement parse -> candidate detect -> dedupe -> score -> persist candidate | End-to-end extraction test passes | 3 pts |
 | V11-P1.3 | Similarity Guardrails | Add content hash + semantic threshold dedupe strategy | Duplicate false-positive rate under target | 2 pts |
 | V11-P1.4 | Extraction API | Add preview/apply endpoints for extraction | OpenAPI docs + contract tests | 2 pts |
-| V11-P1.5 | Feature Flag Gate | Respect `MEMORY_AUTO_EXTRACT` with clear disabled responses | Flag tests pass | 1 pt |
+| V11-P1.5 | Availability Gate (Historical) | Original plan assumed `MEMORY_AUTO_EXTRACT` gating; superseded in v1.2 by direct endpoint availability | Historical only | 1 pt |
 
 ### Quality Gates
 
@@ -171,7 +171,7 @@ The plan preserves existing route contracts while introducing a global memories 
 | V11-P6.1 | Test Matrix Expansion | Unit + integration + CLI + web navigation tests | Coverage >=85% for new modules | 2 pts |
 | V11-P6.2 | Performance Validation | Validate p95 targets for extraction/list/pack | Benchmarks documented | 1 pt |
 | V11-P6.3 | User Docs | Add/refresh user docs for new global memories and CLI workflows | Docs linked from user index | 1 pt |
-| V11-P6.4 | Release Controls | Feature flag rollout + monitoring dashboards | Rollout checklist approved | 1 pt |
+| V11-P6.4 | Release Controls | Direct deployment checks + monitoring dashboards | Rollout checklist approved | 1 pt |
 
 ---
 
@@ -215,7 +215,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Exit Criteria
 
-- Auto-extraction preview/apply is available and guarded by feature flag.
+- Auto-extraction preview/apply is available with candidate-only write safeguards.
 - Full CLI command set for memory operations is available and tested.
 - Global memories route and navigation updates are shipped without URL regressions.
 - Skill docs support full memory automation loop for AI agents.

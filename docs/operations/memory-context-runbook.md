@@ -163,7 +163,7 @@ Alerts are routed based on severity:
 
 If latency remains > 1000ms after restart:
 - Page on-call engineer
-- Consider disabling memory system temporarily: `export SKILLMEAT_MEMORY_CONTEXT_ENABLED=false`
+- If failures are widespread, roll back to the previous known-good build
 - Investigate database corruption or disk issues
 
 ---
@@ -286,9 +286,9 @@ Same as Memory List Latency Critical, plus:
    sqlite3 ~/.skillmeat/cache/skillmeat.db "SELECT 1;"
    ```
 
-3. **Disable feature if widespread failures**:
+3. **Rollback if widespread failures**:
    ```bash
-   export SKILLMEAT_MEMORY_CONTEXT_ENABLED=false
+   # Roll back to previous known-good release and restart service
    systemctl restart skillmeat-api
    ```
 
@@ -445,20 +445,18 @@ print(f"Available: {preview['items_available']}, Included: {preview['items_inclu
 
 ---
 
-### Issue: Feature Flag Disabled Unexpectedly
+### Issue: Memory System Unavailable (503)
 
 **Symptoms**: All memory endpoints return 503
 
 **Diagnosis**:
 ```bash
-echo $SKILLMEAT_MEMORY_CONTEXT_ENABLED
 curl http://localhost:8080/health/detailed | jq '.components.memory_system'
 ```
 
 **Resolution**:
 ```bash
-# Re-enable feature
-export SKILLMEAT_MEMORY_CONTEXT_ENABLED=true
+# Verify DB path and service config, then restart API
 systemctl restart skillmeat-api
 ```
 
@@ -548,9 +546,9 @@ sqlite3 ~/.skillmeat/cache/skillmeat.db "SELECT status, COUNT(*) FROM memory_ite
 curl "http://localhost:8080/api/v1/memory-items/count?project_id=test&status=candidate"
 ```
 
-**View feature flag status**:
+**View memory system component status**:
 ```bash
-curl http://localhost:8080/api/v1/config | jq '.memory_context_enabled'
+curl http://localhost:8080/health/detailed | jq '.components.memory_system'
 ```
 
 **Generate test context pack**:
@@ -568,13 +566,12 @@ curl -X POST http://localhost:8080/api/v1/context-packs/generate \
 
 ### Configuration Files
 
-- Feature flags: Environment variables or `.env` file
+- Runtime configuration: Environment variables or `.env` file
 - API settings: `skillmeat/api/config.py`
 - Database location: `~/.skillmeat/cache/skillmeat.db`
 
 ### Related Documentation
 
-- [Feature Flags](../feature-flags.md)
 - [API Documentation](../api/README.md)
 - [Memory Service Documentation](../../skillmeat/core/services/memory_service.py)
 - [Context Packer Documentation](../../skillmeat/core/services/context_packer_service.py)
