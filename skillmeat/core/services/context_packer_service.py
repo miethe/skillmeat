@@ -28,10 +28,12 @@ Usage:
 
 from __future__ import annotations
 
+import fnmatch
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from skillmeat.cache.models import Artifact, get_session
 from skillmeat.core.services.context_module_service import ContextModuleService
 from skillmeat.core.services.memory_service import MemoryService
 from skillmeat.observability.tracing import trace_operation
@@ -44,6 +46,7 @@ _INCLUDABLE_STATUSES = frozenset({"active", "stable"})
 
 # Display order for memory type sections in generated markdown
 _TYPE_DISPLAY_ORDER = [
+    "context_entity",
     "decision",
     "constraint",
     "gotcha",
@@ -53,6 +56,7 @@ _TYPE_DISPLAY_ORDER = [
 
 # Human-readable section headings for each memory type
 _TYPE_HEADINGS: Dict[str, str] = {
+    "context_entity": "Context Entities",
     "decision": "Decisions",
     "constraint": "Constraints",
     "gotcha": "Gotchas",
@@ -334,7 +338,7 @@ class ContextPackerService:
                 )
                 items.extend(result["items"])
 
-        # Sort combined results: confidence DESC, then created_at DESC
+        items = _apply_selector_post_filters(items, selectors)
         items = sorted(items, key=_sort_key_confidence_desc_created_desc)
 
         logger.debug(
@@ -375,14 +379,17 @@ class ContextPackerService:
         """
         if module_id:
             # Get module and extract selectors
-            module = self.module_service.get(module_id)
+            module = self.module_service.get(module_id, include_items=True)
             selectors = module.get("selectors") or {}
 
             # Merge additional filters into selectors
             if filters:
                 if "type" in filters and filters["type"]:
-                    # Override or narrow memory_types
-                    selectors["memory_types"] = [filters["type"]]
+                    selected_type = filters["type"]
+                    if isinstance(selected_type, list):
+                        selectors["memory_types"] = selected_type
+                    else:
+                        selectors["memory_types"] = [selected_type]
                 if (
                     "min_confidence" in filters
                     and filters["min_confidence"] is not None
@@ -393,22 +400,92 @@ class ContextPackerService:
                         existing_min, filters["min_confidence"]
                     )
 
-            candidates = self.apply_module_selectors(project_id, selectors)
+            selector_items = self.apply_module_selectors(project_id, selectors)
+            manual_items = [
+                item
+                for item in (module.get("memory_items") or [])
+                if item.get("status") in _INCLUDABLE_STATUSES
+            ]
+            manual_items = _apply_selector_post_filters(manual_items, selectors)
+            entity_items = self._get_context_entity_candidates(selectors)
+
+            candidates = _merge_candidate_groups(
+                selector_items=selector_items,
+                manual_items=manual_items,
+                entity_items=entity_items,
+            )
         else:
             # No module -- build selectors from filters
             selectors: Dict[str, Any] = {}
             if filters:
                 if "type" in filters and filters["type"]:
-                    selectors["memory_types"] = [filters["type"]]
+                    selected_type = filters["type"]
+                    if isinstance(selected_type, list):
+                        selectors["memory_types"] = selected_type
+                    else:
+                        selectors["memory_types"] = [selected_type]
                 if (
                     "min_confidence" in filters
                     and filters["min_confidence"] is not None
                 ):
                     selectors["min_confidence"] = filters["min_confidence"]
 
-            candidates = self.apply_module_selectors(project_id, selectors)
+            selector_items = self.apply_module_selectors(project_id, selectors)
+            entity_items = self._get_context_entity_candidates(selectors)
+            candidates = _merge_candidate_groups(
+                selector_items=selector_items,
+                manual_items=[],
+                entity_items=entity_items,
+            )
 
         return candidates
+
+    def _get_context_entity_candidates(self, selectors: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Return context entities formatted as pack candidates."""
+        try:
+            session = get_session()
+            try:
+                entities = (
+                    session.query(Artifact)
+                    .filter(
+                        Artifact.type.in_(
+                            [
+                                "project_config",
+                                "spec_file",
+                                "rule_file",
+                                "context_file",
+                                "progress_template",
+                            ]
+                        )
+                    )
+                    .order_by(Artifact.updated_at.desc(), Artifact.id.desc())
+                    .all()
+                )
+            finally:
+                session.close()
+        except Exception:
+            logger.debug("Skipping context entity candidates due to lookup failure")
+            return []
+
+        candidates: List[Dict[str, Any]] = []
+        for entity in entities:
+            content = (entity.content or "").strip()
+            if not content:
+                continue
+            item = {
+                "id": f"entity:{entity.id}",
+                "type": "context_entity",
+                "content": content,
+                "confidence": 1.0,
+                "status": "stable",
+                "created_at": entity.created_at or "",
+                "updated_at": entity.updated_at or "",
+                "anchors": [entity.path_pattern] if entity.path_pattern else [],
+                "provenance": {"workflow_stage": entity.category} if entity.category else {},
+            }
+            candidates.append(item)
+
+        return _apply_selector_post_filters(candidates, selectors)
 
     @staticmethod
     def _generate_markdown(items: List[Dict[str, Any]]) -> str:
@@ -507,3 +584,68 @@ def _sort_key_confidence_desc_created_desc(item: Dict[str, Any]) -> tuple:
     )
 
     return (-confidence, inverted_created)
+
+
+def _matches_file_patterns(item: Dict[str, Any], file_patterns: List[str]) -> bool:
+    if not file_patterns:
+        return True
+    anchors = item.get("anchors") or []
+    if not isinstance(anchors, list) or not anchors:
+        return False
+    for anchor in anchors:
+        for pattern in file_patterns:
+            if fnmatch.fnmatch(anchor, pattern):
+                return True
+    return False
+
+
+def _matches_workflow_stages(item: Dict[str, Any], workflow_stages: List[str]) -> bool:
+    if not workflow_stages:
+        return True
+    provenance = item.get("provenance") or {}
+    if not isinstance(provenance, dict):
+        return False
+    stage = provenance.get("workflow_stage") or provenance.get("stage")
+    if isinstance(stage, str):
+        return stage in workflow_stages
+    return False
+
+
+def _apply_selector_post_filters(items: List[Dict[str, Any]], selectors: Dict[str, Any]) -> List[Dict[str, Any]]:
+    file_patterns = selectors.get("file_patterns") or []
+    workflow_stages = selectors.get("workflow_stages") or []
+    if not file_patterns and not workflow_stages:
+        return items
+    filtered: List[Dict[str, Any]] = []
+    for item in items:
+        if not _matches_file_patterns(item, file_patterns):
+            continue
+        if not _matches_workflow_stages(item, workflow_stages):
+            continue
+        filtered.append(item)
+    return filtered
+
+
+def _merge_candidate_groups(
+    selector_items: List[Dict[str, Any]],
+    manual_items: List[Dict[str, Any]],
+    entity_items: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    merged: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def add_group(group: List[Dict[str, Any]]) -> None:
+        for item in group:
+            item_id = item.get("id")
+            if not isinstance(item_id, str) or item_id in seen:
+                continue
+            seen.add(item_id)
+            merged.append(item)
+
+    # Deterministic merge order: selectors -> manual inclusions -> entities.
+    add_group(selector_items)
+    add_group(manual_items)
+    add_group(entity_items)
+
+    # Ranking inside merged set keeps higher-confidence/newer items earlier.
+    return sorted(merged, key=_sort_key_confidence_desc_created_desc)

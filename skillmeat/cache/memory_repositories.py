@@ -190,6 +190,7 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
         *,
         status: Optional[str] = None,
         type: Optional[str] = None,
+        search: Optional[str] = None,
         min_confidence: Optional[float] = None,
         limit: int = 50,
         cursor: Optional[str] = None,
@@ -222,6 +223,8 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
                 query = query.filter(MemoryItem.status == status)
             if type is not None:
                 query = query.filter(MemoryItem.type == type)
+            if search:
+                query = query.filter(MemoryItem.content.ilike(f"%{search}%"))
             if min_confidence is not None:
                 query = query.filter(MemoryItem.confidence >= min_confidence)
 

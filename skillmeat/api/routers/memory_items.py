@@ -308,6 +308,9 @@ async def list_memory_items(
     project_id: str = Query(..., description="Project ID to scope the query"),
     status: Optional[MemoryStatus] = Query(None, description="Filter by status"),
     type: Optional[MemoryType] = Query(None, description="Filter by memory type"),
+    search: Optional[str] = Query(
+        None, description="Case-insensitive substring match against memory content"
+    ),
     min_confidence: Optional[float] = Query(
         None, ge=0.0, le=1.0, description="Minimum confidence threshold"
     ),
@@ -346,6 +349,7 @@ async def list_memory_items(
             project_id=project_id,
             status=status.value if status else None,
             type=type.value if type else None,
+            search=search,
             min_confidence=min_confidence,
             limit=limit,
             cursor=cursor,

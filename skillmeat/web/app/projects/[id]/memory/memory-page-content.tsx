@@ -8,6 +8,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useMemoryItems,
   useMemoryItem,
@@ -31,6 +32,8 @@ import { ConfirmActionDialog } from '@/components/memory/confirm-action-dialog';
 import { MemoryFormModal } from '@/components/memory/memory-form-modal';
 import { MergeModal } from '@/components/memory/merge-modal';
 import { KeyboardHelpModal } from '@/components/memory/keyboard-help-modal';
+import { ContextModulesTab } from '@/components/memory/context-modules-tab';
+import { ContextPackGenerator } from '@/components/memory/context-pack-generator';
 
 // ---------------------------------------------------------------------------
 // Sort mapping: UI sort values -> API sort_by + sort_order
@@ -69,6 +72,7 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'inbox' | 'modules' | 'packs'>('inbox');
   const [selectedMemoryId, setSelectedMemoryId] = useState<string | null>(null);
 
   // For now, use projectId as the display name. Hook integration comes in a
@@ -332,7 +336,7 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
       },
       itemCount: memories.length,
     },
-    !anyModalOpen
+    activeTab === 'inbox' && !anyModalOpen
   );
 
   // ---------------------------------------------------------------------------
@@ -393,9 +397,11 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/settings">
               <Settings className="mr-2 h-4 w-4" aria-hidden="true" />
               Settings
+              </Link>
             </Button>
             <Button size="sm" onClick={handleCreateMemory}>
               <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -405,78 +411,86 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
         </div>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Filter Bar (Type Tabs + Controls)                                  */}
-      {/* ------------------------------------------------------------------ */}
-      <MemoryFilterBar
-        typeFilter={typeFilter}
-        onTypeFilterChange={setTypeFilter}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        sortBy={sortBy}
-        onSortByChange={setSortBy}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        counts={counts}
-      />
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Main Content: List + Detail Panel                                  */}
-      {/* ------------------------------------------------------------------ */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Memory list area (scrollable, flex-1) */}
-        <div
-          className="flex-1 overflow-y-auto"
-          role="region"
-          aria-label="Memory list"
-        >
-          <MemoryList
-            memories={memories}
-            isLoading={isLoading}
-            isError={isError}
-            error={error}
-            refetch={refetch}
-            selectedIds={selectedIds}
-            focusedIndex={focusedIndex}
-            onToggleSelect={toggleSelect}
-            onApprove={handleApprove}
-            onReject={handleReject}
-            onEdit={handleEdit}
-            onMerge={handleMerge}
-            onCardClick={handleCardClick}
-            onCreateMemory={handleCreateMemory}
-            onReactivate={handleReactivate}
-            onDeprecate={handleDeprecate}
-          />
-        </div>
-
+      <div className="border-b px-6 py-2">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
+          <TabsList aria-label="Memory workspace tabs">
+            <TabsTrigger value="inbox">Memory Inbox</TabsTrigger>
+            <TabsTrigger value="modules">Context Modules</TabsTrigger>
+            <TabsTrigger value="packs">Context Packs</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Detail Panel (fixed right sidebar, slides in/out)                  */}
-      {/* ------------------------------------------------------------------ */}
-      <MemoryDetailPanel
-        memory={selectedMemory ?? null}
-        isOpen={!!selectedMemoryId}
-        onClose={handleCloseDetail}
-        onEdit={handleEdit}
-        onApprove={handleApprove}
-        onReject={handleReject}
-        onMerge={handleMerge}
-        onDeprecate={handleDeprecate}
-        onReactivate={handleReactivate}
-        onSetStatus={handleSetStatus}
-      />
+      {activeTab === 'inbox' && (
+        <>
+          <MemoryFilterBar
+            typeFilter={typeFilter}
+            onTypeFilterChange={setTypeFilter}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            sortBy={sortBy}
+            onSortByChange={setSortBy}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            counts={counts}
+          />
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Batch Action Bar (fixed bottom, slides up when items selected)     */}
-      {/* ------------------------------------------------------------------ */}
-      <BatchActionBar
-        selectedCount={selectedIds.size}
-        onApproveAll={handleBatchApprove}
-        onRejectAll={handleBatchReject}
-        onClearSelection={clearSelection}
-      />
+          <div className="flex flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto" role="region" aria-label="Memory list">
+              <MemoryList
+                memories={memories}
+                isLoading={isLoading}
+                isError={isError}
+                error={error}
+                refetch={refetch}
+                selectedIds={selectedIds}
+                focusedIndex={focusedIndex}
+                onToggleSelect={toggleSelect}
+                onApprove={handleApprove}
+                onReject={handleReject}
+                onEdit={handleEdit}
+                onMerge={handleMerge}
+                onCardClick={handleCardClick}
+                onCreateMemory={handleCreateMemory}
+                onReactivate={handleReactivate}
+                onDeprecate={handleDeprecate}
+              />
+            </div>
+          </div>
+
+          <MemoryDetailPanel
+            memory={selectedMemory ?? null}
+            isOpen={!!selectedMemoryId}
+            onClose={handleCloseDetail}
+            onEdit={handleEdit}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onMerge={handleMerge}
+            onDeprecate={handleDeprecate}
+            onReactivate={handleReactivate}
+            onSetStatus={handleSetStatus}
+          />
+
+          <BatchActionBar
+            selectedCount={selectedIds.size}
+            onApproveAll={handleBatchApprove}
+            onRejectAll={handleBatchReject}
+            onClearSelection={clearSelection}
+          />
+        </>
+      )}
+
+      {activeTab === 'modules' && (
+        <div className="flex-1 overflow-y-auto">
+          <ContextModulesTab projectId={projectId} />
+        </div>
+      )}
+
+      {activeTab === 'packs' && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <ContextPackGenerator projectId={projectId} />
+        </div>
+      )}
 
       {/* ------------------------------------------------------------------ */}
       {/* Modals                                                             */}

@@ -25,13 +25,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import {
   useCreateContextModule,
   useUpdateContextModule,
   useModuleMemories,
   useRemoveMemoryFromModule,
+  useAddMemoryToModule,
 } from '@/hooks/use-context-modules';
+import { useMemoryItems } from '@/hooks/use-memory-items';
 import type { ContextModuleResponse } from '@/sdk/models/ContextModuleResponse';
 import type { MemoryItemResponse } from '@/sdk/models/MemoryItemResponse';
 import { MemoryTypeBadge } from './memory-type-badge';
@@ -334,6 +343,8 @@ export function ModuleEditor({
   // -------------------------------------------------------------------------
   const [form, setForm] = useState<FormState>(() => getInitialState(module));
   const [errors, setErrors] = useState<FormErrors>({});
+  const [addMemoryOpen, setAddMemoryOpen] = useState(false);
+  const [memorySearch, setMemorySearch] = useState('');
 
   // Reset form when module changes (e.g. navigating between modules)
   useEffect(() => {
@@ -357,6 +368,7 @@ export function ModuleEditor({
   });
 
   const removeMutation = useRemoveMemoryFromModule();
+  const addMutation = useAddMemoryToModule();
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
@@ -364,13 +376,30 @@ export function ModuleEditor({
   // Manual memory list (edit mode only)
   // -------------------------------------------------------------------------
   const memoriesQuery = useModuleMemories(
-    isEditMode ? module!.id : '',
-    { enabled: isEditMode }
+    isEditMode ? module!.id : ''
   );
 
   const manualMemories: MemoryItemResponse[] = useMemo(
     () => (memoriesQuery.data as MemoryItemResponse[] | undefined) ?? [],
     [memoriesQuery.data]
+  );
+  const manualMemoryIds = useMemo(
+    () => new Set(manualMemories.map((m) => m.id)),
+    [manualMemories]
+  );
+
+  const availableMemoriesQuery = useMemoryItems({
+    projectId,
+    search: memorySearch || undefined,
+    limit: 50,
+  });
+
+  const availableMemories = useMemo(
+    () =>
+      (availableMemoriesQuery.data?.items ?? []).filter(
+        (item) => item.status !== 'deprecated' && !manualMemoryIds.has(item.id)
+      ),
+    [availableMemoriesQuery.data?.items, manualMemoryIds]
   );
 
   // -------------------------------------------------------------------------
@@ -496,6 +525,28 @@ export function ModuleEditor({
       removeMutation.mutate({ moduleId: module.id, memoryId });
     },
     [module, removeMutation]
+  );
+
+  const handleAddMemory = useCallback(
+    (memoryId: string) => {
+      if (!module) return;
+      addMutation.mutate(
+        {
+          moduleId: module.id,
+          data: {
+            memory_id: memoryId,
+            ordering: manualMemories.length,
+          },
+        },
+        {
+          onSuccess: () => {
+            setAddMemoryOpen(false);
+            setMemorySearch('');
+          },
+        }
+      );
+    },
+    [module, addMutation, manualMemories.length]
   );
 
   // -------------------------------------------------------------------------
@@ -720,13 +771,12 @@ export function ModuleEditor({
                       </span>
                     )}
                   </h3>
-                  {/* TODO: Wire to a memory picker/search dialog */}
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     className="h-7 text-xs"
-                    disabled
+                    onClick={() => setAddMemoryOpen(true)}
                     aria-label="Add memory to module"
                   >
                     <Plus className="mr-1 h-3 w-3" aria-hidden="true" />
@@ -821,6 +871,56 @@ export function ModuleEditor({
           </div>
         </form>
       </CardContent>
+      {isEditMode && (
+        <Dialog open={addMemoryOpen} onOpenChange={setAddMemoryOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add Memory to Module</DialogTitle>
+              <DialogDescription>
+                Search and select a memory item to include manually.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Input
+                placeholder="Search memories..."
+                value={memorySearch}
+                onChange={(e) => setMemorySearch(e.target.value)}
+                aria-label="Search memories to add"
+              />
+              <div className="max-h-[360px] space-y-2 overflow-y-auto rounded-md border p-2">
+                {availableMemoriesQuery.isLoading && (
+                  <div className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    Loading memories...
+                  </div>
+                )}
+                {!availableMemoriesQuery.isLoading && availableMemories.length === 0 && (
+                  <p className="px-2 py-3 text-sm text-muted-foreground">
+                    No matching memories available.
+                  </p>
+                )}
+                {availableMemories.map((memory) => (
+                  <div key={memory.id} className="flex items-center gap-2 rounded border p-2">
+                    <MemoryTypeBadge type={memory.type} />
+                    <p className="flex-1 truncate text-sm" title={memory.content}>
+                      {memory.content}
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleAddMemory(memory.id)}
+                      disabled={addMutation.isPending}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
   );
 }

@@ -54,8 +54,12 @@ import {
   useCreateContextModule,
   useDeleteContextModule,
 } from '@/hooks/use-context-modules';
+import { useGenerateContextPack } from '@/hooks/use-context-packs';
 
 import type { ContextModuleResponse } from '@/sdk/models/ContextModuleResponse';
+import type { ContextPackGenerateResponse } from '@/sdk/models/ContextPackGenerateResponse';
+import { ModuleEditor } from './module-editor';
+import { EffectiveContextPreview } from './effective-context-preview';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -448,7 +452,7 @@ export function ContextModulesTab({ projectId }: ContextModulesTabProps) {
     isError,
     error,
     refetch,
-  } = useContextModules({ projectId });
+  } = useContextModules(projectId);
 
   const modules = modulesData?.items ?? [];
 
@@ -457,12 +461,22 @@ export function ContextModulesTab({ projectId }: ContextModulesTabProps) {
   // ---------------------------------------------------------------------------
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ContextModuleResponse | null>(null);
+  const [editTarget, setEditTarget] = useState<ContextModuleResponse | null>(null);
+  const [previewData, setPreviewData] = useState<ContextPackGenerateResponse | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewModuleId, setPreviewModuleId] = useState<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // Delete mutation
   // ---------------------------------------------------------------------------
   const deleteMutation = useDeleteContextModule({
     onSuccess: () => setDeleteTarget(null),
+  });
+  const previewMutation = useGenerateContextPack({
+    onSuccess: (data) => {
+      setPreviewData(data);
+      setPreviewOpen(true);
+    },
   });
 
   // ---------------------------------------------------------------------------
@@ -472,9 +486,8 @@ export function ContextModulesTab({ projectId }: ContextModulesTabProps) {
     setCreateModalOpen(true);
   }, []);
 
-  const handleEdit = useCallback((_module: ContextModuleResponse) => {
-    // Edit functionality will be wired in a follow-up task.
-    // For now this is a placeholder -- the button renders and is accessible.
+  const handleEdit = useCallback((module: ContextModuleResponse) => {
+    setEditTarget(module);
   }, []);
 
   const handleDelete = useCallback((module: ContextModuleResponse) => {
@@ -483,15 +496,18 @@ export function ContextModulesTab({ projectId }: ContextModulesTabProps) {
 
   const handleConfirmDelete = useCallback(() => {
     if (!deleteTarget) return;
-    deleteMutation.mutate({
-      projectId,
-      moduleId: deleteTarget.id,
-    });
-  }, [deleteTarget, deleteMutation, projectId]);
+    deleteMutation.mutate(deleteTarget.id);
+  }, [deleteTarget, deleteMutation]);
 
-  const handlePreview = useCallback((_module: ContextModuleResponse) => {
-    // Preview Pack functionality will be wired in a follow-up task.
-  }, []);
+  const handlePreview = useCallback((module: ContextModuleResponse) => {
+    setPreviewModuleId(module.id);
+    previewMutation.mutate({
+      projectId,
+      data: {
+        module_id: module.id,
+      },
+    });
+  }, [previewMutation, projectId]);
 
   // ---------------------------------------------------------------------------
   // Loading State
@@ -620,6 +636,40 @@ export function ContextModulesTab({ projectId }: ContextModulesTabProps) {
         confirmVariant="destructive"
         onConfirm={handleConfirmDelete}
         isLoading={deleteMutation.isPending}
+      />
+      <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
+        <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+          {editTarget && (
+            <ModuleEditor
+              module={editTarget}
+              projectId={projectId}
+              onCancel={() => setEditTarget(null)}
+              onSave={() => {
+                setEditTarget(null);
+                refetch();
+              }}
+              onPreview={(moduleId) => {
+                previewMutation.mutate({
+                  projectId,
+                  data: { module_id: moduleId },
+                });
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+      <EffectiveContextPreview
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        data={previewData}
+        isLoading={previewMutation.isPending}
+        onRegenerate={() => {
+          if (!previewModuleId) return;
+          previewMutation.mutate({
+            projectId,
+            data: { module_id: previewModuleId },
+          });
+        }}
       />
     </div>
   );

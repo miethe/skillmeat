@@ -111,6 +111,7 @@ export function useMemoryItems(filters: MemoryItemFilters) {
       params.set('project_id', filters.projectId);
       if (filters.status) params.set('status', filters.status);
       if (filters.type) params.set('type', filters.type);
+      if (filters.search) params.set('search', filters.search);
       if (filters.minConfidence != null) params.set('min_confidence', String(filters.minConfidence));
       if (filters.limit != null) params.set('limit', String(filters.limit));
       if (filters.cursor) params.set('cursor', filters.cursor);
@@ -165,11 +166,57 @@ export function useMemoryItemCounts(filters: {
   return useQuery({
     queryKey: memoryItemKeys.count(filters),
     queryFn: async (): Promise<Record<string, number>> => {
-      const params = new URLSearchParams();
-      params.set('project_id', filters.projectId);
-      if (filters.status) params.set('status', filters.status);
-      if (filters.type) params.set('type', filters.type);
-      return apiRequest<Record<string, number>>(`/memory-items/count?${params.toString()}`);
+      const buildCountPath = (params: URLSearchParams) =>
+        `/memory-items/count?${params.toString()}`;
+
+      // Filtered count request preserves existing single-count behavior.
+      if (filters.status || filters.type) {
+        const params = new URLSearchParams();
+        params.set('project_id', filters.projectId);
+        if (filters.status) params.set('status', filters.status);
+        if (filters.type) params.set('type', filters.type);
+        const filtered = await apiRequest<{ count: number }>(buildCountPath(params));
+        return { all: filtered.count };
+      }
+
+      const types: MemoryType[] = ['constraint', 'decision', 'gotcha', 'learning', 'style_rule'];
+      const statuses: MemoryStatus[] = ['candidate', 'active', 'stable', 'deprecated'];
+
+      const totalParams = new URLSearchParams();
+      totalParams.set('project_id', filters.projectId);
+
+      const typeParams = types.map((type) => {
+        const params = new URLSearchParams();
+        params.set('project_id', filters.projectId);
+        params.set('type', type);
+        return params;
+      });
+
+      const statusParams = statuses.map((status) => {
+        const params = new URLSearchParams();
+        params.set('project_id', filters.projectId);
+        params.set('status', status);
+        return params;
+      });
+
+      const responses = await Promise.all([
+        apiRequest<{ count: number }>(buildCountPath(totalParams)),
+        ...typeParams.map((p) => apiRequest<{ count: number }>(buildCountPath(p))),
+        ...statusParams.map((p) => apiRequest<{ count: number }>(buildCountPath(p))),
+      ]);
+
+      const [total, ...rest] = responses;
+      const typeResponses = rest.slice(0, types.length);
+      const statusResponses = rest.slice(types.length);
+
+      const counts: Record<string, number> = { all: total.count };
+      types.forEach((type, idx) => {
+        counts[type] = typeResponses[idx]?.count ?? 0;
+      });
+      statuses.forEach((status, idx) => {
+        counts[status] = statusResponses[idx]?.count ?? 0;
+      });
+      return counts;
     },
     enabled: !!filters.projectId,
     staleTime: MEMORY_STALE_TIME,

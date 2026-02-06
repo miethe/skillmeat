@@ -322,6 +322,18 @@ class TestMemoryItemRepository:
         for item in result.items:
             assert item.confidence >= 0.70
 
+    def test_list_items_filter_by_search(self, seeded_db_path):
+        """Filter items by case-insensitive content search."""
+        repo = MemoryItemRepository(db_path=seeded_db_path)
+        repo.create(_make_memory_data(content="Decision: use sqlite"))
+        repo.create(_make_memory_data(content="Constraint: no ORM"))
+        repo.create(_make_memory_data(content="Learning: avoid SQLITE locks"))
+
+        result = repo.list_items(PROJECT_ID, search="sqlite")
+
+        assert len(result.items) == 2
+        assert all("sqlite" in item.content.lower() for item in result.items)
+
     def test_list_items_combined_filters(self, seeded_db_path):
         """Multiple filters applied together."""
         repo = MemoryItemRepository(db_path=seeded_db_path)

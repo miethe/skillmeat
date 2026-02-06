@@ -286,6 +286,29 @@ class TestMemoryServiceCRUD:
         assert len(result["items"]) == 1
         assert result["items"][0]["confidence"] >= 0.7
 
+    def test_list_items_filter_by_search(self, memory_service):
+        """list_items with search filter matches memory content."""
+        memory_service.create(
+            project_id=PROJECT_ID,
+            type="decision",
+            content="Adopt SQLAlchemy for data access",
+        )
+        memory_service.create(
+            project_id=PROJECT_ID,
+            type="gotcha",
+            content="SQLite file locks in CI",
+        )
+        memory_service.create(
+            project_id=PROJECT_ID,
+            type="learning",
+            content="Prefer explicit retries",
+        )
+
+        result = memory_service.list_items(PROJECT_ID, search="sql")
+
+        assert len(result["items"]) == 2
+        assert all("sql" in item["content"].lower() for item in result["items"])
+
     def test_list_items_pagination(self, memory_service):
         """list_items supports cursor-based pagination."""
         for i in range(5):
