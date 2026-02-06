@@ -22,6 +22,18 @@ export type { MemoryListProps } from './memory-list';
 export { BatchActionBar } from './batch-action-bar';
 export type { BatchActionBarProps } from './batch-action-bar';
 
+export { MemoryDetailPanel } from './memory-detail-panel';
+export type { MemoryDetailPanelProps } from './memory-detail-panel';
+
+export { ConfirmActionDialog } from './confirm-action-dialog';
+export type { ConfirmActionDialogProps } from './confirm-action-dialog';
+
+export { MemoryFormModal } from './memory-form-modal';
+export type { MemoryFormModalProps } from './memory-form-modal';
+
+export { MergeModal } from './merge-modal';
+export type { MergeModalProps } from './merge-modal';
+
 export {
   getConfidenceTier,
   getConfidenceColorClasses,

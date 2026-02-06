@@ -8,9 +8,9 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import {
   useMemoryItems,
+  useMemoryItem,
   useMemoryItemCounts,
   useMemorySelection,
   usePromoteMemoryItem,
@@ -20,9 +20,14 @@ import {
 } from '@/hooks';
 import type { MemoryStatus } from '@/sdk/models/MemoryStatus';
 import type { MemoryType } from '@/sdk/models/MemoryType';
+import type { MemoryItemResponse } from '@/sdk/models/MemoryItemResponse';
 import { MemoryFilterBar } from '@/components/memory/memory-filter-bar';
 import { MemoryList } from '@/components/memory/memory-list';
 import { BatchActionBar } from '@/components/memory/batch-action-bar';
+import { MemoryDetailPanel } from '@/components/memory/memory-detail-panel';
+import { ConfirmActionDialog } from '@/components/memory/confirm-action-dialog';
+import { MemoryFormModal } from '@/components/memory/memory-form-modal';
+import { MergeModal } from '@/components/memory/merge-modal';
 
 // ---------------------------------------------------------------------------
 // Sort mapping: UI sort values -> API sort_by + sort_order
@@ -43,19 +48,6 @@ function parseSortValue(sortBy: string): { sortBy?: string; sortOrder?: 'asc' | 
     default:
       return {};
   }
-}
-
-// ---------------------------------------------------------------------------
-// Placeholder component (detail panel -- replaced in UI-3.4)
-// ---------------------------------------------------------------------------
-
-function DetailPanelPlaceholder() {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-      <p className="text-sm font-medium">Select a memory to view details</p>
-      <p className="text-xs">Click on any memory item in the list</p>
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -91,6 +83,19 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   } = useMemorySelection();
 
   // ---------------------------------------------------------------------------
+  // Modal state
+  // ---------------------------------------------------------------------------
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editingMemory, setEditingMemory] = useState<MemoryItemResponse | null>(null);
+  const [mergingMemoryId, setMergingMemoryId] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'reject' | 'deprecate';
+    memoryId: string;
+    title: string;
+    description: string;
+  } | null>(null);
+
+  // ---------------------------------------------------------------------------
   // Build API filter params from UI state
   // ---------------------------------------------------------------------------
   const { sortBy: apiSortBy, sortOrder: apiSortOrder } = parseSortValue(sortBy);
@@ -119,11 +124,16 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
 
   const memories = memoryData?.items ?? [];
 
+  // Fetch the selected memory item for the detail panel
+  const { data: selectedMemory } = useMemoryItem(selectedMemoryId ?? undefined);
+
   // ---------------------------------------------------------------------------
   // Mutation hooks
   // ---------------------------------------------------------------------------
   const promoteItem = usePromoteMemoryItem();
-  const deprecateItem = useDeprecateMemoryItem();
+  const deprecateItem = useDeprecateMemoryItem({
+    onSuccess: () => setConfirmAction(null),
+  });
   const bulkPromote = useBulkPromoteMemoryItems();
   const bulkDeprecate = useBulkDeprecateMemoryItems();
 
@@ -144,27 +154,72 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
     [promoteItem]
   );
 
-  /** Reject (deprecate) a single memory item. */
+  /** Reject (deprecate) a single memory item -- opens confirm dialog. */
   const handleReject = useCallback(
     (id: string) => {
-      deprecateItem.mutate({ itemId: id, data: { reason: 'Rejected via memory inbox' } });
+      setConfirmAction({
+        type: 'reject',
+        memoryId: id,
+        title: 'Reject Memory?',
+        description:
+          'This will deprecate the memory item. It can be restored later by changing its status.',
+      });
     },
-    [deprecateItem]
+    []
   );
 
-  /** Placeholder for edit -- will open edit panel/dialog in UI-3.4. */
-  const handleEdit = useCallback((_id: string) => {
-    // TODO: Open edit dialog (UI-3.4)
+  /** Open the edit form modal for a memory item. */
+  const handleEdit = useCallback(
+    (id: string) => {
+      const mem = memories.find((m) => m.id === id) ?? null;
+      if (mem) {
+        setEditingMemory(mem);
+      }
+    },
+    [memories]
+  );
+
+  /** Open the merge modal for a memory item. */
+  const handleMerge = useCallback((id: string) => {
+    setMergingMemoryId(id);
   }, []);
 
-  /** Placeholder for merge -- will open merge dialog in a future task. */
-  const handleMerge = useCallback((_id: string) => {
-    // TODO: Open merge dialog
+  /** Deprecate a single memory item from the detail panel -- opens confirm dialog. */
+  const handleDeprecate = useCallback(
+    (id: string) => {
+      setConfirmAction({
+        type: 'deprecate',
+        memoryId: id,
+        title: 'Deprecate Memory?',
+        description:
+          'This will mark the memory item as deprecated. It will no longer be included in active context.',
+      });
+    },
+    []
+  );
+
+  /** Execute the confirmed action (reject or deprecate). */
+  const handleConfirmAction = useCallback(() => {
+    if (!confirmAction) return;
+    deprecateItem.mutate({
+      itemId: confirmAction.memoryId,
+      data: {
+        reason:
+          confirmAction.type === 'reject'
+            ? 'Rejected via memory inbox'
+            : 'Deprecated via memory detail panel',
+      },
+    });
+  }, [confirmAction, deprecateItem]);
+
+  /** Close the detail panel. */
+  const handleCloseDetail = useCallback(() => {
+    setSelectedMemoryId(null);
   }, []);
 
-  /** Open create memory flow. */
+  /** Open create memory dialog. */
   const handleCreateMemory = useCallback(() => {
-    // TODO: Open create memory dialog
+    setCreateModalOpen(true);
   }, []);
 
   /** Batch approve all selected items. */
@@ -284,21 +339,21 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
           />
         </div>
 
-        {/* Detail panel (conditional, right sidebar) */}
-        {selectedMemoryId && (
-          <aside
-            className={cn(
-              'w-[420px] shrink-0 border-l overflow-y-auto',
-              'hidden lg:block' // hide on smaller screens
-            )}
-            role="complementary"
-            aria-label="Memory detail panel"
-          >
-            {/* TODO: Replace with DetailPanel in UI-3.4 */}
-            <DetailPanelPlaceholder />
-          </aside>
-        )}
       </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Detail Panel (fixed right sidebar, slides in/out)                  */}
+      {/* ------------------------------------------------------------------ */}
+      <MemoryDetailPanel
+        memory={selectedMemory ?? null}
+        isOpen={!!selectedMemoryId}
+        onClose={handleCloseDetail}
+        onEdit={handleEdit}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        onMerge={handleMerge}
+        onDeprecate={handleDeprecate}
+      />
 
       {/* ------------------------------------------------------------------ */}
       {/* Batch Action Bar (fixed bottom, slides up when items selected)     */}
@@ -308,6 +363,47 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
         onApproveAll={handleBatchApprove}
         onRejectAll={handleBatchReject}
         onClearSelection={clearSelection}
+      />
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Modals                                                             */}
+      {/* ------------------------------------------------------------------ */}
+
+      {/* Create / Edit memory form modal */}
+      <MemoryFormModal
+        open={createModalOpen || !!editingMemory}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateModalOpen(false);
+            setEditingMemory(null);
+          }
+        }}
+        memory={editingMemory}
+        projectId={projectId}
+      />
+
+      {/* Merge modal */}
+      <MergeModal
+        open={!!mergingMemoryId}
+        onOpenChange={(open) => {
+          if (!open) setMergingMemoryId(null);
+        }}
+        sourceMemory={memories.find((m) => m.id === mergingMemoryId) ?? null}
+        allMemories={memories}
+      />
+
+      {/* Confirm action dialog (reject / deprecate) */}
+      <ConfirmActionDialog
+        open={!!confirmAction}
+        onOpenChange={(open) => {
+          if (!open) setConfirmAction(null);
+        }}
+        title={confirmAction?.title ?? ''}
+        description={confirmAction?.description ?? ''}
+        confirmLabel={confirmAction?.type === 'reject' ? 'Reject' : 'Deprecate'}
+        confirmVariant="destructive"
+        onConfirm={handleConfirmAction}
+        isLoading={deprecateItem.isPending}
       />
     </div>
   );
