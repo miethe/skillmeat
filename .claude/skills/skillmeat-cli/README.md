@@ -1,23 +1,24 @@
 # SkillMeat CLI Skill
 
-Natural language interface for SkillMeat operations across artifacts and Memory & Context workflows.
+Natural language interface for SkillMeat operations across artifacts, project setup, sharing, and Memory & Context workflows.
 
-## What This Skill Covers
+## Capability Scope
 
-- Artifact workflows: search, add, deploy, update, remove, bundle/share.
-- Memory workflows: create/triage memories, compose modules, generate context packs.
-- Automation workflows: pre-run context consumption and post-run memory capture.
-- Fallback behavior: if memory CLI commands are unavailable, use API equivalents.
+- Artifact discovery, recommendation, and deployment
+- Collection and sync lifecycle management
+- Bundle create/import/sign/inspect workflows
+- MCP and context-entity CLI operations
+- Confidence/context-aware recommendation support
+- Caching and error-recovery playbooks
+- Memory capture, triage, module composition, and context-pack generation
 
-## When To Use
+## Progressive Disclosure Entry Point
 
-Use this skill when users ask to:
+Start with:
+- `./SKILL.md` (routing and policy)
+- `./references/capability-router.md` (intent -> doc map)
 
-- find or deploy Claude Code artifacts
-- manage project memory and context modules
-- generate context packs for upcoming tasks
-- capture learnings from recent agentic runs
-- improve memory discoverability/usage across projects
+Then load only the minimal workflow/reference docs needed for the active task.
 
 ## Fast Path Commands
 
@@ -103,6 +104,7 @@ Always communicate fallback usage clearly.
 ├── SKILL.md
 ├── README.md
 ├── references/
+│   ├── capability-router.md
 │   ├── command-quick-reference.md
 │   ├── agent-integration.md
 │   ├── claudectl-setup.md
@@ -112,7 +114,8 @@ Always communicate fallback usage clearly.
 │   ├── deployment-workflow.md
 │   ├── management-workflow.md
 │   ├── bundle-workflow.md
-│   └── memory-context-workflow.md
+│   ├── memory-context-workflow.md
+│   └── ...additional workflow modules
 ├── templates/
 └── scripts/
 ```
@@ -120,6 +123,7 @@ Always communicate fallback usage clearly.
 ## Related Docs
 
 - `./SKILL.md`
+- `./references/capability-router.md`
 - `./references/command-quick-reference.md`
 - `./references/agent-integration.md`
 - `./workflows/memory-context-workflow.md`

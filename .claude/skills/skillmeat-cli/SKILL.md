@@ -2,178 +2,131 @@
 name: skillmeat-cli
 description: |
   Manage SkillMeat and Claude Code environments through natural language.
-  Use this skill when users want to:
-  - discover, add, deploy, or manage Claude Code artifacts
-  - manage Memory & Context features (memory items, modules, context packs)
-  - automate pre-run context generation and post-run memory capture
-  - navigate project and memory workflows in CLI/web/API
-  Supports both current commands and planned `skillmeat memory ...` CLI flows.
+  Use this skill for artifact discovery/deployment/management, bundles,
+  MCP and context entity operations, and Memory & Context workflows.
+  This skill uses progressive disclosure: load only the specific workflow or
+  reference docs needed for the current user request.
 ---
 
 # SkillMeat CLI Skill
 
-Natural language interface for SkillMeat operations, including artifact management and Memory & Context workflows.
+High-level orchestrator for SkillMeat capabilities.
 
-## Core Operating Principle
+This file is intentionally concise. Use it to route to focused docs in
+`references/` and `workflows/` based on user intent.
 
-When memory features are requested, prefer the `skillmeat memory ...` CLI surface.
+## Progressive Disclosure Rules
 
-If the command is unavailable in the current installation:
-1. Detect this quickly (`skillmeat memory --help` or command failure).
-2. Fall back to equivalent API endpoints.
-3. Tell the user you used API fallback and why.
+1. Start from user intent, not from command memorization.
+2. Open only the minimal docs needed for the task.
+3. Do not load every workflow file by default.
+4. Prefer one primary workflow doc plus one reference doc when needed.
+5. If memory CLI commands are unavailable, fall back to API equivalents and
+   state that fallback explicitly.
 
-Do not pretend unavailable CLI commands succeeded.
+Use routing map:
+- `./references/capability-router.md`
 
----
+## Capability Coverage
 
-## Main Capability Areas
+This skill covers:
 
-- Artifact discovery/deployment (`search`, `add`, `deploy`, `sync`, `bundle`, etc.)
-- Memory item lifecycle management
-- Context module composition
-- Context pack preview/generation
-- Auto-extraction preview/apply from run artifacts
-- Project/global memory visibility workflows
+- Artifact discovery and recommendations
+- Artifact deployment and update management
+- Collection and sync operations
+- Bundle create/import/sign/inspect workflows
+- MCP and context entity command usage
+- Confidence scoring, context boosting, gap detection
+- Caching/performance-aware operation
+- Error handling and recovery patterns
+- Memory & Context workflows (item/module/pack/extract/search)
 
----
+## Intent Routing
 
-## Memory Command Model (Target)
+When a request arrives, route it first:
 
-### Item Lifecycle
+1. Capability discovery/search/recommendation:
+- Open `./workflows/discovery-workflow.md`
+- Optional: `./workflows/gap-detection.md`
 
+2. Deploy/add artifact to project:
+- Open `./workflows/deployment-workflow.md`
+
+3. Inspect/update/remove/sync artifacts:
+- Open `./workflows/management-workflow.md`
+
+4. Share/import setups and signing:
+- Open `./workflows/bundle-workflow.md`
+
+5. Confidence/context-aware recommendation logic:
+- Open `./workflows/context-boosting.md`
+- Optional: `./workflows/confidence-integration.md`
+
+6. Memory capture/consumption flows:
+- Open `./workflows/memory-context-workflow.md`
+- Optional: `./references/agent-integration.md` (integration pattern)
+
+7. CLI command syntax quick lookup:
+- Open `./references/command-quick-reference.md`
+
+8. Troubleshooting failures:
+- Open `./workflows/error-handling.md`
+
+9. claudectl alias behavior/setup:
+- Open `./references/claudectl-setup.md`
+
+## Memory & Context Handling Policy
+
+When user asks for memory operations:
+
+1. Prefer target CLI surface:
+- `skillmeat memory item ...`
+- `skillmeat memory module ...`
+- `skillmeat memory pack ...`
+- `skillmeat memory extract ...`
+- `skillmeat memory search ...`
+
+2. Verify availability quickly:
 ```bash
-skillmeat memory item create --project <project> --type decision --content "..."
-skillmeat memory item list --project <project> --status candidate
-skillmeat memory item show <item-id>
-skillmeat memory item update <item-id> --confidence 0.9
-skillmeat memory item promote <item-id> --reason "validated"
-skillmeat memory item deprecate <item-id> --reason "superseded"
-skillmeat memory item merge --source <id> --target <id> --strategy combine
-skillmeat memory item bulk-promote --ids <id1,id2>
-```
-
-### Module Composition
-
-```bash
-skillmeat memory module create --project <project> --name "API Debug"
-skillmeat memory module list --project <project>
-skillmeat memory module add-item <module-id> --item <item-id>
-skillmeat memory module remove-item <module-id> --item <item-id>
-```
-
-### Pack Consumption
-
-```bash
-skillmeat memory pack preview --project <project> --module <module-id> --budget 4000 --json
-skillmeat memory pack generate --project <project> --module <module-id> --output ./context-pack.md
-```
-
-### Auto-Extraction
-
-```bash
-skillmeat memory extract preview --project <project> --run-log ./run.log
-skillmeat memory extract apply --project <project> --run-log ./run.log
-```
-
-### Search
-
-```bash
-skillmeat memory search "oauth timeout" --project <project>
-skillmeat memory search "postgres lock" --all-projects
-```
-
----
-
-## API Fallback Map (When CLI Memory Commands Are Missing)
-
-- Item CRUD/lifecycle/merge:
-  - `/api/v1/memory-items`
-  - `/api/v1/memory-items/{id}/promote`
-  - `/api/v1/memory-items/{id}/deprecate`
-  - `/api/v1/memory-items/merge`
-- Module management:
-  - `/api/v1/context-modules`
-- Pack operations:
-  - `/api/v1/context-packs/preview`
-  - `/api/v1/context-packs/generate`
-
-Use project scoping explicitly (`project_id` query) to avoid cross-project mistakes.
-
----
-
-## Agent Workflows
-
-## 1) Pre-Run Context Consumption
-
-When user starts a substantial task:
-
-1. Determine project scope.
-2. Preview memory pack for relevant module.
-3. If utilization is poor, adjust filters/budget.
-4. Generate pack and provide/attach result.
-
-Prompt pattern:
-- "I can generate a context pack from your active memories before we start."
-
-## 2) Post-Run Memory Capture
-
-After significant implementation/debugging:
-
-1. Offer extraction from run notes/logs.
-2. Create candidates only.
-3. Route user to triage (or summarize candidates in CLI).
-
-Prompt pattern:
-- "I can extract candidate memories from this run and queue them for review."
-
-## 3) Triage Loop
-
-- Promote high-confidence validated learnings.
-- Deprecate stale/incorrect entries.
-- Merge near-duplicates with explicit confirmation.
-
----
-
-## Permission & Safety Protocol
-
-- Ask before mutating memory state in bulk.
-- Ask before applying extraction (preview can run without mutation).
-- For merges, show source/target and selected strategy before execution.
-- Never auto-promote extracted candidates in unattended mode.
-
----
-
-## Suggestion Guidelines
-
-Use concise value framing:
-
-```
-This workflow can benefit from Memory Context.
-I can:
-1) generate a pack for this task,
-2) run capture after completion,
-3) leave extracted items in candidate status for review.
-Proceed?
-```
-
----
-
-## Quick Checks
-
-Before memory operations:
-
-```bash
-skillmeat --version
 skillmeat memory --help
 ```
 
-If memory commands unavailable, switch to API fallback and state it.
+3. If unavailable, use API fallback and explain:
+- `/api/v1/memory-items`
+- `/api/v1/context-modules`
+- `/api/v1/context-packs/preview`
+- `/api/v1/context-packs/generate`
 
----
+4. Safety defaults:
+- Keep extracted memories as `candidate`
+- Do not auto-promote extracted items
+- Confirm before bulk/deprecate/merge operations
 
-## Related References
+## Permission Protocol
 
-- `./references/command-quick-reference.md`
-- `./references/agent-integration.md`
-- `./workflows/memory-context-workflow.md`
+For mutating actions, require explicit user confirmation:
+
+- Deploying artifacts
+- Bulk updates/removals
+- Memory extraction apply
+- Memory merges and bulk lifecycle changes
+
+Allowed without extra confirmation (read-only):
+
+- Search/list/show/preview commands
+- Diagnostics and health checks
+
+## Output Expectations
+
+- Be explicit about what command/action is being taken.
+- Report important command results clearly and briefly.
+- When using fallback paths, state fallback reason in one sentence.
+- Keep recommendations concrete and tied to current task context.
+
+## Recommended Starting Point
+
+For most tasks:
+
+1. Open `./references/capability-router.md`
+2. Select one primary workflow file
+3. Execute and report results
