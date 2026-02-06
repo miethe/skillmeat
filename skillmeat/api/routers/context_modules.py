@@ -23,6 +23,7 @@ API Endpoints:
 
 import logging
 from typing import List, Optional
+from urllib.parse import unquote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -98,6 +99,7 @@ async def list_context_modules(
         Paginated list of context modules.
     """
     try:
+        project_id = unquote(project_id)
         service = _get_service()
         result = service.list_by_project(project_id, limit=limit, cursor=cursor)
 
@@ -155,6 +157,7 @@ async def create_context_module(
         Created context module.
     """
     try:
+        project_id = unquote(project_id)
         service = _get_service()
         module = service.create(
             project_id=project_id,

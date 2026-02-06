@@ -27,6 +27,7 @@ Endpoint Groups:
 import json
 import logging
 from typing import Optional
+from urllib.parse import unquote
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -118,6 +119,7 @@ async def count_memory_items(
         Dict with a single 'count' key.
     """
     try:
+        project_id = unquote(project_id)
         service = _get_service()
         count = service.count(
             project_id=project_id,
@@ -338,6 +340,7 @@ async def list_memory_items(
         Paginated list of memory items.
     """
     try:
+        project_id = unquote(project_id)
         service = _get_service()
         result = service.list_items(
             project_id=project_id,
@@ -401,6 +404,7 @@ async def create_memory_item(
         HTTPException 409: If a duplicate content hash is detected.
     """
     try:
+        project_id = unquote(project_id)
         service = _get_service()
         result = service.create(
             project_id=project_id,
