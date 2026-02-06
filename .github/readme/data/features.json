@@ -1,7 +1,7 @@
 {
   "$schema": "./features.schema.json",
   "version": "0.3.0-beta",
-  "lastUpdated": "2026-01-29",
+  "lastUpdated": "2026-02-06",
   "categories": [
     {
       "id": "collection",
@@ -356,6 +356,31 @@
           "shortDescription": "Deploy config",
           "cliCommand": "skillmeat context deploy",
           "since": "0.3.0"
+        },
+        {
+          "id": "memory-inbox",
+          "name": "Memory Inbox",
+          "description": "Triage project-scoped memory items with keyboard-first review actions and lifecycle governance",
+          "shortDescription": "Review project memory",
+          "webPage": "/projects/[id]/memory",
+          "since": "0.4.0",
+          "highlight": true
+        },
+        {
+          "id": "context-modules",
+          "name": "Context Modules",
+          "description": "Create reusable selector-based modules to curate memory for specific workflows",
+          "shortDescription": "Reusable context modules",
+          "webPage": "/projects/[id]/memory",
+          "since": "0.4.0"
+        },
+        {
+          "id": "context-pack-preview",
+          "name": "Context Pack Preview",
+          "description": "Preview and generate token-budgeted context packs before agent execution",
+          "shortDescription": "Budgeted context packs",
+          "webPage": "/projects/[id]/memory",
+          "since": "0.4.0"
         }
       ]
     },
@@ -467,7 +492,7 @@
   "stats": {
     "totalCommands": 116,
     "commandGroups": 23,
-    "webPages": 22,
+    "webPages": 23,
     "apiEndpoints": 150,
     "modals": 40
   }

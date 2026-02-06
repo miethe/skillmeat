@@ -8,7 +8,8 @@ updated: 2026-02-06
 category: user-guide
 status: published
 related_documents:
-  - /docs/user/guides/memory-management.md
+  - /docs/user/guides/memory-context-system.md
+  - /docs/user/guides/memory-inbox.md
   - /docs/user/guides/web-ui-guide.md
   - /docs/project_plans/PRDs/features/memory-context-system-v1.md
 ---
@@ -1232,7 +1233,8 @@ Step 4: Test and refine
 
 ## See Also
 
-- **[Memory Management Guide](/docs/user/guides/memory-management.md)** - Managing memory items and triage workflows
+- **[Memory & Context Intelligence Guide](/docs/user/guides/memory-context-system.md)** - System overview and workflow map
+- **[Memory Inbox User Guide](/docs/user/guides/memory-inbox.md)** - Memory triage and lifecycle operations
 - **[Web UI Guide](/docs/user/guides/web-ui-guide.md)** - Complete web interface documentation
 - **[CLI Commands Reference](/docs/user/cli/commands.md)** - Command-line interface for memory and modules
 - **[PRD: Memory & Context Intelligence System](/docs/project_plans/PRDs/features/memory-context-system-v1.md)** - Technical specification and architecture

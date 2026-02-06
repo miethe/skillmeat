@@ -9,6 +9,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Memory & Context Intelligence System v1 (2026-02-06)
+
+**Project Memory Workspace**
+- New `/projects/[id]/memory` workspace for project-scoped memory operations
+- Memory Inbox triage flow with type/status/confidence/search filtering
+- Keyboard-first workflows for review and actions (`J/K`, `A`, `E`, `R`, `M`, `?`)
+- Detail panel with provenance, usage metadata, and lifecycle controls
+- Batch selection and bulk lifecycle actions for high-throughput triage
+
+**Context Composition**
+- Context Modules management for reusable selector-based curation
+- Selector support for memory types, minimum confidence, file patterns, and workflow stages
+- Context pack preview and generation endpoints with token budget awareness
+- Effective context preview UI for validating selected content before generation
+
+**API & Backend**
+- New memory lifecycle API surface:
+  - `GET/POST/PUT/DELETE /api/v1/memory-items`
+  - `POST /api/v1/memory-items/{id}/promote`
+  - `POST /api/v1/memory-items/{id}/deprecate`
+  - `POST /api/v1/memory-items/merge`
+- New context module and packing API surface:
+  - `GET/POST/PUT/DELETE /api/v1/context-modules`
+  - `POST /api/v1/context-packs/preview`
+  - `POST /api/v1/context-packs/generate`
+- Feature flag controls documented for memory system rollout:
+  - `SKILLMEAT_MEMORY_CONTEXT_ENABLED`
+  - `SKILLMEAT_MEMORY_AUTO_EXTRACT` (reserved for future phase)
+
+**Documentation**
+- Added user-facing system overview: `docs/user/guides/memory-context-system.md`
+- Updated and cross-linked:
+  - `docs/user/guides/memory-inbox.md`
+  - `docs/user/guides/context-modules.md`
+  - `docs/user/guides/web-ui-guide.md`
+  - `docs/user/README.md`
+  - `.github/readme/data/features.json`
+  - `.github/readme/partials/documentation.md`
+  - `docs/dev/FEATURE_INDEX.md`
+  - `docs/architecture/web-app-map.md`
+
 #### Unified Sync Workflow (2026-02-05)
 
 **Sync Confirmation & Conflict Detection**

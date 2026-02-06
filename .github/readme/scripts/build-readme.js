@@ -253,6 +253,15 @@ function registerHelpers(Handlebars) {
     if (!Array.isArray(features)) return false;
     return features.some(feature => feature.cliCommand);
   });
+
+  // Render only CLI commands from a feature array, joined by commas.
+  Handlebars.registerHelper('cliCommands', function(features) {
+    if (!Array.isArray(features)) return '';
+    return features
+      .filter(feature => feature && feature.cliCommand)
+      .map(feature => `\`${feature.cliCommand}\``)
+      .join(', ');
+  });
 }
 
 /**

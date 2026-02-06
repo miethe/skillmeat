@@ -5,6 +5,9 @@ Comprehensive guides and references to help you get the most out of SkillMeat.
 ### User Guides
 
 - [Quickstart Guide](docs/user/quickstart.md) - Installation, setup, and first steps
+- [Memory & Context Guide](docs/user/guides/memory-context-system.md) - Memory Inbox, modules, and context pack workflows
+- [Memory Inbox Guide](docs/user/guides/memory-inbox.md) - Triage, lifecycle, and keyboard-first memory review
+- [Context Modules Guide](docs/user/guides/context-modules.md) - Selector-driven modules and pack generation
 - [CLI Commands](docs/user/cli/commands.md) - Complete command documentation
 - [Web Commands](docs/user/cli/web-commands.md) - Web interface CLI usage
 - [Examples](docs/user/examples.md) - Common workflows and use cases
@@ -14,6 +17,7 @@ Comprehensive guides and references to help you get the most out of SkillMeat.
 
 - [API Development](skillmeat/api/CLAUDE.md) - Backend development guide
 - [Web Development](skillmeat/web/CLAUDE.md) - Frontend development guide
+- [Memory Context Developer Guide](docs/developer/guides/memory-context-system.md) - Architecture, APIs, and extension points
 - [Contributing Guide](CONTRIBUTING.md) - Development setup, coding standards, and guidelines
 
 ### Advanced Topics

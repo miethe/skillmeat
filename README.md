@@ -1,5 +1,5 @@
 <!-- AUTO-GENERATED: Do not edit directly. See .github/readme/ -->
-<!-- GENERATED: 2026-01-30T20:24:48.605Z -->
+<!-- GENERATED: 2026-02-06T17:59:27.995Z -->
 <!-- VERSION: 0.3.0-beta -->
 
 <!-- BEGIN:hero -->
@@ -150,7 +150,7 @@ For complete documentation, see the [Quickstart Guide](docs/user/quickstart.md).
 <!-- BEGIN:features -->
 ## Features
 
-> **116+ CLI commands** | **150+ API endpoints** | **22 web pages**
+> **116+ CLI commands** | **150+ API endpoints** | **23 web pages**
 
 ### Collection Management
 
@@ -247,6 +247,9 @@ _Project configuration artifacts_
 |---------|-------------|
 | Context Entity Management | Manage project config (`skillmeat context`) |
 | Context Deploy | Deploy config (`skillmeat context deploy`) |
+| **Memory Inbox** | Review project memory |
+| Context Modules | Reusable context modules |
+| Context Pack Preview | Budgeted context packs |
 
 ### Team Collaboration
 
@@ -293,17 +296,17 @@ SkillMeat provides **116+ commands** across **23 command groups**.
 
 | Category | Commands |
 |----------|----------|
-| **Collection Management** | `skillmeat collection create`,  |
-| **Deployment &amp; Projects** | `skillmeat deploy`, `skillmeat status`,  |
-| **Intelligence &amp; Sync** | `skillmeat sync check`, `skillmeat sync pull`, `skillmeat sync preview`,  |
-| **Marketplace &amp; Discovery** | `skillmeat marketplace-publish` |
-| **Analytics &amp; Insights** | `skillmeat analytics usage`, `skillmeat analytics top`, `skillmeat analytics cleanup`, `skillmeat analytics trends` |
-| **Search &amp; Discovery** | `skillmeat search`, `skillmeat find-duplicates`,  |
-| **Versioning &amp; Safety** | `skillmeat snapshot`, `skillmeat rollback`, `skillmeat history` |
-| **MCP Server Management** | `skillmeat mcp add`, `skillmeat mcp deploy`, `skillmeat mcp health` |
-| **Context Entities** | `skillmeat context`, `skillmeat context deploy` |
-| **Team Collaboration** | `skillmeat bundle create`, `skillmeat vault`, `skillmeat sign` |
-| **Three-Way Interface** | `skillmeat --help`, `skillmeat web dev`,  |
+| **Collection Management** | &#x60;skillmeat collection create&#x60; |
+| **Deployment &amp; Projects** | &#x60;skillmeat deploy&#x60;, &#x60;skillmeat status&#x60; |
+| **Intelligence &amp; Sync** | &#x60;skillmeat sync check&#x60;, &#x60;skillmeat sync pull&#x60;, &#x60;skillmeat sync preview&#x60; |
+| **Marketplace &amp; Discovery** | &#x60;skillmeat marketplace-publish&#x60; |
+| **Analytics &amp; Insights** | &#x60;skillmeat analytics usage&#x60;, &#x60;skillmeat analytics top&#x60;, &#x60;skillmeat analytics cleanup&#x60;, &#x60;skillmeat analytics trends&#x60; |
+| **Search &amp; Discovery** | &#x60;skillmeat search&#x60;, &#x60;skillmeat find-duplicates&#x60; |
+| **Versioning &amp; Safety** | &#x60;skillmeat snapshot&#x60;, &#x60;skillmeat rollback&#x60;, &#x60;skillmeat history&#x60; |
+| **MCP Server Management** | &#x60;skillmeat mcp add&#x60;, &#x60;skillmeat mcp deploy&#x60;, &#x60;skillmeat mcp health&#x60; |
+| **Context Entities** | &#x60;skillmeat context&#x60;, &#x60;skillmeat context deploy&#x60; |
+| **Team Collaboration** | &#x60;skillmeat bundle create&#x60;, &#x60;skillmeat vault&#x60;, &#x60;skillmeat sign&#x60; |
+| **Three-Way Interface** | &#x60;skillmeat --help&#x60;, &#x60;skillmeat web dev&#x60; |
 
 ### Core Commands
 
@@ -454,6 +457,9 @@ Comprehensive guides and references to help you get the most out of SkillMeat.
 ### User Guides
 
 - [Quickstart Guide](docs/user/quickstart.md) - Installation, setup, and first steps
+- [Memory & Context Guide](docs/user/guides/memory-context-system.md) - Memory Inbox, modules, and context pack workflows
+- [Memory Inbox Guide](docs/user/guides/memory-inbox.md) - Triage, lifecycle, and keyboard-first memory review
+- [Context Modules Guide](docs/user/guides/context-modules.md) - Selector-driven modules and pack generation
 - [CLI Commands](docs/user/cli/commands.md) - Complete command documentation
 - [Web Commands](docs/user/cli/web-commands.md) - Web interface CLI usage
 - [Examples](docs/user/examples.md) - Common workflows and use cases
@@ -463,6 +469,7 @@ Comprehensive guides and references to help you get the most out of SkillMeat.
 
 - [API Development](skillmeat/api/CLAUDE.md) - Backend development guide
 - [Web Development](skillmeat/web/CLAUDE.md) - Frontend development guide
+- [Memory Context Developer Guide](docs/developer/guides/memory-context-system.md) - Architecture, APIs, and extension points
 - [Contributing Guide](CONTRIBUTING.md) - Development setup, coding standards, and guidelines
 
 ### Advanced Topics

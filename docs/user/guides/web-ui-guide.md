@@ -11,6 +11,7 @@ This guide covers the SkillMeat web interface, including launching the UI, manag
 - [Artifact Management](#artifact-management)
 - [Notification Center](#notification-center)
 - [Deploying to Projects](#deploying-to-projects)
+- [Memory & Context Workspace](#memory--context-workspace)
 - [Analytics Dashboard](#analytics-dashboard)
 - [Settings and Configuration](#settings-and-configuration)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
@@ -578,6 +579,39 @@ Recent deployments offer rollback:
 2. Click "Rollback"
 3. Confirm
 4. Monitor restoration
+
+## Memory & Context Workspace
+
+The Memory workspace gives each project a dedicated triage and context composition flow.
+
+### Accessing Memory
+
+1. Open a project.
+2. Navigate to `/projects/[id]/memory`.
+3. Use the **Memory Inbox** tab to review candidate memories.
+4. Use the **Context Modules** tab to build reusable module selectors.
+
+### Memory Inbox Workflow
+
+- Review candidate items by type, status, and confidence.
+- Promote useful items (`candidate -> active -> stable`).
+- Deprecate stale or incorrect items.
+- Use keyboard shortcuts for high-speed triage (`J/K`, `A`, `E`, `R`, `M`, `?`).
+
+### Context Modules and Packs
+
+- Create modules with selector rules:
+  - memory types
+  - minimum confidence
+  - file patterns
+  - workflow stages
+- Preview context packs with token budget limits.
+- Generate finalized packs for agent runs.
+
+For full usage details, see:
+- `docs/user/guides/memory-context-system.md`
+- `docs/user/guides/memory-inbox.md`
+- `docs/user/guides/context-modules.md`
 
 ## Analytics Dashboard
 

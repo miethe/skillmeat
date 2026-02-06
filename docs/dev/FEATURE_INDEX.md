@@ -1,13 +1,13 @@
 # SkillMeat - Complete Feature Index
 
-**Date**: 2026-01-29 | **Status**: Comprehensive Catalog Complete | **Scope**: Full Web UI
+**Date**: 2026-02-06 | **Status**: Comprehensive Catalog Complete | **Scope**: Full Web UI
 
 ## Executive Summary
 
 SkillMeat is a personal collection manager for Claude Code artifacts (Skills, Commands, Agents, MCP servers, Hooks) with marketplace integration, deployment tracking, and project management.
 
 **Total Inventory**:
-- **22 Pages**: Core features + sub-routes
+- **23 Pages**: Core features + sub-routes
 - **40+ Modals**: CRUD operations and workflows
 - **100+ Components**: UI building blocks
 - **150+ API Endpoints**: Full backend coverage
@@ -36,6 +36,7 @@ Root (/)
 │   │   ├── page           Project info
 │   │   ├── settings/      Configuration
 │   │   └── manage/        Deployment sync
+│   │   └── memory/        Memory inbox + context modules
 │   └── Outdated artifacts alert
 ├── Deployments           Deployment dashboard
 │   └── Flat/Grouped views
@@ -92,7 +93,7 @@ Root (/)
 
 ---
 
-### Project Management (3 pages)
+### Project Management (4 pages)
 
 **Projects (/projects)**
 - Project list with metrics
@@ -114,6 +115,14 @@ Root (/)
 - Sync status
 - Drift detection
 - Modals: Pull/Deploy dialogs
+
+**Projects Memory (/projects/[id]/memory)**
+- Memory Inbox triage interface
+- Type/status/confidence/search filters
+- Keyboard-first review shortcuts
+- Lifecycle actions: promote, deprecate, merge
+- Context Modules tab with selector-based composition
+- Context pack preview and generation
 
 ---
 

@@ -12,6 +12,7 @@ Sources: `skillmeat/web/app`, `skillmeat/web/components`, `skillmeat/web/hooks`,
 - `/projects` -> `skillmeat/web/app/projects/page.tsx`
 - `/projects/[id]` -> `skillmeat/web/app/projects/[id]/page.tsx`
 - `/projects/[id]/manage` -> `skillmeat/web/app/projects/[id]/manage/page.tsx`
+- `/projects/[id]/memory` -> `skillmeat/web/app/projects/[id]/memory/page.tsx`
 - `/projects/[id]/settings` -> `skillmeat/web/app/projects/[id]/settings/page.tsx`
 - `/templates` -> `skillmeat/web/app/templates/page.tsx`
 - `/deployments` -> `skillmeat/web/app/deployments/page.tsx`

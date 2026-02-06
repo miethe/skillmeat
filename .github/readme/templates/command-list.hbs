@@ -18,7 +18,7 @@ SkillMeat provides **{{stats.totalCommands}}+ commands** across **{{stats.comman
 |----------|----------|
 {{#each categories}}
 {{#if (hasCliCommands features)}}
-| **{{name}}** | {{#each features}}{{#if cliCommand}}`{{cliCommand}}`{{#unless @last}}, {{/unless}}{{/if}}{{/each}} |
+| **{{name}}** | {{cliCommands features}} |
 {{/if}}
 {{/each}}
 

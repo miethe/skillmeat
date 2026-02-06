@@ -22,8 +22,8 @@ The Memory Inbox is your command center for managing project memory items—atom
 
 - **Constraints**: Rules and limitations ("API key must be refreshed every 3600 seconds")
 - **Decisions**: Design choices made during implementation ("Use TanStack Query for server state")
-- **Fixes**: Workarounds and bug resolutions ("list_id comes from URL path, not body")
-- **Patterns**: Reusable code structures ("Always validate form inputs with Zod schemas")
+- **Gotchas/Fixes**: Workarounds and bug resolutions ("list_id comes from URL path, not body")
+- **Patterns/Learnings**: Reusable structures and discovered insights
 - **Learnings**: Discovered insights ("React 19 requires async client components")
 - **Style Rules**: Code style preferences ("Use named exports, not default exports")
 
@@ -755,6 +755,8 @@ Use type tags consistently:
 
 ## See Also
 
+- [Memory & Context Intelligence Guide](./memory-context-system.md) - Overview and workflow map
+- [Context Modules Guide](./context-modules.md) - Build reusable context packs
 - [Web UI Guide](./web-ui-guide.md) - Complete web interface reference
 - [Context Entities Guide](./context-entities.md) - Managing context files and entities
 - [Tags User Guide](./tags-user-guide.md) - Organizing artifacts with tags
