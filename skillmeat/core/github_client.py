@@ -27,8 +27,10 @@ Example:
     >>> sha = client.resolve_version("anthropics/skills", "latest")
 """
 
+import base64
 import logging
 import os
+import posixpath
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -548,6 +550,12 @@ class GitHubClient:
             GitHubRateLimitError: If rate limit exceeded
             GitHubClientError: For other errors
 
+        Note:
+            Symlinks are resolved to their target type. If a symlink points to
+            a directory in the same tree, it returns type "tree". If it points
+            to a file, it returns type "blob". If the target cannot be resolved
+            (external symlink), it returns type "symlink".
+
         Example:
             >>> client = GitHubClient()
             >>> tree = client.get_repo_tree("anthropics/skills")
@@ -559,19 +567,72 @@ class GitHubClient:
             tree_ref = ref or repo.default_branch
             git_tree = repo.get_git_tree(tree_ref, recursive=recursive)
 
-            return [
-                {
-                    "path": item.path,
-                    "type": (
-                        "symlink"
-                        if item.type == "blob" and getattr(item, "mode", "") == "120000"
-                        else item.type
-                    ),
-                    "sha": item.sha,
-                    "size": item.size if item.type == "blob" else None,
-                }
-                for item in git_tree.tree
-            ]
+            # First pass: build path -> type lookup for symlink resolution
+            path_types: Dict[str, str] = {}
+            symlinks: List[Tuple[Any, str]] = []  # (item, path) pairs for symlinks
+
+            for item in git_tree.tree:
+                mode = getattr(item, "mode", "")
+                if item.type == "blob" and mode == "120000":
+                    # This is a symlink - we'll resolve it in second pass
+                    symlinks.append((item, item.path))
+                else:
+                    path_types[item.path] = item.type
+
+            # Second pass: resolve symlinks to their target types
+            symlink_resolved_types: Dict[str, str] = {}
+            for item, symlink_path in symlinks:
+                try:
+                    # Get symlink target by fetching blob content
+                    blob = repo.get_git_blob(item.sha)
+                    if blob.encoding == "base64":
+                        target = base64.b64decode(blob.content).decode("utf-8").strip()
+                    else:
+                        target = blob.content.strip()
+
+                    # Resolve relative path from symlink location
+                    symlink_dir = posixpath.dirname(symlink_path)
+                    resolved_path = posixpath.normpath(
+                        posixpath.join(symlink_dir, target)
+                    )
+
+                    # Look up resolved path in tree
+                    if resolved_path in path_types:
+                        symlink_resolved_types[symlink_path] = path_types[resolved_path]
+                    else:
+                        # Target not in tree (external symlink or broken)
+                        symlink_resolved_types[symlink_path] = "symlink"
+                except Exception as e:
+                    # If we can't resolve, fall back to "symlink"
+                    logger.debug(f"Failed to resolve symlink {symlink_path}: {e}")
+                    symlink_resolved_types[symlink_path] = "symlink"
+
+            # Build final result
+            result = []
+            for item in git_tree.tree:
+                mode = getattr(item, "mode", "")
+                if item.type == "blob" and mode == "120000":
+                    # Use resolved type for symlinks
+                    resolved_type = symlink_resolved_types.get(item.path, "symlink")
+                    result.append(
+                        {
+                            "path": item.path,
+                            "type": resolved_type,
+                            "sha": item.sha,
+                            "size": item.size if resolved_type == "blob" else None,
+                        }
+                    )
+                else:
+                    result.append(
+                        {
+                            "path": item.path,
+                            "type": item.type,
+                            "sha": item.sha,
+                            "size": item.size if item.type == "blob" else None,
+                        }
+                    )
+
+            return result
         except GithubException as e:
             self._handle_exception(e, context=f"get_repo_tree({owner_repo})")
             raise
