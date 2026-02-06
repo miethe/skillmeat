@@ -16,6 +16,7 @@ import {
   Code,
   Settings,
   Loader2,
+  Brain,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -347,6 +348,10 @@ function ProjectDetailPageContent() {
               <p className="font-mono text-sm text-muted-foreground">{project.path}</p>
             </div>
             <div className="flex items-center gap-2">
+              <Button onClick={() => router.push(`/projects/${projectId}/memory`)}>
+                <Brain className="mr-2 h-4 w-4" />
+                Memory
+              </Button>
               <Button onClick={() => router.push(`/projects/${projectId}/manage`)}>
                 <Settings className="mr-2 h-4 w-4" />
                 Manage Entities

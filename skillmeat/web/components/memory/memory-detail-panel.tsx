@@ -198,9 +198,19 @@ function ProvenanceSection({
             )
             .map(([key, value]) => {
               if (value === undefined || value === null) return null;
-              const displayValue = Array.isArray(value)
-                ? value.join(', ')
-                : String(value);
+              let displayValue: string;
+              if (Array.isArray(value)) {
+                // Check if array contains objects
+                if (value.length > 0 && typeof value[0] === 'object') {
+                  displayValue = JSON.stringify(value, null, 2);
+                } else {
+                  displayValue = value.join(', ');
+                }
+              } else if (typeof value === 'object') {
+                displayValue = JSON.stringify(value, null, 2);
+              } else {
+                displayValue = String(value);
+              }
               return (
                 <div key={key} className="flex items-start gap-2">
                   <Hash className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -208,7 +218,13 @@ function ProvenanceSection({
                     <dt className="text-xs font-medium text-muted-foreground">
                       {key}
                     </dt>
-                    <dd className="text-sm break-all">{displayValue}</dd>
+                    <dd className="text-sm break-all">
+                      {displayValue.startsWith('[') || displayValue.startsWith('{') ? (
+                        <pre className="text-xs font-mono whitespace-pre-wrap">{displayValue}</pre>
+                      ) : (
+                        displayValue
+                      )}
+                    </dd>
                   </div>
                 </div>
               );
@@ -290,7 +306,7 @@ export function MemoryDetailPanel({
       role="complementary"
       aria-label="Memory detail panel"
       className={cn(
-        'fixed top-0 right-0 bottom-0 z-30 w-[420px] border-l bg-background',
+        'fixed top-14 right-0 bottom-0 z-30 w-[420px] border-l bg-background',
         'flex flex-col shadow-lg',
         'transform transition-transform duration-200 ease-out',
         isOpen ? 'translate-x-0' : 'translate-x-full'
