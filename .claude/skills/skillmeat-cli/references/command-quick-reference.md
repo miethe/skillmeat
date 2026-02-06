@@ -1,285 +1,128 @@
 # SkillMeat CLI Quick Reference
 
-Condensed command reference for the skillmeat-cli skill.
-
----
+Condensed command reference for artifact and memory workflows.
 
 ## Command Groups Overview
 
 | Group | Purpose | Key Commands |
-|-------|---------|--------------|
+|---|---|---|
 | (root) | Core operations | `add`, `deploy`, `list`, `show`, `search` |
 | `collection` | Multi-collection | `create`, `list`, `use` |
-| `mcp` | MCP servers | `add`, `remove`, `list`, `enable`, `disable` |
-| `bundle` | Sharing | `create`, `import`, `list` |
-| `sign` | Security | `create`, `verify`, `list-keys` |
-| `sync` | Updates | `(default)`, `--all`, `--dry-run` |
-| `diff` | Changes | `artifact`, `collection`, `project` |
-| `config` | Settings | `get`, `set`, `list` |
-| `web` | Web UI | `dev`, `build`, `start`, `doctor` |
-| `analytics` | Usage | `summary`, `trends`, `export` |
-| `cache` | Performance | `clear`, `stats`, `config` |
-| `vault` | Team sharing | `create`, `add`, `pull`, `push` |
-| `context` | Context entities | `add`, `remove`, `list`, `show`, `sync` |
+| `sync` | Updates and drift | `check`, `pull`, `preview` |
+| `bundle` | Sharing | `create`, `import`, `inspect` |
+| `mcp` | MCP servers | `add`, `list`, `deploy`, `health` |
+| `context` | Context entities | `add`, `list`, `show`, `deploy` |
+| `memory` (target) | Memory lifecycle + packs | `item`, `module`, `pack`, `extract`, `search` |
 
 ---
 
-## Core Commands
-
-### Search & Discovery
+## Artifact Operations
 
 ```bash
-# Search all sources
-skillmeat search "<query>"
-skillmeat search "pdf" --type skill
-skillmeat search "database" --type agent
-
-# List artifacts
-skillmeat list                    # All in collection
-skillmeat list --type skill       # Filter by type
-skillmeat list --project .        # Deployed in project
-skillmeat list --json             # JSON output
-
-# Show details
-skillmeat show <artifact-name>
-skillmeat show canvas-design --full
-```
-
-### Adding Artifacts
-
-```bash
-# Add skill
+skillmeat search "<query>" --type skill
 skillmeat add skill <source>
-skillmeat add skill anthropics/skills/canvas-design
-skillmeat add skill anthropics/skills/pdf@v1.0.0
-skillmeat add skill user/repo/path/to/skill
-
-# Add other types
-skillmeat add command <source>
-skillmeat add agent <source>
-skillmeat add mcp <source>
-
-# Options
---collection <name>    # Target collection
---alias <name>         # Local alias
---force                # Overwrite existing
-```
-
-### Deploying Artifacts
-
-```bash
-# Deploy to project
 skillmeat deploy <artifact-name>
-skillmeat deploy canvas-design
-skillmeat deploy pdf --project /path/to/project
-
-# Options
---project <path>       # Target project (default: .)
---force                # Overwrite existing
---dry-run              # Preview changes
-```
-
-### Updating & Syncing
-
-```bash
-# Check for updates
-skillmeat diff <artifact-name>
-skillmeat diff --all
-
-# Update
-skillmeat update <artifact-name>
-skillmeat sync                    # Sync collection
-skillmeat sync --all              # Sync everything
-
-# Options
---dry-run              # Preview changes
---force                # Force update
-```
-
-### Removing Artifacts
-
-```bash
-# Remove from collection
+skillmeat list
+skillmeat show <artifact-name>
 skillmeat remove <artifact-name>
-skillmeat remove canvas-design
-
-# Undeploy from project
-skillmeat undeploy <artifact-name>
-skillmeat undeploy canvas-design --project .
-
-# Options
---force                # Skip confirmation
---keep-data            # Keep local data
 ```
 
 ---
 
-## Collection Management
+## Memory Operations (Target CLI)
+
+## `memory item`
 
 ```bash
-# List collections
-skillmeat collection list
-
-# Create collection
-skillmeat collection create <name>
-skillmeat collection create work --description "Work artifacts"
-
-# Switch collection
-skillmeat collection use <name>
-skillmeat collection use personal
-
-# Delete collection
-skillmeat collection delete <name> --force
+skillmeat memory item create --project <project> --type decision --content "..." --confidence 0.8
+skillmeat memory item list --project <project> --status candidate --type gotcha
+skillmeat memory item show <item-id>
+skillmeat memory item update <item-id> --content "..." --confidence 0.9
+skillmeat memory item delete <item-id>
+skillmeat memory item promote <item-id> --reason "validated"
+skillmeat memory item deprecate <item-id> --reason "obsolete"
+skillmeat memory item merge --source <id> --target <id> --strategy combine --merged-content "..."
+skillmeat memory item bulk-promote --ids <id1,id2,id3>
+skillmeat memory item bulk-deprecate --ids <id1,id2,id3>
 ```
 
----
-
-## Bundle Operations
+## `memory module`
 
 ```bash
-# Create bundle
-skillmeat bundle create <name>
-skillmeat bundle create my-setup
-skillmeat bundle create my-setup --include skill,command
-
-# Import bundle
-skillmeat bundle import <file>
-skillmeat bundle import setup.zip
-skillmeat bundle import setup.zip --dry-run
-
-# List bundles
-skillmeat bundle list
-
-# Sign bundle
-skillmeat sign create <bundle>
-skillmeat sign verify <bundle>
+skillmeat memory module create --project <project> --name "API Debug" --types decision,constraint,gotcha --min-confidence 0.7
+skillmeat memory module list --project <project>
+skillmeat memory module show <module-id>
+skillmeat memory module update <module-id> --priority 80
+skillmeat memory module add-item <module-id> --item <item-id> --ordering 10
+skillmeat memory module remove-item <module-id> --item <item-id>
+skillmeat memory module list-items <module-id>
+skillmeat memory module duplicate <module-id> --name "API Debug v2"
+skillmeat memory module delete <module-id>
 ```
 
----
-
-## MCP Server Management
+## `memory pack`
 
 ```bash
-# Add MCP server
-skillmeat mcp add <name> <command>
-skillmeat mcp add sqlite "uvx mcp-server-sqlite"
-
-# List MCP servers
-skillmeat mcp list
-
-# Enable/disable
-skillmeat mcp enable <name>
-skillmeat mcp disable <name>
-
-# Remove
-skillmeat mcp remove <name>
+skillmeat memory pack preview --project <project> --module <module-id> --budget 4000 --json
+skillmeat memory pack generate --project <project> --module <module-id> --budget 4000 --output ./context-pack.md
 ```
 
----
-
-## Configuration
+## `memory extract`
 
 ```bash
-# View config
-skillmeat config list
-skillmeat config get <key>
-
-# Set config
-skillmeat config set <key> <value>
-skillmeat config set github-token ghp_xxxxx
-skillmeat config set default-collection work
-
-# Common settings
-github-token           # GitHub API token
-default-collection     # Default collection name
-auto-sync              # Auto-sync on start
+skillmeat memory extract preview --project <project> --run-log ./run.log --profile balanced
+skillmeat memory extract apply --project <project> --run-log ./run.log --min-confidence 0.65
 ```
 
----
-
-## Web Interface
+## `memory search`
 
 ```bash
-# Development
-skillmeat web dev              # Start dev servers
-skillmeat web dev --api-only   # API only
-skillmeat web dev --web-only   # Frontend only
-
-# Production
-skillmeat web build            # Build for production
-skillmeat web start            # Start production servers
-
-# Diagnostics
-skillmeat web doctor           # Check environment
+skillmeat memory search "oauth timeout" --project <project>
+skillmeat memory search "postgres migration lock" --all-projects
 ```
 
 ---
 
-## Output Formats
+## API Fallbacks (when `memory` CLI is unavailable)
 
-Most commands support `--json` for machine-readable output:
+```bash
+# List items
+curl "http://localhost:8000/api/v1/memory-items?project_id=<project>"
+
+# Create item
+curl -X POST "http://localhost:8000/api/v1/memory-items?project_id=<project>" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"decision","content":"...","confidence":0.8}'
+
+# Preview context pack
+curl -X POST "http://localhost:8000/api/v1/context-packs/preview?project_id=<project>" \
+  -H "Content-Type: application/json" \
+  -d '{"module_id":"<module-id>","budget_tokens":4000}'
+```
+
+---
+
+## JSON Output Guidance
+
+Use `--json` whenever output must be consumed by agents/scripts.
+
+Recommended commands:
 
 ```bash
 skillmeat list --json
-skillmeat search "pdf" --json
-skillmeat show canvas-design --json
+skillmeat search "<query>" --json
+skillmeat memory item list --project <project> --json
+skillmeat memory pack preview --project <project> --json
 ```
 
 ---
 
-## Common Workflows
-
-### Set Up New Project
+## Validation Commands
 
 ```bash
-skillmeat init                           # Initialize in project
-skillmeat search "react"                 # Find relevant skills
-skillmeat add skill anthropics/skills/frontend-design
-skillmeat deploy frontend-design
+skillmeat --help
+skillmeat memory --help
+skillmeat memory item --help
 ```
 
-### Share Your Setup
-
-```bash
-skillmeat bundle create my-team-setup    # Create bundle
-skillmeat sign create my-team-setup.zip  # Sign it
-# Share the .zip file
-```
-
-### Import Colleague's Setup
-
-```bash
-skillmeat bundle import colleague-setup.zip
-skillmeat sign verify colleague-setup.zip  # Verify signature
-skillmeat deploy --all                     # Deploy everything
-```
-
-### Keep Everything Updated
-
-```bash
-skillmeat diff --all                     # Check for updates
-skillmeat sync --all                     # Update everything
-```
-
----
-
-## Error Codes
-
-| Code | Meaning | Solution |
-|------|---------|----------|
-| 1 | General error | Check error message |
-| 2 | Not found | Verify artifact name |
-| 3 | Permission denied | Check file permissions |
-| 4 | Rate limited | Set GitHub token |
-| 5 | Network error | Check connectivity |
-
----
-
-## Environment Variables
-
-| Variable | Purpose |
-|----------|---------|
-| `SKILLMEAT_HOME` | Collection directory (default: `~/.skillmeat`) |
-| `SKILLMEAT_CONFIG` | Config file path |
-| `GITHUB_TOKEN` | GitHub API token |
-| `NO_COLOR` | Disable colored output |
+If memory help fails, switch to API fallback mode and tell the user.

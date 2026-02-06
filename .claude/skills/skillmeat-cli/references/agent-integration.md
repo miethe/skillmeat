@@ -35,6 +35,48 @@ When an agent identifies a capability gap or receives a task requiring specializ
 
 ---
 
+## Memory Context Integration Pattern
+
+Use this pattern when the task benefits from prior project learnings or when a run produced reusable lessons.
+
+```
+1. PRE-RUN CONSUME
+   - Identify project
+   - Preview/generate context pack (module + token budget)
+   - Include pack in task execution context
+
+2. EXECUTE TASK
+   - Implement/debug as normal
+
+3. POST-RUN CAPTURE
+   - Extract candidate memories from run notes/logs
+   - Keep candidates in review status (no auto-promotion)
+
+4. TRIAGE
+   - Promote validated items
+   - Deprecate low-signal items
+   - Merge near-duplicates
+```
+
+### Preferred CLI (Target)
+
+```bash
+skillmeat memory pack preview --project <project> --module <module-id> --budget 4000 --json
+skillmeat memory pack generate --project <project> --module <module-id> --output ./context-pack.md
+skillmeat memory extract preview --project <project> --run-log ./run.log --profile balanced
+skillmeat memory extract apply --project <project> --run-log ./run.log --min-confidence 0.65
+```
+
+### API Fallback (Current-Compatible)
+
+- `POST /api/v1/context-packs/preview`
+- `POST /api/v1/context-packs/generate`
+- `POST /api/v1/memory-items` and lifecycle endpoints
+
+If CLI memory commands are missing, state fallback mode explicitly.
+
+---
+
 ## Decision Tree: When to Check for Artifacts
 
 ### ALWAYS Check When:

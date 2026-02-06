@@ -1,266 +1,179 @@
 ---
 name: skillmeat-cli
 description: |
-  Manage Claude Code environments using natural language. Use this skill when:
-  - User wants to add, deploy, or manage Claude Code artifacts (skills, commands, agents, MCP servers)
-  - User asks about available skills or capabilities ("what skills exist for X?")
-  - User wants to search for artifacts to solve a problem ("I need something for PDF processing")
-  - Agent needs to discover or deploy capabilities for a development task
-  - User wants to create, import, or share artifact bundles
-  - User mentions "skillmeat", "claudectl", or managing their Claude Code setup
-  Supports conversational requests and the claudectl power-user alias.
+  Manage SkillMeat and Claude Code environments through natural language.
+  Use this skill when users want to:
+  - discover, add, deploy, or manage Claude Code artifacts
+  - manage Memory & Context features (memory items, modules, context packs)
+  - automate pre-run context generation and post-run memory capture
+  - navigate project and memory workflows in CLI/web/API
+  Supports both current commands and planned `skillmeat memory ...` CLI flows.
 ---
 
 # SkillMeat CLI Skill
 
-Natural language interface for managing Claude Code artifacts and environments.
+Natural language interface for SkillMeat operations, including artifact management and Memory & Context workflows.
 
-## Quick Start
+## Core Operating Principle
 
-### Common Operations
+When memory features are requested, prefer the `skillmeat memory ...` CLI surface.
 
-| User Says | What Happens |
-|-----------|--------------|
-| "Add the PDF skill" | Adds `ms-office-suite:pdf` to collection |
-| "Deploy canvas to this project" | Deploys canvas-design skill to `.claude/skills/` |
-| "What skills do I have?" | Lists artifacts in current collection |
-| "Search for database skills" | Searches all sources for database-related skills |
-| "Update all my skills" | Syncs collection with upstream sources |
-| "Remove the xlsx skill" | Removes artifact from collection |
+If the command is unavailable in the current installation:
+1. Detect this quickly (`skillmeat memory --help` or command failure).
+2. Fall back to equivalent API endpoints.
+3. Tell the user you used API fallback and why.
 
-### For AI Agents
-
-When you identify a capability gap during development:
-
-1. **Search** for relevant artifacts (don't announce this)
-2. **Suggest** to user: "This task would benefit from the X skill. Would you like me to add it?"
-3. **Wait** for explicit permission before deploying
-4. **Deploy** only what was approved
-
-**Never auto-deploy artifacts without user permission.**
+Do not pretend unavailable CLI commands succeeded.
 
 ---
 
-## Workflows
+## Main Capability Areas
 
-### Discovery: Finding Artifacts
+- Artifact discovery/deployment (`search`, `add`, `deploy`, `sync`, `bundle`, etc.)
+- Memory item lifecycle management
+- Context module composition
+- Context pack preview/generation
+- Auto-extraction preview/apply from run artifacts
+- Project/global memory visibility workflows
 
-When user needs a capability or asks what's available:
+---
+
+## Memory Command Model (Target)
+
+### Item Lifecycle
 
 ```bash
-# Search all sources
-skillmeat search "<query>" --type skill
-
-# Search with JSON output (for parsing)
-skillmeat search "<query>" --type skill --json
-
-# List what's in collection
-skillmeat list --type skill
-
-# Show artifact details
-skillmeat show <artifact-name>
+skillmeat memory item create --project <project> --type decision --content "..."
+skillmeat memory item list --project <project> --status candidate
+skillmeat memory item show <item-id>
+skillmeat memory item update <item-id> --confidence 0.9
+skillmeat memory item promote <item-id> --reason "validated"
+skillmeat memory item deprecate <item-id> --reason "superseded"
+skillmeat memory item merge --source <id> --target <id> --strategy combine
+skillmeat memory item bulk-promote --ids <id1,id2>
 ```
 
-**Artifact Types**: `skill`, `command`, `agent`, `mcp`, `hook`
+### Module Composition
 
-**Common Sources**:
-- `anthropics/skills/*` - Official Anthropic skills
-- `anthropics/example-skills/*` - Example/template skills
-- Community sources (user-configured)
-
-### Deployment: Adding Artifacts
-
-When user wants to add or deploy an artifact:
-
-**Step 1: Add to Collection**
 ```bash
-# Add from official source
-skillmeat add skill anthropics/skills/canvas-design
-
-# Add specific version
-skillmeat add skill anthropics/skills/canvas-design@v1.0.0
-
-# Add from any GitHub repo
-skillmeat add skill username/repo/path/to/skill
+skillmeat memory module create --project <project> --name "API Debug"
+skillmeat memory module list --project <project>
+skillmeat memory module add-item <module-id> --item <item-id>
+skillmeat memory module remove-item <module-id> --item <item-id>
 ```
 
-**Step 2: Deploy to Project**
+### Pack Consumption
+
 ```bash
-# Deploy to current project
-skillmeat deploy <artifact-name>
-
-# Deploy to specific project
-skillmeat deploy <artifact-name> --project /path/to/project
-
-# Check what's deployed
-skillmeat list --project .
+skillmeat memory pack preview --project <project> --module <module-id> --budget 4000 --json
+skillmeat memory pack generate --project <project> --module <module-id> --output ./context-pack.md
 ```
 
-### Management: Updating & Removing
+### Auto-Extraction
 
 ```bash
-# Check for updates
-skillmeat diff <artifact-name>
-
-# Update specific artifact
-skillmeat update <artifact-name>
-
-# Update all artifacts
-skillmeat sync --all
-
-# Remove from collection
-skillmeat remove <artifact-name>
-
-# Undeploy from project
-skillmeat undeploy <artifact-name> --project .
+skillmeat memory extract preview --project <project> --run-log ./run.log
+skillmeat memory extract apply --project <project> --run-log ./run.log
 ```
 
-### Bundles: Sharing Setups
+### Search
 
 ```bash
-# Create bundle from current collection
-skillmeat bundle create my-setup
-
-# Sign bundle for distribution
-skillmeat sign create my-setup.zip
-
-# Import bundle
-skillmeat bundle import setup.zip
-
-# Verify bundle signature
-skillmeat sign verify setup.zip
+skillmeat memory search "oauth timeout" --project <project>
+skillmeat memory search "postgres lock" --all-projects
 ```
 
 ---
 
-## claudectl Alias
+## API Fallback Map (When CLI Memory Commands Are Missing)
 
-Power users can use `claudectl` for simplified commands with smart defaults:
+- Item CRUD/lifecycle/merge:
+  - `/api/v1/memory-items`
+  - `/api/v1/memory-items/{id}/promote`
+  - `/api/v1/memory-items/{id}/deprecate`
+  - `/api/v1/memory-items/merge`
+- Module management:
+  - `/api/v1/context-modules`
+- Pack operations:
+  - `/api/v1/context-packs/preview`
+  - `/api/v1/context-packs/generate`
+
+Use project scoping explicitly (`project_id` query) to avoid cross-project mistakes.
+
+---
+
+## Agent Workflows
+
+## 1) Pre-Run Context Consumption
+
+When user starts a substantial task:
+
+1. Determine project scope.
+2. Preview memory pack for relevant module.
+3. If utilization is poor, adjust filters/budget.
+4. Generate pack and provide/attach result.
+
+Prompt pattern:
+- "I can generate a context pack from your active memories before we start."
+
+## 2) Post-Run Memory Capture
+
+After significant implementation/debugging:
+
+1. Offer extraction from run notes/logs.
+2. Create candidates only.
+3. Route user to triage (or summarize candidates in CLI).
+
+Prompt pattern:
+- "I can extract candidate memories from this run and queue them for review."
+
+## 3) Triage Loop
+
+- Promote high-confidence validated learnings.
+- Deprecate stale/incorrect entries.
+- Merge near-duplicates with explicit confirmation.
+
+---
+
+## Permission & Safety Protocol
+
+- Ask before mutating memory state in bulk.
+- Ask before applying extraction (preview can run without mutation).
+- For merges, show source/target and selected strategy before execution.
+- Never auto-promote extracted candidates in unattended mode.
+
+---
+
+## Suggestion Guidelines
+
+Use concise value framing:
+
+```
+This workflow can benefit from Memory Context.
+I can:
+1) generate a pack for this task,
+2) run capture after completion,
+3) leave extracted items in candidate status for review.
+Proceed?
+```
+
+---
+
+## Quick Checks
+
+Before memory operations:
 
 ```bash
-claudectl add pdf              # → skillmeat add skill anthropics/skills/pdf
-claudectl deploy pdf           # → skillmeat deploy pdf --project .
-claudectl search database      # → skillmeat search database --type skill
-claudectl status               # → skillmeat list --project . --json
-claudectl sync                 # → skillmeat sync --all
-claudectl bundle my-setup      # → skillmeat bundle create my-setup
+skillmeat --version
+skillmeat memory --help
 ```
 
-### Setup claudectl
-
-Add to `~/.bashrc` or `~/.zshrc`:
-```bash
-alias claudectl='skillmeat'
-```
-
-Or for smart defaults wrapper, see [claudectl-setup.md](./references/claudectl-setup.md).
+If memory commands unavailable, switch to API fallback and state it.
 
 ---
 
-## AI Agent Guidelines
+## Related References
 
-### When to Suggest Artifacts
-
-**DO suggest** when:
-- User explicitly asks about capabilities
-- Clear capability gap identified (e.g., "process this PDF" but no PDF skill)
-- User asks for help with a task that has a well-known skill
-
-**DON'T suggest** when:
-- Task can be completed without additional skills
-- User is in the middle of focused work
-- Suggestion would be redundant (skill already deployed)
-
-### Suggestion Format
-
-```
-I notice this task involves [capability]. The [artifact-name] skill
-could help with this. Would you like me to add it to the project?
-
-It provides: [brief description]
-Source: [source path]
-```
-
-### Permission Protocol
-
-1. **Always ask** before deploying
-2. **Show what will change** (files to be created)
-3. **Confirm success** after deployment
-4. **Suggest related artifacts** only if relevant
-
----
-
-## Command Reference
-
-For complete command documentation, see [command-quick-reference.md](./references/command-quick-reference.md).
-
-### Most Used Commands
-
-| Command | Purpose |
-|---------|---------|
-| `skillmeat search <query>` | Find artifacts |
-| `skillmeat add <type> <source>` | Add to collection |
-| `skillmeat deploy <name>` | Deploy to project |
-| `skillmeat list` | List in collection |
-| `skillmeat list --project .` | List deployed in project |
-| `skillmeat show <name>` | Show artifact details |
-| `skillmeat sync` | Sync with upstream |
-| `skillmeat remove <name>` | Remove from collection |
-
-### Artifact Resolution
-
-The skill resolves fuzzy names to full identifiers:
-
-| User Says | Resolves To |
-|-----------|-------------|
-| "pdf" | `ms-office-suite:pdf` or `example-skills:pdf` |
-| "canvas" | `canvas-design` |
-| "xlsx" | `ms-office-suite:xlsx` |
-| "docx" | `ms-office-suite:docx` |
-
-When ambiguous, present options and ask user to choose.
-
----
-
-## Project Context Analysis
-
-When recommending artifacts, analyze project context:
-
-| Project Indicator | Recommended Artifacts |
-|-------------------|----------------------|
-| `package.json` with React | `frontend-design`, `webapp-testing` |
-| `pyproject.toml` | Python-related skills |
-| FastAPI imports | `openapi-expert`, backend skills |
-| `.claude/` directory | Check what's already deployed |
-| `tests/` directory | Testing-related skills |
-
-See [analyze-project.js](./scripts/analyze-project.js) for analysis script.
-
----
-
-## Error Handling
-
-### Common Issues
-
-| Error | Solution |
-|-------|----------|
-| "Artifact not found" | Check spelling, try `search` first |
-| "Already in collection" | Use `deploy` to deploy existing artifact |
-| "Permission denied" | Check directory permissions |
-| "Rate limited" | Set GitHub token: `skillmeat config set github-token <token>` |
-
-### Getting Help
-
-```bash
-skillmeat --help              # General help
-skillmeat <command> --help    # Command-specific help
-skillmeat web doctor          # Diagnose environment issues
-```
-
----
-
-## Related Skills
-
-- **skill-builder**: Create new skills
-- **skill-creator**: Design skill workflows
-- **chrome-devtools**: Browser automation (example of CLI wrapper skill)
+- `./references/command-quick-reference.md`
+- `./references/agent-integration.md`
+- `./workflows/memory-context-workflow.md`
