@@ -510,9 +510,10 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-xs">
                               <p>
-                                Enable this if the repository itself is a single Claude Code artifact
-                                (e.g., a skill with SKILL.md at the root). This bypasses automatic
-                                detection and treats the entire repo as one artifact of the selected type.
+                                Enable this if the repository itself is a single Claude Code
+                                artifact (e.g., a skill with SKILL.md at the root). This bypasses
+                                automatic detection and treats the entire repo as one artifact of
+                                the selected type.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -624,9 +625,9 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
                               <TooltipContent side="top" className="max-w-xs">
                                 <p>
                                   Indexes the full text content of artifact files (code,
-                                  documentation, etc.) for deeper search capabilities. This uses more
-                                  storage and processing time. Only enable if you need to search
-                                  within artifact file contents.
+                                  documentation, etc.) for deeper search capabilities. This uses
+                                  more storage and processing time. Only enable if you need to
+                                  search within artifact file contents.
                                 </p>
                               </TooltipContent>
                             </Tooltip>

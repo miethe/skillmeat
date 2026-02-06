@@ -10,17 +10,16 @@ import type { ContextEntityInfo } from './ContextEntityInfo';
  * separated by auto-loading behavior for progressive disclosure.
  */
 export type ContextMapResponse = {
-    /**
-     * Entities that auto-load based on path patterns
-     */
-    auto_loaded?: Array<ContextEntityInfo>;
-    /**
-     * Entities that load on-demand (context files)
-     */
-    on_demand?: Array<ContextEntityInfo>;
-    /**
-     * Total estimated tokens for all auto-loaded entities
-     */
-    total_auto_load_tokens: number;
+  /**
+   * Entities that auto-load based on path patterns
+   */
+  auto_loaded?: Array<ContextEntityInfo>;
+  /**
+   * Entities that load on-demand (context files)
+   */
+  on_demand?: Array<ContextEntityInfo>;
+  /**
+   * Total estimated tokens for all auto-loaded entities
+   */
+  total_auto_load_tokens: number;
 };
-

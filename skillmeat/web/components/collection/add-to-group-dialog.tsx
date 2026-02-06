@@ -17,12 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   useGroups,
   useAddArtifactToGroup,
@@ -312,7 +307,11 @@ export function AddToGroupDialog({
   };
 
   const handleClose = () => {
-    if (!addArtifactToGroup.isPending && !createGroup.isPending && !removeArtifactFromGroup.isPending) {
+    if (
+      !addArtifactToGroup.isPending &&
+      !createGroup.isPending &&
+      !removeArtifactFromGroup.isPending
+    ) {
       onOpenChange(false);
     }
   };
@@ -536,7 +535,8 @@ export function AddToGroupDialog({
                 </div>
                 <div className="space-y-1 p-2">
                   {groups.map((group) => {
-                    const isAlreadyInGroup = existingGroups?.some((g) => g.id === group.id) ?? false;
+                    const isAlreadyInGroup =
+                      existingGroups?.some((g) => g.id === group.id) ?? false;
                     const isRemoving = isRemovePending && removingGroupId === group.id;
 
                     return (

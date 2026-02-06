@@ -111,10 +111,7 @@ function EditableTagBadge({ tag, onRemove, disabled }: EditableTagBadgeProps) {
   return (
     <Badge
       colorStyle={color}
-      className={cn(
-        'group gap-1 pr-1 text-xs transition-all',
-        !disabled && 'hover:pr-0.5'
-      )}
+      className={cn('group gap-1 pr-1 text-xs transition-all', !disabled && 'hover:pr-0.5')}
     >
       {tag}
       {!disabled && (
@@ -311,12 +308,7 @@ export function TagEditor({
       aria-label="Tag editor"
     >
       {tags.map((tag) => (
-        <EditableTagBadge
-          key={tag}
-          tag={tag}
-          onRemove={handleRemoveTag}
-          disabled={disabled}
-        />
+        <EditableTagBadge key={tag} tag={tag} onRemove={handleRemoveTag} disabled={disabled} />
       ))}
       <AddTagPopover
         availableTags={availableTags}

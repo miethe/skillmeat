@@ -9,9 +9,8 @@
  * including all artifacts from the source group.
  */
 export type CopyGroupRequest = {
-    /**
-     * ID of the collection to copy the group to
-     */
-    target_collection_id: string;
+  /**
+   * ID of the collection to copy the group to
+   */
+  target_collection_id: string;
 };
-

@@ -9,11 +9,7 @@
 
 import { useState, useCallback, memo } from 'react';
 import { ChevronRight, Sparkles, Terminal, Bot, Server, Anchor } from 'lucide-react';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { ArtifactCompactCard } from './artifact-compact-card';
 import type { CatalogEntry, ArtifactType } from '@/types/marketplace';
@@ -48,11 +44,14 @@ export interface ArtifactTypeSectionProps {
 /**
  * Icon and label configuration for each artifact type.
  */
-const typeConfig: Record<ArtifactType, {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  pluralLabel: string;
-}> = {
+const typeConfig: Record<
+  ArtifactType,
+  {
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    pluralLabel: string;
+  }
+> = {
   skill: { icon: Sparkles, label: 'Skill', pluralLabel: 'Skills' },
   command: { icon: Terminal, label: 'Command', pluralLabel: 'Commands' },
   agent: { icon: Bot, label: 'Agent', pluralLabel: 'Agents' },
@@ -92,10 +91,7 @@ function ArtifactTypeSectionComponent({
   void _onExclude;
 
   // Memoize import handler factory to provide stable callbacks
-  const handleImport = useCallback(
-    (entry: CatalogEntry) => () => onImport(entry),
-    [onImport]
-  );
+  const handleImport = useCallback((entry: CatalogEntry) => () => onImport(entry), [onImport]);
 
   // Memoize click handler factory to provide stable callbacks
   const handleClick = useCallback(
@@ -140,7 +136,9 @@ function ArtifactTypeSectionComponent({
           <span className="text-sm font-medium">{config.pluralLabel}</span>
 
           {/* Count Badge - aria-hidden since count is in aria-label */}
-          <span className="text-sm text-muted-foreground" aria-hidden="true">({artifacts.length})</span>
+          <span className="text-sm text-muted-foreground" aria-hidden="true">
+            ({artifacts.length})
+          </span>
         </button>
       </CollapsibleTrigger>
 

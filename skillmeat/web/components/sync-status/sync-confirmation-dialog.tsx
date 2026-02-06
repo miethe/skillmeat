@@ -25,21 +25,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle2,
-  ArrowDown,
-  ArrowUp,
-  Upload,
-} from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, ArrowDown, ArrowUp, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Artifact } from '@/types/artifact';
 import type { ConflictCheckDirection } from '@/hooks';
@@ -208,8 +196,8 @@ export function SyncConfirmationDialog({
             <Alert variant="destructive" className="m-4">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Failed to load diff: {error.message || 'An unexpected error occurred.'}
-                {' '}Please close the dialog and try again.
+                Failed to load diff: {error.message || 'An unexpected error occurred.'} Please close
+                the dialog and try again.
               </AlertDescription>
             </Alert>
           )}

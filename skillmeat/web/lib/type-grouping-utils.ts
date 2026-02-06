@@ -15,17 +15,15 @@ const TYPE_DISPLAY_ORDER: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 
 /**
  * Type display metadata mapping
  */
-const TYPE_DISPLAY_INFO: Record<
-  ArtifactType,
-  { label: string; plural: string; iconName: string }
-> = {
-  skill: { label: 'Skill', plural: 'Skills', iconName: 'Sparkles' },
-  command: { label: 'Command', plural: 'Commands', iconName: 'Terminal' },
-  agent: { label: 'Agent', plural: 'Agents', iconName: 'Bot' },
-  mcp: { label: 'MCP Server', plural: 'MCP Servers', iconName: 'Server' },
-  mcp_server: { label: 'MCP Server', plural: 'MCP Servers', iconName: 'Server' }, // Alias
-  hook: { label: 'Hook', plural: 'Hooks', iconName: 'Anchor' },
-};
+const TYPE_DISPLAY_INFO: Record<ArtifactType, { label: string; plural: string; iconName: string }> =
+  {
+    skill: { label: 'Skill', plural: 'Skills', iconName: 'Sparkles' },
+    command: { label: 'Command', plural: 'Commands', iconName: 'Terminal' },
+    agent: { label: 'Agent', plural: 'Agents', iconName: 'Bot' },
+    mcp: { label: 'MCP Server', plural: 'MCP Servers', iconName: 'Server' },
+    mcp_server: { label: 'MCP Server', plural: 'MCP Servers', iconName: 'Server' }, // Alias
+    hook: { label: 'Hook', plural: 'Hooks', iconName: 'Anchor' },
+  };
 
 /**
  * Group artifacts by their type for display.

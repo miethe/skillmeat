@@ -8,13 +8,12 @@
  * Used to approve or reject a path segment for tag creation.
  */
 export type UpdateSegmentStatusRequest = {
-    /**
-     * Original segment value to update
-     */
-    segment: string;
-    /**
-     * New status (approved or rejected)
-     */
-    status: 'approved' | 'rejected';
+  /**
+   * Original segment value to update
+   */
+  segment: string;
+  /**
+   * New status (approved or rejected)
+   */
+  status: 'approved' | 'rejected';
 };
-

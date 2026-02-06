@@ -282,6 +282,54 @@ cache_entries_total = Gauge(
 )
 
 # =============================================================================
+# Memory & Context Intelligence Metrics
+# =============================================================================
+
+memory_items_total = Gauge(
+    "skillmeat_memory_items_total",
+    "Total memory items by status and type",
+    ["status", "type"],
+)
+
+memory_operations_total = Counter(
+    "skillmeat_memory_operations_total",
+    "Total memory operations",
+    ["operation", "status"],
+)
+
+memory_operation_duration = Histogram(
+    "skillmeat_memory_operation_duration_seconds",
+    "Memory operation duration in seconds",
+    ["operation"],
+    buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0],
+)
+
+context_pack_generation_duration = Histogram(
+    "skillmeat_context_pack_generation_duration_seconds",
+    "Context pack generation duration in seconds",
+    ["mode"],
+    buckets=[0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
+)
+
+context_pack_token_utilization = Histogram(
+    "skillmeat_context_pack_token_utilization",
+    "Context pack token budget utilization ratio (0-1)",
+    buckets=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0],
+)
+
+context_pack_items_selected = Histogram(
+    "skillmeat_context_pack_items_selected",
+    "Number of items included in context packs",
+    buckets=[1, 5, 10, 20, 50, 100, 200, 500],
+)
+
+memory_inbox_size = Gauge(
+    "skillmeat_memory_inbox_size",
+    "Number of candidate memory items awaiting review",
+    ["project_id"],
+)
+
+# =============================================================================
 # Application Info
 # =============================================================================
 

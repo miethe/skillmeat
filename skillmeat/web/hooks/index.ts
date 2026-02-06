@@ -498,11 +498,28 @@ export { versionKeys, useVersionGraph } from './useVersionGraph';
  *   return <Button onClick={navigateBack}>Return to {returnToLabel}</Button>
  * }
  */
+export { useReturnTo, type UseReturnToOptions, type UseReturnToReturn } from './use-return-to';
+
+// ============================================================================
+// MEMORY ITEMS (12 hooks)
+// ============================================================================
+// Memory item CRUD, lifecycle, bulk operations, merge, and selection
 export {
-  useReturnTo,
-  type UseReturnToOptions,
-  type UseReturnToReturn,
-} from './use-return-to';
+  memoryItemKeys,
+  useMemoryItems,
+  useMemoryItem,
+  useMemoryItemCounts,
+  useCreateMemoryItem,
+  useUpdateMemoryItem,
+  useDeleteMemoryItem,
+  usePromoteMemoryItem,
+  useDeprecateMemoryItem,
+  useBulkPromoteMemoryItems,
+  useBulkDeprecateMemoryItems,
+  useMergeMemoryItems,
+  useMemorySelection,
+  type MemoryItemFilters,
+} from './use-memory-items';
 
 // ============================================================================
 // CONTEXT HOOKS
@@ -519,3 +536,37 @@ export { useCollectionContext } from './use-collection-context';
  * Manages entity creation, updates, and deletion in React context
  */
 export { EntityLifecycleProvider, useEntityLifecycle } from './useEntityLifecycle';
+
+// ============================================================================
+// CONTEXT MODULES (8 hooks)
+// ============================================================================
+// Context module CRUD, memory association, and listing
+export {
+  contextModuleKeys,
+  useContextModules,
+  useContextModule,
+  useModuleMemories,
+  useCreateContextModule,
+  useUpdateContextModule,
+  useDeleteContextModule,
+  useAddMemoryToModule,
+  useRemoveMemoryFromModule,
+} from './use-context-modules';
+
+// ============================================================================
+// CONTEXT PACKS (2 hooks)
+// ============================================================================
+// Context pack preview and generation
+export {
+  usePreviewContextPack,
+  useGenerateContextPack,
+} from './use-context-packs';
+
+// ============================================================================
+// KEYBOARD SHORTCUTS (1 hook)
+// ============================================================================
+// Container-scoped keyboard shortcut handler for triage workflows
+export {
+  useKeyboardShortcuts,
+  type KeyboardShortcutActions,
+} from './use-keyboard-shortcuts';

@@ -315,9 +315,7 @@ function generateMockHistory(artifact: Artifact): HistoryEntry[] {
     });
   }
 
-  return history.sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  );
+  return history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }
 
 /**
@@ -444,11 +442,7 @@ export function ArtifactOperationsModal({
   // Auto-detect project for diff when artifact has deployments
   const deployments = artifact?.deployments;
   useEffect(() => {
-    if (
-      !selectedProjectForDiff &&
-      deployments &&
-      deployments.length > 0
-    ) {
+    if (!selectedProjectForDiff && deployments && deployments.length > 0) {
       const firstProjectPath = deployments[0]?.project_path;
       if (firstProjectPath) {
         setSelectedProjectForDiff(firstProjectPath);
@@ -519,8 +513,7 @@ export function ArtifactOperationsModal({
     })),
   });
 
-  const isDeploymentsLoading =
-    isProjectsLoading || deploymentQueries.some((q) => q.isLoading);
+  const isDeploymentsLoading = isProjectsLoading || deploymentQueries.some((q) => q.isLoading);
 
   const allDeployments = useMemo((): ArtifactDeploymentInfo[] => {
     if (!projects || projects.length === 0) return [];
@@ -619,10 +612,7 @@ export function ArtifactOperationsModal({
 
         for (const source of allSources) {
           const repoPattern = `${source.owner}/${source.repo_name}`;
-          if (
-            artifactSource.includes(repoPattern) ||
-            artifactSource.includes(source.repo_url)
-          ) {
+          if (artifactSource.includes(repoPattern) || artifactSource.includes(source.repo_url)) {
             try {
               const catalogResponse = await apiRequest<{
                 items: Array<{ name: string; artifact_type: string; path: string }>;
@@ -700,10 +690,7 @@ export function ArtifactOperationsModal({
 
   const encodeProjectId = (projectPath: string): string => btoa(projectPath);
 
-  const handleDeploymentRemove = async (
-    deployment: Deployment,
-    removeFiles: boolean
-  ) => {
+  const handleDeploymentRemove = async (deployment: Deployment, removeFiles: boolean) => {
     if (!artifact) return;
 
     try {
@@ -853,9 +840,7 @@ export function ArtifactOperationsModal({
               {artifact.upstream?.updateAvailable && (
                 <Alert>
                   <GitBranch className="h-4 w-4" />
-                  <AlertDescription>
-                    A newer version is available upstream.
-                  </AlertDescription>
+                  <AlertDescription>A newer version is available upstream.</AlertDescription>
                 </Alert>
               )}
             </CardContent>
@@ -905,21 +890,18 @@ export function ArtifactOperationsModal({
             </CardHeader>
             <CardContent>
               {artifactDeployments.length > 0 ? (
-                <DeploymentBadgeStack
-                  deployments={artifact.deployments || []}
-                  maxBadges={5}
-                />
+                <DeploymentBadgeStack deployments={artifact.deployments || []} maxBadges={5} />
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  Not deployed to any projects yet.
-                </p>
+                <p className="text-sm text-muted-foreground">Not deployed to any projects yet.</p>
               )}
               <div className="mt-4 flex justify-end">
                 <DeployButton
                   artifact={artifact}
-                  existingDeploymentPaths={artifactDeployments.map(d => `${d.project_path}/${d.artifact_path}`)}
+                  existingDeploymentPaths={artifactDeployments.map(
+                    (d) => `${d.project_path}/${d.artifact_path}`
+                  )}
                   onDeploySuccess={() => {
-                    projects?.forEach(p => {
+                    projects?.forEach((p) => {
                       queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
                     });
                   }}
@@ -952,20 +934,18 @@ export function ArtifactOperationsModal({
               </Button>
               <DeployButton
                 artifact={artifact}
-                existingDeploymentPaths={artifactDeployments.map(d => `${d.project_path}/${d.artifact_path}`)}
+                existingDeploymentPaths={artifactDeployments.map(
+                  (d) => `${d.project_path}/${d.artifact_path}`
+                )}
                 onDeploySuccess={() => {
-                  projects?.forEach(p => {
+                  projects?.forEach((p) => {
                     queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
                   });
                 }}
                 variant="outline"
                 size="sm"
               />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleTabChange('history')}
-              >
+              <Button variant="outline" size="sm" onClick={() => handleTabChange('history')}>
                 <History className="mr-2 h-4 w-4" />
                 View History
               </Button>
@@ -1069,9 +1049,7 @@ export function ArtifactOperationsModal({
                   <Skeleton className="h-4 w-1/2" />
                 </div>
               ) : filesError ? (
-                <div className="p-3 text-sm text-destructive">
-                  Failed to load files
-                </div>
+                <div className="p-3 text-sm text-destructive">Failed to load files</div>
               ) : (
                 <FileTree
                   entityId={artifact.id}
@@ -1130,9 +1108,11 @@ export function ArtifactOperationsModal({
             </h3>
             <DeployButton
               artifact={artifact}
-              existingDeploymentPaths={artifactDeployments.map(d => `${d.project_path}/${d.artifact_path}`)}
+              existingDeploymentPaths={artifactDeployments.map(
+                (d) => `${d.project_path}/${d.artifact_path}`
+              )}
               onDeploySuccess={() => {
-                projects?.forEach(p => {
+                projects?.forEach((p) => {
                   queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
                 });
               }}
@@ -1157,7 +1137,7 @@ export function ArtifactOperationsModal({
                 <DeployButton
                   artifact={artifact}
                   onDeploySuccess={() => {
-                    projects?.forEach(p => {
+                    projects?.forEach((p) => {
                       queryClient.invalidateQueries({ queryKey: deploymentKeys.list(p.path) });
                     });
                   }}
@@ -1181,9 +1161,7 @@ export function ArtifactOperationsModal({
                       syncEntity(artifact.id, deployment.project_path);
                     }
                   }}
-                  onRemove={(removeFiles) =>
-                    handleDeploymentRemove(deployment, removeFiles)
-                  }
+                  onRemove={(removeFiles) => handleDeploymentRemove(deployment, removeFiles)}
                 />
               ))}
             </div>
@@ -1212,9 +1190,7 @@ export function ArtifactOperationsModal({
                 <Github className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
                 <div className="flex-1">
                   <div className="font-medium">{sourceEntry.sourceName}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {sourceEntry.entryPath}
-                  </div>
+                  <div className="text-sm text-muted-foreground">{sourceEntry.entryPath}</div>
                   {artifact.version && (
                     <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
                       <Tag className="h-3 w-3" aria-hidden="true" />

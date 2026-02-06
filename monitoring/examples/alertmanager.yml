@@ -1,0 +1,85 @@
+# Example Alertmanager configuration for SkillMeat alerts
+# See monitoring/README.md for deployment instructions
+
+global:
+  resolve_timeout: 5m
+
+# Alert routing
+route:
+  receiver: 'default'
+  group_by: ['alertname', 'system', 'severity']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  routes:
+    # Route critical memory system alerts to PagerDuty
+    - match:
+        system: memory-context
+        severity: critical
+      receiver: 'pagerduty-critical'
+      continue: true
+
+    # Route warning memory system alerts to Slack
+    - match:
+        system: memory-context
+        severity: warning
+      receiver: 'slack-warnings'
+
+    # Route info memory system alerts to logs only
+    - match:
+        system: memory-context
+        severity: info
+      receiver: 'null'
+
+receivers:
+  # Default receiver (logs only)
+  - name: 'default'
+
+  # Null receiver (discard)
+  - name: 'null'
+
+  # PagerDuty receiver for critical alerts
+  - name: 'pagerduty-critical'
+    pagerduty_configs:
+      - service_key: '<YOUR_PAGERDUTY_SERVICE_KEY>'
+        description: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        client: 'SkillMeat Monitoring'
+        client_url: 'https://your-grafana.com/d/memory-context'
+        details:
+          severity: '{{ .CommonLabels.severity }}'
+          component: '{{ .CommonLabels.component }}'
+          runbook: '{{ range .Alerts }}{{ .Annotations.runbook }}{{ end }}'
+
+  # Slack receiver for warning alerts
+  - name: 'slack-warnings'
+    slack_configs:
+      - api_url: '<YOUR_SLACK_WEBHOOK_URL>'
+        channel: '#skillmeat-alerts'
+        username: 'SkillMeat Alertmanager'
+        icon_emoji: ':warning:'
+        title: 'Memory System Alert - {{ .CommonLabels.severity }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }}
+          *Severity:* {{ .Labels.severity }}
+          *Component:* {{ .Labels.component }}
+          *Description:* {{ .Annotations.description }}
+          *Runbook:* {{ .Annotations.runbook }}
+          {{ end }}
+        send_resolved: true
+
+# Inhibition rules (suppress alerts)
+inhibit_rules:
+  # Suppress warning alerts when critical alert is firing for same component
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'component']
+
+  # Suppress specific alerts when service is down
+  - source_match:
+      alertname: 'MemorySystemUnhealthy'
+    target_match_re:
+      alertname: 'Memory.*'
+    equal: ['system']

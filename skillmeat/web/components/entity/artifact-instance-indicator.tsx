@@ -102,10 +102,7 @@ function getInstanceLevel(artifact: Artifact): keyof typeof INSTANCE_LEVELS {
  * @param props - ArtifactInstanceIndicatorProps configuration
  * @returns Badge component with instance level indicator
  */
-export function ArtifactInstanceIndicator({
-  artifact,
-  className
-}: ArtifactInstanceIndicatorProps) {
+export function ArtifactInstanceIndicator({ artifact, className }: ArtifactInstanceIndicatorProps) {
   const level = getInstanceLevel(artifact);
   const config = INSTANCE_LEVELS[level];
   const Icon = config.icon;
@@ -114,17 +111,9 @@ export function ArtifactInstanceIndicator({
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div
-            className={cn(
-              'absolute top-3 right-3 z-10',
-              className
-            )}
-          >
+          <div className={cn('absolute right-3 top-3 z-10', className)}>
             <Badge
-              className={cn(
-                'font-medium text-xs px-2 py-1 shadow-sm',
-                config.colorClass
-              )}
+              className={cn('px-2 py-1 text-xs font-medium shadow-sm', config.colorClass)}
               aria-label={`Instance level: ${config.label}`}
             >
               <Icon className="mr-1.5 h-3 w-3" />
@@ -137,9 +126,7 @@ export function ArtifactInstanceIndicator({
             <Icon className="mt-0.5 h-4 w-4 text-muted-foreground" />
             <div>
               <p className="font-medium">{config.label}</p>
-              <p className="text-xs text-muted-foreground max-w-48">
-                {config.description}
-              </p>
+              <p className="max-w-48 text-xs text-muted-foreground">{config.description}</p>
             </div>
           </div>
         </TooltipContent>
@@ -153,20 +140,11 @@ export function ArtifactInstanceIndicator({
  *
  * Displays a placeholder while artifact data is being fetched.
  */
-export function ArtifactInstanceIndicatorSkeleton({
-  className
-}: {
-  className?: string
-}) {
+export function ArtifactInstanceIndicatorSkeleton({ className }: { className?: string }) {
   return (
-    <div
-      className={cn(
-        'absolute top-3 right-3 z-10',
-        className
-      )}
-    >
+    <div className={cn('absolute right-3 top-3 z-10', className)}>
       <div className="inline-flex animate-pulse items-center rounded-md border bg-muted px-2 py-1">
-        <div className="mr-1.5 h-3 w-3 bg-muted-foreground/20 rounded" />
+        <div className="mr-1.5 h-3 w-3 rounded bg-muted-foreground/20" />
         <span className="text-xs opacity-0">Collection</span>
       </div>
     </div>

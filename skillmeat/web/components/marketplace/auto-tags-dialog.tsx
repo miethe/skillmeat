@@ -289,15 +289,9 @@ export function AutoTagsDialog({ open, onOpenChange, sourceId }: AutoTagsDialogP
             <>
               {/* Summary */}
               <div className="mb-4 flex items-center gap-4 text-sm text-muted-foreground">
-                {pendingCount > 0 && (
-                  <span>
-                    {pendingCount} pending review
-                  </span>
-                )}
+                {pendingCount > 0 && <span>{pendingCount} pending review</span>}
                 {approvedCount > 0 && (
-                  <span className="text-green-600">
-                    {approvedCount} approved
-                  </span>
+                  <span className="text-green-600">{approvedCount} approved</span>
                 )}
               </div>
 

@@ -5,7 +5,12 @@
  * displayed in the folder detail pane. Filters are AND conditions.
  */
 
-import type { CatalogEntry, CatalogFilters, ArtifactType, CatalogStatus } from '@/types/marketplace';
+import type {
+  CatalogEntry,
+  CatalogFilters,
+  ArtifactType,
+  CatalogStatus,
+} from '@/types/marketplace';
 import { DEFAULT_LEAF_CONTAINERS } from '@/hooks/use-detection-patterns';
 
 /**
@@ -315,9 +320,7 @@ export function getDisplayArtifactsForFolder(
       // segments = ["skills", "commands"]
       // All must be leaf containers for the artifact to be promoted
 
-      const allAreLeafContainers = segments.every((segment) =>
-        leafContainerSet.has(segment)
-      );
+      const allAreLeafContainers = segments.every((segment) => leafContainerSet.has(segment));
 
       if (allAreLeafContainers) {
         return true;

@@ -2,7 +2,15 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FolderOpen, Plus, X, MoreHorizontal, FolderPlus, Layers, ExternalLink } from 'lucide-react';
+import {
+  FolderOpen,
+  Plus,
+  X,
+  MoreHorizontal,
+  FolderPlus,
+  Layers,
+  ExternalLink,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';

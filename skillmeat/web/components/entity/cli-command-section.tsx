@@ -153,10 +153,7 @@ export function CliCommandSection({
     <div className={cn('space-y-2', className)}>
       {/* Label - hidden when used in collapsible context */}
       {!hideLabel && (
-        <label
-          htmlFor="cli-command-select"
-          className="text-sm font-medium text-foreground"
-        >
+        <label htmlFor="cli-command-select" className="text-sm font-medium text-foreground">
           CLI Deploy Command
         </label>
       )}
@@ -164,10 +161,7 @@ export function CliCommandSection({
       {/* Command section: dropdown, code display, and copy button */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         {/* Select dropdown */}
-        <Select
-          value={selectedCommand}
-          onValueChange={setSelectedCommand}
-        >
+        <Select value={selectedCommand} onValueChange={setSelectedCommand}>
           <SelectTrigger
             id="cli-command-select"
             className="w-full sm:w-[180px]"

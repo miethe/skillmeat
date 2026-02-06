@@ -164,13 +164,16 @@ describe('GroupArtifactGrid', () => {
     mockUseToast.mockReturnValue({ toast: mockToast } as any);
 
     // Default mock for useArtifact - returns artifact based on ID
-    mockUseArtifact.mockImplementation((artifactId: string) => ({
-      data: mockArtifacts[artifactId],
-      isLoading: false,
-      error: null,
-      isError: false,
-      isSuccess: true,
-    } as any));
+    mockUseArtifact.mockImplementation(
+      (artifactId: string) =>
+        ({
+          data: mockArtifacts[artifactId],
+          isLoading: false,
+          error: null,
+          isError: false,
+          isSuccess: true,
+        }) as any
+    );
 
     // Clear localStorage
     localStorage.clear();
@@ -184,11 +187,7 @@ describe('GroupArtifactGrid', () => {
   const renderComponent = (props = {}) => {
     return render(
       <QueryClientProvider client={queryClient}>
-        <GroupArtifactGrid
-          groupId="group-1"
-          collectionId="collection-1"
-          {...props}
-        />
+        <GroupArtifactGrid groupId="group-1" collectionId="collection-1" {...props} />
       </QueryClientProvider>
     );
   };

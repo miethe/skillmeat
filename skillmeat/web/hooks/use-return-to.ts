@@ -196,10 +196,7 @@ export function useReturnTo(options: UseReturnToOptions = {}): UseReturnToReturn
    * Create a URL with returnTo param pointing to current location
    */
   const createReturnUrl = useCallback(
-    (
-      targetPath: string,
-      additionalParams?: Record<string, string | undefined>
-    ): string => {
+    (targetPath: string, additionalParams?: Record<string, string | undefined>): string => {
       // Build target URL params
       const params = new URLSearchParams();
 
@@ -217,9 +214,7 @@ export function useReturnTo(options: UseReturnToOptions = {}): UseReturnToReturn
       currentWithoutReturnTo.delete('returnTo');
 
       const currentQueryString = currentWithoutReturnTo.toString();
-      const serializedCurrent = currentQueryString
-        ? `${pathname}?${currentQueryString}`
-        : pathname;
+      const serializedCurrent = currentQueryString ? `${pathname}?${currentQueryString}` : pathname;
 
       // Add returnTo param
       params.set('returnTo', serializedCurrent);

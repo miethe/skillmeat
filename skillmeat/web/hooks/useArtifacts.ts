@@ -6,18 +6,10 @@
  */
 
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import type {
-  Artifact,
-  ArtifactFilters,
-  ArtifactSort,
-  ArtifactsResponse,
-} from '@/types/artifact';
+import type { Artifact, ArtifactFilters, ArtifactSort, ArtifactsResponse } from '@/types/artifact';
 import { ApiError, apiConfig, apiRequest } from '@/lib/api';
 import { fetchArtifactsPaginated, type ArtifactsPaginatedResponse } from '@/lib/api/artifacts';
-import {
-  mapApiResponseToArtifact,
-  type ArtifactResponse,
-} from '@/lib/api/mappers';
+import { mapApiResponseToArtifact, type ArtifactResponse } from '@/lib/api/mappers';
 
 const USE_MOCKS = apiConfig.useMocks;
 
@@ -104,9 +96,7 @@ const generateMockArtifacts = (): Artifact[] => {
       createdAt: new Date(Date.now() - 60 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 45 * 86400000).toISOString(),
       collection: 'Document Processing',
-      collections: [
-        { id: 'document-processing', name: 'Document Processing', artifact_count: 6 },
-      ],
+      collections: [{ id: 'document-processing', name: 'Document Processing', artifact_count: 6 }],
     },
     {
       id: 'command:git-helper',
@@ -369,11 +359,14 @@ export function useUpdateArtifact() {
   return useMutation({
     mutationFn: async (artifact: Partial<Artifact> & { id: string }) => {
       try {
-        const response = await apiRequest<ArtifactResponse>(`/artifacts/${encodeURIComponent(artifact.id)}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(artifact),
-        });
+        const response = await apiRequest<ArtifactResponse>(
+          `/artifacts/${encodeURIComponent(artifact.id)}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(artifact),
+          }
+        );
         return mapApiResponseToArtifact(response, 'collection');
       } catch (error) {
         if (USE_MOCKS) {

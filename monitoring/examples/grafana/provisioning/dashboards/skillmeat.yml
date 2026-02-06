@@ -1,0 +1,16 @@
+# Grafana dashboard provisioning for SkillMeat
+# Place this file in /etc/grafana/provisioning/dashboards/
+
+apiVersion: 1
+
+providers:
+  - name: 'SkillMeat'
+    folder: 'SkillMeat'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      # or use absolute path to monitoring directory:
+      # path: /path/to/skillmeat/monitoring/dashboards

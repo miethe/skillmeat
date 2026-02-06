@@ -220,9 +220,10 @@ export function UnifiedCardActions({
         )}
 
         {/* Separator after primary actions */}
-        {hasPrimaryActions && (hasOrganizationActions || hasEditAction || hasStatusActions || hasDeleteAction) && (
-          <DropdownMenuSeparator />
-        )}
+        {hasPrimaryActions &&
+          (hasOrganizationActions || hasEditAction || hasStatusActions || hasDeleteAction) && (
+            <DropdownMenuSeparator />
+          )}
 
         {/* Organization actions: Collection, Groups */}
         {onMoveToCollection && (
@@ -274,16 +275,16 @@ export function UnifiedCardActions({
         )}
 
         {/* Separator before delete */}
-        {hasDeleteAction && (hasPrimaryActions || hasOrganizationActions || hasEditAction || hasStatusActions || hasUtilityActions) && (
-          <DropdownMenuSeparator />
-        )}
+        {hasDeleteAction &&
+          (hasPrimaryActions ||
+            hasOrganizationActions ||
+            hasEditAction ||
+            hasStatusActions ||
+            hasUtilityActions) && <DropdownMenuSeparator />}
 
         {/* Delete action (destructive) */}
         {onDelete && (
-          <DropdownMenuItem
-            onClick={onDelete}
-            className="text-destructive focus:text-destructive"
-          >
+          <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
             <Trash2 className="mr-2 h-4 w-4" />
             Delete
           </DropdownMenuItem>

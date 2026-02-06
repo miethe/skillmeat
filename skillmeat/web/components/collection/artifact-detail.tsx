@@ -169,9 +169,7 @@ export function ArtifactDetail({
                       <Icon className="h-6 w-6 text-primary" />
                     </div>
                     <div className="min-w-0 flex-1 space-y-2">
-                      <DialogTitle className="text-2xl">
-                        {artifact.name}
-                      </DialogTitle>
+                      <DialogTitle className="text-2xl">{artifact.name}</DialogTitle>
                       <DialogDescription>
                         {artifactTypeLabels[artifact.type]} · {artifact.name}
                       </DialogDescription>

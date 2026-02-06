@@ -330,6 +330,9 @@ class BaseRepository(Generic[T]):
             yield session
             session.commit()
             logger.debug(f"Transaction committed successfully")
+        except RepositoryError:
+            session.rollback()
+            raise
         except Exception as e:
             session.rollback()
             logger.error(f"Transaction rolled back due to error: {e}")

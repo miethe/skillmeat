@@ -6,21 +6,20 @@
  * Response from parameter update.
  */
 export type ParameterUpdateResponse = {
-    /**
-     * Whether update succeeded
-     */
-    success: boolean;
-    /**
-     * ID of the updated artifact (type:name)
-     */
-    artifact_id: string;
-    /**
-     * List of fields that were updated
-     */
-    updated_fields?: Array<string>;
-    /**
-     * Human-readable result message
-     */
-    message: string;
+  /**
+   * Whether update succeeded
+   */
+  success: boolean;
+  /**
+   * ID of the updated artifact (type:name)
+   */
+  artifact_id: string;
+  /**
+   * List of fields that were updated
+   */
+  updated_fields?: Array<string>;
+  /**
+   * Human-readable result message
+   */
+  message: string;
 };
-

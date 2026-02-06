@@ -103,9 +103,7 @@ const navigationConfig: NavigationConfig = {
       ],
     },
   ],
-  bottomItems: [
-    { name: 'Sharing', href: '/sharing', icon: Share2 },
-  ],
+  bottomItems: [{ name: 'Sharing', href: '/sharing', icon: Share2 }],
 };
 
 // ============================================================================

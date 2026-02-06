@@ -8,10 +8,7 @@
 import React from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {
-  CollectionBadgeStack,
-  CollectionInfo,
-} from '@/components/shared/collection-badge-stack';
+import { CollectionBadgeStack, CollectionInfo } from '@/components/shared/collection-badge-stack';
 
 // ============================================================================
 // Test Data
@@ -25,9 +22,7 @@ const mockCollections: CollectionInfo[] = [
   { id: 'default', name: 'Default', is_default: true },
 ];
 
-const singleCollection: CollectionInfo[] = [
-  { id: '1', name: 'Work', is_default: false },
-];
+const singleCollection: CollectionInfo[] = [{ id: '1', name: 'Work', is_default: false }];
 
 const twoCollections: CollectionInfo[] = [
   { id: '1', name: 'Work', is_default: false },
@@ -56,9 +51,7 @@ describe('CollectionBadgeStack', () => {
     });
 
     it('renders nothing when all collections are default', () => {
-      const { container } = render(
-        <CollectionBadgeStack collections={onlyDefaultCollection} />
-      );
+      const { container } = render(<CollectionBadgeStack collections={onlyDefaultCollection} />);
       expect(container.firstChild).toBeNull();
     });
 
@@ -337,9 +330,7 @@ describe('CollectionBadgeStack', () => {
         { id: '2', name: 'Personal', is_default: false },
       ];
 
-      render(
-        <CollectionBadgeStack collections={collectionsWithUndefinedDefault} />
-      );
+      render(<CollectionBadgeStack collections={collectionsWithUndefinedDefault} />);
 
       // Both should render (undefined is_default treated as non-default)
       expect(screen.getByText('Work')).toBeInTheDocument();
@@ -370,24 +361,14 @@ describe('CollectionBadgeStack', () => {
 
   describe('Custom Styling', () => {
     it('applies custom className to container', () => {
-      render(
-        <CollectionBadgeStack
-          collections={singleCollection}
-          className="custom-class"
-        />
-      );
+      render(<CollectionBadgeStack collections={singleCollection} className="custom-class" />);
 
       const container = screen.getByRole('list');
       expect(container).toHaveClass('custom-class');
     });
 
     it('preserves default classes when custom className is added', () => {
-      render(
-        <CollectionBadgeStack
-          collections={singleCollection}
-          className="custom-class"
-        />
-      );
+      render(<CollectionBadgeStack collections={singleCollection} className="custom-class" />);
 
       const container = screen.getByRole('list');
       expect(container).toHaveClass('inline-flex');

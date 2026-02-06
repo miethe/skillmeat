@@ -6,10 +6,7 @@ import {
   getSemanticFolderPaths,
   type SemanticFilterConfig,
 } from '@/lib/tree-filter-utils';
-import {
-  DEFAULT_LEAF_CONTAINERS,
-  DEFAULT_ROOT_EXCLUSIONS,
-} from '@/hooks/use-detection-patterns';
+import { DEFAULT_LEAF_CONTAINERS, DEFAULT_ROOT_EXCLUSIONS } from '@/hooks/use-detection-patterns';
 import { buildFolderTree, type FolderTree, type FolderNode } from '@/lib/tree-builder';
 import type { CatalogEntry } from '@/types/marketplace';
 
@@ -396,10 +393,7 @@ describe('filterSemanticTree', () => {
 
   describe('preserving artifacts and counts', () => {
     it('preserves direct artifacts in semantic folders', () => {
-      const entries = [
-        createEntry('anthropics/tool1'),
-        createEntry('anthropics/tool2'),
-      ];
+      const entries = [createEntry('anthropics/tool1'), createEntry('anthropics/tool2')];
       const tree = buildFolderTree(entries, 0);
       const filtered = filterSemanticTree(tree);
 
@@ -454,9 +448,7 @@ describe('filterSemanticTree', () => {
     });
 
     it('handles deeply nested semantic paths', () => {
-      const entries = [
-        createEntry('anthropics/category/subcategory/group/subgroup/tool1'),
-      ];
+      const entries = [createEntry('anthropics/category/subcategory/group/subgroup/tool1')];
       const tree = buildFolderTree(entries, 0);
       const filtered = filterSemanticTree(tree);
 
@@ -746,10 +738,7 @@ describe('leaf container promotion', () => {
   describe('root exclusions vs leaf containers', () => {
     it('does NOT promote from root exclusions (they are completely skipped)', () => {
       // Root exclusions at depth 1 should be completely filtered - no promotion
-      const entries = [
-        createEntry('src/utils/tool1'),
-        createEntry('lib/helpers/tool2'),
-      ];
+      const entries = [createEntry('src/utils/tool1'), createEntry('lib/helpers/tool2')];
       const tree = buildFolderTree(entries, 0);
       const filtered = filterSemanticTree(tree);
 

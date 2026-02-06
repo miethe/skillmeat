@@ -15,12 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Artifact,
-  ArtifactType,
-  ARTIFACT_TYPES,
-  getAllArtifactTypes,
-} from '@/types/artifact';
+import { Artifact, ArtifactType, ARTIFACT_TYPES, getAllArtifactTypes } from '@/types/artifact';
 import { apiRequest } from '@/lib/api';
 import { ArtifactListResponse, DeployRequest } from '@/sdk';
 import { Search, Loader2, Package, CheckCircle2 } from 'lucide-react';

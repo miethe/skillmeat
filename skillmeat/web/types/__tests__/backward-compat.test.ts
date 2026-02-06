@@ -15,7 +15,7 @@ import type {
   ArtifactType,
   ArtifactScope,
   SyncStatus,
-  ArtifactStatus,  // deprecated alias for SyncStatus
+  ArtifactStatus, // deprecated alias for SyncStatus
   ArtifactFilters,
   CollectionRef,
 } from '../artifact';
@@ -249,10 +249,13 @@ type _TypeConfigTest = EntityTypeConfig extends {
   type: EntityType;
   label: string;
   formSchema: EntityFormSchema;
-} ? true : never;
+}
+  ? true
+  : never;
 
 // Verify ENTITY_TYPES is correctly typed
-type _EntityTypesTest = typeof ENTITY_TYPES extends Record<EntityType, EntityTypeConfig> ? true : never;
+type _EntityTypesTest =
+  typeof ENTITY_TYPES extends Record<EntityType, EntityTypeConfig> ? true : never;
 
 // Verify CollectionRef is available (new in unified Artifact)
 type _CollectionRefTest = CollectionRef extends { id: string; name: string } ? true : never;

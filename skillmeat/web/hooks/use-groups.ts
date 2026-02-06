@@ -622,9 +622,12 @@ export function useRemoveArtifactFromGroup(): UseMutationResult<
       artifactId: string;
     }): Promise<void> => {
       try {
-        await apiRequest<void>(`/groups/${encodeURIComponent(groupId)}/artifacts/${encodeURIComponent(artifactId)}`, {
-          method: 'DELETE',
-        });
+        await apiRequest<void>(
+          `/groups/${encodeURIComponent(groupId)}/artifacts/${encodeURIComponent(artifactId)}`,
+          {
+            method: 'DELETE',
+          }
+        );
       } catch (error) {
         if (USE_MOCKS) {
           console.warn(`[groups] Remove artifact API failed for group ${groupId}`, error);
@@ -754,11 +757,14 @@ export function useMoveArtifactToGroup(): UseMutationResult<
           ...(position !== undefined && { position }),
         };
 
-        await apiRequest<void>(`/groups/${encodeURIComponent(sourceGroupId)}/artifacts/${encodeURIComponent(artifactId)}/move`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
+        await apiRequest<void>(
+          `/groups/${encodeURIComponent(sourceGroupId)}/artifacts/${encodeURIComponent(artifactId)}/move`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          }
+        );
       } catch (error) {
         if (USE_MOCKS) {
           console.warn(

@@ -102,13 +102,27 @@ async function setupApiMocks(page: Page) {
       { id: '2', name: 'data', artifact_count: 3 },
       { id: '3', name: 'code', artifact_count: 2 },
     ],
-    page_info: { page: 1, page_size: 100, total_count: 3, total_pages: 1, has_next: false, has_previous: false },
+    page_info: {
+      page: 1,
+      page_size: 100,
+      total_count: 3,
+      total_pages: 1,
+      has_next: false,
+      has_previous: false,
+    },
   });
 
   // Mock marketplace sources
   await mockApiRoute(page, '/api/v1/marketplace/sources*', {
     items: [],
-    page_info: { page: 1, page_size: 50, total_count: 0, total_pages: 0, has_next: false, has_previous: false },
+    page_info: {
+      page: 1,
+      page_size: 50,
+      total_count: 0,
+      total_pages: 0,
+      has_next: false,
+      has_previous: false,
+    },
   });
 
   // Mock artifact files
@@ -349,7 +363,9 @@ test.describe('Deep Link Handling', () => {
     await expect(modal).toContainText(mockArtifacts[0].name);
   });
 
-  test('navigating to /collection?artifact={id}&tab=contents opens correct tab', async ({ page }) => {
+  test('navigating to /collection?artifact={id}&tab=contents opens correct tab', async ({
+    page,
+  }) => {
     const artifactId = mockArtifacts[0].id;
     await page.goto(`/collection?artifact=${artifactId}&tab=contents`);
     await waitForPageReady(page);
@@ -363,7 +379,9 @@ test.describe('Deep Link Handling', () => {
     await expect(contentsTab).toHaveAttribute('data-state', 'active');
   });
 
-  test('navigating to /manage?artifact={id}&tab=deployments opens correct tab', async ({ page }) => {
+  test('navigating to /manage?artifact={id}&tab=deployments opens correct tab', async ({
+    page,
+  }) => {
     const artifactId = mockArtifacts[0].id;
     await page.goto(`/manage?artifact=${artifactId}&tab=deployments`);
     await waitForPageReady(page);

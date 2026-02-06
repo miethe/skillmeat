@@ -1,0 +1,272 @@
+{
+  "dashboard": {
+    "title": "Memory & Context Intelligence System",
+    "description": "Monitoring dashboard for memory operations, context packing, and system health",
+    "tags": ["memory", "context", "intelligence"],
+    "timezone": "utc",
+    "refresh": "30s",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Memory List Query Latency",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(skillmeat_api_request_duration_seconds_bucket{endpoint=~\"/api/v1/memory-items.*\", method=\"GET\"}[5m]))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(skillmeat_api_request_duration_seconds_bucket{endpoint=~\"/api/v1/memory-items.*\", method=\"GET\"}[5m]))",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(skillmeat_api_request_duration_seconds_bucket{endpoint=~\"/api/v1/memory-items.*\", method=\"GET\"}[5m]))",
+            "legendFormat": "p99"
+          }
+        ],
+        "yaxis": {
+          "format": "s",
+          "label": "Latency"
+        },
+        "alert": {
+          "name": "Memory List Query Latency High",
+          "conditions": [
+            {
+              "evaluator": {"type": "gt", "params": [0.2]},
+              "query": {"params": ["p95", "5m", "now"]},
+              "type": "query"
+            }
+          ]
+        }
+      },
+      {
+        "id": 2,
+        "title": "Context Pack Generation Latency",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(skillmeat_api_request_duration_seconds_bucket{endpoint=~\"/api/v1/context-packs.*\"}[5m]))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(skillmeat_api_request_duration_seconds_bucket{endpoint=~\"/api/v1/context-packs.*\"}[5m]))",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(skillmeat_api_request_duration_seconds_bucket{endpoint=~\"/api/v1/context-packs.*\"}[5m]))",
+            "legendFormat": "p99"
+          }
+        ],
+        "yaxis": {
+          "format": "s",
+          "label": "Latency"
+        },
+        "alert": {
+          "name": "Context Pack Latency High",
+          "conditions": [
+            {
+              "evaluator": {"type": "gt", "params": [0.5]},
+              "query": {"params": ["p95", "5m", "now"]},
+              "type": "query"
+            }
+          ]
+        }
+      },
+      {
+        "id": 3,
+        "title": "Memory Operations Rate",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 8, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(skillmeat_api_requests_total{endpoint=~\"/api/v1/memory-items.*\", method=\"POST\"}[1m]) * 60",
+            "legendFormat": "Creates/min"
+          },
+          {
+            "expr": "rate(skillmeat_api_requests_total{endpoint=~\"/api/v1/memory-items/.*/promote\", method=\"POST\"}[1m]) * 60",
+            "legendFormat": "Promotes/min"
+          },
+          {
+            "expr": "rate(skillmeat_api_requests_total{endpoint=~\"/api/v1/memory-items/.*/deprecate\", method=\"POST\"}[1m]) * 60",
+            "legendFormat": "Deprecates/min"
+          },
+          {
+            "expr": "rate(skillmeat_api_requests_total{endpoint=~\"/api/v1/memory-items.*\", method=\"DELETE\"}[1m]) * 60",
+            "legendFormat": "Deletes/min"
+          }
+        ],
+        "yaxis": {
+          "format": "ops",
+          "label": "Operations/min"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Context Pack Generation Rate",
+        "type": "graph",
+        "gridPos": {"x": 8, "y": 8, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(skillmeat_api_requests_total{endpoint=\"/api/v1/context-packs/generate\", method=\"POST\"}[1m]) * 60",
+            "legendFormat": "Generations/min"
+          },
+          {
+            "expr": "rate(skillmeat_api_requests_total{endpoint=\"/api/v1/context-packs/preview\", method=\"POST\"}[1m]) * 60",
+            "legendFormat": "Previews/min"
+          }
+        ],
+        "yaxis": {
+          "format": "ops",
+          "label": "Operations/min"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Inbox Size (Candidate Items)",
+        "type": "stat",
+        "gridPos": {"x": 16, "y": 8, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(skillmeat_memory_items_total{status=\"candidate\"})",
+            "legendFormat": "Pending Items"
+          }
+        ],
+        "thresholds": [
+          {"value": 0, "color": "green"},
+          {"value": 100, "color": "yellow"},
+          {"value": 200, "color": "red"}
+        ],
+        "description": "Total number of candidate memory items across all projects awaiting review"
+      },
+      {
+        "id": 6,
+        "title": "Error Rate by Endpoint",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum by (endpoint) (rate(skillmeat_api_errors_total{endpoint=~\"/api/v1/memory-items.*|/api/v1/context-packs.*|/api/v1/context-modules.*\"}[5m])) * 100",
+            "legendFormat": "{{endpoint}}"
+          }
+        ],
+        "yaxis": {
+          "format": "percent",
+          "label": "Error Rate %"
+        },
+        "alert": {
+          "name": "Memory System Error Rate High",
+          "conditions": [
+            {
+              "evaluator": {"type": "gt", "params": [1.0]},
+              "query": {"params": ["error_rate", "5m", "now"]},
+              "type": "query"
+            }
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "title": "Request Success Rate",
+        "type": "gauge",
+        "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(skillmeat_api_requests_total{endpoint=~\"/api/v1/memory-items.*|/api/v1/context-packs.*\", status=~\"2..\"}[5m])) / sum(rate(skillmeat_api_requests_total{endpoint=~\"/api/v1/memory-items.*|/api/v1/context-packs.*\"}[5m])) * 100",
+            "legendFormat": "Success Rate"
+          }
+        ],
+        "thresholds": [
+          {"value": 0, "color": "red"},
+          {"value": 95, "color": "yellow"},
+          {"value": 99, "color": "green"}
+        ],
+        "yaxis": {
+          "min": 0,
+          "max": 100,
+          "format": "percent"
+        }
+      },
+      {
+        "id": 8,
+        "title": "Memory Items by Status",
+        "type": "piechart",
+        "gridPos": {"x": 0, "y": 24, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "sum by (status) (skillmeat_memory_items_total)",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "description": "Distribution of memory items across lifecycle stages (candidate, active, stable, deprecated)"
+      },
+      {
+        "id": 9,
+        "title": "Memory Items by Type",
+        "type": "piechart",
+        "gridPos": {"x": 8, "y": 24, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "sum by (type) (skillmeat_memory_items_total)",
+            "legendFormat": "{{type}}"
+          }
+        ],
+        "description": "Distribution of memory items by type (decision, constraint, gotcha, style_rule, learning)"
+      },
+      {
+        "id": 10,
+        "title": "Feature Flag Status",
+        "type": "stat",
+        "gridPos": {"x": 16, "y": 24, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "up{job=\"skillmeat-api\"}",
+            "legendFormat": "Memory System Enabled"
+          }
+        ],
+        "mappings": [
+          {"value": 0, "text": "Disabled", "color": "red"},
+          {"value": 1, "text": "Enabled", "color": "green"}
+        ],
+        "description": "Memory & Context Intelligence System feature flag status (SKILLMEAT_MEMORY_CONTEXT_ENABLED)"
+      },
+      {
+        "id": 11,
+        "title": "Average Context Pack Token Utilization",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 32, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "avg(rate(skillmeat_context_pack_token_utilization[5m]))",
+            "legendFormat": "Avg Utilization"
+          }
+        ],
+        "yaxis": {
+          "format": "percentunit",
+          "label": "Token Budget Utilization",
+          "min": 0,
+          "max": 1
+        },
+        "description": "Average percentage of token budget used in generated context packs"
+      },
+      {
+        "id": 12,
+        "title": "Memory Operation Failures",
+        "type": "table",
+        "gridPos": {"x": 12, "y": 32, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum by (endpoint, error_type) (increase(skillmeat_api_errors_total{endpoint=~\"/api/v1/memory-items.*|/api/v1/context-packs.*\"}[1h]))",
+            "format": "table"
+          }
+        ],
+        "description": "Recent failures by endpoint and error type (last 1 hour)"
+      }
+    ]
+  }
+}

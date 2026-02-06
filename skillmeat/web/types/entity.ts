@@ -275,7 +275,8 @@ export type EntityFormField = ArtifactFormField;
  * console.log(skillConfig.icon);  // "Sparkles"
  * ```
  */
-export const getEntityTypeConfig: (type: ArtifactType) => ArtifactTypeConfig = getArtifactTypeConfig;
+export const getEntityTypeConfig: (type: ArtifactType) => ArtifactTypeConfig =
+  getArtifactTypeConfig;
 
 /**
  * Get all supported entity types.
@@ -367,4 +368,5 @@ export const formatEntityId: (type: ArtifactType, name: string) => string = form
  * }
  * ```
  */
-export const parseEntityId: (id: string) => { type: ArtifactType; name: string } | null = parseArtifactId;
+export const parseEntityId: (id: string) => { type: ArtifactType; name: string } | null =
+  parseArtifactId;

@@ -96,7 +96,15 @@ import type { ArtifactDeploymentInfo } from '@/types/deployments';
 import type { Deployment } from '@/components/deployments/deployment-card';
 
 /** Valid tab values for the artifact modal */
-export type ArtifactModalTab = 'overview' | 'contents' | 'sync' | 'links' | 'history' | 'collections' | 'sources' | 'deployments';
+export type ArtifactModalTab =
+  | 'overview'
+  | 'contents'
+  | 'sync'
+  | 'links'
+  | 'history'
+  | 'collections'
+  | 'sources'
+  | 'deployments';
 
 interface UnifiedEntityModalProps {
   /**
@@ -371,7 +379,7 @@ export function UnifiedEntityModal({
   // Internal code uses 'entity' variable for minimal refactoring
   const entity = artifact ?? entityProp ?? null;
   const [activeTab, setActiveTab] = useState<ArtifactModalTab>(initialTab);
-  
+
   // Sync activeTab with initialTab when modal opens or initialTab changes
   useEffect(() => {
     if (open && initialTab) {
@@ -430,8 +438,8 @@ export function UnifiedEntityModal({
   const router = useRouter();
 
   // Determine current page context
-  const isOnCollectionPage = pathname === "/collection" || pathname?.startsWith("/collection");
-  const isOnManagePage = pathname === "/manage" || pathname?.startsWith("/manage");
+  const isOnCollectionPage = pathname === '/collection' || pathname?.startsWith('/collection');
+  const isOnManagePage = pathname === '/manage' || pathname?.startsWith('/manage');
 
   // Handle cross-navigation between pages
   const handleCrossNavigation = () => {
@@ -830,13 +838,15 @@ export function UnifiedEntityModal({
         usageCount: 0,
       },
       // Add upstream info if not present
-      upstream: entity.upstream || (entity.source
-        ? {
-            enabled: true,
-            url: entity.source,
-            updateAvailable: entity.syncStatus === 'outdated',
-          }
-        : undefined),
+      upstream:
+        entity.upstream ||
+        (entity.source
+          ? {
+              enabled: true,
+              url: entity.source,
+              updateAvailable: entity.syncStatus === 'outdated',
+            }
+          : undefined),
     };
   }, [entity, artifactDeployments.length, deploymentProjectCount]);
 
@@ -1735,7 +1745,6 @@ export function UnifiedEntityModal({
     <>
       <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="flex h-[90vh] max-h-[90vh] min-h-0 max-w-4xl flex-col overflow-hidden p-0 lg:max-w-6xl xl:max-w-7xl">
-
           {/* Header Section - Fixed */}
           <div className="border-b px-6 pb-4 pt-6">
             <DialogHeader>
@@ -1751,23 +1760,32 @@ export function UnifiedEntityModal({
                     {getStatusLabel()}
                   </Badge>
                 )}
-                {(pathname === "/collection" || pathname?.startsWith("/collection") || pathname === "/manage" || pathname?.startsWith("/manage")) && (
+                {(pathname === '/collection' ||
+                  pathname?.startsWith('/collection') ||
+                  pathname === '/manage' ||
+                  pathname?.startsWith('/manage')) && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => {
                       if (!entity) return;
                       onClose?.();
-                      if (pathname === "/collection" || pathname?.startsWith("/collection")) {
+                      if (pathname === '/collection' || pathname?.startsWith('/collection')) {
                         router.push(`/manage?artifact=${entity.id}`);
-                      } else if (pathname === "/manage" || pathname?.startsWith("/manage")) {
+                      } else if (pathname === '/manage' || pathname?.startsWith('/manage')) {
                         router.push(`/collection?artifact=${entity.id}`);
                       }
                     }}
                     className="gap-1"
-                    aria-label={(pathname === "/collection" || pathname?.startsWith("/collection")) ? "Navigate to manage page" : "Navigate to collection page"}
+                    aria-label={
+                      pathname === '/collection' || pathname?.startsWith('/collection')
+                        ? 'Navigate to manage page'
+                        : 'Navigate to collection page'
+                    }
                   >
-                    {(pathname === "/collection" || pathname?.startsWith("/collection")) ? "Manage Artifact" : "View Full Details"}
+                    {pathname === '/collection' || pathname?.startsWith('/collection')
+                      ? 'Manage Artifact'
+                      : 'View Full Details'}
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 )}
@@ -2302,9 +2320,7 @@ export function UnifiedEntityModal({
               <TabsContent value="sources" className="mt-0 flex-1">
                 <ScrollArea className="h-[calc(90vh-12rem)]">
                   <div className="space-y-4 py-4">
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Imported From
-                    </div>
+                    <div className="text-sm font-medium text-muted-foreground">Imported From</div>
 
                     {isLoadingSource ? (
                       <div className="flex items-center justify-center py-8">
@@ -2469,10 +2485,7 @@ export function UnifiedEntityModal({
 
           {/* Collapsible Action Bar - hidden on Contents and Sync Status tabs */}
           {entity.name && activeTab !== 'contents' && activeTab !== 'sync' && (
-            <CollapsibleActionBar
-              artifactName={entity.name}
-              className="mt-auto"
-            />
+            <CollapsibleActionBar artifactName={entity.name} className="mt-auto" />
           )}
         </DialogContent>
       </Dialog>

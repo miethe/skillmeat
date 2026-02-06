@@ -71,7 +71,10 @@ describe('LinkedArtifactsSection', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <LinkedArtifactsSection artifactId="source-artifact" linkedArtifacts={mockLinkedArtifacts} />
+          <LinkedArtifactsSection
+            artifactId="source-artifact"
+            linkedArtifacts={mockLinkedArtifacts}
+          />
         </Wrapper>
       );
 
@@ -89,7 +92,10 @@ describe('LinkedArtifactsSection', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <LinkedArtifactsSection artifactId="source-artifact" linkedArtifacts={mockLinkedArtifacts} />
+          <LinkedArtifactsSection
+            artifactId="source-artifact"
+            linkedArtifacts={mockLinkedArtifacts}
+          />
         </Wrapper>
       );
 
@@ -102,7 +108,10 @@ describe('LinkedArtifactsSection', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <LinkedArtifactsSection artifactId="source-artifact" linkedArtifacts={mockLinkedArtifacts} />
+          <LinkedArtifactsSection
+            artifactId="source-artifact"
+            linkedArtifacts={mockLinkedArtifacts}
+          />
         </Wrapper>
       );
 
@@ -115,7 +124,10 @@ describe('LinkedArtifactsSection', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <LinkedArtifactsSection artifactId="source-artifact" linkedArtifacts={mockLinkedArtifacts} />
+          <LinkedArtifactsSection
+            artifactId="source-artifact"
+            linkedArtifacts={mockLinkedArtifacts}
+          />
         </Wrapper>
       );
 
@@ -137,7 +149,10 @@ describe('LinkedArtifactsSection', () => {
 
       render(
         <Wrapper>
-          <LinkedArtifactsSection artifactId="source-artifact" linkedArtifacts={artifactsWithoutIds} />
+          <LinkedArtifactsSection
+            artifactId="source-artifact"
+            linkedArtifacts={artifactsWithoutIds}
+          />
         </Wrapper>
       );
 
@@ -349,7 +364,10 @@ describe('LinkedArtifactsSection', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <LinkedArtifactsSection artifactId="source-artifact" linkedArtifacts={mockLinkedArtifacts} />
+          <LinkedArtifactsSection
+            artifactId="source-artifact"
+            linkedArtifacts={mockLinkedArtifacts}
+          />
         </Wrapper>
       );
 
@@ -364,7 +382,10 @@ describe('LinkedArtifactsSection', () => {
 
       render(
         <Wrapper>
-          <LinkedArtifactsSection artifactId="source-artifact" linkedArtifacts={mockLinkedArtifacts} />
+          <LinkedArtifactsSection
+            artifactId="source-artifact"
+            linkedArtifacts={mockLinkedArtifacts}
+          />
         </Wrapper>
       );
 
@@ -425,7 +446,10 @@ describe('LinkedArtifactsSection', () => {
 
       render(
         <Wrapper>
-          <LinkedArtifactsSection artifactId="source-artifact" linkedArtifacts={mockLinkedArtifacts} />
+          <LinkedArtifactsSection
+            artifactId="source-artifact"
+            linkedArtifacts={mockLinkedArtifacts}
+          />
         </Wrapper>
       );
 
@@ -455,7 +479,10 @@ describe('LinkedArtifactsSection', () => {
 
       render(
         <Wrapper>
-          <LinkedArtifactsSection artifactId="source-artifact" linkedArtifacts={mockLinkedArtifacts} />
+          <LinkedArtifactsSection
+            artifactId="source-artifact"
+            linkedArtifacts={mockLinkedArtifacts}
+          />
         </Wrapper>
       );
 
@@ -551,7 +578,10 @@ describe('LinkedArtifactsSection', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <LinkedArtifactsSection artifactId="source-artifact" linkedArtifacts={mockLinkedArtifacts} />
+          <LinkedArtifactsSection
+            artifactId="source-artifact"
+            linkedArtifacts={mockLinkedArtifacts}
+          />
         </Wrapper>
       );
 
@@ -563,7 +593,10 @@ describe('LinkedArtifactsSection', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <LinkedArtifactsSection artifactId="source-artifact" linkedArtifacts={mockLinkedArtifacts} />
+          <LinkedArtifactsSection
+            artifactId="source-artifact"
+            linkedArtifacts={mockLinkedArtifacts}
+          />
         </Wrapper>
       );
 
@@ -575,7 +608,10 @@ describe('LinkedArtifactsSection', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <LinkedArtifactsSection artifactId="source-artifact" linkedArtifacts={mockLinkedArtifacts} />
+          <LinkedArtifactsSection
+            artifactId="source-artifact"
+            linkedArtifacts={mockLinkedArtifacts}
+          />
         </Wrapper>
       );
 
@@ -587,7 +623,10 @@ describe('LinkedArtifactsSection', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <LinkedArtifactsSection artifactId="source-artifact" linkedArtifacts={mockLinkedArtifacts} />
+          <LinkedArtifactsSection
+            artifactId="source-artifact"
+            linkedArtifacts={mockLinkedArtifacts}
+          />
         </Wrapper>
       );
 
@@ -601,7 +640,10 @@ describe('LinkedArtifactsSection', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <LinkedArtifactsSection artifactId="source-artifact" linkedArtifacts={mockLinkedArtifacts} />
+          <LinkedArtifactsSection
+            artifactId="source-artifact"
+            linkedArtifacts={mockLinkedArtifacts}
+          />
         </Wrapper>
       );
 

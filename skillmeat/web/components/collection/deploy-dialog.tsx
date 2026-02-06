@@ -573,23 +573,24 @@ export function DeployDialog({
                 </div>
 
                 {/* Existing Deployments Info */}
-                {artifact.usageStats?.totalDeployments && artifact.usageStats.totalDeployments > 0 && (
-                  <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-600" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
-                          Existing Deployments
-                        </p>
-                        <p className="mt-1 text-xs text-yellow-800 dark:text-yellow-200">
-                          This artifact is already deployed to{' '}
-                          {artifact.usageStats?.totalDeployments ?? 0} project(s). If the target project
-                          already has this artifact, it will be overwritten.
-                        </p>
+                {artifact.usageStats?.totalDeployments &&
+                  artifact.usageStats.totalDeployments > 0 && (
+                    <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-600" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+                            Existing Deployments
+                          </p>
+                          <p className="mt-1 text-xs text-yellow-800 dark:text-yellow-200">
+                            This artifact is already deployed to{' '}
+                            {artifact.usageStats?.totalDeployments ?? 0} project(s). If the target
+                            project already has this artifact, it will be overwritten.
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </>
             ) : (
               <>

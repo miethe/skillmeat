@@ -14,10 +14,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import {
-  getDetectionPatterns,
-  type DetectionPatternsResponse,
-} from '@/lib/api/config';
+import { getDetectionPatterns, type DetectionPatternsResponse } from '@/lib/api/config';
 
 /**
  * Default leaf container names used when API is unavailable
@@ -76,13 +73,7 @@ export const DEFAULT_CANONICAL_CONTAINERS: Record<string, string> = {
  * Note: 'plugins' intentionally excluded - they're meaningful folders
  * that should be shown as they often contain the main artifact structure.
  */
-export const DEFAULT_ROOT_EXCLUSIONS = [
-  'src',
-  'lib',
-  'packages',
-  'apps',
-  'examples',
-];
+export const DEFAULT_ROOT_EXCLUSIONS = ['src', 'lib', 'packages', 'apps', 'examples'];
 
 /**
  * Query key factory for detection pattern queries

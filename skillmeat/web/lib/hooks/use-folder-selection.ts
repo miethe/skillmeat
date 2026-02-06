@@ -88,7 +88,6 @@ export interface UseFolderSelectionReturn {
   navigateToFolder: (path: string) => void;
 }
 
-
 /**
  * Manage folder selection and expansion state for folder tree views.
  *

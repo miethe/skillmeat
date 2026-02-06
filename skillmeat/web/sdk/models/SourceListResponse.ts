@@ -10,13 +10,12 @@ import type { SourceResponse } from './SourceResponse';
  * Uses cursor-based pagination for efficient browsing.
  */
 export type SourceListResponse = {
-    /**
-     * List of sources for this page
-     */
-    items: Array<SourceResponse>;
-    /**
-     * Pagination metadata
-     */
-    page_info: PageInfo;
+  /**
+   * List of sources for this page
+   */
+  items: Array<SourceResponse>;
+  /**
+   * Pagination metadata
+   */
+  page_info: PageInfo;
 };
-

@@ -48,9 +48,7 @@ function createQueryClient() {
 
 function renderWithProviders(ui: React.ReactElement) {
   const queryClient = createQueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
-  );
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
 // ============================================================================
@@ -63,9 +61,7 @@ const mockGroups = [
   { id: '3', name: 'Archive', position: 2, collection_id: 'c1' },
 ];
 
-const singleGroup = [
-  { id: '1', name: 'Priority Tasks', position: 0, collection_id: 'c1' },
-];
+const singleGroup = [{ id: '1', name: 'Priority Tasks', position: 0, collection_id: 'c1' }];
 
 // ============================================================================
 // Tests
@@ -113,11 +109,7 @@ describe('GroupsDisplay', () => {
       } as any);
 
       const { container } = renderWithProviders(
-        <GroupsDisplay
-          collectionId="c1"
-          artifactId="a1"
-          className="custom-class"
-        />
+        <GroupsDisplay collectionId="c1" artifactId="a1" className="custom-class" />
       );
 
       // The wrapper div should have the custom class
@@ -142,9 +134,7 @@ describe('GroupsDisplay', () => {
         status: 'success',
       } as any);
 
-      renderWithProviders(
-        <GroupsDisplay collectionId="c1" artifactId="a1" />
-      );
+      renderWithProviders(<GroupsDisplay collectionId="c1" artifactId="a1" />);
 
       expect(screen.getByText('No groups')).toBeInTheDocument();
     });
@@ -160,9 +150,7 @@ describe('GroupsDisplay', () => {
         status: 'success',
       } as any);
 
-      renderWithProviders(
-        <GroupsDisplay collectionId="c1" artifactId="a1" />
-      );
+      renderWithProviders(<GroupsDisplay collectionId="c1" artifactId="a1" />);
 
       expect(screen.getByText('No groups')).toBeInTheDocument();
     });
@@ -179,11 +167,7 @@ describe('GroupsDisplay', () => {
       } as any);
 
       renderWithProviders(
-        <GroupsDisplay
-          collectionId="c1"
-          artifactId="a1"
-          className="custom-class"
-        />
+        <GroupsDisplay collectionId="c1" artifactId="a1" className="custom-class" />
       );
 
       const emptyMessage = screen.getByText('No groups');
@@ -250,9 +234,7 @@ describe('GroupsDisplay', () => {
         status: 'success',
       } as any);
 
-      renderWithProviders(
-        <GroupsDisplay collectionId="c1" artifactId="a1" />
-      );
+      renderWithProviders(<GroupsDisplay collectionId="c1" artifactId="a1" />);
 
       // First two groups should be visible (default maxBadges=3 for GroupsDisplay)
       expect(screen.getByText('Priority Tasks')).toBeInTheDocument();
@@ -271,9 +253,7 @@ describe('GroupsDisplay', () => {
         status: 'success',
       } as any);
 
-      renderWithProviders(
-        <GroupsDisplay collectionId="c1" artifactId="a1" />
-      );
+      renderWithProviders(<GroupsDisplay collectionId="c1" artifactId="a1" />);
 
       expect(screen.getByText('Priority Tasks')).toBeInTheDocument();
       // No overflow badge
@@ -299,9 +279,7 @@ describe('GroupsDisplay', () => {
         status: 'success',
       } as any);
 
-      renderWithProviders(
-        <GroupsDisplay collectionId="c1" artifactId="a1" maxBadges={2} />
-      );
+      renderWithProviders(<GroupsDisplay collectionId="c1" artifactId="a1" maxBadges={2} />);
 
       // Only 2 visible with custom maxBadges
       expect(screen.getByText('One')).toBeInTheDocument();
@@ -322,11 +300,7 @@ describe('GroupsDisplay', () => {
       } as any);
 
       renderWithProviders(
-        <GroupsDisplay
-          collectionId="c1"
-          artifactId="a1"
-          className="custom-class"
-        />
+        <GroupsDisplay collectionId="c1" artifactId="a1" className="custom-class" />
       );
 
       // GroupBadgeRow container should have the custom class
@@ -355,10 +329,7 @@ describe('GroupsDisplay', () => {
         <GroupsDisplay collectionId="collection-123" artifactId="artifact-456" />
       );
 
-      expect(mockUseArtifactGroups).toHaveBeenCalledWith(
-        'artifact-456',
-        'collection-123'
-      );
+      expect(mockUseArtifactGroups).toHaveBeenCalledWith('artifact-456', 'collection-123');
     });
 
     it('calls hook with different IDs on prop change', () => {
@@ -372,9 +343,7 @@ describe('GroupsDisplay', () => {
         status: 'success',
       } as any);
 
-      const { rerender } = renderWithProviders(
-        <GroupsDisplay collectionId="c1" artifactId="a1" />
-      );
+      const { rerender } = renderWithProviders(<GroupsDisplay collectionId="c1" artifactId="a1" />);
 
       expect(mockUseArtifactGroups).toHaveBeenLastCalledWith('a1', 'c1');
 
@@ -496,9 +465,7 @@ describe('GroupsDisplay', () => {
         status: 'success',
       } as any);
 
-      renderWithProviders(
-        <GroupsDisplay collectionId="c1" artifactId="a1" />
-      );
+      renderWithProviders(<GroupsDisplay collectionId="c1" artifactId="a1" />);
 
       // Should still render correctly, extracting only id and name
       expect(screen.getByText('Priority Tasks')).toBeInTheDocument();

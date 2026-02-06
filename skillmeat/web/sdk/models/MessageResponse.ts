@@ -9,9 +9,8 @@
  * such as successful deletion or updates.
  */
 export type MessageResponse = {
-    /**
-     * Human-readable message describing the operation result
-     */
-    message: string;
+  /**
+   * Human-readable message describing the operation result
+   */
+  message: string;
 };
-

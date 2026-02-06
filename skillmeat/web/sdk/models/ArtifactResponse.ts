@@ -13,65 +13,68 @@ import type { DeploymentStatistics } from './DeploymentStatistics';
  * deployment status, and upstream tracking.
  */
 export type ArtifactResponse = {
-    /**
-     * Artifact composite key (type:name)
-     */
-    id: string;
-    /**
-     * Artifact name
-     */
-    name: string;
-    /**
-     * Artifact type
-     */
-    type: string;
-    /**
-     * Source specification
-     */
-    source: string;
-    /**
-     * Origin category: 'local', 'github', or 'marketplace'
-     */
-    origin: string;
-    /**
-     * Platform source when origin is 'marketplace' (e.g., 'github', 'gitlab', 'bitbucket')
-     */
-    origin_source?: (string | null);
-    /**
-     * Version specification
-     */
-    version: string;
-    /**
-     * Artifact aliases
-     */
-    aliases?: Array<string>;
-    /**
-     * Artifact tags
-     */
-    tags?: Array<string>;
-    /**
-     * Artifact metadata
-     */
-    metadata?: (ArtifactMetadataResponse | null);
-    /**
-     * Upstream tracking information
-     */
-    upstream?: (ArtifactUpstreamInfo | null);
-    /**
-     * Deployment statistics (included when include_deployments=true)
-     */
-    deployment_stats?: (DeploymentStatistics | null);
-    /**
-     * Collections this artifact belongs to (many-to-many relationship)
-     */
-    collections?: Array<ArtifactCollectionInfo>;
-    /**
-     * Timestamp when artifact was added to collection
-     */
-    added: string;
-    /**
-     * Timestamp of last update
-     */
-    updated: string;
+  /**
+   * Artifact composite key (type:name)
+   */
+  id: string;
+  /**
+   * Artifact name
+   */
+  name: string;
+  /**
+   * Artifact type
+   */
+  type: string;
+  /**
+   * Source specification
+   */
+  source: string;
+  /**
+   * Origin category: 'local', 'github', or 'marketplace'
+   */
+  origin: string;
+  /**
+   * Platform source when origin is 'marketplace' (e.g., 'github', 'gitlab', 'bitbucket')
+   */
+  origin_source?: string | null;
+  /**
+   * Version specification
+   */
+  version: string;
+  /**
+   * Artifact aliases
+   */
+  aliases?: Array<string>;
+  /**
+   * Artifact tags
+   */
+  tags?: Array<string>;
+  /**
+   * Artifact metadata
+   */
+  metadata?: ArtifactMetadataResponse | null;
+  /**
+   * Upstream tracking information
+   */
+  upstream?: ArtifactUpstreamInfo | null;
+  /**
+   * Deployment statistics (included when include_deployments=true)
+   */
+  deployment_stats?: DeploymentStatistics | null;
+  /**
+   * Collections this artifact belongs to (many-to-many relationship)
+   */
+  collections?: Array<ArtifactCollectionInfo>;
+  /**
+   * Timestamp when artifact was added to collection
+   */
+  added: string;
+  /**
+   * Timestamp of last update
+   */
+  updated: string;
+  /**
+   * Marketplace import batch ID if imported from marketplace
+   */
+  import_id?: string | null;
 };
-

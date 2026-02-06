@@ -33,6 +33,8 @@ from .routers import (
     collections,
     config,
     context_entities,
+    context_modules,
+    context_packing,
     context_sync,
     deployments,
     groups,
@@ -42,6 +44,7 @@ from .routers import (
     marketplace_sources,
     match,
     mcp,
+    memory_items,
     merge,
     project_templates,
     projects,
@@ -338,6 +341,12 @@ def create_app(settings: APISettings = None) -> FastAPI:
         context_entities.router, prefix=settings.api_prefix, tags=["context-entities"]
     )
     app.include_router(
+        context_modules.router, prefix=settings.api_prefix, tags=["context-modules"]
+    )
+    app.include_router(
+        context_packing.router, prefix=settings.api_prefix, tags=["context-packs"]
+    )
+    app.include_router(
         context_sync.router, prefix=settings.api_prefix, tags=["context-sync"]
     )
     app.include_router(
@@ -359,6 +368,9 @@ def create_app(settings: APISettings = None) -> FastAPI:
         tags=["marketplace-sources"],
     )
     app.include_router(match.router, prefix=settings.api_prefix, tags=["match"])
+    app.include_router(
+        memory_items.router, prefix=settings.api_prefix, tags=["memory-items"]
+    )
     app.include_router(merge.router, prefix=settings.api_prefix, tags=["merge"])
     app.include_router(
         project_templates.router, prefix=settings.api_prefix, tags=["project-templates"]

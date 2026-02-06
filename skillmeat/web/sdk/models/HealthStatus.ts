@@ -6,25 +6,24 @@
  * Health check response model.
  */
 export type HealthStatus = {
-    /**
-     * Service status (healthy, degraded, unhealthy)
-     */
-    status: string;
-    /**
-     * Current timestamp in ISO format
-     */
-    timestamp: string;
-    /**
-     * SkillMeat version
-     */
-    version: string;
-    /**
-     * Application environment
-     */
-    environment: string;
-    /**
-     * Service uptime in seconds
-     */
-    uptime_seconds?: (number | null);
+  /**
+   * Service status (healthy, degraded, unhealthy)
+   */
+  status: string;
+  /**
+   * Current timestamp in ISO format
+   */
+  timestamp: string;
+  /**
+   * SkillMeat version
+   */
+  version: string;
+  /**
+   * Application environment
+   */
+  environment: string;
+  /**
+   * Service uptime in seconds
+   */
+  uptime_seconds?: number | null;
 };
-

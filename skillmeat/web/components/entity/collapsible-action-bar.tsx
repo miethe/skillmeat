@@ -4,11 +4,7 @@ import { useState } from 'react';
 import { ChevronUp, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { useCliCopy } from '@/hooks';
 import { CliCommandSection, getCommandForOption } from './cli-command-section';
 
@@ -80,7 +76,7 @@ export function CollapsibleActionBar({
             'z-10 flex h-6 w-6 items-center justify-center',
             'rounded-full border border-border bg-muted',
             'transition-all duration-200',
-            'hover:bg-accent hover:border-accent-foreground/20',
+            'hover:border-accent-foreground/20 hover:bg-accent',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
           )}
           aria-label={isOpen ? 'Collapse CLI command section' : 'Expand CLI command section'}
@@ -105,9 +101,7 @@ export function CollapsibleActionBar({
           role="button"
           tabIndex={-1} // Not focusable since the chevron button handles keyboard
         >
-          <span className="text-sm font-medium text-foreground">
-            CLI Deploy Command
-          </span>
+          <span className="text-sm font-medium text-foreground">CLI Deploy Command</span>
 
           {/* Copy button - Always visible */}
           <Button

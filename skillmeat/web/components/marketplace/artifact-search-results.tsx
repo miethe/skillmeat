@@ -17,12 +17,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -51,11 +46,14 @@ interface GroupedResults {
 // Type Configuration
 // ============================================================================
 
-const artifactTypeConfig: Record<string, {
-  icon: React.ComponentType<{ className?: string }>;
-  borderColor: string;
-  label: string;
-}> = {
+const artifactTypeConfig: Record<
+  string,
+  {
+    icon: React.ComponentType<{ className?: string }>;
+    borderColor: string;
+    label: string;
+  }
+> = {
   skill: { icon: Package, borderColor: 'border-l-blue-500', label: 'Skill' },
   command: { icon: Terminal, borderColor: 'border-l-purple-500', label: 'Command' },
   agent: { icon: Bot, borderColor: 'border-l-green-500', label: 'Agent' },
@@ -133,7 +131,7 @@ function ResultCard({ result, onClick }: ResultCardProps) {
   return (
     <Card
       className={cn(
-        'p-4 transition-all duration-200 cursor-pointer',
+        'cursor-pointer p-4 transition-all duration-200',
         'hover:bg-muted/50 hover:shadow-sm',
         'border-l-2',
         typeConfig.borderColor,
@@ -165,7 +163,7 @@ function ResultCard({ result, onClick }: ResultCardProps) {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge variant="secondary" className="text-xs px-1.5">
+                <Badge variant="secondary" className="px-1.5 text-xs">
                   <TypeIcon className="h-3 w-3" aria-hidden="true" />
                   <span className="sr-only">{formatArtifactType(result.artifact_type)}</span>
                 </Badge>
@@ -250,11 +248,7 @@ function SourceGroup({ group, value, onResultClick }: SourceGroupProps) {
       <AccordionContent className="px-4 pb-4">
         <div className="space-y-3">
           {group.results.map((result) => (
-            <ResultCard
-              key={result.id}
-              result={result}
-              onClick={() => onResultClick?.(result)}
-            />
+            <ResultCard key={result.id} result={result} onClick={() => onResultClick?.(result)} />
           ))}
         </div>
       </AccordionContent>
@@ -275,10 +269,7 @@ export function ArtifactSearchResults({
   if (results.length === 0) {
     return (
       <div
-        className={cn(
-          'flex flex-col items-center justify-center py-12 text-center',
-          className
-        )}
+        className={cn('flex flex-col items-center justify-center py-12 text-center', className)}
         role="status"
         aria-live="polite"
       >

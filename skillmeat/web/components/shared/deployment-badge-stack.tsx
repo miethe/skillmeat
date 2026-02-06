@@ -27,12 +27,7 @@
 import * as React from 'react';
 import { FolderKanban } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { DeploymentSummary } from '@/types/artifact';
 
@@ -116,9 +111,7 @@ function DeploymentBadge({ deployment, onClick }: DeploymentBadgeProps) {
       aria-label={`Deployed to ${deployment.project_name || projectName}`}
     >
       <FolderKanban className="h-3 w-3" aria-hidden="true" />
-      <span className="max-w-[100px] truncate">
-        {deployment.project_name || projectName}
-      </span>
+      <span className="max-w-[100px] truncate">{deployment.project_name || projectName}</span>
     </Badge>
   );
 }
@@ -141,10 +134,7 @@ function OverflowBadge({ count, hiddenDeployments, onClick }: OverflowBadgeProps
   const badge = (
     <Badge
       variant="outline"
-      className={cn(
-        'text-xs',
-        isClickable && 'cursor-pointer hover:bg-muted'
-      )}
+      className={cn('text-xs', isClickable && 'cursor-pointer hover:bg-muted')}
       onClick={onClick}
       role={isClickable ? 'button' : undefined}
       tabIndex={isClickable ? 0 : undefined}
@@ -170,14 +160,9 @@ function OverflowBadge({ count, hiddenDeployments, onClick }: OverflowBadgeProps
         <TooltipTrigger asChild>{badge}</TooltipTrigger>
         <TooltipContent className="max-w-xs">
           <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground">
-              Also deployed to:
-            </p>
+            <p className="text-xs font-medium text-muted-foreground">Also deployed to:</p>
             {hiddenDeployments.map((deployment) => (
-              <div
-                key={deployment.project_path}
-                className="flex items-center gap-1 text-xs"
-              >
+              <div key={deployment.project_path} className="flex items-center gap-1 text-xs">
                 <FolderKanban className="h-3 w-3" aria-hidden="true" />
                 <span>
                   {deployment.project_name || extractProjectName(deployment.project_path)}

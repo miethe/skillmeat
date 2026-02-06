@@ -118,6 +118,32 @@ from .match import (
     MatchedArtifact,
     MatchResponse,
 )
+from .memory import (
+    MemoryType,
+    MemoryStatus,
+    MemoryItemCreateRequest,
+    MemoryItemUpdateRequest,
+    MemoryItemResponse,
+    MemoryItemListResponse,
+    PromoteRequest,
+    DeprecateRequest,
+    BulkPromoteRequest,
+    BulkDeprecateRequest,
+    BulkActionResponse,
+    MergeRequest as MemoryMergeRequest,
+    MergeResponse as MemoryMergeResponse,
+)
+from .context_module import (
+    ContextModuleCreateRequest,
+    ContextModuleUpdateRequest,
+    ContextModuleResponse,
+    ContextModuleListResponse,
+    AddMemoryToModuleRequest,
+    ContextPackPreviewRequest,
+    ContextPackPreviewResponse,
+    ContextPackGenerateRequest,
+    ContextPackGenerateResponse,
+)
 
 __all__ = [
     # Common
@@ -220,4 +246,29 @@ __all__ = [
     "ScoreBreakdown",
     "MatchedArtifact",
     "MatchResponse",
+    # Memory Items
+    "MemoryType",
+    "MemoryStatus",
+    "MemoryItemCreateRequest",
+    "MemoryItemUpdateRequest",
+    "MemoryItemResponse",
+    "MemoryItemListResponse",
+    "PromoteRequest",
+    "DeprecateRequest",
+    "BulkPromoteRequest",
+    "BulkDeprecateRequest",
+    "BulkActionResponse",
+    "MemoryMergeRequest",
+    "MemoryMergeResponse",
+    # Context Modules
+    "ContextModuleCreateRequest",
+    "ContextModuleUpdateRequest",
+    "ContextModuleResponse",
+    "ContextModuleListResponse",
+    "AddMemoryToModuleRequest",
+    # Context Packing
+    "ContextPackPreviewRequest",
+    "ContextPackPreviewResponse",
+    "ContextPackGenerateRequest",
+    "ContextPackGenerateResponse",
 ]

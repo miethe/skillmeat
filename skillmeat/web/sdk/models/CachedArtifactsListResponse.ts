@@ -13,21 +13,20 @@ import type { CachedArtifactResponse } from './CachedArtifactResponse';
  * limit: Maximum items per page
  */
 export type CachedArtifactsListResponse = {
-    /**
-     * List of cached artifacts
-     */
-    items: Array<CachedArtifactResponse>;
-    /**
-     * Total number of artifacts
-     */
-    total: number;
-    /**
-     * Number of items skipped
-     */
-    skip: number;
-    /**
-     * Maximum items per page
-     */
-    limit: number;
+  /**
+   * List of cached artifacts
+   */
+  items: Array<CachedArtifactResponse>;
+  /**
+   * Total number of artifacts
+   */
+  total: number;
+  /**
+   * Number of items skipped
+   */
+  skip: number;
+  /**
+   * Maximum items per page
+   */
+  limit: number;
 };
-

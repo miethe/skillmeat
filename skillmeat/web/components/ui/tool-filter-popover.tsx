@@ -156,7 +156,7 @@ export function ToolFilterPopover({
                       >
                         {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
                       </div>
-                      <span className="text-sm font-mono">{tool.name}</span>
+                      <span className="font-mono text-sm">{tool.name}</span>
                     </div>
                     {tool.artifact_count > 0 && (
                       <span className="text-xs text-muted-foreground">{tool.artifact_count}</span>

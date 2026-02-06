@@ -88,7 +88,11 @@ interface SortableArtifactCardProps {
   onCopyCliCommand?: (artifactName: string) => void;
 }
 
-function SortableArtifactCard({ artifact, onArtifactClick, onCopyCliCommand }: SortableArtifactCardProps) {
+function SortableArtifactCard({
+  artifact,
+  onArtifactClick,
+  onCopyCliCommand,
+}: SortableArtifactCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: artifact.id,
     data: {

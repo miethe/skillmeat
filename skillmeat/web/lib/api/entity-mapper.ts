@@ -185,10 +185,7 @@ export interface ApiArtifactResponse {
  * @param context - Whether this is a collection, project, or marketplace context
  * @returns Resolved SyncStatus value
  */
-function determineSyncStatus(
-  artifact: ApiArtifactResponse,
-  context: EntityContext
-): SyncStatus {
+function determineSyncStatus(artifact: ApiArtifactResponse, context: EntityContext): SyncStatus {
   // Check drift_status first (most specific)
   const driftStatus = artifact.drift_status ?? artifact.upstream?.drift_status;
   if (driftStatus) {
@@ -258,27 +255,13 @@ function resolveTimestamps(artifact: ApiArtifactResponse): {
 } {
   const now = new Date().toISOString();
 
-  const createdAt =
-    artifact.createdAt ??
-    artifact.created_at ??
-    artifact.added ??
-    now;
+  const createdAt = artifact.createdAt ?? artifact.created_at ?? artifact.added ?? now;
 
-  const updatedAt =
-    artifact.updatedAt ??
-    artifact.updated_at ??
-    artifact.updated ??
-    createdAt;
+  const updatedAt = artifact.updatedAt ?? artifact.updated_at ?? artifact.updated ?? createdAt;
 
-  const deployedAt =
-    artifact.deployedAt ??
-    artifact.deployed_at ??
-    undefined;
+  const deployedAt = artifact.deployedAt ?? artifact.deployed_at ?? undefined;
 
-  const modifiedAt =
-    artifact.modifiedAt ??
-    artifact.modified_at ??
-    undefined;
+  const modifiedAt = artifact.modifiedAt ?? artifact.modified_at ?? undefined;
 
   return { createdAt, updatedAt, deployedAt, modifiedAt };
 }
@@ -402,8 +385,7 @@ export function mapArtifactToEntity(
     (artifact.scope as ArtifactScope) ?? (context === 'project' ? 'local' : 'user');
 
   // Flatten metadata - prefer top-level, fall back to nested
-  const description =
-    artifact.description ?? artifact.metadata?.description ?? undefined;
+  const description = artifact.description ?? artifact.metadata?.description ?? undefined;
   const author = artifact.author ?? artifact.metadata?.author ?? undefined;
   const license = artifact.license ?? artifact.metadata?.license ?? undefined;
 

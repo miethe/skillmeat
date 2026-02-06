@@ -6,9 +6,8 @@
  * Request schema for adding artifacts to a collection.
  */
 export type AddArtifactsRequest = {
-    /**
-     * List of artifact IDs to add to collection
-     */
-    artifact_ids: Array<string>;
+  /**
+   * List of artifact IDs to add to collection
+   */
+  artifact_ids: Array<string>;
 };
-

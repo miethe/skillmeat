@@ -75,11 +75,7 @@ export function TabContentWrapper({
   scrollable = true,
 }: TabContentWrapperProps) {
   // Inner content with consistent padding
-  const content = (
-    <div className="space-y-4 px-6 py-4">
-      {children}
-    </div>
-  );
+  const content = <div className="space-y-4 px-6 py-4">{children}</div>;
 
   return (
     <TabsContent
@@ -94,13 +90,7 @@ export function TabContentWrapper({
         className
       )}
     >
-      {scrollable ? (
-        <ScrollArea className="h-full">
-          {content}
-        </ScrollArea>
-      ) : (
-        content
-      )}
+      {scrollable ? <ScrollArea className="h-full">{content}</ScrollArea> : content}
     </TabsContent>
   );
 }

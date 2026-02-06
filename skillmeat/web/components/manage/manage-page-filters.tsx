@@ -157,11 +157,7 @@ export function ManagePageFilters({
 
   // Check if any filters are active
   const hasActiveFilters =
-    search !== '' ||
-    status !== 'all' ||
-    type !== 'all' ||
-    project !== null ||
-    tags.length > 0;
+    search !== '' || status !== 'all' || type !== 'all' || project !== null || tags.length > 0;
 
   // Count active filters (excluding search)
   const activeFilterCount =
@@ -176,7 +172,10 @@ export function ManagePageFilters({
       <div className="flex flex-wrap items-center gap-3">
         {/* Search Input */}
         <div className="relative min-w-[200px] flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Search
+            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
           <Input
             placeholder="Search artifacts..."
             value={searchInput}
@@ -237,10 +236,7 @@ export function ManagePageFilters({
         </Select>
 
         {/* Type Filter */}
-        <Select
-          value={type}
-          onValueChange={(value) => onTypeChange(value as ArtifactType | 'all')}
-        >
+        <Select value={type} onValueChange={(value) => onTypeChange(value as ArtifactType | 'all')}>
           <SelectTrigger className="w-[140px]" aria-label="Filter by artifact type">
             <SelectValue placeholder="All Types" />
           </SelectTrigger>
@@ -276,7 +272,12 @@ export function ManagePageFilters({
 
       {/* Active Filters Display (Chips) */}
       {activeFilterCount > 0 && (
-        <div className="flex flex-wrap items-center gap-2" role="status" aria-live="polite" aria-label="Active filters">
+        <div
+          className="flex flex-wrap items-center gap-2"
+          role="status"
+          aria-live="polite"
+          aria-label="Active filters"
+        >
           <span className="text-sm text-muted-foreground">Active filters:</span>
 
           {/* Project chip */}

@@ -79,7 +79,11 @@ export interface TabNavigationProps {
  * @param className - Additional CSS classes for the container
  * @param ariaLabel - Accessible label for the tab list
  */
-export function TabNavigation({ tabs, className, ariaLabel = 'Navigation tabs' }: TabNavigationProps) {
+export function TabNavigation({
+  tabs,
+  className,
+  ariaLabel = 'Navigation tabs',
+}: TabNavigationProps) {
   return (
     <TabsList
       className={cn(
@@ -111,11 +115,13 @@ export function TabNavigation({ tabs, className, ariaLabel = 'Navigation tabs' }
               // Focus ring
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
             )}
-            aria-label={tab.badge !== undefined && tab.badge > 0 ? `${tab.label}, ${tab.badge} items` : undefined}
+            aria-label={
+              tab.badge !== undefined && tab.badge > 0
+                ? `${tab.label}, ${tab.badge} items`
+                : undefined
+            }
           >
-            {Icon && (
-              <Icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-            )}
+            {Icon && <Icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />}
             <span>{tab.label}</span>
             {typeof tab.badge === 'number' && tab.badge > 0 && (
               <Badge

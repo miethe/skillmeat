@@ -9,21 +9,20 @@
  * before executing a rollback operation.
  */
 export type RollbackSafetyAnalysisResponse = {
-    /**
-     * Whether rollback can proceed without data loss
-     */
-    is_safe: boolean;
-    /**
-     * Files that have conflicts requiring manual resolution
-     */
-    files_with_conflicts?: Array<string>;
-    /**
-     * Files that can be safely restored without conflicts
-     */
-    files_safe_to_restore?: Array<string>;
-    /**
-     * Warning messages about potential issues
-     */
-    warnings?: Array<string>;
+  /**
+   * Whether rollback can proceed without data loss
+   */
+  is_safe: boolean;
+  /**
+   * Files that have conflicts requiring manual resolution
+   */
+  files_with_conflicts?: Array<string>;
+  /**
+   * Files that can be safely restored without conflicts
+   */
+  files_safe_to_restore?: Array<string>;
+  /**
+   * Warning messages about potential issues
+   */
+  warnings?: Array<string>;
 };
-

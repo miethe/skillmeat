@@ -27,8 +27,10 @@ Example:
     >>> sha = client.resolve_version("anthropics/skills", "latest")
 """
 
+import base64
 import logging
 import os
+import posixpath
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -482,8 +484,6 @@ class GitHubClient:
             if isinstance(content_file, ContentFile):
                 if content_file.type == "symlink":
                     # Symlink detected - resolve target and fetch actual content
-                    import posixpath
-
                     symlink_target = getattr(content_file, "target", None)
                     if symlink_target:
                         # Resolve relative path against parent directory
@@ -521,10 +521,69 @@ class GitHubClient:
             raise GitHubClientError(f"Unexpected content type for '{path}'")
 
         except GithubException as e:
+            if getattr(e, "status", None) == 404:
+                # Path not found - check if an ancestor is a symlink
+                resolved = self._resolve_symlink_ancestor(repo, path, ref)
+                if resolved is not None:
+                    return resolved
             self._handle_exception(
                 e, context=f"get_file_with_metadata({owner_repo}, {path})"
             )
             raise
+
+    def _resolve_symlink_ancestor(
+        self, repo: Repository, path: str, ref: Optional[str]
+    ) -> Optional[Dict[str, Any]]:
+        """Walk up parent directories to find a symlink ancestor and resolve through it.
+
+        When a file path like '.claude/skills/foo/scripts/core.py' doesn't exist
+        because 'scripts' is a symlink to '../../../src/foo/scripts', this method:
+        1. Checks '.claude/skills/foo/scripts' - finds it's a symlink
+        2. Resolves target: 'src/foo/scripts'
+        3. Remaps remaining path: 'src/foo/scripts/core.py'
+        4. Fetches the file at the real path
+
+        Args:
+            repo: PyGithub Repository object
+            path: Original file path that returned 404
+            ref: Git ref (branch, tag, SHA) or None
+
+        Returns:
+            File metadata dict if symlink ancestor found and resolved,
+            None if no symlink ancestor exists.
+        """
+        parts = path.split("/")
+        ref_arg = ref if ref is not None else NotSet
+        # Try each ancestor from deepest to shallowest
+        # e.g., for "a/b/c/d.py", try "a/b/c", then "a/b", then "a"
+        for i in range(len(parts) - 1, 0, -1):
+            ancestor_path = "/".join(parts[:i])
+            remaining_path = "/".join(parts[i:])
+
+            try:
+                content = repo.get_contents(ancestor_path, ref=ref_arg)
+                if isinstance(content, ContentFile) and content.type == "symlink":
+                    # Found a symlink ancestor - resolve target
+                    target = getattr(content, "target", None)
+                    if not target:
+                        continue
+
+                    parent_dir = posixpath.dirname(ancestor_path)
+                    resolved_base = posixpath.normpath(
+                        posixpath.join(parent_dir, target)
+                    )
+
+                    if resolved_base.startswith("..") or resolved_base.startswith("/"):
+                        continue  # Target outside repo
+
+                    # Build the real path and recursively fetch
+                    real_path = f"{resolved_base}/{remaining_path}"
+                    owner_repo = f"{repo.owner.login}/{repo.name}"
+                    return self.get_file_with_metadata(owner_repo, real_path, ref=ref)
+            except GithubException:
+                continue  # Ancestor doesn't exist either, try next level up
+
+        return None
 
     def get_repo_tree(
         self, owner_repo: str, ref: Optional[str] = None, recursive: bool = True
@@ -548,6 +607,12 @@ class GitHubClient:
             GitHubRateLimitError: If rate limit exceeded
             GitHubClientError: For other errors
 
+        Note:
+            Symlinks are resolved to their target type. If a symlink points to
+            a directory in the same tree, it returns type "tree". If it points
+            to a file, it returns type "blob". If the target cannot be resolved
+            (external symlink), it returns type "symlink".
+
         Example:
             >>> client = GitHubClient()
             >>> tree = client.get_repo_tree("anthropics/skills")
@@ -559,19 +624,97 @@ class GitHubClient:
             tree_ref = ref or repo.default_branch
             git_tree = repo.get_git_tree(tree_ref, recursive=recursive)
 
-            return [
-                {
-                    "path": item.path,
-                    "type": (
-                        "symlink"
-                        if item.type == "blob" and getattr(item, "mode", "") == "120000"
-                        else item.type
-                    ),
-                    "sha": item.sha,
-                    "size": item.size if item.type == "blob" else None,
-                }
-                for item in git_tree.tree
-            ]
+            # First pass: build path -> type lookup for symlink resolution
+            path_types: Dict[str, str] = {}
+            symlinks: List[Tuple[Any, str]] = []  # (item, path) pairs for symlinks
+
+            for item in git_tree.tree:
+                mode = getattr(item, "mode", "")
+                if item.type == "blob" and mode == "120000":
+                    # This is a symlink - we'll resolve it in second pass
+                    symlinks.append((item, item.path))
+                else:
+                    path_types[item.path] = item.type
+
+            # Second pass: resolve symlinks to their target types
+            symlink_resolved_types: Dict[str, str] = {}
+            symlink_resolved_targets: Dict[str, str] = {}  # symlink_path -> target
+            for item, symlink_path in symlinks:
+                try:
+                    # Get symlink target by fetching blob content
+                    blob = repo.get_git_blob(item.sha)
+                    if blob.encoding == "base64":
+                        target = base64.b64decode(blob.content).decode("utf-8").strip()
+                    else:
+                        target = blob.content.strip()
+
+                    # Resolve relative path from symlink location
+                    symlink_dir = posixpath.dirname(symlink_path)
+                    resolved_path = posixpath.normpath(
+                        posixpath.join(symlink_dir, target)
+                    )
+
+                    # Look up resolved path in tree
+                    if resolved_path in path_types:
+                        resolved_type = path_types[resolved_path]
+                        symlink_resolved_types[symlink_path] = resolved_type
+                        # Store target path for directory symlinks so we
+                        # can mirror children in the third pass
+                        if resolved_type == "tree":
+                            symlink_resolved_targets[symlink_path] = resolved_path
+                    else:
+                        # Target not in tree (external symlink or broken)
+                        symlink_resolved_types[symlink_path] = "symlink"
+                except Exception as e:
+                    # If we can't resolve, fall back to "symlink"
+                    logger.debug(f"Failed to resolve symlink {symlink_path}: {e}")
+                    symlink_resolved_types[symlink_path] = "symlink"
+
+            # Build final result
+            result = []
+            for item in git_tree.tree:
+                mode = getattr(item, "mode", "")
+                if item.type == "blob" and mode == "120000":
+                    # Use resolved type for symlinks
+                    resolved_type = symlink_resolved_types.get(item.path, "symlink")
+                    result.append(
+                        {
+                            "path": item.path,
+                            "type": resolved_type,
+                            "sha": item.sha,
+                            "size": item.size if resolved_type == "blob" else None,
+                        }
+                    )
+                else:
+                    result.append(
+                        {
+                            "path": item.path,
+                            "type": item.type,
+                            "sha": item.sha,
+                            "size": item.size if item.type == "blob" else None,
+                        }
+                    )
+
+            # Third pass: add virtual entries for directory symlink children.
+            # When a symlink resolves to a directory, the target's children
+            # need to appear under the symlink path as well so that
+            # prefix-filtered views (e.g. ".claude/") see the full subtree.
+            for symlink_path, target_path in symlink_resolved_targets.items():
+                target_prefix = target_path + "/"
+                for item in git_tree.tree:
+                    if item.path.startswith(target_prefix):
+                        relative = item.path[len(target_prefix) :]
+                        virtual_path = f"{symlink_path}/{relative}"
+                        result.append(
+                            {
+                                "path": virtual_path,
+                                "type": item.type,
+                                "sha": item.sha,
+                                "size": (item.size if item.type == "blob" else None),
+                            }
+                        )
+
+            return result
         except GithubException as e:
             self._handle_exception(e, context=f"get_repo_tree({owner_repo})")
             raise

@@ -10,21 +10,20 @@ import type { ExtractedSegmentResponse } from './ExtractedSegmentResponse';
  * status for tag management.
  */
 export type PathSegmentsResponse = {
-    /**
-     * Catalog entry ID
-     */
-    entry_id: string;
-    /**
-     * Full artifact path
-     */
-    raw_path: string;
-    /**
-     * Extracted segments with status
-     */
-    extracted: Array<ExtractedSegmentResponse>;
-    /**
-     * Extraction timestamp
-     */
-    extracted_at: string;
+  /**
+   * Catalog entry ID
+   */
+  entry_id: string;
+  /**
+   * Full artifact path
+   */
+  raw_path: string;
+  /**
+   * Extracted segments with status
+   */
+  extracted: Array<ExtractedSegmentResponse>;
+  /**
+   * Extraction timestamp
+   */
+  extracted_at: string;
 };
-

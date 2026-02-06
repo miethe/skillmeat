@@ -10,17 +10,16 @@ import type { FileTreeEntry } from './FileTreeEntry';
  * artifact, used for file browsing in the catalog entry modal.
  */
 export type FileTreeResponse = {
-    /**
-     * List of file and directory entries
-     */
-    entries: Array<FileTreeEntry>;
-    /**
-     * Path to artifact within repository
-     */
-    artifact_path: string;
-    /**
-     * Marketplace source ID
-     */
-    source_id: string;
+  /**
+   * List of file and directory entries
+   */
+  entries: Array<FileTreeEntry>;
+  /**
+   * Path to artifact within repository
+   */
+  artifact_path: string;
+  /**
+   * Marketplace source ID
+   */
+  source_id: string;
 };
-

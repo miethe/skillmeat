@@ -254,9 +254,7 @@ export function EntityList({
     if (viewMode === 'grid') {
       // Choose skeleton based on card variant
       const SkeletonComponent =
-        cardVariant === 'operations'
-          ? ArtifactOperationsCardSkeleton
-          : EntityCardSkeleton;
+        cardVariant === 'operations' ? ArtifactOperationsCardSkeleton : EntityCardSkeleton;
 
       return (
         <ScrollArea className="h-full">
@@ -306,8 +304,7 @@ export function EntityList({
 
   // Grid view - choose card renderer based on variant
   if (viewMode === 'grid') {
-    const renderCard =
-      cardVariant === 'operations' ? renderOperationsCard : renderEntityCard;
+    const renderCard = cardVariant === 'operations' ? renderOperationsCard : renderEntityCard;
 
     return (
       <ScrollArea className="h-full">

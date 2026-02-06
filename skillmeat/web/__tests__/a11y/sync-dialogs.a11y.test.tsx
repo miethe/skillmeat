@@ -248,10 +248,9 @@ describe('SyncConfirmationDialog Accessibility', () => {
   it('should move focus into the dialog when opened', async () => {
     mockUseConflictCheck.mockReturnValue(noChangesState);
 
-    render(
-      <SyncConfirmationDialog {...baseDialogProps} direction="deploy" />,
-      { wrapper: createWrapper(queryClient) }
-    );
+    render(<SyncConfirmationDialog {...baseDialogProps} direction="deploy" />, {
+      wrapper: createWrapper(queryClient),
+    });
 
     // Radix Dialog moves focus to the first focusable element inside DialogContent.
     // Wait for the dialog to be fully rendered and focus to settle.
@@ -267,10 +266,9 @@ describe('SyncConfirmationDialog Accessibility', () => {
     const user = userEvent.setup();
     mockUseConflictCheck.mockReturnValue(noChangesState);
 
-    render(
-      <SyncConfirmationDialog {...baseDialogProps} direction="deploy" />,
-      { wrapper: createWrapper(queryClient) }
-    );
+    render(<SyncConfirmationDialog {...baseDialogProps} direction="deploy" />, {
+      wrapper: createWrapper(queryClient),
+    });
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -289,10 +287,9 @@ describe('SyncConfirmationDialog Accessibility', () => {
   it('should have accessible labels on all buttons (no changes)', async () => {
     mockUseConflictCheck.mockReturnValue(noChangesState);
 
-    render(
-      <SyncConfirmationDialog {...baseDialogProps} direction="deploy" />,
-      { wrapper: createWrapper(queryClient) }
-    );
+    render(<SyncConfirmationDialog {...baseDialogProps} direction="deploy" />, {
+      wrapper: createWrapper(queryClient),
+    });
 
     // Cancel button
     const cancelButton = screen.getByRole('button', { name: /cancel/i });
@@ -310,10 +307,9 @@ describe('SyncConfirmationDialog Accessibility', () => {
   it('should have accessible labels on all buttons (with changes)', async () => {
     mockUseConflictCheck.mockReturnValue(hasChangesState);
 
-    render(
-      <SyncConfirmationDialog {...baseDialogProps} direction="deploy" />,
-      { wrapper: createWrapper(queryClient) }
-    );
+    render(<SyncConfirmationDialog {...baseDialogProps} direction="deploy" />, {
+      wrapper: createWrapper(queryClient),
+    });
 
     // Cancel button
     expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
@@ -328,10 +324,9 @@ describe('SyncConfirmationDialog Accessibility', () => {
   it('should have accessible labels on push direction buttons', async () => {
     mockUseConflictCheck.mockReturnValue(hasChangesState);
 
-    render(
-      <SyncConfirmationDialog {...baseDialogProps} direction="push" />,
-      { wrapper: createWrapper(queryClient) }
-    );
+    render(<SyncConfirmationDialog {...baseDialogProps} direction="push" />, {
+      wrapper: createWrapper(queryClient),
+    });
 
     expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /push changes/i })).toBeInTheDocument();
@@ -340,10 +335,9 @@ describe('SyncConfirmationDialog Accessibility', () => {
   it('should have accessible labels on pull direction buttons', async () => {
     mockUseConflictCheck.mockReturnValue(hasChangesState);
 
-    render(
-      <SyncConfirmationDialog {...baseDialogProps} direction="pull" />,
-      { wrapper: createWrapper(queryClient) }
-    );
+    render(<SyncConfirmationDialog {...baseDialogProps} direction="pull" />, {
+      wrapper: createWrapper(queryClient),
+    });
 
     expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /pull changes/i })).toBeInTheDocument();
@@ -485,11 +479,7 @@ describe('DriftAlertBanner Accessibility', () => {
   ])('comparisonScope=%s', (scope) => {
     it('should have no axe violations with conflict status', async () => {
       const { container } = render(
-        <DriftAlertBanner
-          {...baseBannerProps}
-          driftStatus="conflict"
-          comparisonScope={scope}
-        />
+        <DriftAlertBanner {...baseBannerProps} driftStatus="conflict" comparisonScope={scope} />
       );
 
       const results = await axe(container);

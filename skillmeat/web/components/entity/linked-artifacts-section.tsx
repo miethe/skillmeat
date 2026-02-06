@@ -101,12 +101,11 @@ function getLinkTypeLabel(linkType: LinkType): string {
 /**
  * Delete a linked artifact
  */
-async function deleteLinkedArtifact(
-  artifactId: string,
-  targetArtifactId: string
-): Promise<void> {
+async function deleteLinkedArtifact(artifactId: string, targetArtifactId: string): Promise<void> {
   const response = await fetch(
-    buildUrl(`/artifacts/${encodeURIComponent(artifactId)}/linked-artifacts/${encodeURIComponent(targetArtifactId)}`),
+    buildUrl(
+      `/artifacts/${encodeURIComponent(artifactId)}/linked-artifacts/${encodeURIComponent(targetArtifactId)}`
+    ),
     {
       method: 'DELETE',
     }
@@ -352,7 +351,7 @@ export function LinkedArtifactsSection({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                        className="h-8 w-8 shrink-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
                         onClick={() => handleDeleteClick(artifact)}
                         aria-label={`Remove link to ${artifact.artifact_name}`}
                         disabled={deleteMutation.isPending}
@@ -405,8 +404,8 @@ export function LinkedArtifactsSection({
             <AlertDialogTitle>Remove Artifact Link</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to remove the link to{' '}
-              <span className="font-medium">{deleteTarget?.artifact_name}</span>? This action
-              cannot be undone.
+              <span className="font-medium">{deleteTarget?.artifact_name}</span>? This action cannot
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

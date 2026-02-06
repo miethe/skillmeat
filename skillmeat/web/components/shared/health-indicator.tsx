@@ -18,19 +18,8 @@
 'use client';
 
 import * as React from 'react';
-import {
-  CheckCircle2,
-  ArrowUp,
-  GitBranch,
-  AlertCircle,
-  type LucideIcon,
-} from 'lucide-react';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { CheckCircle2, ArrowUp, GitBranch, AlertCircle, type LucideIcon } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { Artifact } from '@/types/artifact';
 
@@ -157,10 +146,7 @@ export function HealthIndicator({
       role="status"
       aria-label={`Health: ${health.replace('-', ' ')}`}
     >
-      <Icon
-        className={cn(config.color, sizeClasses[size])}
-        aria-hidden="true"
-      />
+      <Icon className={cn(config.color, sizeClasses[size])} aria-hidden="true" />
     </div>
   );
 

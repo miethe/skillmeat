@@ -361,10 +361,7 @@ export function CatalogEntryModal({
     isLoading: isTreeLoading,
     error: treeError,
     refetch: refetchTree,
-  } = useCatalogFileTree(
-    entry ? sourceId : null,
-    entry ? artifactPath : null
-  );
+  } = useCatalogFileTree(entry ? sourceId : null, entry ? artifactPath : null);
 
   // Fetch file content when a file is selected
   const {
@@ -381,19 +378,13 @@ export function CatalogEntryModal({
 
     const files = fileTreeData.entries;
     // Priority: SKILL.md > README.md > first .md file
-    const skillMd = files.find(
-      (f) => f.type === 'file' && f.path.toLowerCase() === 'skill.md'
-    );
+    const skillMd = files.find((f) => f.type === 'file' && f.path.toLowerCase() === 'skill.md');
     if (skillMd) return skillMd.path;
 
-    const readmeMd = files.find(
-      (f) => f.type === 'file' && f.path.toLowerCase() === 'readme.md'
-    );
+    const readmeMd = files.find((f) => f.type === 'file' && f.path.toLowerCase() === 'readme.md');
     if (readmeMd) return readmeMd.path;
 
-    const firstMd = files.find(
-      (f) => f.type === 'file' && f.path.toLowerCase().endsWith('.md')
-    );
+    const firstMd = files.find((f) => f.type === 'file' && f.path.toLowerCase().endsWith('.md'));
     return firstMd?.path ?? null;
   }, [fileTreeData?.entries]);
 
@@ -613,615 +604,617 @@ export function CatalogEntryModal({
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="flex h-[85vh] max-h-[85vh] min-h-0 max-w-4xl flex-col overflow-hidden p-0 lg:max-w-5xl">
-        {/* Header Section - Fixed */}
-        <div className="border-b px-6 pb-4 pt-6">
-          <DialogHeader className="flex flex-row items-start justify-between gap-4">
-            <div className="flex-1">
-              <DialogTitle>Catalog Entry Details</DialogTitle>
-              <DialogDescription className="sr-only">
-                Detailed view of the {entry.name} artifact including confidence scores, metadata, and
-                import options
-              </DialogDescription>
-            </div>
-            {canReimport && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
-                    aria-label="More options"
-                  >
-                    <MoreVertical className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={() => setShowReimportDialog(true)}
-                    disabled={isReimporting}
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Force Re-import
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </DialogHeader>
-        </div>
-
-        {/* Tabs Section */}
-        <Tabs
-          value={activeTab}
-          onValueChange={(value) =>
-            setActiveTab(
-              value as 'overview' | 'contents' | 'tags' | 'collections' | 'deployments'
-            )
-          }
-          className="flex h-full min-h-0 flex-1 flex-col px-6"
-        >
-          <TabsList className="h-auto w-full justify-start rounded-none border-b bg-transparent p-0">
-            <TabsTrigger
-              value="overview"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
-            >
-              <List className="mr-2 h-4 w-4" aria-hidden="true" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger
-              value="contents"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
-            >
-              <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
-              Contents
-            </TabsTrigger>
-            <TabsTrigger
-              value="tags"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
-            >
-              <Tag className="mr-2 h-4 w-4" aria-hidden="true" />
-              Suggested Tags
-            </TabsTrigger>
-            {entry.status === 'imported' && (
-              <>
-                <TabsTrigger
-                  value="collections"
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
-                >
-                  <FolderOpen className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Collections
-                  {collectionsCount > 0 && (
-                    <Badge variant="secondary" className="ml-2">
-                      {collectionsCount}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="deployments"
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
-                >
-                  <Rocket className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Deployments
-                  {deploymentsCount > 0 && (
-                    <Badge variant="secondary" className="ml-2">
-                      {deploymentsCount}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              </>
-            )}
-          </TabsList>
-
-          {/* Overview Tab */}
-          <TabsContent
-            value="overview"
-            className="mt-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-4"
-          >
-            <div className="grid gap-6">
-              {/* Header Section */}
-              <div className="space-y-2 border-b pb-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
-                    {isEditingName ? (
-                      <form
-                        className="flex w-full flex-wrap items-center gap-2"
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          handleSaveName();
-                        }}
-                      >
-                        <Input
-                          value={draftName}
-                          onChange={(event) => {
-                            setDraftName(event.target.value);
-                            setNameError(null);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Escape') {
-                              event.preventDefault();
-                              handleCancelEditName();
-                            }
-                          }}
-                          maxLength={100}
-                          className="min-w-[220px] flex-1"
-                          aria-label="Artifact name"
-                        />
-                        <Button type="submit" size="sm" disabled={isSaveDisabled}>
-                          {isSavingName ? (
-                            <>
-                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                              Saving
-                            </>
-                          ) : (
-                            'Save'
-                          )}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleCancelEditName}
-                          disabled={isSavingName}
-                        >
-                          Cancel
-                        </Button>
-                      </form>
-                    ) : (
-                      <>
-                        <h2 className="truncate text-xl font-semibold">{entry.name}</h2>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleStartEditName}
-                          aria-label={`Edit name for ${entry.name}`}
-                        >
-                          <Pencil className="h-4 w-4" aria-hidden="true" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge className={typeConfig[entry.artifact_type]?.color || 'bg-gray-100'}>
-                      {typeConfig[entry.artifact_type]?.label || entry.artifact_type}
-                    </Badge>
-                    <Badge variant="outline" className={statusConfig[entry.status]?.className}>
-                      {statusConfig[entry.status]?.label || entry.status}
-                    </Badge>
-                  </div>
-                </div>
-                {nameError && (
-                  <p className="text-xs text-destructive" role="alert">
-                    {nameError}
-                  </p>
-                )}
-                <div className="flex min-w-0 items-center gap-3">
-                  <ScoreBadge
-                    confidence={entry.confidence_score}
-                    size="md"
-                    breakdown={entry.score_breakdown}
-                  />
-                  <div className="min-w-0 flex-1 overflow-x-auto">
-                    <code className="break-all rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
-                      {entry.path}
-                    </code>
-                  </div>
-                </div>
+          {/* Header Section - Fixed */}
+          <div className="border-b px-6 pb-4 pt-6">
+            <DialogHeader className="flex flex-row items-start justify-between gap-4">
+              <div className="flex-1">
+                <DialogTitle>Catalog Entry Details</DialogTitle>
+                <DialogDescription className="sr-only">
+                  Detailed view of the {entry.name} artifact including confidence scores, metadata,
+                  and import options
+                </DialogDescription>
               </div>
-
-              {/* Frontmatter Metadata Section */}
-              {isFrontmatterLoading && (
-                <section aria-label="Loading artifact metadata" className="space-y-3">
-                  <h3 className="text-sm font-medium">Artifact Metadata</h3>
-                  <div className="animate-pulse space-y-2">
-                    <div className="h-4 w-1/3 rounded bg-muted" />
-                    <div className="h-4 w-2/3 rounded bg-muted" />
-                    <div className="h-4 w-1/2 rounded bg-muted" />
-                  </div>
-                </section>
+              {canReimport && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      aria-label="More options"
+                    >
+                      <MoreVertical className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => setShowReimportDialog(true)}
+                      disabled={isReimporting}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+                      Force Re-import
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
+            </DialogHeader>
+          </div>
 
-              {parsedFrontmatter && Object.keys(parsedFrontmatter).length > 0 && (
-                <section aria-label="Artifact metadata from frontmatter" className="space-y-3">
-                  <h3 className="text-sm font-medium">Artifact Metadata</h3>
-                  <FrontmatterDisplay
-                    frontmatter={parsedFrontmatter}
-                    defaultCollapsed={false}
-                    className="bg-background"
-                  />
-                </section>
+          {/* Tabs Section */}
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) =>
+              setActiveTab(
+                value as 'overview' | 'contents' | 'tags' | 'collections' | 'deployments'
+              )
+            }
+            className="flex h-full min-h-0 flex-1 flex-col px-6"
+          >
+            <TabsList className="h-auto w-full justify-start rounded-none border-b bg-transparent p-0">
+              <TabsTrigger
+                value="overview"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+              >
+                <List className="mr-2 h-4 w-4" aria-hidden="true" />
+                Overview
+              </TabsTrigger>
+              <TabsTrigger
+                value="contents"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+              >
+                <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
+                Contents
+              </TabsTrigger>
+              <TabsTrigger
+                value="tags"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+              >
+                <Tag className="mr-2 h-4 w-4" aria-hidden="true" />
+                Suggested Tags
+              </TabsTrigger>
+              {entry.status === 'imported' && (
+                <>
+                  <TabsTrigger
+                    value="collections"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                  >
+                    <FolderOpen className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Collections
+                    {collectionsCount > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {collectionsCount}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="deployments"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                  >
+                    <Rocket className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Deployments
+                    {deploymentsCount > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {deploymentsCount}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                </>
               )}
+            </TabsList>
 
-              {/* Confidence Section */}
-              <section aria-label="Confidence score breakdown" className="space-y-3 border-t pt-4">
-                <h3 className="text-sm font-medium">Confidence Score Breakdown</h3>
-                <div className="max-h-[200px] overflow-y-auto">
-                  {entry.score_breakdown ? (
-                    <HeuristicScoreBreakdown breakdown={entry.score_breakdown} variant="full" />
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">
-                        Score breakdown not available for this entry.
-                      </p>
-                      <p className="text-xs text-muted-foreground/70">
-                        Rescan the source to generate detailed scoring breakdown for artifacts.
-                      </p>
+            {/* Overview Tab */}
+            <TabsContent
+              value="overview"
+              className="mt-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-4"
+            >
+              <div className="grid gap-6">
+                {/* Header Section */}
+                <div className="space-y-2 border-b pb-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      {isEditingName ? (
+                        <form
+                          className="flex w-full flex-wrap items-center gap-2"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            handleSaveName();
+                          }}
+                        >
+                          <Input
+                            value={draftName}
+                            onChange={(event) => {
+                              setDraftName(event.target.value);
+                              setNameError(null);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Escape') {
+                                event.preventDefault();
+                                handleCancelEditName();
+                              }
+                            }}
+                            maxLength={100}
+                            className="min-w-[220px] flex-1"
+                            aria-label="Artifact name"
+                          />
+                          <Button type="submit" size="sm" disabled={isSaveDisabled}>
+                            {isSavingName ? (
+                              <>
+                                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                Saving
+                              </>
+                            ) : (
+                              'Save'
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleCancelEditName}
+                            disabled={isSavingName}
+                          >
+                            Cancel
+                          </Button>
+                        </form>
+                      ) : (
+                        <>
+                          <h2 className="truncate text-xl font-semibold">{entry.name}</h2>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleStartEditName}
+                            aria-label={`Edit name for ${entry.name}`}
+                          >
+                            <Pencil className="h-4 w-4" aria-hidden="true" />
+                          </Button>
+                        </>
+                      )}
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className={typeConfig[entry.artifact_type]?.color || 'bg-gray-100'}>
+                        {typeConfig[entry.artifact_type]?.label || entry.artifact_type}
+                      </Badge>
+                      <Badge variant="outline" className={statusConfig[entry.status]?.className}>
+                        {statusConfig[entry.status]?.label || entry.status}
+                      </Badge>
+                    </div>
+                  </div>
+                  {nameError && (
+                    <p className="text-xs text-destructive" role="alert">
+                      {nameError}
+                    </p>
                   )}
-                </div>
-              </section>
-
-              {/* Metadata Section */}
-              <section aria-label="Artifact details" className="space-y-4">
-                <h3 className="text-sm font-semibold">Metadata</h3>
-
-                {/* Path Details */}
-                <div className="space-y-2">
-                  <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                    <span className="font-medium text-muted-foreground">Path:</span>
-                    <div className="overflow-x-auto">
-                      <code className="break-all rounded bg-muted px-2 py-1 font-mono text-xs">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <ScoreBadge
+                      confidence={entry.confidence_score}
+                      size="md"
+                      breakdown={entry.score_breakdown}
+                    />
+                    <div className="min-w-0 flex-1 overflow-x-auto">
+                      <code className="break-all rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
                         {entry.path}
                       </code>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                    <span className="font-medium text-muted-foreground">Upstream URL:</span>
-                    <div className="overflow-x-auto">
-                      <a
-                        href={entry.upstream_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 break-all text-primary hover:underline"
-                        aria-label={`View source repository for ${entry.name} on GitHub`}
-                      >
-                        <span>{entry.upstream_url}</span>
-                        <ExternalLink className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
-                      </a>
-                    </div>
-                  </div>
-
-                  {entry.detected_version && (
-                    <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                      <span className="inline-flex items-center gap-1 font-medium text-muted-foreground">
-                        <GitBranch className="h-3 w-3" aria-hidden="true" />
-                        Version:
-                      </span>
-                      <div className="overflow-x-auto">
-                        <code className="break-all rounded bg-muted px-2 py-1 font-mono text-xs">
-                          {entry.detected_version}
-                        </code>
-                      </div>
-                    </div>
-                  )}
-
-                  {entry.detected_sha && (
-                    <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                      <span className="inline-flex items-center gap-1 font-medium text-muted-foreground">
-                        <GitCommit className="h-3 w-3" aria-hidden="true" />
-                        SHA:
-                      </span>
-                      <div className="overflow-x-auto">
-                        <code className="break-all rounded bg-muted px-2 py-1 font-mono text-xs">
-                          {shortenSha(entry.detected_sha)}
-                        </code>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                    <span className="inline-flex items-center gap-1 font-medium text-muted-foreground">
-                      <Calendar className="h-3 w-3" aria-hidden="true" />
-                      Detected at:
-                    </span>
-                    <span>{formatDate(entry.detected_at)}</span>
-                  </div>
-                </div>
-              </section>
-            </div>
-          </TabsContent>
-
-          {/* Contents Tab - FileTree + ContentPane split layout */}
-          <TabsContent
-            value="contents"
-            className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
-          >
-            <div className="flex h-full min-h-0 min-w-0 flex-1 gap-0 overflow-hidden">
-              {/* Left Panel - File Tree */}
-              <div className="flex w-[280px] flex-shrink-0 flex-col overflow-hidden border-r">
-                {treeError ? (
-                  <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-                    <AlertCircle className="h-8 w-8 text-destructive" aria-hidden="true" />
-                    <div>
-                      <p className="text-sm font-medium">
-                        {getErrorMessage(treeError, true).title}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {getErrorMessage(treeError, true).description}
-                      </p>
-                    </div>
-                    <div className="flex w-full max-w-[200px] flex-col gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => refetchTree()}
-                        className="w-full"
-                      >
-                        <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
-                        Try again
-                      </Button>
-                      <Button variant="ghost" size="sm" asChild className="w-full">
-                        <a href={entry.upstream_url} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
-                          View on GitHub
-                        </a>
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <FileTree
-                    entityId={entry.id}
-                    files={fileStructure}
-                    selectedPath={selectedFilePath}
-                    onSelect={setSelectedFilePath}
-                    isLoading={isTreeLoading}
-                    readOnly
-                    ariaLabel={`File browser for ${entry.name}`}
-                  />
-                )}
-              </div>
-
-              {/* Right Panel - Content Pane with enhanced error handling */}
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                {contentError ? (
-                  <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-                    <AlertCircle className="h-8 w-8 text-destructive" aria-hidden="true" />
-                    <div>
-                      <p className="text-sm font-medium">
-                        {getErrorMessage(contentError, false).title}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {getErrorMessage(contentError, false).description}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => refetchContent()}>
-                        <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
-                        Try again
-                      </Button>
-                      <Button variant="ghost" size="sm" asChild>
-                        <a href={entry.upstream_url} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
-                          View on GitHub
-                        </a>
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <ContentPane
-                    path={selectedFilePath}
-                    content={fileContentData?.content ?? null}
-                    isLoading={isContentLoading}
-                    readOnly
-                    truncationInfo={
-                      fileContentData?.truncated
-                        ? {
-                            truncated: true,
-                            originalSize: fileContentData.original_size,
-                            fullFileUrl: selectedFilePath
-                              ? buildGitHubFileUrl(
-                                  entry.upstream_url,
-                                  entry.path,
-                                  selectedFilePath,
-                                  entry.detected_sha
-                                )
-                              : undefined,
-                          }
-                        : undefined
-                    }
-                  />
-                )}
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* Suggested Tags Tab */}
-          <TabsContent value="tags" className="mt-0 min-h-0 flex-1 overflow-y-auto py-4">
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <h3 className="text-sm font-medium">Path-Based Tag Suggestions</h3>
-                <p className="text-xs text-muted-foreground">
-                  Review and approve tags extracted from the artifact path. Approved tags will be
-                  applied when importing.
-                </p>
-              </div>
-              <PathTagReview sourceId={entry.source_id} entryId={entry.id} />
-            </div>
-          </TabsContent>
-
-          {/* Collections Tab - only rendered for imported artifacts */}
-          {entry.status === 'imported' && (
-            <TabsContent value="collections" className="mt-0 min-h-0 flex-1 overflow-y-auto py-4">
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium">Collections</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Collections this artifact belongs to in your library.
-                  </p>
                 </div>
 
-                {isLoadingArtifact ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    <span className="ml-2 text-sm text-muted-foreground">
-                      Loading collections...
-                    </span>
-                  </div>
-                ) : importedArtifact?.collections && importedArtifact.collections.length > 0 ? (
-                  <div className="grid gap-3">
-                    {importedArtifact.collections.map((collection) => (
-                      <button
-                        key={collection.id}
-                        type="button"
-                        onClick={() =>
-                          onNavigateToCollection?.(collection.id, importedArtifact.id)
-                        }
-                        className="flex items-center gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-muted/50"
-                      >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-                          <FolderOpen className="h-5 w-5 text-primary" aria-hidden="true" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium">{collection.name}</p>
-                          {collection.artifact_count !== undefined && (
-                            <p className="text-xs text-muted-foreground">
-                              {collection.artifact_count} artifact
-                              {collection.artifact_count !== 1 ? 's' : ''}
-                            </p>
-                          )}
-                        </div>
-                        <ExternalLink
-                          className="h-4 w-4 flex-shrink-0 text-muted-foreground"
-                          aria-hidden="true"
-                        />
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <FolderOpen
-                      className="mb-2 h-10 w-10 text-muted-foreground/50"
-                      aria-hidden="true"
+                {/* Frontmatter Metadata Section */}
+                {isFrontmatterLoading && (
+                  <section aria-label="Loading artifact metadata" className="space-y-3">
+                    <h3 className="text-sm font-medium">Artifact Metadata</h3>
+                    <div className="animate-pulse space-y-2">
+                      <div className="h-4 w-1/3 rounded bg-muted" />
+                      <div className="h-4 w-2/3 rounded bg-muted" />
+                      <div className="h-4 w-1/2 rounded bg-muted" />
+                    </div>
+                  </section>
+                )}
+
+                {parsedFrontmatter && Object.keys(parsedFrontmatter).length > 0 && (
+                  <section aria-label="Artifact metadata from frontmatter" className="space-y-3">
+                    <h3 className="text-sm font-medium">Artifact Metadata</h3>
+                    <FrontmatterDisplay
+                      frontmatter={parsedFrontmatter}
+                      defaultCollapsed={false}
+                      className="bg-background"
                     />
-                    <p className="text-sm font-medium text-muted-foreground">
-                      No collections
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground/70">
-                      This artifact is not in any collections yet.
-                    </p>
-                  </div>
+                  </section>
                 )}
+
+                {/* Confidence Section */}
+                <section
+                  aria-label="Confidence score breakdown"
+                  className="space-y-3 border-t pt-4"
+                >
+                  <h3 className="text-sm font-medium">Confidence Score Breakdown</h3>
+                  <div className="max-h-[200px] overflow-y-auto">
+                    {entry.score_breakdown ? (
+                      <HeuristicScoreBreakdown breakdown={entry.score_breakdown} variant="full" />
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          Score breakdown not available for this entry.
+                        </p>
+                        <p className="text-xs text-muted-foreground/70">
+                          Rescan the source to generate detailed scoring breakdown for artifacts.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {/* Metadata Section */}
+                <section aria-label="Artifact details" className="space-y-4">
+                  <h3 className="text-sm font-semibold">Metadata</h3>
+
+                  {/* Path Details */}
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+                      <span className="font-medium text-muted-foreground">Path:</span>
+                      <div className="overflow-x-auto">
+                        <code className="break-all rounded bg-muted px-2 py-1 font-mono text-xs">
+                          {entry.path}
+                        </code>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+                      <span className="font-medium text-muted-foreground">Upstream URL:</span>
+                      <div className="overflow-x-auto">
+                        <a
+                          href={entry.upstream_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 break-all text-primary hover:underline"
+                          aria-label={`View source repository for ${entry.name} on GitHub`}
+                        >
+                          <span>{entry.upstream_url}</span>
+                          <ExternalLink className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+                        </a>
+                      </div>
+                    </div>
+
+                    {entry.detected_version && (
+                      <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+                        <span className="inline-flex items-center gap-1 font-medium text-muted-foreground">
+                          <GitBranch className="h-3 w-3" aria-hidden="true" />
+                          Version:
+                        </span>
+                        <div className="overflow-x-auto">
+                          <code className="break-all rounded bg-muted px-2 py-1 font-mono text-xs">
+                            {entry.detected_version}
+                          </code>
+                        </div>
+                      </div>
+                    )}
+
+                    {entry.detected_sha && (
+                      <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+                        <span className="inline-flex items-center gap-1 font-medium text-muted-foreground">
+                          <GitCommit className="h-3 w-3" aria-hidden="true" />
+                          SHA:
+                        </span>
+                        <div className="overflow-x-auto">
+                          <code className="break-all rounded bg-muted px-2 py-1 font-mono text-xs">
+                            {shortenSha(entry.detected_sha)}
+                          </code>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+                      <span className="inline-flex items-center gap-1 font-medium text-muted-foreground">
+                        <Calendar className="h-3 w-3" aria-hidden="true" />
+                        Detected at:
+                      </span>
+                      <span>{formatDate(entry.detected_at)}</span>
+                    </div>
+                  </div>
+                </section>
               </div>
             </TabsContent>
-          )}
 
-          {/* Deployments Tab - only rendered for imported artifacts */}
-          {entry.status === 'imported' && (
-            <TabsContent value="deployments" className="mt-0 min-h-0 flex-1 overflow-y-auto py-4">
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium">Deployments</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Projects where this artifact is deployed.
-                  </p>
+            {/* Contents Tab - FileTree + ContentPane split layout */}
+            <TabsContent
+              value="contents"
+              className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
+            >
+              <div className="flex h-full min-h-0 min-w-0 flex-1 gap-0 overflow-hidden">
+                {/* Left Panel - File Tree */}
+                <div className="flex w-[280px] flex-shrink-0 flex-col overflow-hidden border-r">
+                  {treeError ? (
+                    <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+                      <AlertCircle className="h-8 w-8 text-destructive" aria-hidden="true" />
+                      <div>
+                        <p className="text-sm font-medium">
+                          {getErrorMessage(treeError, true).title}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {getErrorMessage(treeError, true).description}
+                        </p>
+                      </div>
+                      <div className="flex w-full max-w-[200px] flex-col gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => refetchTree()}
+                          className="w-full"
+                        >
+                          <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+                          Try again
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild className="w-full">
+                          <a href={entry.upstream_url} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
+                            View on GitHub
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <FileTree
+                      entityId={entry.id}
+                      files={fileStructure}
+                      selectedPath={selectedFilePath}
+                      onSelect={setSelectedFilePath}
+                      isLoading={isTreeLoading}
+                      readOnly
+                      ariaLabel={`File browser for ${entry.name}`}
+                    />
+                  )}
                 </div>
 
-                {isLoadingDeployments ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    <span className="ml-2 text-sm text-muted-foreground">
-                      Loading deployments...
-                    </span>
+                {/* Right Panel - Content Pane with enhanced error handling */}
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                  {contentError ? (
+                    <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+                      <AlertCircle className="h-8 w-8 text-destructive" aria-hidden="true" />
+                      <div>
+                        <p className="text-sm font-medium">
+                          {getErrorMessage(contentError, false).title}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {getErrorMessage(contentError, false).description}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => refetchContent()}>
+                          <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+                          Try again
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild>
+                          <a href={entry.upstream_url} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
+                            View on GitHub
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <ContentPane
+                      path={selectedFilePath}
+                      content={fileContentData?.content ?? null}
+                      isLoading={isContentLoading}
+                      readOnly
+                      truncationInfo={
+                        fileContentData?.truncated
+                          ? {
+                              truncated: true,
+                              originalSize: fileContentData.original_size,
+                              fullFileUrl: selectedFilePath
+                                ? buildGitHubFileUrl(
+                                    entry.upstream_url,
+                                    entry.path,
+                                    selectedFilePath,
+                                    entry.detected_sha
+                                  )
+                                : undefined,
+                            }
+                          : undefined
+                      }
+                    />
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Suggested Tags Tab */}
+            <TabsContent value="tags" className="mt-0 min-h-0 flex-1 overflow-y-auto py-4">
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium">Path-Based Tag Suggestions</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Review and approve tags extracted from the artifact path. Approved tags will be
+                    applied when importing.
+                  </p>
+                </div>
+                <PathTagReview sourceId={entry.source_id} entryId={entry.id} />
+              </div>
+            </TabsContent>
+
+            {/* Collections Tab - only rendered for imported artifacts */}
+            {entry.status === 'imported' && (
+              <TabsContent value="collections" className="mt-0 min-h-0 flex-1 overflow-y-auto py-4">
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-medium">Collections</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Collections this artifact belongs to in your library.
+                    </p>
                   </div>
-                ) : artifactDeployments.length > 0 ? (
-                  <div className="grid gap-3">
-                    {artifactDeployments.map((deployment, index) => (
-                      <button
-                        key={`${deployment.project_path}-${deployment.artifact_name}-${index}`}
-                        type="button"
-                        onClick={() =>
-                          onNavigateToDeployment?.(
-                            deployment.project_path,
-                            entry.import_id || entry.id
-                          )
-                        }
-                        className="flex items-center gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-muted/50"
-                      >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-green-500/10">
-                          <Rocket className="h-5 w-5 text-green-600" aria-hidden="true" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium">{deployment.artifact_name}</p>
-                          <p
-                            className="truncate text-xs text-muted-foreground"
-                            title={deployment.project_path}
-                          >
-                            {deployment.project_path}
-                          </p>
-                          <p className="text-xs text-muted-foreground/70">
-                            Deployed {formatDate(deployment.deployed_at)}
-                          </p>
-                        </div>
-                        <div className="flex flex-shrink-0 items-center gap-2">
-                          {deployment.local_modifications && (
-                            <Badge variant="outline" className="border-yellow-500 text-yellow-600">
-                              Modified
-                            </Badge>
-                          )}
+
+                  {isLoadingArtifact ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-sm text-muted-foreground">
+                        Loading collections...
+                      </span>
+                    </div>
+                  ) : importedArtifact?.collections && importedArtifact.collections.length > 0 ? (
+                    <div className="grid gap-3">
+                      {importedArtifact.collections.map((collection) => (
+                        <button
+                          key={collection.id}
+                          type="button"
+                          onClick={() =>
+                            onNavigateToCollection?.(collection.id, importedArtifact.id)
+                          }
+                          className="flex items-center gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-muted/50"
+                        >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+                            <FolderOpen className="h-5 w-5 text-primary" aria-hidden="true" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium">{collection.name}</p>
+                            {collection.artifact_count !== undefined && (
+                              <p className="text-xs text-muted-foreground">
+                                {collection.artifact_count} artifact
+                                {collection.artifact_count !== 1 ? 's' : ''}
+                              </p>
+                            )}
+                          </div>
                           <ExternalLink
-                            className="h-4 w-4 text-muted-foreground"
+                            className="h-4 w-4 flex-shrink-0 text-muted-foreground"
                             aria-hidden="true"
                           />
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <Rocket
-                      className="mb-2 h-10 w-10 text-muted-foreground/50"
-                      aria-hidden="true"
-                    />
-                    <p className="text-sm font-medium text-muted-foreground">
-                      No deployments
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground/70">
-                      This artifact has not been deployed to any projects.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-          )}
-        </Tabs>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <FolderOpen
+                        className="mb-2 h-10 w-10 text-muted-foreground/50"
+                        aria-hidden="true"
+                      />
+                      <p className="text-sm font-medium text-muted-foreground">No collections</p>
+                      <p className="mt-1 text-xs text-muted-foreground/70">
+                        This artifact is not in any collections yet.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            )}
 
-        {/* Action Buttons */}
-        <DialogFooter className="mt-auto flex-shrink-0 border-t px-6 py-4">
-          <Button
-            variant="outline"
-            onClick={() => window.open(entry.upstream_url, '_blank', 'noopener,noreferrer')}
-            aria-label={`View ${entry.name} source repository on GitHub`}
-          >
-            <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
-            View on GitHub
-          </Button>
+            {/* Deployments Tab - only rendered for imported artifacts */}
+            {entry.status === 'imported' && (
+              <TabsContent value="deployments" className="mt-0 min-h-0 flex-1 overflow-y-auto py-4">
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-medium">Deployments</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Projects where this artifact is deployed.
+                    </p>
+                  </div>
 
-          {onImport && (
+                  {isLoadingDeployments ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-sm text-muted-foreground">
+                        Loading deployments...
+                      </span>
+                    </div>
+                  ) : artifactDeployments.length > 0 ? (
+                    <div className="grid gap-3">
+                      {artifactDeployments.map((deployment, index) => (
+                        <button
+                          key={`${deployment.project_path}-${deployment.artifact_name}-${index}`}
+                          type="button"
+                          onClick={() =>
+                            onNavigateToDeployment?.(
+                              deployment.project_path,
+                              entry.import_id || entry.id
+                            )
+                          }
+                          className="flex items-center gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-muted/50"
+                        >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-green-500/10">
+                            <Rocket className="h-5 w-5 text-green-600" aria-hidden="true" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium">{deployment.artifact_name}</p>
+                            <p
+                              className="truncate text-xs text-muted-foreground"
+                              title={deployment.project_path}
+                            >
+                              {deployment.project_path}
+                            </p>
+                            <p className="text-xs text-muted-foreground/70">
+                              Deployed {formatDate(deployment.deployed_at)}
+                            </p>
+                          </div>
+                          <div className="flex flex-shrink-0 items-center gap-2">
+                            {deployment.local_modifications && (
+                              <Badge
+                                variant="outline"
+                                className="border-yellow-500 text-yellow-600"
+                              >
+                                Modified
+                              </Badge>
+                            )}
+                            <ExternalLink
+                              className="h-4 w-4 text-muted-foreground"
+                              aria-hidden="true"
+                            />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <Rocket
+                        className="mb-2 h-10 w-10 text-muted-foreground/50"
+                        aria-hidden="true"
+                      />
+                      <p className="text-sm font-medium text-muted-foreground">No deployments</p>
+                      <p className="mt-1 text-xs text-muted-foreground/70">
+                        This artifact has not been deployed to any projects.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            )}
+          </Tabs>
+
+          {/* Action Buttons */}
+          <DialogFooter className="mt-auto flex-shrink-0 border-t px-6 py-4">
             <Button
-              variant="default"
-              onClick={() => onImport(entry)}
-              disabled={isImportDisabled}
-              aria-label={
-                isImporting
-                  ? `Importing ${entry.name}...`
-                  : isImportDisabled
-                    ? `Cannot import ${entry.name} - ${entry.status === 'imported' ? 'already imported' : 'artifact removed'}`
-                    : `Import ${entry.name} artifact`
-              }
+              variant="outline"
+              onClick={() => window.open(entry.upstream_url, '_blank', 'noopener,noreferrer')}
+              aria-label={`View ${entry.name} source repository on GitHub`}
             >
-              {isImporting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                  Importing...
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Import
-                </>
-              )}
+              <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
+              View on GitHub
             </Button>
-          )}
-        </DialogFooter>
+
+            {onImport && (
+              <Button
+                variant="default"
+                onClick={() => onImport(entry)}
+                disabled={isImportDisabled}
+                aria-label={
+                  isImporting
+                    ? `Importing ${entry.name}...`
+                    : isImportDisabled
+                      ? `Cannot import ${entry.name} - ${entry.status === 'imported' ? 'already imported' : 'artifact removed'}`
+                      : `Import ${entry.name} artifact`
+                }
+              >
+                {isImporting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Import
+                  </>
+                )}
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

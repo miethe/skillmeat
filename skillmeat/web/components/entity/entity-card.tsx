@@ -69,13 +69,7 @@ export interface EntityCardProps {
  * @returns Unified card component with consistent ArtifactCard styling
  */
 export function EntityCard(props: EntityCardProps) {
-  return (
-    <UnifiedCard
-      {...props}
-      item={props.entity}
-      onCopyCliCommand={props.onCopyCliCommand}
-    />
-  );
+  return <UnifiedCard {...props} item={props.entity} onCopyCliCommand={props.onCopyCliCommand} />;
 }
 
 /**

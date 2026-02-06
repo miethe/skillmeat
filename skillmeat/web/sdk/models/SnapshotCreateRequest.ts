@@ -8,13 +8,12 @@
  * Creates a point-in-time snapshot of a collection for later rollback.
  */
 export type SnapshotCreateRequest = {
-    /**
-     * Collection name (uses active collection if not specified)
-     */
-    collection_name?: (string | null);
-    /**
-     * Snapshot description or commit message
-     */
-    message?: string;
+  /**
+   * Collection name (uses active collection if not specified)
+   */
+  collection_name?: string | null;
+  /**
+   * Snapshot description or commit message
+   */
+  message?: string;
 };
-

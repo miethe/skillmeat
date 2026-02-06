@@ -1568,7 +1568,9 @@ export default function SourceDetailPage() {
         onNavigateToCollection={(collectionId, artifactId) => {
           setModalOpen(false);
           setSelectedEntry(null);
-          router.push(`/manage?collection=${collectionId}&artifact=${encodeURIComponent(artifactId)}`);
+          router.push(
+            `/manage?collection=${collectionId}&artifact=${encodeURIComponent(artifactId)}`
+          );
         }}
         onNavigateToDeployment={(projectPath, artifactId) => {
           setModalOpen(false);

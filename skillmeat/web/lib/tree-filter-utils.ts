@@ -10,10 +10,7 @@
 
 import type { FolderTree, FolderNode } from './tree-builder';
 import type { CatalogEntry } from '@/types/marketplace';
-import {
-  DEFAULT_LEAF_CONTAINERS,
-  DEFAULT_ROOT_EXCLUSIONS,
-} from '@/hooks/use-detection-patterns';
+import { DEFAULT_LEAF_CONTAINERS, DEFAULT_ROOT_EXCLUSIONS } from '@/hooks/use-detection-patterns';
 
 /**
  * Configuration for semantic folder filtering
@@ -87,10 +84,7 @@ function isRootExclusion(
 /**
  * Check if a folder is a leaf container (applies at any depth)
  */
-function isLeafContainer(
-  folderPath: string,
-  config?: SemanticFilterConfig
-): boolean {
+function isLeafContainer(folderPath: string, config?: SemanticFilterConfig): boolean {
   const leafContainers = config?.leafContainers ?? DEFAULT_LEAF_CONTAINERS;
   const folderName = folderPath.split('/').pop() || '';
   return leafContainers.includes(folderName);

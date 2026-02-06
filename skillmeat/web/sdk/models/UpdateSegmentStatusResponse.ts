@@ -9,21 +9,20 @@ import type { ExtractedSegmentResponse } from './ExtractedSegmentResponse';
  * Returns the updated entry with all segments and their new statuses.
  */
 export type UpdateSegmentStatusResponse = {
-    /**
-     * Catalog entry ID
-     */
-    entry_id: string;
-    /**
-     * Full artifact path
-     */
-    raw_path: string;
-    /**
-     * Updated segments with status
-     */
-    extracted: Array<ExtractedSegmentResponse>;
-    /**
-     * Update timestamp
-     */
-    updated_at: string;
+  /**
+   * Catalog entry ID
+   */
+  entry_id: string;
+  /**
+   * Full artifact path
+   */
+  raw_path: string;
+  /**
+   * Updated segments with status
+   */
+  extracted: Array<ExtractedSegmentResponse>;
+  /**
+   * Update timestamp
+   */
+  updated_at: string;
 };
-

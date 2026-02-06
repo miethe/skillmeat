@@ -122,6 +122,44 @@ Orchestrates the process of importing detected artifacts to the user's collectio
 - `OVERWRITE`: Replace existing artifact
 - `RENAME`: Append suffix to name if exists
 
+### Symlink Support
+
+SkillMeat transparently resolves symlinks in GitHub repositories, enabling artifacts that use symlinks to reference shared resources elsewhere in the repository.
+
+**Overview**: Artifacts in GitHub repos may use symlinks to reference directories or files elsewhere in the repository structure. For example, a skill at `.claude/skills/my-skill/` might symlink `data/` to a shared data directory or `scripts/` to utility scripts. SkillMeat resolves these symlinks transparently so they appear as regular files and directories in artifact file trees.
+
+**How it works**: Symlink support spans three layers:
+
+1. **Tree resolution** (`GitHubClient.get_repo_tree()`):
+   - Detects symlinks via Git mode `120000` (symlink file mode)
+   - Fetches blob content to extract target path
+   - Resolves relative paths (e.g., `../shared` → `shared`)
+   - Looks up target in tree to determine if symlink points to file or directory
+   - Symlinks to directories get `type: "tree"`, symlinks to files get `type: "blob"`
+
+2. **Virtual entry mirroring**:
+   - For symlinks that resolve to directories, children of the target directory are added as virtual entries under the symlink path
+   - Ensures prefix-filtered views (e.g., filtering to `.claude/`) include all files even when some are accessed through symlinked directories
+   - Virtual entries have same content as real entries but appear at symlink path
+
+3. **Content resolution** (`GitHubClient.get_file_with_metadata()`):
+   - When a file at a virtual path returns 404, walks up parent directories to find symlink ancestors
+   - Resolves through the symlink to get the real path
+   - Fetches content from the real location
+   - Returns file with correct metadata while preserving virtual path context
+
+**Import-time resolution** (`ImportCoordinator._download_directory_recursive()`):
+- During artifact import, symlinks are detected by checking for `type: "symlink"` in Git mode
+- Target path is fetched from blob content
+- Directory symlinks are recursively downloaded with contents
+- Circular symlink detection prevents infinite loops (tracks visited paths)
+- Target validation ensures symlink destination exists and is accessible
+
+**Limitations**:
+- Symlinks pointing outside the repository are skipped (cannot be imported)
+- Resolving symlinks requires additional GitHub API calls: one `get_git_blob()` per symlink for tree resolution, one `get_contents()` per ancestor level for content resolution
+- Broken symlinks (target not found in tree) fall through as `type: "symlink"` and appear as regular files in the UI
+
 ### Data Flow
 
 The typical GitHub ingestion workflow follows this flow:

@@ -317,7 +317,11 @@ export function ArtifactBrowseCard({
               </Badge>
             ))}
             {artifact.collections.length > 2 && (
-              <Badge variant="outline" className="text-xs" aria-label={`${artifact.collections.length - 2} more collections`}>
+              <Badge
+                variant="outline"
+                className="text-xs"
+                aria-label={`${artifact.collections.length - 2} more collections`}
+              >
                 +{artifact.collections.length - 2}
               </Badge>
             )}
@@ -333,14 +337,22 @@ export function ArtifactBrowseCard({
       </div>
 
       {/* Tags */}
-      <div className="flex min-h-[28px] flex-wrap items-center gap-1 px-4 pb-3" role="list" aria-label="Tags">
+      <div
+        className="flex min-h-[28px] flex-wrap items-center gap-1 px-4 pb-3"
+        role="list"
+        aria-label="Tags"
+      >
         {visibleTags.map((tag) => (
           <Badge key={tag} variant="secondary" className="text-xs" role="listitem">
             {tag}
           </Badge>
         ))}
         {remainingTagsCount > 0 && (
-          <Badge variant="secondary" className="text-xs" aria-label={`${remainingTagsCount} more tags`}>
+          <Badge
+            variant="secondary"
+            className="text-xs"
+            aria-label={`${remainingTagsCount} more tags`}
+          >
             +{remainingTagsCount} more
           </Badge>
         )}
@@ -357,7 +369,11 @@ export function ArtifactBrowseCard({
             </Badge>
           ))}
           {tools.length > 3 && (
-            <Badge variant="outline" className="text-xs font-normal" aria-label={`${tools.length - 3} more tools`}>
+            <Badge
+              variant="outline"
+              className="text-xs font-normal"
+              aria-label={`${tools.length - 3} more tools`}
+            >
               +{tools.length - 3}
             </Badge>
           )}
@@ -388,7 +404,11 @@ export function ArtifactBrowseCard({
  */
 export function ArtifactBrowseCardSkeleton({ className }: { className?: string }) {
   return (
-    <Card className={cn('border-l-4', className)} aria-busy="true" aria-label="Loading artifact card">
+    <Card
+      className={cn('border-l-4', className)}
+      aria-busy="true"
+      aria-label="Loading artifact card"
+    >
       {/* Header skeleton */}
       <div className="p-4 pb-3">
         <div className="flex items-start justify-between gap-2">

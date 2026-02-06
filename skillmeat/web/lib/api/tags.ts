@@ -134,9 +134,12 @@ export async function getArtifactTags(artifactId: string): Promise<Tag[]> {
  * Add tag to artifact
  */
 export async function addTagToArtifact(artifactId: string, tagId: string): Promise<void> {
-  const response = await fetch(buildUrl(`/artifacts/${encodeURIComponent(artifactId)}/tags/${encodeURIComponent(tagId)}`), {
-    method: 'POST',
-  });
+  const response = await fetch(
+    buildUrl(`/artifacts/${encodeURIComponent(artifactId)}/tags/${encodeURIComponent(tagId)}`),
+    {
+      method: 'POST',
+    }
+  );
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error(errorBody.detail || `Failed to add tag to artifact: ${response.statusText}`);
@@ -147,9 +150,12 @@ export async function addTagToArtifact(artifactId: string, tagId: string): Promi
  * Remove tag from artifact
  */
 export async function removeTagFromArtifact(artifactId: string, tagId: string): Promise<void> {
-  const response = await fetch(buildUrl(`/artifacts/${encodeURIComponent(artifactId)}/tags/${encodeURIComponent(tagId)}`), {
-    method: 'DELETE',
-  });
+  const response = await fetch(
+    buildUrl(`/artifacts/${encodeURIComponent(artifactId)}/tags/${encodeURIComponent(tagId)}`),
+    {
+      method: 'DELETE',
+    }
+  );
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error(

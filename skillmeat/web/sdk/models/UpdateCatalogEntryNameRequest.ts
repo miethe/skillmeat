@@ -6,9 +6,8 @@
  * Request body for updating the display name of a catalog entry.
  */
 export type UpdateCatalogEntryNameRequest = {
-    /**
-     * Updated artifact name to use for display and import
-     */
-    name: string;
+  /**
+   * Updated artifact name to use for display and import
+   */
+  name: string;
 };
-

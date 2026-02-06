@@ -8,25 +8,24 @@
  * Lightweight group representation for collection listings.
  */
 export type GroupSummary = {
-    /**
-     * Group unique identifier
-     */
-    id: string;
-    /**
-     * Group name
-     */
-    name: string;
-    /**
-     * Group description
-     */
-    description?: (string | null);
-    /**
-     * Display order within collection
-     */
-    position: number;
-    /**
-     * Number of artifacts in group
-     */
-    artifact_count: number;
+  /**
+   * Group unique identifier
+   */
+  id: string;
+  /**
+   * Group name
+   */
+  name: string;
+  /**
+   * Group description
+   */
+  description?: string | null;
+  /**
+   * Display order within collection
+   */
+  position: number;
+  /**
+   * Number of artifacts in group
+   */
+  artifact_count: number;
 };
-

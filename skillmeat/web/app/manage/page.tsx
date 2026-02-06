@@ -6,16 +6,18 @@ import { Plus, Grid3x3, List, Loader2, RefreshCw, Activity } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/shared/page-header';
-import {
-  EntityLifecycleProvider,
-  useEntityLifecycle,
-  useReturnTo,
-} from '@/hooks';
+import { EntityLifecycleProvider, useEntityLifecycle, useReturnTo } from '@/hooks';
 import { EntityList } from '@/components/entity/entity-list';
 import { EntityForm } from '@/components/entity/entity-form';
 import { EntityTabs } from './components/entity-tabs';
-import { ManagePageFilters, type ManageStatusFilter } from '@/components/manage/manage-page-filters';
-import { ArtifactOperationsModal, type OperationsModalTab } from '@/components/manage/artifact-operations-modal';
+import {
+  ManagePageFilters,
+  type ManageStatusFilter,
+} from '@/components/manage/manage-page-filters';
+import {
+  ArtifactOperationsModal,
+  type OperationsModalTab,
+} from '@/components/manage/artifact-operations-modal';
 import { AddEntityDialog } from './components/add-entity-dialog';
 import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
 import type { Artifact, ArtifactType } from '@/types';
@@ -100,11 +102,11 @@ function ManagePageContent() {
     // The hook expects: 'synced' | 'modified' | 'outdated' | 'conflict' | 'error' | null
     // ManageStatusFilter has: 'all' | 'needs-update' | 'has-drift' | 'deployed' | 'error'
     const statusMapping: Record<ManageStatusFilter, string | null> = {
-      'all': null,
+      all: null,
       'needs-update': 'outdated',
       'has-drift': 'modified',
-      'deployed': 'synced',
-      'error': 'error',
+      deployed: 'synced',
+      error: 'error',
     };
     setStatusFilter(statusMapping[urlStatus] as any);
   }, [urlStatus, setStatusFilter]);
@@ -210,25 +212,40 @@ function ManagePageContent() {
   // Filter Change Handlers (update URL)
   // ==========================================================================
 
-  const handleSearchChange = useCallback((search: string) => {
-    updateUrlParams({ search: search || null });
-  }, [updateUrlParams]);
+  const handleSearchChange = useCallback(
+    (search: string) => {
+      updateUrlParams({ search: search || null });
+    },
+    [updateUrlParams]
+  );
 
-  const handleStatusChange = useCallback((status: ManageStatusFilter) => {
-    updateUrlParams({ status: status === 'all' ? null : status });
-  }, [updateUrlParams]);
+  const handleStatusChange = useCallback(
+    (status: ManageStatusFilter) => {
+      updateUrlParams({ status: status === 'all' ? null : status });
+    },
+    [updateUrlParams]
+  );
 
-  const handleTypeChange = useCallback((type: ArtifactType | 'all') => {
-    updateUrlParams({ type: type === 'skill' ? null : type }); // skill is default
-  }, [updateUrlParams]);
+  const handleTypeChange = useCallback(
+    (type: ArtifactType | 'all') => {
+      updateUrlParams({ type: type === 'skill' ? null : type }); // skill is default
+    },
+    [updateUrlParams]
+  );
 
-  const handleProjectChange = useCallback((project: string | null) => {
-    updateUrlParams({ project });
-  }, [updateUrlParams]);
+  const handleProjectChange = useCallback(
+    (project: string | null) => {
+      updateUrlParams({ project });
+    },
+    [updateUrlParams]
+  );
 
-  const handleTagsChange = useCallback((tags: string[]) => {
-    updateUrlParams({ tags: tags.length > 0 ? tags.join(',') : null });
-  }, [updateUrlParams]);
+  const handleTagsChange = useCallback(
+    (tags: string[]) => {
+      updateUrlParams({ tags: tags.length > 0 ? tags.join(',') : null });
+    },
+    [updateUrlParams]
+  );
 
   const handleClearAllFilters = useCallback(() => {
     updateUrlParams({
@@ -245,15 +262,18 @@ function ManagePageContent() {
   // ==========================================================================
 
   // Memoize event handlers to prevent EntityList re-renders
-  const handleArtifactClick = useCallback((artifact: Artifact) => {
-    setSelectedArtifact(artifact);
-    setDetailPanelOpen(true);
-    // Update URL with artifact ID (clear tab to start at default 'status' for operations modal)
-    updateUrlParams({
-      artifact: artifact.id,
-      tab: null,
-    });
-  }, [updateUrlParams]);
+  const handleArtifactClick = useCallback(
+    (artifact: Artifact) => {
+      setSelectedArtifact(artifact);
+      setDetailPanelOpen(true);
+      // Update URL with artifact ID (clear tab to start at default 'status' for operations modal)
+      updateUrlParams({
+        artifact: artifact.id,
+        tab: null,
+      });
+    },
+    [updateUrlParams]
+  );
 
   const handleDetailClose = useCallback(() => {
     // Set closing flag FIRST to prevent race condition with auto-open useEffect
@@ -271,12 +291,15 @@ function ManagePageContent() {
     }, 0);
   }, [updateUrlParams]);
 
-  const handleTabChange = useCallback((tab: OperationsModalTab) => {
-    // Update URL with new tab
-    updateUrlParams({
-      tab: tab === 'status' ? null : tab, // Don't clutter URL with default tab
-    });
-  }, [updateUrlParams]);
+  const handleTabChange = useCallback(
+    (tab: OperationsModalTab) => {
+      // Update URL with new tab
+      updateUrlParams({
+        tab: tab === 'status' ? null : tab, // Don't clutter URL with default tab
+      });
+    },
+    [updateUrlParams]
+  );
 
   const handleEdit = useCallback((artifact: Artifact) => {
     setEditingArtifact(artifact);
@@ -288,9 +311,12 @@ function ManagePageContent() {
   }, []);
 
   // Handler for delete from card - uses deletion dialog
-  const handleDelete = useCallback((artifact: Artifact) => {
-    handleDeleteArtifact(artifact);
-  }, [handleDeleteArtifact]);
+  const handleDelete = useCallback(
+    (artifact: Artifact) => {
+      handleDeleteArtifact(artifact);
+    },
+    [handleDeleteArtifact]
+  );
 
   // Handler for delete from modal - closes modal first then shows deletion dialog
   const handleDeleteFromModal = useCallback(() => {
@@ -303,55 +329,70 @@ function ManagePageContent() {
     }
   }, [selectedArtifact, handleDetailClose]);
 
-  const handleDeploy = useCallback((artifact: Artifact) => {
-    // Open artifact modal to deployments tab for deployment
-    setSelectedArtifact(artifact);
-    setDetailPanelOpen(true);
-    updateUrlParams({
-      artifact: artifact.id,
-      tab: 'deployments',
-    });
-  }, [updateUrlParams]);
+  const handleDeploy = useCallback(
+    (artifact: Artifact) => {
+      // Open artifact modal to deployments tab for deployment
+      setSelectedArtifact(artifact);
+      setDetailPanelOpen(true);
+      updateUrlParams({
+        artifact: artifact.id,
+        tab: 'deployments',
+      });
+    },
+    [updateUrlParams]
+  );
 
-  const handleSync = useCallback((artifact: Artifact) => {
-    // Open artifact modal to sync tab for sync operations
-    setSelectedArtifact(artifact);
-    setDetailPanelOpen(true);
-    updateUrlParams({
-      artifact: artifact.id,
-      tab: 'sync',
-    });
-  }, [updateUrlParams]);
+  const handleSync = useCallback(
+    (artifact: Artifact) => {
+      // Open artifact modal to sync tab for sync operations
+      setSelectedArtifact(artifact);
+      setDetailPanelOpen(true);
+      updateUrlParams({
+        artifact: artifact.id,
+        tab: 'sync',
+      });
+    },
+    [updateUrlParams]
+  );
 
-  const handleViewDiff = useCallback((artifact: Artifact) => {
-    // Open artifact modal to sync tab which shows diff viewer
-    setSelectedArtifact(artifact);
-    setDetailPanelOpen(true);
-    updateUrlParams({
-      artifact: artifact.id,
-      tab: 'sync',
-    });
-  }, [updateUrlParams]);
+  const handleViewDiff = useCallback(
+    (artifact: Artifact) => {
+      // Open artifact modal to sync tab which shows diff viewer
+      setSelectedArtifact(artifact);
+      setDetailPanelOpen(true);
+      updateUrlParams({
+        artifact: artifact.id,
+        tab: 'sync',
+      });
+    },
+    [updateUrlParams]
+  );
 
-  const handleRollback = useCallback((artifact: Artifact) => {
-    // Open artifact modal to history tab for rollback
-    setSelectedArtifact(artifact);
-    setDetailPanelOpen(true);
-    updateUrlParams({
-      artifact: artifact.id,
-      tab: 'history',
-    });
-  }, [updateUrlParams]);
+  const handleRollback = useCallback(
+    (artifact: Artifact) => {
+      // Open artifact modal to history tab for rollback
+      setSelectedArtifact(artifact);
+      setDetailPanelOpen(true);
+      updateUrlParams({
+        artifact: artifact.id,
+        tab: 'history',
+      });
+    },
+    [updateUrlParams]
+  );
 
-  const handleManage = useCallback((artifact: Artifact) => {
-    // Open artifact modal to status tab (default) for management options
-    setSelectedArtifact(artifact);
-    setDetailPanelOpen(true);
-    updateUrlParams({
-      artifact: artifact.id,
-      tab: null, // Default to status which has health overview
-    });
-  }, [updateUrlParams]);
+  const handleManage = useCallback(
+    (artifact: Artifact) => {
+      // Open artifact modal to status tab (default) for management options
+      setSelectedArtifact(artifact);
+      setDetailPanelOpen(true);
+      updateUrlParams({
+        artifact: artifact.id,
+        tab: null, // Default to status which has health overview
+      });
+    },
+    [updateUrlParams]
+  );
 
   return (
     <div className="flex h-screen flex-col">
@@ -477,11 +518,7 @@ function ManagePageContent() {
       />
 
       {/* Add Dialog */}
-      <AddEntityDialog
-        entityType={urlType}
-        open={addDialogOpen}
-        onOpenChange={setAddDialogOpen}
-      />
+      <AddEntityDialog entityType={urlType} open={addDialogOpen} onOpenChange={setAddDialogOpen} />
 
       {/* Edit Dialog */}
       {editingArtifact && (

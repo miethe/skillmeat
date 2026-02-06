@@ -86,18 +86,14 @@ describe('ContentPane', () => {
     });
 
     it('renders content when path and content provided', () => {
-      render(
-        <ContentPane path="test.txt" content="Hello world" />
-      );
+      render(<ContentPane path="test.txt" content="Hello world" />);
 
       expect(screen.getByText('test.txt')).toBeInTheDocument();
       expect(screen.getByText('Hello world')).toBeInTheDocument();
     });
 
     it('renders loading skeleton when isLoading is true', () => {
-      const { container } = render(
-        <ContentPane path="test.md" content={null} isLoading={true} />
-      );
+      const { container } = render(<ContentPane path="test.md" content={null} isLoading={true} />);
 
       // Should show skeleton elements
       const skeletons = container.querySelectorAll('.animate-pulse');
@@ -106,17 +102,13 @@ describe('ContentPane', () => {
     });
 
     it('renders error state when error is provided', () => {
-      render(
-        <ContentPane path="test.md" content={null} error="Failed to load file" />
-      );
+      render(<ContentPane path="test.md" content={null} error="Failed to load file" />);
 
       expect(screen.getByText('Failed to load file')).toBeInTheDocument();
     });
 
     it('renders empty content message for empty file', () => {
-      render(
-        <ContentPane path="empty.txt" content="" />
-      );
+      render(<ContentPane path="empty.txt" content="" />);
 
       expect(screen.getByText('This file is empty')).toBeInTheDocument();
     });
@@ -126,11 +118,7 @@ describe('ContentPane', () => {
     describe('When showFrontmatter=true (default)', () => {
       it('strips raw frontmatter from content when showFrontmatter=true', () => {
         render(
-          <ContentPane
-            path="test.md"
-            content={contentWithFrontmatter}
-            showFrontmatter={true}
-          />
+          <ContentPane path="test.md" content={contentWithFrontmatter} showFrontmatter={true} />
         );
 
         // FrontmatterDisplay should be rendered
@@ -147,11 +135,7 @@ describe('ContentPane', () => {
 
       it('displays FrontmatterDisplay component with parsed frontmatter', () => {
         render(
-          <ContentPane
-            path="test.md"
-            content={contentWithFrontmatter}
-            showFrontmatter={true}
-          />
+          <ContentPane path="test.md" content={contentWithFrontmatter} showFrontmatter={true} />
         );
 
         const frontmatterDisplay = screen.getByTestId('frontmatter-display');
@@ -164,11 +148,7 @@ describe('ContentPane', () => {
 
       it('preserves body content after stripping frontmatter', () => {
         render(
-          <ContentPane
-            path="test.md"
-            content={contentWithFrontmatter}
-            showFrontmatter={true}
-          />
+          <ContentPane path="test.md" content={contentWithFrontmatter} showFrontmatter={true} />
         );
 
         const splitPreview = screen.getByTestId('split-preview-content');
@@ -184,11 +164,7 @@ describe('ContentPane', () => {
     describe('When showFrontmatter=false (deprecated prop)', () => {
       it('still strips frontmatter from content (prop is deprecated)', () => {
         render(
-          <ContentPane
-            path="test.md"
-            content={contentWithFrontmatter}
-            showFrontmatter={false}
-          />
+          <ContentPane path="test.md" content={contentWithFrontmatter} showFrontmatter={false} />
         );
 
         // FrontmatterDisplay is shown because frontmatter is detected
@@ -209,11 +185,7 @@ describe('ContentPane', () => {
     describe('Content Without Frontmatter', () => {
       it('handles content without frontmatter correctly when showFrontmatter=true', () => {
         render(
-          <ContentPane
-            path="test.md"
-            content={contentWithoutFrontmatter}
-            showFrontmatter={true}
-          />
+          <ContentPane path="test.md" content={contentWithoutFrontmatter} showFrontmatter={true} />
         );
 
         // FrontmatterDisplay should NOT be rendered
@@ -227,11 +199,7 @@ describe('ContentPane', () => {
 
       it('handles content without frontmatter correctly when showFrontmatter=false', () => {
         render(
-          <ContentPane
-            path="test.md"
-            content={contentWithoutFrontmatter}
-            showFrontmatter={false}
-          />
+          <ContentPane path="test.md" content={contentWithoutFrontmatter} showFrontmatter={false} />
         );
 
         // FrontmatterDisplay should NOT be rendered
@@ -246,11 +214,7 @@ describe('ContentPane', () => {
     describe('Non-Markdown Files', () => {
       it('displays frontmatter for non-markdown files with frontmatter', () => {
         render(
-          <ContentPane
-            path="test.txt"
-            content={contentWithFrontmatter}
-            showFrontmatter={true}
-          />
+          <ContentPane path="test.txt" content={contentWithFrontmatter} showFrontmatter={true} />
         );
 
         // Frontmatter should be detected and displayed
@@ -258,13 +222,7 @@ describe('ContentPane', () => {
       });
 
       it('does not show frontmatter display for plain text without frontmatter', () => {
-        render(
-          <ContentPane
-            path="test.txt"
-            content={plainTextContent}
-            showFrontmatter={true}
-          />
-        );
+        render(<ContentPane path="test.txt" content={plainTextContent} showFrontmatter={true} />);
 
         // No frontmatter display
         expect(screen.queryByTestId('frontmatter-display')).not.toBeInTheDocument();
@@ -277,9 +235,7 @@ describe('ContentPane', () => {
 
   describe('Breadcrumb Navigation', () => {
     it('displays file path as breadcrumb', () => {
-      render(
-        <ContentPane path="src/components/test.tsx" content="content" />
-      );
+      render(<ContentPane path="src/components/test.tsx" content="content" />);
 
       expect(screen.getByText('src')).toBeInTheDocument();
       expect(screen.getByText('components')).toBeInTheDocument();
@@ -287,9 +243,7 @@ describe('ContentPane', () => {
     });
 
     it('highlights current file in breadcrumb', () => {
-      render(
-        <ContentPane path="src/test.tsx" content="content" />
-      );
+      render(<ContentPane path="src/test.tsx" content="content" />);
 
       const currentFile = screen.getByText('test.tsx');
       expect(currentFile).toHaveClass('font-medium');
@@ -299,12 +253,7 @@ describe('ContentPane', () => {
   describe('Edit Mode', () => {
     it('shows Edit button for editable files when not in readOnly mode', () => {
       render(
-        <ContentPane
-          path="test.md"
-          content="# Test"
-          onEditStart={jest.fn()}
-          onSave={jest.fn()}
-        />
+        <ContentPane path="test.md" content="# Test" onEditStart={jest.fn()} onSave={jest.fn()} />
       );
 
       expect(screen.getByRole('button', { name: /Edit test.md/i })).toBeInTheDocument();
@@ -448,10 +397,7 @@ describe('ContentPane', () => {
       );
 
       const link = screen.getByRole('link', { name: /View full file on GitHub/i });
-      expect(link).toHaveAttribute(
-        'href',
-        'https://github.com/user/repo/blob/main/large-file.md'
-      );
+      expect(link).toHaveAttribute('href', 'https://github.com/user/repo/blob/main/large-file.md');
     });
 
     it('does not show truncation banner when truncated is false', () => {
@@ -471,21 +417,18 @@ describe('ContentPane', () => {
 
   describe('Accessibility', () => {
     it('has proper region role and aria-label', () => {
-      render(
-        <ContentPane path="test.md" content="# Content" />
-      );
+      render(<ContentPane path="test.md" content="# Content" />);
 
       const region = screen.getByRole('region');
-      expect(region).toHaveAttribute('aria-label', expect.stringContaining('Markdown file: test.md'));
+      expect(region).toHaveAttribute(
+        'aria-label',
+        expect.stringContaining('Markdown file: test.md')
+      );
     });
 
     it('supports custom ariaLabel', () => {
       render(
-        <ContentPane
-          path="test.md"
-          content="# Content"
-          ariaLabel="Custom accessibility label"
-        />
+        <ContentPane path="test.md" content="# Content" ariaLabel="Custom accessibility label" />
       );
 
       const region = screen.getByRole('region');
@@ -493,9 +436,7 @@ describe('ContentPane', () => {
     });
 
     it('has accessible breadcrumb navigation', () => {
-      render(
-        <ContentPane path="src/test.md" content="# Content" />
-      );
+      render(<ContentPane path="src/test.md" content="# Content" />);
 
       const nav = screen.getByRole('navigation', { name: /File path/i });
       expect(nav).toBeInTheDocument();
@@ -503,12 +444,7 @@ describe('ContentPane', () => {
 
     it('edit button has descriptive aria-label', () => {
       render(
-        <ContentPane
-          path="test.md"
-          content="# Test"
-          onEditStart={jest.fn()}
-          onSave={jest.fn()}
-        />
+        <ContentPane path="test.md" content="# Test" onEditStart={jest.fn()} onSave={jest.fn()} />
       );
 
       const editButton = screen.getByRole('button', { name: /Edit test.md/i });
@@ -518,18 +454,14 @@ describe('ContentPane', () => {
 
   describe('File Type Detection', () => {
     it('identifies markdown files correctly', () => {
-      render(
-        <ContentPane path="README.md" content="# Readme" />
-      );
+      render(<ContentPane path="README.md" content="# Readme" />);
 
       // SplitPreview should be used for markdown
       expect(screen.getByTestId('split-preview')).toBeInTheDocument();
     });
 
     it('handles .MD extension (case insensitive)', () => {
-      render(
-        <ContentPane path="FILE.MD" content="# Uppercase Extension" />
-      );
+      render(<ContentPane path="FILE.MD" content="# Uppercase Extension" />);
 
       expect(screen.getByTestId('split-preview')).toBeInTheDocument();
     });
@@ -563,15 +495,12 @@ describe('ContentPane', () => {
 
       editableExtensions.forEach((path) => {
         const { unmount } = render(
-          <ContentPane
-            path={path}
-            content="content"
-            onEditStart={jest.fn()}
-            onSave={jest.fn()}
-          />
+          <ContentPane path={path} content="content" onEditStart={jest.fn()} onSave={jest.fn()} />
         );
 
-        expect(screen.getByRole('button', { name: new RegExp(`Edit ${path}`, 'i') })).toBeInTheDocument();
+        expect(
+          screen.getByRole('button', { name: new RegExp(`Edit ${path}`, 'i') })
+        ).toBeInTheDocument();
         unmount();
       });
     });
@@ -579,17 +508,13 @@ describe('ContentPane', () => {
 
   describe('Edge Cases', () => {
     it('handles null content gracefully', () => {
-      render(
-        <ContentPane path="test.txt" content={null} />
-      );
+      render(<ContentPane path="test.txt" content={null} />);
 
       expect(screen.getByText('This file is empty')).toBeInTheDocument();
     });
 
     it('handles undefined path gracefully', () => {
-      render(
-        <ContentPane path={undefined as any} content="content" />
-      );
+      render(<ContentPane path={undefined as any} content="content" />);
 
       expect(screen.getByText('No file selected')).toBeInTheDocument();
     });
@@ -602,13 +527,7 @@ author: Test
 # This should still render
 `;
 
-      render(
-        <ContentPane
-          path="test.md"
-          content={malformedContent}
-          showFrontmatter={true}
-        />
-      );
+      render(<ContentPane path="test.md" content={malformedContent} showFrontmatter={true} />);
 
       // Should still render without crashing
       expect(screen.getByTestId('split-preview')).toBeInTheDocument();
@@ -620,13 +539,7 @@ title: Only Frontmatter
 ---
 `;
 
-      render(
-        <ContentPane
-          path="test.md"
-          content={onlyFrontmatter}
-          showFrontmatter={true}
-        />
-      );
+      render(<ContentPane path="test.md" content={onlyFrontmatter} showFrontmatter={true} />);
 
       // Should render frontmatter display
       expect(screen.getByTestId('frontmatter-display')).toBeInTheDocument();

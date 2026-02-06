@@ -197,7 +197,9 @@ test.describe('Marketplace Source Indexing - opt_in Mode', () => {
     await expect(toggle).toBeChecked();
 
     // Submit form using the submit button in the form (not the quick import button)
-    const submitButton = page.locator('form button[type="submit"]').filter({ hasText: 'Add Source' });
+    const submitButton = page
+      .locator('form button[type="submit"]')
+      .filter({ hasText: 'Add Source' });
     await submitButton.click();
 
     // Wait for modal to close (indicates success)
@@ -234,7 +236,9 @@ test.describe('Marketplace Source Indexing - opt_in Mode', () => {
     await expect(toggle).not.toBeChecked();
 
     // Submit form
-    const submitButton = page.locator('form button[type="submit"]').filter({ hasText: 'Add Source' });
+    const submitButton = page
+      .locator('form button[type="submit"]')
+      .filter({ hasText: 'Add Source' });
     await submitButton.click();
 
     // Wait for modal to close
@@ -289,7 +293,9 @@ test.describe('Marketplace Source Indexing - off Mode', () => {
     await page.locator('#repo-url').fill('https://github.com/anthropics/anthropic-cookbook');
 
     // Submit form
-    const submitButton = page.locator('form button[type="submit"]').filter({ hasText: 'Add Source' });
+    const submitButton = page
+      .locator('form button[type="submit"]')
+      .filter({ hasText: 'Add Source' });
     await submitButton.click();
 
     // Wait for modal to close
@@ -344,7 +350,9 @@ test.describe('Marketplace Source Indexing - on Mode', () => {
     await page.locator('#repo-url').fill('https://github.com/anthropics/anthropic-cookbook');
 
     // Submit form
-    const submitButton = page.locator('form button[type="submit"]').filter({ hasText: 'Add Source' });
+    const submitButton = page
+      .locator('form button[type="submit"]')
+      .filter({ hasText: 'Add Source' });
     await submitButton.click();
 
     // Wait for modal to close
@@ -382,7 +390,9 @@ test.describe('Indexing Toggle State Reset', () => {
     await openAddSourceModal(page);
 
     // Verify toggle is reset to unchecked
-    const toggleAfterReopen = page.getByRole('switch', { name: /Enable artifact search indexing/i });
+    const toggleAfterReopen = page.getByRole('switch', {
+      name: /Enable artifact search indexing/i,
+    });
     await expect(toggleAfterReopen).not.toBeChecked();
   });
 
@@ -409,7 +419,9 @@ test.describe('Indexing Toggle State Reset', () => {
     await expect(toggle).toBeChecked();
 
     // Submit form
-    const submitButton = page.locator('form button[type="submit"]').filter({ hasText: 'Add Source' });
+    const submitButton = page
+      .locator('form button[type="submit"]')
+      .filter({ hasText: 'Add Source' });
     await submitButton.click();
 
     // Wait for modal to close (success)
@@ -419,7 +431,9 @@ test.describe('Indexing Toggle State Reset', () => {
     await openAddSourceModal(page);
 
     // Verify toggle is reset to unchecked
-    const toggleAfterReopen = page.getByRole('switch', { name: /Enable artifact search indexing/i });
+    const toggleAfterReopen = page.getByRole('switch', {
+      name: /Enable artifact search indexing/i,
+    });
     await expect(toggleAfterReopen).not.toBeChecked();
   });
 });

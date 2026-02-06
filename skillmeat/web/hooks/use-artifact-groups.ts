@@ -98,15 +98,11 @@ export function useArtifactGroups(
           collection_id: collectionId,
           artifact_id: artifactId,
         });
-        const response = await apiRequest<ApiGroupListResponse>(
-          `/groups?${params.toString()}`
-        );
+        const response = await apiRequest<ApiGroupListResponse>(`/groups?${params.toString()}`);
 
         // Sort by position to ensure consistent ordering
         // Backend may already sort, but defensive sorting ensures UI consistency
-        const sortedGroups = [...response.groups].sort(
-          (a, b) => a.position - b.position
-        );
+        const sortedGroups = [...response.groups].sort((a, b) => a.position - b.position);
 
         return sortedGroups;
       } catch (error) {

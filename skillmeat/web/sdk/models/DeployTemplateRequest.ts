@@ -10,21 +10,20 @@ import type { TemplateVariableValue } from './TemplateVariableValue';
  * Supports selective entity deployment and overwrite control.
  */
 export type DeployTemplateRequest = {
-    /**
-     * Path to target project directory (must be valid filesystem path)
-     */
-    project_path: string;
-    /**
-     * Variable values for template substitution
-     */
-    variables: TemplateVariableValue;
-    /**
-     * Subset of entity IDs to deploy (deploys all if not specified)
-     */
-    selected_entity_ids?: (Array<string> | null);
-    /**
-     * Whether to overwrite existing files at target paths
-     */
-    overwrite?: boolean;
+  /**
+   * Path to target project directory (must be valid filesystem path)
+   */
+  project_path: string;
+  /**
+   * Variable values for template substitution
+   */
+  variables: TemplateVariableValue;
+  /**
+   * Subset of entity IDs to deploy (deploys all if not specified)
+   */
+  selected_entity_ids?: Array<string> | null;
+  /**
+   * Whether to overwrite existing files at target paths
+   */
+  overwrite?: boolean;
 };
-

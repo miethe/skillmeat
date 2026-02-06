@@ -2393,6 +2393,268 @@ class CacheMetadata(Base):
 
 
 # =============================================================================
+# Memory & Context Intelligence System Models
+# =============================================================================
+
+
+class MemoryItem(Base):
+    """Project-scoped memory item for the Memory & Context Intelligence System.
+
+    Stores learned knowledge about a project including decisions, constraints,
+    gotchas, style rules, and learnings. Each item has a confidence score,
+    status lifecycle, provenance tracking, and TTL policies.
+
+    Attributes:
+        id: Unique identifier (UUID hex string)
+        project_id: Foreign key to projects.id
+        type: Memory type (decision, constraint, gotcha, style_rule, learning)
+        content: The actual memory content text
+        confidence: Confidence score between 0.0 and 1.0
+        status: Lifecycle status (candidate, active, stable, deprecated)
+        provenance_json: JSON object tracking origin/source of the memory
+        anchors_json: JSON array of file paths this memory is anchored to
+        ttl_policy_json: JSON object with max_age_days, max_idle_days
+        content_hash: SHA hash of content for deduplication (unique)
+        access_count: Number of times this memory has been accessed
+        created_at: ISO datetime when memory was created
+        updated_at: ISO datetime when memory was last modified
+        deprecated_at: ISO datetime when memory was deprecated (nullable)
+        context_modules: List of context modules containing this memory
+
+    Indexes:
+        - idx_memory_items_project_status: Filter by project and status
+        - idx_memory_items_project_type: Filter by project and type
+        - idx_memory_items_created_at: Chronological ordering
+        - content_hash UNIQUE: Deduplication
+    """
+
+    __tablename__ = "memory_items"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Foreign key
+    project_id: Mapped[str] = mapped_column(
+        String, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Core fields
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.75)
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="candidate", server_default="candidate"
+    )
+
+    # JSON fields (stored as Text, following codebase convention)
+    provenance_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    anchors_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ttl_policy_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Deduplication and access tracking
+    content_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    access_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+
+    # Timestamps (stored as ISO strings, following codebase convention for new tables)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String, nullable=False)
+    deprecated_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Relationships
+    context_modules: Mapped[List["ContextModule"]] = relationship(
+        "ContextModule",
+        secondary="module_memory_items",
+        back_populates="memory_items",
+        lazy="select",
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        CheckConstraint(
+            "confidence >= 0.0 AND confidence <= 1.0",
+            name="ck_memory_items_confidence",
+        ),
+        CheckConstraint(
+            "type IN ('decision', 'constraint', 'gotcha', 'style_rule', 'learning')",
+            name="ck_memory_items_type",
+        ),
+        CheckConstraint(
+            "status IN ('candidate', 'active', 'stable', 'deprecated')",
+            name="ck_memory_items_status",
+        ),
+        Index("idx_memory_items_project_status", "project_id", "status"),
+        Index("idx_memory_items_project_type", "project_id", "type"),
+        Index("idx_memory_items_created_at", "created_at"),
+    )
+
+    @property
+    def provenance(self) -> Optional[Dict[str, Any]]:
+        """Parse provenance_json into a dictionary."""
+        if self.provenance_json:
+            return json.loads(self.provenance_json)
+        return None
+
+    @property
+    def anchors(self) -> List[str]:
+        """Parse anchors_json into a list of file paths."""
+        if self.anchors_json:
+            return json.loads(self.anchors_json)
+        return []
+
+    @property
+    def ttl_policy(self) -> Optional[Dict[str, Any]]:
+        """Parse ttl_policy_json into a dictionary."""
+        if self.ttl_policy_json:
+            return json.loads(self.ttl_policy_json)
+        return None
+
+    def __repr__(self) -> str:
+        """Return string representation of MemoryItem."""
+        return (
+            f"<MemoryItem(id={self.id!r}, project_id={self.project_id!r}, "
+            f"type={self.type!r}, status={self.status!r}, "
+            f"confidence={self.confidence})>"
+        )
+
+
+class ContextModule(Base):
+    """Named grouping of memory items with selector criteria.
+
+    Context modules define how memory items are assembled into contextual
+    knowledge for different workflows. Each module has selector criteria
+    (memory types, confidence thresholds, file patterns, workflow stages)
+    and a priority for ordering when multiple modules apply.
+
+    Attributes:
+        id: Unique identifier (UUID hex string)
+        project_id: Foreign key to projects.id
+        name: Human-readable module name
+        description: Optional description of the module's purpose
+        selectors_json: JSON object with memory_types, min_confidence,
+            file_patterns, workflow_stages
+        priority: Module priority for ordering (default 5)
+        content_hash: Hash of assembled content for cache invalidation
+        created_at: ISO datetime when module was created
+        updated_at: ISO datetime when module was last modified
+        memory_items: List of memory items in this module
+
+    Indexes:
+        - idx_context_modules_project: Filter by project
+    """
+
+    __tablename__ = "context_modules"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Foreign key
+    project_id: Mapped[str] = mapped_column(
+        String, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Core fields
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # JSON fields
+    selectors_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Priority
+    priority: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=5, server_default="5"
+    )
+
+    # Cache hash
+    content_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    # Relationships
+    memory_items: Mapped[List["MemoryItem"]] = relationship(
+        "MemoryItem",
+        secondary="module_memory_items",
+        back_populates="context_modules",
+        lazy="select",
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        Index("idx_context_modules_project", "project_id"),
+    )
+
+    @property
+    def selectors(self) -> Optional[Dict[str, Any]]:
+        """Parse selectors_json into a dictionary."""
+        if self.selectors_json:
+            return json.loads(self.selectors_json)
+        return None
+
+    def __repr__(self) -> str:
+        """Return string representation of ContextModule."""
+        return (
+            f"<ContextModule(id={self.id!r}, project_id={self.project_id!r}, "
+            f"name={self.name!r}, priority={self.priority})>"
+        )
+
+
+class ModuleMemoryItem(Base):
+    """Association between ContextModule and MemoryItem with ordering.
+
+    Represents the many-to-many relationship between context modules and
+    memory items, allowing memory items to be organized within modules
+    with explicit ordering.
+
+    Attributes:
+        module_id: Foreign key to context_modules.id (part of composite PK)
+        memory_id: Foreign key to memory_items.id (part of composite PK)
+        ordering: Display/priority order within module (0-based, default 0)
+
+    Indexes:
+        - Primary key covers (module_id, memory_id)
+        - idx_module_memory_items_memory: Reverse lookup by memory item
+    """
+
+    __tablename__ = "module_memory_items"
+
+    # Composite primary key
+    module_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("context_modules.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    memory_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("memory_items.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    # Ordering
+    ordering: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_module_memory_items_memory", "memory_id"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of ModuleMemoryItem."""
+        return (
+            f"<ModuleMemoryItem(module_id={self.module_id!r}, "
+            f"memory_id={self.memory_id!r}, ordering={self.ordering})>"
+        )
+
+
+# =============================================================================
 # Database Engine and Session Setup
 # =============================================================================
 
