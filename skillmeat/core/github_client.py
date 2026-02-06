@@ -484,8 +484,6 @@ class GitHubClient:
             if isinstance(content_file, ContentFile):
                 if content_file.type == "symlink":
                     # Symlink detected - resolve target and fetch actual content
-                    import posixpath
-
                     symlink_target = getattr(content_file, "target", None)
                     if symlink_target:
                         # Resolve relative path against parent directory
@@ -523,10 +521,69 @@ class GitHubClient:
             raise GitHubClientError(f"Unexpected content type for '{path}'")
 
         except GithubException as e:
+            if getattr(e, "status", None) == 404:
+                # Path not found - check if an ancestor is a symlink
+                resolved = self._resolve_symlink_ancestor(repo, path, ref)
+                if resolved is not None:
+                    return resolved
             self._handle_exception(
                 e, context=f"get_file_with_metadata({owner_repo}, {path})"
             )
             raise
+
+    def _resolve_symlink_ancestor(
+        self, repo: Repository, path: str, ref: Optional[str]
+    ) -> Optional[Dict[str, Any]]:
+        """Walk up parent directories to find a symlink ancestor and resolve through it.
+
+        When a file path like '.claude/skills/foo/scripts/core.py' doesn't exist
+        because 'scripts' is a symlink to '../../../src/foo/scripts', this method:
+        1. Checks '.claude/skills/foo/scripts' - finds it's a symlink
+        2. Resolves target: 'src/foo/scripts'
+        3. Remaps remaining path: 'src/foo/scripts/core.py'
+        4. Fetches the file at the real path
+
+        Args:
+            repo: PyGithub Repository object
+            path: Original file path that returned 404
+            ref: Git ref (branch, tag, SHA) or None
+
+        Returns:
+            File metadata dict if symlink ancestor found and resolved,
+            None if no symlink ancestor exists.
+        """
+        parts = path.split("/")
+        ref_arg = ref if ref is not None else NotSet
+        # Try each ancestor from deepest to shallowest
+        # e.g., for "a/b/c/d.py", try "a/b/c", then "a/b", then "a"
+        for i in range(len(parts) - 1, 0, -1):
+            ancestor_path = "/".join(parts[:i])
+            remaining_path = "/".join(parts[i:])
+
+            try:
+                content = repo.get_contents(ancestor_path, ref=ref_arg)
+                if isinstance(content, ContentFile) and content.type == "symlink":
+                    # Found a symlink ancestor - resolve target
+                    target = getattr(content, "target", None)
+                    if not target:
+                        continue
+
+                    parent_dir = posixpath.dirname(ancestor_path)
+                    resolved_base = posixpath.normpath(
+                        posixpath.join(parent_dir, target)
+                    )
+
+                    if resolved_base.startswith("..") or resolved_base.startswith("/"):
+                        continue  # Target outside repo
+
+                    # Build the real path and recursively fetch
+                    real_path = f"{resolved_base}/{remaining_path}"
+                    owner_repo = f"{repo.owner.login}/{repo.name}"
+                    return self.get_file_with_metadata(owner_repo, real_path, ref=ref)
+            except GithubException:
+                continue  # Ancestor doesn't exist either, try next level up
+
+        return None
 
     def get_repo_tree(
         self, owner_repo: str, ref: Optional[str] = None, recursive: bool = True
