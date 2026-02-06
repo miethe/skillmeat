@@ -1,180 +1,213 @@
 ---
-# === PROGRESS TRACKING ===
-# Phase-level task tracking optimized for AI agent orchestration
-# REQUIRED FIELDS: assigned_to, dependencies for EVERY task
-
-# Metadata: Identification and Classification
 type: progress
-prd: "memory-context-system-v1"
+prd: memory-context-system-v1
 phase: 3
-title: "Frontend Memory Inbox UI"
-status: "planning"
-started: "2026-02-05"
+title: Frontend Memory Inbox UI
+status: in_progress
+started: '2026-02-05'
 completed: null
-
-# Overall Progress: Status and Estimates
 overall_progress: 0
-completion_estimate: "on-track"
-
-# Task Counts: Machine-readable task state
+completion_estimate: on-track
 total_tasks: 15
 completed_tasks: 0
-in_progress_tasks: 0
+in_progress_tasks: 2
 blocked_tasks: 0
 at_risk_tasks: 0
-
-# Ownership: Primary and secondary agents
-owners: ["ui-engineer-enhanced", "frontend-developer"]
-contributors: ["web-accessibility-checker"]
-
-# === TASKS (SOURCE OF TRUTH) ===
+owners:
+- ui-engineer-enhanced
+- frontend-developer
+contributors:
+- web-accessibility-checker
 tasks:
-  - id: "UI-3.1"
-    description: "Memory Inbox Page Layout"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["API-2.6"]
-    estimated_effort: "2 pts"
-    priority: "critical"
-
-  - id: "UI-3.2"
-    description: "MemoryCard Component"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["UI-3.1"]
-    estimated_effort: "2 pts"
-    priority: "critical"
-
-  - id: "UI-3.3"
-    description: "Filter Bar Components"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["UI-3.1"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "UI-3.4"
-    description: "Detail Panel Component"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["UI-3.2"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "UI-3.5"
-    description: "Triage Action Buttons"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["UI-3.2"]
-    estimated_effort: "3 pts"
-    priority: "critical"
-
-  - id: "UI-3.6"
-    description: "Memory Form Modal"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["UI-3.5"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "UI-3.7"
-    description: "Merge Modal"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["UI-3.5"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "UI-3.8"
-    description: "Batch Selection & Actions"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["UI-3.2"]
-    estimated_effort: "2 pts"
-    priority: "medium"
-
-  - id: "HOOKS-3.9"
-    description: "useMemoryItems Hook"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["API-2.6"]
-    estimated_effort: "1 pt"
-    priority: "critical"
-
-  - id: "HOOKS-3.10"
-    description: "useMutateMemory Hook"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["API-2.7"]
-    estimated_effort: "2 pts"
-    priority: "critical"
-
-  - id: "HOOKS-3.11"
-    description: "useMemorySelection Hook"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["UI-3.8"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
-  - id: "A11Y-3.12"
-    description: "Keyboard Navigation"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["HOOKS-3.11"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "A11Y-3.13"
-    description: "WCAG Compliance"
-    status: "pending"
-    assigned_to: ["web-accessibility-checker"]
-    dependencies: ["UI-3.8"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "TEST-3.14"
-    description: "Component Tests"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["UI-3.8"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "TEST-3.15"
-    description: "Keyboard Tests"
-    status: "pending"
-    assigned_to: ["web-accessibility-checker"]
-    dependencies: ["A11Y-3.12"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
-# Parallelization Strategy
+- id: UI-3.1
+  description: Memory Inbox Page Layout
+  status: in_progress
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - API-2.6
+  estimated_effort: 2 pts
+  priority: critical
+- id: UI-3.2
+  description: MemoryCard Component
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - UI-3.1
+  estimated_effort: 2 pts
+  priority: critical
+- id: UI-3.3
+  description: Filter Bar Components
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - UI-3.1
+  estimated_effort: 2 pts
+  priority: high
+- id: UI-3.4
+  description: Detail Panel Component
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - UI-3.2
+  estimated_effort: 2 pts
+  priority: high
+- id: UI-3.5
+  description: Triage Action Buttons
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - UI-3.2
+  estimated_effort: 3 pts
+  priority: critical
+- id: UI-3.6
+  description: Memory Form Modal
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - UI-3.5
+  estimated_effort: 2 pts
+  priority: high
+- id: UI-3.7
+  description: Merge Modal
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - UI-3.5
+  estimated_effort: 2 pts
+  priority: high
+- id: UI-3.8
+  description: Batch Selection & Actions
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - UI-3.2
+  estimated_effort: 2 pts
+  priority: medium
+- id: HOOKS-3.9
+  description: useMemoryItems Hook
+  status: in_progress
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - API-2.6
+  estimated_effort: 1 pt
+  priority: critical
+- id: HOOKS-3.10
+  description: useMutateMemory Hook
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - API-2.7
+  estimated_effort: 2 pts
+  priority: critical
+- id: HOOKS-3.11
+  description: useMemorySelection Hook
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - UI-3.8
+  estimated_effort: 1 pt
+  priority: medium
+- id: A11Y-3.12
+  description: Keyboard Navigation
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - HOOKS-3.11
+  estimated_effort: 2 pts
+  priority: high
+- id: A11Y-3.13
+  description: WCAG Compliance
+  status: pending
+  assigned_to:
+  - web-accessibility-checker
+  dependencies:
+  - UI-3.8
+  estimated_effort: 2 pts
+  priority: high
+- id: TEST-3.14
+  description: Component Tests
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - UI-3.8
+  estimated_effort: 2 pts
+  priority: high
+- id: TEST-3.15
+  description: Keyboard Tests
+  status: pending
+  assigned_to:
+  - web-accessibility-checker
+  dependencies:
+  - A11Y-3.12
+  estimated_effort: 1 pt
+  priority: medium
 parallelization:
-  batch_1: ["UI-3.1", "HOOKS-3.9"]
-  batch_2: ["UI-3.2", "UI-3.3", "HOOKS-3.10"]
-  batch_3: ["UI-3.4", "UI-3.5", "UI-3.8", "HOOKS-3.11"]
-  batch_4: ["UI-3.6", "UI-3.7", "A11Y-3.12", "A11Y-3.13"]
-  batch_5: ["TEST-3.14", "TEST-3.15"]
-  critical_path: ["UI-3.1", "UI-3.2", "UI-3.5", "UI-3.6", "TEST-3.14"]
-  estimated_total_time: "17 pts"
-
-# Critical Blockers
+  batch_1:
+  - UI-3.1
+  - HOOKS-3.9
+  batch_2:
+  - UI-3.2
+  - UI-3.3
+  - HOOKS-3.10
+  batch_3:
+  - UI-3.4
+  - UI-3.5
+  - UI-3.8
+  - HOOKS-3.11
+  batch_4:
+  - UI-3.6
+  - UI-3.7
+  - A11Y-3.12
+  - A11Y-3.13
+  batch_5:
+  - TEST-3.14
+  - TEST-3.15
+  critical_path:
+  - UI-3.1
+  - UI-3.2
+  - UI-3.5
+  - UI-3.6
+  - TEST-3.14
+  estimated_total_time: 17 pts
 blockers: []
-
-# Success Criteria
-success_criteria: [
-  { id: "SC-3.1", description: "Memory Inbox page renders without errors", status: "pending" },
-  { id: "SC-3.2", description: "All filters and search working", status: "pending" },
-  { id: "SC-3.3", description: "Triage actions update memory status correctly", status: "pending" },
-  { id: "SC-3.4", description: "Keyboard navigation works smoothly", status: "pending" },
-  { id: "SC-3.5", description: "Component test coverage >85%", status: "pending" },
-  { id: "SC-3.6", description: "WCAG 2.1 AA compliance verified", status: "pending" },
-  { id: "SC-3.7", description: "No console errors or warnings", status: "pending" }
-]
-
-# Files Modified
+success_criteria:
+- id: SC-3.1
+  description: Memory Inbox page renders without errors
+  status: pending
+- id: SC-3.2
+  description: All filters and search working
+  status: pending
+- id: SC-3.3
+  description: Triage actions update memory status correctly
+  status: pending
+- id: SC-3.4
+  description: Keyboard navigation works smoothly
+  status: pending
+- id: SC-3.5
+  description: Component test coverage >85%
+  status: pending
+- id: SC-3.6
+  description: WCAG 2.1 AA compliance verified
+  status: pending
+- id: SC-3.7
+  description: No console errors or warnings
+  status: pending
 files_modified: []
+progress: 0
+updated: '2026-02-06'
 ---
 
 # memory-context-system-v1 - Phase 3: Frontend Memory Inbox UI

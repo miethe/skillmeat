@@ -501,6 +501,27 @@ export { versionKeys, useVersionGraph } from './useVersionGraph';
 export { useReturnTo, type UseReturnToOptions, type UseReturnToReturn } from './use-return-to';
 
 // ============================================================================
+// MEMORY ITEMS (12 hooks)
+// ============================================================================
+// Memory item CRUD, lifecycle, bulk operations, merge, and selection
+export {
+  memoryItemKeys,
+  useMemoryItems,
+  useMemoryItem,
+  useMemoryItemCounts,
+  useCreateMemoryItem,
+  useUpdateMemoryItem,
+  useDeleteMemoryItem,
+  usePromoteMemoryItem,
+  useDeprecateMemoryItem,
+  useBulkPromoteMemoryItems,
+  useBulkDeprecateMemoryItems,
+  useMergeMemoryItems,
+  useMemorySelection,
+  type MemoryItemFilters,
+} from './use-memory-items';
+
+// ============================================================================
 // CONTEXT HOOKS
 // ============================================================================
 
