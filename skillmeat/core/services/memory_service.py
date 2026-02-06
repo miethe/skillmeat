@@ -39,6 +39,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from skillmeat.cache.memory_repositories import MemoryItemRepository
+from skillmeat.cache.models import Project
 from skillmeat.cache.repositories import ConstraintError, NotFoundError
 from skillmeat.observability.tracing import trace_operation
 
@@ -131,6 +132,7 @@ class MemoryService:
         ) as span:
             # Validate inputs
             self._validate_project_id(project_id)
+            self._verify_project_exists(project_id)
             self._validate_type(type)
             self._validate_confidence(confidence)
             self._validate_status(status)
@@ -844,3 +846,24 @@ class MemoryService:
         """
         if not project_id or not project_id.strip():
             raise ValueError("project_id must not be empty")
+
+    def _verify_project_exists(self, project_id: str) -> None:
+        """Verify that the project exists in the database.
+
+        This prevents FOREIGN KEY constraint failures by validating that
+        the referenced project_id exists in the projects table before
+        attempting to create a memory item.
+
+        Args:
+            project_id: The project ID to verify.
+
+        Raises:
+            ValueError: If the project does not exist in the database.
+        """
+        session = self.repo._get_session()
+        try:
+            exists = session.query(Project).filter_by(id=project_id).first() is not None
+            if not exists:
+                raise ValueError(f"Project not found: {project_id}")
+        finally:
+            session.close()
