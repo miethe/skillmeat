@@ -69,35 +69,87 @@ class MemoryExtractorService:
             candidates: List[Dict[str, Any]] = []
             seen_content: set[str] = set()
 
-            for line in self._iter_candidate_lines(text_corpus):
-                mem_type = self._classify_type(line)
-                confidence = self._score(line, mem_type, profile)
-                if confidence < min_confidence:
-                    continue
+            # Two-path extraction: try JSONL parsing first, fall back to plain-text
+            messages = self._parse_jsonl_messages(text_corpus)
 
-                normalized = line.strip().lower()
-                if normalized in seen_content:
-                    continue
-                seen_content.add(normalized)
+            if messages:
+                content_blocks = self._extract_content_blocks(messages)
+                for content_text, provenance_meta in content_blocks:
+                    # Split each content block into candidate lines
+                    block_lines = [
+                        ln.strip(" -*\t")
+                        for ln in content_text.splitlines()
+                    ]
+                    block_lines = [ln for ln in block_lines if len(ln.strip()) >= 24]
 
-                content_hash = _compute_content_hash(line.strip())
-                duplicate = self.memory_repo.get_by_content_hash(content_hash)
-                candidates.append(
-                    {
-                        "type": mem_type,
-                        "content": line.strip(),
-                        "confidence": round(confidence, 3),
-                        "status": "candidate",
-                        "duplicate_of": duplicate.id if duplicate else None,
-                        "provenance": {
+                    for line in block_lines:
+                        mem_type = self._classify_type(line)
+                        confidence = self._score(line, mem_type, profile)
+                        if confidence < min_confidence:
+                            continue
+
+                        normalized = line.strip().lower()
+                        if normalized in seen_content:
+                            continue
+                        seen_content.add(normalized)
+
+                        content_hash = _compute_content_hash(line.strip())
+                        duplicate = self.memory_repo.get_by_content_hash(content_hash)
+
+                        # Build provenance: base fields + JSONL message metadata
+                        provenance = {
                             "source": "memory_extraction",
                             "run_id": run_id,
                             "session_id": session_id,
                             "commit_sha": commit_sha,
                             "workflow_stage": "extraction",
-                        },
-                    }
+                        }
+                        provenance.update(provenance_meta)
+
+                        candidates.append(
+                            {
+                                "type": mem_type,
+                                "content": line.strip(),
+                                "confidence": round(confidence, 3),
+                                "status": "candidate",
+                                "duplicate_of": duplicate.id if duplicate else None,
+                                "provenance": provenance,
+                            }
+                        )
+            else:
+                # Fallback: plain-text line extraction (backward compat)
+                logger.info(
+                    "No JSONL messages found, falling back to plain-text extraction"
                 )
+                for line in self._iter_candidate_lines(text_corpus):
+                    mem_type = self._classify_type(line)
+                    confidence = self._score(line, mem_type, profile)
+                    if confidence < min_confidence:
+                        continue
+
+                    normalized = line.strip().lower()
+                    if normalized in seen_content:
+                        continue
+                    seen_content.add(normalized)
+
+                    content_hash = _compute_content_hash(line.strip())
+                    duplicate = self.memory_repo.get_by_content_hash(content_hash)
+                    candidates.append(
+                        {
+                            "type": mem_type,
+                            "content": line.strip(),
+                            "confidence": round(confidence, 3),
+                            "status": "candidate",
+                            "duplicate_of": duplicate.id if duplicate else None,
+                            "provenance": {
+                                "source": "memory_extraction",
+                                "run_id": run_id,
+                                "session_id": session_id,
+                                "commit_sha": commit_sha,
+                                "workflow_stage": "extraction",
+                            },
+                        }
+                    )
 
             candidates.sort(key=lambda c: (-c["confidence"], c["content"]))
             return candidates

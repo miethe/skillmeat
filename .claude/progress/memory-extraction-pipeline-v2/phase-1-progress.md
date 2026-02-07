@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 3
+completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -51,7 +51,7 @@ tasks:
 - id: MEX-1.4
   description: Wire new parser into existing preview()/apply() pipeline - replace
     _iter_candidate_lines() with new JSONL methods, maintain backward compat
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -109,7 +109,7 @@ files_modified:
 - skillmeat/core/services/memory_extractor_service.py
 - skillmeat/cli.py
 - tests/test_memory/test_memory_extractor_service.py
-progress: 60
+progress: 80
 updated: '2026-02-07'
 ---
 
