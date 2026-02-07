@@ -12040,6 +12040,48 @@ def memory_pack_generate(project_id, module_id, budget_tokens, output, as_json):
         sys.exit(1)
 
 
+def _truncate_run_log(content: str, max_bytes: int = 500_000) -> str:
+    """Truncate run log content if it exceeds max_bytes, keeping the most recent content.
+
+    Args:
+        content: The run log content to potentially truncate
+        max_bytes: Maximum size in bytes (default 500KB)
+
+    Returns:
+        Original or truncated content, starting at a complete line boundary
+    """
+    content_bytes = content.encode('utf-8')
+
+    # Size check: if within limit, return unchanged
+    if len(content_bytes) <= max_bytes:
+        return content
+
+    # Intelligent truncation: keep the LAST max_bytes (recent content)
+    bytes_removed = len(content_bytes) - max_bytes
+    truncated_bytes = content_bytes[-max_bytes:]
+
+    # Decode back to string (ignore partial UTF-8 sequences)
+    truncated_str = truncated_bytes.decode('utf-8', errors='ignore')
+
+    # Find first complete newline boundary (skip partial first line)
+    first_newline = truncated_str.find('\n')
+    if first_newline != -1:
+        truncated_str = truncated_str[first_newline + 1:]
+
+    # Count lines removed (approximate from bytes removed and avg line length)
+    original_lines = content.count('\n')
+    remaining_lines = truncated_str.count('\n')
+    lines_removed = original_lines - remaining_lines
+
+    # Log warning
+    console.print(
+        f"[yellow]⚠ Session log truncated: removed {lines_removed} lines "
+        f"({bytes_removed:,} bytes) from start to fit 500KB limit[/yellow]"
+    )
+
+    return truncated_str
+
+
 @memory.group("extract")
 def memory_extract():
     """Memory extraction commands."""
@@ -12054,6 +12096,7 @@ def memory_extract():
 @click.option("--json", "as_json", is_flag=True)
 def memory_extract_preview(project_id, run_log_path, profile, min_confidence, as_json):
     text_corpus = Path(run_log_path).read_text(encoding="utf-8")
+    text_corpus = _truncate_run_log(text_corpus)
     payload = {
         "text_corpus": text_corpus,
         "profile": profile,
@@ -12080,6 +12123,7 @@ def memory_extract_preview(project_id, run_log_path, profile, min_confidence, as
 @click.option("--json", "as_json", is_flag=True)
 def memory_extract_apply(project_id, run_log_path, profile, min_confidence, as_json):
     text_corpus = Path(run_log_path).read_text(encoding="utf-8")
+    text_corpus = _truncate_run_log(text_corpus)
     payload = {
         "text_corpus": text_corpus,
         "profile": profile,
@@ -12107,6 +12151,7 @@ def memory_extract_apply(project_id, run_log_path, profile, min_confidence, as_j
 def memory_extract_run(project_id, run_log_path, profile, min_confidence, as_json):
     """Alias for extract apply."""
     text_corpus = Path(run_log_path).read_text(encoding="utf-8")
+    text_corpus = _truncate_run_log(text_corpus)
     payload = {
         "text_corpus": text_corpus,
         "profile": profile,

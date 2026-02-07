@@ -1,15 +1,23 @@
 ---
-title: "Implementation Plan: Memory Extraction Pipeline v2"
-description: "Phased implementation of JSONL parser, message filtering, and quality enhancement for memory extraction from Claude Code sessions"
-audience: [ai-agents, developers]
-tags: [implementation, planning, memory-extraction, jsonl, service-layer]
+title: 'Implementation Plan: Memory Extraction Pipeline v2'
+description: Phased implementation of JSONL parser, message filtering, and quality
+  enhancement for memory extraction from Claude Code sessions
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- planning
+- memory-extraction
+- jsonl
+- service-layer
 created: 2026-02-07
-updated: 2026-02-07
-category: "product-planning"
-status: draft
+updated: '2026-02-07'
+category: product-planning
+status: in-progress
 related:
-  - docs/project_plans/PRDs/features/memory-extraction-pipeline-v2.md
-  - docs/project_plans/reports/memory-extraction-gap-analysis-2026-02-07.md
+- docs/project_plans/PRDs/features/memory-extraction-pipeline-v2.md
+- docs/project_plans/reports/memory-extraction-gap-analysis-2026-02-07.md
 ---
 
 # Implementation Plan: Memory Extraction Pipeline v2

@@ -7,12 +7,16 @@ or arbitrary text corpora. Extraction is review-first and only creates
 
 from __future__ import annotations
 
+import json
+import logging
 import re
 import time
 from typing import Any, Dict, List, Optional
 
 from skillmeat.cache.memory_repositories import _compute_content_hash
 from skillmeat.core.services.memory_service import MemoryService
+
+logger = logging.getLogger(__name__)
 
 try:
     from skillmeat.observability.metrics import (
@@ -166,6 +170,144 @@ class MemoryExtractorService:
     def _iter_candidate_lines(text_corpus: str) -> List[str]:
         lines = [line.strip(" -*\t") for line in text_corpus.splitlines()]
         return [line for line in lines if len(line.strip()) >= 24]
+
+    @staticmethod
+    def _parse_jsonl_messages(text_corpus: str) -> list[dict]:
+        """Parse JSONL format text corpus into list of message dictionaries.
+
+        Handles three input formats:
+        1. Standard JSONL: One JSON object per line
+        2. JSON-string-wrapped JSONL: Entire corpus is a JSON string with escaped newlines
+        3. Mixed: Lines that fail parsing are skipped with debug logging
+
+        Args:
+            text_corpus: String containing JSONL data or JSON-string-wrapped JSONL
+
+        Returns:
+            List of dictionaries parsed from valid JSON lines. Lines that fail
+            parsing or parse to non-dict types are skipped.
+
+        Examples:
+            >>> _parse_jsonl_messages('{"role":"user"}\\n{"role":"assistant"}')
+            [{"role": "user"}, {"role": "assistant"}]
+
+            >>> _parse_jsonl_messages('"{\\"role\\":\\"user\\"}\\n{\\"role\\":\\"assistant\\"}"')
+            [{"role": "user"}, {"role": "assistant"}]
+        """
+        if not text_corpus or not text_corpus.strip():
+            return []
+
+        corpus = text_corpus.strip()
+
+        # Handle JSON-string-wrapped JSONL: if starts with quote, try unwrapping
+        if corpus.startswith('"'):
+            try:
+                corpus = json.loads(corpus)
+                if not isinstance(corpus, str):
+                    logger.debug("Unwrapped JSON was not a string, using original corpus")
+                    corpus = text_corpus.strip()
+            except json.JSONDecodeError:
+                logger.debug("Failed to unwrap JSON-string format, treating as regular JSONL")
+
+        messages: list[dict] = []
+        for line_num, line in enumerate(corpus.splitlines(), start=1):
+            line = line.strip()
+            if not line:
+                continue
+
+            try:
+                parsed = json.loads(line)
+                if isinstance(parsed, dict):
+                    messages.append(parsed)
+                else:
+                    logger.debug(
+                        f"Line {line_num} parsed to non-dict type ({type(parsed).__name__}), skipping"
+                    )
+            except json.JSONDecodeError as e:
+                logger.debug(f"Line {line_num} failed JSON parsing: {e}, skipping")
+
+        return messages
+
+    @staticmethod
+    def _extract_content_blocks(messages: List[Dict]) -> List[tuple[str, Dict]]:
+        """Extract content blocks from JSONL message structures.
+
+        Filters messages by type, skips metadata/tool results, and extracts
+        text content blocks with provenance metadata.
+
+        Args:
+            messages: List of message dictionaries from run log JSONL
+
+        Returns:
+            List of (content_text, provenance_metadata) tuples for non-empty
+            content >= 20 characters
+        """
+        # Message types to skip (noise)
+        skip_types = {"progress", "file-history-snapshot", "system", "result"}
+
+        results: List[tuple[str, Dict]] = []
+
+        for message in messages:
+            msg_type = message.get("type")
+            msg_role = message.get("role")
+
+            # Skip noise message types
+            if msg_type in skip_types:
+                logger.debug(f"Skipping message with type={msg_type}")
+                continue
+
+            # Skip meta messages and tool results
+            if message.get("isMeta") in (True, "true"):
+                logger.debug("Skipping meta message")
+                continue
+            if message.get("toolUseResult") is True:
+                logger.debug("Skipping tool use result message")
+                continue
+
+            # Determine if this is a user or assistant message
+            is_user = msg_type == "human" or msg_role == "user"
+            is_assistant = msg_type == "assistant" or msg_role == "assistant"
+
+            if not (is_user or is_assistant):
+                logger.debug(f"Skipping message with type={msg_type}, role={msg_role}")
+                continue
+
+            # Extract content (handle both string and list formats)
+            content = message.get("content")
+            if content is None:
+                continue
+
+            # Extract text blocks
+            text_blocks: List[str] = []
+            if isinstance(content, str):
+                text_blocks.append(content)
+            elif isinstance(content, list):
+                # Extract only text-type blocks, skip tool_use/tool_result
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        text_blocks.append(block.get("text", ""))
+            else:
+                logger.debug(f"Unexpected content type: {type(content)}")
+                continue
+
+            # Join text blocks and filter by length
+            content_text = "\n".join(text_blocks).strip()
+            if len(content_text) < 20:
+                logger.debug(f"Skipping short content: {len(content_text)} chars")
+                continue
+
+            # Build provenance metadata
+            provenance = {
+                "message_uuid": message.get("uuid", ""),
+                "message_role": msg_type or msg_role or "unknown",
+                "timestamp": message.get("timestamp", ""),
+                "session_id": message.get("sessionId", ""),
+            }
+
+            results.append((content_text, provenance))
+
+        logger.debug(f"Extracted {len(results)} content blocks from {len(messages)} messages")
+        return results
 
     @staticmethod
     def _classify_type(line: str) -> str:
