@@ -106,6 +106,29 @@ class TestMemoryServiceCRUD:
         assert result["access_count"] == 0
         assert result["created_at"] is not None
         assert result["updated_at"] is not None
+        assert result["share_scope"] == "project"
+
+    def test_create_with_explicit_share_scope(self, memory_service):
+        """Creating with an explicit share_scope persists the selected scope."""
+        result = memory_service.create(
+            project_id=PROJECT_ID,
+            type="decision",
+            content="Cross-project candidate",
+            confidence=0.8,
+            share_scope="global_candidate",
+        )
+
+        assert result["share_scope"] == "global_candidate"
+
+    def test_create_invalid_share_scope_raises(self, memory_service):
+        """Creating with an invalid share scope raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid share_scope"):
+            memory_service.create(
+                project_id=PROJECT_ID,
+                type="decision",
+                content="Invalid scope test",
+                share_scope="org-wide",
+            )
 
     def test_create_with_provenance_and_anchors(self, memory_service):
         """Creating with optional provenance and anchors serializes them correctly."""
@@ -309,6 +332,26 @@ class TestMemoryServiceCRUD:
         assert len(result["items"]) == 2
         assert all("sql" in item["content"].lower() for item in result["items"])
 
+    def test_list_items_filter_by_share_scope(self, memory_service):
+        """list_items with share_scope filter returns only matching items."""
+        memory_service.create(
+            project_id=PROJECT_ID,
+            type="decision",
+            content="Project local memory",
+            share_scope="project",
+        )
+        memory_service.create(
+            project_id=PROJECT_ID,
+            type="learning",
+            content="Global candidate memory",
+            share_scope="global_candidate",
+        )
+
+        result = memory_service.list_items(PROJECT_ID, share_scope="global_candidate")
+
+        assert len(result["items"]) == 1
+        assert result["items"][0]["share_scope"] == "global_candidate"
+
     def test_search_global_across_projects(self, seeded_db_path):
         """search() supports global query when project_id is omitted."""
         # Seed second project and memory directly through service
@@ -343,6 +386,7 @@ class TestMemoryServiceCRUD:
 
         result = service.search(query="global search token", project_id=None)
         assert len(result["items"]) == 2
+        assert all(item.get("project_name") for item in result["items"])
 
     def test_list_items_pagination(self, memory_service):
         """list_items supports cursor-based pagination."""
@@ -399,6 +443,18 @@ class TestMemoryServiceCRUD:
 
         assert updated["content"] == "Updated content"
         assert updated["id"] == created["id"]
+
+    def test_update_share_scope(self, memory_service):
+        """Updating share_scope persists and validates via service layer."""
+        created = memory_service.create(
+            project_id=PROJECT_ID,
+            type="learning",
+            content="Scope update",
+            share_scope="project",
+        )
+
+        updated = memory_service.update(created["id"], share_scope="private")
+        assert updated["share_scope"] == "private"
 
     def test_update_confidence(self, memory_service):
         """Updating confidence validates the new value."""

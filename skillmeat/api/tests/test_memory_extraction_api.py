@@ -22,6 +22,7 @@ def test_search_memory_items_endpoint():
                 "content": "Use retries",
                 "confidence": 0.8,
                 "status": "candidate",
+                "share_scope": "project",
             }
         ],
         "next_cursor": None,
@@ -46,6 +47,8 @@ def test_list_global_memory_items_endpoint():
                 "content": "Watch lock contention",
                 "confidence": 0.7,
                 "status": "active",
+                "share_scope": "project",
+                "project_name": "Project Two",
             }
         ],
         "next_cursor": None,
@@ -56,6 +59,7 @@ def test_list_global_memory_items_endpoint():
         response = _client().get("/api/v1/memory-items/global")
     assert response.status_code == 200
     assert response.json()["items"][0]["project_id"] == "proj-2"
+    assert response.json()["items"][0]["project_name"] == "Project Two"
 
 
 def test_preview_memory_extraction_endpoint():
@@ -90,6 +94,7 @@ def test_apply_memory_extraction_endpoint():
                 "content": "Prefer retries",
                 "confidence": 0.72,
                 "status": "candidate",
+                "share_scope": "project",
             }
         ],
         "skipped_duplicates": [],

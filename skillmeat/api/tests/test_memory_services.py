@@ -45,6 +45,7 @@ def _make_mock_memory_item(
     content: str = "Use pytest for testing",
     confidence: float = 0.9,
     status: str = "candidate",
+    share_scope: str = "project",
     content_hash: str = "abc123hash",
     access_count: int = 0,
     created_at: str = "2025-01-15T10:00:00Z",
@@ -62,6 +63,7 @@ def _make_mock_memory_item(
     item.content = content
     item.confidence = confidence
     item.status = status
+    item.share_scope = share_scope
     item.content_hash = content_hash
     item.access_count = access_count
     item.created_at = created_at
@@ -494,6 +496,7 @@ class TestMemoryServiceUpdate:
             "confidence": 0.8,
             "type": "decision",
             "status": "active",
+            "share_scope": "global_candidate",
             "provenance_json": '{"key": "val"}',
             "anchors_json": '["a.py"]',
             "ttl_policy_json": '{"max_age_days": 7}',

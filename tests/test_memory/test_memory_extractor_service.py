@@ -66,3 +66,37 @@ def test_apply_persists_candidates_as_candidate_status(seeded_db_path):
     assert result["preview_total"] >= 1
     assert len(result["created"]) >= 1
     assert all(item["status"] == "candidate" for item in result["created"])
+
+
+def test_profile_scoring_order_strict_vs_aggressive(seeded_db_path):
+    service = MemoryExtractorService(db_path=seeded_db_path)
+    corpus = "Decision: Use transactional retries for lock contention handling."
+
+    strict = service.preview(
+        project_id=PROJECT_ID,
+        text_corpus=corpus,
+        profile="strict",
+        min_confidence=0.0,
+    )
+    aggressive = service.preview(
+        project_id=PROJECT_ID,
+        text_corpus=corpus,
+        profile="aggressive",
+        min_confidence=0.0,
+    )
+
+    assert len(strict) == 1
+    assert len(aggressive) == 1
+    assert aggressive[0]["confidence"] > strict[0]["confidence"]
+
+
+def test_invalid_profile_raises_value_error(seeded_db_path):
+    service = MemoryExtractorService(db_path=seeded_db_path)
+
+    with pytest.raises(ValueError, match="Invalid extraction profile"):
+        service.preview(
+            project_id=PROJECT_ID,
+            text_corpus="Decision: Use deterministic retries.",
+            profile="experimental",
+            min_confidence=0.0,
+        )
