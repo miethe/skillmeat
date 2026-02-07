@@ -94,6 +94,7 @@ For phase execution, use artifact-tracking skill for:
 - UPDATE task status after completion
 - QUERY pending/blocked tasks
 - ORCHESTRATE batch delegation
+- **Plan status**: Use `manage-plan-status.py` to update implementation plan status (draft → in-progress → completed)
 
 Integration patterns: [./integrations/artifact-tracking.md]
 
@@ -147,6 +148,20 @@ Task("artifact-tracker", "Update phase N: Mark TASK-1.1, TASK-1.2 complete")
 
 # 5. Update request-log if applicable
 meatycapture log item update REQ-*.md REQ-ITEM --status done
+```
+
+### Update Plan Status
+
+```bash
+# Mark implementation plan in progress
+python .claude/skills/artifact-tracking/scripts/manage-plan-status.py \
+  --file docs/project_plans/implementation_plans/features/feature-name-v1.md \
+  --status in-progress
+
+# Mark complete after all phases done
+python .claude/skills/artifact-tracking/scripts/manage-plan-status.py \
+  --file docs/project_plans/implementation_plans/features/feature-name-v1.md \
+  --status completed
 ```
 
 ### Quick Feature Flow

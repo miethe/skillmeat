@@ -18,6 +18,18 @@ Token-efficient tracking artifacts for AI agent orchestration.
 
 **Scripts location**: `.claude/skills/artifact-tracking/scripts/`
 
+## Plan Status Management
+
+| Operation | Command | Tokens |
+|-----------|---------|--------|
+| Read status | `python scripts/manage-plan-status.py --read FILE` | ~50 |
+| Update status | `python scripts/manage-plan-status.py --file FILE --status STATUS` | ~50 |
+| Query plans | `python scripts/manage-plan-status.py --query --status STATUS` | ~100 |
+
+**Use for**: Managing PRD and implementation plan status fields (draft, approved, in-progress, completed, superseded).
+
+**Detailed guide**: `./plan-status-management.md`
+
 ## Agent Operations (When Needed)
 
 For complex operations requiring judgment:

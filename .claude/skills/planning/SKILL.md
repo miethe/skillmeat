@@ -88,6 +88,29 @@ User: "Create progress tracking for data-layer-fixes PRD"
 # With task breakdown, subagent assignments, completion tracking
 ```
 
+### Track Plan Status Lifecycle
+
+```bash
+# Mark PRD approved
+python .claude/skills/artifact-tracking/scripts/manage-plan-status.py \
+  --file docs/project_plans/PRDs/features/feature-name-v1.md \
+  --status approved
+
+# Mark implementation in progress
+python .claude/skills/artifact-tracking/scripts/manage-plan-status.py \
+  --file docs/project_plans/implementation_plans/features/feature-name-v1.md \
+  --status in-progress
+
+# Mark implementation completed
+python .claude/skills/artifact-tracking/scripts/manage-plan-status.py \
+  --file docs/project_plans/implementation_plans/features/feature-name-v1.md \
+  --status completed
+```
+
+Status values: `draft` → `approved` → `in-progress` → `completed`
+
+**Reference**: See `.claude/skills/artifact-tracking/plan-status-management.md` for full status management guide.
+
 ## Core Workflows
 
 ### Workflow 1: Create PRD from Feature Request
