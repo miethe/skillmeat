@@ -28,10 +28,9 @@ function createDefaultProps(
       all: 42,
       constraint: 10,
       decision: 8,
-      fix: 6,
-      pattern: 7,
+      gotcha: 6,
+      style_rule: 7,
       learning: 5,
-      style_rule: 6,
     },
     ...overrides,
   };
@@ -50,10 +49,9 @@ describe('MemoryFilterBar', () => {
       expect(screen.getByRole('tab', { name: /all/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /constraints/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /decisions/i })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: /fixes/i })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: /patterns/i })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: /learnings/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /gotchas/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /style rules/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /learnings/i })).toBeInTheDocument();
     });
 
     it('shows count badges when counts provided', () => {
@@ -64,11 +62,9 @@ describe('MemoryFilterBar', () => {
       expect(screen.getByText('42')).toBeInTheDocument(); // all
       expect(screen.getByText('10')).toBeInTheDocument(); // constraint
       expect(screen.getByText('8')).toBeInTheDocument();  // decision
-      expect(screen.getByText('7')).toBeInTheDocument();  // pattern
+      expect(screen.getByText('7')).toBeInTheDocument();  // style_rule
       expect(screen.getByText('5')).toBeInTheDocument();  // learning
-      // fix=6 and style_rule=6 both render "6", so use getAllByText
-      const sixes = screen.getAllByText('6');
-      expect(sixes).toHaveLength(2);
+      expect(screen.getByText('6')).toBeInTheDocument(); // gotcha
     });
 
     it('shows zero counts when counts not provided', () => {
@@ -77,7 +73,7 @@ describe('MemoryFilterBar', () => {
 
       // All count badges should show 0
       const zeroBadges = screen.getAllByText('0');
-      expect(zeroBadges.length).toBe(7); // One per type tab
+      expect(zeroBadges.length).toBe(6); // One per type tab
     });
 
     it('calls onTypeFilterChange when tab is clicked', async () => {

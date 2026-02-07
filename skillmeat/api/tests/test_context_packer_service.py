@@ -764,7 +764,7 @@ class TestGetCandidatesWithModule:
 
         result = service.preview_pack("proj-1", module_id="mod-1", budget_tokens=100000)
 
-        mock_module_service.get.assert_called_once_with("mod-1")
+        mock_module_service.get.assert_called_once_with("mod-1", include_items=True)
         assert result["items_included"] >= 1
 
     def test_module_selectors_with_additional_filters(

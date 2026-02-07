@@ -17,7 +17,7 @@
 
 import * as React from 'react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Loader2, X, Plus, Eye } from 'lucide-react';
+import { Loader2, X, Plus, Eye, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,13 +25,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import {
   useCreateContextModule,
   useUpdateContextModule,
   useModuleMemories,
   useRemoveMemoryFromModule,
+  useAddMemoryToModule,
 } from '@/hooks/use-context-modules';
+import { useMemoryItems } from '@/hooks/use-memory-items';
 import type { ContextModuleResponse } from '@/sdk/models/ContextModuleResponse';
 import type { MemoryItemResponse } from '@/sdk/models/MemoryItemResponse';
 import { MemoryTypeBadge } from './memory-type-badge';
@@ -150,12 +165,14 @@ function TagInput({
   placeholder,
   values,
   onChange,
+  tooltip,
 }: {
   id: string;
   label: string;
   placeholder: string;
   values: string[];
   onChange: (values: string[]) => void;
+  tooltip?: string;
 }) {
   const [inputValue, setInputValue] = useState('');
 
@@ -192,9 +209,29 @@ function TagInput({
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={id} className="text-sm">
-        {label}
-      </Label>
+      <div className="flex items-center gap-1.5">
+        <Label htmlFor={id} className="text-sm">
+          {label}
+        </Label>
+        {tooltip && (
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex text-muted-foreground hover:text-foreground"
+                  aria-label={`Info about ${label}`}
+                >
+                  <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                <p>{tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
       {values.length > 0 && (
         <div className="flex flex-wrap gap-1.5" role="list" aria-label={label}>
           {values.map((tag, index) => (
@@ -334,6 +371,8 @@ export function ModuleEditor({
   // -------------------------------------------------------------------------
   const [form, setForm] = useState<FormState>(() => getInitialState(module));
   const [errors, setErrors] = useState<FormErrors>({});
+  const [addMemoryOpen, setAddMemoryOpen] = useState(false);
+  const [memorySearch, setMemorySearch] = useState('');
 
   // Reset form when module changes (e.g. navigating between modules)
   useEffect(() => {
@@ -357,6 +396,7 @@ export function ModuleEditor({
   });
 
   const removeMutation = useRemoveMemoryFromModule();
+  const addMutation = useAddMemoryToModule();
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
@@ -364,13 +404,30 @@ export function ModuleEditor({
   // Manual memory list (edit mode only)
   // -------------------------------------------------------------------------
   const memoriesQuery = useModuleMemories(
-    isEditMode ? module!.id : '',
-    { enabled: isEditMode }
+    isEditMode ? module!.id : ''
   );
 
   const manualMemories: MemoryItemResponse[] = useMemo(
     () => (memoriesQuery.data as MemoryItemResponse[] | undefined) ?? [],
     [memoriesQuery.data]
+  );
+  const manualMemoryIds = useMemo(
+    () => new Set(manualMemories.map((m) => m.id)),
+    [manualMemories]
+  );
+
+  const availableMemoriesQuery = useMemoryItems({
+    projectId,
+    search: memorySearch || undefined,
+    limit: 50,
+  });
+
+  const availableMemories = useMemo(
+    () =>
+      (availableMemoriesQuery.data?.items ?? []).filter(
+        (item) => item.status !== 'deprecated' && !manualMemoryIds.has(item.id)
+      ),
+    [availableMemoriesQuery.data?.items, manualMemoryIds]
   );
 
   // -------------------------------------------------------------------------
@@ -496,6 +553,28 @@ export function ModuleEditor({
       removeMutation.mutate({ moduleId: module.id, memoryId });
     },
     [module, removeMutation]
+  );
+
+  const handleAddMemory = useCallback(
+    (memoryId: string) => {
+      if (!module) return;
+      addMutation.mutate(
+        {
+          moduleId: module.id,
+          data: {
+            memory_id: memoryId,
+            ordering: manualMemories.length,
+          },
+        },
+        {
+          onSuccess: () => {
+            setAddMemoryOpen(false);
+            setMemorySearch('');
+          },
+        }
+      );
+    },
+    [module, addMutation, manualMemories.length]
   );
 
   // -------------------------------------------------------------------------
@@ -692,6 +771,7 @@ export function ModuleEditor({
               placeholder="e.g. src/components/**"
               values={form.selectors.file_patterns}
               onChange={(vals) => updateSelector('file_patterns', vals)}
+              tooltip="Glob patterns to match source files. Memories associated with matching files will be included in this module. Example: src/components/**, **/*.test.ts"
             />
 
             {/* Workflow Stages */}
@@ -701,6 +781,7 @@ export function ModuleEditor({
               placeholder="e.g. planning, review"
               values={form.selectors.workflow_stages}
               onChange={(vals) => updateSelector('workflow_stages', vals)}
+              tooltip="Development workflow stages to filter memories by. Only memories tagged with these stages will be included. Common stages: planning, implementation, review, debugging, deployment"
             />
           </div>
 
@@ -720,13 +801,12 @@ export function ModuleEditor({
                       </span>
                     )}
                   </h3>
-                  {/* TODO: Wire to a memory picker/search dialog */}
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     className="h-7 text-xs"
-                    disabled
+                    onClick={() => setAddMemoryOpen(true)}
                     aria-label="Add memory to module"
                   >
                     <Plus className="mr-1 h-3 w-3" aria-hidden="true" />
@@ -821,6 +901,56 @@ export function ModuleEditor({
           </div>
         </form>
       </CardContent>
+      {isEditMode && (
+        <Dialog open={addMemoryOpen} onOpenChange={setAddMemoryOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add Memory to Module</DialogTitle>
+              <DialogDescription>
+                Search and select a memory item to include manually.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Input
+                placeholder="Search memories..."
+                value={memorySearch}
+                onChange={(e) => setMemorySearch(e.target.value)}
+                aria-label="Search memories to add"
+              />
+              <div className="max-h-[360px] space-y-2 overflow-y-auto rounded-md border p-2">
+                {availableMemoriesQuery.isLoading && (
+                  <div className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    Loading memories...
+                  </div>
+                )}
+                {!availableMemoriesQuery.isLoading && availableMemories.length === 0 && (
+                  <p className="px-2 py-3 text-sm text-muted-foreground">
+                    No matching memories available.
+                  </p>
+                )}
+                {availableMemories.map((memory) => (
+                  <div key={memory.id} className="flex items-center gap-2 rounded border p-2">
+                    <MemoryTypeBadge type={memory.type} />
+                    <p className="flex-1 truncate text-sm" title={memory.content}>
+                      {memory.content}
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleAddMemory(memory.id)}
+                      disabled={addMutation.isPending}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
   );
 }

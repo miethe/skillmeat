@@ -29,7 +29,9 @@ The Memory & Context Intelligence System consists of three main components:
 | Metric | Target | Warning | Critical |
 |--------|--------|---------|----------|
 | Memory list query p95 | < 200ms | > 200ms | > 1000ms |
+| Global memory query p95 | < 300ms | > 300ms | > 1200ms |
 | Context pack generation p95 | < 500ms | > 500ms | > 1000ms |
+| Extraction preview/apply p95 | < 2s | > 2s | > 5s |
 | Error rate | < 1% | > 1% | > 5% |
 | Inbox size (candidate items) | < 100 | > 200 | N/A |
 | Memory operation failure rate | < 0.5% | > 0.5% | N/A |
@@ -58,7 +60,9 @@ Access the Memory & Context dashboard:
 
 Key panels:
 - Memory list query latency (p50, p95, p99)
+- Global memory query latency (p50, p95)
 - Context pack generation latency (p50, p95, p99)
+- Extraction pipeline latency (preview/apply)
 - Memory operations rate (creates, promotes, deprecates per minute)
 - Inbox size (candidate items)
 - Error rate by endpoint
@@ -70,6 +74,7 @@ All metrics are exported via Prometheus from the SkillMeat API server:
 
 - **API metrics**: `skillmeat_api_request_duration_seconds`, `skillmeat_api_requests_total`, `skillmeat_api_errors_total`
 - **Memory metrics**: `skillmeat_memory_items_total` (by status and type)
+- **Memory operation metrics**: `skillmeat_memory_operations_total`, `skillmeat_memory_operation_duration_seconds`
 - **Context pack metrics**: `skillmeat_context_pack_token_utilization`
 
 ### Alert Channels
@@ -163,7 +168,7 @@ Alerts are routed based on severity:
 
 If latency remains > 1000ms after restart:
 - Page on-call engineer
-- Consider disabling memory system temporarily: `export SKILLMEAT_MEMORY_CONTEXT_ENABLED=false`
+- If failures are widespread, roll back to the previous known-good build
 - Investigate database corruption or disk issues
 
 ---
@@ -286,9 +291,9 @@ Same as Memory List Latency Critical, plus:
    sqlite3 ~/.skillmeat/cache/skillmeat.db "SELECT 1;"
    ```
 
-3. **Disable feature if widespread failures**:
+3. **Rollback if widespread failures**:
    ```bash
-   export SKILLMEAT_MEMORY_CONTEXT_ENABLED=false
+   # Roll back to previous known-good release and restart service
    systemctl restart skillmeat-api
    ```
 
@@ -445,20 +450,18 @@ print(f"Available: {preview['items_available']}, Included: {preview['items_inclu
 
 ---
 
-### Issue: Feature Flag Disabled Unexpectedly
+### Issue: Memory System Unavailable (503)
 
 **Symptoms**: All memory endpoints return 503
 
 **Diagnosis**:
 ```bash
-echo $SKILLMEAT_MEMORY_CONTEXT_ENABLED
 curl http://localhost:8080/health/detailed | jq '.components.memory_system'
 ```
 
 **Resolution**:
 ```bash
-# Re-enable feature
-export SKILLMEAT_MEMORY_CONTEXT_ENABLED=true
+# Verify DB path and service config, then restart API
 systemctl restart skillmeat-api
 ```
 
@@ -548,9 +551,9 @@ sqlite3 ~/.skillmeat/cache/skillmeat.db "SELECT status, COUNT(*) FROM memory_ite
 curl "http://localhost:8080/api/v1/memory-items/count?project_id=test&status=candidate"
 ```
 
-**View feature flag status**:
+**View memory system component status**:
 ```bash
-curl http://localhost:8080/api/v1/config | jq '.memory_context_enabled'
+curl http://localhost:8080/health/detailed | jq '.components.memory_system'
 ```
 
 **Generate test context pack**:
@@ -568,13 +571,12 @@ curl -X POST http://localhost:8080/api/v1/context-packs/generate \
 
 ### Configuration Files
 
-- Feature flags: Environment variables or `.env` file
+- Runtime configuration: Environment variables or `.env` file
 - API settings: `skillmeat/api/config.py`
 - Database location: `~/.skillmeat/cache/skillmeat.db`
 
 ### Related Documentation
 
-- [Feature Flags](../feature-flags.md)
 - [API Documentation](../api/README.md)
 - [Memory Service Documentation](../../skillmeat/core/services/memory_service.py)
 - [Context Packer Documentation](../../skillmeat/core/services/context_packer_service.py)

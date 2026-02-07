@@ -41,7 +41,7 @@ The system follows a strict layered architecture pattern:
 │  API Layer (FastAPI)                                    │
 │  - Routers: memory_items.py, context_modules.py        │
 │  - Schemas: memory.py (Pydantic models)                 │
-│  - Dependencies: Feature flag enforcement               │
+│  - Dependencies: project/context availability checks    │
 └────────────────┬────────────────────────────────────────┘
                  │
 ┌────────────────▼────────────────────────────────────────┐
@@ -404,7 +404,7 @@ Grouped by type with confidence annotations:
 - [medium confidence] Prefer cursor-based pagination over offset
 
 ## Constraints
-- API endpoints must return 503 when feature flag disabled
+- API endpoints should be resilient and return typed validation/runtime errors
 - [low confidence] Rate limit: 100 req/min per user
 
 ## Gotchas
@@ -429,7 +429,7 @@ Grouped by type with confidence annotations:
 
 **Base Path**: `/api/v1/memory-items`
 
-**Feature Flag**: `SKILLMEAT_MEMORY_CONTEXT_ENABLED` (default: `true`)
+**Deployment**: Directly enabled (no runtime feature-gate dependency)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -854,60 +854,14 @@ def memory_svc():
 
 **File**: `docs/feature-flags.md`
 
-The system uses feature flags for gradual rollout and testing.
+Memory/context APIs are deployed directly and are not runtime-gated.
 
-### `MEMORY_CONTEXT_ENABLED`
-
-**Environment Variable**: `SKILLMEAT_MEMORY_CONTEXT_ENABLED`
-**Default**: `true`
-**Type**: boolean
-
-Controls whether the entire Memory & Context Intelligence System is available. When disabled, all memory-related endpoints return 503 (Service Unavailable).
-
-**Usage:**
-
-```bash
-# Disable the feature
-export SKILLMEAT_MEMORY_CONTEXT_ENABLED=false
-skillmeat web dev
-
-# All memory endpoints return 503
-curl http://localhost:8080/api/v1/memory-items?project_id=test
-# {"detail": "Memory & Context Intelligence System is disabled"}
-```
-
-**Implementation:**
+### Testing Availability
 
 ```python
-# File: skillmeat/api/dependencies.py
-def require_memory_context_enabled(settings: APISettings = Depends(get_settings)):
-    """Dependency that raises 503 if memory system is disabled."""
-    if not settings.memory_context_enabled:
-        raise HTTPException(
-            status_code=503,
-            detail="Memory & Context Intelligence System is disabled"
-        )
-
-# File: skillmeat/api/routers/memory_items.py
-router = APIRouter(
-    prefix="/memory-items",
-    tags=["memory-items"],
-    dependencies=[Depends(require_memory_context_enabled)],  # Applied to all routes
-)
-```
-
-### Testing with Feature Flags
-
-```python
-import os
-from unittest.mock import patch
-
-def test_memory_disabled():
-    """Test behavior when memory system is disabled."""
-    with patch.dict(os.environ, {"SKILLMEAT_MEMORY_CONTEXT_ENABLED": "false"}):
-        response = client.get("/api/v1/memory-items?project_id=test")
-        assert response.status_code == 503
-        assert "disabled" in response.json()["detail"]
+def test_memory_available():
+    response = client.get("/api/v1/memory-items?project_id=test")
+    assert response.status_code != 503
 ```
 
 ---

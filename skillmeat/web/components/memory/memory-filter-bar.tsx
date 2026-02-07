@@ -22,7 +22,6 @@ import {
   Wrench,
   Puzzle,
   Lightbulb,
-  Palette,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,10 +43,9 @@ const MEMORY_TYPES = [
   { value: 'all', label: 'All', icon: null },
   { value: 'constraint', label: 'Constraints', icon: ShieldAlert },
   { value: 'decision', label: 'Decisions', icon: GitBranch },
-  { value: 'fix', label: 'Fixes', icon: Wrench },
-  { value: 'pattern', label: 'Patterns', icon: Puzzle },
+  { value: 'gotcha', label: 'Gotchas', icon: Wrench },
+  { value: 'style_rule', label: 'Style Rules', icon: Puzzle },
   { value: 'learning', label: 'Learnings', icon: Lightbulb },
-  { value: 'style_rule', label: 'Style Rules', icon: Palette },
 ] as const;
 
 const STATUS_OPTIONS = [

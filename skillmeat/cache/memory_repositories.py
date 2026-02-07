@@ -124,6 +124,7 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
         data.setdefault("updated_at", now)
         data.setdefault("confidence", 0.75)
         data.setdefault("status", "candidate")
+        data.setdefault("share_scope", "project")
         data.setdefault("access_count", 0)
 
         # Compute content hash if not provided
@@ -186,10 +187,12 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
 
     def list_items(
         self,
-        project_id: str,
+        project_id: Optional[str],
         *,
         status: Optional[str] = None,
         type: Optional[str] = None,
+        share_scope: Optional[str] = None,
+        search: Optional[str] = None,
         min_confidence: Optional[float] = None,
         limit: int = 50,
         cursor: Optional[str] = None,
@@ -213,15 +216,19 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
         """
         session = self._get_session()
         try:
-            query = session.query(MemoryItem).filter(
-                MemoryItem.project_id == project_id
-            )
+            query = session.query(MemoryItem)
+            if project_id is not None:
+                query = query.filter(MemoryItem.project_id == project_id)
 
             # Apply optional filters
             if status is not None:
                 query = query.filter(MemoryItem.status == status)
             if type is not None:
                 query = query.filter(MemoryItem.type == type)
+            if share_scope is not None:
+                query = query.filter(MemoryItem.share_scope == share_scope)
+            if search:
+                query = query.filter(MemoryItem.content.ilike(f"%{search}%"))
             if min_confidence is not None:
                 query = query.filter(MemoryItem.confidence >= min_confidence)
 
@@ -267,6 +274,7 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
             logger.debug(
                 f"Listed {len(items)} memory items "
                 f"(project={project_id}, status={status}, type={type}, "
+                f"share_scope={share_scope}, "
                 f"cursor={cursor}, has_more={has_more})"
             )
 
@@ -373,7 +381,7 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
             session.close()
 
     def count_by_project(
-        self, project_id: str, *, status: Optional[str] = None
+        self, project_id: Optional[str], *, status: Optional[str] = None
     ) -> int:
         """Count memory items for a project with optional status filter.
 
@@ -386,9 +394,9 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
         """
         session = self._get_session()
         try:
-            query = session.query(MemoryItem).filter(
-                MemoryItem.project_id == project_id
-            )
+            query = session.query(MemoryItem)
+            if project_id is not None:
+                query = query.filter(MemoryItem.project_id == project_id)
             if status is not None:
                 query = query.filter(MemoryItem.status == status)
             return query.count()

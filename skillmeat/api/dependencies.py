@@ -305,20 +305,9 @@ def verify_api_key(
 def require_memory_context_enabled(
     settings: Annotated[APISettings, Depends(get_settings)],
 ) -> None:
-    """Verify that Memory & Context Intelligence System is enabled.
-
-    Args:
-        settings: API settings
-
-    Raises:
-        HTTPException: If memory_context_enabled is False
-    """
-    if not settings.memory_context_enabled:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Memory & Context Intelligence System is currently disabled. "
-            "Set SKILLMEAT_MEMORY_CONTEXT_ENABLED=true to enable this feature.",
-        )
+    """Legacy no-op dependency retained for backward compatibility."""
+    _ = settings
+    return
 
 
 # Type aliases for cleaner dependency injection

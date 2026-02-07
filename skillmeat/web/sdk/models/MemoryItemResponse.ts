@@ -12,6 +12,8 @@ export type MemoryItemResponse = {
   content: string;
   confidence: number;
   status: string;
+  share_scope: string;
+  project_name?: string | null;
   provenance?: Record<string, any> | null;
   anchors?: Array<string> | null;
   ttl_policy?: Record<string, any> | null;

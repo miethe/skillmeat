@@ -21,7 +21,7 @@ related:
 **Date:** 2026-02-06  
 **Author:** Claude Code (AI Agent)  
 **Version:** 1.0 (follow-up)  
-**Status:** Draft
+**Status:** Superseded by v1.2 execution
 
 ---
 
@@ -46,9 +46,7 @@ Memory & Context v1 delivered project-scoped memory CRUD, lifecycle governance, 
 - Project-scoped memory model and lifecycle (`candidate`, `active`, `stable`, `deprecated`)
 - Context modules and token-budget pack APIs
 - Project memory page at `/projects/[id]/memory`
-- Feature flags:
-  - `SKILLMEAT_MEMORY_CONTEXT_ENABLED` (active)
-  - `SKILLMEAT_MEMORY_AUTO_EXTRACT` (defined but not implemented)
+- Runtime gating assumptions in this section are historical. Current shipped behavior deploys memory/context endpoints directly without runtime feature gating.
 
 ### 2.2 Gaps
 
@@ -228,12 +226,10 @@ skillmeat memory search "postgres migration lock" --all-projects
 
 ---
 
-## 10. Rollout Strategy
+## 10. Rollout Strategy (Historical)
 
-1. Ship API + CLI in feature-flagged mode (`MEMORY_AUTO_EXTRACT=false` default).
-2. Ship sidebar/global memories IA behind UI flag for limited beta.
-3. Enable extraction for pilot projects with strict profile.
-4. Expand default profile after quality metrics are met.
+This PRD section reflects the original v1.1 proposal.
+Current v1.2 execution uses direct deployment with CI/test gates, candidate-only extraction writes, and operational monitoring.
 
 ---
 

@@ -41,6 +41,14 @@ class MemoryStatus(str, Enum):
     DEPRECATED = "deprecated"
 
 
+class MemoryShareScope(str, Enum):
+    """Allowed cross-project share scope values."""
+
+    PRIVATE = "private"
+    PROJECT = "project"
+    GLOBAL_CANDIDATE = "global_candidate"
+
+
 # =============================================================================
 # CRUD Schemas
 # =============================================================================
@@ -53,6 +61,7 @@ class MemoryItemCreateRequest(BaseModel):
     content: str = Field(min_length=1, max_length=10000)
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     status: MemoryStatus = MemoryStatus.CANDIDATE
+    share_scope: MemoryShareScope = MemoryShareScope.PROJECT
     provenance: Optional[Dict[str, Any]] = None
     anchors: Optional[List[str]] = None
     ttl_policy: Optional[Dict[str, Any]] = None
@@ -65,6 +74,7 @@ class MemoryItemUpdateRequest(BaseModel):
     content: Optional[str] = Field(default=None, min_length=1, max_length=10000)
     confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     status: Optional[MemoryStatus] = None
+    share_scope: Optional[MemoryShareScope] = None
     provenance: Optional[Dict[str, Any]] = None
     anchors: Optional[List[str]] = None
     ttl_policy: Optional[Dict[str, Any]] = None
@@ -79,6 +89,8 @@ class MemoryItemResponse(BaseModel):
     content: str
     confidence: float
     status: str
+    share_scope: str
+    project_name: Optional[str] = None
     provenance: Optional[Dict[str, Any]] = None
     anchors: Optional[List[str]] = None
     ttl_policy: Optional[Dict[str, Any]] = None
@@ -98,6 +110,56 @@ class MemoryItemListResponse(BaseModel):
     next_cursor: Optional[str] = None
     has_more: bool = False
     total: Optional[int] = None
+
+
+class MemorySearchResponse(BaseModel):
+    """Response model for memory search operations."""
+
+    items: List[MemoryItemResponse]
+    next_cursor: Optional[str] = None
+    has_more: bool = False
+    total: Optional[int] = None
+
+
+class ExtractionCandidate(BaseModel):
+    """A preview extraction candidate."""
+
+    type: MemoryType
+    content: str
+    confidence: float
+    status: MemoryStatus = MemoryStatus.CANDIDATE
+    duplicate_of: Optional[str] = None
+    provenance: Optional[Dict[str, Any]] = None
+
+
+class MemoryExtractionPreviewRequest(BaseModel):
+    """Request for extraction preview."""
+
+    text_corpus: str = Field(min_length=1, max_length=500000)
+    profile: str = Field(default="balanced", pattern="^(strict|balanced|aggressive)$")
+    min_confidence: float = Field(default=0.6, ge=0.0, le=1.0)
+    run_id: Optional[str] = None
+    session_id: Optional[str] = None
+    commit_sha: Optional[str] = None
+
+
+class MemoryExtractionPreviewResponse(BaseModel):
+    """Preview response for extraction."""
+
+    candidates: List[ExtractionCandidate]
+    total_candidates: int
+
+
+class MemoryExtractionApplyRequest(MemoryExtractionPreviewRequest):
+    """Request for applying extraction output."""
+
+
+class MemoryExtractionApplyResponse(BaseModel):
+    """Apply response for extraction."""
+
+    created: List[MemoryItemResponse]
+    skipped_duplicates: List[ExtractionCandidate]
+    preview_total: int
 
 
 # =============================================================================

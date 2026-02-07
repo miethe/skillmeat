@@ -10,7 +10,6 @@ status: published
 related:
   - /docs/user/guides/memory-inbox.md
   - /docs/user/guides/context-modules.md
-  - /docs/feature-flags.md
   - /docs/project_plans/PRDs/features/memory-context-system-v1.md
 ---
 
@@ -25,6 +24,8 @@ SkillMeat's Memory & Context Intelligence System helps you capture project knowl
 - Deprecate stale or incorrect memories with reason tracking
 - Build reusable context modules with selector rules
 - Preview and generate token-budgeted context packs
+- Run memory workflows from CLI (`skillmeat memory ...`)
+- Extract candidate memories from run logs (`extract preview/apply`)
 
 ## Core Concepts
 
@@ -46,14 +47,17 @@ SkillMeat's Memory & Context Intelligence System helps you capture project knowl
 - [Memory Inbox User Guide](./memory-inbox.md)
 - [Working with Context Modules](./context-modules.md)
 - [Web UI Guide](./web-ui-guide.md)
-- [Feature Flags](../../feature-flags.md)
 
 ## API Surfaces
 
 - `GET/POST/PUT/DELETE /api/v1/memory-items`
+- `GET /api/v1/memory-items/search`
+- `GET /api/v1/memory-items/global`
 - `POST /api/v1/memory-items/{id}/promote`
 - `POST /api/v1/memory-items/{id}/deprecate`
 - `POST /api/v1/memory-items/merge`
+- `POST /api/v1/memory-items/extract/preview`
+- `POST /api/v1/memory-items/extract/apply`
 - `GET/POST/PUT/DELETE /api/v1/context-modules`
 - `POST /api/v1/context-packs/preview`
 - `POST /api/v1/context-packs/generate`

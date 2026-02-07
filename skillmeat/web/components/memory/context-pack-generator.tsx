@@ -73,8 +73,8 @@ const BUDGET_PRESET_LABELS: Record<number, string> = {
 const MEMORY_TYPE_OPTIONS = [
   { value: 'constraint', label: 'Constraints' },
   { value: 'decision', label: 'Decisions' },
-  { value: 'fix', label: 'Fixes' },
-  { value: 'pattern', label: 'Patterns' },
+  { value: 'gotcha', label: 'Gotchas' },
+  { value: 'style_rule', label: 'Style Rules' },
   { value: 'learning', label: 'Learnings' },
 ] as const;
 
@@ -598,4 +598,3 @@ function PreviewItem({ item }: PreviewItemProps) {
     </li>
   );
 }
-

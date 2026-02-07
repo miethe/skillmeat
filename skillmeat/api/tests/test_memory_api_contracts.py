@@ -49,6 +49,7 @@ def _make_memory_item(
     content: str = "Use pytest for testing",
     confidence: float = 0.85,
     status: str = "candidate",
+    share_scope: str = "project",
     provenance: Optional[Dict[str, Any]] = None,
     anchors: Optional[List[str]] = None,
     ttl_policy: Optional[Dict[str, Any]] = None,
@@ -66,6 +67,7 @@ def _make_memory_item(
         "content": content,
         "confidence": confidence,
         "status": status,
+        "share_scope": share_scope,
         "provenance": provenance,
         "anchors": anchors,
         "ttl_policy": ttl_policy,
@@ -136,7 +138,15 @@ def _make_module_list_result(
 
 def _assert_memory_item_shape(data: Dict[str, Any]) -> None:
     """Assert that a response dict has all required MemoryItemResponse fields."""
-    required_fields = {"id", "project_id", "type", "content", "confidence", "status"}
+    required_fields = {
+        "id",
+        "project_id",
+        "type",
+        "content",
+        "confidence",
+        "status",
+        "share_scope",
+    }
     for field in required_fields:
         assert field in data, f"Missing required field: {field}"
     assert isinstance(data["confidence"], (int, float))
@@ -226,6 +236,21 @@ class TestMemoryItemList:
         assert response.status_code == 200
         call_kwargs = mock_service.list_items.call_args.kwargs
         assert call_kwargs["type"] == "decision"
+
+    @patch("skillmeat.api.routers.memory_items._get_service")
+    def test_list_with_share_scope_filter(self, mock_get_service, client: TestClient):
+        """Filtering by share_scope should pass through to service."""
+        mock_service = MagicMock()
+        mock_service.list_items.return_value = _make_list_result(items=[], total=0)
+        mock_get_service.return_value = mock_service
+
+        response = client.get(
+            "/api/v1/memory-items?project_id=proj-1&share_scope=global_candidate"
+        )
+
+        assert response.status_code == 200
+        call_kwargs = mock_service.list_items.call_args.kwargs
+        assert call_kwargs["share_scope"] == "global_candidate"
 
     def test_list_invalid_status_returns_422(self, client: TestClient):
         """Invalid status enum value should return 422."""

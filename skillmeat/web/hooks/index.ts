@@ -507,6 +507,7 @@ export { useReturnTo, type UseReturnToOptions, type UseReturnToReturn } from './
 export {
   memoryItemKeys,
   useMemoryItems,
+  useGlobalMemoryItems,
   useMemoryItem,
   useMemoryItemCounts,
   useCreateMemoryItem,
@@ -519,6 +520,7 @@ export {
   useMergeMemoryItems,
   useMemorySelection,
   type MemoryItemFilters,
+  type GlobalMemoryItemFilters,
 } from './use-memory-items';
 
 // ============================================================================
