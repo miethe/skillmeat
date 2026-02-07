@@ -180,84 +180,96 @@ describe('MemoryCard', () => {
       expect(onClick).not.toHaveBeenCalled();
     });
 
-    it('calls onApprove when approve button is clicked', async () => {
+    it('calls onApprove when approve menu item is clicked', async () => {
       const user = userEvent.setup();
       const onApprove = jest.fn();
       const memory = createMockMemory();
       const props = createDefaultProps({ onApprove, memory });
       render(<MemoryCard {...props} />);
 
-      const approveButton = screen.getByLabelText(
-        `Approve memory: ${memory.content.slice(0, 40)}`
+      const trigger = screen.getByLabelText(
+        `Actions for memory: ${memory.content.slice(0, 40)}`
       );
-      await user.click(approveButton);
+      await user.click(trigger);
+
+      const approveItem = await screen.findByRole('menuitem', { name: /approve/i });
+      await user.click(approveItem);
 
       expect(onApprove).toHaveBeenCalledWith('test-id-1');
     });
 
-    it('calls onReject when reject button is clicked', async () => {
+    it('calls onReject when reject menu item is clicked', async () => {
       const user = userEvent.setup();
       const onReject = jest.fn();
       const memory = createMockMemory();
       const props = createDefaultProps({ onReject, memory });
       render(<MemoryCard {...props} />);
 
-      const rejectButton = screen.getByLabelText(
-        `Reject memory: ${memory.content.slice(0, 40)}`
+      const trigger = screen.getByLabelText(
+        `Actions for memory: ${memory.content.slice(0, 40)}`
       );
-      await user.click(rejectButton);
+      await user.click(trigger);
+
+      const rejectItem = await screen.findByRole('menuitem', { name: /reject/i });
+      await user.click(rejectItem);
 
       expect(onReject).toHaveBeenCalledWith('test-id-1');
     });
 
-    it('calls onEdit when edit button is clicked', async () => {
+    it('calls onEdit when edit menu item is clicked', async () => {
       const user = userEvent.setup();
       const onEdit = jest.fn();
       const memory = createMockMemory();
       const props = createDefaultProps({ onEdit, memory });
       render(<MemoryCard {...props} />);
 
-      const editButton = screen.getByLabelText(
-        `Edit memory: ${memory.content.slice(0, 40)}`
+      const trigger = screen.getByLabelText(
+        `Actions for memory: ${memory.content.slice(0, 40)}`
       );
-      await user.click(editButton);
+      await user.click(trigger);
+
+      const editItem = await screen.findByRole('menuitem', { name: /edit/i });
+      await user.click(editItem);
 
       expect(onEdit).toHaveBeenCalledWith('test-id-1');
     });
 
-    it('does not call onClick when approve button is clicked', async () => {
+    it('does not call onClick when dropdown trigger is clicked', async () => {
       const user = userEvent.setup();
       const onClick = jest.fn();
-      const onApprove = jest.fn();
       const memory = createMockMemory();
-      const props = createDefaultProps({ onClick, onApprove, memory });
+      const props = createDefaultProps({ onClick, memory });
       render(<MemoryCard {...props} />);
 
-      const approveButton = screen.getByLabelText(
-        `Approve memory: ${memory.content.slice(0, 40)}`
+      const trigger = screen.getByLabelText(
+        `Actions for memory: ${memory.content.slice(0, 40)}`
       );
-      await user.click(approveButton);
+      await user.click(trigger);
 
-      expect(onApprove).toHaveBeenCalled();
+      // The trigger's stopPropagation should prevent the row's onClick from firing
       expect(onClick).not.toHaveBeenCalled();
     });
   });
 
-  describe('Action button visibility', () => {
-    it('renders action buttons in the DOM', () => {
+  describe('Action menu visibility', () => {
+    it('renders the dropdown trigger and reveals menu items when opened', async () => {
+      const user = userEvent.setup();
       const memory = createMockMemory();
       const props = createDefaultProps({ memory });
       render(<MemoryCard {...props} />);
 
-      expect(
-        screen.getByLabelText(`Approve memory: ${memory.content.slice(0, 40)}`)
-      ).toBeInTheDocument();
-      expect(
-        screen.getByLabelText(`Edit memory: ${memory.content.slice(0, 40)}`)
-      ).toBeInTheDocument();
-      expect(
-        screen.getByLabelText(`Reject memory: ${memory.content.slice(0, 40)}`)
-      ).toBeInTheDocument();
+      // The meatballs trigger should always be in the DOM
+      const trigger = screen.getByLabelText(
+        `Actions for memory: ${memory.content.slice(0, 40)}`
+      );
+      expect(trigger).toBeInTheDocument();
+
+      // Open the dropdown and verify menu items appear
+      await user.click(trigger);
+
+      expect(await screen.findByRole('menuitem', { name: /approve/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /edit/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /reject/i })).toBeInTheDocument();
     });
   });
 

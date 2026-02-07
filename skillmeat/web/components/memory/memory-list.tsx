@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import type { MemoryItemResponse } from '@/sdk/models/MemoryItemResponse';
 import { MemoryCard } from './memory-card';
 import { MemoryCardSkeleton } from './memory-card-skeleton';
+import { MemoryGridCard, MemoryGridCardSkeleton } from './memory-grid-card';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -58,6 +59,10 @@ export interface MemoryListProps {
   onReactivate?: (id: string) => void;
   /** Deprecate a memory item. */
   onDeprecate?: (id: string) => void;
+  /** Current view mode: 'grid' or 'list'. */
+  viewMode: 'grid' | 'list';
+  /** Delete a memory item. */
+  onDelete?: (id: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +88,7 @@ const SKELETON_COUNT = 6;
  *   refetch={refetch}
  *   selectedIds={selectedIds}
  *   focusedIndex={focusedIndex}
+ *   viewMode="list"
  *   onToggleSelect={toggleSelect}
  *   onApprove={handleApprove}
  *   onReject={handleReject}
@@ -90,6 +96,7 @@ const SKELETON_COUNT = 6;
  *   onMerge={handleMerge}
  *   onCardClick={handleCardClick}
  *   onCreateMemory={handleCreateMemory}
+ *   onDelete={handleDelete}
  * />
  * ```
  */
@@ -101,6 +108,7 @@ export function MemoryList({
   refetch,
   selectedIds,
   focusedIndex,
+  viewMode,
   onToggleSelect,
   onApprove,
   onReject,
@@ -110,11 +118,27 @@ export function MemoryList({
   onCreateMemory,
   onReactivate,
   onDeprecate,
+  onDelete,
 }: MemoryListProps) {
   // ---------------------------------------------------------------------------
   // Loading State
   // ---------------------------------------------------------------------------
   if (isLoading) {
+    if (viewMode === 'grid') {
+      return (
+        <div
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4"
+          role="status"
+          aria-label="Loading memories"
+        >
+          {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+            <MemoryGridCardSkeleton key={i} />
+          ))}
+          <span className="sr-only">Loading memory items...</span>
+        </div>
+      );
+    }
+
     return (
       <div className="divide-y" role="status" aria-label="Loading memories">
         {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
@@ -169,36 +193,64 @@ export function MemoryList({
   }
 
   // ---------------------------------------------------------------------------
-  // Default: Scrollable List
+  // Default: Scrollable List or Grid
   // ---------------------------------------------------------------------------
   return (
     <>
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {memories.length} {memories.length === 1 ? 'memory item' : 'memory items'} displayed
       </div>
-      <div
-        role="grid"
-        aria-label="Memory items"
-        aria-rowcount={memories.length}
-        className="flex-1 overflow-y-auto divide-y"
-      >
-        {memories.map((memory, index) => (
-          <MemoryCard
-            key={memory.id}
-            memory={memory}
-            selected={selectedIds.has(memory.id)}
-            focused={focusedIndex === index}
-            onToggleSelect={onToggleSelect}
-            onApprove={onApprove}
-            onReject={onReject}
-            onEdit={onEdit}
-            onMerge={onMerge}
-            onClick={onCardClick}
-            onReactivate={onReactivate}
-            onDeprecate={onDeprecate}
-          />
-        ))}
-      </div>
+
+      {viewMode === 'grid' ? (
+        <div
+          role="grid"
+          aria-label="Memory items"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4"
+        >
+          {memories.map((memory, index) => (
+            <MemoryGridCard
+              key={memory.id}
+              memory={memory}
+              selected={selectedIds.has(memory.id)}
+              focused={focusedIndex === index}
+              onToggleSelect={onToggleSelect}
+              onApprove={onApprove}
+              onReject={onReject}
+              onEdit={onEdit}
+              onMerge={onMerge}
+              onClick={onCardClick}
+              onReactivate={onReactivate}
+              onDeprecate={onDeprecate}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      ) : (
+        <div
+          role="grid"
+          aria-label="Memory items"
+          aria-rowcount={memories.length}
+          className="flex-1 overflow-y-auto divide-y"
+        >
+          {memories.map((memory, index) => (
+            <MemoryCard
+              key={memory.id}
+              memory={memory}
+              selected={selectedIds.has(memory.id)}
+              focused={focusedIndex === index}
+              onToggleSelect={onToggleSelect}
+              onApprove={onApprove}
+              onReject={onReject}
+              onEdit={onEdit}
+              onMerge={onMerge}
+              onClick={onCardClick}
+              onReactivate={onReactivate}
+              onDeprecate={onDeprecate}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      )}
     </>
   );
 }

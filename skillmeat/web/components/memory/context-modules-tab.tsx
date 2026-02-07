@@ -23,6 +23,9 @@ import {
   AlertTriangle,
   RefreshCw,
   Loader2,
+  Grid3x3,
+  List,
+  MoreVertical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +48,13 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { ConfirmActionDialog } from './confirm-action-dialog';
 
@@ -151,6 +161,19 @@ function ModuleCardSkeleton() {
   );
 }
 
+function ModuleListRowSkeleton() {
+  return (
+    <div className="flex items-center gap-4 px-4 py-3">
+      <div className="flex-1 space-y-1.5">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-3 w-64" />
+      </div>
+      <Skeleton className="h-5 w-24 rounded-full" />
+      <Skeleton className="h-7 w-7 rounded" />
+    </div>
+  );
+}
+
 const SKELETON_COUNT = 3;
 
 // ---------------------------------------------------------------------------
@@ -171,7 +194,7 @@ function ModuleCard({ module, onEdit, onDelete, onPreview }: ModuleCardProps) {
     : 0;
 
   return (
-    <Card className="group transition-colors hover:bg-accent/30">
+    <Card className="transition-colors hover:bg-accent/30">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -190,41 +213,38 @@ function ModuleCard({ module, onEdit, onDelete, onPreview }: ModuleCardProps) {
             )}
           </div>
 
-          {/* Action buttons -- visible on hover/focus-within */}
-          <div
-            className={cn(
-              'flex items-center gap-1 shrink-0 opacity-0 transition-opacity',
-              'group-hover:opacity-100 group-focus-within:opacity-100'
-            )}
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => onPreview(module)}
-              aria-label={`Preview pack for module: ${module.name}`}
-            >
-              <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => onEdit(module)}
-              aria-label={`Edit module: ${module.name}`}
-            >
-              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => onDelete(module)}
-              aria-label={`Delete module: ${module.name}`}
-            >
-              <Trash2 className="h-3.5 w-3.5 text-destructive" aria-hidden="true" />
-            </Button>
-          </div>
+          {/* Meatballs menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 flex-shrink-0"
+                aria-label={`Actions for ${module.name}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreVertical className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => onPreview(module)}>
+                <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
+                Preview Pack
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(module)}>
+                <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+                Edit Module
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => onDelete(module)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                Delete Module
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </CardHeader>
 
@@ -246,6 +266,77 @@ function ModuleCard({ module, onEdit, onDelete, onPreview }: ModuleCardProps) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Module List Row Sub-Component (for list view)
+// ---------------------------------------------------------------------------
+
+function ModuleListRow({ module, onEdit, onDelete, onPreview }: ModuleCardProps) {
+  const selectorChips = buildSelectorSummary(module.selectors);
+  const memoryCount = Array.isArray(module.memory_items) ? module.memory_items.length : 0;
+
+  return (
+    <div className="flex items-center gap-4 px-4 py-3 hover:bg-accent/50 transition-colors">
+      {/* Name + description */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm truncate">{module.name}</span>
+          <Badge variant="outline" className="shrink-0 text-xs">
+            Priority {module.priority ?? 5}
+          </Badge>
+        </div>
+        {module.description && (
+          <p className="text-xs text-muted-foreground truncate mt-0.5">{module.description}</p>
+        )}
+      </div>
+
+      {/* Selector chips */}
+      <div className="hidden md:flex items-center gap-1.5 shrink-0">
+        {selectorChips.slice(0, 2).map((chip) => (
+          <Badge key={chip} variant="secondary" className="text-xs font-normal whitespace-nowrap">
+            {chip}
+          </Badge>
+        ))}
+        {selectorChips.length > 2 && (
+          <Badge variant="secondary" className="text-xs font-normal">
+            +{selectorChips.length - 2}
+          </Badge>
+        )}
+      </div>
+
+      {/* Memory count */}
+      {memoryCount > 0 && (
+        <Badge variant="outline" className="shrink-0 text-xs font-normal">
+          {memoryCount} {memoryCount === 1 ? 'memory' : 'memories'}
+        </Badge>
+      )}
+
+      {/* Meatballs menu */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label={`Actions for ${module.name}`}>
+            <MoreVertical className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem onClick={() => onPreview(module)}>
+            <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
+            Preview Pack
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onEdit(module)}>
+            <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+            Edit Module
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDelete(module)}>
+            <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+            Delete Module
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 
@@ -435,9 +526,9 @@ function CreateModuleModal({ open, onOpenChange, projectId, onCreated }: CreateM
 /**
  * ContextModulesTab -- lists and manages context modules for a project.
  *
- * Shows module cards with selector summaries, priority badges, and
- * hover-revealed action buttons. Provides a create modal for new modules
- * and a confirmation dialog for deletion.
+ * Shows modules in grid (cards) or list (rows) layout with selector summaries,
+ * priority badges, and meatballs action menus. Provides a create modal for
+ * new modules and a confirmation dialog for deletion.
  *
  * @example
  * ```tsx
@@ -457,6 +548,11 @@ export function ContextModulesTab({ projectId }: ContextModulesTabProps) {
   } = useContextModules(projectId);
 
   const modules = modulesData?.items ?? [];
+
+  // ---------------------------------------------------------------------------
+  // View mode
+  // ---------------------------------------------------------------------------
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // ---------------------------------------------------------------------------
   // Modal state
@@ -519,11 +615,24 @@ export function ContextModulesTab({ projectId }: ContextModulesTabProps) {
       <div className="space-y-4 p-6" role="status" aria-label="Loading context modules">
         <div className="flex items-center justify-between">
           <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-9 w-32" />
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-20 rounded-md" />
+            <Skeleton className="h-9 w-32" />
+          </div>
         </div>
-        {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
-          <ModuleCardSkeleton key={i} />
-        ))}
+        {viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+              <ModuleCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : (
+          <div className="divide-y rounded-md border">
+            {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+              <ModuleListRowSkeleton key={i} />
+            ))}
+          </div>
+        )}
         <span className="sr-only">Loading context modules...</span>
       </div>
     );
@@ -566,10 +675,35 @@ export function ContextModulesTab({ projectId }: ContextModulesTabProps) {
             Configure modules that select memories for context packs
           </p>
         </div>
-        <Button size="sm" onClick={handleCreateNew}>
-          <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-          New Module
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* View toggle */}
+          <div className="flex items-center gap-1 rounded-md border bg-background p-1" role="group" aria-label="View mode">
+            <Button
+              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewMode('grid')}
+              aria-label="Grid view"
+              aria-pressed={viewMode === 'grid'}
+            >
+              <Grid3x3 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewMode('list')}
+              aria-label="List view"
+              aria-pressed={viewMode === 'list'}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button size="sm" onClick={handleCreateNew}>
+            <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+            New Module
+          </Button>
+        </div>
       </div>
 
       {/* Module list or empty state */}
@@ -590,28 +724,47 @@ export function ContextModulesTab({ projectId }: ContextModulesTabProps) {
           </Button>
         </div>
       ) : (
-        /* Module Cards */
+        /* Module Cards / List */
         <>
           <div className="sr-only" aria-live="polite" aria-atomic="true">
             {modules.length} {modules.length === 1 ? 'context module' : 'context modules'}{' '}
             displayed
           </div>
-          <div
-            className="space-y-3"
-            role="list"
-            aria-label="Context modules"
-          >
-            {modules.map((module) => (
-              <div key={module.id} role="listitem">
-                <ModuleCard
-                  module={module}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onPreview={handlePreview}
-                />
-              </div>
-            ))}
-          </div>
+          {viewMode === 'grid' ? (
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+              role="list"
+              aria-label="Context modules"
+            >
+              {modules.map((module) => (
+                <div key={module.id} role="listitem">
+                  <ModuleCard
+                    module={module}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onPreview={handlePreview}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div
+              className="divide-y rounded-md border"
+              role="list"
+              aria-label="Context modules"
+            >
+              {modules.map((module) => (
+                <div key={module.id} role="listitem">
+                  <ModuleListRow
+                    module={module}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onPreview={handlePreview}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
 
