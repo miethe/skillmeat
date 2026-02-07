@@ -3,13 +3,13 @@ type: progress
 prd: memory-extraction-pipeline-v2
 phase: 1
 title: Critical Fix - JSONL Parser & Message Filtering
-status: pending
+status: completed
 started: '2026-02-07'
 completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 4
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -64,7 +64,7 @@ tasks:
 - id: MEX-1.5
   description: Unit + integration tests for Phase 1 - JSONL parsing (valid/malformed/empty),
     message filtering, CLI truncation (400KB-2.5MB), 3 real session JSONL fixtures
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -109,7 +109,7 @@ files_modified:
 - skillmeat/core/services/memory_extractor_service.py
 - skillmeat/cli.py
 - tests/test_memory/test_memory_extractor_service.py
-progress: 80
+progress: 100
 updated: '2026-02-07'
 ---
 
