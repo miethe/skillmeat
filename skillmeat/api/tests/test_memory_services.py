@@ -23,6 +23,7 @@ from skillmeat.core.services.memory_service import (
     MemoryService,
     VALID_TYPES,
     VALID_STATUSES,
+    VALID_SHARE_SCOPES,
     UPDATABLE_FIELDS,
 )
 from skillmeat.core.services.context_module_service import (
@@ -286,6 +287,31 @@ class TestMemoryServiceCreate:
         )
         assert result["type"] == valid_type
 
+    @pytest.mark.parametrize("valid_scope", list(VALID_SHARE_SCOPES))
+    def test_create_all_valid_share_scopes(self, memory_service, valid_scope):
+        """All valid share scopes should be accepted."""
+        mock_item = _make_mock_memory_item(share_scope=valid_scope)
+        memory_service.repo.create.return_value = mock_item
+
+        result = memory_service.create(
+            project_id="proj-1",
+            type="decision",
+            content=f"content-{valid_scope}",
+            share_scope=valid_scope,
+        )
+
+        assert result["share_scope"] == valid_scope
+
+    def test_create_invalid_share_scope_raises(self, memory_service):
+        """Invalid share_scope raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid share_scope"):
+            memory_service.create(
+                project_id="proj-1",
+                type="decision",
+                content="content",
+                share_scope="org",
+            )
+
     def test_create_boundary_confidence_values(self, memory_service):
         """Boundary confidence values 0.0 and 1.0 should be accepted."""
         mock_item = _make_mock_memory_item(confidence=0.0)
@@ -409,6 +435,8 @@ class TestMemoryServiceListItems:
             "proj-1",
             status="active",
             type="decision",
+            share_scope=None,
+            search=None,
             min_confidence=0.7,
             limit=10,
             cursor=None,
@@ -483,6 +511,11 @@ class TestMemoryServiceUpdate:
         """Updating status validates against allowed statuses."""
         with pytest.raises(ValueError, match="Invalid status"):
             memory_service.update("mem-1", status="invalid_status")
+
+    def test_update_validates_share_scope(self, memory_service):
+        """Updating share_scope validates against allowed values."""
+        with pytest.raises(ValueError, match="Invalid share_scope"):
+            memory_service.update("mem-1", share_scope="org")
 
     @pytest.mark.parametrize("field", list(UPDATABLE_FIELDS))
     def test_update_all_updatable_fields_accepted(self, memory_service, field):
@@ -1834,8 +1867,8 @@ class TestContextPackerServiceAdditionalEdgeCases:
 
         assert result["total_tokens"] <= 50
 
-    def test_apply_module_selectors_file_patterns_ignored(self, packer_service):
-        """File patterns in selectors are accepted but do not filter (future feature)."""
+    def test_apply_module_selectors_file_patterns_and_workflow_stage_filter(self, packer_service):
+        """File/workflow selectors should filter items when metadata is non-matching."""
         packer_service.memory_service.list_items.side_effect = [
             {
                 "items": [
@@ -1859,8 +1892,8 @@ class TestContextPackerServiceAdditionalEdgeCases:
             {"file_patterns": ["*.py"], "workflow_stages": ["review"]},
         )
 
-        # Items should still be returned (file_patterns not yet implemented as filter)
-        assert len(result) >= 1
+        # The seeded item has no matching anchors/provenance stage metadata.
+        assert len(result) == 0
 
     def test_estimate_tokens_unicode(self):
         """Token estimation handles unicode text."""

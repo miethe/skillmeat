@@ -31,11 +31,15 @@ def test_search_memory_items_endpoint():
         "total": None,
     }
     with patch("skillmeat.api.routers.memory_items._get_service", return_value=mock_service):
-        response = _client().get("/api/v1/memory-items/search?query=retries")
+        response = _client().get(
+            "/api/v1/memory-items/search?query=retries&share_scope=project"
+        )
     assert response.status_code == 200
     body = response.json()
     assert body["items"][0]["id"] == "mem-1"
     assert body["items"][0]["project_name"] == "Project One"
+    call_kwargs = mock_service.search.call_args.kwargs
+    assert call_kwargs["share_scope"] == "project"
 
 
 def test_list_global_memory_items_endpoint():
