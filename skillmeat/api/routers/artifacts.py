@@ -583,6 +583,7 @@ def artifact_to_response(
         version=version,
         aliases=[],  # TODO: Add alias support when implemented
         tags=artifact.tags or [],
+        target_platforms=artifact.target_platforms,
         metadata=metadata_response,
         upstream=upstream_response,
         collections=collections_response,
@@ -1565,6 +1566,7 @@ async def create_artifact(
                     collection_name=collection_name,
                     custom_name=request.name,
                     tags=request.tags,
+                    target_platforms=request.target_platforms,
                     force=False,  # Don't overwrite by default
                 )
 
@@ -1616,6 +1618,7 @@ async def create_artifact(
                     collection_name=collection_name,
                     custom_name=request.name,
                     tags=request.tags,
+                    target_platforms=request.target_platforms,
                     force=False,
                 )
 

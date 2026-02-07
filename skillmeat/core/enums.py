@@ -33,6 +33,8 @@ class Platform(str, Enum):
 
     Attributes:
         CLAUDE_CODE: Anthropic's Claude Code CLI tool
+        CODEX: OpenAI Codex CLI and integrations
+        GEMINI: Google Gemini CLI and integrations
         CURSOR: Cursor AI editor
         OTHER: Other platforms or unspecified
 
@@ -46,6 +48,8 @@ class Platform(str, Enum):
     """
 
     CLAUDE_CODE = "claude_code"
+    CODEX = "codex"
+    GEMINI = "gemini"
     CURSOR = "cursor"
     OTHER = "other"
 

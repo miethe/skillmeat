@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import requests
 from rich.prompt import Confirm
 
-from skillmeat.core.enums import Tool
+from skillmeat.core.enums import Platform, Tool
 from skillmeat.utils.logging import redact_path
 
 # Handle tomli/tomllib import for different Python versions
@@ -230,6 +230,7 @@ class Artifact:
     discovered_at: Optional[datetime] = None  # When artifact was first discovered or last changed
     tags: List[str] = field(default_factory=list)
     origin_source: Optional[str] = None  # Platform type when origin="marketplace" (e.g., "github", "gitlab", "bitbucket")
+    target_platforms: Optional[List[Platform]] = None  # None means deployable on all platforms; otherwise restricted to listed platforms
     import_id: Optional[str] = None  # Catalog entry import batch ID
 
     def __post_init__(self):
@@ -282,6 +283,21 @@ class Artifact:
                     f"Must be one of: {', '.join(valid_origin_sources)}"
                 )
 
+        # Validate/normalize target_platforms
+        if self.target_platforms is not None:
+            if len(self.target_platforms) == 0:
+                raise ValueError(
+                    "target_platforms cannot be an empty list. "
+                    "Use None for deployable-on-all semantics."
+                )
+            normalized_platforms: List[Platform] = []
+            for platform in self.target_platforms:
+                if isinstance(platform, str):
+                    normalized_platforms.append(Platform(platform))
+                else:
+                    normalized_platforms.append(platform)
+            self.target_platforms = normalized_platforms
+
         # Ensure type is ArtifactType enum
         if isinstance(self.type, str):
             self.type = ArtifactType(self.type)
@@ -327,6 +343,8 @@ class Artifact:
             result["tags"] = self.tags
         if self.origin_source is not None:
             result["origin_source"] = self.origin_source
+        if self.target_platforms is not None:
+            result["target_platforms"] = [platform.value for platform in self.target_platforms]
         if self.import_id is not None:
             result["import_id"] = self.import_id
 
@@ -363,6 +381,7 @@ class Artifact:
             discovered_at=discovered_at,
             tags=data.get("tags", []),
             origin_source=data.get("origin_source"),
+            target_platforms=data.get("target_platforms"),
             import_id=data.get("import_id"),
         )
 
@@ -432,6 +451,7 @@ class ArtifactManager:
         collection_name: Optional[str] = None,
         custom_name: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        target_platforms: Optional[List[Platform]] = None,
         force: bool = False,
     ) -> Artifact:
         """Add artifact from GitHub.
@@ -442,6 +462,7 @@ class ArtifactManager:
             collection_name: Target collection (uses active if None)
             custom_name: Custom artifact name (derives from spec if None)
             tags: Optional tags to add
+            target_platforms: Optional platform restrictions for deployment
             force: If True, overwrite existing artifact
 
         Returns:
@@ -527,6 +548,7 @@ class ArtifactManager:
             resolved_sha=fetch_result.resolved_sha,
             resolved_version=fetch_result.resolved_version,
             tags=tags or [],
+            target_platforms=target_platforms,
         )
 
         # Add to collection
@@ -554,6 +576,7 @@ class ArtifactManager:
         collection_name: Optional[str] = None,
         custom_name: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        target_platforms: Optional[List[Platform]] = None,
         force: bool = False,
     ) -> Artifact:
         """Add artifact from local filesystem.
@@ -564,6 +587,7 @@ class ArtifactManager:
             collection_name: Target collection (uses active if None)
             custom_name: Custom artifact name (derives from path if None)
             tags: Optional tags to add
+            target_platforms: Optional platform restrictions for deployment
             force: If True, overwrite existing artifact
 
         Returns:
@@ -636,6 +660,7 @@ class ArtifactManager:
             metadata=fetch_result.metadata,
             added=datetime.utcnow(),
             tags=tags or [],
+            target_platforms=target_platforms,
         )
 
         # Add to collection
