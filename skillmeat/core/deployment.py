@@ -1,5 +1,6 @@
 """Deployment tracking and management for SkillMeat."""
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -10,9 +11,20 @@ from rich.prompt import Confirm
 
 from skillmeat.core.artifact import Artifact, ArtifactType
 from skillmeat.core.enums import Platform
+from skillmeat.core.path_resolver import (
+    DEFAULT_ARTIFACT_PATH_MAP,
+    DEFAULT_PROFILE_ROOT_DIR,
+    DeploymentPathProfile,
+    default_profile,
+    normalize_profile,
+    resolve_artifact_path,
+    resolve_deployment_path,
+    resolve_profile_root,
+)
 from skillmeat.utils.filesystem import FilesystemManager, compute_content_hash
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -26,7 +38,7 @@ class Deployment:
 
     # Deployment metadata
     deployed_at: datetime
-    artifact_path: Path  # Relative path within .claude/ (e.g., "commands/review.md")
+    artifact_path: Path  # Relative path within profile root (e.g., "commands/review.md")
 
     # Version tracking (ADR-004)
     content_hash: str  # SHA-256 hash of artifact content at deployment time
@@ -179,6 +191,97 @@ class DeploymentManager:
             self._version_mgr = VersionManager(collection_mgr=self.collection_mgr)
         return self._version_mgr
 
+    def _fallback_profile(self, profile_id: Optional[str]) -> DeploymentPathProfile:
+        """Build a deterministic profile when cache profile metadata is unavailable."""
+        if not profile_id or profile_id == "claude_code":
+            return default_profile()
+
+        platform_map = {
+            "claude_code": Platform.CLAUDE_CODE,
+            "codex": Platform.CODEX,
+            "gemini": Platform.GEMINI,
+            "cursor": Platform.CURSOR,
+        }
+        platform = platform_map.get(profile_id, Platform.OTHER)
+        root_dir = (
+            {
+                "claude_code": ".claude",
+                "codex": ".codex",
+                "gemini": ".gemini",
+                "cursor": ".cursor",
+            }.get(profile_id)
+            or f".{profile_id}"
+        )
+        return DeploymentPathProfile(
+            profile_id=profile_id,
+            platform=platform,
+            root_dir=root_dir,
+            artifact_path_map=DEFAULT_ARTIFACT_PATH_MAP.copy(),
+        )
+
+    def _resolve_target_profiles(
+        self,
+        project_path: Path,
+        profile_id: Optional[str] = None,
+        all_profiles: bool = False,
+    ) -> List[DeploymentPathProfile]:
+        """Resolve deployment profiles for a project with backward-compat fallback."""
+        try:
+            import uuid
+
+            from skillmeat.cache.models import Project, get_session
+            from skillmeat.cache.repositories import DeploymentProfileRepository
+
+            resolved_project_path = Path(project_path).resolve()
+            session = get_session()
+            try:
+                project = (
+                    session.query(Project)
+                    .filter(Project.path == str(resolved_project_path))
+                    .first()
+                )
+                if project is None:
+                    project = Project(
+                        id=uuid.uuid4().hex,
+                        name=resolved_project_path.name,
+                        path=str(resolved_project_path),
+                        status="active",
+                    )
+                    session.add(project)
+                    session.commit()
+                    session.refresh(project)
+            finally:
+                session.close()
+
+            repo = DeploymentProfileRepository()
+            if all_profiles:
+                profiles = repo.list_all_profiles(project.id)
+                if not profiles:
+                    profiles = [repo.ensure_default_claude_profile(project.id)]
+            elif profile_id:
+                profile = repo.read_by_project_and_profile_id(project.id, profile_id)
+                if not profile:
+                    raise ValueError(
+                        f"Deployment profile '{profile_id}' not found for project"
+                    )
+                profiles = [profile]
+            else:
+                primary = repo.get_primary_profile(project.id)
+                if primary is None:
+                    primary = repo.ensure_default_claude_profile(project.id)
+                profiles = [primary]
+
+            return [normalize_profile(profile) for profile in profiles]
+        except Exception as exc:
+            logger.debug(
+                "Falling back to implicit profile resolution for %s: %s",
+                project_path,
+                exc,
+            )
+            if all_profiles:
+                return [default_profile()]
+            return [self._fallback_profile(profile_id)]
+
     def deploy_artifacts(
         self,
         artifact_names: List[str],
@@ -187,6 +290,8 @@ class DeploymentManager:
         artifact_type: Optional[ArtifactType] = None,
         overwrite: bool = False,
         dest_path: Optional[str] = None,
+        profile_id: Optional[str] = None,
+        all_profiles: bool = False,
     ) -> List[Deployment]:
         """Deploy specified artifacts to project.
 
@@ -199,6 +304,8 @@ class DeploymentManager:
             dest_path: Custom destination path relative to project root
                 (e.g., '.claude/skills/dev/'). If provided, artifact will be
                 deployed to {dest_path}/{artifact_name}/. Should be pre-validated.
+            profile_id: Optional deployment profile identifier.
+            all_profiles: Deploy to all project profiles if True.
 
         Returns:
             List of Deployment objects
@@ -220,7 +327,15 @@ class DeploymentManager:
         else:
             project_path = Path(project_path).resolve()
 
-        deployments = []
+        # Backward compatibility: ensure default profile metadata exists.
+        self._resolve_target_profiles(project_path=project_path)
+
+        deployments: List[Deployment] = []
+        profiles = self._resolve_target_profiles(
+            project_path=project_path,
+            profile_id=profile_id,
+            all_profiles=all_profiles,
+        )
 
         for artifact_name in artifact_names:
             # Find artifact
@@ -231,110 +346,111 @@ class DeploymentManager:
                 )
                 continue
 
-            # Determine source and destination paths
             source_path = collection_path / artifact.path
-            dest_base = project_path / ".claude"
+            for profile in profiles:
+                dest_base = resolve_profile_root(project_path, profile=profile)
 
-            # Use custom dest_path if provided, otherwise use default based on type
-            if dest_path:
-                # Custom destination path provided
-                # dest_path is relative to project root, e.g., '.claude/skills/dev/'
-                # Append artifact name to create final destination
-                if artifact.type in (ArtifactType.SKILL, ArtifactType.MCP):
-                    # Directory-based artifacts
-                    final_dest_path = project_path / dest_path / artifact.name
+                if dest_path:
+                    if artifact.type in (ArtifactType.SKILL, ArtifactType.MCP):
+                        final_dest_path = project_path / dest_path / artifact.name
+                    else:
+                        final_dest_path = (
+                            project_path / dest_path / f"{artifact.name}.md"
+                        )
                 else:
-                    # File-based artifacts (commands, agents, hooks)
-                    final_dest_path = project_path / dest_path / f"{artifact.name}.md"
-            elif artifact.type == ArtifactType.SKILL:
-                final_dest_path = dest_base / "skills" / artifact.name
-            elif artifact.type == ArtifactType.COMMAND:
-                final_dest_path = dest_base / "commands" / f"{artifact.name}.md"
-            elif artifact.type == ArtifactType.AGENT:
-                final_dest_path = dest_base / "agents" / f"{artifact.name}.md"
-            elif artifact.type == ArtifactType.MCP:
-                final_dest_path = dest_base / "mcp" / artifact.name
-            elif artifact.type == ArtifactType.HOOK:
-                final_dest_path = dest_base / "hooks" / f"{artifact.name}.md"
-            else:
-                raise ValueError(f"Unknown artifact type: {artifact.type}")
+                    final_dest_path = resolve_artifact_path(
+                        artifact_name=artifact.name,
+                        artifact_type=artifact.type.value,
+                        project_path=project_path,
+                        profile=profile,
+                    )
 
-            # Security check: ensure final path is within project directory
-            try:
-                final_dest_path.resolve().relative_to(project_path.resolve())
-            except ValueError:
-                raise ValueError(
-                    f"Destination path '{final_dest_path}' is outside project directory"
+                try:
+                    final_dest_path.resolve(strict=False).relative_to(
+                        project_path.resolve()
+                    )
+                except ValueError:
+                    raise ValueError(
+                        f"Destination path '{final_dest_path}' is outside project directory"
+                    )
+
+                if final_dest_path.exists():
+                    console.print(
+                        f"[yellow]Warning:[/yellow] {final_dest_path} already exists"
+                    )
+                    if not overwrite:
+                        prompt_name = f"{artifact.name} ({profile.profile_id})"
+                        if not Confirm.ask(f"Overwrite {prompt_name}?"):
+                            console.print(f"[yellow]Skipped:[/yellow] {prompt_name}")
+                            continue
+
+                try:
+                    self.filesystem_mgr.copy_artifact(
+                        source_path, final_dest_path, artifact.type
+                    )
+                    console.print(
+                        f"[green][/green] Deployed {artifact.type.value}/{artifact.name} -> {profile.profile_id}"
+                    )
+                except Exception as e:
+                    console.print(
+                        f"[red]Error deploying {artifact.name} ({profile.profile_id}):[/red] {e}"
+                    )
+                    continue
+
+                content_hash = compute_content_hash(final_dest_path)
+
+                try:
+                    artifact_path = final_dest_path.resolve(strict=False).relative_to(
+                        dest_base
+                    )
+                except ValueError:
+                    artifact_path = final_dest_path.resolve(strict=False).relative_to(
+                        project_path.resolve()
+                    )
+
+                DeploymentTracker.record_deployment(
+                    project_path=project_path,
+                    artifact=artifact,
+                    collection_name=collection.name,
+                    collection_sha=content_hash,
+                    deployment_profile_id=profile.profile_id,
+                    platform=profile.platform.value,
+                    profile_root_dir=profile.root_dir,
+                    artifact_path=artifact_path,
+                    artifact_path_map=dict(profile.artifact_path_map),
                 )
 
-            # Check if destination exists and prompt for overwrite
-            if final_dest_path.exists():
-                console.print(f"[yellow]Warning:[/yellow] {final_dest_path} already exists")
-                if not overwrite:  # Only prompt if overwrite not explicitly requested
-                    if not Confirm.ask(f"Overwrite {artifact.name}?"):
-                        console.print(f"[yellow]Skipped:[/yellow] {artifact.name}")
-                        continue
-                # If overwrite=True, continue without prompting
-
-            # Copy artifact
-            try:
-                self.filesystem_mgr.copy_artifact(source_path, final_dest_path, artifact.type)
-                console.print(
-                    f"[green][/green] Deployed {artifact.type.value}/{artifact.name}"
+                self._record_deployment_version(
+                    artifact_name=artifact.name,
+                    artifact_type=artifact.type.value,
+                    project_path=project_path,
+                    content_hash=content_hash,
                 )
-            except Exception as e:
-                console.print(f"[red]Error deploying {artifact.name}:[/red] {e}")
-                continue
 
-            # Compute content hash (becomes merge base for future three-way merges)
-            content_hash = compute_content_hash(final_dest_path)
+                deployment = Deployment(
+                    artifact_name=artifact.name,
+                    artifact_type=artifact.type.value,
+                    from_collection=collection.name,
+                    deployed_at=datetime.now(),
+                    artifact_path=artifact_path,
+                    content_hash=content_hash,
+                    local_modifications=False,
+                    merge_base_snapshot=content_hash,
+                    deployment_profile_id=profile.profile_id,
+                    platform=profile.platform,
+                    profile_root_dir=profile.root_dir,
+                )
+                deployments.append(deployment)
 
-            # Record deployment
-            DeploymentTracker.record_deployment(
-                project_path, artifact, collection.name, content_hash
-            )
-
-            # Create version record in cache database (TASK-2.3)
-            self._record_deployment_version(
-                artifact_name=artifact.name,
-                artifact_type=artifact.type.value,
-                project_path=project_path,
-                content_hash=content_hash,
-            )
-
-            # Create deployment object
-            # Set merge_base_snapshot to content_hash at deployment time
-            # This hash becomes the baseline for future three-way merges
-            # For artifact_path, use relative path from .claude directory if possible,
-            # otherwise relative to project root
-            try:
-                artifact_path = final_dest_path.relative_to(dest_base)
-            except ValueError:
-                # Custom dest_path outside .claude directory
-                artifact_path = final_dest_path.relative_to(project_path)
-
-            deployment = Deployment(
-                artifact_name=artifact.name,
-                artifact_type=artifact.type.value,
-                from_collection=collection.name,
-                deployed_at=datetime.now(),
-                artifact_path=artifact_path,
-                content_hash=content_hash,
-                local_modifications=False,
-                merge_base_snapshot=content_hash,  # Store baseline for merge tracking
-            )
-            deployments.append(deployment)
-
-            # Track deploy event
-            self._record_deploy_event(
-                artifact_name=artifact.name,
-                artifact_type=artifact.type.value,
-                collection_name=collection.name,
-                project_path=project_path,
-                version=artifact.metadata.version,
-                sha=content_hash,
-                success=True,
-            )
+                self._record_deploy_event(
+                    artifact_name=artifact.name,
+                    artifact_type=artifact.type.value,
+                    collection_name=collection.name,
+                    project_path=project_path,
+                    version=artifact.metadata.version,
+                    sha=content_hash,
+                    success=True,
+                )
 
         # Capture version snapshot after successful deployment (SVCV-003)
         if deployments:
@@ -361,7 +477,11 @@ class DeploymentManager:
         return deployments
 
     def deploy_all(
-        self, collection_name: Optional[str] = None, project_path: Optional[Path] = None
+        self,
+        collection_name: Optional[str] = None,
+        project_path: Optional[Path] = None,
+        profile_id: Optional[str] = None,
+        all_profiles: bool = False,
     ) -> List[Deployment]:
         """Deploy entire collection to project.
 
@@ -374,13 +494,20 @@ class DeploymentManager:
         """
         collection = self.collection_mgr.load_collection(collection_name)
         artifact_names = [a.name for a in collection.artifacts]
-        return self.deploy_artifacts(artifact_names, collection_name, project_path)
+        return self.deploy_artifacts(
+            artifact_names,
+            collection_name,
+            project_path,
+            profile_id=profile_id,
+            all_profiles=all_profiles,
+        )
 
     def undeploy(
         self,
         artifact_name: str,
         artifact_type: ArtifactType,
         project_path: Optional[Path] = None,
+        profile_id: Optional[str] = None,
     ) -> None:
         """Remove artifact from project.
 
@@ -396,9 +523,15 @@ class DeploymentManager:
         else:
             project_path = Path(project_path).resolve()
 
+        # Backward compatibility: ensure default profile metadata exists.
+        self._resolve_target_profiles(project_path=project_path, profile_id=profile_id)
+
         # Get deployment record
         deployment = DeploymentTracker.get_deployment(
-            project_path, artifact_name, artifact_type.value
+            project_path,
+            artifact_name,
+            artifact_type.value,
+            profile_id=profile_id,
         )
 
         if not deployment:
@@ -407,7 +540,14 @@ class DeploymentManager:
             )
 
         # Remove files
-        artifact_path = project_path / ".claude" / deployment.artifact_path
+        artifact_path = resolve_deployment_path(
+            deployment_relative_path=deployment.artifact_path,
+            project_path=project_path,
+            profile=DeploymentPathProfile(
+                profile_id=deployment.deployment_profile_id or "claude_code",
+                root_dir=deployment.profile_root_dir or DEFAULT_PROFILE_ROOT_DIR,
+            ),
+        )
         if artifact_path.exists():
             self.filesystem_mgr.remove_artifact(artifact_path)
             console.print(
@@ -416,7 +556,10 @@ class DeploymentManager:
 
         # Remove deployment record
         DeploymentTracker.remove_deployment(
-            project_path, artifact_name, artifact_type.value
+            project_path,
+            artifact_name,
+            artifact_type.value,
+            profile_id=profile_id or deployment.deployment_profile_id,
         )
 
         # Track remove event (from project)
@@ -435,7 +578,11 @@ class DeploymentManager:
             # Never fail undeploy due to analytics
             console.print(f"[dim]Debug: Failed to record remove analytics: {e}[/dim]")
 
-    def list_deployments(self, project_path: Optional[Path] = None) -> List[Deployment]:
+    def list_deployments(
+        self,
+        project_path: Optional[Path] = None,
+        profile_id: Optional[str] = None,
+    ) -> List[Deployment]:
         """List all deployed artifacts in project.
 
         Args:
@@ -451,10 +598,21 @@ class DeploymentManager:
         else:
             project_path = Path(project_path).resolve()
 
-        return DeploymentTracker.read_deployments(project_path)
+        deployments = DeploymentTracker.read_deployments(
+            project_path, profile_root_dir=None
+        )
+        if profile_id is None:
+            return deployments
+        return [
+            deployment
+            for deployment in deployments
+            if (deployment.deployment_profile_id or "claude_code") == profile_id
+        ]
 
     def check_deployment_status(
-        self, project_path: Optional[Path] = None
+        self,
+        project_path: Optional[Path] = None,
+        profile_id: Optional[str] = None,
     ) -> Dict[str, str]:
         """Check sync status of deployed artifacts.
 
@@ -471,15 +629,37 @@ class DeploymentManager:
         else:
             project_path = Path(project_path).resolve()
 
-        deployments = DeploymentTracker.read_deployments(project_path)
-        status = {}
+        deployments = DeploymentTracker.read_deployments(
+            project_path, profile_root_dir=None
+        )
+        if profile_id:
+            deployments = [
+                d
+                for d in deployments
+                if (d.deployment_profile_id or "claude_code") == profile_id
+            ]
+
+        base_key_counts: Dict[str, int] = {}
+        for deployment in deployments:
+            base_key = f"{deployment.artifact_name}::{deployment.artifact_type}"
+            base_key_counts[base_key] = base_key_counts.get(base_key, 0) + 1
+
+        status: Dict[str, str] = {}
 
         for deployment in deployments:
-            key = f"{deployment.artifact_name}::{deployment.artifact_type}"
+            base_key = f"{deployment.artifact_name}::{deployment.artifact_type}"
+            if base_key_counts[base_key] > 1:
+                profile_key = deployment.deployment_profile_id or "claude_code"
+                key = f"{base_key}::{profile_key}"
+            else:
+                key = base_key
 
             # Check for local modifications
             if DeploymentTracker.detect_modifications(
-                project_path, deployment.artifact_name, deployment.artifact_type
+                project_path,
+                deployment.artifact_name,
+                deployment.artifact_type,
+                profile_id=deployment.deployment_profile_id,
             ):
                 status[key] = "modified"
             else:

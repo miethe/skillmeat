@@ -16,6 +16,7 @@ from typing import Dict, List, Optional
 
 from skillmeat.utils.logging import redact_path
 from skillmeat.core.artifact import ArtifactType
+from skillmeat.core.path_resolver import DEFAULT_PROFILE_ROOTS
 from skillmeat.models import (
     ArtifactFingerprint,
     DuplicatePair,
@@ -759,7 +760,7 @@ class SearchManager:
         )
 
     def _discover_projects(self, roots: Optional[List[Path]] = None) -> List[Path]:
-        """Discover all .claude/ directories under roots.
+        """Discover all profile root directories under roots.
 
         Args:
             roots: List of root paths to search (uses config if None)
@@ -789,14 +790,15 @@ class SearchManager:
                 logging.warning(f"Project root does not exist: {redact_path(root)}")
                 continue
 
-            # Find all .claude directories
+            # Find all supported profile roots
             try:
                 for project_path in self._walk_directories(
                     root, max_depth, exclude_patterns
                 ):
-                    claude_dir = project_path / ".claude"
-                    if claude_dir.is_dir():
-                        projects.append(claude_dir)
+                    for profile_root in DEFAULT_PROFILE_ROOTS:
+                        profile_dir = project_path / profile_root
+                        if profile_dir.is_dir():
+                            projects.append(profile_dir)
             except (OSError, IOError) as e:
                 logging.warning(f"Error walking directory {redact_path(root)}: {e}")
                 continue

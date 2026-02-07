@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from skillmeat.core.path_resolver import DEFAULT_PROFILE_ROOTS
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.storage.project import ProjectMetadataStorage
 
@@ -213,26 +214,27 @@ class ProjectRegistry:
                 continue
 
             try:
-                # Use rglob to find deployment files
-                for deployment_file in search_path.rglob(
-                    ".claude/.skillmeat-deployed.toml"
-                ):
-                    project_path = deployment_file.parent.parent
+                # Use rglob to find deployment files across profile roots
+                for profile_root in DEFAULT_PROFILE_ROOTS:
+                    for deployment_file in search_path.rglob(
+                        f"{profile_root}/{DeploymentTracker.DEPLOYMENT_FILE}"
+                    ):
+                        project_path = deployment_file.parent.parent
 
-                    # Validate path is within search_path
-                    try:
-                        project_path = project_path.resolve()
-                        project_path.relative_to(search_path)
-                    except (ValueError, RuntimeError, OSError):
-                        continue
+                        # Validate path is within search_path
+                        try:
+                            project_path = project_path.resolve()
+                            project_path.relative_to(search_path)
+                        except (ValueError, RuntimeError, OSError):
+                            continue
 
-                    # Check depth limit
-                    depth = len(project_path.relative_to(search_path).parts)
-                    if depth > self._max_depth:
-                        continue
+                        # Check depth limit
+                        depth = len(project_path.relative_to(search_path).parts)
+                        if depth > self._max_depth:
+                            continue
 
-                    if project_path not in discovered:
-                        discovered.append(project_path)
+                        if project_path not in discovered:
+                            discovered.append(project_path)
 
             except (PermissionError, OSError) as e:
                 logger.warning(f"Error scanning {search_path}: {e}")
