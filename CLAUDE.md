@@ -236,26 +236,14 @@ python .claude/skills/artifact-tracking/scripts/update-batch.py \
 
 ### Plan Status Management
 
-**Use CLI for PRD/implementation plan status** (0 agent tokens):
+**Manage PRD/implementation plan status fields** (draft → approved → in-progress → completed):
 
 ```bash
-# Read current status
 python .claude/skills/artifact-tracking/scripts/manage-plan-status.py \
-  --read docs/project_plans/PRDs/features/feature-name-v1.md
-
-# Update status
-python .claude/skills/artifact-tracking/scripts/manage-plan-status.py \
-  --file docs/project_plans/implementation_plans/features/feature-name-v1.md \
-  --status completed
-
-# Query all draft PRDs
-python .claude/skills/artifact-tracking/scripts/manage-plan-status.py \
-  --query --status draft --type prd
+  [--read FILE | --file FILE --status STATUS | --query --status STATUS --type TYPE]
 ```
 
-**Status workflow**: draft → approved → in-progress → completed (or superseded)
-
-**Reference**: `.claude/skills/artifact-tracking/plan-status-management.md`
+**Use `artifact-tracking` skill for detailed guidance.**
 
 ### Orchestration Workflow
 
