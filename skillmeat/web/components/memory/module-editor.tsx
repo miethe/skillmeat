@@ -17,7 +17,7 @@
 
 import * as React from 'react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Loader2, X, Plus, Eye } from 'lucide-react';
+import { Loader2, X, Plus, Eye, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -32,6 +32,12 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import {
   useCreateContextModule,
@@ -159,12 +165,14 @@ function TagInput({
   placeholder,
   values,
   onChange,
+  tooltip,
 }: {
   id: string;
   label: string;
   placeholder: string;
   values: string[];
   onChange: (values: string[]) => void;
+  tooltip?: string;
 }) {
   const [inputValue, setInputValue] = useState('');
 
@@ -201,9 +209,29 @@ function TagInput({
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={id} className="text-sm">
-        {label}
-      </Label>
+      <div className="flex items-center gap-1.5">
+        <Label htmlFor={id} className="text-sm">
+          {label}
+        </Label>
+        {tooltip && (
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex text-muted-foreground hover:text-foreground"
+                  aria-label={`Info about ${label}`}
+                >
+                  <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                <p>{tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
       {values.length > 0 && (
         <div className="flex flex-wrap gap-1.5" role="list" aria-label={label}>
           {values.map((tag, index) => (
@@ -743,6 +771,7 @@ export function ModuleEditor({
               placeholder="e.g. src/components/**"
               values={form.selectors.file_patterns}
               onChange={(vals) => updateSelector('file_patterns', vals)}
+              tooltip="Glob patterns to match source files. Memories associated with matching files will be included in this module. Example: src/components/**, **/*.test.ts"
             />
 
             {/* Workflow Stages */}
@@ -752,6 +781,7 @@ export function ModuleEditor({
               placeholder="e.g. planning, review"
               values={form.selectors.workflow_stages}
               onChange={(vals) => updateSelector('workflow_stages', vals)}
+              tooltip="Development workflow stages to filter memories by. Only memories tagged with these stages will be included. Common stages: planning, implementation, review, debugging, deployment"
             />
           </div>
 

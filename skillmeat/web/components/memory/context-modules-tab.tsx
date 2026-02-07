@@ -257,9 +257,10 @@ interface CreateModuleModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
+  onCreated?: (module: ContextModuleResponse) => void;
 }
 
-function CreateModuleModal({ open, onOpenChange, projectId }: CreateModuleModalProps) {
+function CreateModuleModal({ open, onOpenChange, projectId, onCreated }: CreateModuleModalProps) {
   const [form, setForm] = useState<ModuleFormState>({ ...INITIAL_FORM_STATE });
   const [errors, setErrors] = useState<ModuleFormErrors>({});
 
@@ -272,8 +273,9 @@ function CreateModuleModal({ open, onOpenChange, projectId }: CreateModuleModalP
   }, [open]);
 
   const createMutation = useCreateContextModule({
-    onSuccess: () => {
+    onSuccess: (data) => {
       onOpenChange(false);
+      onCreated?.(data);
     },
   });
 
@@ -618,6 +620,7 @@ export function ContextModulesTab({ projectId }: ContextModulesTabProps) {
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
         projectId={projectId}
+        onCreated={(module) => setEditTarget(module)}
       />
 
       {/* Delete Confirmation Dialog */}
