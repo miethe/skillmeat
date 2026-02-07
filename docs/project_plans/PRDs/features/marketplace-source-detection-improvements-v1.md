@@ -1,16 +1,25 @@
 ---
-title: "PRD: Marketplace Source Detection Improvements"
-description: "Two enhancements to marketplace source detection: manual directory mapping for non-skill artifacts and post-detection deduplication using content hashing"
-audience: [ai-agents, developers, product-managers]
-tags: [prd, marketplace, detection, deduplication, artifact-types]
+title: 'PRD: Marketplace Source Detection Improvements'
+description: 'Two enhancements to marketplace source detection: manual directory mapping
+  for non-skill artifacts and post-detection deduplication using content hashing'
+audience:
+- ai-agents
+- developers
+- product-managers
+tags:
+- prd
+- marketplace
+- detection
+- deduplication
+- artifact-types
 created: 2026-01-05
-updated: 2026-01-05
-category: "product-planning"
-status: draft
+updated: '2026-02-07'
+category: product-planning
+status: completed
 related:
-  - /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
-  - /docs/project_plans/bugs/marketplace-sources-non_skills-v1.md
-  - /docs/project_plans/implementation_plans/features/marketplace-sources-crud-enhancement-v1.md
+- /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
+- /docs/project_plans/bugs/marketplace-sources-non_skills-v1.md
+- /docs/project_plans/implementation_plans/features/marketplace-sources-crud-enhancement-v1.md
 ---
 
 # PRD: Marketplace Source Detection Improvements

@@ -1,16 +1,26 @@
 ---
-title: "Implementation Plan: Artifact Deletion from Collections and Projects"
-description: "Phased implementation for artifact deletion UI with multi-step confirmation dialogs and cascading deletion from collections and projects"
-audience: [ai-agents, developers]
-tags: [implementation, planning, phases, tasks, web-ui, deletion, crud]
+title: 'Implementation Plan: Artifact Deletion from Collections and Projects'
+description: Phased implementation for artifact deletion UI with multi-step confirmation
+  dialogs and cascading deletion from collections and projects
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- planning
+- phases
+- tasks
+- web-ui
+- deletion
+- crud
 created: 2025-12-20
-updated: 2025-12-20
-category: "product-planning"
-status: draft
+updated: '2026-02-07'
+category: product-planning
+status: completed
 related:
-  - /docs/project_plans/PRDs/features/artifact-deletion-v1.md
-  - /.claude/rules/web/api-client.md
-  - /.claude/rules/web/hooks.md
+- /docs/project_plans/PRDs/features/artifact-deletion-v1.md
+- /.claude/rules/web/api-client.md
+- /.claude/rules/web/hooks.md
 ---
 
 # Implementation Plan: Artifact Deletion from Collections and Projects

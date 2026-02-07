@@ -1,16 +1,26 @@
 ---
-title: "PRD: Artifact Deletion from Collections and Projects"
-description: "Complete artifact deletion workflow with multi-level cascading deletion from collections and projects through the web UI with context-aware dialogs"
-audience: [ai-agents, developers]
-tags: [prd, planning, feature, web-ui, artifact-lifecycle, deletion, crud]
+title: 'PRD: Artifact Deletion from Collections and Projects'
+description: Complete artifact deletion workflow with multi-level cascading deletion
+  from collections and projects through the web UI with context-aware dialogs
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- planning
+- feature
+- web-ui
+- artifact-lifecycle
+- deletion
+- crud
 created: 2025-12-20
-updated: 2025-12-20
-category: "product-planning"
-status: draft
+updated: '2026-02-07'
+category: product-planning
+status: completed
 related:
-  - /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
-  - /.claude/rules/web/api-client.md
-  - /.claude/rules/web/hooks.md
+- /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
+- /.claude/rules/web/api-client.md
+- /.claude/rules/web/hooks.md
 ---
 
 # PRD: Artifact Deletion from Collections and Projects

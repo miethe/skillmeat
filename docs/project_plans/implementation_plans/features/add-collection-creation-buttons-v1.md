@@ -1,12 +1,19 @@
 ---
-title: "Add Collection Creation Buttons - Implementation Plan"
-description: "Add buttons to create new collections from the /collection page and artifact Collections tab"
-audience: [ai-agents, developers]
-tags: [implementation, collections, ui, frontend]
+title: Add Collection Creation Buttons - Implementation Plan
+description: Add buttons to create new collections from the /collection page and artifact
+  Collections tab
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- collections
+- ui
+- frontend
 created: 2025-12-13
-updated: 2025-12-13
-category: "product-planning"
-status: in-progress
+updated: '2026-02-07'
+category: product-planning
+status: completed
 ---
 
 # Implementation Plan: Add Collection Creation Buttons

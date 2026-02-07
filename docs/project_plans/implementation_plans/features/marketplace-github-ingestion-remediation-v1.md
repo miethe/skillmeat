@@ -1,16 +1,24 @@
 ---
-title: "Implementation Plan: Marketplace GitHub Ingestion Remediation"
-description: "Remediation plan to complete stubbed marketplace ingestion implementation from PR #26"
-audience: [ai-agents, developers]
-tags: [implementation, remediation, marketplace, github, ingestion]
+title: 'Implementation Plan: Marketplace GitHub Ingestion Remediation'
+description: 'Remediation plan to complete stubbed marketplace ingestion implementation
+  from PR #26'
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- remediation
+- marketplace
+- github
+- ingestion
 created: 2025-12-26
-updated: 2025-12-26
-category: "product-planning"
-status: in-progress
+updated: '2026-02-07'
+category: product-planning
+status: completed
 related:
-  - /docs/project_plans/implementation_plans/features/marketplace-github-ingestion-v1.md
-  - /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
-  - /.claude/worknotes/marketplace-gaps-quick-ref.md
+- /docs/project_plans/implementation_plans/features/marketplace-github-ingestion-v1.md
+- /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
+- /.claude/worknotes/marketplace-gaps-quick-ref.md
 ---
 
 # Implementation Plan: Marketplace GitHub Ingestion Remediation

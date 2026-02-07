@@ -1,13 +1,22 @@
 ---
-title: "PRD: Marketplace Folder View"
-description: "Two-pane master-detail layout for marketplace sources: semantic tree navigation + folder detail view"
-audience: [ai-agents, developers]
-tags: [prd, planning, feature, marketplace]
+title: 'PRD: Marketplace Folder View'
+description: 'Two-pane master-detail layout for marketplace sources: semantic tree
+  navigation + folder detail view'
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- planning
+- feature
+- marketplace
 created: 2026-01-28
-updated: 2026-01-29
-category: "product-planning"
-status: draft
-related: ["REQ-20260123-skillmeat", "marketplace-source-detection-improvements-v1"]
+updated: '2026-02-07'
+category: product-planning
+status: completed
+related:
+- REQ-20260123-skillmeat
+- marketplace-source-detection-improvements-v1
 ---
 
 # Feature Brief & Metadata

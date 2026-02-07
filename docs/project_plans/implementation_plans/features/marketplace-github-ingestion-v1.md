@@ -1,15 +1,24 @@
 ---
-title: "Implementation Plan: GitHub Marketplace Ingestion"
-description: "Phased implementation plan for GitHub repo ingestion with auto-detection, manual overrides, and import status tracking"
-audience: [ai-agents, developers]
-tags: [implementation, planning, marketplace, github, ingestion, discovery]
+title: 'Implementation Plan: GitHub Marketplace Ingestion'
+description: Phased implementation plan for GitHub repo ingestion with auto-detection,
+  manual overrides, and import status tracking
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- planning
+- marketplace
+- github
+- ingestion
+- discovery
 created: 2025-12-03
-updated: 2025-12-03
-category: "product-planning"
-status: draft
+updated: '2026-02-07'
+category: product-planning
+status: completed
 related:
-  - /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
-  - /docs/project_plans/SPIKEs/marketplace-github-ingestion-spike.md
+- /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
+- /docs/project_plans/SPIKEs/marketplace-github-ingestion-spike.md
 ---
 
 # Implementation Plan: GitHub Marketplace Ingestion

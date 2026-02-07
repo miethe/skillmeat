@@ -1,14 +1,24 @@
 ---
-title: "Implementation Plan: Marketplace GitHub Sources CRUD Enhancement"
-description: "Edit/Delete functionality and Description/Notes fields for GitHub Sources in SkillMeat"
-audience: [ai-agents, developers]
-tags: [implementation, planning, phases, tasks, web-ui, marketplace, crud]
+title: 'Implementation Plan: Marketplace GitHub Sources CRUD Enhancement'
+description: Edit/Delete functionality and Description/Notes fields for GitHub Sources
+  in SkillMeat
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- planning
+- phases
+- tasks
+- web-ui
+- marketplace
+- crud
 created: 2025-12-12
-updated: 2025-12-12
-category: "product-planning"
-status: draft
+updated: '2026-02-07'
+category: product-planning
+status: completed
 related:
-  - /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
+- /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
 ---
 
 # Implementation Plan: Marketplace GitHub Sources CRUD Enhancement
