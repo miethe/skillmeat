@@ -27,7 +27,10 @@ import {
   GitCommit,
   Hash,
   Activity,
+  ShieldCheck,
+  RotateCcw,
 } from 'lucide-react';
+import type { MemoryStatus } from '@/sdk/models/MemoryStatus';
 import type { MemoryItemResponse } from '@/sdk/models/MemoryItemResponse';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,8 +42,15 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { MemoryTypeBadge } from './memory-type-badge';
 import {
@@ -49,6 +59,7 @@ import {
   getConfidenceColorClasses,
   formatRelativeTime,
   getStatusDotClass,
+  STATUS_DOT_CLASSES,
 } from './memory-utils';
 
 // ---------------------------------------------------------------------------
@@ -72,6 +83,10 @@ export interface MemoryDetailPanelProps {
   onMerge: (id: string) => void;
   /** Deprecate this memory item. */
   onDeprecate: (id: string) => void;
+  /** Reactivate a deprecated memory item (sets status to candidate). */
+  onReactivate?: (id: string) => void;
+  /** Set a memory item's status directly (bypasses promote/deprecate flow). */
+  onSetStatus?: (id: string, status: MemoryStatus) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -276,6 +291,17 @@ function formatDate(dateString: string): string {
  * />
  * ```
  */
+/** All possible statuses for the status override dropdown. */
+const ALL_STATUSES: MemoryStatus[] = ['candidate', 'active', 'stable', 'deprecated'];
+
+/** Human-readable labels for each status. */
+const STATUS_LABELS: Record<MemoryStatus, string> = {
+  candidate: 'Candidate',
+  active: 'Active',
+  stable: 'Stable',
+  deprecated: 'Deprecated',
+};
+
 export function MemoryDetailPanel({
   memory,
   isOpen,
@@ -285,6 +311,8 @@ export function MemoryDetailPanel({
   onReject,
   onMerge,
   onDeprecate,
+  onReactivate,
+  onSetStatus,
 }: MemoryDetailPanelProps) {
   // Close on Escape key
   const handleKeyDown = useCallback(
@@ -447,59 +475,263 @@ export function MemoryDetailPanel({
           {/* Footer Actions                                                  */}
           {/* --------------------------------------------------------------- */}
           <div className="border-t px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => onEdit(memory.id)}
-              >
-                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                Edit
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => onApprove(memory.id)}
-              >
-                <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                Approve
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 text-destructive hover:text-destructive"
-                onClick={() => onReject(memory.id)}
-              >
-                <Ban className="h-3.5 w-3.5" aria-hidden="true" />
-                Reject
-              </Button>
+            <TooltipProvider delayDuration={300}>
+              <div className="flex items-center gap-2">
+                {/* Edit -- always visible */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => onEdit(memory.id)}
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                  Edit
+                </Button>
 
-              {/* More menu */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="ml-auto h-8 w-8"
-                    aria-label="More actions"
-                  >
-                    <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onMerge(memory.id)}>
-                    <GitMerge className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Merge
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onDeprecate(memory.id)}>
-                    <Archive className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Deprecate
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                {/* --------------------------------------------------------- */}
+                {/* Status-aware primary action with split-button dropdown     */}
+                {/* --------------------------------------------------------- */}
+                {memory.status === 'candidate' && (
+                  <div className="flex items-center">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="gap-1.5 rounded-r-none border-r border-r-primary-foreground/30"
+                          onClick={() => onApprove(memory.id)}
+                        >
+                          <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                          Approve
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Promote to active</TooltipContent>
+                    </Tooltip>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="rounded-l-none px-1.5"
+                          aria-label="Set status directly"
+                        >
+                          <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                          Set status directly
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {ALL_STATUSES.map((s) => (
+                          <DropdownMenuItem
+                            key={s}
+                            disabled={s === memory.status}
+                            onClick={() => onSetStatus?.(memory.id, s)}
+                          >
+                            <span
+                              className={cn('mr-2 h-2 w-2 rounded-full', STATUS_DOT_CLASSES[s] ?? 'bg-zinc-400')}
+                              aria-hidden="true"
+                            />
+                            {STATUS_LABELS[s]}
+                            {s === memory.status && (
+                              <Check className="ml-auto h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                            )}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
+
+                {memory.status === 'active' && (
+                  <div className="flex items-center">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="gap-1.5 rounded-r-none border-r border-r-primary-foreground/30 bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={() => onApprove(memory.id)}
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                          Mark Stable
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Promote to stable</TooltipContent>
+                    </Tooltip>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="rounded-l-none px-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+                          aria-label="Set status directly"
+                        >
+                          <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                          Set status directly
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {ALL_STATUSES.map((s) => (
+                          <DropdownMenuItem
+                            key={s}
+                            disabled={s === memory.status}
+                            onClick={() => onSetStatus?.(memory.id, s)}
+                          >
+                            <span
+                              className={cn('mr-2 h-2 w-2 rounded-full', STATUS_DOT_CLASSES[s] ?? 'bg-zinc-400')}
+                              aria-hidden="true"
+                            />
+                            {STATUS_LABELS[s]}
+                            {s === memory.status && (
+                              <Check className="ml-auto h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                            )}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
+
+                {memory.status === 'deprecated' && onReactivate && (
+                  <div className="flex items-center">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="gap-1.5 rounded-r-none border-r border-r-amber-700/30 bg-amber-600 hover:bg-amber-700 text-white"
+                          onClick={() => onReactivate(memory.id)}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                          Reactivate
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Reactivate as candidate</TooltipContent>
+                    </Tooltip>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="rounded-l-none px-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                          aria-label="Set status directly"
+                        >
+                          <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                          Set status directly
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {ALL_STATUSES.map((s) => (
+                          <DropdownMenuItem
+                            key={s}
+                            disabled={s === memory.status}
+                            onClick={() => onSetStatus?.(memory.id, s)}
+                          >
+                            <span
+                              className={cn('mr-2 h-2 w-2 rounded-full', STATUS_DOT_CLASSES[s] ?? 'bg-zinc-400')}
+                              aria-hidden="true"
+                            />
+                            {STATUS_LABELS[s]}
+                            {s === memory.status && (
+                              <Check className="ml-auto h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                            )}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
+
+                {/* stable: no primary action, only split-button for override */}
+                {memory.status === 'stable' && onSetStatus && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        aria-label="Set status directly"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                        Set Status
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                        Set status directly
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {ALL_STATUSES.map((s) => (
+                        <DropdownMenuItem
+                          key={s}
+                          disabled={s === memory.status}
+                          onClick={() => onSetStatus(memory.id, s)}
+                        >
+                          <span
+                            className={cn('mr-2 h-2 w-2 rounded-full', STATUS_DOT_CLASSES[s] ?? 'bg-zinc-400')}
+                            aria-hidden="true"
+                          />
+                          {STATUS_LABELS[s]}
+                          {s === memory.status && (
+                            <Check className="ml-auto h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                          )}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+
+                {/* --------------------------------------------------------- */}
+                {/* Secondary actions: Reject (candidate only)                */}
+                {/* --------------------------------------------------------- */}
+                {memory.status === 'candidate' && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-destructive hover:text-destructive"
+                        onClick={() => onReject(memory.id)}
+                      >
+                        <Ban className="h-3.5 w-3.5" aria-hidden="true" />
+                        Reject
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Deprecate this candidate</TooltipContent>
+                  </Tooltip>
+                )}
+
+                {/* More menu (Merge + Deprecate, when applicable) */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="ml-auto h-8 w-8"
+                      aria-label="More actions"
+                    >
+                      <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {memory.status !== 'deprecated' && (
+                      <DropdownMenuItem onClick={() => onMerge(memory.id)}>
+                        <GitMerge className="mr-2 h-4 w-4" aria-hidden="true" />
+                        Merge
+                      </DropdownMenuItem>
+                    )}
+                    {memory.status !== 'deprecated' && (
+                      <DropdownMenuItem onClick={() => onDeprecate(memory.id)}>
+                        <Archive className="mr-2 h-4 w-4" aria-hidden="true" />
+                        Deprecate
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </TooltipProvider>
           </div>
         </>
       ) : (

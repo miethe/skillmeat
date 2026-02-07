@@ -25,9 +25,7 @@ import logging
 from typing import List, Optional
 from urllib.parse import unquote
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-
-from skillmeat.api.dependencies import require_memory_context_enabled
+from fastapi import APIRouter, HTTPException, Query, status
 from skillmeat.api.schemas.context_module import (
     AddMemoryToModuleRequest,
     ContextModuleCreateRequest,
@@ -42,7 +40,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/context-modules",
     tags=["context-modules"],
-    dependencies=[Depends(require_memory_context_enabled)],
 )
 
 

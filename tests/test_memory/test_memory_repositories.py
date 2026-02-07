@@ -73,6 +73,7 @@ def _make_memory_data(
     content=None,
     confidence=0.75,
     status="candidate",
+    share_scope="project",
     provenance=None,
     anchors=None,
     ttl_policy=None,
@@ -105,6 +106,7 @@ def _make_memory_data(
         "content": content,
         "confidence": confidence,
         "status": status,
+        "share_scope": share_scope,
         "provenance_json": json.dumps(provenance),
         "anchors_json": json.dumps(anchors),
         "ttl_policy_json": json.dumps(ttl_policy),
@@ -185,6 +187,7 @@ class TestMemoryItemRepository:
         assert item.content == "API rate limit is 100 req/min"
         assert item.confidence == 0.90
         assert item.status == "active"
+        assert item.share_scope == "project"
         assert item.content_hash is not None
         assert item.created_at is not None
         assert item.updated_at is not None
@@ -321,6 +324,36 @@ class TestMemoryItemRepository:
         assert len(result.items) == 2
         for item in result.items:
             assert item.confidence >= 0.70
+
+    def test_list_items_filter_by_search(self, seeded_db_path):
+        """Filter items by case-insensitive content search."""
+        repo = MemoryItemRepository(db_path=seeded_db_path)
+        repo.create(_make_memory_data(content="Decision: use sqlite"))
+        repo.create(_make_memory_data(content="Constraint: no ORM"))
+        repo.create(_make_memory_data(content="Learning: avoid SQLITE locks"))
+
+        result = repo.list_items(PROJECT_ID, search="sqlite")
+
+        assert len(result.items) == 2
+        assert all("sqlite" in item.content.lower() for item in result.items)
+
+    def test_list_items_filter_by_share_scope(self, seeded_db_path):
+        """Filter items by share_scope."""
+        repo = MemoryItemRepository(db_path=seeded_db_path)
+        repo.create(
+            _make_memory_data(content="Local memory", share_scope="project")
+        )
+        repo.create(
+            _make_memory_data(
+                content="Cross-project candidate",
+                share_scope="global_candidate",
+            )
+        )
+
+        result = repo.list_items(PROJECT_ID, share_scope="global_candidate")
+
+        assert len(result.items) == 1
+        assert result.items[0].share_scope == "global_candidate"
 
     def test_list_items_combined_filters(self, seeded_db_path):
         """Multiple filters applied together."""

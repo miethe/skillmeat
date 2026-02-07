@@ -45,6 +45,23 @@ export interface MemoryItemFilters {
   projectId: string;
   status?: MemoryStatus;
   type?: MemoryType;
+  shareScope?: 'private' | 'project' | 'global_candidate';
+  minConfidence?: number;
+  search?: string;
+  sortBy?: string; // created_at | confidence | access_count
+  sortOrder?: 'asc' | 'desc';
+  cursor?: string;
+  limit?: number;
+}
+
+/**
+ * Filter parameters for global memory list queries.
+ */
+export interface GlobalMemoryItemFilters {
+  projectId?: string;
+  status?: MemoryStatus;
+  type?: MemoryType;
+  shareScope?: 'private' | 'project' | 'global_candidate';
   minConfidence?: number;
   search?: string;
   sortBy?: string; // created_at | confidence | access_count
@@ -73,6 +90,9 @@ export const memoryItemKeys = {
   all: ['memory-items'] as const,
   lists: () => [...memoryItemKeys.all, 'list'] as const,
   list: (filters?: MemoryItemFilters) => [...memoryItemKeys.lists(), filters] as const,
+  globalLists: () => [...memoryItemKeys.all, 'global-list'] as const,
+  globalList: (filters?: GlobalMemoryItemFilters) =>
+    [...memoryItemKeys.globalLists(), filters] as const,
   details: () => [...memoryItemKeys.all, 'detail'] as const,
   detail: (id: string) => [...memoryItemKeys.details(), id] as const,
   counts: () => [...memoryItemKeys.all, 'count'] as const,
@@ -111,6 +131,8 @@ export function useMemoryItems(filters: MemoryItemFilters) {
       params.set('project_id', filters.projectId);
       if (filters.status) params.set('status', filters.status);
       if (filters.type) params.set('type', filters.type);
+      if (filters.shareScope) params.set('share_scope', filters.shareScope);
+      if (filters.search) params.set('search', filters.search);
       if (filters.minConfidence != null) params.set('min_confidence', String(filters.minConfidence));
       if (filters.limit != null) params.set('limit', String(filters.limit));
       if (filters.cursor) params.set('cursor', filters.cursor);
@@ -119,6 +141,38 @@ export function useMemoryItems(filters: MemoryItemFilters) {
       return apiRequest<MemoryItemListResponse>(`/memory-items?${params.toString()}`);
     },
     enabled: !!filters.projectId,
+    staleTime: MEMORY_STALE_TIME,
+  });
+}
+
+/**
+ * Fetch memory items globally or scoped to a selected project.
+ *
+ * - If projectId is provided, uses the project-scoped list endpoint.
+ * - Otherwise uses the global list endpoint.
+ */
+export function useGlobalMemoryItems(filters: GlobalMemoryItemFilters) {
+  return useQuery({
+    queryKey: memoryItemKeys.globalList(filters),
+    queryFn: async (): Promise<MemoryItemListResponse> => {
+      const params = new URLSearchParams();
+      if (filters.status) params.set('status', filters.status);
+      if (filters.type) params.set('type', filters.type);
+      if (filters.shareScope) params.set('share_scope', filters.shareScope);
+      if (filters.search) params.set('search', filters.search);
+      if (filters.minConfidence != null) params.set('min_confidence', String(filters.minConfidence));
+      if (filters.limit != null) params.set('limit', String(filters.limit));
+      if (filters.cursor) params.set('cursor', filters.cursor);
+      if (filters.sortBy) params.set('sort_by', filters.sortBy);
+      if (filters.sortOrder) params.set('sort_order', filters.sortOrder);
+
+      if (filters.projectId) {
+        params.set('project_id', filters.projectId);
+        return apiRequest<MemoryItemListResponse>(`/memory-items?${params.toString()}`);
+      }
+
+      return apiRequest<MemoryItemListResponse>(`/memory-items/global?${params.toString()}`);
+    },
     staleTime: MEMORY_STALE_TIME,
   });
 }
@@ -165,11 +219,57 @@ export function useMemoryItemCounts(filters: {
   return useQuery({
     queryKey: memoryItemKeys.count(filters),
     queryFn: async (): Promise<Record<string, number>> => {
-      const params = new URLSearchParams();
-      params.set('project_id', filters.projectId);
-      if (filters.status) params.set('status', filters.status);
-      if (filters.type) params.set('type', filters.type);
-      return apiRequest<Record<string, number>>(`/memory-items/count?${params.toString()}`);
+      const buildCountPath = (params: URLSearchParams) =>
+        `/memory-items/count?${params.toString()}`;
+
+      // Filtered count request preserves existing single-count behavior.
+      if (filters.status || filters.type) {
+        const params = new URLSearchParams();
+        params.set('project_id', filters.projectId);
+        if (filters.status) params.set('status', filters.status);
+        if (filters.type) params.set('type', filters.type);
+        const filtered = await apiRequest<{ count: number }>(buildCountPath(params));
+        return { all: filtered.count };
+      }
+
+      const types: MemoryType[] = ['constraint', 'decision', 'gotcha', 'learning', 'style_rule'];
+      const statuses: MemoryStatus[] = ['candidate', 'active', 'stable', 'deprecated'];
+
+      const totalParams = new URLSearchParams();
+      totalParams.set('project_id', filters.projectId);
+
+      const typeParams = types.map((type) => {
+        const params = new URLSearchParams();
+        params.set('project_id', filters.projectId);
+        params.set('type', type);
+        return params;
+      });
+
+      const statusParams = statuses.map((status) => {
+        const params = new URLSearchParams();
+        params.set('project_id', filters.projectId);
+        params.set('status', status);
+        return params;
+      });
+
+      const responses = await Promise.all([
+        apiRequest<{ count: number }>(buildCountPath(totalParams)),
+        ...typeParams.map((p) => apiRequest<{ count: number }>(buildCountPath(p))),
+        ...statusParams.map((p) => apiRequest<{ count: number }>(buildCountPath(p))),
+      ]);
+
+      const [total, ...rest] = responses;
+      const typeResponses = rest.slice(0, types.length);
+      const statusResponses = rest.slice(types.length);
+
+      const counts: Record<string, number> = { all: total.count };
+      types.forEach((type, idx) => {
+        counts[type] = typeResponses[idx]?.count ?? 0;
+      });
+      statuses.forEach((status, idx) => {
+        counts[status] = statusResponses[idx]?.count ?? 0;
+      });
+      return counts;
     },
     enabled: !!filters.projectId,
     staleTime: MEMORY_STALE_TIME,

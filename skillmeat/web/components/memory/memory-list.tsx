@@ -54,6 +54,10 @@ export interface MemoryListProps {
   onCardClick: (id: string) => void;
   /** Callback to create a new memory (used in empty state CTA). */
   onCreateMemory: () => void;
+  /** Reactivate a deprecated memory item. */
+  onReactivate?: (id: string) => void;
+  /** Deprecate a memory item. */
+  onDeprecate?: (id: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,6 +108,8 @@ export function MemoryList({
   onMerge,
   onCardClick,
   onCreateMemory,
+  onReactivate,
+  onDeprecate,
 }: MemoryListProps) {
   // ---------------------------------------------------------------------------
   // Loading State
@@ -188,6 +194,8 @@ export function MemoryList({
             onEdit={onEdit}
             onMerge={onMerge}
             onClick={onCardClick}
+            onReactivate={onReactivate}
+            onDeprecate={onDeprecate}
           />
         ))}
       </div>

@@ -11,11 +11,17 @@
 'use client';
 
 import * as React from 'react';
-import { Check, Pencil, X } from 'lucide-react';
+import { Check, Pencil, X, ShieldCheck, RotateCcw, Archive } from 'lucide-react';
 import type { MemoryItemResponse } from '@/sdk/models/MemoryItemResponse';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { MemoryTypeBadge } from './memory-type-badge';
 import {
   getConfidenceTier,
@@ -48,6 +54,10 @@ export interface MemoryCardProps {
   onMerge: (id: string) => void;
   /** Select/focus this card (opens detail panel). */
   onClick: (id: string) => void;
+  /** Reactivate a deprecated memory item. */
+  onReactivate?: (id: string) => void;
+  /** Deprecate this memory item (for non-candidate statuses). */
+  onDeprecate?: (id: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +93,8 @@ export function MemoryCard({
   onReject,
   onEdit,
   onClick,
+  onReactivate,
+  onDeprecate,
 }: MemoryCardProps) {
   const confidenceTier = getConfidenceTier(memory.confidence);
   const confidenceColors = getConfidenceColorClasses(confidenceTier);
@@ -178,50 +190,194 @@ export function MemoryCard({
         </div>
       </div>
 
-      {/* Action buttons (visible on hover/focus-within) */}
-      <div
-        className={cn(
-          'flex items-center gap-1 opacity-0 transition-opacity',
-          'group-hover:opacity-100 group-focus-within:opacity-100'
-        )}
-      >
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={(e) => {
-            e.stopPropagation();
-            onApprove(memory.id);
-          }}
-          aria-label={`Approve memory: ${memory.content.slice(0, 40)}`}
+      {/* Action buttons (visible on hover/focus-within, status-aware) */}
+      <TooltipProvider delayDuration={300}>
+        <div
+          className={cn(
+            'flex items-center gap-1 opacity-0 transition-opacity',
+            'group-hover:opacity-100 group-focus-within:opacity-100'
+          )}
         >
-          <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit(memory.id);
-          }}
-          aria-label={`Edit memory: ${memory.content.slice(0, 40)}`}
-        >
-          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={(e) => {
-            e.stopPropagation();
-            onReject(memory.id);
-          }}
-          aria-label={`Reject memory: ${memory.content.slice(0, 40)}`}
-        >
-          <X className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />
-        </Button>
-      </div>
+          {/* candidate: Approve (green check), Edit, Reject (red X) */}
+          {memory.status === 'candidate' && (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onApprove(memory.id);
+                    }}
+                    aria-label={`Approve memory: ${memory.content.slice(0, 40)}`}
+                  >
+                    <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Promote to active</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(memory.id);
+                    }}
+                    aria-label={`Edit memory: ${memory.content.slice(0, 40)}`}
+                  >
+                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Edit</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onReject(memory.id);
+                    }}
+                    aria-label={`Reject memory: ${memory.content.slice(0, 40)}`}
+                  >
+                    <X className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Reject</TooltipContent>
+              </Tooltip>
+            </>
+          )}
+
+          {/* active: Promote (blue shield), Edit, Deprecate (red archive) */}
+          {memory.status === 'active' && (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onApprove(memory.id);
+                    }}
+                    aria-label={`Promote memory to stable: ${memory.content.slice(0, 40)}`}
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5 text-blue-600" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Promote to stable</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(memory.id);
+                    }}
+                    aria-label={`Edit memory: ${memory.content.slice(0, 40)}`}
+                  >
+                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Edit</TooltipContent>
+              </Tooltip>
+              {onDeprecate && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeprecate(memory.id);
+                      }}
+                      aria-label={`Deprecate memory: ${memory.content.slice(0, 40)}`}
+                    >
+                      <Archive className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Deprecate</TooltipContent>
+                </Tooltip>
+              )}
+            </>
+          )}
+
+          {/* stable: Edit only */}
+          {memory.status === 'stable' && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(memory.id);
+                  }}
+                  aria-label={`Edit memory: ${memory.content.slice(0, 40)}`}
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Edit</TooltipContent>
+            </Tooltip>
+          )}
+
+          {/* deprecated: Reactivate (amber), Edit */}
+          {memory.status === 'deprecated' && (
+            <>
+              {onReactivate && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onReactivate(memory.id);
+                      }}
+                      aria-label={`Reactivate memory: ${memory.content.slice(0, 40)}`}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 text-amber-600" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Reactivate as candidate</TooltipContent>
+                </Tooltip>
+              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(memory.id);
+                    }}
+                    aria-label={`Edit memory: ${memory.content.slice(0, 40)}`}
+                  >
+                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Edit</TooltipContent>
+              </Tooltip>
+            </>
+          )}
+        </div>
+      </TooltipProvider>
     </div>
   );
 }

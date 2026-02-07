@@ -6,7 +6,7 @@ tags: [implementation, planning, memory, context, auto-extraction, cli, navigati
 created: 2026-02-06
 updated: 2026-02-06
 category: "product-planning"
-status: draft
+status: superseded
 related:
   - /docs/project_plans/PRDs/features/memory-context-system-v1-1.md
   - /docs/project_plans/design-specs/memory-context-system-v1-1-ui-spec.md
@@ -16,12 +16,14 @@ related:
 
 # Implementation Plan: Memory & Context Intelligence System v1.1
 
-**Plan ID**: `IMPL-2026-02-06-memory-context-system-v1-1`  
-**Date**: 2026-02-06  
-**Author**: Implementation Planner Agent  
-**Complexity**: XL  
-**Estimated Effort**: 44 story points  
+**Plan ID**: `IMPL-2026-02-06-memory-context-system-v1-1`
+**Date**: 2026-02-06
+**Author**: Implementation Planner Agent
+**Complexity**: XL
+**Estimated Effort**: 44 story points
 **Target Timeline**: 5-6 weeks
+
+**Note**: superseded by v1.2 execution notes. Runtime feature-flag rollout assumptions below are historical and not current shipped behavior.
 
 ---
 
@@ -57,7 +59,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Phase 0: Design Lock & Contract Alignment
 
-**Duration**: 0.5 week  
+**Duration**: 0.5 week
 **Dependencies**: PRD + Design Spec draft
 
 | Task ID | Task | Description | Acceptance Criteria | Estimate |
@@ -70,7 +72,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Phase 1: Auto-Extraction Service (Deferred v1 Phase 5)
 
-**Duration**: 1.5 weeks  
+**Duration**: 1.5 weeks
 **Dependencies**: Phase 0
 
 | Task ID | Task | Description | Acceptance Criteria | Estimate |
@@ -79,7 +81,7 @@ The plan preserves existing route contracts while introducing a global memories 
 | V11-P1.2 | Extraction Pipeline | Implement parse -> candidate detect -> dedupe -> score -> persist candidate | End-to-end extraction test passes | 3 pts |
 | V11-P1.3 | Similarity Guardrails | Add content hash + semantic threshold dedupe strategy | Duplicate false-positive rate under target | 2 pts |
 | V11-P1.4 | Extraction API | Add preview/apply endpoints for extraction | OpenAPI docs + contract tests | 2 pts |
-| V11-P1.5 | Feature Flag Gate | Respect `MEMORY_AUTO_EXTRACT` with clear disabled responses | Flag tests pass | 1 pt |
+| V11-P1.5 | Availability Gate (Historical) | Original plan assumed `MEMORY_AUTO_EXTRACT` gating; superseded in v1.2 by direct endpoint availability | Historical only | 1 pt |
 
 ### Quality Gates
 
@@ -91,7 +93,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Phase 2: Full Memory CLI Surface
 
-**Duration**: 1.5 weeks  
+**Duration**: 1.5 weeks
 **Dependencies**: Phase 1 API finalized
 
 | Task ID | Task | Description | Acceptance Criteria | Estimate |
@@ -115,7 +117,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Phase 3: Global Visibility + Navigation
 
-**Duration**: 1 week  
+**Duration**: 1 week
 **Dependencies**: Phase 0
 
 | Task ID | Task | Description | Acceptance Criteria | Estimate |
@@ -134,7 +136,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Phase 4: Skill Documentation & Automation Flows
 
-**Duration**: 0.75 week  
+**Duration**: 0.75 week
 **Dependencies**: Phase 2
 
 | Task ID | Task | Description | Acceptance Criteria | Estimate |
@@ -148,7 +150,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Phase 5: Cross-Project Foundations (v1.1 scope)
 
-**Duration**: 0.75 week  
+**Duration**: 0.75 week
 **Dependencies**: Phase 2/3
 
 | Task ID | Task | Description | Acceptance Criteria | Estimate |
@@ -161,7 +163,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Phase 6: Testing, Docs, and Rollout
 
-**Duration**: 1 week  
+**Duration**: 1 week
 **Dependencies**: Phases 1-5
 
 | Task ID | Task | Description | Acceptance Criteria | Estimate |
@@ -169,7 +171,7 @@ The plan preserves existing route contracts while introducing a global memories 
 | V11-P6.1 | Test Matrix Expansion | Unit + integration + CLI + web navigation tests | Coverage >=85% for new modules | 2 pts |
 | V11-P6.2 | Performance Validation | Validate p95 targets for extraction/list/pack | Benchmarks documented | 1 pt |
 | V11-P6.3 | User Docs | Add/refresh user docs for new global memories and CLI workflows | Docs linked from user index | 1 pt |
-| V11-P6.4 | Release Controls | Feature flag rollout + monitoring dashboards | Rollout checklist approved | 1 pt |
+| V11-P6.4 | Release Controls | Direct deployment checks + monitoring dashboards | Rollout checklist approved | 1 pt |
 
 ---
 
@@ -213,7 +215,7 @@ The plan preserves existing route contracts while introducing a global memories 
 
 ## Exit Criteria
 
-- Auto-extraction preview/apply is available and guarded by feature flag.
+- Auto-extraction preview/apply is available with candidate-only write safeguards.
 - Full CLI command set for memory operations is available and tested.
 - Global memories route and navigation updates are shipped without URL regressions.
 - Skill docs support full memory automation loop for AI agents.

@@ -665,8 +665,45 @@ class ImportCoordinator:
                 # containing the relative path to the actual file/directory.
                 symlink_target = item.get("target", "")
                 if not symlink_target:
-                    logger.warning(f"Symlink {item_name} has no target, skipping")
-                    continue
+                    # GitHub Contents API directory listings omit the target
+                    # field for symlinks. Fetch it from download_url (returns
+                    # the raw symlink target string) or fall back to an
+                    # individual Contents API call.
+                    download_url = item.get("download_url")
+                    if download_url:
+                        try:
+                            target_resp = session.get(download_url, timeout=30)
+                            target_resp.raise_for_status()
+                            symlink_target = target_resp.text.strip()
+                        except requests.exceptions.RequestException as e:
+                            logger.warning(
+                                f"Failed to fetch symlink target for "
+                                f"{item_name} via download_url: {e}"
+                            )
+
+                    # Fallback: query the individual symlink path via
+                    # Contents API which includes the target field.
+                    if not symlink_target and item_path:
+                        try:
+                            sym_api_url = (
+                                f"https://api.github.com/repos/{owner}/{repo}"
+                                f"/contents/{item_path}"
+                            )
+                            sym_response = session.get(
+                                sym_api_url, params={"ref": ref}, timeout=30
+                            )
+                            sym_response.raise_for_status()
+                            sym_data = sym_response.json()
+                            symlink_target = sym_data.get("target", "")
+                        except requests.exceptions.RequestException as e:
+                            logger.warning(
+                                f"Failed to fetch symlink target for "
+                                f"{item_name} via Contents API: {e}"
+                            )
+
+                    if not symlink_target:
+                        logger.warning(f"Symlink {item_name} has no target, skipping")
+                        continue
 
                 # Resolve the relative target path against the current directory
                 resolved_path = posixpath.normpath(

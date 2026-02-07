@@ -28,6 +28,7 @@ class TestMemoryItemDataFixture:
             "content",
             "confidence",
             "status",
+            "share_scope",
             "provenance_json",
             "anchors_json",
             "ttl_policy_json",
@@ -39,6 +40,11 @@ class TestMemoryItemDataFixture:
         """Default status should be 'candidate' per lifecycle spec."""
         data = memory_item_data()
         assert data["status"] == "candidate"
+
+    def test_default_share_scope_is_project(self, memory_item_data):
+        """Default share_scope should be 'project'."""
+        data = memory_item_data()
+        assert data["share_scope"] == "project"
 
     def test_default_type_is_constraint(self, memory_item_data):
         """Default type should be 'constraint'."""

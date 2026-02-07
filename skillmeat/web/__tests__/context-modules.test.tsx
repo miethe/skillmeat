@@ -39,6 +39,9 @@ const mockUseDeleteContextModule = jest.fn();
 const mockUseModuleMemories = jest.fn();
 const mockRemoveMutate = jest.fn();
 const mockUseRemoveMemoryFromModule = jest.fn();
+const mockAddMutate = jest.fn();
+const mockUseAddMemoryToModule = jest.fn();
+const mockUseMemoryItems = jest.fn();
 
 jest.mock('@/hooks/use-context-modules', () => ({
   useContextModules: (...args: unknown[]) => mockUseContextModules(...args),
@@ -48,6 +51,11 @@ jest.mock('@/hooks/use-context-modules', () => ({
   useDeleteContextModule: (...args: unknown[]) => mockUseDeleteContextModule(...args),
   useModuleMemories: (...args: unknown[]) => mockUseModuleMemories(...args),
   useRemoveMemoryFromModule: (...args: unknown[]) => mockUseRemoveMemoryFromModule(...args),
+  useAddMemoryToModule: (...args: unknown[]) => mockUseAddMemoryToModule(...args),
+}));
+
+jest.mock('@/hooks/use-memory-items', () => ({
+  useMemoryItems: (...args: unknown[]) => mockUseMemoryItems(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -267,6 +275,20 @@ function setupDefaultMocks() {
     mutate: mockRemoveMutate,
     isPending: false,
     variables: null,
+  });
+
+  // Add memory to module mutation
+  mockUseAddMemoryToModule.mockReturnValue({
+    mutate: mockAddMutate,
+    isPending: false,
+    variables: null,
+  });
+
+  // Available memories query for manual add dialog
+  mockUseMemoryItems.mockReturnValue({
+    data: { items: mockMemoryItems },
+    isLoading: false,
+    isError: false,
   });
 
   // Preview context pack mutation
@@ -659,10 +681,7 @@ describe('ContextModulesTab', () => {
       const confirmBtn = screen.getByRole('button', { name: /^delete$/i });
       await userEvent.click(confirmBtn);
 
-      expect(mockDeleteMutate).toHaveBeenCalledWith({
-        projectId: 'proj-1',
-        moduleId: 'mod-1',
-      });
+      expect(mockDeleteMutate).toHaveBeenCalledWith('mod-1');
     });
 
     it('closes confirmation dialog when cancel is clicked', async () => {
@@ -1880,8 +1899,8 @@ describe('ContextPackGenerator', () => {
       // Should now show memory type checkboxes
       expect(screen.getByText('Constraints')).toBeInTheDocument();
       expect(screen.getByText('Decisions')).toBeInTheDocument();
-      expect(screen.getByText('Fixes')).toBeInTheDocument();
-      expect(screen.getByText('Patterns')).toBeInTheDocument();
+      expect(screen.getByText('Gotchas')).toBeInTheDocument();
+      expect(screen.getByText('Style Rules')).toBeInTheDocument();
       expect(screen.getByText('Learnings')).toBeInTheDocument();
     });
 

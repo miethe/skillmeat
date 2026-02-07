@@ -10,6 +10,7 @@ import {
   Layers,
   Activity,
   FolderKanban,
+  Brain,
   Server,
   Store,
   GitBranch,
@@ -57,6 +58,16 @@ const navigationConfig: NavigationConfig = {
   topItems: [{ name: 'Dashboard', href: '/', icon: LayoutDashboard }],
   sections: [
     {
+      title: 'Projects',
+      icon: FolderKanban,
+      storageKey: 'projects',
+      defaultExpanded: true,
+      items: [
+        { name: 'Projects', href: '/projects', icon: FolderKanban },
+        { name: 'Memories', href: '/memories', icon: Brain },
+      ],
+    },
+    {
       title: 'Collections',
       icon: FolderOpen,
       storageKey: 'collections',
@@ -65,7 +76,6 @@ const navigationConfig: NavigationConfig = {
         { name: 'Collections', href: '/collection', icon: Library },
         { name: 'Groups', href: '/groups', icon: Layers },
         { name: 'Health & Sync', href: '/manage', icon: Activity },
-        { name: 'Projects', href: '/projects', icon: FolderKanban },
         { name: 'MCP Servers', href: '/mcp', icon: Server },
       ],
     },

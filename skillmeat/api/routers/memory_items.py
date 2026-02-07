@@ -29,24 +29,29 @@ import logging
 from typing import Optional
 from urllib.parse import unquote
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-
-from skillmeat.api.dependencies import require_memory_context_enabled
+from fastapi import APIRouter, HTTPException, Query
 from skillmeat.api.schemas.memory import (
     BulkActionResponse,
     BulkDeprecateRequest,
     BulkPromoteRequest,
     DeprecateRequest,
+    MemoryExtractionApplyRequest,
+    MemoryExtractionApplyResponse,
+    MemoryExtractionPreviewRequest,
+    MemoryExtractionPreviewResponse,
     MemoryItemCreateRequest,
     MemoryItemListResponse,
     MemoryItemResponse,
+    MemorySearchResponse,
     MemoryItemUpdateRequest,
+    MemoryShareScope,
     MemoryStatus,
     MemoryType,
     MergeRequest,
     MergeResponse,
     PromoteRequest,
 )
+from skillmeat.core.services.memory_extractor_service import MemoryExtractorService
 from skillmeat.core.services.memory_service import MemoryService
 
 logger = logging.getLogger(__name__)
@@ -54,7 +59,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/memory-items",
     tags=["memory-items"],
-    dependencies=[Depends(require_memory_context_enabled)],
 )
 
 
@@ -65,6 +69,11 @@ def _get_service() -> MemoryService:
         MemoryService configured with the default SQLite database.
     """
     return MemoryService(db_path=None)
+
+
+def _get_extractor_service() -> MemoryExtractorService:
+    """Create a MemoryExtractorService instance using the default database path."""
+    return MemoryExtractorService(db_path=None)
 
 
 def _dict_to_response(data: dict) -> MemoryItemResponse:
@@ -283,6 +292,169 @@ async def merge_memory_items(
         )
 
 
+@router.get(
+    "/search",
+    response_model=MemorySearchResponse,
+    summary="Search memory items",
+    description="Search memory content globally or within a project.",
+)
+async def search_memory_items(
+    query: str = Query(..., min_length=1, description="Search query"),
+    project_id: Optional[str] = Query(None, description="Optional project scope"),
+    status: Optional[MemoryStatus] = Query(None, description="Optional status filter"),
+    type: Optional[MemoryType] = Query(None, description="Optional type filter"),
+    share_scope: Optional[MemoryShareScope] = Query(
+        None, description="Optional share scope filter"
+    ),
+    limit: int = Query(default=50, ge=1, le=100),
+    cursor: Optional[str] = Query(None),
+) -> MemorySearchResponse:
+    """Search memory items globally or by project."""
+    try:
+        service = _get_service()
+        result = service.search(
+            query=query,
+            project_id=unquote(project_id) if project_id else None,
+            status=status.value if status else None,
+            type=type.value if type else None,
+            share_scope=share_scope.value if share_scope else None,
+            limit=limit,
+            cursor=cursor,
+        )
+        items = [_dict_to_response(item) for item in result["items"]]
+        return MemorySearchResponse(
+            items=items,
+            next_cursor=result["next_cursor"],
+            has_more=result["has_more"],
+            total=result.get("total"),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Failed to search memory items: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get(
+    "/global",
+    response_model=MemoryItemListResponse,
+    summary="List memory items across all projects",
+    description="Retrieve a paginated list of memory items across all projects.",
+)
+async def list_global_memory_items(
+    status: Optional[MemoryStatus] = Query(None, description="Filter by status"),
+    type: Optional[MemoryType] = Query(None, description="Filter by memory type"),
+    share_scope: Optional[MemoryShareScope] = Query(
+        None, description="Filter by share scope"
+    ),
+    search: Optional[str] = Query(
+        None, description="Case-insensitive substring match against memory content"
+    ),
+    min_confidence: Optional[float] = Query(
+        None, ge=0.0, le=1.0, description="Minimum confidence threshold"
+    ),
+    limit: int = Query(default=50, ge=1, le=100),
+    cursor: Optional[str] = Query(None),
+    sort_by: str = Query(default="created_at"),
+    sort_order: str = Query(default="desc"),
+) -> MemoryItemListResponse:
+    """List memory items globally."""
+    try:
+        service = _get_service()
+        result = service.list_items(
+            project_id=None,
+            status=status.value if status else None,
+            type=type.value if type else None,
+            share_scope=share_scope.value if share_scope else None,
+            search=search,
+            min_confidence=min_confidence,
+            limit=limit,
+            cursor=cursor,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+        items = [_dict_to_response(item) for item in result["items"]]
+        return MemoryItemListResponse(
+            items=items,
+            next_cursor=result["next_cursor"],
+            has_more=result["has_more"],
+            total=result.get("total"),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Failed to list global memory items: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post(
+    "/extract/preview",
+    response_model=MemoryExtractionPreviewResponse,
+    summary="Preview extracted memory candidates",
+    description="Run extraction without persisting memory items.",
+)
+async def preview_memory_extraction(
+    request: MemoryExtractionPreviewRequest,
+    project_id: str = Query(..., description="Project ID for extraction scope"),
+) -> MemoryExtractionPreviewResponse:
+    """Preview memory extraction candidates."""
+    try:
+        extractor = _get_extractor_service()
+        candidates = extractor.preview(
+            project_id=unquote(project_id),
+            text_corpus=request.text_corpus,
+            profile=request.profile,
+            min_confidence=request.min_confidence,
+            run_id=request.run_id,
+            session_id=request.session_id,
+            commit_sha=request.commit_sha,
+        )
+        return MemoryExtractionPreviewResponse(
+            candidates=candidates,
+            total_candidates=len(candidates),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Failed to preview memory extraction: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post(
+    "/extract/apply",
+    response_model=MemoryExtractionApplyResponse,
+    summary="Apply extracted memory candidates",
+    description="Run extraction and persist candidate memory items.",
+)
+async def apply_memory_extraction(
+    request: MemoryExtractionApplyRequest,
+    project_id: str = Query(..., description="Project ID for extraction scope"),
+) -> MemoryExtractionApplyResponse:
+    """Apply memory extraction candidates."""
+    try:
+        extractor = _get_extractor_service()
+        result = extractor.apply(
+            project_id=unquote(project_id),
+            text_corpus=request.text_corpus,
+            profile=request.profile,
+            min_confidence=request.min_confidence,
+            run_id=request.run_id,
+            session_id=request.session_id,
+            commit_sha=request.commit_sha,
+        )
+        created = [_dict_to_response(item) for item in result["created"]]
+        return MemoryExtractionApplyResponse(
+            created=created,
+            skipped_duplicates=result["skipped_duplicates"],
+            preview_total=result["preview_total"],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Failed to apply memory extraction: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 # =============================================================================
 # CRUD Operations (API-2.6)
 # =============================================================================
@@ -308,6 +480,12 @@ async def list_memory_items(
     project_id: str = Query(..., description="Project ID to scope the query"),
     status: Optional[MemoryStatus] = Query(None, description="Filter by status"),
     type: Optional[MemoryType] = Query(None, description="Filter by memory type"),
+    share_scope: Optional[MemoryShareScope] = Query(
+        None, description="Filter by share scope"
+    ),
+    search: Optional[str] = Query(
+        None, description="Case-insensitive substring match against memory content"
+    ),
     min_confidence: Optional[float] = Query(
         None, ge=0.0, le=1.0, description="Minimum confidence threshold"
     ),
@@ -346,6 +524,8 @@ async def list_memory_items(
             project_id=project_id,
             status=status.value if status else None,
             type=type.value if type else None,
+            share_scope=share_scope.value if share_scope else None,
+            search=search,
             min_confidence=min_confidence,
             limit=limit,
             cursor=cursor,
@@ -412,6 +592,7 @@ async def create_memory_item(
             content=request.content,
             confidence=request.confidence,
             status=request.status.value,
+            share_scope=request.share_scope.value,
             provenance=request.provenance,
             anchors=request.anchors,
             ttl_policy=request.ttl_policy,
@@ -523,6 +704,8 @@ async def update_memory_item(
             update_fields["confidence"] = request.confidence
         if request.status is not None:
             update_fields["status"] = request.status.value
+        if request.share_scope is not None:
+            update_fields["share_scope"] = request.share_scope.value
         if request.provenance is not None:
             update_fields["provenance_json"] = json.dumps(request.provenance)
         if request.anchors is not None:
