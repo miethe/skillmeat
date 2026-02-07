@@ -144,6 +144,11 @@ from .context_module import (
     ContextPackGenerateRequest,
     ContextPackGenerateResponse,
 )
+from .deployment_profiles import (
+    DeploymentProfileCreate,
+    DeploymentProfileRead,
+    DeploymentProfileUpdate,
+)
 
 __all__ = [
     # Common
@@ -271,4 +276,8 @@ __all__ = [
     "ContextPackPreviewResponse",
     "ContextPackGenerateRequest",
     "ContextPackGenerateResponse",
+    # Deployment Profiles
+    "DeploymentProfileCreate",
+    "DeploymentProfileRead",
+    "DeploymentProfileUpdate",
 ]

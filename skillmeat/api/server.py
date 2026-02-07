@@ -36,6 +36,7 @@ from .routers import (
     context_modules,
     context_packing,
     context_sync,
+    deployment_profiles,
     deployments,
     groups,
     health,
@@ -348,6 +349,11 @@ def create_app(settings: APISettings = None) -> FastAPI:
     )
     app.include_router(
         context_sync.router, prefix=settings.api_prefix, tags=["context-sync"]
+    )
+    app.include_router(
+        deployment_profiles.router,
+        prefix=settings.api_prefix,
+        tags=["deployment-profiles"],
     )
     app.include_router(
         deployments.router, prefix=settings.api_prefix, tags=["deployments"]

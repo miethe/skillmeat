@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.prompt import Confirm
 
 from skillmeat.core.artifact import Artifact, ArtifactType
+from skillmeat.core.enums import Platform
 from skillmeat.utils.filesystem import FilesystemManager, compute_content_hash
 
 console = Console()
@@ -45,6 +46,9 @@ class Deployment:
     merge_base_snapshot: Optional[str] = (
         None  # Content hash (SHA-256) used as merge base for 3-way merges
     )
+    deployment_profile_id: Optional[str] = None
+    platform: Optional[Platform] = None
+    profile_root_dir: Optional[str] = None
 
     # Deprecated field for backward compatibility
     collection_sha: Optional[str] = None  # Deprecated: use content_hash instead
@@ -78,6 +82,16 @@ class Deployment:
 
         if self.merge_base_snapshot:
             result["merge_base_snapshot"] = self.merge_base_snapshot
+        if self.deployment_profile_id:
+            result["deployment_profile_id"] = self.deployment_profile_id
+        if self.platform:
+            result["platform"] = (
+                self.platform.value
+                if isinstance(self.platform, Platform)
+                else str(self.platform)
+            )
+        if self.profile_root_dir:
+            result["profile_root_dir"] = self.profile_root_dir
 
         # Keep collection_sha for backward compatibility (same as content_hash)
         result["collection_sha"] = self.content_hash
@@ -124,6 +138,13 @@ class Deployment:
             last_modified_check=last_modified_check,
             modification_detected_at=modification_detected_at,
             merge_base_snapshot=data.get("merge_base_snapshot"),
+            deployment_profile_id=data.get("deployment_profile_id"),
+            platform=(
+                Platform(data["platform"])
+                if data.get("platform") is not None
+                else None
+            ),
+            profile_root_dir=data.get("profile_root_dir"),
             collection_sha=data.get("collection_sha"),  # Keep for backward compat
         )
 

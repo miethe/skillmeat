@@ -8,6 +8,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from skillmeat.core.enums import Platform
+
 
 # ====================
 # Request Schemas
@@ -213,6 +215,18 @@ class DeploymentInfo(BaseModel):
     merge_base_snapshot: Optional[str] = Field(
         default=None,
         description="Content hash (SHA-256) used as merge base for 3-way merges",
+    )
+    deployment_profile_id: Optional[str] = Field(
+        default=None,
+        description="Deployment profile identifier used for this deployment",
+    )
+    platform: Optional[Platform] = Field(
+        default=None,
+        description="Platform associated with the deployment profile",
+    )
+    profile_root_dir: Optional[str] = Field(
+        default=None,
+        description="Resolved profile root directory used for deployment",
     )
 
     class Config:

@@ -76,6 +76,7 @@ from skillmeat.cache.models import (
     ArtifactTag,
     Base,
     CollectionArtifact,
+    DeploymentProfile,
     MarketplaceCatalogEntry,
     MarketplaceSource,
     Tag,
@@ -3025,6 +3026,153 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
                 next_cursor=next_cursor,
                 has_more=has_more,
             )
+        finally:
+            session.close()
+
+
+# =============================================================================
+# Deployment Profile Repository
+# =============================================================================
+
+
+class DeploymentProfileRepository(BaseRepository[DeploymentProfile]):
+    """Repository for deployment profile CRUD operations."""
+
+    def __init__(self, db_path: Optional[str | Path] = None):
+        super().__init__(db_path, DeploymentProfile)
+
+    def create(
+        self,
+        *,
+        project_id: str,
+        profile_id: str,
+        platform: str,
+        root_dir: str,
+        artifact_path_map: Optional[Dict[str, str]] = None,
+        config_filenames: Optional[List[str]] = None,
+        context_prefixes: Optional[List[str]] = None,
+        supported_types: Optional[List[str]] = None,
+    ) -> DeploymentProfile:
+        """Create a deployment profile."""
+        session = self._get_session()
+        try:
+            profile = DeploymentProfile(
+                id=uuid.uuid4().hex,
+                project_id=project_id,
+                profile_id=profile_id,
+                platform=platform,
+                root_dir=root_dir,
+                artifact_path_map=artifact_path_map or {},
+                config_filenames=config_filenames or [],
+                context_prefixes=context_prefixes or [],
+                supported_types=supported_types or [],
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            session.add(profile)
+            session.commit()
+            session.refresh(profile)
+            return profile
+        except IntegrityError as e:
+            session.rollback()
+            raise RepositoryError(f"Failed to create deployment profile: {e}") from e
+        finally:
+            session.close()
+
+    def read_by_id(self, profile_db_id: str) -> Optional[DeploymentProfile]:
+        """Read deployment profile by DB ID."""
+        session = self._get_session()
+        try:
+            return (
+                session.query(DeploymentProfile)
+                .filter(DeploymentProfile.id == profile_db_id)
+                .first()
+            )
+        finally:
+            session.close()
+
+    def read_by_project_and_profile_id(
+        self, project_id: str, profile_id: str
+    ) -> Optional[DeploymentProfile]:
+        """Read deployment profile by project and profile ID."""
+        session = self._get_session()
+        try:
+            return (
+                session.query(DeploymentProfile)
+                .filter(
+                    DeploymentProfile.project_id == project_id,
+                    DeploymentProfile.profile_id == profile_id,
+                )
+                .first()
+            )
+        finally:
+            session.close()
+
+    def list_by_project(self, project_id: str) -> List[DeploymentProfile]:
+        """List deployment profiles for a project."""
+        session = self._get_session()
+        try:
+            return (
+                session.query(DeploymentProfile)
+                .filter(DeploymentProfile.project_id == project_id)
+                .order_by(DeploymentProfile.profile_id.asc())
+                .all()
+            )
+        finally:
+            session.close()
+
+    def update(
+        self,
+        project_id: str,
+        profile_id: str,
+        **updates: Any,
+    ) -> Optional[DeploymentProfile]:
+        """Update an existing deployment profile."""
+        session = self._get_session()
+        try:
+            profile = (
+                session.query(DeploymentProfile)
+                .filter(
+                    DeploymentProfile.project_id == project_id,
+                    DeploymentProfile.profile_id == profile_id,
+                )
+                .first()
+            )
+            if not profile:
+                return None
+
+            for key, value in updates.items():
+                if value is not None and hasattr(profile, key):
+                    setattr(profile, key, value)
+            profile.updated_at = datetime.utcnow()
+
+            session.commit()
+            session.refresh(profile)
+            return profile
+        except IntegrityError as e:
+            session.rollback()
+            raise RepositoryError(f"Failed to update deployment profile: {e}") from e
+        finally:
+            session.close()
+
+    def delete(self, project_id: str, profile_id: str) -> bool:
+        """Delete deployment profile by project and profile ID."""
+        session = self._get_session()
+        try:
+            profile = (
+                session.query(DeploymentProfile)
+                .filter(
+                    DeploymentProfile.project_id == project_id,
+                    DeploymentProfile.profile_id == profile_id,
+                )
+                .first()
+            )
+            if not profile:
+                return False
+
+            session.delete(profile)
+            session.commit()
+            return True
         finally:
             session.close()
 
