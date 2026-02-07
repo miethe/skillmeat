@@ -35,23 +35,11 @@ If user asks for memory capabilities, choose path:
 4. "Command syntax for memory"
 - Open `./command-quick-reference.md`
 
-## Current vs Target Memory CLI State
+## Memory CLI Reference
 
-Target commands are documented in:
+Memory commands are fully implemented. Documentation:
 - `./command-quick-reference.md`
 - `../workflows/memory-context-workflow.md`
-
-Always verify command availability first:
-
-```bash
-skillmeat memory --help
-```
-
-If unavailable, switch to API fallback mode and inform user:
-- `/api/v1/memory-items`
-- `/api/v1/context-modules`
-- `/api/v1/context-packs/preview`
-- `/api/v1/context-packs/generate`
 
 ## Minimal-Load Guidance
 
