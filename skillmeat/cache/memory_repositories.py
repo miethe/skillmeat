@@ -124,6 +124,7 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
         data.setdefault("updated_at", now)
         data.setdefault("confidence", 0.75)
         data.setdefault("status", "candidate")
+        data.setdefault("share_scope", "project")
         data.setdefault("access_count", 0)
 
         # Compute content hash if not provided
@@ -190,6 +191,7 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
         *,
         status: Optional[str] = None,
         type: Optional[str] = None,
+        share_scope: Optional[str] = None,
         search: Optional[str] = None,
         min_confidence: Optional[float] = None,
         limit: int = 50,
@@ -223,6 +225,8 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
                 query = query.filter(MemoryItem.status == status)
             if type is not None:
                 query = query.filter(MemoryItem.type == type)
+            if share_scope is not None:
+                query = query.filter(MemoryItem.share_scope == share_scope)
             if search:
                 query = query.filter(MemoryItem.content.ilike(f"%{search}%"))
             if min_confidence is not None:
@@ -270,6 +274,7 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
             logger.debug(
                 f"Listed {len(items)} memory items "
                 f"(project={project_id}, status={status}, type={type}, "
+                f"share_scope={share_scope}, "
                 f"cursor={cursor}, has_more={has_more})"
             )
 

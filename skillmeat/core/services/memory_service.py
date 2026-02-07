@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -46,9 +47,19 @@ from skillmeat.observability.tracing import trace_operation
 # Configure logging
 logger = logging.getLogger(__name__)
 
+try:
+    from skillmeat.observability.metrics import (
+        memory_operation_duration,
+        memory_operations_total,
+    )
+except Exception:  # pragma: no cover - metrics are optional in some envs
+    memory_operation_duration = None
+    memory_operations_total = None
+
 # Valid values for type and status fields, matching DB CHECK constraints
 VALID_TYPES = {"decision", "constraint", "gotcha", "style_rule", "learning"}
 VALID_STATUSES = {"candidate", "active", "stable", "deprecated"}
+VALID_SHARE_SCOPES = {"private", "project", "global_candidate"}
 
 # Fields that may be updated through the update() method
 UPDATABLE_FIELDS = {
@@ -56,6 +67,7 @@ UPDATABLE_FIELDS = {
     "confidence",
     "type",
     "status",
+    "share_scope",
     "provenance_json",
     "anchors_json",
     "ttl_policy_json",
@@ -98,6 +110,7 @@ class MemoryService:
         content: str,
         confidence: float = 0.5,
         status: str = "candidate",
+        share_scope: str = "project",
         provenance: Optional[Dict[str, Any]] = None,
         anchors: Optional[List[str]] = None,
         ttl_policy: Optional[Dict[str, Any]] = None,
@@ -136,6 +149,7 @@ class MemoryService:
             self._validate_type(type)
             self._validate_confidence(confidence)
             self._validate_status(status)
+            self._validate_share_scope(share_scope)
 
             # Build the data dict for the repository
             data: Dict[str, Any] = {
@@ -144,6 +158,7 @@ class MemoryService:
                 "content": content,
                 "confidence": confidence,
                 "status": status,
+                "share_scope": share_scope,
             }
 
             if provenance is not None:
@@ -228,6 +243,7 @@ class MemoryService:
         project_id: Optional[str],
         status: Optional[str] = None,
         type: Optional[str] = None,
+        share_scope: Optional[str] = None,
         search: Optional[str] = None,
         min_confidence: Optional[float] = None,
         limit: int = 50,
@@ -251,24 +267,41 @@ class MemoryService:
             Dict with keys: items (list of dicts), next_cursor (str or None),
             has_more (bool), total (int or None).
         """
-        result = self.repo.list_items(
-            project_id,
-            status=status,
-            type=type,
-            search=search,
-            min_confidence=min_confidence,
-            limit=limit,
-            cursor=cursor,
-            sort_by=sort_by,
-            sort_order=sort_order,
-        )
+        started = time.perf_counter()
+        status_label = "success"
+        try:
+            result = self.repo.list_items(
+                project_id,
+                status=status,
+                type=type,
+                share_scope=share_scope,
+                search=search,
+                min_confidence=min_confidence,
+                limit=limit,
+                cursor=cursor,
+                sort_by=sort_by,
+                sort_order=sort_order,
+            )
 
-        return {
-            "items": [self._item_to_dict(item) for item in result.items],
-            "next_cursor": result.next_cursor,
-            "has_more": result.has_more,
-            "total": None,  # Not computed for cursor-based pagination
-        }
+            project_names = self._resolve_project_names(result.items)
+            return {
+                "items": [
+                    self._item_to_dict(item, project_name=project_names.get(item.project_id))
+                    for item in result.items
+                ],
+                "next_cursor": result.next_cursor,
+                "has_more": result.has_more,
+                "total": None,  # Not computed for cursor-based pagination
+            }
+        except Exception:
+            status_label = "error"
+            raise
+        finally:
+            self._record_operation_metrics(
+                operation="list",
+                status=status_label,
+                started=started,
+            )
 
     def update(self, item_id: str, **fields: Any) -> Dict[str, Any]:
         """Update allowed fields on a memory item.
@@ -310,6 +343,8 @@ class MemoryService:
                 self._validate_type(update_data["type"])
             if "status" in update_data:
                 self._validate_status(update_data["status"])
+            if "share_scope" in update_data:
+                self._validate_share_scope(update_data["share_scope"])
 
             span.set_attribute("fields_updated", list(update_data.keys()))
             if "status" in update_data:
@@ -390,30 +425,47 @@ class MemoryService:
         project_id: Optional[str] = None,
         status: Optional[str] = None,
         type: Optional[str] = None,
+        share_scope: Optional[str] = None,
         limit: int = 50,
         cursor: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Search memory content globally or within a project."""
         if not query or not query.strip():
             raise ValueError("query must be a non-empty string")
+        started = time.perf_counter()
+        status_label = "success"
+        try:
+            result = self.repo.list_items(
+                project_id=project_id,
+                status=status,
+                type=type,
+                share_scope=share_scope,
+                search=query.strip(),
+                limit=limit,
+                cursor=cursor,
+                sort_by="created_at",
+                sort_order="desc",
+            )
 
-        result = self.repo.list_items(
-            project_id=project_id,
-            status=status,
-            type=type,
-            search=query.strip(),
-            limit=limit,
-            cursor=cursor,
-            sort_by="created_at",
-            sort_order="desc",
-        )
-
-        return {
-            "items": [self._item_to_dict(item) for item in result.items],
-            "next_cursor": result.next_cursor,
-            "has_more": result.has_more,
-            "total": None,
-        }
+            project_names = self._resolve_project_names(result.items)
+            return {
+                "items": [
+                    self._item_to_dict(item, project_name=project_names.get(item.project_id))
+                    for item in result.items
+                ],
+                "next_cursor": result.next_cursor,
+                "has_more": result.has_more,
+                "total": None,
+            }
+        except Exception:
+            status_label = "error"
+            raise
+        finally:
+            self._record_operation_metrics(
+                operation="search",
+                status=status_label,
+                started=started,
+            )
 
     # =========================================================================
     # Lifecycle State Management
@@ -799,7 +851,9 @@ class MemoryService:
     # =========================================================================
 
     @staticmethod
-    def _item_to_dict(item: Any) -> Dict[str, Any]:
+    def _item_to_dict(
+        item: Any, *, project_name: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Convert a MemoryItem ORM instance to a plain dict.
 
         Scalar fields are copied directly. JSON text columns are deserialized
@@ -811,6 +865,10 @@ class MemoryService:
         Returns:
             Dict with all item fields, JSON fields parsed into native types.
         """
+        share_scope = getattr(item, "share_scope", None)
+        if not isinstance(share_scope, str) or not share_scope:
+            share_scope = "project"
+
         result: Dict[str, Any] = {
             "id": item.id,
             "project_id": item.project_id,
@@ -818,12 +876,15 @@ class MemoryService:
             "content": item.content,
             "confidence": item.confidence,
             "status": item.status,
+            "share_scope": share_scope,
             "content_hash": item.content_hash,
             "access_count": item.access_count,
             "created_at": item.created_at,
             "updated_at": item.updated_at,
             "deprecated_at": item.deprecated_at,
         }
+        if project_name is not None:
+            result["project_name"] = project_name
 
         # Parse JSON fields using the model's property helpers
         result["provenance"] = item.provenance
@@ -856,6 +917,19 @@ class MemoryService:
             raise ValueError(
                 f"Invalid status '{status_value}'. "
                 f"Must be one of: {sorted(VALID_STATUSES)}"
+            )
+
+    @staticmethod
+    def _validate_share_scope(share_scope_value: str) -> None:
+        """Validate that share_scope is one of the allowed values.
+
+        Raises:
+            ValueError: If the share_scope is not in VALID_SHARE_SCOPES.
+        """
+        if share_scope_value not in VALID_SHARE_SCOPES:
+            raise ValueError(
+                f"Invalid share_scope '{share_scope_value}'. "
+                f"Must be one of: {sorted(VALID_SHARE_SCOPES)}"
             )
 
     @staticmethod
@@ -900,3 +974,46 @@ class MemoryService:
                 raise ValueError(f"Project not found: {project_id}")
         finally:
             session.close()
+
+    def _resolve_project_names(self, items: List[Any]) -> Dict[str, str]:
+        """Resolve project_id -> project name for returned memory items."""
+        project_ids = {item.project_id for item in items if getattr(item, "project_id", None)}
+        if not project_ids:
+            return {}
+
+        session_factory = getattr(self.repo, "_get_session", None)
+        if not callable(session_factory):
+            return {}
+
+        session = session_factory()
+        try:
+            projects = (
+                session.query(Project.id, Project.name)
+                .filter(Project.id.in_(project_ids))
+                .all()
+            )
+            if not isinstance(projects, list):
+                return {}
+
+            result: Dict[str, str] = {}
+            for row in projects:
+                if isinstance(row, tuple) and len(row) == 2:
+                    project_id, name = row
+                else:
+                    project_id = getattr(row, "id", None)
+                    name = getattr(row, "name", None)
+                if project_id and name:
+                    result[str(project_id)] = str(name)
+            return result
+        finally:
+            if hasattr(session, "close"):
+                session.close()
+
+    @staticmethod
+    def _record_operation_metrics(operation: str, status: str, started: float) -> None:
+        """Record memory operation counters and latency histogram."""
+        duration = max(0.0, time.perf_counter() - started)
+        if memory_operations_total is not None:
+            memory_operations_total.labels(operation=operation, status=status).inc()
+        if memory_operation_duration is not None:
+            memory_operation_duration.labels(operation=operation).observe(duration)

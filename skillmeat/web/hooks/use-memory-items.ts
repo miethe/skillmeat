@@ -45,6 +45,23 @@ export interface MemoryItemFilters {
   projectId: string;
   status?: MemoryStatus;
   type?: MemoryType;
+  shareScope?: 'private' | 'project' | 'global_candidate';
+  minConfidence?: number;
+  search?: string;
+  sortBy?: string; // created_at | confidence | access_count
+  sortOrder?: 'asc' | 'desc';
+  cursor?: string;
+  limit?: number;
+}
+
+/**
+ * Filter parameters for global memory list queries.
+ */
+export interface GlobalMemoryItemFilters {
+  projectId?: string;
+  status?: MemoryStatus;
+  type?: MemoryType;
+  shareScope?: 'private' | 'project' | 'global_candidate';
   minConfidence?: number;
   search?: string;
   sortBy?: string; // created_at | confidence | access_count
@@ -73,6 +90,9 @@ export const memoryItemKeys = {
   all: ['memory-items'] as const,
   lists: () => [...memoryItemKeys.all, 'list'] as const,
   list: (filters?: MemoryItemFilters) => [...memoryItemKeys.lists(), filters] as const,
+  globalLists: () => [...memoryItemKeys.all, 'global-list'] as const,
+  globalList: (filters?: GlobalMemoryItemFilters) =>
+    [...memoryItemKeys.globalLists(), filters] as const,
   details: () => [...memoryItemKeys.all, 'detail'] as const,
   detail: (id: string) => [...memoryItemKeys.details(), id] as const,
   counts: () => [...memoryItemKeys.all, 'count'] as const,
@@ -111,6 +131,7 @@ export function useMemoryItems(filters: MemoryItemFilters) {
       params.set('project_id', filters.projectId);
       if (filters.status) params.set('status', filters.status);
       if (filters.type) params.set('type', filters.type);
+      if (filters.shareScope) params.set('share_scope', filters.shareScope);
       if (filters.search) params.set('search', filters.search);
       if (filters.minConfidence != null) params.set('min_confidence', String(filters.minConfidence));
       if (filters.limit != null) params.set('limit', String(filters.limit));
@@ -120,6 +141,38 @@ export function useMemoryItems(filters: MemoryItemFilters) {
       return apiRequest<MemoryItemListResponse>(`/memory-items?${params.toString()}`);
     },
     enabled: !!filters.projectId,
+    staleTime: MEMORY_STALE_TIME,
+  });
+}
+
+/**
+ * Fetch memory items globally or scoped to a selected project.
+ *
+ * - If projectId is provided, uses the project-scoped list endpoint.
+ * - Otherwise uses the global list endpoint.
+ */
+export function useGlobalMemoryItems(filters: GlobalMemoryItemFilters) {
+  return useQuery({
+    queryKey: memoryItemKeys.globalList(filters),
+    queryFn: async (): Promise<MemoryItemListResponse> => {
+      const params = new URLSearchParams();
+      if (filters.status) params.set('status', filters.status);
+      if (filters.type) params.set('type', filters.type);
+      if (filters.shareScope) params.set('share_scope', filters.shareScope);
+      if (filters.search) params.set('search', filters.search);
+      if (filters.minConfidence != null) params.set('min_confidence', String(filters.minConfidence));
+      if (filters.limit != null) params.set('limit', String(filters.limit));
+      if (filters.cursor) params.set('cursor', filters.cursor);
+      if (filters.sortBy) params.set('sort_by', filters.sortBy);
+      if (filters.sortOrder) params.set('sort_order', filters.sortOrder);
+
+      if (filters.projectId) {
+        params.set('project_id', filters.projectId);
+        return apiRequest<MemoryItemListResponse>(`/memory-items?${params.toString()}`);
+      }
+
+      return apiRequest<MemoryItemListResponse>(`/memory-items/global?${params.toString()}`);
+    },
     staleTime: MEMORY_STALE_TIME,
   });
 }

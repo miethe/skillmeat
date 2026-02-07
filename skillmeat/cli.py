@@ -11621,13 +11621,21 @@ def memory_item():
 @click.option("--content", required=True)
 @click.option("--confidence", type=float, default=0.5)
 @click.option("--status", "memory_status", default="candidate")
+@click.option(
+    "--share-scope",
+    type=click.Choice(["private", "project", "global_candidate"]),
+    default="project",
+)
 @click.option("--json", "as_json", is_flag=True)
-def memory_item_create(project_id, memory_type, content, confidence, memory_status, as_json):
+def memory_item_create(
+    project_id, memory_type, content, confidence, memory_status, share_scope, as_json
+):
     payload = {
         "type": memory_type,
         "content": content,
         "confidence": confidence,
         "status": memory_status,
+        "share_scope": share_scope,
     }
     try:
         response = _memory_request(
@@ -11646,15 +11654,24 @@ def memory_item_create(project_id, memory_type, content, confidence, memory_stat
 @click.option("--project", "project_id", required=True)
 @click.option("--status", "memory_status", default=None)
 @click.option("--type", "memory_type", default=None)
+@click.option(
+    "--share-scope",
+    type=click.Choice(["private", "project", "global_candidate"]),
+    default=None,
+)
 @click.option("--search", default=None)
 @click.option("--limit", default=50, type=int)
 @click.option("--json", "as_json", is_flag=True)
-def memory_item_list(project_id, memory_status, memory_type, search, limit, as_json):
+def memory_item_list(
+    project_id, memory_status, memory_type, share_scope, search, limit, as_json
+):
     params = {"project_id": project_id, "limit": limit}
     if memory_status:
         params["status"] = memory_status
     if memory_type:
         params["type"] = memory_type
+    if share_scope:
+        params["share_scope"] = share_scope
     if search:
         params["search"] = search
     try:
@@ -11684,8 +11701,15 @@ def memory_item_show(item_id, as_json):
 @click.option("--confidence", type=float, default=None)
 @click.option("--type", "memory_type", default=None)
 @click.option("--status", "memory_status", default=None)
+@click.option(
+    "--share-scope",
+    type=click.Choice(["private", "project", "global_candidate"]),
+    default=None,
+)
 @click.option("--json", "as_json", is_flag=True)
-def memory_item_update(item_id, content, confidence, memory_type, memory_status, as_json):
+def memory_item_update(
+    item_id, content, confidence, memory_type, memory_status, share_scope, as_json
+):
     payload = {}
     if content is not None:
         payload["content"] = content
@@ -11695,6 +11719,8 @@ def memory_item_update(item_id, content, confidence, memory_type, memory_status,
         payload["type"] = memory_type
     if memory_status is not None:
         payload["status"] = memory_status
+    if share_scope is not None:
+        payload["share_scope"] = share_scope
     if not payload:
         console.print("[red]No updates specified[/red]")
         sys.exit(1)
@@ -12103,12 +12129,19 @@ def memory_extract_run(project_id, run_log_path, profile, min_confidence, as_jso
 @click.argument("query")
 @click.option("--project", "project_id", default=None)
 @click.option("--all-projects", is_flag=True, default=False)
+@click.option(
+    "--share-scope",
+    type=click.Choice(["private", "project", "global_candidate"]),
+    default=None,
+)
 @click.option("--limit", type=int, default=50)
 @click.option("--json", "as_json", is_flag=True)
-def memory_search(query, project_id, all_projects, limit, as_json):
+def memory_search(query, project_id, all_projects, share_scope, limit, as_json):
     params = {"query": query, "limit": limit}
     if project_id and not all_projects:
         params["project_id"] = project_id
+    if share_scope:
+        params["share_scope"] = share_scope
     try:
         response = _memory_request("GET", "/memory-items/search", params=params)
         data = response.json()

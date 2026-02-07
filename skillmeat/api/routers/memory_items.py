@@ -44,6 +44,7 @@ from skillmeat.api.schemas.memory import (
     MemoryItemResponse,
     MemorySearchResponse,
     MemoryItemUpdateRequest,
+    MemoryShareScope,
     MemoryStatus,
     MemoryType,
     MergeRequest,
@@ -302,6 +303,9 @@ async def search_memory_items(
     project_id: Optional[str] = Query(None, description="Optional project scope"),
     status: Optional[MemoryStatus] = Query(None, description="Optional status filter"),
     type: Optional[MemoryType] = Query(None, description="Optional type filter"),
+    share_scope: Optional[MemoryShareScope] = Query(
+        None, description="Optional share scope filter"
+    ),
     limit: int = Query(default=50, ge=1, le=100),
     cursor: Optional[str] = Query(None),
 ) -> MemorySearchResponse:
@@ -313,6 +317,7 @@ async def search_memory_items(
             project_id=unquote(project_id) if project_id else None,
             status=status.value if status else None,
             type=type.value if type else None,
+            share_scope=share_scope.value if share_scope else None,
             limit=limit,
             cursor=cursor,
         )
@@ -339,6 +344,9 @@ async def search_memory_items(
 async def list_global_memory_items(
     status: Optional[MemoryStatus] = Query(None, description="Filter by status"),
     type: Optional[MemoryType] = Query(None, description="Filter by memory type"),
+    share_scope: Optional[MemoryShareScope] = Query(
+        None, description="Filter by share scope"
+    ),
     search: Optional[str] = Query(
         None, description="Case-insensitive substring match against memory content"
     ),
@@ -357,6 +365,7 @@ async def list_global_memory_items(
             project_id=None,
             status=status.value if status else None,
             type=type.value if type else None,
+            share_scope=share_scope.value if share_scope else None,
             search=search,
             min_confidence=min_confidence,
             limit=limit,
@@ -471,6 +480,9 @@ async def list_memory_items(
     project_id: str = Query(..., description="Project ID to scope the query"),
     status: Optional[MemoryStatus] = Query(None, description="Filter by status"),
     type: Optional[MemoryType] = Query(None, description="Filter by memory type"),
+    share_scope: Optional[MemoryShareScope] = Query(
+        None, description="Filter by share scope"
+    ),
     search: Optional[str] = Query(
         None, description="Case-insensitive substring match against memory content"
     ),
@@ -512,6 +524,7 @@ async def list_memory_items(
             project_id=project_id,
             status=status.value if status else None,
             type=type.value if type else None,
+            share_scope=share_scope.value if share_scope else None,
             search=search,
             min_confidence=min_confidence,
             limit=limit,
@@ -579,6 +592,7 @@ async def create_memory_item(
             content=request.content,
             confidence=request.confidence,
             status=request.status.value,
+            share_scope=request.share_scope.value,
             provenance=request.provenance,
             anchors=request.anchors,
             ttl_policy=request.ttl_policy,
@@ -690,6 +704,8 @@ async def update_memory_item(
             update_fields["confidence"] = request.confidence
         if request.status is not None:
             update_fields["status"] = request.status.value
+        if request.share_scope is not None:
+            update_fields["share_scope"] = request.share_scope.value
         if request.provenance is not None:
             update_fields["provenance_json"] = json.dumps(request.provenance)
         if request.anchors is not None:

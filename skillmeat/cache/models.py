@@ -2411,6 +2411,7 @@ class MemoryItem(Base):
         content: The actual memory content text
         confidence: Confidence score between 0.0 and 1.0
         status: Lifecycle status (candidate, active, stable, deprecated)
+        share_scope: Cross-project visibility scope (private, project, global_candidate)
         provenance_json: JSON object tracking origin/source of the memory
         anchors_json: JSON array of file paths this memory is anchored to
         ttl_policy_json: JSON object with max_age_days, max_idle_days
@@ -2446,6 +2447,9 @@ class MemoryItem(Base):
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.75)
     status: Mapped[str] = mapped_column(
         String, nullable=False, default="candidate", server_default="candidate"
+    )
+    share_scope: Mapped[str] = mapped_column(
+        String, nullable=False, default="project", server_default="project"
     )
 
     # JSON fields (stored as Text, following codebase convention)
@@ -2486,8 +2490,13 @@ class MemoryItem(Base):
             "status IN ('candidate', 'active', 'stable', 'deprecated')",
             name="ck_memory_items_status",
         ),
+        CheckConstraint(
+            "share_scope IN ('private', 'project', 'global_candidate')",
+            name="ck_memory_items_share_scope",
+        ),
         Index("idx_memory_items_project_status", "project_id", "status"),
         Index("idx_memory_items_project_type", "project_id", "type"),
+        Index("idx_memory_items_share_scope", "share_scope"),
         Index("idx_memory_items_created_at", "created_at"),
     )
 
@@ -2517,7 +2526,7 @@ class MemoryItem(Base):
         return (
             f"<MemoryItem(id={self.id!r}, project_id={self.project_id!r}, "
             f"type={self.type!r}, status={self.status!r}, "
-            f"confidence={self.confidence})>"
+            f"share_scope={self.share_scope!r}, confidence={self.confidence})>"
         )
 
 
