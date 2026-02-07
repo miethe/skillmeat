@@ -88,7 +88,31 @@ def main(ctx, smart_defaults):
     default="default",
     help="Collection name (default: 'default')",
 )
-def init(name: str):
+@click.option(
+    "--profile",
+    "deployment_profile",
+    type=click.Choice(["claude_code", "codex", "gemini", "cursor"]),
+    default=None,
+    help="Initialize project deployment scaffolding for a specific profile",
+)
+@click.option(
+    "--all-profiles",
+    is_flag=True,
+    default=False,
+    help="Initialize project scaffolding for all built-in profiles",
+)
+@click.option(
+    "--project-path",
+    default=None,
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    help="Project path for profile initialization (default: current directory)",
+)
+def init(
+    name: str,
+    deployment_profile: Optional[str],
+    all_profiles: bool,
+    project_path: Optional[Path],
+):
     """Initialize a new collection.
 
     Creates a collection directory structure and manifest file.
@@ -99,6 +123,109 @@ def init(name: str):
       skillmeat init --name work        # Create 'work' collection
     """
     try:
+        profile_specs = {
+            "claude_code": {
+                "root_dir": ".claude",
+                "platform": "claude_code",
+            },
+            "codex": {
+                "root_dir": ".codex",
+                "platform": "codex",
+            },
+            "gemini": {
+                "root_dir": ".gemini",
+                "platform": "gemini",
+            },
+            "cursor": {
+                "root_dir": ".cursor",
+                "platform": "cursor",
+            },
+        }
+
+        if deployment_profile or all_profiles:
+            from skillmeat.cache.models import Project, get_session
+            from skillmeat.cache.repositories import DeploymentProfileRepository
+            from skillmeat.core.path_resolver import DEFAULT_ARTIFACT_PATH_MAP
+            from skillmeat.storage.deployment import DeploymentTracker
+            from skillmeat.storage.project import ProjectMetadataStorage
+
+            target_project = (project_path or Path.cwd()).resolve()
+            selected_profiles = (
+                list(profile_specs.keys())
+                if all_profiles
+                else [deployment_profile or "claude_code"]
+            )
+
+            for profile_id in selected_profiles:
+                spec = profile_specs[profile_id]
+                root_dir = target_project / spec["root_dir"]
+                for subdir in ["skills", "commands", "agents", "hooks", "mcp", "context"]:
+                    (root_dir / subdir).mkdir(parents=True, exist_ok=True)
+
+                if not ProjectMetadataStorage.exists(
+                    target_project, profile_root_dir=spec["root_dir"]
+                ):
+                    ProjectMetadataStorage.create_metadata(
+                        target_project,
+                        name=target_project.name,
+                        profile_root_dir=spec["root_dir"],
+                    )
+
+                DeploymentTracker.write_deployments(
+                    target_project,
+                    [],
+                    profile_root_dir=spec["root_dir"],
+                )
+
+            # Best-effort cache registration for profile lookup APIs.
+            try:
+                import uuid
+
+                session = get_session()
+                try:
+                    project = (
+                        session.query(Project)
+                        .filter(Project.path == str(target_project))
+                        .first()
+                    )
+                    if project is None:
+                        project = Project(
+                            id=uuid.uuid4().hex,
+                            name=target_project.name,
+                            path=str(target_project),
+                            status="active",
+                        )
+                        session.add(project)
+                        session.commit()
+                        session.refresh(project)
+                finally:
+                    session.close()
+
+                repo = DeploymentProfileRepository()
+                for profile_id in selected_profiles:
+                    spec = profile_specs[profile_id]
+                    existing = repo.read_by_project_and_profile_id(project.id, profile_id)
+                    if existing:
+                        continue
+                    repo.create(
+                        project_id=project.id,
+                        profile_id=profile_id,
+                        platform=spec["platform"],
+                        root_dir=spec["root_dir"],
+                        artifact_path_map=DEFAULT_ARTIFACT_PATH_MAP.copy(),
+                        config_filenames=[".skillmeat-project.toml"],
+                        context_prefixes=[f"{spec['root_dir']}/context/"],
+                        supported_types=["skill", "command", "agent", "hook", "mcp"],
+                    )
+            except Exception as cache_error:
+                logger.debug(f"Profile cache registration skipped: {cache_error}")
+
+            console.print(
+                f"[green]Project initialized for profiles:[/green] {', '.join(selected_profiles)}"
+            )
+            console.print(f"  Project: {target_project}")
+            return
+
         collection_mgr = CollectionManager()
 
         # Check if collection already exists
@@ -1148,6 +1275,18 @@ def quick_add(
     default=None,
     help="Output format (auto-detected if not specified)",
 )
+@click.option(
+    "--profile",
+    "profile_id",
+    default=None,
+    help="Deployment profile ID (defaults to project primary profile)",
+)
+@click.option(
+    "--all-profiles",
+    is_flag=True,
+    default=False,
+    help="Deploy to all configured project profiles",
+)
 @click.pass_context
 def deploy(
     ctx,
@@ -1157,6 +1296,8 @@ def deploy(
     artifact_type: Optional[str],
     overwrite: bool,
     output_format: Optional[str],
+    profile_id: Optional[str],
+    all_profiles: bool,
 ):
     """Deploy artifacts to a project's .claude/ directory.
 
@@ -1180,6 +1321,8 @@ def deploy(
             "project": project,
             "artifact_type": artifact_type,
             "format": output_format,
+            "profile_id": profile_id,
+            "all_profiles": all_profiles,
         }
 
         if ctx.obj and ctx.obj.get("smart_defaults"):
@@ -1189,6 +1332,8 @@ def deploy(
         resolved_project = params.get("project") or Path.cwd()
         resolved_collection = params.get("collection")
         resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+        resolved_profile_id = params.get("profile_id")
+        resolved_all_profiles = params.get("all_profiles", False)
 
         deployment_mgr = DeploymentManager()
 
@@ -1215,6 +1360,8 @@ def deploy(
                     project_path=resolved_project,
                     artifact_type=type_filter,
                     overwrite=overwrite,
+                    profile_id=resolved_profile_id,
+                    all_profiles=resolved_all_profiles,
                 )
         else:
             deployments = deployment_mgr.deploy_artifacts(
@@ -1223,6 +1370,8 @@ def deploy(
                 project_path=resolved_project,
                 artifact_type=type_filter,
                 overwrite=overwrite,
+                profile_id=resolved_profile_id,
+                all_profiles=resolved_all_profiles,
             )
 
         # Output based on format
@@ -1237,6 +1386,11 @@ def deploy(
                         "artifact": d.artifact_name,
                         "type": d.artifact_type,
                         "path": str(d.artifact_path),
+                        "profile_id": d.deployment_profile_id,
+                        "platform": (
+                            d.platform.value if hasattr(d.platform, "value") else d.platform
+                        ),
+                        "profile_root_dir": d.profile_root_dir,
                     }
                     for d in deployments
                 ],
@@ -1247,6 +1401,7 @@ def deploy(
             for deployment in deployments:
                 console.print(
                     f"  {deployment.artifact_name} -> {deployment.artifact_path}"
+                    f" [dim]({deployment.deployment_profile_id or 'claude_code'})[/dim]"
                 )
 
         # Auto-confirm recent matches (P5-T2)
@@ -1323,6 +1478,12 @@ def deploy(
     default=None,
     help="Output format (default: auto-detect)",
 )
+@click.option(
+    "--profile",
+    "profile_id",
+    default=None,
+    help="Deployment profile ID for artifact removal",
+)
 @click.pass_context
 def undeploy(
     ctx,
@@ -1331,6 +1492,7 @@ def undeploy(
     artifact_type: Optional[str],
     force: bool,
     output_format: Optional[str],
+    profile_id: Optional[str],
 ):
     """Remove deployed artifact from project.
 
@@ -1349,12 +1511,14 @@ def undeploy(
         "name": name,
         "project": project,
         "format": output_format,
+        "profile_id": profile_id,
     }
     if ctx.obj and ctx.obj.get("smart_defaults"):
         params = SmartDefaults.apply_defaults(ctx, params)
 
     resolved_format = params.get("format") or SmartDefaults.detect_output_format()
     resolved_project = params.get("project") or Path.cwd()
+    resolved_profile_id = params.get("profile_id")
 
     try:
         # Require confirmation for TTY unless --force
@@ -1384,6 +1548,7 @@ def undeploy(
             artifact_name=name,
             project_path=resolved_project,
             artifact_type=type_filter,
+            profile_id=resolved_profile_id,
         )
 
         # Invalidate cache after successful undeploy
@@ -1408,6 +1573,7 @@ def undeploy(
                         "command": "undeploy",
                         "artifact": name,
                         "project": str(resolved_project),
+                        "profile_id": resolved_profile_id,
                     }
                 )
             )
@@ -2087,7 +2253,12 @@ def mcp_health(
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     help="Project path for deployment status (default: current directory)",
 )
-def status(collection: Optional[str], project: Optional[Path]):
+@click.option(
+    "--profile",
+    default=None,
+    help="Deployment profile ID to scope deployment status",
+)
+def status(collection: Optional[str], project: Optional[Path], profile: Optional[str]):
     """Check update status for artifacts and deployments.
 
     Shows available updates from upstream sources and checks
@@ -2125,20 +2296,31 @@ def status(collection: Optional[str], project: Optional[Path]):
         # Check deployment status if project specified
         if project or project is None:
             console.print("\n[cyan]Checking deployment status...[/cyan]")
-            status_info = deployment_mgr.check_deployment_status(project_path=project)
+            status_info = deployment_mgr.check_deployment_status(
+                project_path=project,
+                profile_id=profile,
+            )
 
-            modified = status_info.get("modified", [])
-            synced = status_info.get("synced", [])
+            modified = [
+                artifact_key
+                for artifact_key, state in status_info.items()
+                if state == "modified"
+            ]
+            synced = [
+                artifact_key
+                for artifact_key, state in status_info.items()
+                if state == "synced"
+            ]
 
             if modified:
                 console.print(f"\n[yellow]Locally modified ({len(modified)}):[/yellow]")
-                for info in modified:
-                    console.print(f"  {info['name']} ({info['type']})")
+                for artifact_key in modified:
+                    console.print(f"  {artifact_key}")
 
             if synced:
                 console.print(f"\n[green]Synced ({len(synced)}):[/green]")
-                for info in synced:
-                    console.print(f"  {info['name']} ({info['type']})")
+                for artifact_key in synced:
+                    console.print(f"  {artifact_key}")
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")

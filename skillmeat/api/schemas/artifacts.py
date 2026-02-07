@@ -525,6 +525,14 @@ class ArtifactDeployRequest(BaseModel):
             "and conflicts (files modified on both sides) are reported."
         ),
     )
+    deployment_profile_id: Optional[str] = Field(
+        default=None,
+        description="Optional deployment profile ID (defaults to project primary profile)",
+    )
+    all_profiles: bool = Field(
+        default=False,
+        description="Deploy to all deployment profiles for the project",
+    )
 
 
 class MergeFileAction(BaseModel):
@@ -594,6 +602,14 @@ class ArtifactDeployResponse(BaseModel):
     merge_details: Optional[MergeDeployDetails] = Field(
         default=None,
         description="Merge deployment details (only present when strategy='merge')",
+    )
+    deployment_profile_id: Optional[str] = Field(
+        default=None,
+        description="Profile used for deployment (single-profile mode)",
+    )
+    deployed_profiles: Optional[List[str]] = Field(
+        default=None,
+        description="Profiles that received the deployment",
     )
 
     class Config:

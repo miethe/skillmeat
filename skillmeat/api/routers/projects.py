@@ -42,6 +42,7 @@ from skillmeat.api.schemas.projects import (
 )
 from skillmeat.api.project_registry import ProjectRegistry, get_project_registry
 from skillmeat.cache.manager import CacheManager
+from skillmeat.core.path_resolver import DEFAULT_PROFILE_ROOTS
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.storage.project import ProjectMetadataStorage
 from skillmeat.utils.filesystem import compute_content_hash
@@ -139,8 +140,11 @@ def decode_project_id(project_id: str) -> str:
         )
 
 
-def discover_projects(search_paths: Optional[List[Path]] = None) -> List[Path]:
-    """Discover projects with .claude/.skillmeat-deployed.toml files.
+def discover_projects(
+    search_paths: Optional[List[Path]] = None,
+    profile_id: Optional[str] = None,
+) -> List[Path]:
+    """Discover projects with profile deployment tracker files.
 
     This function scans configured search paths for projects that have
     deployment tracking files, indicating they contain deployed artifacts.
@@ -166,6 +170,15 @@ def discover_projects(search_paths: Optional[List[Path]] = None) -> List[Path]:
     discovered = []
     MAX_DEPTH = 3  # Limit search depth to prevent performance issues
 
+    profile_roots = DEFAULT_PROFILE_ROOTS
+    if profile_id:
+        if profile_id.startswith("."):
+            profile_roots = [profile_id]
+        elif profile_id == "claude_code":
+            profile_roots = [".claude"]
+        else:
+            profile_roots = [f".{profile_id}"]
+
     for search_path in search_paths:
         if not search_path.exists() or not search_path.is_dir():
             continue
@@ -179,27 +192,27 @@ def discover_projects(search_paths: Optional[List[Path]] = None) -> List[Path]:
 
         # Search for .skillmeat-deployed.toml files with depth limit
         try:
-            for deployment_file in search_path.rglob(
-                ".claude/.skillmeat-deployed.toml"
-            ):
-                # Get project root (parent of .claude)
-                project_path = deployment_file.parent.parent
+            for profile_root in profile_roots:
+                for deployment_file in search_path.rglob(
+                    f"{profile_root}/{DeploymentTracker.DEPLOYMENT_FILE}"
+                ):
+                    project_path = deployment_file.parent.parent
 
-                # Validate path is within search_path (security check)
-                try:
-                    project_path = project_path.resolve()
-                    project_path.relative_to(search_path)
-                except (ValueError, RuntimeError, OSError):
-                    logger.warning(f"Skipping invalid project path: {project_path}")
-                    continue
+                    # Validate path is within search_path (security check)
+                    try:
+                        project_path = project_path.resolve()
+                        project_path.relative_to(search_path)
+                    except (ValueError, RuntimeError, OSError):
+                        logger.warning(f"Skipping invalid project path: {project_path}")
+                        continue
 
-                # Check depth limit
-                depth = len(project_path.relative_to(search_path).parts)
-                if depth > MAX_DEPTH:
-                    continue
+                    # Check depth limit
+                    depth = len(project_path.relative_to(search_path).parts)
+                    if depth > MAX_DEPTH:
+                        continue
 
-                if project_path not in discovered:
-                    discovered.append(project_path)
+                    if project_path not in discovered:
+                        discovered.append(project_path)
         except (PermissionError, OSError) as e:
             logger.warning(f"Error scanning {search_path}: {e}")
             continue
@@ -373,6 +386,7 @@ async def list_projects(
     """
     start_time = time.monotonic()
     cache_hit = False
+    used_legacy_discovery = False
     cache_last_fetched = None
 
     try:
@@ -432,9 +446,22 @@ async def list_projects(
                 )
         elif cache_manager is None:
             logger.info("CacheManager not available, using ProjectRegistry")
+            try:
+                discovered_paths = discover_projects()
+                logger.info(
+                    "Legacy discovery fallback found %d project(s)",
+                    len(discovered_paths),
+                )
+                for discovered_path in discovered_paths:
+                    all_projects.append(build_project_summary(discovered_path))
+                used_legacy_discovery = True
+            except Exception as discovery_error:
+                logger.warning(
+                    "Legacy discovery fallback failed: %s", discovery_error
+                )
 
         # If no cache hit or force refresh, fall back to ProjectRegistry
-        if not cache_hit or force_refresh:
+        if (not cache_hit and not used_legacy_discovery) or force_refresh:
             logger.info(
                 f"Cache MISS or force refresh - using ProjectRegistry "
                 f"(force={force_refresh})"
