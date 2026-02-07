@@ -93,7 +93,10 @@ def get_deployment_manager(
     response_model=DeploymentResponse,
     status_code=status.HTTP_200_OK,
     summary="Deploy artifact to project",
-    description="Deploy an artifact from collection to a project's .claude directory",
+    description=(
+        "Deploy an artifact from collection to a project's deployment profile root "
+        "(for example: .claude, .codex, or .gemini)."
+    ),
     responses={
         200: {"description": "Artifact deployed successfully"},
         400: {
@@ -115,8 +118,8 @@ async def deploy_artifact(
 ) -> DeploymentResponse:
     """Deploy an artifact to a project.
 
-    Copies an artifact from the collection to the project's .claude directory,
-    maintaining proper structure (skills/, commands/, agents/).
+    Copies an artifact from the collection to the selected deployment profile
+    root, maintaining proper structure (skills/, commands/, agents/).
 
     Args:
         request: Deployment request with artifact and project details
@@ -144,6 +147,14 @@ async def deploy_artifact(
                 detail=str(e),
             )
 
+        if request.all_profiles and request.deployment_profile_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "deployment_profile_id cannot be set when all_profiles=true"
+                ),
+            )
+
         # Parse artifact type
         try:
             artifact_type = ArtifactType(request.artifact_type)
@@ -159,23 +170,22 @@ async def deploy_artifact(
         )
         project_path = project_path.resolve()
 
-        # Check if project has .claude directory
-        claude_dir = project_path / ".claude"
-        if not claude_dir.exists():
-            logger.info(f"Creating .claude directory at {project_path}")
-            claude_dir.mkdir(parents=True, exist_ok=True)
-
         # Deploy artifact (non-interactive mode for API)
         # We'll need to handle overwrite without prompting
         try:
-            # For API, we need to check if artifact exists first
-            from skillmeat.storage.deployment import DeploymentTracker
+            existing_deployments = [
+                deployment
+                for deployment in deployment_mgr.list_deployments(
+                    project_path=project_path,
+                    profile_id=request.deployment_profile_id,
+                )
+                if (
+                    deployment.artifact_name == request.artifact_name
+                    and deployment.artifact_type == request.artifact_type
+                )
+            ]
 
-            existing_deployment = DeploymentTracker.get_deployment(
-                project_path, request.artifact_name, request.artifact_type
-            )
-
-            if existing_deployment:
+            if existing_deployments:
                 if not request.overwrite:
                     raise HTTPException(
                         status_code=status.HTTP_409_CONFLICT,
@@ -183,13 +193,18 @@ async def deploy_artifact(
                         "Set overwrite=true to replace.",
                     )
                 else:
-                    # Remove existing deployment first (to avoid interactive prompt)
-                    logger.info(f"Removing existing deployment before overwrite")
-                    deployment_mgr.undeploy(
-                        artifact_name=request.artifact_name,
-                        artifact_type=artifact_type,
-                        project_path=project_path,
-                    )
+                    for existing_deployment in existing_deployments:
+                        logger.info(
+                            "Removing existing deployment before overwrite "
+                            "(profile=%s)",
+                            existing_deployment.deployment_profile_id,
+                        )
+                        deployment_mgr.undeploy(
+                            artifact_name=request.artifact_name,
+                            artifact_type=artifact_type,
+                            project_path=project_path,
+                            profile_id=existing_deployment.deployment_profile_id,
+                        )
 
             # Perform deployment
             deployments = deployment_mgr.deploy_artifacts(
@@ -197,7 +212,10 @@ async def deploy_artifact(
                 collection_name=request.collection_name,
                 project_path=project_path,
                 artifact_type=artifact_type,
+                overwrite=request.overwrite,
                 dest_path=validated_dest_path,
+                profile_id=request.deployment_profile_id,
+                all_profiles=request.all_profiles,
             )
 
             if not deployments:
@@ -207,6 +225,12 @@ async def deploy_artifact(
                 )
 
             deployment = deployments[0]
+            deployed_profiles = sorted(
+                {
+                    deployed.deployment_profile_id or "claude_code"
+                    for deployed in deployments
+                }
+            )
 
             # Build response
             response = DeploymentResponse(
@@ -219,6 +243,10 @@ async def deploy_artifact(
                 project_path=str(project_path),
                 deployed_path=str(deployment.artifact_path),
                 deployed_at=deployment.deployed_at,
+                deployment_profile_id=deployment.deployment_profile_id,
+                deployed_profiles=deployed_profiles,
+                platform=deployment.platform,
+                profile_root_dir=deployment.profile_root_dir,
             )
 
             logger.info(
@@ -255,7 +283,7 @@ async def deploy_artifact(
     response_model=UndeployResponse,
     status_code=status.HTTP_200_OK,
     summary="Remove deployed artifact",
-    description="Remove an artifact from a project's .claude directory",
+    description="Remove an artifact from a project's deployment profile root",
     responses={
         200: {"description": "Artifact removed successfully"},
         400: {"model": ErrorResponse, "description": "Invalid request"},
@@ -271,7 +299,7 @@ async def undeploy_artifact(
 ) -> UndeployResponse:
     """Remove a deployed artifact from a project.
 
-    Removes the artifact from the project's .claude directory and updates
+    Removes the artifact from the project's selected deployment profile and updates
     the deployment tracking metadata.
 
     Args:
@@ -312,6 +340,7 @@ async def undeploy_artifact(
                 artifact_name=request.artifact_name,
                 artifact_type=artifact_type,
                 project_path=project_path,
+                profile_id=request.profile_id,
             )
 
             response = UndeployResponse(
@@ -370,11 +399,15 @@ async def list_deployments(
         default=None,
         description="Path to project directory (uses CWD if not specified)",
     ),
+    profile_id: Optional[str] = Query(
+        default=None,
+        description="Optional deployment profile ID filter",
+    ),
 ) -> DeploymentListResponse:
     """List all deployed artifacts in a project.
 
     Retrieves deployment metadata for all artifacts in the project's
-    .claude directory, including sync status.
+    profile roots, including sync status.
 
     Args:
         deployment_mgr: Deployment manager dependency
@@ -395,34 +428,47 @@ async def list_deployments(
         logger.info(f"Listing deployments for project: {resolved_path}")
 
         # Get deployments
-        deployments = deployment_mgr.list_deployments(project_path=resolved_path)
+        deployments = deployment_mgr.list_deployments(
+            project_path=resolved_path,
+            profile_id=profile_id,
+        )
 
         # Get sync status for each deployment
-        status_map = deployment_mgr.check_deployment_status(project_path=resolved_path)
+        status_map = deployment_mgr.check_deployment_status(
+            project_path=resolved_path,
+            profile_id=profile_id,
+        )
 
         # Convert to response format
         deployment_infos = []
+        deployments_by_profile = {}
         for deployment in deployments:
             key = f"{deployment.artifact_name}::{deployment.artifact_type}"
-            sync_status = status_map.get(key, "unknown")
+            profile_key = f"{key}::{deployment.deployment_profile_id or 'claude_code'}"
+            sync_status = status_map.get(profile_key, status_map.get(key, "unknown"))
 
-            deployment_infos.append(
-                DeploymentInfo(
-                    artifact_name=deployment.artifact_name,
-                    artifact_type=deployment.artifact_type,
-                    from_collection=deployment.from_collection,
-                    deployed_at=deployment.deployed_at,
-                    artifact_path=str(deployment.artifact_path),
-                    project_path=str(resolved_path),
-                    collection_sha=deployment.collection_sha,
-                    local_modifications=deployment.local_modifications,
-                    sync_status=sync_status,
-                )
+            info = DeploymentInfo(
+                artifact_name=deployment.artifact_name,
+                artifact_type=deployment.artifact_type,
+                from_collection=deployment.from_collection,
+                deployed_at=deployment.deployed_at,
+                artifact_path=str(deployment.artifact_path),
+                project_path=str(resolved_path),
+                collection_sha=deployment.collection_sha,
+                local_modifications=deployment.local_modifications,
+                sync_status=sync_status,
+                deployment_profile_id=deployment.deployment_profile_id,
+                platform=deployment.platform,
+                profile_root_dir=deployment.profile_root_dir,
             )
+            deployment_infos.append(info)
+            grouped_profile = deployment.deployment_profile_id or "claude_code"
+            deployments_by_profile.setdefault(grouped_profile, []).append(info)
 
         response = DeploymentListResponse(
             project_path=str(resolved_path),
             deployments=deployment_infos,
+            deployments_by_profile=deployments_by_profile,
             total=len(deployment_infos),
         )
 
