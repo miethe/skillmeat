@@ -1,15 +1,24 @@
 ---
-title: "PRD: Path-Based Tag Extraction"
-description: "Extract organizational metadata from artifact source paths during marketplace scanning with user review and approval workflow"
-audience: [ai-agents, developers]
-tags: [prd, planning, feature, marketplace, tagging, metadata]
+title: 'PRD: Path-Based Tag Extraction'
+description: Extract organizational metadata from artifact source paths during marketplace
+  scanning with user review and approval workflow
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- planning
+- feature
+- marketplace
+- tagging
+- metadata
 created: 2025-01-04
-updated: 2025-01-04
-category: "product-planning"
-status: draft
+updated: '2026-02-07'
+category: product-planning
+status: completed
 related:
-  - /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
-  - /docs/project_plans/PRDs/enhancements/marketplace-source-enhancements-v1.md
+- /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
+- /docs/project_plans/PRDs/enhancements/marketplace-source-enhancements-v1.md
 ---
 
 # PRD: Path-Based Tag Extraction

@@ -1,14 +1,22 @@
 ---
-title: "Implementation Plan: Clone-Based Artifact Indexing"
-description: "Hybrid sparse clone strategy to reduce GitHub API rate limit exhaustion during artifact metadata extraction"
-audience: [ai-agents, developers, product-managers]
-tags: [implementation, marketplace, optimization, github-integration]
+title: 'Implementation Plan: Clone-Based Artifact Indexing'
+description: Hybrid sparse clone strategy to reduce GitHub API rate limit exhaustion
+  during artifact metadata extraction
+audience:
+- ai-agents
+- developers
+- product-managers
+tags:
+- implementation
+- marketplace
+- optimization
+- github-integration
 created: 2026-01-24
-updated: 2026-01-24
-category: "product-planning"
-status: draft
+updated: '2026-02-07'
+category: product-planning
+status: completed
 related:
-  - /docs/project_plans/SPIKEs/clone-based-artifact-indexing-spike.md
+- /docs/project_plans/SPIKEs/clone-based-artifact-indexing-spike.md
 ---
 
 # Implementation Plan: Clone-Based Artifact Indexing

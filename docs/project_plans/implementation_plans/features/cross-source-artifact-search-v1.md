@@ -1,15 +1,23 @@
 ---
-title: "Implementation Plan: Cross-Source Artifact Search"
-description: "Phased implementation of cross-source artifact search with FTS5 and dual-mode frontend"
-audience: [ai-agents, developers]
-tags: [implementation, planning, marketplace, search, fts5]
+title: 'Implementation Plan: Cross-Source Artifact Search'
+description: Phased implementation of cross-source artifact search with FTS5 and dual-mode
+  frontend
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- planning
+- marketplace
+- search
+- fts5
 created: 2026-01-23
-updated: 2026-01-23
-category: "product-planning"
-status: draft
+updated: '2026-02-07'
+category: product-planning
+status: completed
 related:
-  - /docs/project_plans/PRDs/features/cross-source-artifact-search-v1.md
-  - /docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md
+- /docs/project_plans/PRDs/features/cross-source-artifact-search-v1.md
+- /docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md
 ---
 
 # Implementation Plan: Cross-Source Artifact Search

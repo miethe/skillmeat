@@ -1,15 +1,25 @@
 ---
-title: "PRD: Cross-Source Artifact Search"
-description: "Enable searching detected artifacts across all marketplace sources from a unified search interface"
-audience: [ai-agents, developers]
-tags: [prd, feature, marketplace, search, fts5, artifacts, cross-source]
+title: 'PRD: Cross-Source Artifact Search'
+description: Enable searching detected artifacts across all marketplace sources from
+  a unified search interface
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- feature
+- marketplace
+- search
+- fts5
+- artifacts
+- cross-source
 created: 2026-01-23
-updated: 2026-01-23
-category: "product-planning"
-status: draft
+updated: '2026-02-07'
+category: product-planning
+status: completed
 related:
-  - docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md
-  - docs/project_plans/PRDs/enhancements/configurable-frontmatter-caching-v1.md
+- docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md
+- docs/project_plans/PRDs/enhancements/configurable-frontmatter-caching-v1.md
 ---
 
 # Feature Brief & Metadata

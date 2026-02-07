@@ -1,16 +1,24 @@
 ---
-title: "PRD: Catalog Entry Modal Enhancement with File Contents Preview"
-description: "Add file browsing and content viewing to catalog entry modals for marketplace artifacts"
-audience: [ai-agents, developers]
-tags: [prd, marketplace, ui, content-preview, github]
+title: 'PRD: Catalog Entry Modal Enhancement with File Contents Preview'
+description: Add file browsing and content viewing to catalog entry modals for marketplace
+  artifacts
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- marketplace
+- ui
+- content-preview
+- github
 created: 2025-12-28
-updated: 2025-12-28
-category: "product-planning"
-status: draft
+updated: '2026-02-07'
+category: product-planning
+status: completed
 related:
-  - /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
-  - /skillmeat/web/components/CatalogEntryModal.tsx
-  - /skillmeat/web/components/entity/unified-entity-modal.tsx
+- /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
+- /skillmeat/web/components/CatalogEntryModal.tsx
+- /skillmeat/web/components/entity/unified-entity-modal.tsx
 ---
 
 # PRD: Catalog Entry Modal Enhancement with File Contents Preview

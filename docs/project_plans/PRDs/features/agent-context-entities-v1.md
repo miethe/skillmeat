@@ -1,16 +1,25 @@
 ---
-title: "PRD: Agent Context Entities"
-description: "Support for agent configuration files (CLAUDE.md, specs, rules) as first-class artifacts with full project lifecycle management from SkillMeat"
-audience: [ai-agents, developers]
-tags: [prd, planning, feature, agent-config, context-files, project-management]
+title: 'PRD: Agent Context Entities'
+description: Support for agent configuration files (CLAUDE.md, specs, rules) as first-class
+  artifacts with full project lifecycle management from SkillMeat
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- planning
+- feature
+- agent-config
+- context-files
+- project-management
 created: 2025-12-14
-updated: 2025-12-14
-category: "product-planning"
-status: draft
+updated: '2026-02-07'
+category: product-planning
+status: completed
 related:
-  - /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
-  - /docs/project_plans/PRDs/features/notification-system-v1.md
-  - /.claude/specs/README.md
+- /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
+- /docs/project_plans/PRDs/features/notification-system-v1.md
+- /.claude/specs/README.md
 ---
 
 # PRD: Agent Context Entities
