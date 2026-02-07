@@ -23,6 +23,7 @@ def test_search_memory_items_endpoint():
                 "confidence": 0.8,
                 "status": "candidate",
                 "share_scope": "project",
+                "project_name": "Project One",
             }
         ],
         "next_cursor": None,
@@ -34,6 +35,7 @@ def test_search_memory_items_endpoint():
     assert response.status_code == 200
     body = response.json()
     assert body["items"][0]["id"] == "mem-1"
+    assert body["items"][0]["project_name"] == "Project One"
 
 
 def test_list_global_memory_items_endpoint():
@@ -107,3 +109,11 @@ def test_apply_memory_extraction_endpoint():
         )
     assert response.status_code == 200
     assert response.json()["created"][0]["id"] == "mem-3"
+
+
+def test_preview_memory_extraction_invalid_profile_returns_422():
+    response = _client().post(
+        "/api/v1/memory-items/extract/preview?project_id=proj-1",
+        json={"text_corpus": "Decision: Use strict mode", "profile": "experimental"},
+    )
+    assert response.status_code == 422

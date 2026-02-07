@@ -29,7 +29,9 @@ The Memory & Context Intelligence System consists of three main components:
 | Metric | Target | Warning | Critical |
 |--------|--------|---------|----------|
 | Memory list query p95 | < 200ms | > 200ms | > 1000ms |
+| Global memory query p95 | < 300ms | > 300ms | > 1200ms |
 | Context pack generation p95 | < 500ms | > 500ms | > 1000ms |
+| Extraction preview/apply p95 | < 2s | > 2s | > 5s |
 | Error rate | < 1% | > 1% | > 5% |
 | Inbox size (candidate items) | < 100 | > 200 | N/A |
 | Memory operation failure rate | < 0.5% | > 0.5% | N/A |
@@ -58,7 +60,9 @@ Access the Memory & Context dashboard:
 
 Key panels:
 - Memory list query latency (p50, p95, p99)
+- Global memory query latency (p50, p95)
 - Context pack generation latency (p50, p95, p99)
+- Extraction pipeline latency (preview/apply)
 - Memory operations rate (creates, promotes, deprecates per minute)
 - Inbox size (candidate items)
 - Error rate by endpoint
@@ -70,6 +74,7 @@ All metrics are exported via Prometheus from the SkillMeat API server:
 
 - **API metrics**: `skillmeat_api_request_duration_seconds`, `skillmeat_api_requests_total`, `skillmeat_api_errors_total`
 - **Memory metrics**: `skillmeat_memory_items_total` (by status and type)
+- **Memory operation metrics**: `skillmeat_memory_operations_total`, `skillmeat_memory_operation_duration_seconds`
 - **Context pack metrics**: `skillmeat_context_pack_token_utilization`
 
 ### Alert Channels

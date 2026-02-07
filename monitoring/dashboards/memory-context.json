@@ -266,6 +266,48 @@
           }
         ],
         "description": "Recent failures by endpoint and error type (last 1 hour)"
+      },
+      {
+        "id": 13,
+        "title": "Global Memory Query Latency",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 40, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(skillmeat_api_request_duration_seconds_bucket{endpoint=\"/api/v1/memory-items/global\", method=\"GET\"}[5m]))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(skillmeat_api_request_duration_seconds_bucket{endpoint=\"/api/v1/memory-items/global\", method=\"GET\"}[5m]))",
+            "legendFormat": "p95"
+          }
+        ],
+        "yaxis": {
+          "format": "s",
+          "label": "Latency"
+        },
+        "description": "Tracks global memory list latency against PRD cross-project query targets"
+      },
+      {
+        "id": 14,
+        "title": "Extraction Pipeline Latency",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 40, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(skillmeat_api_request_duration_seconds_bucket{endpoint=~\"/api/v1/memory-items/extract/(preview|apply)\", method=\"POST\"}[5m]))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(skillmeat_api_request_duration_seconds_bucket{endpoint=~\"/api/v1/memory-items/extract/(preview|apply)\", method=\"POST\"}[5m]))",
+            "legendFormat": "p95"
+          }
+        ],
+        "yaxis": {
+          "format": "s",
+          "label": "Latency"
+        },
+        "description": "Extraction preview/apply endpoint latency for profile and replay performance checks"
       }
     ]
   }

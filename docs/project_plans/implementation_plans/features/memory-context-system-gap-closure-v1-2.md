@@ -4,7 +4,7 @@ description: "Execution plan to close functional, UX, API, CLI, extraction, and 
 audience: [ai-agents, developers, architects, product]
 tags: [implementation, planning, memory, context, gap-closure, v1.2]
 created: 2026-02-06
-updated: 2026-02-06
+updated: 2026-02-07
 category: "product-planning"
 status: draft
 related:
@@ -262,3 +262,79 @@ Delivery is split into 3 tracks:
 - G13 (Global memories IA): Backend global list/search support implemented; `/memories` page + sidebar IA deferred as UI-heavy follow-up.
 - G14 (Docs): Updated user/developer docs to reflect current memory/context behavior and APIs.
 - G15 (Flags): Memory/context endpoint gating removed; memory features deploy directly without runtime feature toggles.
+
+## 8. Remaining Gap Assessment vs PRD v1.1 (2026-02-07)
+
+This section compares current v1.2 execution status to PRD v1.1 (`/docs/project_plans/PRDs/features/memory-context-system-v1-1.md`) and tracks only remaining or not-yet-evidenced items.
+
+| Remaining Gap ID | PRD Reference | Gap | Evidence in Current Plan/Notes | Closure Needed |
+|---|---|---|---|---|
+| RG1 | FR-5.11, FR-5.13, FR-5.14 | Global memories discoverability UI still incomplete (`/memories`, sidebar group, project detail CTA). | Explicitly deferred in G13 execution note. | Implement UI routes/navigation and validate route stability. |
+| RG2 | FR-5.16 | Share-scope foundation (`private`, `project`, `global_candidate`) is not explicitly planned as a schema/API deliverable. | No explicit task in Phases 1-7. | Add schema + API + CLI/UI read/write path for `share_scope`. |
+| RG3 | FR-5.3 | Extraction profiles (`strict`, `balanced`, `aggressive`) are not explicitly contract-tested in plan acceptance. | Phase 5 covers extraction generally, but profile behavior is not acceptance-gated. | Add profile contract tests and documented defaults. |
+| RG4 | FR-5.15 | Global list/search ownership metadata is not explicitly acceptance-gated. | Phase 6 references global query support, but not metadata completeness checks. | Add response contract tests for ownership metadata in global endpoints. |
+| RG5 | FR-5.9 | CLI extraction parity requires `run`, `preview`, `apply`; `run` parity not explicitly acceptance-gated. | Execution notes mention extract tree; explicit subcommand parity not called out. | Add explicit CLI parity test + docs for all extraction subcommands. |
+| RG6 | Goals A-D, NFRs | Success metrics/instrumentation not fully operationalized (acceptance %, adoption, latency dashboards). | Testing matrix names perf category but lacks measurable release gate thresholds. | Add observability + release gate checklist tied to PRD metrics. |
+
+## 9. Updated Remaining-Gap Closure Plan (v1.2.1)
+
+**Target Timeline**: 2.5-3.5 weeks  
+**Goal**: Close RG1-RG6 and declare PRD v1.1 full closure with test-backed evidence.
+
+### Phase R1: Global Memories UI + IA Completion (1 week)
+
+#### Tasks
+- `R1.1` Implement `/memories` route with project picker and deep-link to `/projects/[id]/memory`.
+- `R1.2` Implement sidebar top-level `Projects` group with `Projects` and `Memories` entries.
+- `R1.3` Add project detail page CTA: `Open Memory`.
+- `R1.4` Add E2E tests for all three navigation entry points and legacy URL stability.
+
+#### Acceptance Criteria
+- FR-5.11/5.13/5.14 behaviors are visible in production UI.
+- Existing project memory URLs remain unchanged and functional.
+
+### Phase R2: Cross-Project Foundations Contract Completion (0.75 week)
+
+#### Tasks
+- `R2.1` Add/confirm `share_scope` on memory model with allowed values: `private`, `project`, `global_candidate`.
+- `R2.2` Add API contract coverage for global list/search ownership metadata (`project_id`, `project_name`, scope).
+- `R2.3` Add migration/backfill rules for existing memories (default `project` or explicit decided default).
+- `R2.4` Add CLI exposure for setting/filtering `share_scope` where applicable.
+
+#### Acceptance Criteria
+- FR-5.15 and FR-5.16 are validated by API integration tests and documented contracts.
+- No cross-project leakage occurs without explicit scope.
+
+### Phase R3: Extraction and CLI Parity Hardening (0.5 week)
+
+#### Tasks
+- `R3.1` Enforce extraction profile contract (`strict`, `balanced`, `aggressive`) with deterministic tests.
+- `R3.2` Ensure CLI extraction includes `run`, `preview`, and `apply` with automation-friendly output.
+- `R3.3` Document extraction profile semantics and recommended defaults.
+
+#### Acceptance Criteria
+- FR-5.3 and FR-5.9 are explicitly test-passing and documented.
+- Replay corpus confirms stable outputs per profile.
+
+### Phase R4: Metrics, Observability, and Closure Gate (0.5-0.75 week)
+
+#### Tasks
+- `R4.1` Add dashboard/report queries for PRD metrics:
+  - extraction acceptance/edit rate
+  - extraction latency p95
+  - global query latency p95
+  - global memories adoption and navigation time-to-target
+- `R4.2` Add release gate checklist mapping each PRD goal/FR to evidence artifact (test, dashboard, doc).
+- `R4.3` Run pilot measurement window and publish closure report.
+
+#### Acceptance Criteria
+- PRD Goal A-D metrics have measurable sources and threshold checks.
+- v1.1 PRD closure can be signed with objective evidence.
+
+## 10. Updated Definition of Done for v1.2 Closeout
+
+- RG1-RG6 are closed or explicitly deferred with approved issue IDs and owner/date.
+- PRD FR-5.1 through FR-5.16 each map to passing tests and docs references.
+- Global memories UX (`/memories` + sidebar + project CTA) is live.
+- Cross-project foundations include explicit `share_scope` + ownership metadata contracts.
+- Extraction profile behavior and CLI extract parity are validated in CI.
