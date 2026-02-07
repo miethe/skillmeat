@@ -83,6 +83,8 @@ from skillmeat.cache.models import (
     create_db_engine,
     create_tables,
 )
+from skillmeat.core.enums import Platform
+from skillmeat.core.path_resolver import DEFAULT_ARTIFACT_PATH_MAP
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -3120,6 +3122,67 @@ class DeploymentProfileRepository(BaseRepository[DeploymentProfile]):
             )
         finally:
             session.close()
+
+    def list_all_profiles(self, project_id: str) -> List[DeploymentProfile]:
+        """Alias for listing all deployment profiles for a project."""
+        return self.list_by_project(project_id)
+
+    def get_profile_by_platform(
+        self, project_id: str, platform: str | Platform
+    ) -> Optional[DeploymentProfile]:
+        """Get deployment profile by project and platform."""
+        platform_value = (
+            platform.value if isinstance(platform, Platform) else str(platform)
+        )
+        session = self._get_session()
+        try:
+            return (
+                session.query(DeploymentProfile)
+                .filter(
+                    DeploymentProfile.project_id == project_id,
+                    DeploymentProfile.platform == platform_value,
+                )
+                .order_by(DeploymentProfile.profile_id.asc())
+                .first()
+            )
+        finally:
+            session.close()
+
+    def get_primary_profile(self, project_id: str) -> Optional[DeploymentProfile]:
+        """Get primary deployment profile for a project.
+
+        Preference order:
+        1. Explicit Claude Code platform profile
+        2. Profile id == "claude_code"
+        3. First profile alphabetically
+        """
+        primary = self.get_profile_by_platform(project_id, Platform.CLAUDE_CODE)
+        if primary:
+            return primary
+
+        profile = self.read_by_project_and_profile_id(project_id, "claude_code")
+        if profile:
+            return profile
+
+        profiles = self.list_by_project(project_id)
+        return profiles[0] if profiles else None
+
+    def ensure_default_claude_profile(self, project_id: str) -> DeploymentProfile:
+        """Ensure a backward-compatible default Claude profile exists."""
+        primary = self.get_primary_profile(project_id)
+        if primary:
+            return primary
+
+        return self.create(
+            project_id=project_id,
+            profile_id="claude_code",
+            platform=Platform.CLAUDE_CODE.value,
+            root_dir=".claude",
+            artifact_path_map=DEFAULT_ARTIFACT_PATH_MAP.copy(),
+            config_filenames=[".skillmeat-project.toml"],
+            context_prefixes=[".claude/context/"],
+            supported_types=["skill", "command", "agent", "hook", "mcp"],
+        )
 
     def update(
         self,

@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 
 from skillmeat.cache.models import Project, create_db_engine, create_tables
 from skillmeat.cache.repositories import DeploymentProfileRepository
+from skillmeat.core.enums import Platform
 
 
 @pytest.fixture
@@ -91,6 +92,40 @@ def test_deployment_profile_repository_crud(temp_db, seeded_project):
 
     assert repo.delete(seeded_project, "codex-default") is True
     assert repo.read_by_project_and_profile_id(seeded_project, "codex-default") is None
+
+
+def test_profile_repository_queries_and_default_profile(temp_db, seeded_project):
+    """Repository helper methods should resolve primary and default profiles."""
+    repo = DeploymentProfileRepository(db_path=temp_db)
+
+    # No profiles initially: should auto-create default Claude profile
+    default_profile = repo.ensure_default_claude_profile(seeded_project)
+    assert default_profile.profile_id == "claude_code"
+    assert default_profile.platform == Platform.CLAUDE_CODE.value
+    assert default_profile.root_dir == ".claude"
+
+    # Add another profile and verify query helpers
+    repo.create(
+        project_id=seeded_project,
+        profile_id="codex-default",
+        platform=Platform.CODEX.value,
+        root_dir=".codex",
+        artifact_path_map={"skill": "skills"},
+        config_filenames=["CODEX.md"],
+        context_prefixes=[".codex/context/"],
+        supported_types=["skill"],
+    )
+
+    by_platform = repo.get_profile_by_platform(seeded_project, Platform.CODEX)
+    assert by_platform is not None
+    assert by_platform.profile_id == "codex-default"
+
+    all_profiles = repo.list_all_profiles(seeded_project)
+    assert len(all_profiles) == 2
+
+    primary = repo.get_primary_profile(seeded_project)
+    assert primary is not None
+    assert primary.profile_id == "claude_code"
 
 
 def test_phase1_schema_contains_profile_table_and_target_platforms_column(temp_db):
