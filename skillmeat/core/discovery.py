@@ -195,7 +195,7 @@ class DiscoveryResult(BaseModel):
 
 
 class ArtifactDiscoveryService:
-    """Service for discovering artifacts in .claude/ directories or collection artifacts.
+    """Service for discovering artifacts in project profile roots or collections.
 
     This service uses the shared artifact_detection module (Phase 1) for consistent
     artifact type detection across the SkillMeat codebase.
@@ -228,30 +228,52 @@ class ArtifactDiscoveryService:
 
     supported_types: List[str] = [t.value for t in ArtifactType.primary_types()]
 
-    def __init__(self, base_path: Path, scan_mode: str = "auto"):
+    def __init__(
+        self,
+        base_path: Path,
+        scan_mode: str = "auto",
+        profile_root_dir: Optional[str] = None,
+        profile_root_dirs: Optional[List[str]] = None,
+    ):
         """Initialize the discovery service.
 
         Args:
             base_path: Base path to scan (project root or collection root)
-            scan_mode: Scan mode - "project" (.claude/), "collection" (artifacts/), or "auto" (detect)
+            scan_mode: Scan mode - "project" (profile roots), "collection" (artifacts/), or "auto" (detect)
+            profile_root_dir: Optional explicit profile root (e.g., ".codex")
+            profile_root_dirs: Optional profile root priority list
         """
         self.base_path = base_path
         self.scan_mode = scan_mode
+        roots = profile_root_dirs or (
+            [profile_root_dir] if profile_root_dir else [".claude", ".codex", ".gemini", ".cursor"]
+        )
+        self.profile_root_dirs = [r for r in roots if r]
+        if not self.profile_root_dirs:
+            self.profile_root_dirs = [".claude"]
 
         # Auto-detect mode based on directory structure
         if scan_mode == "auto":
-            if (base_path / ".claude").exists():
+            existing_profile_root = next(
+                (root for root in self.profile_root_dirs if (base_path / root).exists()),
+                None,
+            )
+            if existing_profile_root:
                 self.scan_mode = "project"
-                self.artifacts_base = base_path / ".claude"
+                self.artifacts_base = base_path / existing_profile_root
             elif (base_path / "artifacts").exists():
                 self.scan_mode = "collection"
                 self.artifacts_base = base_path / "artifacts"
             else:
                 # Default to project mode
                 self.scan_mode = "project"
-                self.artifacts_base = base_path / ".claude"
+                self.artifacts_base = base_path / self.profile_root_dirs[0]
         elif scan_mode == "project":
-            self.artifacts_base = base_path / ".claude"
+            selected_root = next(
+                (root for root in self.profile_root_dirs if (base_path / root).exists()),
+                self.profile_root_dirs[0],
+            )
+            self.artifacts_base = base_path / selected_root
         else:  # collection
             self.artifacts_base = base_path / "artifacts"
 

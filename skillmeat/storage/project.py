@@ -17,6 +17,12 @@ else:
 
 import tomli_w
 
+from skillmeat.core.path_resolver import (
+    DEFAULT_PROFILE_ROOT_DIR,
+    DeploymentPathProfile,
+    resolve_config_path,
+)
+
 
 @dataclass
 class ProjectMetadata:
@@ -83,7 +89,10 @@ class ProjectMetadataStorage:
     METADATA_FILE = ".skillmeat-project.toml"
 
     @staticmethod
-    def get_metadata_file_path(project_path: Path) -> Path:
+    def get_metadata_file_path(
+        project_path: Path,
+        profile_root_dir: str = DEFAULT_PROFILE_ROOT_DIR,
+    ) -> Path:
         """Get path to project metadata file.
 
         Args:
@@ -92,10 +101,17 @@ class ProjectMetadataStorage:
         Returns:
             Path to .skillmeat-project.toml file
         """
-        return project_path / ".claude" / ProjectMetadataStorage.METADATA_FILE
+        return resolve_config_path(
+            project_path=project_path,
+            profile=DeploymentPathProfile(root_dir=profile_root_dir),
+            filename=ProjectMetadataStorage.METADATA_FILE,
+        )
 
     @staticmethod
-    def read_metadata(project_path: Path) -> Optional[ProjectMetadata]:
+    def read_metadata(
+        project_path: Path,
+        profile_root_dir: str = DEFAULT_PROFILE_ROOT_DIR,
+    ) -> Optional[ProjectMetadata]:
         """Read project metadata.
 
         Args:
@@ -104,7 +120,9 @@ class ProjectMetadataStorage:
         Returns:
             ProjectMetadata object or None if metadata file doesn't exist
         """
-        metadata_file = ProjectMetadataStorage.get_metadata_file_path(project_path)
+        metadata_file = ProjectMetadataStorage.get_metadata_file_path(
+            project_path, profile_root_dir=profile_root_dir
+        )
 
         if not metadata_file.exists():
             return None
@@ -115,14 +133,20 @@ class ProjectMetadataStorage:
         return ProjectMetadata.from_dict(data.get("project", {}))
 
     @staticmethod
-    def write_metadata(project_path: Path, metadata: ProjectMetadata) -> None:
+    def write_metadata(
+        project_path: Path,
+        metadata: ProjectMetadata,
+        profile_root_dir: str = DEFAULT_PROFILE_ROOT_DIR,
+    ) -> None:
         """Write project metadata.
 
         Args:
             project_path: Absolute path to project directory
             metadata: ProjectMetadata object to write
         """
-        metadata_file = ProjectMetadataStorage.get_metadata_file_path(project_path)
+        metadata_file = ProjectMetadataStorage.get_metadata_file_path(
+            project_path, profile_root_dir=profile_root_dir
+        )
 
         # Ensure .claude directory exists
         metadata_file.parent.mkdir(parents=True, exist_ok=True)
@@ -139,6 +163,7 @@ class ProjectMetadataStorage:
         project_path: Path,
         name: str,
         description: Optional[str] = None,
+        profile_root_dir: str = DEFAULT_PROFILE_ROOT_DIR,
     ) -> ProjectMetadata:
         """Create new project metadata.
 
@@ -157,7 +182,9 @@ class ProjectMetadataStorage:
             created_at=datetime.now(),
         )
 
-        ProjectMetadataStorage.write_metadata(project_path, metadata)
+        ProjectMetadataStorage.write_metadata(
+            project_path, metadata, profile_root_dir=profile_root_dir
+        )
         return metadata
 
     @staticmethod
@@ -165,6 +192,7 @@ class ProjectMetadataStorage:
         project_path: Path,
         name: Optional[str] = None,
         description: Optional[str] = None,
+        profile_root_dir: str = DEFAULT_PROFILE_ROOT_DIR,
     ) -> Optional[ProjectMetadata]:
         """Update existing project metadata.
 
@@ -176,7 +204,9 @@ class ProjectMetadataStorage:
         Returns:
             Updated ProjectMetadata object or None if metadata doesn't exist
         """
-        metadata = ProjectMetadataStorage.read_metadata(project_path)
+        metadata = ProjectMetadataStorage.read_metadata(
+            project_path, profile_root_dir=profile_root_dir
+        )
 
         if metadata is None:
             return None
@@ -190,11 +220,16 @@ class ProjectMetadataStorage:
 
         metadata.updated_at = datetime.now()
 
-        ProjectMetadataStorage.write_metadata(project_path, metadata)
+        ProjectMetadataStorage.write_metadata(
+            project_path, metadata, profile_root_dir=profile_root_dir
+        )
         return metadata
 
     @staticmethod
-    def delete_metadata(project_path: Path) -> bool:
+    def delete_metadata(
+        project_path: Path,
+        profile_root_dir: str = DEFAULT_PROFILE_ROOT_DIR,
+    ) -> bool:
         """Delete project metadata file.
 
         Args:
@@ -203,7 +238,9 @@ class ProjectMetadataStorage:
         Returns:
             True if metadata file was deleted, False if it didn't exist
         """
-        metadata_file = ProjectMetadataStorage.get_metadata_file_path(project_path)
+        metadata_file = ProjectMetadataStorage.get_metadata_file_path(
+            project_path, profile_root_dir=profile_root_dir
+        )
 
         if metadata_file.exists():
             metadata_file.unlink()
@@ -212,7 +249,10 @@ class ProjectMetadataStorage:
         return False
 
     @staticmethod
-    def exists(project_path: Path) -> bool:
+    def exists(
+        project_path: Path,
+        profile_root_dir: str = DEFAULT_PROFILE_ROOT_DIR,
+    ) -> bool:
         """Check if project metadata exists.
 
         Args:
@@ -221,5 +261,7 @@ class ProjectMetadataStorage:
         Returns:
             True if metadata file exists, False otherwise
         """
-        metadata_file = ProjectMetadataStorage.get_metadata_file_path(project_path)
+        metadata_file = ProjectMetadataStorage.get_metadata_file_path(
+            project_path, profile_root_dir=profile_root_dir
+        )
         return metadata_file.exists()

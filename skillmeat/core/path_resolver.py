@@ -17,6 +17,12 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PROFILE_ID = "claude_code"
 DEFAULT_PROFILE_ROOT_DIR = ".claude"
+DEFAULT_PROFILE_ROOTS = [
+    ".claude",
+    ".codex",
+    ".gemini",
+    ".cursor",
+]
 
 DEFAULT_ARTIFACT_PATH_MAP = {
     "skill": "skills",
@@ -91,9 +97,9 @@ def resolve_profile_root(project_path: Path, profile: Optional[Any] = None) -> P
         )
 
     raw_root = project_root / root_dir
+    _warn_if_symlink(raw_root, project_root, profile_cfg.profile_id)
     resolved_root = raw_root.resolve(strict=False)
     _ensure_inside_project(project_root, resolved_root, "profile root")
-    _warn_if_symlink(resolved_root, project_root, profile_cfg.profile_id)
     return resolved_root
 
 
