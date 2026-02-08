@@ -211,16 +211,16 @@ class TestCreateContextEntity:
         assert data["name"] == valid_progress_template["name"]
         assert data["entity_type"] == valid_progress_template["entity_type"]
 
-    def test_create_invalid_path_pattern_no_claude_prefix(self, client, valid_spec_file):
-        """Test creating entity with path pattern that doesn't start with .claude/."""
+    def test_create_invalid_path_pattern_no_profile_prefix(self, client, valid_spec_file):
+        """Test creating entity with path pattern outside supported profile roots."""
         invalid_data = valid_spec_file.copy()
-        invalid_data["path_pattern"] = "specs/test-spec.md"  # Missing .claude/ prefix
+        invalid_data["path_pattern"] = "specs/test-spec.md"
 
         response = client.post("/api/v1/context-entities", json=invalid_data)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
         data = response.json()
-        assert "path_pattern must start with '.claude/'" in str(data["detail"])
+        assert "must start with one of" in str(data["detail"])
 
     def test_create_invalid_path_pattern_traversal(self, client, valid_spec_file):
         """Test creating entity with path pattern containing '..' (path traversal)."""

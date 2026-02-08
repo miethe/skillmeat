@@ -11535,7 +11535,25 @@ def context_remove(name_or_id: str, force: bool):
 @click.option(
     "--dry-run", is_flag=True, help="Show what would be deployed without writing"
 )
-def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: bool):
+@click.option(
+    "--profile",
+    "profile_id",
+    default=None,
+    help="Deployment profile id to validate/deploy against (defaults to project primary profile)",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Force deployment when platform targeting does not match selected profile",
+)
+def context_deploy(
+    name_or_id: str,
+    to_project: str,
+    overwrite: bool,
+    dry_run: bool,
+    profile_id: Optional[str],
+    force: bool,
+):
     """Deploy context entity to a project directory.
 
     Write a context entity from your collection to a project's .claude/ directory
@@ -11585,47 +11603,13 @@ def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: b
     """
     api_base = "http://localhost:8080/api/v1"
 
-    def validate_deployment_path(project_path: Path, path_pattern: str) -> Path:
-        """Validate deployment path is safe - SECURITY CRITICAL.
-
-        Args:
-            project_path: Resolved project directory path
-            path_pattern: Path pattern from context entity
-
-        Returns:
-            Validated target path
-
-        Raises:
-            ValueError: If path is unsafe (traversal attempt or outside .claude/)
-        """
-        # Normalize paths
-        project = project_path.resolve()
-
-        # Combine project + path_pattern
-        target = (project / path_pattern).resolve()
-
-        # SECURITY CHECK 1: Target must be inside project directory
-        try:
-            target.relative_to(project)
-        except ValueError:
-            raise ValueError(
-                f"SECURITY: Deployment path escapes project directory: {target}"
-            )
-
-        # SECURITY CHECK 2: Target must be inside .claude/ directory
-        claude_dir = (project / ".claude").resolve()
-        try:
-            target.relative_to(claude_dir)
-        except ValueError:
-            # Allow CLAUDE.md and AGENTS.md in project root (special case for project_config)
-            if target.name in ("CLAUDE.md", "AGENTS.md") and target.parent == project:
-                pass  # OK - project root config files
-            else:
-                raise ValueError(
-                    f"SECURITY: Deployment path is not in .claude/ directory: {target}"
-                )
-
-        return target
+    from skillmeat.core.validators.context_path_validator import (
+        default_config_filenames_for_platform,
+        normalize_context_prefixes,
+        resolve_project_profile,
+        rewrite_path_for_profile,
+        validate_context_path,
+    )
 
     try:
         # Lookup entity by name or ID
@@ -11672,8 +11656,45 @@ def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: b
             console.print(f"[red]Error: Entity has no path_pattern defined[/red]")
             sys.exit(1)
 
+        # Resolve deployment profile to enforce profile-aware path and platform rules.
+        profile = resolve_project_profile(project_path, profile_id)
+        selected_path = rewrite_path_for_profile(path_pattern, profile)
+
+        # Enforce optional platform targeting for context entities.
+        target_platforms = entity.get("target_platforms")
+        if target_platforms:
+            profile_platform = (
+                profile.platform.value
+                if hasattr(profile.platform, "value")
+                else str(profile.platform)
+            )
+            if profile_platform not in target_platforms and not force:
+                console.print(
+                    "[red]Error: Entity target_platforms does not include selected profile platform.[/red]"
+                )
+                console.print(
+                    f"[dim]Entity targets: {', '.join(target_platforms)} | Selected: {profile_platform}[/dim]"
+                )
+                console.print("[dim]Use --force to override[/dim]")
+                sys.exit(1)
+
         try:
-            target_path = validate_deployment_path(project_path, path_pattern)
+            validated = validate_context_path(
+                selected_path,
+                project=project_path,
+                profile=profile,
+                profile_id=profile.profile_id,
+                allowed_prefixes=normalize_context_prefixes(profile),
+                config_filenames=(
+                    list(getattr(profile, "config_filenames", []) or [])
+                    + default_config_filenames_for_platform(
+                        getattr(profile, "platform", None)
+                    )
+                ),
+            )
+            target_path = validated.resolved_path
+            if target_path is None:
+                raise ValueError("SECURITY: Failed to resolve deployment target path")
         except ValueError as e:
             console.print(f"[red]{e}[/red]")
             sys.exit(1)
@@ -11685,7 +11706,10 @@ def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: b
                 f"[bold]Would deploy:[/bold] {entity.get('name')} ({entity.get('type')})"
             )
             console.print(f"[bold]To:[/bold] {target_path}")
-            console.print(f"[bold]Path pattern:[/bold] {path_pattern}")
+            console.print(f"[bold]Path pattern:[/bold] {selected_path}")
+            console.print(
+                f"[bold]Profile:[/bold] {profile.profile_id} ({getattr(profile.platform, 'value', profile.platform)})"
+            )
             if entity.get("category"):
                 console.print(f"[bold]Category:[/bold] {entity.get('category')}")
             console.print(f"\n[bold]Content preview:[/bold]")
