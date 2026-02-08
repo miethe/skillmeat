@@ -23,10 +23,71 @@ import json
 import logging
 import os
 import re
+import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Retry helpers
+# ---------------------------------------------------------------------------
+
+def _retry_with_backoff(fn, max_retries: int = 3, base_delay: float = 2.0, max_delay: float = 30.0):
+    """Execute fn with exponential backoff on rate-limit or transient errors.
+
+    Retries on rate limit (HTTP 429) and server errors (HTTP 5xx).
+    Does NOT retry on auth errors (401/403), bad request (400), or other client errors.
+
+    Returns the result of fn() or raises the last exception.
+    """
+    last_exc = None
+    for attempt in range(max_retries + 1):
+        try:
+            return fn()
+        except Exception as e:
+            last_exc = e
+            # Check if retryable
+            is_rate_limit = _is_rate_limit_error(e)
+            is_server_error = _is_server_error(e)
+
+            if not (is_rate_limit or is_server_error) or attempt >= max_retries:
+                raise
+
+            delay = min(base_delay * (2 ** attempt), max_delay)
+            logger.warning(
+                f"LLM call failed (attempt {attempt + 1}/{max_retries + 1}): {e}. "
+                f"Retrying in {delay:.1f}s..."
+            )
+            time.sleep(delay)
+    raise last_exc
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    """Check if exception is a rate limit error (HTTP 429)."""
+    # Anthropic: anthropic.RateLimitError
+    # OpenAI: openai.RateLimitError
+    # Generic: check status_code attribute
+    exc_name = type(exc).__name__
+    if "RateLimit" in exc_name:
+        return True
+    status = getattr(exc, "status_code", None)
+    if status == 429:
+        return True
+    return False
+
+
+def _is_server_error(exc: Exception) -> bool:
+    """Check if exception is a server error (HTTP 5xx)."""
+    exc_name = type(exc).__name__
+    if "InternalServer" in exc_name or "ServiceUnavailable" in exc_name:
+        return True
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int) and 500 <= status < 600:
+        return True
+    return False
+
 
 # ---------------------------------------------------------------------------
 # Shared classification prompt
@@ -170,6 +231,83 @@ def _parse_classification_response(
 
 
 # ---------------------------------------------------------------------------
+# Usage tracking
+# ---------------------------------------------------------------------------
+
+class LLMUsageStats:
+    """Track API call statistics for LLM classification."""
+
+    def __init__(self):
+        self.total_calls = 0
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
+        self.total_candidates = 0
+        self.failed_calls = 0
+
+    def record_call(self, input_tokens: int = 0, output_tokens: int = 0, candidates: int = 0):
+        self.total_calls += 1
+        self.total_input_tokens += input_tokens
+        self.total_output_tokens += output_tokens
+        self.total_candidates += candidates
+
+    def record_failure(self):
+        self.failed_calls += 1
+
+    def estimated_cost(self, provider: str, model: str) -> float:
+        """Estimate cost based on provider pricing.
+
+        Approximate rates (per 1M tokens):
+        - Claude Haiku: $0.80 input, $4.00 output
+        - Claude Sonnet: $3.00 input, $15.00 output
+        - GPT-4o-mini: $0.15 input, $0.60 output
+        - Ollama/local: $0.00 (free)
+        """
+        # Pricing per 1M tokens (input, output)
+        pricing = {
+            "anthropic": {
+                "claude-haiku-4-5-20251001": (0.80, 4.00),
+                "claude-sonnet-4-5-20250929": (3.00, 15.00),
+            },
+            "openai": {
+                "gpt-4o-mini": (0.15, 0.60),
+                "gpt-4o": (2.50, 10.00),
+            },
+            "ollama": {},  # Free
+            "openai-compatible": {},  # Varies, assume free for local
+        }
+
+        provider_pricing = pricing.get(provider, {})
+        model_pricing = provider_pricing.get(model)
+
+        if not model_pricing:
+            return 0.0
+
+        input_rate, output_rate = model_pricing
+        input_cost = (self.total_input_tokens / 1_000_000) * input_rate
+        output_cost = (self.total_output_tokens / 1_000_000) * output_rate
+        return input_cost + output_cost
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "total_calls": self.total_calls,
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
+            "total_candidates": self.total_candidates,
+            "failed_calls": self.failed_calls,
+        }
+
+    def summary(self, provider: str = "", model: str = "") -> str:
+        cost = self.estimated_cost(provider, model)
+        cost_str = f", est_cost=${cost:.4f}" if cost > 0 else ""
+        return (
+            f"LLM stats: {self.total_calls} calls, "
+            f"{self.total_candidates} candidates, "
+            f"{self.total_input_tokens} in/{self.total_output_tokens} out tokens, "
+            f"{self.failed_calls} failures{cost_str}"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Abstract base
 # ---------------------------------------------------------------------------
 
@@ -219,6 +357,7 @@ class AnthropicClassifier(LLMClassifier):
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
         self.model = model
         self._client = None  # Lazy init
+        self.usage_stats = LLMUsageStats()
 
     def _get_client(self):
         """Get or create Anthropic client (lazy initialization)."""
@@ -258,18 +397,26 @@ class AnthropicClassifier(LLMClassifier):
         for start in range(0, len(contents), batch_size):
             chunk = contents[start : start + batch_size]
             try:
-                response = client.messages.create(
-                    model=self.model,
-                    max_tokens=1024,
-                    system=CLASSIFICATION_SYSTEM_PROMPT,
-                    messages=[{"role": "user", "content": _build_user_prompt(chunk)}],
+                response = _retry_with_backoff(
+                    lambda: client.messages.create(
+                        model=self.model,
+                        max_tokens=1024,
+                        system=CLASSIFICATION_SYSTEM_PROMPT,
+                        messages=[{"role": "user", "content": _build_user_prompt(chunk)}],
+                    )
                 )
+                # Track usage
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                self.usage_stats.record_call(input_tokens, output_tokens, len(chunk))
+
                 raw_text = response.content[0].text if response.content else ""
                 all_results.extend(
                     _parse_classification_response(raw_text, len(chunk))
                 )
             except Exception as e:
                 logger.warning(f"Anthropic classify_batch failed for chunk: {e}")
+                self.usage_stats.record_failure()
                 all_results.extend([None] * len(chunk))
 
         return all_results
@@ -297,6 +444,7 @@ class OpenAIClassifier(LLMClassifier):
         self.model = model
         self.base_url = base_url
         self._client = None
+        self.usage_stats = LLMUsageStats()
 
     def _get_client(self):
         if self._client is None and self.api_key:
@@ -324,21 +472,26 @@ class OpenAIClassifier(LLMClassifier):
     def provider_name(self) -> str:
         return "openai"
 
-    def _call_chat(self, chunk: List[str]) -> str:
-        """Make a single Chat Completions call and return raw text."""
+    def _call_chat(self, chunk: List[str]) -> tuple[str, int, int]:
+        """Make a single Chat Completions call and return raw text with token counts."""
         client = self._get_client()
         if client is None:
-            return ""
-        response = client.chat.completions.create(
-            model=self.model,
-            temperature=0.0,
-            max_tokens=1024,
-            messages=[
-                {"role": "system", "content": CLASSIFICATION_SYSTEM_PROMPT},
-                {"role": "user", "content": _build_user_prompt(chunk)},
-            ],
+            return "", 0, 0
+        response = _retry_with_backoff(
+            lambda: client.chat.completions.create(
+                model=self.model,
+                temperature=0.0,
+                max_tokens=1024,
+                messages=[
+                    {"role": "system", "content": CLASSIFICATION_SYSTEM_PROMPT},
+                    {"role": "user", "content": _build_user_prompt(chunk)},
+                ],
+            )
         )
-        return response.choices[0].message.content or "" if response.choices else ""
+        input_tokens = getattr(response.usage, 'prompt_tokens', 0) if response.usage else 0
+        output_tokens = getattr(response.usage, 'completion_tokens', 0) if response.usage else 0
+        raw_text = response.choices[0].message.content or "" if response.choices else ""
+        return raw_text, input_tokens, output_tokens
 
     def classify_batch(
         self, contents: List[str], batch_size: int = DEFAULT_BATCH_SIZE,
@@ -354,12 +507,14 @@ class OpenAIClassifier(LLMClassifier):
         for start in range(0, len(contents), batch_size):
             chunk = contents[start : start + batch_size]
             try:
-                raw_text = self._call_chat(chunk)
+                raw_text, input_tokens, output_tokens = self._call_chat(chunk)
+                self.usage_stats.record_call(input_tokens, output_tokens, len(chunk))
                 all_results.extend(
                     _parse_classification_response(raw_text, len(chunk))
                 )
             except Exception as e:
                 logger.warning(f"OpenAI classify_batch failed for chunk: {e}")
+                self.usage_stats.record_failure()
                 all_results.extend([None] * len(chunk))
 
         return all_results
@@ -391,6 +546,7 @@ class OllamaClassifier(LLMClassifier):
         if not self.base_url.endswith("/v1"):
             self.base_url += "/v1"
         self._client = None
+        self.usage_stats = LLMUsageStats()
 
     def _get_client(self):
         if self._client is None:
@@ -437,15 +593,22 @@ class OllamaClassifier(LLMClassifier):
         for start in range(0, len(contents), batch_size):
             chunk = contents[start : start + batch_size]
             try:
-                response = client.chat.completions.create(
-                    model=self.model,
-                    temperature=0.0,
-                    max_tokens=1024,
-                    messages=[
-                        {"role": "system", "content": CLASSIFICATION_SYSTEM_PROMPT},
-                        {"role": "user", "content": _build_user_prompt(chunk)},
-                    ],
+                response = _retry_with_backoff(
+                    lambda: client.chat.completions.create(
+                        model=self.model,
+                        temperature=0.0,
+                        max_tokens=1024,
+                        messages=[
+                            {"role": "system", "content": CLASSIFICATION_SYSTEM_PROMPT},
+                            {"role": "user", "content": _build_user_prompt(chunk)},
+                        ],
+                    )
                 )
+                # Track usage
+                input_tokens = getattr(response.usage, 'prompt_tokens', 0) if response.usage else 0
+                output_tokens = getattr(response.usage, 'completion_tokens', 0) if response.usage else 0
+                self.usage_stats.record_call(input_tokens, output_tokens, len(chunk))
+
                 raw_text = (
                     response.choices[0].message.content or ""
                     if response.choices
@@ -456,6 +619,7 @@ class OllamaClassifier(LLMClassifier):
                 )
             except Exception as e:
                 logger.warning(f"Ollama classify_batch failed for chunk: {e}")
+                self.usage_stats.record_failure()
                 all_results.extend([None] * len(chunk))
 
         return all_results
@@ -485,6 +649,7 @@ class OpenAICompatibleClassifier(LLMClassifier):
         self.model = model
         self.base_url = base_url.rstrip("/")
         self._client = None
+        self.usage_stats = LLMUsageStats()
 
     def _get_client(self):
         if self._client is None:
@@ -526,15 +691,22 @@ class OpenAICompatibleClassifier(LLMClassifier):
         for start in range(0, len(contents), batch_size):
             chunk = contents[start : start + batch_size]
             try:
-                response = client.chat.completions.create(
-                    model=self.model,
-                    temperature=0.0,
-                    max_tokens=1024,
-                    messages=[
-                        {"role": "system", "content": CLASSIFICATION_SYSTEM_PROMPT},
-                        {"role": "user", "content": _build_user_prompt(chunk)},
-                    ],
+                response = _retry_with_backoff(
+                    lambda: client.chat.completions.create(
+                        model=self.model,
+                        temperature=0.0,
+                        max_tokens=1024,
+                        messages=[
+                            {"role": "system", "content": CLASSIFICATION_SYSTEM_PROMPT},
+                            {"role": "user", "content": _build_user_prompt(chunk)},
+                        ],
+                    )
                 )
+                # Track usage
+                input_tokens = getattr(response.usage, 'prompt_tokens', 0) if response.usage else 0
+                output_tokens = getattr(response.usage, 'completion_tokens', 0) if response.usage else 0
+                self.usage_stats.record_call(input_tokens, output_tokens, len(chunk))
+
                 raw_text = (
                     response.choices[0].message.content or ""
                     if response.choices
@@ -547,6 +719,7 @@ class OpenAICompatibleClassifier(LLMClassifier):
                 logger.warning(
                     f"OpenAI-compatible classify_batch failed for chunk: {e}"
                 )
+                self.usage_stats.record_failure()
                 all_results.extend([None] * len(chunk))
 
         return all_results

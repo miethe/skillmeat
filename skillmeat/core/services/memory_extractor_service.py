@@ -578,6 +578,10 @@ class MemoryExtractorService:
         # Call LLM classifier
         llm_results = self._semantic_classify_batch(contents, self._classifier)
 
+        # Track success/fallback counts
+        llm_success = 0
+        llm_fallback = 0
+
         # Apply LLM results to candidates
         for candidate, llm_result in zip(candidates, llm_results):
             if llm_result:
@@ -594,12 +598,26 @@ class MemoryExtractorService:
                     "reasoning", ""
                 )
                 candidate["provenance"]["llm_provider"] = self._classifier.provider_name
+                llm_success += 1
             else:
                 # LLM failed, keep heuristic values
                 if "provenance" not in candidate:
                     candidate["provenance"] = {}
 
                 candidate["provenance"]["classification_method"] = "heuristic"
+                llm_fallback += 1
+
+        logger.info(
+            f"LLM classification complete: {llm_success}/{len(candidates)} classified, "
+            f"{llm_fallback} fell back to heuristic (provider={self._classifier.provider_name})"
+        )
+
+        # Log usage stats
+        if hasattr(self._classifier, 'usage_stats'):
+            logger.info(self._classifier.usage_stats.summary(
+                provider=self._classifier.provider_name,
+                model=getattr(self._classifier, 'model', ''),
+            ))
 
     def _semantic_classify_batch(
         self,
