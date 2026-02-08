@@ -437,3 +437,306 @@ def test_preview_jsonl_with_tool_use(seeded_db_path):
     assert "validated at startup" in all_content or any(
         "validated at startup" in c["content"] for c in candidates
     )
+
+
+# ============================================================================
+# Phase 2 Tests: Provenance (MEX-2.1)
+# ============================================================================
+
+
+def test_provenance_includes_git_branch(seeded_db_path):
+    """Git branch from JSONL message should appear in candidate provenance."""
+    messages = [
+        {
+            "type": "human",
+            "content": "Decision: Use feature flags for gradual rollouts.",
+            "uuid": "msg-branch-test",
+            "timestamp": "2024-01-10T00:00:00Z",
+            "gitBranch": "feat/rollout-system",
+        }
+    ]
+
+    jsonl_corpus = "\n".join(json.dumps(msg) for msg in messages)
+
+    service = MemoryExtractorService(db_path=seeded_db_path)
+    candidates = service.preview(
+        project_id=PROJECT_ID,
+        text_corpus=jsonl_corpus,
+        profile="balanced",
+        min_confidence=0.0,
+    )
+
+    assert len(candidates) >= 1
+    prov = candidates[0]["provenance"]
+    assert prov["git_branch"] == "feat/rollout-system"
+
+
+def test_provenance_git_branch_missing_graceful(seeded_db_path):
+    """Missing gitBranch field should result in empty string, not error."""
+    messages = [
+        {
+            "type": "human",
+            "content": "Decision: Use connection pooling for database access.",
+            "uuid": "msg-no-branch",
+            "timestamp": "2024-01-10T00:00:00Z",
+            # gitBranch field intentionally omitted
+        }
+    ]
+
+    jsonl_corpus = "\n".join(json.dumps(msg) for msg in messages)
+
+    service = MemoryExtractorService(db_path=seeded_db_path)
+    candidates = service.preview(
+        project_id=PROJECT_ID,
+        text_corpus=jsonl_corpus,
+        profile="balanced",
+        min_confidence=0.0,
+    )
+
+    assert len(candidates) >= 1
+    prov = candidates[0]["provenance"]
+    assert "git_branch" in prov
+    assert prov["git_branch"] == ""
+
+
+def test_provenance_all_fields_present(seeded_db_path):
+    """Verify complete provenance structure has all expected fields."""
+    messages = [
+        {
+            "type": "assistant",
+            "content": "Constraint: Rate limit is 100 requests per minute.",
+            "uuid": "msg-complete",
+            "timestamp": "2024-01-10T12:00:00Z",
+            "sessionId": "sess-complete-test",
+            "gitBranch": "main",
+        }
+    ]
+
+    jsonl_corpus = "\n".join(json.dumps(msg) for msg in messages)
+
+    service = MemoryExtractorService(db_path=seeded_db_path)
+    candidates = service.preview(
+        project_id=PROJECT_ID,
+        text_corpus=jsonl_corpus,
+        profile="balanced",
+        min_confidence=0.0,
+        run_id="run-abc",
+        session_id="sess-complete-test",
+        commit_sha="abc123def",
+    )
+
+    assert len(candidates) >= 1
+    prov = candidates[0]["provenance"]
+
+    # Base fields
+    assert prov["source"] == "memory_extraction"
+    assert prov["run_id"] == "run-abc"
+    assert prov["session_id"] == "sess-complete-test"
+    assert prov["commit_sha"] == "abc123def"
+    assert prov["workflow_stage"] == "extraction"
+
+    # JSONL-specific fields
+    assert prov["message_uuid"] == "msg-complete"
+    assert prov["message_role"] == "assistant"
+    assert prov["timestamp"] == "2024-01-10T12:00:00Z"
+    assert prov["git_branch"] == "main"
+    assert prov["format"] == "jsonl"
+
+
+# ============================================================================
+# Phase 2 Tests: Scoring (MEX-2.2)
+# ============================================================================
+
+
+def test_score_learning_signal_boost(seeded_db_path):
+    """Lines with learning indicators should score higher than generic lines."""
+    service = MemoryExtractorService(db_path=seeded_db_path)
+
+    learning_line = "I learned that async handlers improve throughput by 40%."
+    generic_line = "Async handlers improve throughput by 40%."
+
+    learning_score = service._score(learning_line, "learning", "balanced")
+    generic_score = service._score(generic_line, "learning", "balanced")
+
+    assert learning_score > generic_score
+    # Learning boost is +0.05
+    assert abs(learning_score - generic_score - 0.05) < 0.01
+
+
+def test_score_specificity_signal_boost(seeded_db_path):
+    """Lines with file paths/function names should score higher."""
+    service = MemoryExtractorService(db_path=seeded_db_path)
+
+    specific_line = "Gotcha: config.py:42 validate_settings() throws on missing keys."
+    generic_line = "Gotcha: validation throws on missing configuration keys."
+
+    specific_score = service._score(specific_line, "gotcha", "balanced")
+    generic_score = service._score(generic_line, "gotcha", "balanced")
+
+    assert specific_score > generic_score
+    # Specificity boost is +0.03
+    assert abs(specific_score - generic_score - 0.03) < 0.01
+
+
+def test_score_question_penalty(seeded_db_path):
+    """Lines ending with '?' should score lower than assertions."""
+    service = MemoryExtractorService(db_path=seeded_db_path)
+
+    question_line = "Should we use Redis for caching API responses?"
+    assertion_line = "We should use Redis for caching API responses."
+
+    question_score = service._score(question_line, "decision", "balanced")
+    assertion_score = service._score(assertion_line, "decision", "balanced")
+
+    assert question_score < assertion_score
+    # Question penalty is -0.03
+    assert abs(assertion_score - question_score - 0.03) < 0.01
+
+
+def test_score_vague_language_penalty(seeded_db_path):
+    """Lines with vague words should score lower than definitive versions."""
+    service = MemoryExtractorService(db_path=seeded_db_path)
+
+    vague_line = "We might need to use connection pooling maybe for performance."
+    definitive_line = "We need to use connection pooling for performance."
+
+    vague_score = service._score(vague_line, "constraint", "balanced")
+    definitive_score = service._score(definitive_line, "constraint", "balanced")
+
+    assert vague_score < definitive_score
+    # Vague penalty is -0.04
+    assert abs(definitive_score - vague_score - 0.04) < 0.01
+
+
+def test_score_combined_signals(seeded_db_path):
+    """Lines with multiple signals should stack bonuses."""
+    service = MemoryExtractorService(db_path=seeded_db_path)
+
+    # Has learning signal (+0.05) + specificity (+0.03 for path and function)
+    combined_line = "I learned that cache.py:get_or_set() reduces DB queries by 60%."
+    baseline_line = "Cache reduces database queries by sixty percent."
+
+    combined_score = service._score(combined_line, "learning", "balanced")
+    baseline_score = service._score(baseline_line, "learning", "balanced")
+
+    assert combined_score > baseline_score
+    # Combined boost should be at least +0.05 (learning) + 0.03 (specificity) = +0.08
+    assert (combined_score - baseline_score) >= 0.07
+
+
+def test_score_distinct_values(seeded_db_path):
+    """Diverse lines should produce varied scores (>=8 distinct values)."""
+    service = MemoryExtractorService(db_path=seeded_db_path)
+
+    test_lines = [
+        # Learning + specificity + numbers (very high)
+        "I learned that api.py:rate_limit() allows 100 req/min for authenticated users.",
+        # Decision + specificity + numbers (high)
+        "Decision: Use PostgreSQL 14+ for advanced indexing features with p95 < 50ms.",
+        # Constraint + specificity (medium-high)
+        "Constraint: config.toml must define timeout_ms setting properly.",
+        # Generic decision with vague word (lower)
+        "Decision: Maybe use Redis for session storage.",
+        # Learning only (medium)
+        "I discovered that connection pooling reduces database latency significantly.",
+        # Gotcha without specificity (medium-low)
+        "Gotcha: Beware of timezone issues in datetime parsing operations.",
+        # Question without learning (low due to penalty)
+        "Should we use async handlers for API endpoints?",
+        # Vague language stacked penalties (very low)
+        "Maybe we could probably use caching somehow for performance.",
+        # Learning + question (mixed)
+        "I learned that caching helps, but should we use Redis for this?",
+        # Very short generic (lowest)
+        "Use environment variables.",
+        # Constraint without specificity
+        "Constraint: All async functions must have timeouts configured.",
+        # Style rule (unique category)
+        "Style rule: prefer explicit type hints for public APIs.",
+    ]
+
+    scores = [service._score(line, service._classify_type(line), "balanced") for line in test_lines]
+    distinct_scores = len(set(scores))
+
+    # Must have at least 8 distinct score values
+    assert distinct_scores >= 8, f"Only {distinct_scores} distinct scores: {sorted(set(scores))}"
+
+
+# ============================================================================
+# Phase 2 Tests: Backward Compatibility (MEX-2.3)
+# ============================================================================
+
+
+def test_plaintext_fallback_format_field(seeded_db_path):
+    """Plain text input should produce candidates with format='plain_text'."""
+    corpus = """
+    Decision: Use async/await for I/O-bound operations.
+    Constraint: All async functions must have timeouts.
+    """
+
+    service = MemoryExtractorService(db_path=seeded_db_path)
+    candidates = service.preview(
+        project_id=PROJECT_ID,
+        text_corpus=corpus,
+        profile="balanced",
+        min_confidence=0.0,
+    )
+
+    assert len(candidates) >= 2
+    for candidate in candidates:
+        assert candidate["provenance"]["format"] == "plain_text"
+
+
+def test_jsonl_format_field(seeded_db_path):
+    """Valid JSONL input should produce candidates with format='jsonl'."""
+    messages = [
+        {
+            "type": "human",
+            "content": "Decision: Use structured logging for production.",
+            "uuid": "msg-format-test",
+            "timestamp": "2024-01-15T00:00:00Z",
+        }
+    ]
+
+    jsonl_corpus = "\n".join(json.dumps(msg) for msg in messages)
+
+    service = MemoryExtractorService(db_path=seeded_db_path)
+    candidates = service.preview(
+        project_id=PROJECT_ID,
+        text_corpus=jsonl_corpus,
+        profile="balanced",
+        min_confidence=0.0,
+    )
+
+    assert len(candidates) >= 1
+    for candidate in candidates:
+        assert candidate["provenance"]["format"] == "jsonl"
+
+
+def test_invalid_json_fallback(seeded_db_path):
+    """Input with invalid JSON lines should fall back to plain-text mode."""
+    corpus = """
+    {invalid json}
+    {"partial": json without closing brace
+    Decision: Use message queues for async processing.
+    Constraint: Queue depth must not exceed 10000 messages.
+    """
+
+    service = MemoryExtractorService(db_path=seeded_db_path)
+    candidates = service.preview(
+        project_id=PROJECT_ID,
+        text_corpus=corpus,
+        profile="balanced",
+        min_confidence=0.0,
+    )
+
+    # Should extract candidates using plain-text fallback
+    assert len(candidates) >= 2
+
+    # All should have plain_text format
+    for candidate in candidates:
+        assert candidate["provenance"]["format"] == "plain_text"
+
+    # Verify actual content was extracted
+    all_content = " ".join(c["content"] for c in candidates)
+    assert "message queues" in all_content or any("message queues" in c["content"] for c in candidates)

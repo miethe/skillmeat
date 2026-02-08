@@ -61,7 +61,16 @@ class MemoryExtractorService:
         session_id: Optional[str] = None,
         commit_sha: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Extract candidate memory items without persisting."""
+        """Extract candidate memory items without persisting.
+
+        Supports two input formats:
+        1. JSONL: Structured message logs with metadata (format='jsonl')
+        2. Plain text: Line-based extraction (format='plain_text')
+
+        Automatically detects format and falls back to plain-text if JSONL
+        parsing fails. Provenance includes 'format' field indicating which
+        extraction path was used.
+        """
         started = time.perf_counter()
         status_label = "success"
         self._validate_profile(profile)
@@ -296,14 +305,16 @@ class MemoryExtractorService:
         """Extract content blocks from JSONL message structures.
 
         Filters messages by type, skips metadata/tool results, and extracts
-        text content blocks with provenance metadata.
+        text content blocks with provenance metadata including git_branch.
 
         Args:
             messages: List of message dictionaries from run log JSONL
 
         Returns:
             List of (content_text, provenance_metadata) tuples for non-empty
-            content >= 20 characters
+            content >= 20 characters. Provenance dict includes:
+            - message_uuid, message_role, timestamp, session_id (standard)
+            - git_branch (from message.gitBranch, empty string if missing)
         """
         # Message types to skip (noise)
         skip_types = {"progress", "file-history-snapshot", "system", "result"}
@@ -382,6 +393,22 @@ class MemoryExtractorService:
 
     @staticmethod
     def _score(line: str, mem_type: str, profile: str) -> float:
+        """Calculate confidence score for a candidate line.
+
+        Base scoring:
+        - Start: 0.58 + length bonus (max 0.18)
+        - Type bonus: decision/constraint +0.08, gotcha/style_rule +0.05
+        - Profile adjustment: strict -0.08, balanced 0.0, aggressive +0.08
+
+        Content quality signals:
+        - First-person learning (+0.05): "learned that", "discovered that", etc.
+        - Specificity (+0.03): file paths, function names, numbers
+        - Question penalty (-0.03): ends with '?' or starts with question word
+        - Vague language (-0.04): "maybe", "probably", "might", etc.
+
+        Returns:
+            Float confidence score clamped to [0.0, 0.98]
+        """
         base = 0.58
         base += min(len(line) / 200.0, 0.18)
         if mem_type in {"decision", "constraint"}:
