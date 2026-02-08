@@ -740,3 +740,284 @@ def test_invalid_json_fallback(seeded_db_path):
     # Verify actual content was extracted
     all_content = " ".join(c["content"] for c in candidates)
     assert "message queues" in all_content or any("message queues" in c["content"] for c in candidates)
+
+
+# ============================================================================
+# Phase 3 Tests: LLM Integration (MEX-3.5)
+# ============================================================================
+
+
+def test_preview_without_llm(seeded_db_path):
+    """Default preview (no LLM) sets classification_method=heuristic."""
+    service = MemoryExtractorService(db_path=seeded_db_path, use_llm=False)
+    corpus = "Decision: Use Redis for distributed caching across services."
+
+    candidates = service.preview(
+        project_id=PROJECT_ID,
+        text_corpus=corpus,
+        profile="balanced",
+        min_confidence=0.0,
+    )
+
+    assert len(candidates) >= 1
+    for candidate in candidates:
+        assert candidate["provenance"]["classification_method"] == "heuristic"
+        assert "llm_reasoning" not in candidate["provenance"]
+        assert "llm_provider" not in candidate["provenance"]
+
+
+def test_preview_with_mock_llm(seeded_db_path):
+    """Preview with mocked LLM overrides type and confidence."""
+    from unittest.mock import MagicMock, patch
+    from skillmeat.core.services.llm_classifier import ClassificationResult
+
+    # Don't enable LLM in constructor - we'll mock _semantic_classify_batch directly
+    service = MemoryExtractorService(db_path=seeded_db_path, use_llm=False)
+
+    # Return a high-confidence "gotcha" classification from the batch method
+    llm_result_dict = {
+        "type": "gotcha",
+        "confidence": 0.95,
+        "reasoning": "Identifies a specific pitfall with clear context"
+    }
+
+    # Mock the _semantic_classify_batch method to return our result
+    with patch.object(service, '_semantic_classify_batch') as mock_batch:
+        # Mock a classifier that's available
+        mock_classifier = MagicMock()
+        mock_classifier.is_available.return_value = True
+        mock_classifier.provider_name = "anthropic"
+        mock_classifier.usage_stats = MagicMock()
+        mock_classifier.usage_stats.summary.return_value = "1 calls, 1 candidates"
+
+        service._classifier = mock_classifier
+        mock_batch.return_value = [llm_result_dict]
+
+        corpus = "Decision: Use connection pooling for database access."
+
+        candidates = service.preview(
+            project_id=PROJECT_ID,
+            text_corpus=corpus,
+            profile="balanced",
+            min_confidence=0.0,
+        )
+
+        assert len(candidates) >= 1
+        candidate = candidates[0]
+
+        # LLM should override heuristic values
+        assert candidate["type"] == "gotcha"
+        assert candidate["confidence"] == 0.95
+
+        # LLM provenance should be present
+        prov = candidate["provenance"]
+        assert prov["classification_method"] == "llm"
+        assert prov["llm_reasoning"] == "Identifies a specific pitfall with clear context"
+        assert prov["llm_provider"] == "anthropic"
+
+
+def test_preview_llm_failure_falls_back(seeded_db_path):
+    """When LLM fails, candidates keep heuristic values."""
+    from unittest.mock import MagicMock
+
+    service = MemoryExtractorService(db_path=seeded_db_path, use_llm=True)
+
+    # Mock the classifier to return None (failure)
+    mock_classifier = MagicMock()
+    mock_classifier.is_available.return_value = True
+    mock_classifier.provider_name = "anthropic"
+    mock_classifier.usage_stats = MagicMock()
+    mock_classifier.usage_stats.summary.return_value = "0 calls"
+    mock_classifier.classify_batch.return_value = [None]  # LLM failure
+
+    service._classifier = mock_classifier
+
+    corpus = "Constraint: API timeout must be under 5 seconds."
+
+    candidates = service.preview(
+        project_id=PROJECT_ID,
+        text_corpus=corpus,
+        profile="balanced",
+        min_confidence=0.0,
+    )
+
+    assert len(candidates) >= 1
+    candidate = candidates[0]
+
+    # Should keep heuristic classification
+    assert candidate["type"] == "constraint"  # Heuristic would classify this
+    assert candidate["provenance"]["classification_method"] == "heuristic"
+    assert "llm_reasoning" not in candidate["provenance"]
+
+
+def test_provenance_includes_llm_metadata(seeded_db_path):
+    """Provenance includes llm_provider and llm_reasoning when LLM succeeds."""
+    from unittest.mock import MagicMock, patch
+
+    service = MemoryExtractorService(db_path=seeded_db_path, use_llm=False)
+
+    llm_result_dict = {
+        "type": "learning",
+        "confidence": 0.88,
+        "reasoning": "General development insight about testing patterns"
+    }
+
+    with patch.object(service, '_semantic_classify_batch') as mock_batch:
+        mock_classifier = MagicMock()
+        mock_classifier.is_available.return_value = True
+        mock_classifier.provider_name = "openai"
+        mock_classifier.usage_stats = MagicMock()
+        mock_classifier.usage_stats.summary.return_value = "1 calls, 1 candidates"
+
+        service._classifier = mock_classifier
+        mock_batch.return_value = [llm_result_dict]
+
+        corpus = "I learned that integration tests catch more bugs than unit tests."
+
+        candidates = service.preview(
+            project_id=PROJECT_ID,
+            text_corpus=corpus,
+            profile="balanced",
+            min_confidence=0.0,
+        )
+
+        assert len(candidates) >= 1
+        prov = candidates[0]["provenance"]
+
+        assert prov["classification_method"] == "llm"
+        assert prov["llm_provider"] == "openai"
+        assert prov["llm_reasoning"] == "General development insight about testing patterns"
+
+
+def test_env_var_enables_llm(seeded_db_path, monkeypatch):
+    """SKILLMEAT_LLM_ENABLED=true enables LLM."""
+    from unittest.mock import MagicMock, patch
+
+    # Set environment variable
+    monkeypatch.setenv("SKILLMEAT_LLM_ENABLED", "true")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    # Mock get_classifier at the module level where it's imported
+    with patch('skillmeat.core.services.llm_classifier.get_classifier') as mock_get_classifier:
+        mock_classifier = MagicMock()
+        mock_classifier.is_available.return_value = True
+        mock_get_classifier.return_value = mock_classifier
+
+        # Create service without use_llm parameter
+        service = MemoryExtractorService(db_path=seeded_db_path)
+
+        # Should have created a classifier
+        assert service._classifier is not None
+        mock_get_classifier.assert_called_once()
+
+
+def test_cli_flag_overrides_env(seeded_db_path, monkeypatch):
+    """use_llm=True overrides SKILLMEAT_LLM_ENABLED=false."""
+    from unittest.mock import MagicMock, patch
+
+    # Set env to false
+    monkeypatch.setenv("SKILLMEAT_LLM_ENABLED", "false")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    # Mock get_classifier
+    with patch('skillmeat.core.services.llm_classifier.get_classifier') as mock_get_classifier:
+        mock_classifier = MagicMock()
+        mock_classifier.is_available.return_value = True
+        mock_get_classifier.return_value = mock_classifier
+
+        # Create service with use_llm=True (should override env)
+        service = MemoryExtractorService(db_path=seeded_db_path, use_llm=True)
+
+        # Should have created a classifier despite env=false
+        assert service._classifier is not None
+        mock_get_classifier.assert_called_once()
+
+
+def test_llm_batch_classification(seeded_db_path):
+    """Multiple candidates are classified in a single batch."""
+    from unittest.mock import MagicMock, patch
+
+    service = MemoryExtractorService(db_path=seeded_db_path, use_llm=False)
+
+    # Return 3 classifications
+    llm_results = [
+        {"type": "decision", "confidence": 0.90, "reasoning": "test1"},
+        {"type": "constraint", "confidence": 0.85, "reasoning": "test2"},
+        {"type": "gotcha", "confidence": 0.92, "reasoning": "test3"},
+    ]
+
+    with patch.object(service, '_semantic_classify_batch') as mock_batch:
+        mock_classifier = MagicMock()
+        mock_classifier.is_available.return_value = True
+        mock_classifier.provider_name = "anthropic"
+        mock_classifier.usage_stats = MagicMock()
+        mock_classifier.usage_stats.summary.return_value = "1 calls, 3 candidates"
+
+        service._classifier = mock_classifier
+        mock_batch.return_value = llm_results
+
+        corpus = """
+        Decision: Use PostgreSQL for production database.
+        Constraint: Database connections must be pooled.
+        Gotcha: Beware of N+1 query problems in ORM.
+        """
+
+        candidates = service.preview(
+            project_id=PROJECT_ID,
+            text_corpus=corpus,
+            profile="balanced",
+            min_confidence=0.0,
+        )
+
+        # Should classify all candidates in single batch
+        assert mock_batch.call_count == 1
+
+        # Verify LLM classifications were applied
+        assert len(candidates) >= 3
+        types = {c["type"] for c in candidates}
+        assert "decision" in types or "constraint" in types or "gotcha" in types
+
+
+def test_llm_partial_failure(seeded_db_path):
+    """When LLM fails for some items, those fall back to heuristic."""
+    from unittest.mock import MagicMock, patch
+
+    service = MemoryExtractorService(db_path=seeded_db_path, use_llm=False)
+
+    # Mock classifier to return mixed results (some success, some None)
+    llm_results = [
+        {"type": "learning", "confidence": 0.88, "reasoning": "test"},
+        None,  # Second item failed
+    ]
+
+    with patch.object(service, '_semantic_classify_batch') as mock_batch:
+        mock_classifier = MagicMock()
+        mock_classifier.is_available.return_value = True
+        mock_classifier.provider_name = "anthropic"
+        mock_classifier.usage_stats = MagicMock()
+        mock_classifier.usage_stats.summary.return_value = "1 calls, 2 candidates"
+
+        service._classifier = mock_classifier
+        mock_batch.return_value = llm_results
+
+        corpus = """
+        I learned that connection pooling improves performance significantly.
+        Decision: Use async handlers for API endpoints.
+        """
+
+        candidates = service.preview(
+            project_id=PROJECT_ID,
+            text_corpus=corpus,
+            profile="balanced",
+            min_confidence=0.0,
+        )
+
+        assert len(candidates) >= 2
+
+        # First should use LLM classification
+        llm_classified = [c for c in candidates if c["provenance"].get("classification_method") == "llm"]
+        heuristic_classified = [c for c in candidates if c["provenance"].get("classification_method") == "heuristic"]
+
+        # Should have at least one of each
+        assert len(llm_classified) >= 1
+        assert len(heuristic_classified) >= 1
