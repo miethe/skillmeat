@@ -24,6 +24,14 @@ DEFAULT_PROFILE_ROOTS = [
     ".cursor",
 ]
 
+DEFAULT_PROJECT_CONFIG_FILENAMES_BY_PLATFORM = {
+    Platform.CLAUDE_CODE: ["CLAUDE.md", "AGENTS.md", ".skillmeat-project.toml"],
+    Platform.CODEX: ["CODEX.md", ".skillmeat-project.toml"],
+    Platform.GEMINI: ["GEMINI.md", ".skillmeat-project.toml"],
+    Platform.CURSOR: ["CURSOR.md", ".skillmeat-project.toml"],
+    Platform.OTHER: [".skillmeat-project.toml"],
+}
+
 DEFAULT_ARTIFACT_PATH_MAP = {
     "skill": "skills",
     "command": "commands",
@@ -52,8 +60,19 @@ def default_profile() -> DeploymentPathProfile:
         platform=Platform.CLAUDE_CODE,
         root_dir=DEFAULT_PROFILE_ROOT_DIR,
         artifact_path_map=DEFAULT_ARTIFACT_PATH_MAP.copy(),
-        config_filenames=(".skillmeat-project.toml",),
+        config_filenames=tuple(default_project_config_filenames(Platform.CLAUDE_CODE)),
         context_prefixes=(f"{DEFAULT_PROFILE_ROOT_DIR}/context/",),
+    )
+
+
+def default_project_config_filenames(platform: Optional[Platform]) -> list[str]:
+    """Return default project config filenames for a platform."""
+    if platform is None:
+        platform = Platform.CLAUDE_CODE
+    return list(
+        DEFAULT_PROJECT_CONFIG_FILENAMES_BY_PLATFORM.get(
+            platform, DEFAULT_PROJECT_CONFIG_FILENAMES_BY_PLATFORM[Platform.OTHER]
+        )
     )
 
 

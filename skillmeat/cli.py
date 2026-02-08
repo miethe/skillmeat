@@ -127,18 +127,22 @@ def init(
             "claude_code": {
                 "root_dir": ".claude",
                 "platform": "claude_code",
+                "config_filenames": ["CLAUDE.md", "AGENTS.md", ".skillmeat-project.toml"],
             },
             "codex": {
                 "root_dir": ".codex",
                 "platform": "codex",
+                "config_filenames": ["CODEX.md", ".skillmeat-project.toml"],
             },
             "gemini": {
                 "root_dir": ".gemini",
                 "platform": "gemini",
+                "config_filenames": ["GEMINI.md", ".skillmeat-project.toml"],
             },
             "cursor": {
                 "root_dir": ".cursor",
                 "platform": "cursor",
+                "config_filenames": ["CURSOR.md", ".skillmeat-project.toml"],
             },
         }
 
@@ -213,8 +217,11 @@ def init(
                         platform=spec["platform"],
                         root_dir=spec["root_dir"],
                         artifact_path_map=DEFAULT_ARTIFACT_PATH_MAP.copy(),
-                        config_filenames=[".skillmeat-project.toml"],
-                        context_prefixes=[f"{spec['root_dir']}/context/"],
+                        config_filenames=spec["config_filenames"],
+                        context_prefixes=[
+                            f"{spec['root_dir']}/context/",
+                            f"{spec['root_dir']}/",
+                        ],
                         supported_types=["skill", "command", "agent", "hook", "mcp"],
                     )
             except Exception as cache_error:
@@ -11604,12 +11611,12 @@ def context_deploy(
     api_base = "http://localhost:8080/api/v1"
 
     from skillmeat.core.validators.context_path_validator import (
-        default_config_filenames_for_platform,
         normalize_context_prefixes,
         resolve_project_profile,
         rewrite_path_for_profile,
         validate_context_path,
     )
+    from skillmeat.core.path_resolver import default_project_config_filenames
 
     try:
         # Lookup entity by name or ID
@@ -11687,7 +11694,7 @@ def context_deploy(
                 allowed_prefixes=normalize_context_prefixes(profile),
                 config_filenames=(
                     list(getattr(profile, "config_filenames", []) or [])
-                    + default_config_filenames_for_platform(
+                    + default_project_config_filenames(
                         getattr(profile, "platform", None)
                     )
                 ),

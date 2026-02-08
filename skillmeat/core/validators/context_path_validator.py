@@ -10,6 +10,7 @@ from skillmeat.core.enums import Platform
 from skillmeat.core.path_resolver import (
     DEFAULT_PROFILE_ROOTS,
     DeploymentPathProfile,
+    default_project_config_filenames,
     normalize_profile,
 )
 
@@ -69,7 +70,7 @@ def validate_context_path(
         else (
             profile_cfg.config_filenames
             if profile_cfg is not None
-            else default_config_filenames_for_platform(None)
+            else default_project_config_filenames(None)
         )
     )
 
@@ -165,12 +166,12 @@ def resolve_project_profile(
         if profile_id:
             profile = repo.read_by_project_and_profile_id(project_row.id, profile_id)
             if profile:
-                return normalize_profile(profile)
+                return _augment_profile_for_backward_compat(project_root, profile)
             return _fallback_profile(profile_id)
 
         primary = repo.get_primary_profile(project_row.id)
         if primary:
-            return normalize_profile(primary)
+            return _augment_profile_for_backward_compat(project_root, primary)
         return fallback
     except Exception:
         if profile_id:
@@ -179,18 +180,6 @@ def resolve_project_profile(
     finally:
         if session is not None:
             session.close()
-
-
-def default_config_filenames_for_platform(platform: Optional[Platform]) -> List[str]:
-    """Return default project config filename set for a platform."""
-    base = [".skillmeat-project.toml"]
-    if platform == Platform.CODEX:
-        return ["CODEX.md", *base]
-    if platform == Platform.GEMINI:
-        return ["GEMINI.md", *base]
-    if platform == Platform.CURSOR:
-        return ["CURSOR.md", *base]
-    return ["CLAUDE.md", "AGENTS.md", *base]
 
 
 def _fallback_profile(profile_id: str) -> DeploymentPathProfile:
@@ -206,8 +195,44 @@ def _fallback_profile(profile_id: str) -> DeploymentPathProfile:
         profile_id=profile_key,
         platform=platform,
         root_dir=root_dir,
-        config_filenames=default_config_filenames_for_platform(platform),
+        config_filenames=default_project_config_filenames(platform),
         context_prefixes=[f"{root_dir}/context/"],
+    )
+
+
+def _augment_profile_for_backward_compat(
+    project_root: Path,
+    profile: object,
+) -> DeploymentPathProfile:
+    """Augment profile metadata for legacy projects missing config hints."""
+    profile_cfg = normalize_profile(profile)
+    config_filenames = list(profile_cfg.config_filenames or [])
+    if not config_filenames:
+        config_filenames = default_project_config_filenames(profile_cfg.platform)
+
+    # Legacy projects may place config markdown under profile root without DB metadata.
+    profile_root = project_root / profile_cfg.root_dir
+    discovered = (
+        [p.name for p in profile_root.glob("*.md") if p.is_file()]
+        if profile_root.exists()
+        else []
+    )
+    for filename in discovered:
+        if filename not in config_filenames:
+            config_filenames.append(filename)
+
+    context_prefixes = list(profile_cfg.context_prefixes or [])
+    root_prefix = f"{profile_cfg.root_dir.rstrip('/')}/"
+    if root_prefix not in context_prefixes:
+        context_prefixes.append(root_prefix)
+
+    return DeploymentPathProfile(
+        profile_id=profile_cfg.profile_id,
+        platform=profile_cfg.platform,
+        root_dir=profile_cfg.root_dir,
+        artifact_path_map=dict(profile_cfg.artifact_path_map),
+        config_filenames=config_filenames,
+        context_prefixes=context_prefixes,
     )
 
 
