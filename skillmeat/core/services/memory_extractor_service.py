@@ -11,9 +11,12 @@ import json
 import logging
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from skillmeat.cache.memory_repositories import _compute_content_hash
+
+if TYPE_CHECKING:
+    from skillmeat.core.services.llm_classifier import LLMClassifier
 from skillmeat.core.services.memory_service import MemoryService
 
 logger = logging.getLogger(__name__)
@@ -455,6 +458,44 @@ class MemoryExtractorService:
             base -= 0.04
 
         return max(0.0, min(base, 0.98))
+
+    def _semantic_classify_batch(
+        self,
+        contents: List[str],
+        classifier: Optional["LLMClassifier"] = None,
+    ) -> List[Optional[Dict[str, Any]]]:
+        """Classify candidates using an LLM provider.
+
+        If *classifier* is ``None`` or unavailable the method returns a list
+        of ``None`` values (same length as *contents*) so the caller can
+        fall back to heuristic scoring transparently.
+
+        Args:
+            contents: List of candidate text strings to classify.
+            classifier: An ``LLMClassifier`` instance from
+                ``skillmeat.core.services.llm_classifier``.  May be
+                ``None`` to indicate LLM classification is disabled.
+
+        Returns:
+            List of classification dicts (keys: ``type``, ``confidence``,
+            ``reasoning``) or ``None`` per item when classification is
+            unavailable or fails.
+        """
+        if classifier is None:
+            return [None] * len(contents)
+
+        # Import the type only for the availability check
+        from skillmeat.core.services.llm_classifier import LLMClassifier as _LC
+
+        if not isinstance(classifier, _LC) or not classifier.is_available():
+            return [None] * len(contents)
+
+        try:
+            results = classifier.classify_batch(contents)
+            return [r.to_dict() if r else None for r in results]
+        except Exception as e:
+            logger.warning(f"LLM classification failed: {e}")
+            return [None] * len(contents)
 
     @staticmethod
     def _validate_profile(profile: str) -> None:
