@@ -38,6 +38,7 @@ from skillmeat.api.schemas.context_entity import (
 )
 from skillmeat.api.schemas.common import PageInfo
 from skillmeat.core.validators.context_entity import validate_context_entity
+from skillmeat.core.validators.context_path_validator import validate_context_path
 
 from skillmeat.cache.models import Artifact, Project, get_session
 
@@ -80,6 +81,17 @@ CONTEXT_ENTITY_TYPES = {
     "context_file",
     "progress_template",
 }
+
+
+def _as_target_platforms(raw: Optional[List[str]]) -> Optional[List[str]]:
+    if raw is None:
+        return None
+    return [str(item) for item in raw]
+
+
+def _empty_deployed_to() -> dict:
+    # Phase 3 adds response shape; deployment aggregation wiring is added separately.
+    return {}
 
 
 def compute_content_hash(content: str) -> str:
@@ -244,6 +256,8 @@ async def list_context_entities(
                 category=artifact.category,
                 auto_load=artifact.auto_load,
                 version=artifact.deployed_version,
+                target_platforms=_as_target_platforms(artifact.target_platforms),
+                deployed_to=_empty_deployed_to(),
                 content_hash=artifact.content_hash,
                 created_at=artifact.created_at,
                 updated_at=artifact.updated_at,
@@ -322,11 +336,23 @@ async def create_context_entity(
         This endpoint requires TASK-1.2 (database model) to be completed.
         Current implementation will raise 501 Not Implemented.
     """
+    try:
+        validate_context_path(
+            request.path_pattern,
+            allowed_prefixes=[".claude/", ".codex/", ".gemini/", ".cursor/"],
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
     # Validate content using validators from TASK-1.3
     validation_errors = validate_context_entity(
         entity_type=request.entity_type.value,
         content=request.content,
         path=request.path_pattern,
+        allowed_prefixes=[".claude/", ".codex/", ".gemini/", ".cursor/"],
     )
 
     if validation_errors:
@@ -355,6 +381,11 @@ async def create_context_entity(
             category=request.category,
             auto_load=request.auto_load,
             deployed_version=request.version if request.version else None,
+            target_platforms=(
+                [platform.value for platform in request.target_platforms]
+                if request.target_platforms is not None
+                else None
+            ),
             content_hash=content_hash,
         )
 
@@ -376,6 +407,8 @@ async def create_context_entity(
             category=artifact.category,
             auto_load=artifact.auto_load,
             version=artifact.deployed_version,
+            target_platforms=_as_target_platforms(artifact.target_platforms),
+            deployed_to=_empty_deployed_to(),
             content_hash=artifact.content_hash,
             created_at=artifact.created_at,
             updated_at=artifact.updated_at,
@@ -463,6 +496,8 @@ async def get_context_entity(entity_id: str) -> ContextEntityResponse:
             category=artifact.category,
             auto_load=artifact.auto_load,
             version=artifact.deployed_version,
+            target_platforms=_as_target_platforms(artifact.target_platforms),
+            deployed_to=_empty_deployed_to(),
             content_hash=artifact.content_hash,
             created_at=artifact.created_at,
             updated_at=artifact.updated_at,
@@ -545,6 +580,16 @@ async def update_context_entity(
             artifact.content = request.content
             content_changed = True
         if request.path_pattern is not None:
+            try:
+                validate_context_path(
+                    request.path_pattern,
+                    allowed_prefixes=[".claude/", ".codex/", ".gemini/", ".cursor/"],
+                )
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(exc),
+                ) from exc
             artifact.path_pattern = request.path_pattern
         if request.description is not None:
             artifact.description = request.description
@@ -554,6 +599,10 @@ async def update_context_entity(
             artifact.auto_load = request.auto_load
         if request.version is not None:
             artifact.deployed_version = request.version
+        if request.target_platforms is not None:
+            artifact.target_platforms = [
+                platform.value for platform in request.target_platforms
+            ]
 
         # Validate content if changed or type changed
         if content_changed or request.entity_type is not None:
@@ -561,6 +610,7 @@ async def update_context_entity(
                 entity_type=artifact.type,
                 content=artifact.content or "",
                 path=artifact.path_pattern or "",
+                allowed_prefixes=[".claude/", ".codex/", ".gemini/", ".cursor/"],
             )
             if validation_errors:
                 session.rollback()
@@ -587,6 +637,8 @@ async def update_context_entity(
             category=artifact.category,
             auto_load=artifact.auto_load,
             version=artifact.deployed_version,
+            target_platforms=_as_target_platforms(artifact.target_platforms),
+            deployed_to=_empty_deployed_to(),
             content_hash=artifact.content_hash,
             created_at=artifact.created_at,
             updated_at=artifact.updated_at,

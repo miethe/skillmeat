@@ -26,6 +26,7 @@ def mock_api_response():
                 "category": "testing",
                 "auto_load": False,
                 "content": "# Test Spec\n\nThis is a test.",
+                "target_platforms": None,
                 "created_at": "2025-01-01T00:00:00Z",
                 "updated_at": "2025-01-01T00:00:00Z",
             }
@@ -183,6 +184,8 @@ class TestContextDeploy:
         assert "--to-project" in result.output
         assert "--overwrite" in result.output
         assert "--dry-run" in result.output
+        assert "--profile" in result.output
+        assert "--force" in result.output
 
     def test_context_deploy_missing_project(self, runner):
         """Test deploy without --to-project fails."""
@@ -290,3 +293,58 @@ class TestContextDeploySecurityCases:
 
             # All variants should fail or be rejected
             assert result.exit_code != 0 or "SECURITY" in result.output or "error" in result.output.lower()
+
+    def test_context_deploy_with_profile_rewrites_root(self, runner, tmp_path, mock_api_response):
+        """Deploy should map path_pattern root to selected profile root."""
+        project_path = tmp_path / "project"
+        project_path.mkdir()
+        (project_path / ".codex").mkdir()
+
+        with patch("requests.get") as mock_get:
+            mock_get.return_value = MagicMock(
+                status_code=200,
+                json=lambda: mock_api_response
+            )
+            mock_get.return_value.raise_for_status = MagicMock()
+
+            result = runner.invoke(cli, [
+                "context", "deploy", "test-spec",
+                "--to-project", str(project_path),
+                "--profile", "codex",
+                "--dry-run"
+            ])
+
+            assert result.exit_code == 0
+            assert ".codex/specs/test-spec.md" in result.output
+
+    def test_context_deploy_platform_filter_requires_force(self, runner, tmp_path, mock_api_response):
+        """Deployment should fail when target_platforms excludes selected profile."""
+        project_path = tmp_path / "project"
+        project_path.mkdir()
+
+        mock_api_response["items"][0]["target_platforms"] = ["claude_code"]
+
+        with patch("requests.get") as mock_get:
+            mock_get.return_value = MagicMock(
+                status_code=200,
+                json=lambda: mock_api_response
+            )
+            mock_get.return_value.raise_for_status = MagicMock()
+
+            result = runner.invoke(cli, [
+                "context", "deploy", "test-spec",
+                "--to-project", str(project_path),
+                "--profile", "codex",
+                "--dry-run"
+            ])
+            assert result.exit_code != 0
+            assert "target_platforms" in result.output
+
+            forced = runner.invoke(cli, [
+                "context", "deploy", "test-spec",
+                "--to-project", str(project_path),
+                "--profile", "codex",
+                "--force",
+                "--dry-run"
+            ])
+            assert forced.exit_code == 0

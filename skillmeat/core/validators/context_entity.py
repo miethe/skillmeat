@@ -14,9 +14,12 @@ Entity Types:
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence
 
 import yaml
+
+from skillmeat.core.path_resolver import DEFAULT_PROFILE_ROOTS
+from skillmeat.core.validators.context_path_validator import validate_context_path
 
 
 @dataclass
@@ -37,7 +40,10 @@ class ValidationError:
         return f"[{self.severity.upper()}] {self.field}: {self.message}"
 
 
-def _validate_path_security(path: str) -> List[str]:
+def _validate_path_security(
+    path: str,
+    allowed_prefixes: Optional[Sequence[str]] = None,
+) -> List[str]:
     """Validate path for security issues.
 
     Prevents path traversal attacks by checking for:
@@ -53,32 +59,42 @@ def _validate_path_security(path: str) -> List[str]:
     """
     errors = []
 
-    # Normalize path for checking
-    normalized = Path(path).as_posix()
-
-    # Check for parent directory references
-    if ".." in normalized.split("/"):
-        errors.append("Path contains parent directory reference (..) - security risk")
-
-    # Check for absolute paths (Unix-style)
-    if normalized.startswith("/"):
-        errors.append("Absolute path detected - must be relative")
-
-    # Check for absolute paths (Windows-style)
-    if len(normalized) > 1 and normalized[1] == ":":
-        errors.append("Absolute path detected - must be relative")
-
-    # For .claude/* paths, verify they don't escape the directory
-    if path.startswith(".claude/"):
-        try:
-            # Resolve would fail on invalid paths
-            resolved = Path(".claude") / Path(path.replace(".claude/", ""))
-            if not str(resolved).startswith(".claude"):
-                errors.append("Path attempts to escape .claude directory")
-        except (ValueError, OSError):
-            errors.append("Invalid path format")
+    try:
+        validate_context_path(
+            path,
+            allowed_prefixes=allowed_prefixes
+            if allowed_prefixes is not None
+            else [f"{root.rstrip('/')}/" for root in DEFAULT_PROFILE_ROOTS],
+        )
+    except ValueError as exc:
+        errors.append(str(exc))
 
     return errors
+
+
+def _entity_prefixes(
+    suffix: str,
+    allowed_prefixes: Optional[Sequence[str]] = None,
+) -> List[str]:
+    roots = _root_prefixes(allowed_prefixes)
+    return [f"{root}{suffix}" for root in roots]
+
+
+def _root_prefixes(allowed_prefixes: Optional[Sequence[str]] = None) -> List[str]:
+    if not allowed_prefixes:
+        return [f"{root.rstrip('/')}/" for root in DEFAULT_PROFILE_ROOTS]
+    roots: List[str] = []
+    for prefix in allowed_prefixes:
+        normalized = Path(prefix).as_posix().rstrip("/")
+        if not normalized:
+            continue
+        root_component = normalized.split("/", 1)[0]
+        if not root_component:
+            continue
+        root_prefix = f"{root_component}/"
+        if root_prefix not in roots:
+            roots.append(root_prefix)
+    return roots or [f"{root.rstrip('/')}/" for root in DEFAULT_PROFILE_ROOTS]
 
 
 def _extract_frontmatter(content: str) -> tuple[Optional[Dict], str]:
@@ -120,7 +136,11 @@ def _extract_frontmatter(content: str) -> tuple[Optional[Dict], str]:
         return None, content
 
 
-def validate_project_config(content: str, path: str) -> List[str]:
+def validate_project_config(
+    content: str,
+    path: str,
+    allowed_prefixes: Optional[Sequence[str]] = None,
+) -> List[str]:
     """Validate ProjectConfig entity (CLAUDE.md).
 
     Requirements:
@@ -139,7 +159,7 @@ def validate_project_config(content: str, path: str) -> List[str]:
     errors = []
 
     # Validate path security
-    path_errors = _validate_path_security(path)
+    path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
     errors.extend(path_errors)
 
     # Must not be empty
@@ -161,7 +181,11 @@ def validate_project_config(content: str, path: str) -> List[str]:
     return errors
 
 
-def validate_spec_file(content: str, path: str) -> List[str]:
+def validate_spec_file(
+    content: str,
+    path: str,
+    allowed_prefixes: Optional[Sequence[str]] = None,
+) -> List[str]:
     """Validate SpecFile entity (.claude/specs/).
 
     Requirements:
@@ -180,12 +204,13 @@ def validate_spec_file(content: str, path: str) -> List[str]:
     errors = []
 
     # Validate path security
-    path_errors = _validate_path_security(path)
+    path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
     errors.extend(path_errors)
 
-    # Path must start with .claude/specs/
-    if not path.startswith(".claude/specs/"):
-        errors.append("Path must start with .claude/specs/")
+    # Path must start with {profile_root}/specs/
+    prefixes = _entity_prefixes("specs/", allowed_prefixes=allowed_prefixes)
+    if not any(path.startswith(prefix) for prefix in prefixes):
+        errors.append(f"Path must start with one of: {', '.join(prefixes)}")
 
     # Must not be empty
     if not content or not content.strip():
@@ -210,7 +235,11 @@ def validate_spec_file(content: str, path: str) -> List[str]:
     return errors
 
 
-def validate_rule_file(content: str, path: str) -> List[str]:
+def validate_rule_file(
+    content: str,
+    path: str,
+    allowed_prefixes: Optional[Sequence[str]] = None,
+) -> List[str]:
     """Validate RuleFile entity (.claude/rules/).
 
     Requirements:
@@ -228,12 +257,13 @@ def validate_rule_file(content: str, path: str) -> List[str]:
     errors = []
 
     # Validate path security
-    path_errors = _validate_path_security(path)
+    path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
     errors.extend(path_errors)
 
-    # Path must start with .claude/rules/
-    if not path.startswith(".claude/rules/"):
-        errors.append("Path must start with .claude/rules/")
+    # Path must start with {profile_root}/rules/
+    prefixes = _entity_prefixes("rules/", allowed_prefixes=allowed_prefixes)
+    if not any(path.startswith(prefix) for prefix in prefixes):
+        errors.append(f"Path must start with one of: {', '.join(prefixes)}")
 
     # Must not be empty
     if not content or not content.strip():
@@ -255,7 +285,11 @@ def validate_rule_file(content: str, path: str) -> List[str]:
     return errors
 
 
-def validate_context_file(content: str, path: str) -> List[str]:
+def validate_context_file(
+    content: str,
+    path: str,
+    allowed_prefixes: Optional[Sequence[str]] = None,
+) -> List[str]:
     """Validate ContextFile entity (.claude/context/).
 
     Requirements:
@@ -273,12 +307,13 @@ def validate_context_file(content: str, path: str) -> List[str]:
     errors = []
 
     # Validate path security
-    path_errors = _validate_path_security(path)
+    path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
     errors.extend(path_errors)
 
-    # Path must start with .claude/context/
-    if not path.startswith(".claude/context/"):
-        errors.append("Path must start with .claude/context/")
+    # Path must start with {profile_root}/context/
+    prefixes = _entity_prefixes("context/", allowed_prefixes=allowed_prefixes)
+    if not any(path.startswith(prefix) for prefix in prefixes):
+        errors.append(f"Path must start with one of: {', '.join(prefixes)}")
 
     # Must not be empty
     if not content or not content.strip():
@@ -305,7 +340,11 @@ def validate_context_file(content: str, path: str) -> List[str]:
     return errors
 
 
-def validate_progress_template(content: str, path: str) -> List[str]:
+def validate_progress_template(
+    content: str,
+    path: str,
+    allowed_prefixes: Optional[Sequence[str]] = None,
+) -> List[str]:
     """Validate ProgressTemplate entity (.claude/progress/).
 
     Requirements:
@@ -324,12 +363,13 @@ def validate_progress_template(content: str, path: str) -> List[str]:
     errors = []
 
     # Validate path security
-    path_errors = _validate_path_security(path)
+    path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
     errors.extend(path_errors)
 
-    # Path must start with .claude/progress/
-    if not path.startswith(".claude/progress/"):
-        errors.append("Path must start with .claude/progress/")
+    # Path must start with {profile_root}/progress/
+    prefixes = _entity_prefixes("progress/", allowed_prefixes=allowed_prefixes)
+    if not any(path.startswith(prefix) for prefix in prefixes):
+        errors.append(f"Path must start with one of: {', '.join(prefixes)}")
 
     # Must not be empty
     if not content or not content.strip():
@@ -356,7 +396,12 @@ def validate_progress_template(content: str, path: str) -> List[str]:
     return errors
 
 
-def validate_context_entity(entity_type: str, content: str, path: str) -> List[str]:
+def validate_context_entity(
+    entity_type: str,
+    content: str,
+    path: str,
+    allowed_prefixes: Optional[Sequence[str]] = None,
+) -> List[str]:
     """Unified validation function for all context entity types.
 
     Args:
@@ -386,4 +431,4 @@ def validate_context_entity(entity_type: str, content: str, path: str) -> List[s
             f"Must be one of: {', '.join(validators.keys())}"
         )
 
-    return validator(content, path)
+    return validator(content, path, allowed_prefixes=allowed_prefixes)
