@@ -3,16 +3,16 @@ type: progress
 prd: "multi-platform-project-deployments-v1"
 phase: 3
 title: "Context Entity Generalization"
-status: "in_progress"
+status: "completed"
 started: "2026-02-08T00:00:00Z"
-completed: null
+completed: "2026-02-08T00:00:00Z"
 
-overall_progress: 57
+overall_progress: 100
 completion_estimate: "on-track"
 
 total_tasks: 14
-completed_tasks: 8
-in_progress_tasks: 1
+completed_tasks: 14
+in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
 
@@ -54,7 +54,7 @@ tasks:
 
   - id: "P3-T5"
     description: "Add project_config_filenames field to DeploymentProfile - Add list[str] field to core model and DB model; create migration with sensible defaults per platform"
-    status: "pending"
+    status: "completed"
     assigned_to: ["data-layer-expert", "python-backend-engineer"]
     dependencies: ["P1-T5", "P1-T6"]
     estimated_effort: "1 pt"
@@ -62,7 +62,7 @@ tasks:
 
   - id: "P3-T6"
     description: "Update context entity deployment to profile-aware filenames - Deploy logic checks project-config files per profile; context entities deploy alongside any profile's project config"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3-T5", "P2-T3"]
     estimated_effort: "1.5 pts"
@@ -102,7 +102,7 @@ tasks:
 
   - id: "P3-T11"
     description: "Integration test: context entity deployment across profiles - Test project with Claude + Codex profiles; deploy context entity to both; verify path rules respected; verify platform targeting"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3-T6", "P3-T7", "P3-T9"]
     estimated_effort: "1.5 pts"
@@ -110,7 +110,7 @@ tasks:
 
   - id: "P3-T12"
     description: "Integration test: project config file discovery per profile - Test context entity deployment when project-config files exist in different profile roots (CLAUDE.md in .claude/, GEMINI.md in .gemini/)"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3-T6"]
     estimated_effort: "1.5 pts"
@@ -118,7 +118,7 @@ tasks:
 
   - id: "P3-T13"
     description: "Update context entity API response to include platform info - Extend ContextEntityRead schema with target_platforms and deployed_to per-profile breakdown; update OpenAPI docs"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3-T8"]
     estimated_effort: "1 pt"
@@ -126,7 +126,7 @@ tasks:
 
   - id: "P3-T14"
     description: "Backward compatibility: auto-detect project config roots - For existing projects without explicit profile config_filenames, auto-detect .claude/*.md config files and add to default profile's context_path_prefixes"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3-T6"]
     estimated_effort: "1 pt"
@@ -148,23 +148,22 @@ success_criteria:
   - { id: "SC-2", description: "Path traversal tests pass; security review approved", status: "completed" }
   - { id: "SC-3", description: "Context entities deployable to multiple profile roots in same project", status: "completed" }
   - { id: "SC-4", description: "Platform targeting works correctly; --force override tested", status: "completed" }
-  - { id: "SC-5", description: "Project config file detection per profile working", status: "pending" }
-  - { id: "SC-6", description: "API response includes deployed profiles and platform info", status: "pending" }
-  - { id: "SC-7", description: "Backward compatibility: existing context entities auto-detect their profile", status: "pending" }
-  - { id: "SC-8", description: "Integration tests pass: cross-profile context deployment, config file discovery", status: "pending" }
+  - { id: "SC-5", description: "Project config file detection per profile working", status: "completed" }
+  - { id: "SC-6", description: "API response includes deployed profiles and platform info", status: "completed" }
+  - { id: "SC-7", description: "Backward compatibility: existing context entities auto-detect their profile", status: "completed" }
+  - { id: "SC-8", description: "Integration tests pass: cross-profile context deployment, config file discovery", status: "completed" }
 
 files_modified:
   - "skillmeat/core/validators/context_path_validator.py"
   - "skillmeat/core/validators/context_entity.py"
-  - "skillmeat/core/models/context_entity.py"
-  - "skillmeat/core/models/deployment_profile.py"
+  - "skillmeat/core/path_resolver.py"
   - "skillmeat/api/schemas/context_entity.py"
   - "skillmeat/api/routers/context_entities.py"
-  - "skillmeat/cache/models.py"
+  - "skillmeat/cache/repositories.py"
   - "skillmeat/cli.py"
   - "tests/test_core_context_path_validator.py"
   - "tests/test_context_entity_cross_profile.py"
-  - "tests/test_context_entity_platform_filter.py"
+  - "tests/integration/test_context_cli.py"
 ---
 
 # Phase 3: Context Entity Generalization

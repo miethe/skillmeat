@@ -84,7 +84,10 @@ from skillmeat.cache.models import (
     create_tables,
 )
 from skillmeat.core.enums import Platform
-from skillmeat.core.path_resolver import DEFAULT_ARTIFACT_PATH_MAP
+from skillmeat.core.path_resolver import (
+    DEFAULT_ARTIFACT_PATH_MAP,
+    default_project_config_filenames,
+)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -3058,15 +3061,19 @@ class DeploymentProfileRepository(BaseRepository[DeploymentProfile]):
         """Create a deployment profile."""
         session = self._get_session()
         try:
+            platform_value = platform.value if isinstance(platform, Platform) else str(platform)
+            platform_enum = Platform(platform_value) if platform_value in {p.value for p in Platform} else Platform.OTHER
+            root_prefix = f"{root_dir.rstrip('/')}/context/"
             profile = DeploymentProfile(
                 id=uuid.uuid4().hex,
                 project_id=project_id,
                 profile_id=profile_id,
-                platform=platform,
+                platform=platform_value,
                 root_dir=root_dir,
                 artifact_path_map=artifact_path_map or {},
-                config_filenames=config_filenames or [],
-                context_prefixes=context_prefixes or [],
+                config_filenames=config_filenames
+                or default_project_config_filenames(platform_enum),
+                context_prefixes=context_prefixes or [root_prefix],
                 supported_types=supported_types or [],
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
@@ -3179,8 +3186,8 @@ class DeploymentProfileRepository(BaseRepository[DeploymentProfile]):
             platform=Platform.CLAUDE_CODE.value,
             root_dir=".claude",
             artifact_path_map=DEFAULT_ARTIFACT_PATH_MAP.copy(),
-            config_filenames=[".skillmeat-project.toml"],
-            context_prefixes=[".claude/context/"],
+            config_filenames=default_project_config_filenames(Platform.CLAUDE_CODE),
+            context_prefixes=[".claude/context/", ".claude/"],
             supported_types=["skill", "command", "agent", "hook", "mcp"],
         )
 
