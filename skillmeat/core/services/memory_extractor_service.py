@@ -72,6 +72,18 @@ class MemoryExtractorService:
             # Two-path extraction: try JSONL parsing first, fall back to plain-text
             messages = self._parse_jsonl_messages(text_corpus)
 
+            # Detect if we should fall back: empty messages but non-empty input
+            has_input = bool(text_corpus and text_corpus.strip())
+            should_fallback = not messages and has_input
+
+            if should_fallback:
+                # Check if input looks like JSON attempts (heuristic: contains '{' or '[')
+                looks_like_json = "{" in text_corpus or "[" in text_corpus
+                if looks_like_json:
+                    logger.info("All JSONL lines failed to parse; falling back to plain-text extraction")
+                else:
+                    logger.info("No JSONL messages found; falling back to plain-text extraction")
+
             if messages:
                 content_blocks = self._extract_content_blocks(messages)
                 for content_text, provenance_meta in content_blocks:
@@ -99,6 +111,7 @@ class MemoryExtractorService:
                         # Build provenance: base fields + JSONL message metadata
                         provenance = {
                             "source": "memory_extraction",
+                            "format": "jsonl",
                             "run_id": run_id,
                             "session_id": session_id,
                             "commit_sha": commit_sha,
@@ -118,9 +131,6 @@ class MemoryExtractorService:
                         )
             else:
                 # Fallback: plain-text line extraction (backward compat)
-                logger.info(
-                    "No JSONL messages found, falling back to plain-text extraction"
-                )
                 for line in self._iter_candidate_lines(text_corpus):
                     mem_type = self._classify_type(line)
                     confidence = self._score(line, mem_type, profile)
@@ -143,6 +153,7 @@ class MemoryExtractorService:
                             "duplicate_of": duplicate.id if duplicate else None,
                             "provenance": {
                                 "source": "memory_extraction",
+                                "format": "plain_text",
                                 "run_id": run_id,
                                 "session_id": session_id,
                                 "commit_sha": commit_sha,
@@ -354,6 +365,7 @@ class MemoryExtractorService:
                 "message_role": msg_type or msg_role or "unknown",
                 "timestamp": message.get("timestamp", ""),
                 "session_id": message.get("sessionId", ""),
+                "git_branch": message.get("gitBranch", ""),
             }
 
             results.append((content_text, provenance))
@@ -377,6 +389,44 @@ class MemoryExtractorService:
         elif mem_type in {"gotcha", "style_rule"}:
             base += 0.05
         base += _PROFILE_BONUS[profile]
+
+        # Content quality signals
+        line_lower = line.lower()
+
+        # 1. First-person learning indicators (+0.05)
+        learning_patterns = {
+            "learned that", "discovered that", "realized that",
+            "found that", "noticed that", "understood that"
+        }
+        if any(pattern in line_lower for pattern in learning_patterns):
+            base += 0.05
+
+        # 2. Specificity indicators (+0.03)
+        has_path = "/" in line or any(ext in line_lower for ext in {".py", ".ts", ".tsx", ".js", ".md"})
+        has_function = "()" in line
+        has_numbers = any(char.isdigit() for char in line)
+        if has_path or has_function or has_numbers:
+            base += 0.03
+
+        # 3. Question penalty (-0.03)
+        question_starters = {
+            "why", "how", "what", "should", "could",
+            "would", "can", "is", "are", "does", "do"
+        }
+        is_question = line.rstrip().endswith("?") or any(
+            line_lower.startswith(word + " ") for word in question_starters
+        )
+        if is_question:
+            base -= 0.03
+
+        # 4. Vague language penalty (-0.04)
+        vague_words = {
+            "maybe", "probably", "might", "perhaps",
+            "possibly", "somehow", "something", "somewhere"
+        }
+        if any(word in line_lower for word in vague_words):
+            base -= 0.04
+
         return max(0.0, min(base, 0.98))
 
     @staticmethod
