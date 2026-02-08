@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
@@ -34,7 +35,10 @@ except Exception:  # pragma: no cover - metrics are optional in some envs
 _TYPE_RULES: List[tuple[str, re.Pattern[str]]] = [
     ("constraint", re.compile(r"\b(must|require|cannot|never|limit|blocked)\b", re.I)),
     ("gotcha", re.compile(r"\b(gotcha|beware|pitfall|timeout|lock|race)\b", re.I)),
-    ("style_rule", re.compile(r"\b(style|convention|naming|format|lint|prefer)\b", re.I)),
+    (
+        "style_rule",
+        re.compile(r"\b(style|convention|naming|format|lint|prefer)\b", re.I),
+    ),
     ("decision", re.compile(r"\b(decide|decision|use|adopt|choose|standard)\b", re.I)),
     ("learning", re.compile(r"\b(learned|learning|insight|remember)\b", re.I)),
 ]
@@ -50,9 +54,66 @@ _VALID_PROFILES = frozenset(_PROFILE_BONUS.keys())
 class MemoryExtractorService:
     """Extract and optionally persist candidate memories."""
 
-    def __init__(self, db_path: Optional[str]):
+    def __init__(
+        self,
+        db_path: Optional[str],
+        use_llm: bool = False,
+        llm_provider: Optional[str] = None,
+        llm_model: Optional[str] = None,
+        llm_api_key: Optional[str] = None,
+        llm_base_url: Optional[str] = None,
+    ):
         self.memory_service = MemoryService(db_path=db_path)
         self.memory_repo = self.memory_service.repo
+
+        # LLM classification setup
+        self._classifier: Optional["LLMClassifier"] = None
+
+        # Check if LLM is enabled: CLI param takes priority over env var
+        # Only check env var if use_llm is explicitly False (default)
+        env_llm_enabled = (
+            os.environ.get("SKILLMEAT_LLM_ENABLED", "false").lower() == "true"
+        )
+        llm_enabled = use_llm if use_llm else env_llm_enabled
+
+        if llm_enabled:
+            # Resolve provider (CLI param > env var > default)
+            provider = llm_provider or os.environ.get(
+                "SKILLMEAT_LLM_PROVIDER", "anthropic"
+            )
+
+            # Resolve model (CLI param > env var > provider default)
+            model = llm_model or os.environ.get("SKILLMEAT_LLM_MODEL")
+
+            # Resolve API key with fallback chain
+            api_key = llm_api_key or os.environ.get("SKILLMEAT_LLM_API_KEY")
+            if not api_key:
+                if provider == "anthropic":
+                    api_key = os.environ.get("ANTHROPIC_API_KEY")
+                elif provider == "openai":
+                    api_key = os.environ.get("OPENAI_API_KEY")
+
+            # Resolve base URL (CLI param > env var > default for Ollama)
+            base_url = llm_base_url or os.environ.get("SKILLMEAT_LLM_BASE_URL")
+            if not base_url and provider == "ollama":
+                base_url = "http://localhost:11434"
+
+            # Create classifier
+            try:
+                from skillmeat.core.services.llm_classifier import get_classifier
+
+                self._classifier = get_classifier(
+                    provider=provider,
+                    model=model,
+                    api_key=api_key,
+                    base_url=base_url,
+                )
+                logger.info(
+                    f"LLM classifier initialized: provider={provider}, model={model or 'default'}"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to initialize LLM classifier: {e}")
+                self._classifier = None
 
     def preview(
         self,
@@ -92,17 +153,20 @@ class MemoryExtractorService:
                 # Check if input looks like JSON attempts (heuristic: contains '{' or '[')
                 looks_like_json = "{" in text_corpus or "[" in text_corpus
                 if looks_like_json:
-                    logger.info("All JSONL lines failed to parse; falling back to plain-text extraction")
+                    logger.info(
+                        "All JSONL lines failed to parse; falling back to plain-text extraction"
+                    )
                 else:
-                    logger.info("No JSONL messages found; falling back to plain-text extraction")
+                    logger.info(
+                        "No JSONL messages found; falling back to plain-text extraction"
+                    )
 
             if messages:
                 content_blocks = self._extract_content_blocks(messages)
                 for content_text, provenance_meta in content_blocks:
                     # Split each content block into candidate lines
                     block_lines = [
-                        ln.strip(" -*\t")
-                        for ln in content_text.splitlines()
+                        ln.strip(" -*\t") for ln in content_text.splitlines()
                     ]
                     block_lines = [ln for ln in block_lines if len(ln.strip()) >= 24]
 
@@ -128,6 +192,7 @@ class MemoryExtractorService:
                             "session_id": session_id,
                             "commit_sha": commit_sha,
                             "workflow_stage": "extraction",
+                            "classification_method": "heuristic",
                         }
                         provenance.update(provenance_meta)
 
@@ -170,9 +235,17 @@ class MemoryExtractorService:
                                 "session_id": session_id,
                                 "commit_sha": commit_sha,
                                 "workflow_stage": "extraction",
+                                "classification_method": "heuristic",
                             },
                         }
                     )
+
+            # Apply LLM classification if classifier is available
+            if self._classifier and candidates:
+                logger.info(
+                    f"Applying LLM classification to {len(candidates)} candidates"
+                )
+                self._apply_llm_classification(candidates)
 
             candidates.sort(key=lambda c: (-c["confidence"], c["content"]))
             return candidates
@@ -279,10 +352,14 @@ class MemoryExtractorService:
             try:
                 corpus = json.loads(corpus)
                 if not isinstance(corpus, str):
-                    logger.debug("Unwrapped JSON was not a string, using original corpus")
+                    logger.debug(
+                        "Unwrapped JSON was not a string, using original corpus"
+                    )
                     corpus = text_corpus.strip()
             except json.JSONDecodeError:
-                logger.debug("Failed to unwrap JSON-string format, treating as regular JSONL")
+                logger.debug(
+                    "Failed to unwrap JSON-string format, treating as regular JSONL"
+                )
 
         messages: list[dict] = []
         for line_num, line in enumerate(corpus.splitlines(), start=1):
@@ -384,7 +461,9 @@ class MemoryExtractorService:
 
             results.append((content_text, provenance))
 
-        logger.debug(f"Extracted {len(results)} content blocks from {len(messages)} messages")
+        logger.debug(
+            f"Extracted {len(results)} content blocks from {len(messages)} messages"
+        )
         return results
 
     @staticmethod
@@ -425,14 +504,20 @@ class MemoryExtractorService:
 
         # 1. First-person learning indicators (+0.05)
         learning_patterns = {
-            "learned that", "discovered that", "realized that",
-            "found that", "noticed that", "understood that"
+            "learned that",
+            "discovered that",
+            "realized that",
+            "found that",
+            "noticed that",
+            "understood that",
         }
         if any(pattern in line_lower for pattern in learning_patterns):
             base += 0.05
 
         # 2. Specificity indicators (+0.03)
-        has_path = "/" in line or any(ext in line_lower for ext in {".py", ".ts", ".tsx", ".js", ".md"})
+        has_path = "/" in line or any(
+            ext in line_lower for ext in {".py", ".ts", ".tsx", ".js", ".md"}
+        )
         has_function = "()" in line
         has_numbers = any(char.isdigit() for char in line)
         if has_path or has_function or has_numbers:
@@ -440,8 +525,17 @@ class MemoryExtractorService:
 
         # 3. Question penalty (-0.03)
         question_starters = {
-            "why", "how", "what", "should", "could",
-            "would", "can", "is", "are", "does", "do"
+            "why",
+            "how",
+            "what",
+            "should",
+            "could",
+            "would",
+            "can",
+            "is",
+            "are",
+            "does",
+            "do",
         }
         is_question = line.rstrip().endswith("?") or any(
             line_lower.startswith(word + " ") for word in question_starters
@@ -451,13 +545,61 @@ class MemoryExtractorService:
 
         # 4. Vague language penalty (-0.04)
         vague_words = {
-            "maybe", "probably", "might", "perhaps",
-            "possibly", "somehow", "something", "somewhere"
+            "maybe",
+            "probably",
+            "might",
+            "perhaps",
+            "possibly",
+            "somehow",
+            "something",
+            "somewhere",
         }
         if any(word in line_lower for word in vague_words):
             base -= 0.04
 
         return max(0.0, min(base, 0.98))
+
+    def _apply_llm_classification(self, candidates: List[Dict[str, Any]]) -> None:
+        """Apply LLM classification to candidates in-place.
+
+        For each candidate where LLM returns a result, override the type and
+        confidence with LLM values. Add LLM reasoning and provider to provenance.
+        Gracefully falls back to heuristic classification when LLM fails.
+
+        Args:
+            candidates: List of candidate dicts to classify (modified in-place).
+        """
+        if not self._classifier:
+            return
+
+        # Collect content texts for batch classification
+        contents = [c["content"] for c in candidates]
+
+        # Call LLM classifier
+        llm_results = self._semantic_classify_batch(contents, self._classifier)
+
+        # Apply LLM results to candidates
+        for candidate, llm_result in zip(candidates, llm_results):
+            if llm_result:
+                # Override type and confidence with LLM values
+                candidate["type"] = llm_result["type"]
+                candidate["confidence"] = round(llm_result["confidence"], 3)
+
+                # Add LLM metadata to provenance
+                if "provenance" not in candidate:
+                    candidate["provenance"] = {}
+
+                candidate["provenance"]["classification_method"] = "llm"
+                candidate["provenance"]["llm_reasoning"] = llm_result.get(
+                    "reasoning", ""
+                )
+                candidate["provenance"]["llm_provider"] = self._classifier.provider_name
+            else:
+                # LLM failed, keep heuristic values
+                if "provenance" not in candidate:
+                    candidate["provenance"] = {}
+
+                candidate["provenance"]["classification_method"] = "heuristic"
 
     def _semantic_classify_batch(
         self,

@@ -255,9 +255,7 @@ def cmd_list(
                 artifact.origin,
             ]
             if tags:
-                tag_str = (
-                    ", ".join(artifact.tags) if artifact.tags else ""
-                )
+                tag_str = ", ".join(artifact.tags) if artifact.tags else ""
                 row.append(tag_str)
             table.add_row(*row)
 
@@ -736,7 +734,9 @@ def _refresh_api_cache_batch(output_format: str = "table") -> None:
         # API server not running - this is fine
         logger.debug("API server not running, skipping batch cache refresh")
     except requests.exceptions.Timeout:
-        logger.warning("Batch API cache refresh timed out (operation may still complete)")
+        logger.warning(
+            "Batch API cache refresh timed out (operation may still complete)"
+        )
     except Exception as e:
         # Log but don't fail - cache refresh is non-critical
         logger.debug(f"Batch API cache refresh failed: {e}")
@@ -11579,7 +11579,9 @@ def _memory_request(method: str, path: str, **kwargs):
     return response
 
 
-def _memory_output(data: Any, as_json: bool = False, title: Optional[str] = None) -> None:
+def _memory_output(
+    data: Any, as_json: bool = False, title: Optional[str] = None
+) -> None:
     if as_json:
         console.print(json.dumps(data, indent=2))
         return
@@ -11803,7 +11805,10 @@ def memory_item_merge(source_id, target_id, strategy, merged_content, as_json):
 @click.option("--reason", default=None)
 @click.option("--json", "as_json", is_flag=True)
 def memory_item_bulk_promote(ids, reason, as_json):
-    payload = {"item_ids": [x.strip() for x in ids.split(",") if x.strip()], "reason": reason}
+    payload = {
+        "item_ids": [x.strip() for x in ids.split(",") if x.strip()],
+        "reason": reason,
+    }
     try:
         response = _memory_request("POST", "/memory-items/bulk-promote", json=payload)
         _memory_output(response.json(), as_json)
@@ -11817,7 +11822,10 @@ def memory_item_bulk_promote(ids, reason, as_json):
 @click.option("--reason", default=None)
 @click.option("--json", "as_json", is_flag=True)
 def memory_item_bulk_deprecate(ids, reason, as_json):
-    payload = {"item_ids": [x.strip() for x in ids.split(",") if x.strip()], "reason": reason}
+    payload = {
+        "item_ids": [x.strip() for x in ids.split(",") if x.strip()],
+        "reason": reason,
+    }
     try:
         response = _memory_request("POST", "/memory-items/bulk-deprecate", json=payload)
         _memory_output(response.json(), as_json)
@@ -11840,7 +11848,9 @@ def memory_module():
 @click.option("--min-confidence", type=float, default=None)
 @click.option("--priority", type=int, default=5)
 @click.option("--json", "as_json", is_flag=True)
-def memory_module_create(project_id, name, description, types, min_confidence, priority, as_json):
+def memory_module_create(
+    project_id, name, description, types, min_confidence, priority, as_json
+):
     selectors = {}
     if types:
         selectors["memory_types"] = [t.strip() for t in types.split(",") if t.strip()]
@@ -11867,7 +11877,9 @@ def memory_module_create(project_id, name, description, types, min_confidence, p
 @click.option("--json", "as_json", is_flag=True)
 def memory_module_list(project_id, as_json):
     try:
-        response = _memory_request("GET", "/context-modules", params={"project_id": project_id})
+        response = _memory_request(
+            "GET", "/context-modules", params={"project_id": project_id}
+        )
         data = response.json()
         _memory_output(data.get("items", []), as_json, title="Memory Modules")
     except Exception as e:
@@ -11880,7 +11892,9 @@ def memory_module_list(project_id, as_json):
 @click.option("--json", "as_json", is_flag=True)
 def memory_module_show(module_id, as_json):
     try:
-        response = _memory_request("GET", f"/context-modules/{module_id}", params={"include_items": "true"})
+        response = _memory_request(
+            "GET", f"/context-modules/{module_id}", params={"include_items": "true"}
+        )
         _memory_output(response.json(), as_json)
     except Exception as e:
         console.print(f"[red]Error showing memory module: {e}[/red]")
@@ -11931,7 +11945,9 @@ def memory_module_delete(module_id):
 def memory_module_add_item(module_id, item_id, ordering, as_json):
     payload = {"memory_id": item_id, "ordering": ordering}
     try:
-        response = _memory_request("POST", f"/context-modules/{module_id}/memories", json=payload)
+        response = _memory_request(
+            "POST", f"/context-modules/{module_id}/memories", json=payload
+        )
         _memory_output(response.json(), as_json)
     except Exception as e:
         console.print(f"[red]Error adding item to module: {e}[/red]")
@@ -11944,7 +11960,9 @@ def memory_module_add_item(module_id, item_id, ordering, as_json):
 def memory_module_remove_item(module_id, item_id):
     try:
         _memory_request("DELETE", f"/context-modules/{module_id}/memories/{item_id}")
-        console.print(f"[green]Removed memory {item_id} from module {module_id}[/green]")
+        console.print(
+            f"[green]Removed memory {item_id} from module {module_id}[/green]"
+        )
     except Exception as e:
         console.print(f"[red]Error removing item from module: {e}[/red]")
         sys.exit(1)
@@ -11956,7 +11974,9 @@ def memory_module_remove_item(module_id, item_id):
 @click.option("--json", "as_json", is_flag=True)
 def memory_module_list_items(module_id, limit, as_json):
     try:
-        response = _memory_request("GET", f"/context-modules/{module_id}/memories", params={"limit": limit})
+        response = _memory_request(
+            "GET", f"/context-modules/{module_id}/memories", params={"limit": limit}
+        )
         _memory_output(response.json(), as_json, title="Module Memories")
     except Exception as e:
         console.print(f"[red]Error listing module items: {e}[/red]")
@@ -11969,7 +11989,9 @@ def memory_module_list_items(module_id, limit, as_json):
 @click.option("--json", "as_json", is_flag=True)
 def memory_module_duplicate(module_id, new_name, as_json):
     try:
-        source = _memory_request("GET", f"/context-modules/{module_id}", params={"include_items": "true"}).json()
+        source = _memory_request(
+            "GET", f"/context-modules/{module_id}", params={"include_items": "true"}
+        ).json()
         payload = {
             "name": new_name or f"{source['name']} Copy",
             "description": source.get("description"),
@@ -12008,7 +12030,12 @@ def memory_pack():
 def memory_pack_preview(project_id, module_id, budget_tokens, as_json):
     payload = {"module_id": module_id, "budget_tokens": budget_tokens}
     try:
-        response = _memory_request("POST", "/context-packs/preview", params={"project_id": project_id}, json=payload)
+        response = _memory_request(
+            "POST",
+            "/context-packs/preview",
+            params={"project_id": project_id},
+            json=payload,
+        )
         _memory_output(response.json(), as_json)
     except Exception as e:
         console.print(f"[red]Error previewing pack: {e}[/red]")
@@ -12050,7 +12077,7 @@ def _truncate_run_log(content: str, max_bytes: int = 500_000) -> str:
     Returns:
         Original or truncated content, starting at a complete line boundary
     """
-    content_bytes = content.encode('utf-8')
+    content_bytes = content.encode("utf-8")
 
     # Size check: if within limit, return unchanged
     if len(content_bytes) <= max_bytes:
@@ -12061,16 +12088,16 @@ def _truncate_run_log(content: str, max_bytes: int = 500_000) -> str:
     truncated_bytes = content_bytes[-max_bytes:]
 
     # Decode back to string (ignore partial UTF-8 sequences)
-    truncated_str = truncated_bytes.decode('utf-8', errors='ignore')
+    truncated_str = truncated_bytes.decode("utf-8", errors="ignore")
 
     # Find first complete newline boundary (skip partial first line)
-    first_newline = truncated_str.find('\n')
+    first_newline = truncated_str.find("\n")
     if first_newline != -1:
-        truncated_str = truncated_str[first_newline + 1:]
+        truncated_str = truncated_str[first_newline + 1 :]
 
     # Count lines removed (approximate from bytes removed and avg line length)
-    original_lines = content.count('\n')
-    remaining_lines = truncated_str.count('\n')
+    original_lines = content.count("\n")
+    remaining_lines = truncated_str.count("\n")
     lines_removed = original_lines - remaining_lines
 
     # Log warning
@@ -12091,16 +12118,51 @@ def memory_extract():
 @memory_extract.command("preview")
 @click.option("--project", "project_id", required=True)
 @click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True))
-@click.option("--profile", type=click.Choice(["strict", "balanced", "aggressive"]), default="balanced")
+@click.option(
+    "--profile",
+    type=click.Choice(["strict", "balanced", "aggressive"]),
+    default="balanced",
+)
 @click.option("--min-confidence", type=float, default=0.6)
+@click.option(
+    "--use-llm", is_flag=True, default=False, help="Enable LLM-based classification"
+)
+@click.option(
+    "--llm-provider",
+    type=click.Choice(["anthropic", "openai", "ollama", "openai-compatible"]),
+    default=None,
+    help="LLM provider (default: from env or anthropic)",
+)
+@click.option(
+    "--llm-model", default=None, help="LLM model name (provider-specific default)"
+)
+@click.option(
+    "--llm-base-url",
+    default=None,
+    help="Base URL for Ollama/OpenAI-compatible endpoints",
+)
 @click.option("--json", "as_json", is_flag=True)
-def memory_extract_preview(project_id, run_log_path, profile, min_confidence, as_json):
+def memory_extract_preview(
+    project_id,
+    run_log_path,
+    profile,
+    min_confidence,
+    use_llm,
+    llm_provider,
+    llm_model,
+    llm_base_url,
+    as_json,
+):
     text_corpus = Path(run_log_path).read_text(encoding="utf-8")
     text_corpus = _truncate_run_log(text_corpus)
     payload = {
         "text_corpus": text_corpus,
         "profile": profile,
         "min_confidence": min_confidence,
+        "use_llm": use_llm,
+        "llm_provider": llm_provider,
+        "llm_model": llm_model,
+        "llm_base_url": llm_base_url,
     }
     try:
         response = _memory_request(
@@ -12118,16 +12180,51 @@ def memory_extract_preview(project_id, run_log_path, profile, min_confidence, as
 @memory_extract.command("apply")
 @click.option("--project", "project_id", required=True)
 @click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True))
-@click.option("--profile", type=click.Choice(["strict", "balanced", "aggressive"]), default="balanced")
+@click.option(
+    "--profile",
+    type=click.Choice(["strict", "balanced", "aggressive"]),
+    default="balanced",
+)
 @click.option("--min-confidence", type=float, default=0.6)
+@click.option(
+    "--use-llm", is_flag=True, default=False, help="Enable LLM-based classification"
+)
+@click.option(
+    "--llm-provider",
+    type=click.Choice(["anthropic", "openai", "ollama", "openai-compatible"]),
+    default=None,
+    help="LLM provider (default: from env or anthropic)",
+)
+@click.option(
+    "--llm-model", default=None, help="LLM model name (provider-specific default)"
+)
+@click.option(
+    "--llm-base-url",
+    default=None,
+    help="Base URL for Ollama/OpenAI-compatible endpoints",
+)
 @click.option("--json", "as_json", is_flag=True)
-def memory_extract_apply(project_id, run_log_path, profile, min_confidence, as_json):
+def memory_extract_apply(
+    project_id,
+    run_log_path,
+    profile,
+    min_confidence,
+    use_llm,
+    llm_provider,
+    llm_model,
+    llm_base_url,
+    as_json,
+):
     text_corpus = Path(run_log_path).read_text(encoding="utf-8")
     text_corpus = _truncate_run_log(text_corpus)
     payload = {
         "text_corpus": text_corpus,
         "profile": profile,
         "min_confidence": min_confidence,
+        "use_llm": use_llm,
+        "llm_provider": llm_provider,
+        "llm_model": llm_model,
+        "llm_base_url": llm_base_url,
     }
     try:
         response = _memory_request(
@@ -12145,10 +12242,41 @@ def memory_extract_apply(project_id, run_log_path, profile, min_confidence, as_j
 @memory_extract.command("run")
 @click.option("--project", "project_id", required=True)
 @click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True))
-@click.option("--profile", type=click.Choice(["strict", "balanced", "aggressive"]), default="balanced")
+@click.option(
+    "--profile",
+    type=click.Choice(["strict", "balanced", "aggressive"]),
+    default="balanced",
+)
 @click.option("--min-confidence", type=float, default=0.6)
+@click.option(
+    "--use-llm", is_flag=True, default=False, help="Enable LLM-based classification"
+)
+@click.option(
+    "--llm-provider",
+    type=click.Choice(["anthropic", "openai", "ollama", "openai-compatible"]),
+    default=None,
+    help="LLM provider (default: from env or anthropic)",
+)
+@click.option(
+    "--llm-model", default=None, help="LLM model name (provider-specific default)"
+)
+@click.option(
+    "--llm-base-url",
+    default=None,
+    help="Base URL for Ollama/OpenAI-compatible endpoints",
+)
 @click.option("--json", "as_json", is_flag=True)
-def memory_extract_run(project_id, run_log_path, profile, min_confidence, as_json):
+def memory_extract_run(
+    project_id,
+    run_log_path,
+    profile,
+    min_confidence,
+    use_llm,
+    llm_provider,
+    llm_model,
+    llm_base_url,
+    as_json,
+):
     """Alias for extract apply."""
     text_corpus = Path(run_log_path).read_text(encoding="utf-8")
     text_corpus = _truncate_run_log(text_corpus)
@@ -12156,6 +12284,10 @@ def memory_extract_run(project_id, run_log_path, profile, min_confidence, as_jso
         "text_corpus": text_corpus,
         "profile": profile,
         "min_confidence": min_confidence,
+        "use_llm": use_llm,
+        "llm_provider": llm_provider,
+        "llm_model": llm_model,
+        "llm_base_url": llm_base_url,
     }
     try:
         response = _memory_request(

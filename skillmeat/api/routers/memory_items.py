@@ -399,7 +399,13 @@ async def preview_memory_extraction(
 ) -> MemoryExtractionPreviewResponse:
     """Preview memory extraction candidates."""
     try:
-        extractor = _get_extractor_service()
+        extractor = MemoryExtractorService(
+            db_path=None,
+            use_llm=request.use_llm,
+            llm_provider=request.llm_provider,
+            llm_model=request.llm_model,
+            llm_base_url=request.llm_base_url,
+        )
         candidates = extractor.preview(
             project_id=unquote(project_id),
             text_corpus=request.text_corpus,
@@ -432,7 +438,13 @@ async def apply_memory_extraction(
 ) -> MemoryExtractionApplyResponse:
     """Apply memory extraction candidates."""
     try:
-        extractor = _get_extractor_service()
+        extractor = MemoryExtractorService(
+            db_path=None,
+            use_llm=request.use_llm,
+            llm_provider=request.llm_provider,
+            llm_model=request.llm_model,
+            llm_base_url=request.llm_base_url,
+        )
         result = extractor.apply(
             project_id=unquote(project_id),
             text_corpus=request.text_corpus,
@@ -495,12 +507,8 @@ async def list_memory_items(
     cursor: Optional[str] = Query(
         None, description="Cursor from previous page for pagination"
     ),
-    sort_by: str = Query(
-        default="created_at", description="Field to sort by"
-    ),
-    sort_order: str = Query(
-        default="desc", description="Sort direction (asc or desc)"
-    ),
+    sort_by: str = Query(default="created_at", description="Field to sort by"),
+    sort_order: str = Query(default="desc", description="Sort direction (asc or desc)"),
 ) -> MemoryItemListResponse:
     """List memory items with filtering and cursor-based pagination.
 
