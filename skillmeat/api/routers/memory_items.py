@@ -391,13 +391,68 @@ async def list_global_memory_items(
     "/extract/preview",
     response_model=MemoryExtractionPreviewResponse,
     summary="Preview extracted memory candidates",
-    description="Run extraction without persisting memory items.",
+    description="Extract candidate memory items from session transcript without persisting to database. Supports heuristic and optional LLM classification.",
 )
 async def preview_memory_extraction(
     request: MemoryExtractionPreviewRequest,
     project_id: str = Query(..., description="Project ID for extraction scope"),
 ) -> MemoryExtractionPreviewResponse:
-    """Preview memory extraction candidates."""
+    """Preview memory extraction candidates without persisting to database.
+
+    Parses JSONL session data, filters noise messages (progress, system, meta),
+    classifies content by type, and scores candidates by quality signals.
+    Optionally enhances classification via LLM (if use_llm=true in request).
+
+    Request body:
+        text_corpus: Raw session transcript (JSONL preferred, plain text fallback)
+        profile: Extraction profile ("strict", "balanced", "aggressive")
+        min_confidence: Minimum score to include candidate (default: 0.6)
+        use_llm: Enable LLM semantic classification (default: false)
+        llm_provider: Provider name ("anthropic", "openai", "ollama", "openai-compatible")
+        llm_model: Model name (e.g., "haiku", "gpt-4o-mini")
+        llm_base_url: Base URL for Ollama/OpenAI-compatible endpoints
+        run_id, session_id, commit_sha: Optional provenance metadata
+
+    Response:
+        candidates: List of dicts with type, content, confidence, status, provenance
+        total_candidates: Count of extracted candidates
+
+    Example request:
+        POST /api/v1/memory-items/extract/preview?project_id=proj-1
+        {
+          "text_corpus": "{\\"type\\":\\"assistant\\",\\"content\\":\\"Learned that uv is faster\\"}\\n",
+          "profile": "balanced",
+          "min_confidence": 0.6,
+          "use_llm": true,
+          "llm_provider": "anthropic",
+          "llm_model": "haiku"
+        }
+
+    Example response:
+        {
+          "candidates": [
+            {
+              "type": "learning",
+              "content": "Learned that uv is faster",
+              "confidence": 0.87,
+              "status": "candidate",
+              "duplicate_of": null,
+              "provenance": {
+                "format": "jsonl",
+                "session_id": "s1",
+                "git_branch": "main",
+                "classification_method": "llm",
+                "llm_reasoning": "First-person learning with tool comparison"
+              }
+            }
+          ],
+          "total_candidates": 1
+        }
+
+    Raises:
+        400: Invalid profile or malformed request
+        500: Extraction failure or LLM classification error
+    """
     try:
         extractor = MemoryExtractorService(
             db_path=None,
@@ -430,13 +485,64 @@ async def preview_memory_extraction(
     "/extract/apply",
     response_model=MemoryExtractionApplyResponse,
     summary="Apply extracted memory candidates",
-    description="Run extraction and persist candidate memory items.",
+    description="Extract candidate memory items from session transcript and persist to database with status='candidate'. Skips duplicates detected by content hash.",
 )
 async def apply_memory_extraction(
     request: MemoryExtractionApplyRequest,
     project_id: str = Query(..., description="Project ID for extraction scope"),
 ) -> MemoryExtractionApplyResponse:
-    """Apply memory extraction candidates."""
+    """Extract and persist candidate memory items to database.
+
+    Calls preview() to extract candidates, then persists non-duplicate items
+    to database with status="candidate". Duplicates are detected by content
+    hash and skipped. All extracted items require human review before activation.
+
+    Request body:
+        text_corpus: Raw session transcript (JSONL preferred, plain text fallback)
+        profile: Extraction profile ("strict", "balanced", "aggressive")
+        min_confidence: Minimum score to include candidate (default: 0.6)
+        use_llm: Enable LLM semantic classification (default: false)
+        llm_provider: Provider name ("anthropic", "openai", "ollama", "openai-compatible")
+        llm_model: Model name (e.g., "haiku", "gpt-4o-mini")
+        llm_base_url: Base URL for Ollama/OpenAI-compatible endpoints
+        run_id, session_id, commit_sha: Optional provenance metadata
+
+    Response:
+        created: List of persisted memory items with database IDs
+        skipped_duplicates: List of items skipped due to duplicate content hash
+        preview_total: Total candidates extracted (created + skipped)
+
+    Example request:
+        POST /api/v1/memory-items/extract/apply?project_id=proj-1
+        {
+          "text_corpus": "{\\"type\\":\\"assistant\\",\\"content\\":\\"Learned that uv is faster\\"}\\n",
+          "profile": "balanced",
+          "use_llm": true,
+          "llm_provider": "anthropic"
+        }
+
+    Example response:
+        {
+          "created": [
+            {
+              "id": "mem-123",
+              "type": "learning",
+              "content": "Learned that uv is faster",
+              "confidence": 0.87,
+              "status": "candidate",
+              "project_id": "proj-1",
+              "created_at": "2024-01-15T10:30:00Z",
+              "provenance": {...}
+            }
+          ],
+          "skipped_duplicates": [],
+          "preview_total": 1
+        }
+
+    Raises:
+        400: Invalid profile or malformed request
+        500: Extraction failure, database error, or LLM classification error
+    """
     try:
         extractor = MemoryExtractorService(
             db_path=None,

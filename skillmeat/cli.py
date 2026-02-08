@@ -12111,37 +12111,56 @@ def _truncate_run_log(content: str, max_bytes: int = 500_000) -> str:
 
 @memory.group("extract")
 def memory_extract():
-    """Memory extraction commands."""
+    """Extract candidate memory items from Claude Code session transcripts.
+
+    Parses JSONL session logs, filters noise messages, classifies content by type,
+    and scores candidates by quality signals. Supports optional LLM classification
+    for enhanced semantic analysis.
+
+    Extraction profiles:
+      - strict: Higher threshold, fewer candidates (confidence -0.08)
+      - balanced: Default threshold (confidence +0.0)
+      - aggressive: Lower threshold, more candidates (confidence +0.08)
+
+    Example usage:
+      skillmeat memory extract preview --project proj-1 --run-log session.jsonl
+      skillmeat memory extract apply --project proj-1 --run-log session.jsonl --use-llm
+    """
     pass
 
 
 @memory_extract.command("preview")
-@click.option("--project", "project_id", required=True)
-@click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True))
+@click.option("--project", "project_id", required=True, help="Project ID for extraction scope")
+@click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True),
+              help="Path to JSONL session log from Claude Code")
 @click.option(
     "--profile",
     type=click.Choice(["strict", "balanced", "aggressive"]),
     default="balanced",
+    help="Extraction profile (strict: fewer candidates, aggressive: more candidates)",
 )
-@click.option("--min-confidence", type=float, default=0.6)
+@click.option("--min-confidence", type=float, default=0.6,
+              help="Minimum confidence score to include candidate (0.0-1.0)")
 @click.option(
-    "--use-llm", is_flag=True, default=False, help="Enable LLM-based classification"
+    "--use-llm", is_flag=True, default=False,
+    help="Enable LLM-based semantic classification (requires API key)",
 )
 @click.option(
     "--llm-provider",
     type=click.Choice(["anthropic", "openai", "ollama", "openai-compatible"]),
     default=None,
-    help="LLM provider (default: from env or anthropic)",
+    help="LLM provider (default: anthropic or SKILLMEAT_LLM_PROVIDER env var)",
 )
 @click.option(
-    "--llm-model", default=None, help="LLM model name (provider-specific default)"
+    "--llm-model", default=None,
+    help="LLM model name (e.g., 'haiku', 'gpt-4o-mini', provider-specific default)",
 )
 @click.option(
     "--llm-base-url",
     default=None,
-    help="Base URL for Ollama/OpenAI-compatible endpoints",
+    help="Base URL for Ollama/OpenAI-compatible endpoints (default: http://localhost:11434 for Ollama)",
 )
-@click.option("--json", "as_json", is_flag=True)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON instead of formatted table")
 def memory_extract_preview(
     project_id,
     run_log_path,
@@ -12153,6 +12172,39 @@ def memory_extract_preview(
     llm_base_url,
     as_json,
 ):
+    """Preview extracted memory candidates without persisting to database.
+
+    Extracts candidate memory items from a Claude Code session transcript (JSONL format).
+    Parses messages, filters noise (progress/system/meta), classifies by type
+    (learning, constraint, gotcha, decision, style_rule), and scores by quality signals.
+
+    Optional LLM classification enhances semantic analysis with retry backoff, cost
+    monitoring, and usage tracking. Supports multiple providers: Anthropic, OpenAI,
+    Ollama, OpenAI-compatible endpoints.
+
+    \b
+    Troubleshooting:
+      - If extraction returns 0 candidates, ensure input is JSONL format from Claude Code
+        sessions, not plain conversation text. Each line must be valid JSON with 'type'
+        and 'content' fields.
+      - Session logs are auto-truncated to 500KB. For large sessions, consider splitting
+        or using aggressive profile.
+      - LLM classification requires valid API key (set via --llm-provider flag or
+        ANTHROPIC_API_KEY/OPENAI_API_KEY env vars).
+
+    \b
+    Examples:
+      # Preview with heuristic classification only
+      skillmeat memory extract preview --project proj-1 --run-log session.jsonl
+
+      # Preview with LLM classification (Anthropic Haiku)
+      skillmeat memory extract preview --project proj-1 --run-log session.jsonl \\
+        --use-llm --llm-provider anthropic --llm-model haiku
+
+      # Aggressive profile to extract more candidates
+      skillmeat memory extract preview --project proj-1 --run-log session.jsonl \\
+        --profile aggressive --min-confidence 0.5
+    """
     text_corpus = Path(run_log_path).read_text(encoding="utf-8")
     text_corpus = _truncate_run_log(text_corpus)
     payload = {
@@ -12178,32 +12230,37 @@ def memory_extract_preview(
 
 
 @memory_extract.command("apply")
-@click.option("--project", "project_id", required=True)
-@click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True))
+@click.option("--project", "project_id", required=True, help="Project ID for extraction scope")
+@click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True),
+              help="Path to JSONL session log from Claude Code")
 @click.option(
     "--profile",
     type=click.Choice(["strict", "balanced", "aggressive"]),
     default="balanced",
+    help="Extraction profile (strict: fewer candidates, aggressive: more candidates)",
 )
-@click.option("--min-confidence", type=float, default=0.6)
+@click.option("--min-confidence", type=float, default=0.6,
+              help="Minimum confidence score to include candidate (0.0-1.0)")
 @click.option(
-    "--use-llm", is_flag=True, default=False, help="Enable LLM-based classification"
+    "--use-llm", is_flag=True, default=False,
+    help="Enable LLM-based semantic classification (requires API key)",
 )
 @click.option(
     "--llm-provider",
     type=click.Choice(["anthropic", "openai", "ollama", "openai-compatible"]),
     default=None,
-    help="LLM provider (default: from env or anthropic)",
+    help="LLM provider (default: anthropic or SKILLMEAT_LLM_PROVIDER env var)",
 )
 @click.option(
-    "--llm-model", default=None, help="LLM model name (provider-specific default)"
+    "--llm-model", default=None,
+    help="LLM model name (e.g., 'haiku', 'gpt-4o-mini', provider-specific default)",
 )
 @click.option(
     "--llm-base-url",
     default=None,
-    help="Base URL for Ollama/OpenAI-compatible endpoints",
+    help="Base URL for Ollama/OpenAI-compatible endpoints (default: http://localhost:11434 for Ollama)",
 )
-@click.option("--json", "as_json", is_flag=True)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON instead of formatted table")
 def memory_extract_apply(
     project_id,
     run_log_path,
@@ -12215,6 +12272,42 @@ def memory_extract_apply(
     llm_base_url,
     as_json,
 ):
+    """Extract and persist candidate memory items to database.
+
+    Extracts candidate memory items from a Claude Code session transcript (JSONL format)
+    and persists them to the database with status="candidate". Skips duplicates detected
+    by content hash. All extracted items require human review before activation.
+
+    Parses messages, filters noise (progress/system/meta), classifies by type
+    (learning, constraint, gotcha, decision, style_rule), and scores by quality signals.
+    Optional LLM classification enhances semantic analysis with retry backoff, cost
+    monitoring, and usage tracking.
+
+    \b
+    Troubleshooting:
+      - If extraction returns 0 candidates, ensure input is JSONL format from Claude Code
+        sessions, not plain conversation text. Each line must be valid JSON with 'type'
+        and 'content' fields.
+      - Session logs are auto-truncated to 500KB. For large sessions, consider splitting
+        or using aggressive profile.
+      - LLM classification requires valid API key (set via --llm-provider flag or
+        ANTHROPIC_API_KEY/OPENAI_API_KEY env vars).
+      - Duplicates are detected by content hash and skipped automatically. Check
+        "skipped_duplicates" in output.
+
+    \b
+    Examples:
+      # Extract and persist with heuristic classification only
+      skillmeat memory extract apply --project proj-1 --run-log session.jsonl
+
+      # Extract with LLM classification (Anthropic Haiku)
+      skillmeat memory extract apply --project proj-1 --run-log session.jsonl \\
+        --use-llm --llm-provider anthropic --llm-model haiku
+
+      # Aggressive profile to extract more candidates
+      skillmeat memory extract apply --project proj-1 --run-log session.jsonl \\
+        --profile aggressive --min-confidence 0.5
+    """
     text_corpus = Path(run_log_path).read_text(encoding="utf-8")
     text_corpus = _truncate_run_log(text_corpus)
     payload = {
@@ -12240,32 +12333,37 @@ def memory_extract_apply(
 
 
 @memory_extract.command("run")
-@click.option("--project", "project_id", required=True)
-@click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True))
+@click.option("--project", "project_id", required=True, help="Project ID for extraction scope")
+@click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True),
+              help="Path to JSONL session log from Claude Code")
 @click.option(
     "--profile",
     type=click.Choice(["strict", "balanced", "aggressive"]),
     default="balanced",
+    help="Extraction profile (strict: fewer candidates, aggressive: more candidates)",
 )
-@click.option("--min-confidence", type=float, default=0.6)
+@click.option("--min-confidence", type=float, default=0.6,
+              help="Minimum confidence score to include candidate (0.0-1.0)")
 @click.option(
-    "--use-llm", is_flag=True, default=False, help="Enable LLM-based classification"
+    "--use-llm", is_flag=True, default=False,
+    help="Enable LLM-based semantic classification (requires API key)",
 )
 @click.option(
     "--llm-provider",
     type=click.Choice(["anthropic", "openai", "ollama", "openai-compatible"]),
     default=None,
-    help="LLM provider (default: from env or anthropic)",
+    help="LLM provider (default: anthropic or SKILLMEAT_LLM_PROVIDER env var)",
 )
 @click.option(
-    "--llm-model", default=None, help="LLM model name (provider-specific default)"
+    "--llm-model", default=None,
+    help="LLM model name (e.g., 'haiku', 'gpt-4o-mini', provider-specific default)",
 )
 @click.option(
     "--llm-base-url",
     default=None,
-    help="Base URL for Ollama/OpenAI-compatible endpoints",
+    help="Base URL for Ollama/OpenAI-compatible endpoints (default: http://localhost:11434 for Ollama)",
 )
-@click.option("--json", "as_json", is_flag=True)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON instead of formatted table")
 def memory_extract_run(
     project_id,
     run_log_path,
@@ -12277,7 +12375,11 @@ def memory_extract_run(
     llm_base_url,
     as_json,
 ):
-    """Alias for extract apply."""
+    """Alias for 'extract apply' - extract and persist candidates to database.
+
+    This command is identical to 'extract apply'. Use 'extract preview' to see
+    candidates without persisting, or 'extract apply'/'extract run' to persist.
+    """
     text_corpus = Path(run_log_path).read_text(encoding="utf-8")
     text_corpus = _truncate_run_log(text_corpus)
     payload = {

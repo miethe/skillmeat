@@ -1,8 +1,21 @@
-"""Heuristic memory extraction service.
+"""Memory extraction service with heuristic and optional LLM classification.
 
-Provides deterministic extraction of candidate memory items from run logs
-or arbitrary text corpora. Extraction is review-first and only creates
-`candidate` memories on apply.
+Extracts candidate memory items from Claude Code session transcripts (JSONL format)
+or plain text. Filters noise messages, classifies content by type (learning, constraint,
+gotcha, decision, style_rule), and scores candidates by quality signals. Optionally
+enhances classification via LLM (Anthropic, OpenAI, Ollama, OpenAI-compatible providers)
+with retry backoff, cost monitoring, and usage tracking.
+
+Extraction is review-first: creates only `candidate` memories requiring human approval.
+Supports two input formats with automatic detection and fallback:
+- JSONL: Structured message logs with provenance metadata (sessionId, gitBranch, timestamp)
+- Plain text: Line-based extraction for backward compatibility
+
+Quality signals for scoring (confidence 0.55-0.92):
+- First-person learning indicators (+0.05): "learned that", "discovered that"
+- Specificity (+0.03): file paths, function names, numbers
+- Question penalty (-0.03): ends with '?' or starts with question word
+- Vague language penalty (-0.04): "maybe", "probably", "might"
 """
 
 from __future__ import annotations
@@ -52,7 +65,30 @@ _VALID_PROFILES = frozenset(_PROFILE_BONUS.keys())
 
 
 class MemoryExtractorService:
-    """Extract and optionally persist candidate memories."""
+    """Extract and optionally persist candidate memories from session transcripts.
+
+    Supports heuristic classification (fast, deterministic) and optional LLM
+    classification (semantic, provider-configurable). LLM classification can be
+    enabled via constructor flags or environment variables (SKILLMEAT_LLM_ENABLED,
+    SKILLMEAT_LLM_PROVIDER, SKILLMEAT_LLM_MODEL).
+
+    Args:
+        db_path: Path to SQLite database (None to use default).
+        use_llm: Enable LLM classification (default: False).
+        llm_provider: LLM provider name ("anthropic", "openai", "ollama", "openai-compatible").
+        llm_model: Model name (provider-specific, e.g., "haiku", "gpt-4o-mini").
+        llm_api_key: API key for LLM provider (fallback to env vars).
+        llm_base_url: Base URL for Ollama/OpenAI-compatible endpoints.
+
+    Example:
+        >>> svc = MemoryExtractorService(db_path=None, use_llm=True, llm_provider="anthropic")
+        >>> candidates = svc.preview("proj-1", jsonl_data, profile="balanced")
+        >>> len(candidates)  # Typically 5-30 candidates per session
+        12
+        >>> result = svc.apply("proj-1", jsonl_data)
+        >>> result["created"]
+        [{"type": "learning", "content": "...", "confidence": 0.87}, ...]
+    """
 
     def __init__(
         self,
@@ -125,15 +161,54 @@ class MemoryExtractorService:
         session_id: Optional[str] = None,
         commit_sha: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Extract candidate memory items without persisting.
+        """Extract candidate memory items without persisting to database.
 
-        Supports two input formats:
-        1. JSONL: Structured message logs with metadata (format='jsonl')
-        2. Plain text: Line-based extraction (format='plain_text')
+        Parses JSONL session data, filters noise messages (progress, system, meta),
+        classifies content by type, and scores candidates by quality signals.
+        Optionally enhances classification via LLM (if enabled in constructor).
+        Automatically detects format and falls back to plain-text if JSONL parsing fails.
 
-        Automatically detects format and falls back to plain-text if JSONL
-        parsing fails. Provenance includes 'format' field indicating which
-        extraction path was used.
+        Args:
+            project_id: Project ID for provenance tracking and duplicate detection.
+            text_corpus: Raw session transcript (JSONL preferred, plain text fallback).
+            profile: Extraction profile ("strict", "balanced", "aggressive"). Adjusts
+                confidence threshold via profile bonus: strict -0.08, balanced 0.0,
+                aggressive +0.08.
+            min_confidence: Minimum confidence score to include candidate (default: 0.6).
+            run_id: Optional run ID for provenance tracking.
+            session_id: Optional session ID for provenance (extracted from JSONL if present).
+            commit_sha: Optional commit SHA for provenance.
+
+        Returns:
+            List of candidate dicts sorted by confidence descending, each with keys:
+            - type (str): Memory type (learning, constraint, gotcha, decision, style_rule)
+            - content (str): Extracted text content
+            - confidence (float): Score 0.0-0.98 (typical range 0.55-0.92)
+            - status (str): Always "candidate"
+            - duplicate_of (str|None): ID if content hash matches existing memory
+            - provenance (dict): Metadata including format (jsonl|plain_text),
+              session_id, git_branch, timestamp, classification_method (heuristic|llm)
+
+        Raises:
+            ValueError: If profile is not one of: strict, balanced, aggressive.
+
+        Example:
+            >>> svc = MemoryExtractorService(db_path=None)
+            >>> jsonl_data = '{"type":"assistant","content":"Learned that uv is faster than pip"}\\n'
+            >>> candidates = svc.preview("proj-1", jsonl_data)
+            >>> len(candidates)
+            1
+            >>> candidates[0]["type"]
+            'learning'
+            >>> candidates[0]["confidence"]
+            0.71
+            >>> candidates[0]["provenance"]["format"]
+            'jsonl'
+
+        Note:
+            If extraction returns 0 candidates, ensure input is JSONL format from
+            Claude Code sessions, not plain conversation text. JSONL lines must
+            parse to dictionaries with 'type' and 'content' fields.
         """
         started = time.perf_counter()
         status_label = "success"
@@ -269,7 +344,42 @@ class MemoryExtractorService:
         session_id: Optional[str] = None,
         commit_sha: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Extract and persist candidate memories."""
+        """Extract and persist candidate memories to database.
+
+        Calls preview() to extract candidates, then persists non-duplicate items
+        to database with status="candidate". Duplicates are detected by content
+        hash and skipped.
+
+        Args:
+            project_id: Project ID for provenance tracking and duplicate detection.
+            text_corpus: Raw session transcript (JSONL preferred, plain text fallback).
+            profile: Extraction profile ("strict", "balanced", "aggressive").
+            min_confidence: Minimum confidence score to include candidate (default: 0.6).
+            run_id: Optional run ID for provenance tracking.
+            session_id: Optional session ID for provenance.
+            commit_sha: Optional commit SHA for provenance.
+
+        Returns:
+            Dict with keys:
+            - created (list): Persisted memory items with database IDs
+            - skipped_duplicates (list): Items skipped due to duplicate content hash
+            - preview_total (int): Total candidates extracted (created + skipped)
+
+        Raises:
+            ValueError: If profile is not one of: strict, balanced, aggressive.
+
+        Example:
+            >>> svc = MemoryExtractorService(db_path=None)
+            >>> result = svc.apply("proj-1", jsonl_data)
+            >>> result["preview_total"]
+            12
+            >>> len(result["created"])
+            10
+            >>> len(result["skipped_duplicates"])
+            2
+            >>> result["created"][0]["status"]
+            'candidate'
+        """
         started = time.perf_counter()
         status_label = "success"
         try:
@@ -328,19 +438,27 @@ class MemoryExtractorService:
         2. JSON-string-wrapped JSONL: Entire corpus is a JSON string with escaped newlines
         3. Mixed: Lines that fail parsing are skipped with debug logging
 
+        Claude Code session logs use standard JSONL format with one message per line.
+        Each message typically contains: type, role, content, timestamp, sessionId,
+        gitBranch, uuid, and optional metadata fields.
+
         Args:
-            text_corpus: String containing JSONL data or JSON-string-wrapped JSONL
+            text_corpus: String containing JSONL data or JSON-string-wrapped JSONL.
 
         Returns:
             List of dictionaries parsed from valid JSON lines. Lines that fail
-            parsing or parse to non-dict types are skipped.
+            parsing or parse to non-dict types are skipped with debug logging.
+            Empty list if all lines fail to parse or input is empty.
 
-        Examples:
-            >>> _parse_jsonl_messages('{"role":"user"}\\n{"role":"assistant"}')
-            [{"role": "user"}, {"role": "assistant"}]
+        Example:
+            >>> _parse_jsonl_messages('{"role":"user","content":"test"}\\n{"role":"assistant","content":"reply"}')
+            [{"role": "user", "content": "test"}, {"role": "assistant", "content": "reply"}]
 
             >>> _parse_jsonl_messages('"{\\"role\\":\\"user\\"}\\n{\\"role\\":\\"assistant\\"}"')
             [{"role": "user"}, {"role": "assistant"}]
+
+            >>> _parse_jsonl_messages('invalid json\\n{"role":"user"}')  # Mixed valid/invalid
+            [{"role": "user"}]
         """
         if not text_corpus or not text_corpus.strip():
             return []
@@ -382,19 +500,47 @@ class MemoryExtractorService:
 
     @staticmethod
     def _extract_content_blocks(messages: List[Dict]) -> List[tuple[str, Dict]]:
-        """Extract content blocks from JSONL message structures.
+        """Extract content blocks from JSONL message structures with filtering.
 
-        Filters messages by type, skips metadata/tool results, and extracts
-        text content blocks with provenance metadata including git_branch.
+        Applies noise filtering to skip non-content messages:
+        - Skips message types: progress, file-history-snapshot, system, result
+        - Skips meta messages (isMeta=true)
+        - Skips tool use results (toolUseResult=true)
+        - Extracts only text blocks from content (skips tool_use/tool_result blocks)
+
+        Processes both user and assistant messages. Extracts provenance metadata
+        including sessionId, gitBranch, timestamp for tracking learning context.
 
         Args:
-            messages: List of message dictionaries from run log JSONL
+            messages: List of message dictionaries from JSONL run log. Expected
+                structure per message:
+                - type: "human" | "assistant" | "progress" | "system" | etc.
+                - role: "user" | "assistant" (optional)
+                - content: str | list[dict] (text blocks or mixed content)
+                - timestamp, sessionId, gitBranch, uuid: metadata fields
 
         Returns:
-            List of (content_text, provenance_metadata) tuples for non-empty
-            content >= 20 characters. Provenance dict includes:
-            - message_uuid, message_role, timestamp, session_id (standard)
-            - git_branch (from message.gitBranch, empty string if missing)
+            List of (content_text, provenance_metadata) tuples. Only includes
+            content blocks >= 20 characters. Provenance dict keys:
+            - message_uuid: Unique message identifier
+            - message_role: Message type or role (e.g., "assistant", "human")
+            - timestamp: ISO 8601 timestamp string
+            - session_id: Session identifier from JSONL
+            - git_branch: Git branch name (empty string if missing)
+
+        Example:
+            >>> messages = [
+            ...     {"type": "assistant", "content": "Learned that uv is faster", "sessionId": "s1", "gitBranch": "main"},
+            ...     {"type": "progress", "content": "Working..."},  # Skipped (noise)
+            ...     {"type": "assistant", "content": [{"type": "text", "text": "Important insight"}]}
+            ... ]
+            >>> blocks = _extract_content_blocks(messages)
+            >>> len(blocks)
+            2
+            >>> blocks[0][0]
+            'Learned that uv is faster'
+            >>> blocks[0][1]["git_branch"]
+            'main'
         """
         # Message types to skip (noise)
         skip_types = {"progress", "file-history-snapshot", "system", "result"}
@@ -475,21 +621,36 @@ class MemoryExtractorService:
 
     @staticmethod
     def _score(line: str, mem_type: str, profile: str) -> float:
-        """Calculate confidence score for a candidate line.
+        """Calculate confidence score for a candidate line using quality signals.
 
         Base scoring:
-        - Start: 0.58 + length bonus (max 0.18)
+        - Start: 0.58 + length bonus (max 0.18 for lines >= 200 chars)
         - Type bonus: decision/constraint +0.08, gotcha/style_rule +0.05
         - Profile adjustment: strict -0.08, balanced 0.0, aggressive +0.08
 
-        Content quality signals:
-        - First-person learning (+0.05): "learned that", "discovered that", etc.
-        - Specificity (+0.03): file paths, function names, numbers
+        Content quality signals (additive):
+        - First-person learning (+0.05): "learned that", "discovered that",
+          "realized that", "found that", "noticed that", "understood that"
+        - Specificity (+0.03): file paths (.py, .ts, .tsx, .js, .md), function
+          names (contains "()"), or numbers
         - Question penalty (-0.03): ends with '?' or starts with question word
-        - Vague language (-0.04): "maybe", "probably", "might", etc.
+          (why, how, what, should, could, would, can, is, are, does, do)
+        - Vague language (-0.04): "maybe", "probably", "might", "perhaps",
+          "possibly", "somehow", "something", "somewhere"
+
+        Args:
+            line: Candidate text to score.
+            mem_type: Memory type from classification (learning, constraint, etc.).
+            profile: Extraction profile ("strict", "balanced", "aggressive").
 
         Returns:
-            Float confidence score clamped to [0.0, 0.98]
+            Float confidence score clamped to [0.0, 0.98]. Typical range: 0.55-0.92.
+
+        Example:
+            >>> _score("Learned that uv is faster than pip for package management", "learning", "balanced")
+            0.76  # Base + length + learning pattern + specificity
+            >>> _score("Maybe we should try this approach?", "learning", "balanced")
+            0.58  # Base - question - vague language
         """
         base = 0.58
         base += min(len(line) / 200.0, 0.18)
@@ -560,14 +721,33 @@ class MemoryExtractorService:
         return max(0.0, min(base, 0.98))
 
     def _apply_llm_classification(self, candidates: List[Dict[str, Any]]) -> None:
-        """Apply LLM classification to candidates in-place.
+        """Apply LLM semantic classification to candidates in-place.
 
-        For each candidate where LLM returns a result, override the type and
-        confidence with LLM values. Add LLM reasoning and provider to provenance.
-        Gracefully falls back to heuristic classification when LLM fails.
+        For each candidate where LLM returns a result, overrides the heuristic
+        type and confidence with LLM values. Adds LLM reasoning and provider
+        to provenance metadata. Gracefully falls back to heuristic classification
+        when LLM fails (network error, rate limit, invalid response).
+
+        Updates provenance field `classification_method` to "llm" on success,
+        keeps "heuristic" on failure. Logs success/fallback counts and usage
+        stats (tokens, cost) if available.
 
         Args:
             candidates: List of candidate dicts to classify (modified in-place).
+                Each dict must have 'content' key. Modified keys: type, confidence,
+                provenance (adds classification_method, llm_reasoning, llm_provider).
+
+        Example:
+            >>> candidates = [{"content": "Use uv not pip", "type": "learning", "confidence": 0.65}]
+            >>> svc._apply_llm_classification(candidates)
+            >>> candidates[0]["type"]  # May change based on LLM analysis
+            'style_rule'
+            >>> candidates[0]["confidence"]
+            0.88
+            >>> candidates[0]["provenance"]["classification_method"]
+            'llm'
+            >>> candidates[0]["provenance"]["llm_reasoning"]
+            'Tool choice recommendation with clear preference'
         """
         if not self._classifier:
             return
@@ -624,22 +804,34 @@ class MemoryExtractorService:
         contents: List[str],
         classifier: Optional["LLMClassifier"] = None,
     ) -> List[Optional[Dict[str, Any]]]:
-        """Classify candidates using an LLM provider.
+        """Classify candidates using an LLM provider with automatic fallback.
 
-        If *classifier* is ``None`` or unavailable the method returns a list
-        of ``None`` values (same length as *contents*) so the caller can
-        fall back to heuristic scoring transparently.
+        Calls LLM classifier in batch mode for efficiency. If classifier is None,
+        unavailable, or classification fails, returns None values for transparent
+        fallback to heuristic scoring. Handles network errors, rate limits, and
+        invalid responses gracefully.
 
         Args:
             contents: List of candidate text strings to classify.
-            classifier: An ``LLMClassifier`` instance from
-                ``skillmeat.core.services.llm_classifier``.  May be
-                ``None`` to indicate LLM classification is disabled.
+            classifier: An LLMClassifier instance from llm_classifier module.
+                May be None to indicate LLM classification is disabled.
 
         Returns:
-            List of classification dicts (keys: ``type``, ``confidence``,
-            ``reasoning``) or ``None`` per item when classification is
-            unavailable or fails.
+            List of classification dicts or None per item. Each successful
+            classification dict contains:
+            - type (str): Memory type (learning, constraint, gotcha, etc.)
+            - confidence (float): LLM-assigned confidence score 0.0-1.0
+            - reasoning (str): LLM explanation for classification
+            Returns [None, None, ...] if classifier unavailable or fails.
+
+        Example:
+            >>> from skillmeat.core.services.llm_classifier import get_classifier
+            >>> classifier = get_classifier(provider="anthropic")
+            >>> results = _semantic_classify_batch(["Use uv not pip"], classifier)
+            >>> results[0]["type"]
+            'style_rule'
+            >>> results[0]["confidence"]
+            0.92
         """
         if classifier is None:
             return [None] * len(contents)
