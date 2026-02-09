@@ -63,7 +63,7 @@ Phase 2 is the critical path refactor that removes hardcoded `.claude/` assumpti
 - `skillmeat/cli.py` — Add `--profile` and `--all-profiles` flags to deploy, status, undeploy, init (P2-T6, P2-T7, P2-T8)
 
 **Repository** (modified):
-- `skillmeat/cache/repositories/deployment_profile_repository.py` — Add query helpers (P2-T9)
+- `skillmeat/cache/repositories.py` — Add deployment profile query helpers (P2-T9)
 
 **API** (modified):
 - `skillmeat/api/routers/deployments.py` — Accept `deployment_profile_id`, update endpoints (P2-T10, P2-T11, P2-T12)
@@ -89,6 +89,6 @@ Phase 2 is the critical path refactor that removes hardcoded `.claude/` assumpti
 
 ---
 
-**Phase Status**: Awaiting Phase 1 completion
-**Blocks**: Phase 3 (Context Entity), Phase 4 (Discovery/UI/Cache), Phase 5 (Migration)
-**Blocked By**: Phase 1 (Data Model Foundations)
+**Phase Status**: Completed (2026-02-07)
+**Blocks**: None
+**Blocked By**: None

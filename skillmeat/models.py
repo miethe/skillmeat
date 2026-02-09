@@ -600,6 +600,9 @@ class DeploymentRecord:
     sha: str
     deployed_at: str  # ISO 8601 timestamp
     deployed_from: str  # Path as string for TOML serialization
+    deployment_profile_id: Optional[str] = None
+    platform: Optional[str] = None
+    profile_root_dir: Optional[str] = None
 
 
 @dataclass

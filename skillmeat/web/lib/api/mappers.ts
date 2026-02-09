@@ -14,6 +14,7 @@ import type {
   SyncStatus,
   CollectionRef,
 } from '@/types/artifact';
+import { Platform } from '@/types/enums';
 
 // ============================================================================
 // API Response Types (match backend response structure)
@@ -113,6 +114,7 @@ export interface ArtifactResponse {
   description?: string;
   tags?: string[];
   tools?: string[];
+  target_platforms?: string[] | null;
   author?: string;
   license?: string;
   version?: string;
@@ -303,6 +305,11 @@ export function mapApiResponseToArtifact(
   const topLevelTools = response.tools || [];
   const metadataTools = response.metadata?.tools || [];
   const allTools = [...new Set([...topLevelTools, ...metadataTools])];
+  const targetPlatforms = (response.target_platforms || [])
+    .map((value) => String(value))
+    .filter((value): value is Platform =>
+      Object.values(Platform).includes(value as Platform)
+    );
 
   // Resolve scope (default to 'user' for collection context)
   const scope: ArtifactScope =
@@ -348,6 +355,7 @@ export function mapApiResponseToArtifact(
     ...(description && { description }),
     ...(allTags.length > 0 && { tags: allTags }),
     ...(allTools.length > 0 && { tools: allTools }),
+    ...(targetPlatforms.length > 0 && { targetPlatforms }),
     ...(author && { author }),
     ...(license && { license }),
     ...(version && { version }),

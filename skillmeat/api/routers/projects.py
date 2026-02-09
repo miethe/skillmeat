@@ -42,6 +42,7 @@ from skillmeat.api.schemas.projects import (
 )
 from skillmeat.api.project_registry import ProjectRegistry, get_project_registry
 from skillmeat.cache.manager import CacheManager
+from skillmeat.core.path_resolver import DEFAULT_PROFILE_ROOTS
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.storage.project import ProjectMetadataStorage
 from skillmeat.utils.filesystem import compute_content_hash
@@ -139,8 +140,11 @@ def decode_project_id(project_id: str) -> str:
         )
 
 
-def discover_projects(search_paths: Optional[List[Path]] = None) -> List[Path]:
-    """Discover projects with .claude/.skillmeat-deployed.toml files.
+def discover_projects(
+    search_paths: Optional[List[Path]] = None,
+    profile_id: Optional[str] = None,
+) -> List[Path]:
+    """Discover projects with profile deployment tracker files.
 
     This function scans configured search paths for projects that have
     deployment tracking files, indicating they contain deployed artifacts.
@@ -166,6 +170,15 @@ def discover_projects(search_paths: Optional[List[Path]] = None) -> List[Path]:
     discovered = []
     MAX_DEPTH = 3  # Limit search depth to prevent performance issues
 
+    profile_roots = DEFAULT_PROFILE_ROOTS
+    if profile_id:
+        if profile_id.startswith("."):
+            profile_roots = [profile_id]
+        elif profile_id == "claude_code":
+            profile_roots = [".claude"]
+        else:
+            profile_roots = [f".{profile_id}"]
+
     for search_path in search_paths:
         if not search_path.exists() or not search_path.is_dir():
             continue
@@ -179,27 +192,27 @@ def discover_projects(search_paths: Optional[List[Path]] = None) -> List[Path]:
 
         # Search for .skillmeat-deployed.toml files with depth limit
         try:
-            for deployment_file in search_path.rglob(
-                ".claude/.skillmeat-deployed.toml"
-            ):
-                # Get project root (parent of .claude)
-                project_path = deployment_file.parent.parent
+            for profile_root in profile_roots:
+                for deployment_file in search_path.rglob(
+                    f"{profile_root}/{DeploymentTracker.DEPLOYMENT_FILE}"
+                ):
+                    project_path = deployment_file.parent.parent
 
-                # Validate path is within search_path (security check)
-                try:
-                    project_path = project_path.resolve()
-                    project_path.relative_to(search_path)
-                except (ValueError, RuntimeError, OSError):
-                    logger.warning(f"Skipping invalid project path: {project_path}")
-                    continue
+                    # Validate path is within search_path (security check)
+                    try:
+                        project_path = project_path.resolve()
+                        project_path.relative_to(search_path)
+                    except (ValueError, RuntimeError, OSError):
+                        logger.warning(f"Skipping invalid project path: {project_path}")
+                        continue
 
-                # Check depth limit
-                depth = len(project_path.relative_to(search_path).parts)
-                if depth > MAX_DEPTH:
-                    continue
+                    # Check depth limit
+                    depth = len(project_path.relative_to(search_path).parts)
+                    if depth > MAX_DEPTH:
+                        continue
 
-                if project_path not in discovered:
-                    discovered.append(project_path)
+                    if project_path not in discovered:
+                        discovered.append(project_path)
         except (PermissionError, OSError) as e:
             logger.warning(f"Error scanning {search_path}: {e}")
             continue
@@ -247,25 +260,44 @@ def build_project_detail(project_path: Path, db_session: Optional[Session] = Non
         ProjectDetail object
     """
     from skillmeat.api.services import CollectionService
-    from skillmeat.cache.models import get_session
+    from skillmeat.cache.models import Project, get_session
+    from skillmeat.cache.repositories import DeploymentProfileRepository
 
     deployments = DeploymentTracker.read_deployments(project_path)
 
+    session = db_session or get_session()
+    close_session = db_session is None
+
     # Fetch collection memberships for all artifacts (batch query)
     collections_map = {}
-    if deployments:
-        # Construct artifact IDs: {type}:{name}
-        artifact_ids = [f"{d.artifact_type}:{d.artifact_name}" for d in deployments]
-
-        # Use provided session or create new one
-        session = db_session or get_session()
-        try:
+    deployment_profiles = []
+    try:
+        if deployments:
+            # Construct artifact IDs: {type}:{name}
+            artifact_ids = [f"{d.artifact_type}:{d.artifact_name}" for d in deployments]
             collection_service = CollectionService(session)
             collections_map = collection_service.get_collection_membership_batch(artifact_ids)
-        finally:
-            # Only close session if we created it
-            if db_session is None:
-                session.close()
+
+        project_row = (
+            session.query(Project)
+            .filter(Project.path == str(project_path.resolve()))
+            .first()
+        )
+        if project_row:
+            profile_repo = DeploymentProfileRepository()
+            deployment_profiles = [
+                {
+                    "profile_id": profile.profile_id,
+                    "platform": profile.platform,
+                    "root_dir": profile.root_dir,
+                    "artifact_path_map": profile.artifact_path_map or {},
+                    "context_path_prefixes": profile.context_prefixes or [],
+                }
+                for profile in profile_repo.list_all_profiles(project_row.id)
+            ]
+    finally:
+        if close_session:
+            session.close()
 
     # Convert to API schema with collection memberships
     deployed_artifacts = [
@@ -286,17 +318,20 @@ def build_project_detail(project_path: Path, db_session: Optional[Session] = Non
     # Calculate statistics
     by_type = defaultdict(int)
     by_collection = defaultdict(int)
+    by_profile = defaultdict(int)
     modified_count = 0
 
     for d in deployments:
         by_type[d.artifact_type] += 1
         by_collection[d.from_collection] += 1
+        by_profile[d.deployment_profile_id or "claude_code"] += 1
         if d.local_modifications:
             modified_count += 1
 
     stats = {
         "by_type": dict(by_type),
         "by_collection": dict(by_collection),
+        "by_profile": dict(by_profile),
         "modified_count": modified_count,
     }
 
@@ -317,6 +352,7 @@ def build_project_detail(project_path: Path, db_session: Optional[Session] = Non
         last_deployment=last_deployment,
         deployments=deployed_artifacts,
         stats=stats,
+        deployment_profiles=deployment_profiles,
     )
 
 
@@ -373,6 +409,7 @@ async def list_projects(
     """
     start_time = time.monotonic()
     cache_hit = False
+    used_legacy_discovery = False
     cache_last_fetched = None
 
     try:
@@ -432,9 +469,22 @@ async def list_projects(
                 )
         elif cache_manager is None:
             logger.info("CacheManager not available, using ProjectRegistry")
+            try:
+                discovered_paths = discover_projects()
+                logger.info(
+                    "Legacy discovery fallback found %d project(s)",
+                    len(discovered_paths),
+                )
+                for discovered_path in discovered_paths:
+                    all_projects.append(build_project_summary(discovered_path))
+                used_legacy_discovery = True
+            except Exception as discovery_error:
+                logger.warning(
+                    "Legacy discovery fallback failed: %s", discovery_error
+                )
 
         # If no cache hit or force refresh, fall back to ProjectRegistry
-        if not cache_hit or force_refresh:
+        if (not cache_hit and not used_legacy_discovery) or force_refresh:
             logger.info(
                 f"Cache MISS or force refresh - using ProjectRegistry "
                 f"(force={force_refresh})"

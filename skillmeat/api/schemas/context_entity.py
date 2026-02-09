@@ -13,9 +13,13 @@ for progressive disclosure patterns.
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
+
+from skillmeat.core.enums import Platform
+from skillmeat.core.path_resolver import DEFAULT_PROFILE_ROOTS
+from skillmeat.core.validators.context_path_validator import validate_context_path
 
 from .common import PaginatedResponse
 
@@ -41,7 +45,7 @@ class ContextEntityCreateRequest(BaseModel):
     They support path-pattern matching for auto-loading and categorization.
 
     Path Pattern Security:
-    - Must start with '.claude/' (enforced via validation)
+    - Must start with a profile root (e.g. '.claude/', '.codex/')
     - Cannot contain '..' for path traversal prevention
 
     Examples:
@@ -71,7 +75,7 @@ class ContextEntityCreateRequest(BaseModel):
         examples=["# Web API Patterns\n\nFollow REST conventions..."],
     )
     path_pattern: str = Field(
-        description="Path pattern within .claude/ directory (must start with '.claude/', no '..')",
+        description="Path pattern within a profile root (must start with '.claude/'/'.codex/' etc, no '..')",
         examples=[".claude/rules/web/api-client.md"],
     )
     description: Optional[str] = Field(
@@ -94,6 +98,15 @@ class ContextEntityCreateRequest(BaseModel):
         description="Version identifier (semantic versioning recommended)",
         examples=["1.0.0"],
     )
+    deployment_profile_id: Optional[str] = Field(
+        default=None,
+        description="Optional profile id used when validating/deploying this entity",
+        examples=["claude_code"],
+    )
+    target_platforms: Optional[List[Platform]] = Field(
+        default=None,
+        description="Optional deployment platform restrictions (null means deployable on all platforms)",
+    )
 
     @field_validator("path_pattern")
     @classmethod
@@ -109,10 +122,10 @@ class ContextEntityCreateRequest(BaseModel):
         Raises:
             ValueError: If path pattern is invalid
         """
-        if not v.startswith(".claude/"):
-            raise ValueError("path_pattern must start with '.claude/'")
-        if ".." in v:
-            raise ValueError("path_pattern cannot contain '..' (path traversal)")
+        validate_context_path(
+            v,
+            allowed_prefixes=[f"{root.rstrip('/')}/" for root in DEFAULT_PROFILE_ROOTS],
+        )
         return v
 
     class Config:
@@ -128,6 +141,8 @@ class ContextEntityCreateRequest(BaseModel):
                 "category": "web",
                 "auto_load": True,
                 "version": "1.0.0",
+                "deployment_profile_id": "claude_code",
+                "target_platforms": ["claude_code", "codex"],
             }
         }
 
@@ -158,7 +173,7 @@ class ContextEntityUpdateRequest(BaseModel):
     )
     path_pattern: Optional[str] = Field(
         default=None,
-        description="Updated path pattern (must start with '.claude/', no '..')",
+        description="Updated path pattern (must start with profile root, no '..')",
         examples=[".claude/rules/web/api-client-v2.md"],
     )
     description: Optional[str] = Field(
@@ -181,6 +196,15 @@ class ContextEntityUpdateRequest(BaseModel):
         description="Updated version",
         examples=["2.0.0"],
     )
+    deployment_profile_id: Optional[str] = Field(
+        default=None,
+        description="Updated deployment profile id",
+        examples=["codex"],
+    )
+    target_platforms: Optional[List[Platform]] = Field(
+        default=None,
+        description="Updated platform restrictions",
+    )
 
     @field_validator("path_pattern")
     @classmethod
@@ -198,10 +222,10 @@ class ContextEntityUpdateRequest(BaseModel):
         """
         if v is None:
             return None
-        if not v.startswith(".claude/"):
-            raise ValueError("path_pattern must start with '.claude/'")
-        if ".." in v:
-            raise ValueError("path_pattern cannot contain '..' (path traversal)")
+        validate_context_path(
+            v,
+            allowed_prefixes=[f"{root.rstrip('/')}/" for root in DEFAULT_PROFILE_ROOTS],
+        )
         return v
 
     class Config:
@@ -237,7 +261,7 @@ class ContextEntityResponse(BaseModel):
         examples=[ContextEntityType.RULE_FILE],
     )
     path_pattern: str = Field(
-        description="Path pattern within .claude/ directory",
+        description="Path pattern within profile root directory",
         examples=[".claude/rules/web/api-client.md"],
     )
     description: Optional[str] = Field(
@@ -258,6 +282,14 @@ class ContextEntityResponse(BaseModel):
         default=None,
         description="Version identifier",
         examples=["1.0.0"],
+    )
+    target_platforms: Optional[List[Platform]] = Field(
+        default=None,
+        description="Platform restrictions for deployment (null means deployable anywhere)",
+    )
+    deployed_to: Dict[str, List[str]] = Field(
+        default_factory=dict,
+        description="Deployment paths grouped by profile/platform key",
     )
     content_hash: Optional[str] = Field(
         default=None,
@@ -312,3 +344,48 @@ class ContextEntityListResponse(PaginatedResponse[ContextEntityResponse]):
     """
 
     pass
+
+
+class ContextEntityDeployRequest(BaseModel):
+    """Request schema for deploying a context entity to a project."""
+
+    project_path: str = Field(
+        description="Target project path",
+        examples=["/Users/me/my-project"],
+    )
+    overwrite: bool = Field(
+        default=False,
+        description="Overwrite existing file when destination already exists",
+    )
+    deployment_profile_id: Optional[str] = Field(
+        default=None,
+        description="Optional deployment profile id (uses project primary profile when omitted)",
+        examples=["codex"],
+    )
+    all_profiles: bool = Field(
+        default=False,
+        description="Deploy to all configured project profiles",
+    )
+    force: bool = Field(
+        default=False,
+        description=(
+            "Allow deployment when entity target_platforms exclude selected profile platform"
+        ),
+    )
+
+
+class ContextEntityDeployResponse(BaseModel):
+    """Response schema for context entity deployment."""
+
+    success: bool = Field(description="Whether deployment succeeded")
+    entity_id: str = Field(description="Context entity identifier")
+    project_path: str = Field(description="Resolved project path")
+    deployed_paths: List[str] = Field(
+        default_factory=list,
+        description="Paths written relative to project root",
+    )
+    deployed_profiles: List[str] = Field(
+        default_factory=list,
+        description="Deployment profile IDs that received the entity",
+    )
+    message: str = Field(description="Human-readable deployment result")

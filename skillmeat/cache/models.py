@@ -162,6 +162,12 @@ class Project(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    deployment_profiles: Mapped[List["DeploymentProfile"]] = relationship(
+        "DeploymentProfile",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
     # Constraints
     __table_args__ = (
@@ -197,6 +203,9 @@ class Project(Base):
             "status": self.status,
             "error_message": self.error_message,
             "artifacts": [artifact.to_dict() for artifact in self.artifacts],
+            "deployment_profiles": [
+                profile.to_dict() for profile in self.deployment_profiles
+            ],
         }
 
 
@@ -266,6 +275,7 @@ class Artifact(Base):
     content_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    target_platforms: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -346,6 +356,7 @@ class Artifact(Base):
             "content_hash": self.content_hash,
             "content": self.content,
             "description": self.description,
+            "target_platforms": self.target_platforms,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -355,6 +366,70 @@ class Artifact(Base):
             result["metadata"] = self.artifact_metadata.to_dict()
 
         return result
+
+
+class DeploymentProfile(Base):
+    """Deployment profile configuration for a project."""
+
+    __tablename__ = "deployment_profiles"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    project_id: Mapped[str] = mapped_column(
+        String, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    profile_id: Mapped[str] = mapped_column(String, nullable=False)
+    platform: Mapped[str] = mapped_column(String, nullable=False)
+    root_dir: Mapped[str] = mapped_column(Text, nullable=False)
+    artifact_path_map: Mapped[Optional[Dict[str, str]]] = mapped_column(
+        JSON, nullable=True
+    )
+    config_filenames: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    context_prefixes: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    supported_types: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    project: Mapped["Project"] = relationship(
+        "Project", back_populates="deployment_profiles"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "profile_id",
+            name="uq_deployment_profiles_project_profile_id",
+        ),
+        Index(
+            "idx_deployment_profiles_project_profile",
+            "project_id",
+            "profile_id",
+            unique=True,
+        ),
+        CheckConstraint(
+            "platform IN ('claude_code', 'codex', 'gemini', 'cursor', 'other')",
+            name="ck_deployment_profiles_platform",
+        ),
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert deployment profile to dictionary."""
+        return {
+            "id": self.id,
+            "project_id": self.project_id,
+            "profile_id": self.profile_id,
+            "platform": self.platform,
+            "root_dir": self.root_dir,
+            "artifact_path_map": self.artifact_path_map,
+            "config_filenames": self.config_filenames or [],
+            "context_prefixes": self.context_prefixes or [],
+            "supported_types": self.supported_types or [],
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
 
 
 class ArtifactMetadata(Base):

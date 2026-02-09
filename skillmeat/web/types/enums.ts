@@ -11,6 +11,8 @@
  */
 export enum Platform {
   CLAUDE_CODE = 'claude_code',
+  CODEX = 'codex',
+  GEMINI = 'gemini',
   CURSOR = 'cursor',
   OTHER = 'other',
 }

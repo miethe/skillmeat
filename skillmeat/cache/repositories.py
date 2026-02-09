@@ -76,11 +76,17 @@ from skillmeat.cache.models import (
     ArtifactTag,
     Base,
     CollectionArtifact,
+    DeploymentProfile,
     MarketplaceCatalogEntry,
     MarketplaceSource,
     Tag,
     create_db_engine,
     create_tables,
+)
+from skillmeat.core.enums import Platform
+from skillmeat.core.path_resolver import (
+    DEFAULT_ARTIFACT_PATH_MAP,
+    default_project_config_filenames,
 )
 
 # Configure logging
@@ -3025,6 +3031,218 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
                 next_cursor=next_cursor,
                 has_more=has_more,
             )
+        finally:
+            session.close()
+
+
+# =============================================================================
+# Deployment Profile Repository
+# =============================================================================
+
+
+class DeploymentProfileRepository(BaseRepository[DeploymentProfile]):
+    """Repository for deployment profile CRUD operations."""
+
+    def __init__(self, db_path: Optional[str | Path] = None):
+        super().__init__(db_path, DeploymentProfile)
+
+    def create(
+        self,
+        *,
+        project_id: str,
+        profile_id: str,
+        platform: str,
+        root_dir: str,
+        artifact_path_map: Optional[Dict[str, str]] = None,
+        config_filenames: Optional[List[str]] = None,
+        context_prefixes: Optional[List[str]] = None,
+        supported_types: Optional[List[str]] = None,
+    ) -> DeploymentProfile:
+        """Create a deployment profile."""
+        session = self._get_session()
+        try:
+            platform_value = platform.value if isinstance(platform, Platform) else str(platform)
+            platform_enum = Platform(platform_value) if platform_value in {p.value for p in Platform} else Platform.OTHER
+            root_prefix = f"{root_dir.rstrip('/')}/context/"
+            profile = DeploymentProfile(
+                id=uuid.uuid4().hex,
+                project_id=project_id,
+                profile_id=profile_id,
+                platform=platform_value,
+                root_dir=root_dir,
+                artifact_path_map=artifact_path_map or {},
+                config_filenames=config_filenames
+                or default_project_config_filenames(platform_enum),
+                context_prefixes=context_prefixes or [root_prefix],
+                supported_types=supported_types or [],
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            session.add(profile)
+            session.commit()
+            session.refresh(profile)
+            return profile
+        except IntegrityError as e:
+            session.rollback()
+            raise RepositoryError(f"Failed to create deployment profile: {e}") from e
+        finally:
+            session.close()
+
+    def read_by_id(self, profile_db_id: str) -> Optional[DeploymentProfile]:
+        """Read deployment profile by DB ID."""
+        session = self._get_session()
+        try:
+            return (
+                session.query(DeploymentProfile)
+                .filter(DeploymentProfile.id == profile_db_id)
+                .first()
+            )
+        finally:
+            session.close()
+
+    def read_by_project_and_profile_id(
+        self, project_id: str, profile_id: str
+    ) -> Optional[DeploymentProfile]:
+        """Read deployment profile by project and profile ID."""
+        session = self._get_session()
+        try:
+            return (
+                session.query(DeploymentProfile)
+                .filter(
+                    DeploymentProfile.project_id == project_id,
+                    DeploymentProfile.profile_id == profile_id,
+                )
+                .first()
+            )
+        finally:
+            session.close()
+
+    def list_by_project(self, project_id: str) -> List[DeploymentProfile]:
+        """List deployment profiles for a project."""
+        session = self._get_session()
+        try:
+            return (
+                session.query(DeploymentProfile)
+                .filter(DeploymentProfile.project_id == project_id)
+                .order_by(DeploymentProfile.profile_id.asc())
+                .all()
+            )
+        finally:
+            session.close()
+
+    def list_all_profiles(self, project_id: str) -> List[DeploymentProfile]:
+        """Alias for listing all deployment profiles for a project."""
+        return self.list_by_project(project_id)
+
+    def get_profile_by_platform(
+        self, project_id: str, platform: str | Platform
+    ) -> Optional[DeploymentProfile]:
+        """Get deployment profile by project and platform."""
+        platform_value = (
+            platform.value if isinstance(platform, Platform) else str(platform)
+        )
+        session = self._get_session()
+        try:
+            return (
+                session.query(DeploymentProfile)
+                .filter(
+                    DeploymentProfile.project_id == project_id,
+                    DeploymentProfile.platform == platform_value,
+                )
+                .order_by(DeploymentProfile.profile_id.asc())
+                .first()
+            )
+        finally:
+            session.close()
+
+    def get_primary_profile(self, project_id: str) -> Optional[DeploymentProfile]:
+        """Get primary deployment profile for a project.
+
+        Preference order:
+        1. Explicit Claude Code platform profile
+        2. Profile id == "claude_code"
+        3. First profile alphabetically
+        """
+        primary = self.get_profile_by_platform(project_id, Platform.CLAUDE_CODE)
+        if primary:
+            return primary
+
+        profile = self.read_by_project_and_profile_id(project_id, "claude_code")
+        if profile:
+            return profile
+
+        profiles = self.list_by_project(project_id)
+        return profiles[0] if profiles else None
+
+    def ensure_default_claude_profile(self, project_id: str) -> DeploymentProfile:
+        """Ensure a backward-compatible default Claude profile exists."""
+        primary = self.get_primary_profile(project_id)
+        if primary:
+            return primary
+
+        return self.create(
+            project_id=project_id,
+            profile_id="claude_code",
+            platform=Platform.CLAUDE_CODE.value,
+            root_dir=".claude",
+            artifact_path_map=DEFAULT_ARTIFACT_PATH_MAP.copy(),
+            config_filenames=default_project_config_filenames(Platform.CLAUDE_CODE),
+            context_prefixes=[".claude/context/", ".claude/"],
+            supported_types=["skill", "command", "agent", "hook", "mcp"],
+        )
+
+    def update(
+        self,
+        project_id: str,
+        profile_id: str,
+        **updates: Any,
+    ) -> Optional[DeploymentProfile]:
+        """Update an existing deployment profile."""
+        session = self._get_session()
+        try:
+            profile = (
+                session.query(DeploymentProfile)
+                .filter(
+                    DeploymentProfile.project_id == project_id,
+                    DeploymentProfile.profile_id == profile_id,
+                )
+                .first()
+            )
+            if not profile:
+                return None
+
+            for key, value in updates.items():
+                if value is not None and hasattr(profile, key):
+                    setattr(profile, key, value)
+            profile.updated_at = datetime.utcnow()
+
+            session.commit()
+            session.refresh(profile)
+            return profile
+        except IntegrityError as e:
+            session.rollback()
+            raise RepositoryError(f"Failed to update deployment profile: {e}") from e
+        finally:
+            session.close()
+
+    def delete(self, project_id: str, profile_id: str) -> bool:
+        """Delete deployment profile by project and profile ID."""
+        session = self._get_session()
+        try:
+            profile = (
+                session.query(DeploymentProfile)
+                .filter(
+                    DeploymentProfile.project_id == project_id,
+                    DeploymentProfile.profile_id == profile_id,
+                )
+                .first()
+            )
+            if not profile:
+                return False
+
+            session.delete(profile)
+            session.commit()
+            return True
         finally:
             session.close()
 

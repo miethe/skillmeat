@@ -6,6 +6,8 @@ import {
   Settings,
   Plus,
   ChevronRight,
+  Grid3x3,
+  List,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -16,6 +18,7 @@ import {
   useMemorySelection,
   usePromoteMemoryItem,
   useDeprecateMemoryItem,
+  useDeleteMemoryItem,
   useUpdateMemoryItem,
   useBulkPromoteMemoryItems,
   useBulkDeprecateMemoryItems,
@@ -73,6 +76,7 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   const [sortBy, setSortBy] = useState('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'inbox' | 'modules' | 'packs'>('inbox');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [selectedMemoryId, setSelectedMemoryId] = useState<string | null>(null);
 
   // For now, use projectId as the display name. Hook integration comes in a
@@ -98,7 +102,7 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   const [editingMemory, setEditingMemory] = useState<MemoryItemResponse | null>(null);
   const [mergingMemoryId, setMergingMemoryId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
-    type: 'reject' | 'deprecate';
+    type: 'reject' | 'deprecate' | 'delete';
     memoryId: string;
     title: string;
     description: string;
@@ -149,6 +153,7 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   const deprecateItem = useDeprecateMemoryItem({
     onSuccess: () => setConfirmAction(null),
   });
+  const deleteItem = useDeleteMemoryItem();
   const updateItem = useUpdateMemoryItem();
   const bulkPromote = useBulkPromoteMemoryItems();
   const bulkDeprecate = useBulkDeprecateMemoryItems();
@@ -225,6 +230,19 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
     [updateItem]
   );
 
+  /** Delete a single memory item -- opens confirm dialog. */
+  const handleDelete = useCallback(
+    (id: string) => {
+      setConfirmAction({
+        type: 'delete',
+        memoryId: id,
+        title: 'Delete Memory?',
+        description: 'This will permanently delete this memory item. This action cannot be undone.',
+      });
+    },
+    []
+  );
+
   /** Set a memory item's status directly (bypasses promote/deprecate flow). */
   const handleSetStatus = useCallback(
     (id: string, status: MemoryStatus) => {
@@ -236,19 +254,25 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
     [updateItem]
   );
 
-  /** Execute the confirmed action (reject or deprecate). */
+  /** Execute the confirmed action (reject, deprecate, or delete). */
   const handleConfirmAction = useCallback(() => {
     if (!confirmAction) return;
-    deprecateItem.mutate({
-      itemId: confirmAction.memoryId,
-      data: {
-        reason:
-          confirmAction.type === 'reject'
-            ? 'Rejected via memory inbox'
-            : 'Deprecated via memory detail panel',
-      },
-    });
-  }, [confirmAction, deprecateItem]);
+    if (confirmAction.type === 'delete') {
+      deleteItem.mutate(confirmAction.memoryId, {
+        onSuccess: () => setConfirmAction(null),
+      });
+    } else {
+      deprecateItem.mutate({
+        itemId: confirmAction.memoryId,
+        data: {
+          reason:
+            confirmAction.type === 'reject'
+              ? 'Rejected via memory inbox'
+              : 'Deprecated via memory detail panel',
+        },
+      });
+    }
+  }, [confirmAction, deprecateItem, deleteItem]);
 
   /** Close the detail panel. */
   const handleCloseDetail = useCallback(() => {
@@ -435,6 +459,35 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
             counts={counts}
           />
 
+          {/* View toggle */}
+          <div className="flex items-center justify-between px-6 py-2 border-b">
+            <div className="text-sm text-muted-foreground">
+              {memories.length} {memories.length === 1 ? 'memory' : 'memories'}
+            </div>
+            <div className="flex items-center gap-1 rounded-md border bg-background p-1" role="group" aria-label="View mode">
+              <Button
+                variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setViewMode('grid')}
+                aria-label="Grid view"
+                aria-pressed={viewMode === 'grid'}
+              >
+                <Grid3x3 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setViewMode('list')}
+                aria-label="List view"
+                aria-pressed={viewMode === 'list'}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
           <div className="flex flex-1 overflow-hidden">
             <div className="flex-1 overflow-y-auto" role="region" aria-label="Memory list">
               <MemoryList
@@ -454,6 +507,8 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
                 onCreateMemory={handleCreateMemory}
                 onReactivate={handleReactivate}
                 onDeprecate={handleDeprecate}
+                viewMode={viewMode}
+                onDelete={handleDelete}
               />
             </div>
           </div>
@@ -527,10 +582,16 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
         }}
         title={confirmAction?.title ?? ''}
         description={confirmAction?.description ?? ''}
-        confirmLabel={confirmAction?.type === 'reject' ? 'Reject' : 'Deprecate'}
+        confirmLabel={
+          confirmAction?.type === 'delete'
+            ? 'Delete'
+            : confirmAction?.type === 'reject'
+              ? 'Reject'
+              : 'Deprecate'
+        }
         confirmVariant="destructive"
         onConfirm={handleConfirmAction}
-        isLoading={deprecateItem.isPending}
+        isLoading={deprecateItem.isPending || deleteItem.isPending}
       />
 
       {/* Keyboard shortcuts help modal */}

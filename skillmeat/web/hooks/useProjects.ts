@@ -12,6 +12,7 @@ import type {
   ProjectsResponse,
   ProjectDetailResponse,
 } from '@/types/project';
+import { Platform } from '@/types/enums';
 import { ApiError, apiConfig, apiRequest } from '@/lib/api';
 import type { ProjectCreateRequest, ProjectUpdateRequest } from '@/sdk';
 
@@ -103,8 +104,21 @@ const generateMockProjectDetail = (projectId: string): ProjectDetail | null => {
         default: 6,
         custom: 2,
       },
+      by_profile: {
+        claude_code: 6,
+        codex: 2,
+      },
       modified_count: 1,
     },
+    deployment_profiles: [
+      {
+        profile_id: 'claude_code',
+        platform: Platform.CLAUDE_CODE,
+        root_dir: '.claude',
+        artifact_path_map: { skill: 'skills' },
+        context_path_prefixes: ['.claude/context/'],
+      },
+    ],
   };
 };
 
@@ -152,6 +166,7 @@ async function fetchProjectFromApi(id: string): Promise<ProjectDetail | null> {
       last_deployment: response.last_deployment,
       deployments: response.deployments,
       stats: response.stats,
+      deployment_profiles: response.deployment_profiles || [],
     };
   } catch (error) {
     if (USE_MOCKS && error instanceof ApiError && error.status === 404) {

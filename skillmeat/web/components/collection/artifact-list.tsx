@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { DeployDialog } from '@/components/collection/deploy-dialog';
 import { UnifiedCardActions } from '@/components/shared/unified-card-actions';
+import { PlatformBadge } from '@/components/platform-badge';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 import { useCliCopy } from '@/hooks';
 import { generateBasicDeployCommand } from '@/lib/cli-commands';
@@ -98,6 +99,7 @@ function ArtifactListSkeleton({ showCollectionColumn }: { showCollectionColumn?:
           <TableHead>Name</TableHead>
           {showCollectionColumn && <TableHead>Collection</TableHead>}
           <TableHead>Type</TableHead>
+          <TableHead>Platform</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Version</TableHead>
           <TableHead>Scope</TableHead>
@@ -122,6 +124,9 @@ function ArtifactListSkeleton({ showCollectionColumn }: { showCollectionColumn?:
             )}
             <TableCell>
               <Skeleton className="h-4 w-16" />
+            </TableCell>
+            <TableCell>
+              <Skeleton className="h-5 w-20 rounded-full" />
             </TableCell>
             <TableCell>
               <Skeleton className="h-5 w-16 rounded-full" />
@@ -223,6 +228,7 @@ export function ArtifactList({
               <TableHead>Name</TableHead>
               {showCollectionColumn && <TableHead>Collection</TableHead>}
               <TableHead>Type</TableHead>
+              <TableHead>Platform</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Version</TableHead>
               <TableHead>Scope</TableHead>
@@ -294,6 +300,19 @@ export function ArtifactList({
                     <div className="flex items-center gap-2" data-testid="type-badge">
                       <Icon className={`h-4 w-4 ${iconColor}`} aria-hidden="true" />
                       <span className="text-sm">{typeLabel}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {artifact.targetPlatforms && artifact.targetPlatforms.length > 0 ? (
+                        artifact.targetPlatforms.map((platform) => (
+                          <PlatformBadge key={`${artifact.id}-${platform}`} platform={platform} compact />
+                        ))
+                      ) : (
+                        <Badge variant="outline" className="text-xs text-muted-foreground">
+                          Universal
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>

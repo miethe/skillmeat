@@ -88,7 +88,31 @@ def main(ctx, smart_defaults):
     default="default",
     help="Collection name (default: 'default')",
 )
-def init(name: str):
+@click.option(
+    "--profile",
+    "deployment_profile",
+    type=click.Choice(["claude_code", "codex", "gemini", "cursor"]),
+    default=None,
+    help="Initialize project deployment scaffolding for a specific profile",
+)
+@click.option(
+    "--all-profiles",
+    is_flag=True,
+    default=False,
+    help="Initialize project scaffolding for all built-in profiles",
+)
+@click.option(
+    "--project-path",
+    default=None,
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    help="Project path for profile initialization (default: current directory)",
+)
+def init(
+    name: str,
+    deployment_profile: Optional[str],
+    all_profiles: bool,
+    project_path: Optional[Path],
+):
     """Initialize a new collection.
 
     Creates a collection directory structure and manifest file.
@@ -99,6 +123,116 @@ def init(name: str):
       skillmeat init --name work        # Create 'work' collection
     """
     try:
+        profile_specs = {
+            "claude_code": {
+                "root_dir": ".claude",
+                "platform": "claude_code",
+                "config_filenames": ["CLAUDE.md", "AGENTS.md", ".skillmeat-project.toml"],
+            },
+            "codex": {
+                "root_dir": ".codex",
+                "platform": "codex",
+                "config_filenames": ["CODEX.md", ".skillmeat-project.toml"],
+            },
+            "gemini": {
+                "root_dir": ".gemini",
+                "platform": "gemini",
+                "config_filenames": ["GEMINI.md", ".skillmeat-project.toml"],
+            },
+            "cursor": {
+                "root_dir": ".cursor",
+                "platform": "cursor",
+                "config_filenames": ["CURSOR.md", ".skillmeat-project.toml"],
+            },
+        }
+
+        if deployment_profile or all_profiles:
+            from skillmeat.cache.models import Project, get_session
+            from skillmeat.cache.repositories import DeploymentProfileRepository
+            from skillmeat.core.path_resolver import DEFAULT_ARTIFACT_PATH_MAP
+            from skillmeat.storage.deployment import DeploymentTracker
+            from skillmeat.storage.project import ProjectMetadataStorage
+
+            target_project = (project_path or Path.cwd()).resolve()
+            selected_profiles = (
+                list(profile_specs.keys())
+                if all_profiles
+                else [deployment_profile or "claude_code"]
+            )
+
+            for profile_id in selected_profiles:
+                spec = profile_specs[profile_id]
+                root_dir = target_project / spec["root_dir"]
+                for subdir in ["skills", "commands", "agents", "hooks", "mcp", "context"]:
+                    (root_dir / subdir).mkdir(parents=True, exist_ok=True)
+
+                if not ProjectMetadataStorage.exists(
+                    target_project, profile_root_dir=spec["root_dir"]
+                ):
+                    ProjectMetadataStorage.create_metadata(
+                        target_project,
+                        name=target_project.name,
+                        profile_root_dir=spec["root_dir"],
+                    )
+
+                DeploymentTracker.write_deployments(
+                    target_project,
+                    [],
+                    profile_root_dir=spec["root_dir"],
+                )
+
+            # Best-effort cache registration for profile lookup APIs.
+            try:
+                import uuid
+
+                session = get_session()
+                try:
+                    project = (
+                        session.query(Project)
+                        .filter(Project.path == str(target_project))
+                        .first()
+                    )
+                    if project is None:
+                        project = Project(
+                            id=uuid.uuid4().hex,
+                            name=target_project.name,
+                            path=str(target_project),
+                            status="active",
+                        )
+                        session.add(project)
+                        session.commit()
+                        session.refresh(project)
+                finally:
+                    session.close()
+
+                repo = DeploymentProfileRepository()
+                for profile_id in selected_profiles:
+                    spec = profile_specs[profile_id]
+                    existing = repo.read_by_project_and_profile_id(project.id, profile_id)
+                    if existing:
+                        continue
+                    repo.create(
+                        project_id=project.id,
+                        profile_id=profile_id,
+                        platform=spec["platform"],
+                        root_dir=spec["root_dir"],
+                        artifact_path_map=DEFAULT_ARTIFACT_PATH_MAP.copy(),
+                        config_filenames=spec["config_filenames"],
+                        context_prefixes=[
+                            f"{spec['root_dir']}/context/",
+                            f"{spec['root_dir']}/",
+                        ],
+                        supported_types=["skill", "command", "agent", "hook", "mcp"],
+                    )
+            except Exception as cache_error:
+                logger.debug(f"Profile cache registration skipped: {cache_error}")
+
+            console.print(
+                f"[green]Project initialized for profiles:[/green] {', '.join(selected_profiles)}"
+            )
+            console.print(f"  Project: {target_project}")
+            return
+
         collection_mgr = CollectionManager()
 
         # Check if collection already exists
@@ -1148,6 +1282,18 @@ def quick_add(
     default=None,
     help="Output format (auto-detected if not specified)",
 )
+@click.option(
+    "--profile",
+    "profile_id",
+    default=None,
+    help="Deployment profile ID (defaults to project primary profile)",
+)
+@click.option(
+    "--all-profiles",
+    is_flag=True,
+    default=False,
+    help="Deploy to all configured project profiles",
+)
 @click.pass_context
 def deploy(
     ctx,
@@ -1157,6 +1303,8 @@ def deploy(
     artifact_type: Optional[str],
     overwrite: bool,
     output_format: Optional[str],
+    profile_id: Optional[str],
+    all_profiles: bool,
 ):
     """Deploy artifacts to a project's .claude/ directory.
 
@@ -1180,6 +1328,8 @@ def deploy(
             "project": project,
             "artifact_type": artifact_type,
             "format": output_format,
+            "profile_id": profile_id,
+            "all_profiles": all_profiles,
         }
 
         if ctx.obj and ctx.obj.get("smart_defaults"):
@@ -1189,6 +1339,8 @@ def deploy(
         resolved_project = params.get("project") or Path.cwd()
         resolved_collection = params.get("collection")
         resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+        resolved_profile_id = params.get("profile_id")
+        resolved_all_profiles = params.get("all_profiles", False)
 
         deployment_mgr = DeploymentManager()
 
@@ -1215,6 +1367,8 @@ def deploy(
                     project_path=resolved_project,
                     artifact_type=type_filter,
                     overwrite=overwrite,
+                    profile_id=resolved_profile_id,
+                    all_profiles=resolved_all_profiles,
                 )
         else:
             deployments = deployment_mgr.deploy_artifacts(
@@ -1223,6 +1377,8 @@ def deploy(
                 project_path=resolved_project,
                 artifact_type=type_filter,
                 overwrite=overwrite,
+                profile_id=resolved_profile_id,
+                all_profiles=resolved_all_profiles,
             )
 
         # Output based on format
@@ -1237,6 +1393,11 @@ def deploy(
                         "artifact": d.artifact_name,
                         "type": d.artifact_type,
                         "path": str(d.artifact_path),
+                        "profile_id": d.deployment_profile_id,
+                        "platform": (
+                            d.platform.value if hasattr(d.platform, "value") else d.platform
+                        ),
+                        "profile_root_dir": d.profile_root_dir,
                     }
                     for d in deployments
                 ],
@@ -1247,6 +1408,7 @@ def deploy(
             for deployment in deployments:
                 console.print(
                     f"  {deployment.artifact_name} -> {deployment.artifact_path}"
+                    f" [dim]({deployment.deployment_profile_id or 'claude_code'})[/dim]"
                 )
 
         # Auto-confirm recent matches (P5-T2)
@@ -1323,6 +1485,12 @@ def deploy(
     default=None,
     help="Output format (default: auto-detect)",
 )
+@click.option(
+    "--profile",
+    "profile_id",
+    default=None,
+    help="Deployment profile ID for artifact removal",
+)
 @click.pass_context
 def undeploy(
     ctx,
@@ -1331,6 +1499,7 @@ def undeploy(
     artifact_type: Optional[str],
     force: bool,
     output_format: Optional[str],
+    profile_id: Optional[str],
 ):
     """Remove deployed artifact from project.
 
@@ -1349,12 +1518,14 @@ def undeploy(
         "name": name,
         "project": project,
         "format": output_format,
+        "profile_id": profile_id,
     }
     if ctx.obj and ctx.obj.get("smart_defaults"):
         params = SmartDefaults.apply_defaults(ctx, params)
 
     resolved_format = params.get("format") or SmartDefaults.detect_output_format()
     resolved_project = params.get("project") or Path.cwd()
+    resolved_profile_id = params.get("profile_id")
 
     try:
         # Require confirmation for TTY unless --force
@@ -1384,6 +1555,7 @@ def undeploy(
             artifact_name=name,
             project_path=resolved_project,
             artifact_type=type_filter,
+            profile_id=resolved_profile_id,
         )
 
         # Invalidate cache after successful undeploy
@@ -1408,6 +1580,7 @@ def undeploy(
                         "command": "undeploy",
                         "artifact": name,
                         "project": str(resolved_project),
+                        "profile_id": resolved_profile_id,
                     }
                 )
             )
@@ -2087,7 +2260,12 @@ def mcp_health(
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     help="Project path for deployment status (default: current directory)",
 )
-def status(collection: Optional[str], project: Optional[Path]):
+@click.option(
+    "--profile",
+    default=None,
+    help="Deployment profile ID to scope deployment status",
+)
+def status(collection: Optional[str], project: Optional[Path], profile: Optional[str]):
     """Check update status for artifacts and deployments.
 
     Shows available updates from upstream sources and checks
@@ -2125,20 +2303,31 @@ def status(collection: Optional[str], project: Optional[Path]):
         # Check deployment status if project specified
         if project or project is None:
             console.print("\n[cyan]Checking deployment status...[/cyan]")
-            status_info = deployment_mgr.check_deployment_status(project_path=project)
+            status_info = deployment_mgr.check_deployment_status(
+                project_path=project,
+                profile_id=profile,
+            )
 
-            modified = status_info.get("modified", [])
-            synced = status_info.get("synced", [])
+            modified = [
+                artifact_key
+                for artifact_key, state in status_info.items()
+                if state == "modified"
+            ]
+            synced = [
+                artifact_key
+                for artifact_key, state in status_info.items()
+                if state == "synced"
+            ]
 
             if modified:
                 console.print(f"\n[yellow]Locally modified ({len(modified)}):[/yellow]")
-                for info in modified:
-                    console.print(f"  {info['name']} ({info['type']})")
+                for artifact_key in modified:
+                    console.print(f"  {artifact_key}")
 
             if synced:
                 console.print(f"\n[green]Synced ({len(synced)}):[/green]")
-                for info in synced:
-                    console.print(f"  {info['name']} ({info['type']})")
+                for artifact_key in synced:
+                    console.print(f"  {artifact_key}")
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -11353,7 +11542,25 @@ def context_remove(name_or_id: str, force: bool):
 @click.option(
     "--dry-run", is_flag=True, help="Show what would be deployed without writing"
 )
-def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: bool):
+@click.option(
+    "--profile",
+    "profile_id",
+    default=None,
+    help="Deployment profile id to validate/deploy against (defaults to project primary profile)",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Force deployment when platform targeting does not match selected profile",
+)
+def context_deploy(
+    name_or_id: str,
+    to_project: str,
+    overwrite: bool,
+    dry_run: bool,
+    profile_id: Optional[str],
+    force: bool,
+):
     """Deploy context entity to a project directory.
 
     Write a context entity from your collection to a project's .claude/ directory
@@ -11403,47 +11610,13 @@ def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: b
     """
     api_base = "http://localhost:8080/api/v1"
 
-    def validate_deployment_path(project_path: Path, path_pattern: str) -> Path:
-        """Validate deployment path is safe - SECURITY CRITICAL.
-
-        Args:
-            project_path: Resolved project directory path
-            path_pattern: Path pattern from context entity
-
-        Returns:
-            Validated target path
-
-        Raises:
-            ValueError: If path is unsafe (traversal attempt or outside .claude/)
-        """
-        # Normalize paths
-        project = project_path.resolve()
-
-        # Combine project + path_pattern
-        target = (project / path_pattern).resolve()
-
-        # SECURITY CHECK 1: Target must be inside project directory
-        try:
-            target.relative_to(project)
-        except ValueError:
-            raise ValueError(
-                f"SECURITY: Deployment path escapes project directory: {target}"
-            )
-
-        # SECURITY CHECK 2: Target must be inside .claude/ directory
-        claude_dir = (project / ".claude").resolve()
-        try:
-            target.relative_to(claude_dir)
-        except ValueError:
-            # Allow CLAUDE.md and AGENTS.md in project root (special case for project_config)
-            if target.name in ("CLAUDE.md", "AGENTS.md") and target.parent == project:
-                pass  # OK - project root config files
-            else:
-                raise ValueError(
-                    f"SECURITY: Deployment path is not in .claude/ directory: {target}"
-                )
-
-        return target
+    from skillmeat.core.validators.context_path_validator import (
+        normalize_context_prefixes,
+        resolve_project_profile,
+        rewrite_path_for_profile,
+        validate_context_path,
+    )
+    from skillmeat.core.path_resolver import default_project_config_filenames
 
     try:
         # Lookup entity by name or ID
@@ -11490,8 +11663,45 @@ def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: b
             console.print(f"[red]Error: Entity has no path_pattern defined[/red]")
             sys.exit(1)
 
+        # Resolve deployment profile to enforce profile-aware path and platform rules.
+        profile = resolve_project_profile(project_path, profile_id)
+        selected_path = rewrite_path_for_profile(path_pattern, profile)
+
+        # Enforce optional platform targeting for context entities.
+        target_platforms = entity.get("target_platforms")
+        if target_platforms:
+            profile_platform = (
+                profile.platform.value
+                if hasattr(profile.platform, "value")
+                else str(profile.platform)
+            )
+            if profile_platform not in target_platforms and not force:
+                console.print(
+                    "[red]Error: Entity target_platforms does not include selected profile platform.[/red]"
+                )
+                console.print(
+                    f"[dim]Entity targets: {', '.join(target_platforms)} | Selected: {profile_platform}[/dim]"
+                )
+                console.print("[dim]Use --force to override[/dim]")
+                sys.exit(1)
+
         try:
-            target_path = validate_deployment_path(project_path, path_pattern)
+            validated = validate_context_path(
+                selected_path,
+                project=project_path,
+                profile=profile,
+                profile_id=profile.profile_id,
+                allowed_prefixes=normalize_context_prefixes(profile),
+                config_filenames=(
+                    list(getattr(profile, "config_filenames", []) or [])
+                    + default_project_config_filenames(
+                        getattr(profile, "platform", None)
+                    )
+                ),
+            )
+            target_path = validated.resolved_path
+            if target_path is None:
+                raise ValueError("SECURITY: Failed to resolve deployment target path")
         except ValueError as e:
             console.print(f"[red]{e}[/red]")
             sys.exit(1)
@@ -11503,7 +11713,10 @@ def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: b
                 f"[bold]Would deploy:[/bold] {entity.get('name')} ({entity.get('type')})"
             )
             console.print(f"[bold]To:[/bold] {target_path}")
-            console.print(f"[bold]Path pattern:[/bold] {path_pattern}")
+            console.print(f"[bold]Path pattern:[/bold] {selected_path}")
+            console.print(
+                f"[bold]Profile:[/bold] {profile.profile_id} ({getattr(profile.platform, 'value', profile.platform)})"
+            )
             if entity.get("category"):
                 console.print(f"[bold]Category:[/bold] {entity.get('category')}")
             console.print(f"\n[bold]Content preview:[/bold]")

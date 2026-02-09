@@ -7,6 +7,7 @@ export * from './collections';
 export * from './config';
 export * from './groups';
 export * from './deployments';
+export * from './deployment-profiles';
 export * from './context-entities';
 export * from './templates';
 export * from './context-sync';

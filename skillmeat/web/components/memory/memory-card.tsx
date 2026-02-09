@@ -3,7 +3,7 @@
  *
  * Single row in the Memory Inbox list. Dense, triage-oriented layout with
  * checkbox, confidence bar, type badge, content preview, metadata, and
- * hover-revealed action buttons.
+ * a meatballs (three-dot) dropdown menu for status-aware actions.
  *
  * Design spec reference: section 3.4
  */
@@ -11,17 +11,28 @@
 'use client';
 
 import * as React from 'react';
-import { Check, Pencil, X, ShieldCheck, RotateCcw, Archive } from 'lucide-react';
+import {
+  MoreVertical,
+  Check,
+  Pencil,
+  X,
+  ShieldCheck,
+  RotateCcw,
+  Archive,
+  Trash2,
+} from 'lucide-react';
 import type { MemoryItemResponse } from '@/sdk/models/MemoryItemResponse';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
 import { MemoryTypeBadge } from './memory-type-badge';
 import {
   getConfidenceTier,
@@ -58,6 +69,8 @@ export interface MemoryCardProps {
   onReactivate?: (id: string) => void;
   /** Deprecate this memory item (for non-candidate statuses). */
   onDeprecate?: (id: string) => void;
+  /** Delete this memory item. */
+  onDelete?: (id: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -67,7 +80,7 @@ export interface MemoryCardProps {
 /**
  * MemoryCard -- a single row in the memory inbox list.
  *
- * Layout: [Checkbox] [ConfidenceBar] [TypeBadge + Content + Metadata] [Actions]
+ * Layout: [Checkbox] [ConfidenceBar] [TypeBadge + Content + Metadata] [DropdownMenu]
  *
  * @example
  * ```tsx
@@ -81,6 +94,7 @@ export interface MemoryCardProps {
  *   onEdit={handleEdit}
  *   onMerge={handleMerge}
  *   onClick={handleCardClick}
+ *   onDelete={handleDelete}
  * />
  * ```
  */
@@ -95,6 +109,7 @@ export function MemoryCard({
   onClick,
   onReactivate,
   onDeprecate,
+  onDelete,
 }: MemoryCardProps) {
   const confidenceTier = getConfidenceTier(memory.confidence);
   const confidenceColors = getConfidenceColorClasses(confidenceTier);
@@ -105,6 +120,10 @@ export function MemoryCard({
     memory.provenance && typeof memory.provenance === 'object'
       ? (memory.provenance as Record<string, unknown>).source_type as string | undefined
       : undefined;
+
+  // Extract tags if available (forward-compatible with future API additions)
+  const tags = (memory as Record<string, unknown>).tags as string[] | undefined;
+  const visibleTags = tags?.slice(0, 2);
 
   return (
     <div
@@ -187,197 +206,116 @@ export function MemoryCard({
             />
             {memory.status}
           </span>
+
+          {/* Tags (first 2, if available) */}
+          {visibleTags && visibleTags.length > 0 && (
+            <>
+              {visibleTags.map((tag) => (
+                <Badge
+                  key={tag}
+                  variant="secondary"
+                  className="text-[10px] px-1.5 py-0 h-4 leading-none"
+                >
+                  {tag}
+                </Badge>
+              ))}
+            </>
+          )}
         </div>
       </div>
 
-      {/* Action buttons (visible on hover/focus-within, status-aware) */}
-      <TooltipProvider delayDuration={300}>
-        <div
-          className={cn(
-            'flex items-center gap-1 opacity-0 transition-opacity',
-            'group-hover:opacity-100 group-focus-within:opacity-100'
-          )}
-        >
-          {/* candidate: Approve (green check), Edit, Reject (red X) */}
-          {memory.status === 'candidate' && (
-            <>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onApprove(memory.id);
-                    }}
-                    aria-label={`Approve memory: ${memory.content.slice(0, 40)}`}
-                  >
-                    <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Promote to active</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(memory.id);
-                    }}
-                    aria-label={`Edit memory: ${memory.content.slice(0, 40)}`}
-                  >
-                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Edit</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onReject(memory.id);
-                    }}
-                    aria-label={`Reject memory: ${memory.content.slice(0, 40)}`}
-                  >
-                    <X className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Reject</TooltipContent>
-              </Tooltip>
-            </>
-          )}
+      {/* Meatballs dropdown menu (always visible) */}
+      <div className="flex items-center">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label={`Actions for memory: ${memory.content.slice(0, 40)}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreVertical className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {/* candidate: Approve, Edit, Reject */}
+            {memory.status === 'candidate' && (
+              <>
+                <DropdownMenuItem onClick={() => onApprove(memory.id)}>
+                  <Check className="mr-2 h-4 w-4 text-emerald-600" aria-hidden="true" />
+                  Approve
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEdit(memory.id)}>
+                  <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onReject(memory.id)}>
+                  <X className="mr-2 h-4 w-4 text-red-500" aria-hidden="true" />
+                  Reject
+                </DropdownMenuItem>
+              </>
+            )}
 
-          {/* active: Promote (blue shield), Edit, Deprecate (red archive) */}
-          {memory.status === 'active' && (
-            <>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onApprove(memory.id);
-                    }}
-                    aria-label={`Promote memory to stable: ${memory.content.slice(0, 40)}`}
+            {/* active: Promote to Stable, Edit, Deprecate */}
+            {memory.status === 'active' && (
+              <>
+                <DropdownMenuItem onClick={() => onApprove(memory.id)}>
+                  <ShieldCheck className="mr-2 h-4 w-4 text-blue-600" aria-hidden="true" />
+                  Promote to Stable
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEdit(memory.id)}>
+                  <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Edit
+                </DropdownMenuItem>
+                {onDeprecate && (
+                  <DropdownMenuItem
+                    className="text-red-500 focus:text-red-500"
+                    onClick={() => onDeprecate(memory.id)}
                   >
-                    <ShieldCheck className="h-3.5 w-3.5 text-blue-600" aria-hidden="true" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Promote to stable</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(memory.id);
-                    }}
-                    aria-label={`Edit memory: ${memory.content.slice(0, 40)}`}
-                  >
-                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Edit</TooltipContent>
-              </Tooltip>
-              {onDeprecate && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeprecate(memory.id);
-                      }}
-                      aria-label={`Deprecate memory: ${memory.content.slice(0, 40)}`}
-                    >
-                      <Archive className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Deprecate</TooltipContent>
-                </Tooltip>
-              )}
-            </>
-          )}
+                    <Archive className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Deprecate
+                  </DropdownMenuItem>
+                )}
+              </>
+            )}
 
-          {/* stable: Edit only */}
-          {memory.status === 'stable' && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit(memory.id);
-                  }}
-                  aria-label={`Edit memory: ${memory.content.slice(0, 40)}`}
-                >
-                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Edit</TooltipContent>
-            </Tooltip>
-          )}
+            {/* stable: Edit only */}
+            {memory.status === 'stable' && (
+              <DropdownMenuItem onClick={() => onEdit(memory.id)}>
+                <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+                Edit
+              </DropdownMenuItem>
+            )}
 
-          {/* deprecated: Reactivate (amber), Edit */}
-          {memory.status === 'deprecated' && (
-            <>
-              {onReactivate && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onReactivate(memory.id);
-                      }}
-                      aria-label={`Reactivate memory: ${memory.content.slice(0, 40)}`}
-                    >
-                      <RotateCcw className="h-3.5 w-3.5 text-amber-600" aria-hidden="true" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Reactivate as candidate</TooltipContent>
-                </Tooltip>
-              )}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(memory.id);
-                    }}
-                    aria-label={`Edit memory: ${memory.content.slice(0, 40)}`}
-                  >
-                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Edit</TooltipContent>
-              </Tooltip>
-            </>
-          )}
-        </div>
-      </TooltipProvider>
+            {/* deprecated: Reactivate, Edit */}
+            {memory.status === 'deprecated' && (
+              <>
+                {onReactivate && (
+                  <DropdownMenuItem onClick={() => onReactivate(memory.id)}>
+                    <RotateCcw className="mr-2 h-4 w-4 text-amber-600" aria-hidden="true" />
+                    Reactivate
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => onEdit(memory.id)}>
+                  <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Edit
+                </DropdownMenuItem>
+              </>
+            )}
+
+            {/* Delete action (always present) */}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => onDelete?.(memory.id)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   );
 }

@@ -1,196 +1,283 @@
 ---
 type: progress
-prd: "multi-platform-project-deployments-v1"
+prd: multi-platform-project-deployments-v1
 phase: 2
-title: "Deployment Engine Refactor"
-status: "planning"
-started: null
-completed: null
-
-overall_progress: 0
-completion_estimate: "on-track"
-
+title: Deployment Engine Refactor
+status: completed
+started: '2026-02-07'
+completed: '2026-02-07'
+overall_progress: 100
+completion_estimate: on-track
 total_tasks: 17
-completed_tasks: 0
+completed_tasks: 17
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer"]
-contributors: ["documentation-writer"]
-
+owners:
+- python-backend-engineer
+contributors:
+- documentation-writer
 tasks:
-  - id: "P2-T1"
-    description: "Inventory all hardcoded .claude/ paths - Audit deployment.py, storage layers, watcher, discovery for hardcoded .claude/ strings; document file, line number, context"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "1 pt"
-    priority: "critical"
-
-  - id: "P2-T2"
-    description: "Create profile-aware path resolver utility - Create skillmeat/core/path_resolver.py with resolve_artifact_path, resolve_deployment_path, resolve_config_path, resolve_context_path; handle symlinks; validate path traversal"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T5", "P1-T6"]
-    estimated_effort: "2 pts"
-    priority: "critical"
-
-  - id: "P2-T3"
-    description: "Refactor deployment path resolution in core - Replace hardcoded .claude/ in skillmeat/core/deployment.py with profile-aware resolution; deploy/undeploy accept profile_id parameter"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T2", "P1-T9"]
-    estimated_effort: "2 pts"
-    priority: "critical"
-
-  - id: "P2-T4"
-    description: "Refactor storage layer path resolution - Replace hardcoded .claude/ in skillmeat/storage/deployment.py and skillmeat/storage/project.py with profile-aware resolver"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T2"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "P2-T5"
-    description: "Refactor discovery to profile-aware scanning - Update skillmeat/core/discovery.py to accept optional profile_id; scan all configured profiles when none specified; find .codex/, .gemini/, custom roots"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T2"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "P2-T6"
-    description: "Add --profile flag to CLI deploy command - Update skillmeat/cli.py deploy with --profile <profile_id> and --all-profiles flags; default to primary profile"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T3", "P2-T4"]
-    estimated_effort: "1.5 pts"
-    priority: "high"
-
-  - id: "P2-T7"
-    description: "Add --profile flag to CLI status/undeploy commands - Update skillmeat status --profile and skillmeat undeploy --profile; output per-profile info and aggregate stats"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T3"]
-    estimated_effort: "1.5 pts"
-    priority: "high"
-
-  - id: "P2-T8"
-    description: "Update skillmeat init to be profile-aware - Add --profile <profile_id> flag; scaffold profile directory structure; backward compatible (no flag = .claude/)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T3"]
-    estimated_effort: "1.5 pts"
-    priority: "high"
-
-  - id: "P2-T9"
-    description: "Create repository for DeploymentProfile queries - Add get_primary_profile, get_profile_by_platform, list_all_profiles, ensure_default_claude_profile methods"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T10"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "P2-T10"
-    description: "Add profile parameter to API deploy endpoints - Update POST /artifacts/{artifact_id}/deploy to accept optional deployment_profile_id; add all_profiles option"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T3", "P2-T11"]
-    estimated_effort: "1.5 pts"
-    priority: "high"
-
-  - id: "P2-T11"
-    description: "Add profile parameter to API status/undeploy endpoints - Update GET /projects/{project_id}/status to segment by profile; add optional profile_id query param"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T3"]
-    estimated_effort: "1.5 pts"
-    priority: "high"
-
-  - id: "P2-T12"
-    description: "Update deployment router documentation - Update docstrings and OpenAPI descriptions for new deployment_profile_id parameter, semantics, and examples"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["P2-T10", "P2-T11"]
-    estimated_effort: "0.5 pts"
-    priority: "medium"
-
-  - id: "P2-T13"
-    description: "Integration test: deploy same artifact to multiple profiles - Test deploying one artifact to Claude and Codex profiles; verify separate tracking; verify undeploy isolation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T3", "P2-T6"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "P2-T14"
-    description: "Integration test: profile-aware discovery and status - Test project with 3 profiles; deploy to different profiles; verify discovery and per-profile status breakdown"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T5", "P2-T11"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "P2-T15"
-    description: "Integration test: skillmeat init with profile - Test init --profile codex scaffolds correct directory; test default profile; test --all-profiles flag"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T8"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
-  - id: "P2-T16"
-    description: "Symlink-aware path resolution (bridge to Phase 0) - Add explicit symlink detection in path resolver; log warning for symlink scenarios; test symlink resolution"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T2"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
-  - id: "P2-T17"
-    description: "Backward compatibility: auto-create default Claude profile - When opening existing project without profiles, auto-create claude_code profile matching current .claude/ structure"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T9"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
+- id: P2-T1
+  description: Inventory all hardcoded .claude/ paths - Audit deployment.py, storage
+    layers, watcher, discovery for hardcoded .claude/ strings; document file, line
+    number, context
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 1 pt
+  priority: critical
+- id: P2-T2
+  description: Create profile-aware path resolver utility - Create skillmeat/core/path_resolver.py
+    with resolve_artifact_path, resolve_deployment_path, resolve_config_path, resolve_context_path;
+    handle symlinks; validate path traversal
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T5
+  - P1-T6
+  estimated_effort: 2 pts
+  priority: critical
+- id: P2-T3
+  description: Refactor deployment path resolution in core - Replace hardcoded .claude/
+    in skillmeat/core/deployment.py with profile-aware resolution; deploy/undeploy
+    accept profile_id parameter
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T2
+  - P1-T9
+  estimated_effort: 2 pts
+  priority: critical
+- id: P2-T4
+  description: Refactor storage layer path resolution - Replace hardcoded .claude/
+    in skillmeat/storage/deployment.py and skillmeat/storage/project.py with profile-aware
+    resolver
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T2
+  estimated_effort: 2 pts
+  priority: high
+- id: P2-T5
+  description: Refactor discovery to profile-aware scanning - Update skillmeat/core/discovery.py
+    to accept optional profile_id; scan all configured profiles when none specified;
+    find .codex/, .gemini/, custom roots
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T2
+  estimated_effort: 2 pts
+  priority: high
+- id: P2-T6
+  description: Add --profile flag to CLI deploy command - Update skillmeat/cli.py
+    deploy with --profile <profile_id> and --all-profiles flags; default to primary
+    profile
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T3
+  - P2-T4
+  estimated_effort: 1.5 pts
+  priority: high
+- id: P2-T7
+  description: Add --profile flag to CLI status/undeploy commands - Update skillmeat
+    status --profile and skillmeat undeploy --profile; output per-profile info and
+    aggregate stats
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T3
+  estimated_effort: 1.5 pts
+  priority: high
+- id: P2-T8
+  description: Update skillmeat init to be profile-aware - Add --profile <profile_id>
+    flag; scaffold profile directory structure; backward compatible (no flag = .claude/)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T3
+  estimated_effort: 1.5 pts
+  priority: high
+- id: P2-T9
+  description: Create repository for DeploymentProfile queries - Add get_primary_profile,
+    get_profile_by_platform, list_all_profiles, ensure_default_claude_profile methods
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T10
+  estimated_effort: 1 pt
+  priority: high
+- id: P2-T10
+  description: Add profile parameter to API deploy endpoints - Update POST /artifacts/{artifact_id}/deploy
+    to accept optional deployment_profile_id; add all_profiles option
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T3
+  - P2-T11
+  estimated_effort: 1.5 pts
+  priority: high
+- id: P2-T11
+  description: Add profile parameter to API status/undeploy endpoints - Update GET
+    /projects/{project_id}/status to segment by profile; add optional profile_id query
+    param
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T3
+  estimated_effort: 1.5 pts
+  priority: high
+- id: P2-T12
+  description: Update deployment router documentation - Update docstrings and OpenAPI
+    descriptions for new deployment_profile_id parameter, semantics, and examples
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - P2-T10
+  - P2-T11
+  estimated_effort: 0.5 pts
+  priority: medium
+- id: P2-T13
+  description: 'Integration test: deploy same artifact to multiple profiles - Test
+    deploying one artifact to Claude and Codex profiles; verify separate tracking;
+    verify undeploy isolation'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T3
+  - P2-T6
+  estimated_effort: 2 pts
+  priority: high
+- id: P2-T14
+  description: 'Integration test: profile-aware discovery and status - Test project
+    with 3 profiles; deploy to different profiles; verify discovery and per-profile
+    status breakdown'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T5
+  - P2-T11
+  estimated_effort: 2 pts
+  priority: high
+- id: P2-T15
+  description: 'Integration test: skillmeat init with profile - Test init --profile
+    codex scaffolds correct directory; test default profile; test --all-profiles flag'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T8
+  estimated_effort: 1 pt
+  priority: medium
+- id: P2-T16
+  description: Symlink-aware path resolution (bridge to Phase 0) - Add explicit symlink
+    detection in path resolver; log warning for symlink scenarios; test symlink resolution
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T2
+  estimated_effort: 1 pt
+  priority: medium
+- id: P2-T17
+  description: 'Backward compatibility: auto-create default Claude profile - When
+    opening existing project without profiles, auto-create claude_code profile matching
+    current .claude/ structure'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T9
+  estimated_effort: 1 pt
+  priority: high
 parallelization:
-  batch_1: ["P2-T1"]
-  batch_2: ["P2-T2", "P2-T9"]
-  batch_3: ["P2-T3", "P2-T4", "P2-T5", "P2-T16"]
-  batch_4: ["P2-T6", "P2-T7", "P2-T8", "P2-T11", "P2-T17"]
-  batch_5: ["P2-T10", "P2-T12", "P2-T13", "P2-T14", "P2-T15"]
-  critical_path: ["P2-T1", "P2-T2", "P2-T3", "P2-T6", "P2-T13"]
-  estimated_total_time: "25 pts (5 batches)"
-
+  batch_1:
+  - P2-T1
+  batch_2:
+  - P2-T2
+  - P2-T9
+  batch_3:
+  - P2-T3
+  - P2-T4
+  - P2-T5
+  - P2-T16
+  batch_4:
+  - P2-T6
+  - P2-T7
+  - P2-T8
+  - P2-T11
+  - P2-T17
+  batch_5:
+  - P2-T10
+  - P2-T12
+  - P2-T13
+  - P2-T14
+  - P2-T15
+  critical_path:
+  - P2-T1
+  - P2-T2
+  - P2-T3
+  - P2-T6
+  - P2-T13
+  estimated_total_time: 25 pts (5 batches)
 blockers: []
-
 success_criteria:
-  - { id: "SC-1", description: "All hardcoded .claude/ paths identified and refactored", status: "pending" }
-  - { id: "SC-2", description: "Path resolver utility tested (symlinks, path traversal, errors)", status: "pending" }
-  - { id: "SC-3", description: "CLI --profile flags working on deploy, status, undeploy, init", status: "pending" }
-  - { id: "SC-4", description: "--all-profiles deploys cleanly to all configured profiles", status: "pending" }
-  - { id: "SC-5", description: "API endpoints accept and validate deployment_profile_id", status: "pending" }
-  - { id: "SC-6", description: "Integration tests pass: multi-profile deployment, discovery, status", status: "pending" }
-  - { id: "SC-7", description: "Backward compatibility: existing Claude-only projects auto-get default profile", status: "pending" }
-  - { id: "SC-8", description: "Symlink edge cases handled (Phase 0 bridge scenarios)", status: "pending" }
-
+- id: SC-1
+  description: All hardcoded .claude/ paths identified and refactored
+  status: completed
+- id: SC-2
+  description: Path resolver utility tested (symlinks, path traversal, errors)
+  status: completed
+- id: SC-3
+  description: CLI --profile flags working on deploy, status, undeploy, init
+  status: completed
+- id: SC-4
+  description: --all-profiles deploys cleanly to all configured profiles
+  status: completed
+- id: SC-5
+  description: API endpoints accept and validate deployment_profile_id
+  status: completed
+- id: SC-6
+  description: 'Integration tests pass: multi-profile deployment, discovery, status'
+  status: completed
+- id: SC-7
+  description: 'Backward compatibility: existing Claude-only projects auto-get default
+    profile'
+  status: completed
+- id: SC-8
+  description: Symlink edge cases handled (Phase 0 bridge scenarios)
+  status: completed
 files_modified:
-  - "skillmeat/core/deployment.py"
-  - "skillmeat/core/path_resolver.py"
-  - "skillmeat/core/discovery.py"
-  - "skillmeat/storage/deployment.py"
-  - "skillmeat/storage/project.py"
-  - "skillmeat/cli.py"
-  - "skillmeat/cache/repositories/deployment_profile_repository.py"
-  - "skillmeat/api/routers/deployments.py"
-  - "tests/test_core_path_resolver.py"
-  - "tests/test_core_deployment_profile_aware.py"
-  - "tests/test_discovery_profile_aware.py"
-  - "tests/test_cli_init_profile.py"
-  - "tests/test_symlink_path_resolution.py"
+- skillmeat/core/deployment.py
+- skillmeat/core/path_resolver.py
+- skillmeat/core/discovery.py
+- skillmeat/storage/deployment.py
+- skillmeat/storage/project.py
+- skillmeat/cli.py
+- skillmeat/cache/repositories/deployment_profile_repository.py
+- skillmeat/api/routers/deployments.py
+- tests/test_core_path_resolver.py
+- tests/test_core_deployment_profile_aware.py
+- tests/test_discovery_profile_aware.py
+- tests/test_cli_init_profile.py
+- tests/test_symlink_path_resolution.py
+progress: 100
+updated: '2026-02-07'
 ---
 
 # Phase 2: Deployment Engine Refactor

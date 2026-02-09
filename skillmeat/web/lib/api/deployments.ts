@@ -86,11 +86,15 @@ export async function undeployArtifact(
  * @throws Error if list operation fails
  */
 export async function listDeployments(
-  projectPath?: string
+  projectPath?: string,
+  deploymentProfileId?: string
 ): Promise<ArtifactDeploymentListResponse> {
   const params = new URLSearchParams();
   if (projectPath) {
     params.append('project_path', projectPath);
+  }
+  if (deploymentProfileId) {
+    params.append('deployment_profile_id', deploymentProfileId);
   }
 
   const url = buildUrl(`/deploy${params.toString() ? `?${params.toString()}` : ''}`);
@@ -181,6 +185,8 @@ export interface DeploymentSummary {
 export interface DeploymentQueryParams {
   /** Project path to query */
   projectPath?: string;
+  /** Filter by deployment profile ID */
+  deploymentProfileId?: string;
   /** Filter by artifact type */
   artifactType?: string;
   /** Filter by sync status */
@@ -196,7 +202,7 @@ export interface DeploymentQueryParams {
 export async function getDeployments(
   params?: DeploymentQueryParams
 ): Promise<ArtifactDeploymentInfo[]> {
-  const listResponse = await listDeployments(params?.projectPath);
+  const listResponse = await listDeployments(params?.projectPath, params?.deploymentProfileId);
   let deployments = listResponse.deployments;
 
   // Apply client-side filtering if needed

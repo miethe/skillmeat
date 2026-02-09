@@ -12,7 +12,7 @@ Condensed command reference for artifact and memory workflows.
 | `bundle` | Sharing | `create`, `import`, `inspect` |
 | `mcp` | MCP servers | `add`, `list`, `deploy`, `health` |
 | `context` | Context entities | `add`, `list`, `show`, `deploy` |
-| `memory` (target) | Memory lifecycle + packs | `item`, `module`, `pack`, `extract`, `search` |
+| `memory` | Memory lifecycle + packs | `item`, `module`, `pack`, `extract`, `search` |
 
 ---
 
@@ -29,7 +29,7 @@ skillmeat remove <artifact-name>
 
 ---
 
-## Memory Operations (Target CLI)
+## Memory Operations
 
 ## `memory item`
 
@@ -83,25 +83,6 @@ skillmeat memory search "postgres migration lock" --all-projects
 
 ---
 
-## API Fallbacks (when `memory` CLI is unavailable)
-
-```bash
-# List items
-curl "http://localhost:8000/api/v1/memory-items?project_id=<project>"
-
-# Create item
-curl -X POST "http://localhost:8000/api/v1/memory-items?project_id=<project>" \
-  -H "Content-Type: application/json" \
-  -d '{"type":"decision","content":"...","confidence":0.8}'
-
-# Preview context pack
-curl -X POST "http://localhost:8000/api/v1/context-packs/preview?project_id=<project>" \
-  -H "Content-Type: application/json" \
-  -d '{"module_id":"<module-id>","budget_tokens":4000}'
-```
-
----
-
 ## JSON Output Guidance
 
 Use `--json` whenever output must be consumed by agents/scripts.
@@ -125,4 +106,3 @@ skillmeat memory --help
 skillmeat memory item --help
 ```
 
-If memory help fails, switch to API fallback mode and tell the user.

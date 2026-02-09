@@ -3,6 +3,7 @@
  *
  * These types represent projects with deployed artifacts from collections.
  */
+import { Platform } from './enums';
 
 export interface DeployedArtifact {
   artifact_name: string;
@@ -13,12 +14,24 @@ export interface DeployedArtifact {
   version?: string;
   collection_sha: string;
   local_modifications: boolean;
+  deployment_profile_id?: string;
+  platform?: Platform;
+  profile_root_dir?: string;
 }
 
 export interface ProjectStats {
   by_type: Record<string, number>;
   by_collection: Record<string, number>;
+  by_profile?: Record<string, number>;
   modified_count: number;
+}
+
+export interface DeploymentProfileInfo {
+  profile_id: string;
+  platform: Platform;
+  root_dir: string;
+  artifact_path_map: Record<string, string>;
+  context_path_prefixes: string[];
 }
 
 export interface ProjectSummary {
@@ -32,6 +45,7 @@ export interface ProjectSummary {
 export interface ProjectDetail extends ProjectSummary {
   deployments: DeployedArtifact[];
   stats: ProjectStats;
+  deployment_profiles?: DeploymentProfileInfo[];
 }
 
 export interface ProjectsResponse {
@@ -53,4 +67,5 @@ export interface ProjectDetailResponse {
   last_deployment?: string;
   deployments: DeployedArtifact[];
   stats: ProjectStats;
+  deployment_profiles?: DeploymentProfileInfo[];
 }

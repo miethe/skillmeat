@@ -4,9 +4,11 @@ Defines request and response models for artifact deployment operations.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
+
+from skillmeat.core.enums import Platform
 
 
 # ====================
@@ -48,6 +50,15 @@ class DeployRequest(BaseModel):
         "to {dest_path}/{artifact_name}/. Must not contain '..' or be absolute.",
         examples=[".claude/skills/", ".claude/skills/dev/"],
     )
+    deployment_profile_id: Optional[str] = Field(
+        default=None,
+        description="Optional deployment profile ID (uses primary profile when omitted)",
+        examples=["codex-default"],
+    )
+    all_profiles: bool = Field(
+        default=False,
+        description="Deploy to all project deployment profiles",
+    )
 
     class Config:
         """Pydantic config."""
@@ -61,6 +72,8 @@ class DeployRequest(BaseModel):
                 "collection_name": "default",
                 "overwrite": False,
                 "dest_path": ".claude/skills/dev/",
+                "deployment_profile_id": "codex-default",
+                "all_profiles": False,
             }
         }
 
@@ -80,6 +93,10 @@ class UndeployRequest(BaseModel):
         default=None,
         description="Path to project directory (uses CWD if not specified)",
     )
+    profile_id: Optional[str] = Field(
+        default=None,
+        description="Optional profile ID to undeploy from a single profile",
+    )
 
     class Config:
         """Pydantic config."""
@@ -89,6 +106,7 @@ class UndeployRequest(BaseModel):
                 "artifact_name": "pdf",
                 "artifact_type": "skill",
                 "project_path": "/path/to/project",
+                "profile_id": "codex-default",
             }
         }
 
@@ -118,6 +136,22 @@ class DeploymentResponse(BaseModel):
     deployed_at: Optional[datetime] = Field(
         default=None,
         description="Timestamp of deployment",
+    )
+    deployment_profile_id: Optional[str] = Field(
+        default=None,
+        description="Profile used for deployment (single-profile deploy)",
+    )
+    deployed_profiles: List[str] = Field(
+        default_factory=list,
+        description="Profiles that received the artifact deployment",
+    )
+    platform: Optional[Platform] = Field(
+        default=None,
+        description="Platform associated with deployment_profile_id",
+    )
+    profile_root_dir: Optional[str] = Field(
+        default=None,
+        description="Resolved profile root directory used for deployment",
     )
 
     class Config:
@@ -214,6 +248,18 @@ class DeploymentInfo(BaseModel):
         default=None,
         description="Content hash (SHA-256) used as merge base for 3-way merges",
     )
+    deployment_profile_id: Optional[str] = Field(
+        default=None,
+        description="Deployment profile identifier used for this deployment",
+    )
+    platform: Optional[Platform] = Field(
+        default=None,
+        description="Platform associated with the deployment profile",
+    )
+    profile_root_dir: Optional[str] = Field(
+        default=None,
+        description="Resolved profile root directory used for deployment",
+    )
 
     class Config:
         """Pydantic config."""
@@ -240,6 +286,10 @@ class DeploymentListResponse(BaseModel):
     deployments: List[DeploymentInfo] = Field(
         default_factory=list,
         description="List of deployments",
+    )
+    deployments_by_profile: Dict[str, List[DeploymentInfo]] = Field(
+        default_factory=dict,
+        description="Deployments grouped by deployment profile ID",
     )
     total: int = Field(description="Total number of deployments")
 

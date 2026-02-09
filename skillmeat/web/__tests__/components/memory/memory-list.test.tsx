@@ -60,6 +60,7 @@ function createDefaultProps(overrides: Partial<MemoryListProps> = {}): MemoryLis
     onMerge: jest.fn(),
     onCardClick: jest.fn(),
     onCreateMemory: jest.fn(),
+    viewMode: 'list',
     ...overrides,
   };
 }

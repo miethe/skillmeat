@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from skillmeat.core.enums import Platform
+
 from .common import PaginatedResponse
 
 
@@ -29,6 +31,10 @@ class ArtifactCreateRequest(BaseModel):
         default=None, description="Target collection (uses default if not specified)"
     )
     tags: Optional[List[str]] = Field(default=None, description="Tags to apply")
+    target_platforms: Optional[List[Platform]] = Field(
+        default=None,
+        description="Optional deployment platform restrictions (null means deployable on all platforms)",
+    )
     description: Optional[str] = Field(default=None, description="Override description")
 
     class Config:
@@ -42,6 +48,7 @@ class ArtifactCreateRequest(BaseModel):
                 "name": "canvas",
                 "collection": "default",
                 "tags": ["design", "canvas"],
+                "target_platforms": ["claude_code", "codex"],
                 "description": "Canvas design skill",
             }
         }
@@ -296,6 +303,10 @@ class ArtifactResponse(BaseModel):
         description="Artifact tags",
         examples=[["data-processing", "ai-tools"]],
     )
+    target_platforms: Optional[List[Platform]] = Field(
+        default=None,
+        description="Optional deployment platform restrictions (null means deployable on all platforms)",
+    )
     metadata: Optional[ArtifactMetadataResponse] = Field(
         default=None,
         description="Artifact metadata",
@@ -336,6 +347,7 @@ class ArtifactResponse(BaseModel):
                 "origin_source": None,
                 "version": "latest",
                 "aliases": ["pdf-processor"],
+                "target_platforms": ["claude_code"],
                 "metadata": {
                     "title": "PDF Processing Skill",
                     "description": "Extract and analyze PDF documents",
@@ -513,6 +525,14 @@ class ArtifactDeployRequest(BaseModel):
             "and conflicts (files modified on both sides) are reported."
         ),
     )
+    deployment_profile_id: Optional[str] = Field(
+        default=None,
+        description="Optional deployment profile ID (defaults to project primary profile)",
+    )
+    all_profiles: bool = Field(
+        default=False,
+        description="Deploy to all deployment profiles for the project",
+    )
 
 
 class MergeFileAction(BaseModel):
@@ -582,6 +602,14 @@ class ArtifactDeployResponse(BaseModel):
     merge_details: Optional[MergeDeployDetails] = Field(
         default=None,
         description="Merge deployment details (only present when strategy='merge')",
+    )
+    deployment_profile_id: Optional[str] = Field(
+        default=None,
+        description="Profile used for deployment (single-profile mode)",
+    )
+    deployed_profiles: Optional[List[str]] = Field(
+        default=None,
+        description="Profiles that received the deployment",
     )
 
     class Config:
