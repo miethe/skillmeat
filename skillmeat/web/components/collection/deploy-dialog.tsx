@@ -33,8 +33,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ProgressIndicator, ProgressStep } from './progress-indicator';
-import { useDeployArtifact, useProjects } from '@/hooks';
+import { useDeployArtifact, useProjects, useDeploymentProfiles, useProfileSelector } from '@/hooks';
 import { CreateProjectDialog } from '@/app/projects/components/create-project-dialog';
+import { ProfileSelector } from '@/components/profile-selector';
 import type { Artifact } from '@/types/artifact';
 import { cn } from '@/lib/utils';
 
@@ -114,6 +115,13 @@ export function DeployDialog({
   const [customSubPath, setCustomSubPath] = useState('');
   const [customPathError, setCustomPathError] = useState<string | null>(null);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const {
+    selectedProfileId,
+    setSelectedProfileId,
+    allProfiles,
+    setAllProfiles,
+    deploymentParams,
+  } = useProfileSelector('claude_code');
   const [initialSteps] = useState<ProgressStep[]>([
     { step: 'Validating artifact', status: 'pending' },
     { step: 'Checking project path', status: 'pending' },
@@ -125,6 +133,8 @@ export function DeployDialog({
 
   // Determine if using custom path mode
   const useCustomPath = selectedProjectId === CUSTOM_PATH_VALUE;
+  const profileProjectId = selectedProjectId && !useCustomPath ? selectedProjectId : undefined;
+  const { data: deploymentProfiles } = useDeploymentProfiles(profileProjectId);
 
   // Get selected project object
   const selectedProject =
@@ -217,8 +227,10 @@ export function DeployDialog({
       setCustomPathEnabled(false);
       setCustomSubPath('');
       setCustomPathError(null);
+      setSelectedProfileId('claude_code');
+      setAllProfiles(false);
     }
-  }, [isOpen, artifact?.id]);
+  }, [isOpen, artifact?.id, setAllProfiles, setSelectedProfileId]);
 
   // Reset overwrite warning when overwrite is enabled
   useEffect(() => {
@@ -231,7 +243,24 @@ export function DeployDialog({
   useEffect(() => {
     setOverwriteEnabled(false);
     setShowOverwriteWarning(false);
+    setAllProfiles(false);
+    setSelectedProfileId('claude_code');
   }, [selectedProjectId]);
+
+  useEffect(() => {
+    if (useCustomPath) {
+      setAllProfiles(false);
+    }
+  }, [useCustomPath, setAllProfiles]);
+
+  useEffect(() => {
+    if (deploymentProfiles && deploymentProfiles.length > 0 && !allProfiles) {
+      const nextProfileId = deploymentProfiles[0]?.profile_id;
+      if (nextProfileId) {
+        setSelectedProfileId(nextProfileId);
+      }
+    }
+  }, [deploymentProfiles, allProfiles, setSelectedProfileId]);
 
   const deployMutation = useDeployArtifact();
 
@@ -272,6 +301,7 @@ export function DeployDialog({
         // Include collection name to ensure correct collection lookup
         // Falls back to 'default' if not specified on the artifact
         collection_name: artifact.collection || 'default',
+        ...deploymentParams,
       });
       // Deployment successful
       handleComplete(true);
@@ -468,6 +498,21 @@ export function DeployDialog({
                     </p>
                   </div>
                 )}
+
+                <ProfileSelector
+                  profiles={deploymentProfiles}
+                  value={selectedProfileId}
+                  onValueChange={setSelectedProfileId}
+                  allProfiles={allProfiles}
+                  onAllProfilesChange={
+                    useCustomPath
+                      ? undefined
+                      : (checked) => {
+                          setAllProfiles(checked);
+                        }
+                  }
+                  disabled={isDeploying}
+                />
 
                 {/* Overwrite Toggle - Only shown when selecting an already-deployed project */}
                 {currentSelectionDeployed && (

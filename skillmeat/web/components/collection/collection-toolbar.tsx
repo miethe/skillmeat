@@ -279,6 +279,29 @@ export function CollectionToolbar({
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Platform Filter */}
+              <div className="p-2">
+                <label htmlFor="platform-filter" className="mb-1.5 block text-xs font-medium">
+                  Platform
+                </label>
+                <Select
+                  value={filters.platform || 'all'}
+                  onValueChange={(value) => handleFilterChange('platform', value)}
+                >
+                  <SelectTrigger id="platform-filter" className="h-8">
+                    <SelectValue placeholder="All Platforms" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Platforms</SelectItem>
+                    <SelectItem value="universal">Universal</SelectItem>
+                    <SelectItem value="claude_code">Claude Code</SelectItem>
+                    <SelectItem value="codex">Codex</SelectItem>
+                    <SelectItem value="gemini">Gemini</SelectItem>
+                    <SelectItem value="cursor">Cursor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
 

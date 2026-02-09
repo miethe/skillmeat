@@ -121,6 +121,7 @@ function CollectionPageContent() {
   const urlType = searchParams.get('type') || 'all';
   const urlStatus = searchParams.get('status') || 'all';
   const urlScope = searchParams.get('scope') || 'all';
+  const urlPlatform = searchParams.get('platform') || 'all';
   const urlSort = searchParams.get('sort') || 'confidence';
   const urlOrder = (searchParams.get('order') as 'asc' | 'desc') || 'desc';
 
@@ -140,8 +141,10 @@ function CollectionPageContent() {
       type: urlType !== 'all' ? (urlType as ArtifactFilters['type']) : undefined,
       status: urlStatus !== 'all' ? (urlStatus as ArtifactFilters['status']) : undefined,
       scope: urlScope !== 'all' ? (urlScope as ArtifactFilters['scope']) : undefined,
+      platform:
+        urlPlatform !== 'all' ? (urlPlatform as ArtifactFilters['platform']) : undefined,
     }),
-    [urlType, urlStatus, urlScope]
+    [urlType, urlStatus, urlScope, urlPlatform]
   );
 
   // Use URL values directly for search and sort
@@ -400,6 +403,8 @@ function CollectionPageContent() {
         type: newFilters.type && newFilters.type !== 'all' ? newFilters.type : null,
         status: newFilters.status && newFilters.status !== 'all' ? newFilters.status : null,
         scope: newFilters.scope && newFilters.scope !== 'all' ? newFilters.scope : null,
+        platform:
+          newFilters.platform && newFilters.platform !== 'all' ? newFilters.platform : null,
       });
     },
     [updateUrlParams]
@@ -495,6 +500,19 @@ function CollectionPageContent() {
     // Scope filter
     if (filters.scope && filters.scope !== 'all') {
       artifacts = artifacts.filter((artifact) => artifact.scope === filters.scope);
+    }
+
+    // Target platform filter
+    if (filters.platform && filters.platform !== 'all') {
+      if (filters.platform === 'universal') {
+        artifacts = artifacts.filter(
+          (artifact) => !artifact.targetPlatforms || artifact.targetPlatforms.length === 0
+        );
+      } else {
+        artifacts = artifacts.filter((artifact) =>
+          artifact.targetPlatforms?.some((platform) => platform === filters.platform)
+        );
+      }
     }
 
     // Search

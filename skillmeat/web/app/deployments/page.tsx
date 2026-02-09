@@ -27,6 +27,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { cn } from '@/lib/utils';
 import { useDeploymentList, useDeploymentSummary, useRefreshDeployments } from '@/hooks';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
+import { DeploymentStatusProfileView } from '@/components/deployments/deployment-status-profile-view';
+import { SyncComparisonView } from '@/components/deployments/sync-comparison-view';
 import type { ArtifactDeploymentInfo, ArtifactSyncStatus } from '@/types/deployments';
 import type { ArtifactType } from '@/types/artifact';
 
@@ -323,6 +325,13 @@ export default function DeploymentsPage() {
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
+        {!!listData?.deployments_by_profile && Object.keys(listData.deployments_by_profile).length > 0 && (
+          <div className="mb-6 space-y-4">
+            <DeploymentStatusProfileView deploymentsByProfile={listData.deployments_by_profile} />
+            <SyncComparisonView deploymentsByProfile={listData.deployments_by_profile} />
+          </div>
+        )}
+
         {isLoading ? (
           // Loading skeletons
           <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">

@@ -22,6 +22,8 @@ import type {
   UpdateContextEntityRequest,
   ContextEntityFilters,
   ContextEntityListResponse,
+  ContextEntityDeployRequest,
+  ContextEntityDeployResponse,
 } from '@/types/context-entity';
 
 /**
@@ -240,9 +242,13 @@ export function useDeployContextEntity() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, projectPath }: { id: string; projectPath: string }): Promise<void> => {
-      return deployContextEntity(id, projectPath);
-    },
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: ContextEntityDeployRequest;
+    }): Promise<ContextEntityDeployResponse> => deployContextEntity(id, data),
     onSuccess: () => {
       // Invalidate context entities lists to reflect changes if any (e.g. usage stats)
       queryClient.invalidateQueries({ queryKey: contextEntityKeys.lists() });
