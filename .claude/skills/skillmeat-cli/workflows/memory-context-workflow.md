@@ -46,8 +46,27 @@ skillmeat memory item create --project <project> \
   --type <learning|gotcha|constraint|decision|style_rule> \
   --content "Your learning here" \
   --confidence 0.85 \
-  --status candidate
+  --status candidate \
+  --anchor "path:type:start-end" \
+  --provenance-branch "<branch>" \
+  --provenance-commit "<sha>" \
+  --provenance-agent-type "<agent>" \
+  --provenance-model "<model>"
 ```
+
+### Anchor Format Reference
+
+- `--anchor "path:type"` (path + anchor type)
+- `--anchor "path:type:start-end"` (includes line range)
+- Repeat `--anchor` to attach multiple anchors.
+- Valid anchor types: `code`, `test`, `doc`, `config`, `plan`
+
+Classification heuristic:
+- `test`: `tests/` paths or `test_*` files
+- `doc`: markdown under `docs/` or `project_plans/`
+- `plan`: markdown under `.claude/progress/` or `.claude/worknotes/`
+- `config`: `.toml`, `.yaml`, `.yml`, `.json`, `.ini`, `.cfg`, `.env*`
+- `code`: all other files
 
 ### Examples
 
@@ -57,14 +76,29 @@ skillmeat memory item create --project skillmeat \
   --type gotcha \
   --content "useEffect with empty deps [] runs before refs are attached - use [dependency] to re-run after conditional render" \
   --confidence 0.9 \
-  --status candidate
+  --status candidate \
+  --anchor "skillmeat/web/components/memory/memory-details-modal.tsx:code:950-1004"
 
 # Pattern discovery
 skillmeat memory item create --project skillmeat \
   --type learning \
   --content "Write-through pattern: always write filesystem first, then call refresh_single_artifact_cache() to sync DB" \
   --confidence 0.9 \
-  --status candidate
+  --status candidate \
+  --anchor "skillmeat/core/services/artifact_service.py:code" \
+  --anchor "docs/project_plans/implementation_plans/features/memory-anchors-provenance-v1.md:doc"
+
+# With provenance flags from current session
+skillmeat memory item create --project skillmeat \
+  --type decision \
+  --content "Persist promoted provenance in both columns and provenance_json for backward compatibility" \
+  --confidence 0.88 \
+  --status candidate \
+  --anchor "skillmeat/core/services/memory_service.py:code:150-240" \
+  --provenance-branch "feat/memory-anchors" \
+  --provenance-commit "abc1234" \
+  --provenance-agent-type "backend-typescript-architect" \
+  --provenance-model "claude-opus-4-6"
 ```
 
 ### Why Manual > Extraction

@@ -7846,6 +7846,72 @@
         }
       }
     },
+    "/api/v1/context-entities/{entity_id}/deploy": {
+      "post": {
+        "tags": [
+          "context-entities",
+          "context-entities"
+        ],
+        "summary": "Deploy context entity to a project",
+        "description": "Deploy a context entity to the target project using a selected deployment profile or all configured profiles.",
+        "operationId": "deploy_context_entity_api_v1_context_entities__entity_id__deploy_post",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContextEntityDeployRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Context entity deployed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextEntityDeployResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "404": {
+            "description": "Context entity not found"
+          },
+          "409": {
+            "description": "Destination file exists and overwrite=false"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/context-entities/{entity_id}/content": {
       "get": {
         "tags": [
@@ -8814,6 +8880,339 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/profiles": {
+      "post": {
+        "tags": [
+          "deployment-profiles",
+          "deployment-profiles"
+        ],
+        "summary": "Create Profile",
+        "operationId": "create_profile_api_v1_projects__project_id__profiles_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentProfileCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Deployment profile created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentProfileRead"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Profile already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "deployment-profiles",
+          "deployment-profiles"
+        ],
+        "summary": "List Profiles",
+        "operationId": "list_profiles_api_v1_projects__project_id__profiles_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeploymentProfileRead"
+                  },
+                  "title": "Response List Profiles Api V1 Projects  Project Id  Profiles Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project_id}/profiles/{profile_id}": {
+      "get": {
+        "tags": [
+          "deployment-profiles",
+          "deployment-profiles"
+        ],
+        "summary": "Get Profile",
+        "operationId": "get_profile_api_v1_projects__project_id__profiles__profile_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentProfileRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profile not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "deployment-profiles",
+          "deployment-profiles"
+        ],
+        "summary": "Update Profile",
+        "operationId": "update_profile_api_v1_projects__project_id__profiles__profile_id__put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentProfileUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentProfileRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profile not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "deployment-profiles",
+          "deployment-profiles"
+        ],
+        "summary": "Delete Profile",
+        "operationId": "delete_profile_api_v1_projects__project_id__profiles__profile_id__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Profile not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/deploy": {
       "post": {
         "tags": [
@@ -8821,7 +9220,7 @@
           "deployments"
         ],
         "summary": "Deploy artifact to project",
-        "description": "Deploy an artifact from collection to a project's .claude directory",
+        "description": "Deploy an artifact from collection to a project's deployment profile root (for example: .claude, .codex, or .gemini).",
         "operationId": "deploy_artifact_api_v1_deploy_post",
         "security": [
           {
@@ -8938,6 +9337,24 @@
               "title": "Project Path"
             },
             "description": "Path to project directory (uses CWD if not specified)"
+          },
+          {
+            "name": "profile_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional deployment profile ID filter",
+              "title": "Profile Id"
+            },
+            "description": "Optional deployment profile ID filter"
           }
         ],
         "responses": {
@@ -8991,7 +9408,7 @@
           "deployments"
         ],
         "summary": "Remove deployed artifact",
-        "description": "Remove an artifact from a project's .claude directory",
+        "description": "Remove an artifact from a project's deployment profile root",
         "operationId": "undeploy_artifact_api_v1_deploy_undeploy_post",
         "requestBody": {
           "content": {
@@ -13601,6 +14018,114 @@
             "description": "Filter by share scope"
           },
           {
+            "name": "git_branch",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by git branch",
+              "title": "Git Branch"
+            },
+            "description": "Filter by git branch"
+          },
+          {
+            "name": "git_commit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by git commit",
+              "title": "Git Commit"
+            },
+            "description": "Filter by git commit"
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by session ID",
+              "title": "Session Id"
+            },
+            "description": "Filter by session ID"
+          },
+          {
+            "name": "agent_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by agent type",
+              "title": "Agent Type"
+            },
+            "description": "Filter by agent type"
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by model",
+              "title": "Model"
+            },
+            "description": "Filter by model"
+          },
+          {
+            "name": "source_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by source type",
+              "title": "Source Type"
+            },
+            "description": "Filter by source type"
+          },
+          {
             "name": "search",
             "in": "query",
             "required": false,
@@ -13899,6 +14424,114 @@
             "description": "Filter by share scope"
           },
           {
+            "name": "git_branch",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by git branch",
+              "title": "Git Branch"
+            },
+            "description": "Filter by git branch"
+          },
+          {
+            "name": "git_commit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by git commit",
+              "title": "Git Commit"
+            },
+            "description": "Filter by git commit"
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by session ID",
+              "title": "Session Id"
+            },
+            "description": "Filter by session ID"
+          },
+          {
+            "name": "agent_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by agent type",
+              "title": "Agent Type"
+            },
+            "description": "Filter by agent type"
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by model",
+              "title": "Model"
+            },
+            "description": "Filter by model"
+          },
+          {
+            "name": "source_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by source type",
+              "title": "Source Type"
+            },
+            "description": "Filter by source type"
+          },
+          {
             "name": "search",
             "in": "query",
             "required": false,
@@ -14141,7 +14774,7 @@
           "memory-items"
         ],
         "summary": "Update a memory item",
-        "description": "Update an existing memory item. Only provided fields are changed.\n\n    Updatable fields: type, content, confidence, status, provenance, anchors, ttl_policy.",
+        "description": "Update an existing memory item. Only provided fields are changed.\n\n    Updatable fields: type, content, confidence, status, provenance, anchors, ttl_policy,\n    git_branch, git_commit, session_id, agent_type, model, source_type.",
         "operationId": "update_memory_item_api_v1_memory_items__item_id__put",
         "parameters": [
           {
@@ -16451,6 +17084,231 @@
         }
       }
     },
+    "/api/v1/settings/platform-defaults": {
+      "get": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "Get all platform defaults",
+        "description": "Returns resolved default configurations for all supported platforms.\n\n    Each platform's defaults include:\n    - root_dir: Platform root directory\n    - artifact_path_map: Artifact type to path mappings\n    - config_filenames: Recognized configuration files\n    - supported_artifact_types: Supported artifact types\n    - context_prefixes: Context directory prefixes",
+        "operationId": "get_all_platform_defaults_api_v1_settings_platform_defaults_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllPlatformDefaultsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/platform-defaults/{platform}": {
+      "get": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "Get platform defaults",
+        "description": "Returns resolved default configuration for a specific platform.\n\n    The returned configuration includes any TOML overrides merged with\n    hardcoded defaults.",
+        "operationId": "get_platform_defaults_api_v1_settings_platform_defaults__platform__get",
+        "parameters": [
+          {
+            "name": "platform",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Platform"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformDefaultsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "Update platform defaults",
+        "description": "Update TOML overrides for a platform's default configuration.\n\n    Only provided fields will be updated; others remain unchanged.\n    The updated configuration is persisted to the TOML settings file.",
+        "operationId": "update_platform_defaults_api_v1_settings_platform_defaults__platform__put",
+        "parameters": [
+          {
+            "name": "platform",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Platform"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformDefaultsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformDefaultsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "Reset platform defaults",
+        "description": "Reset a platform to its hardcoded defaults by clearing all TOML overrides.\n\n    Returns the platform's hardcoded defaults after reset.",
+        "operationId": "reset_platform_defaults_api_v1_settings_platform_defaults__platform__delete",
+        "parameters": [
+          {
+            "name": "platform",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Platform"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformDefaultsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/custom-context": {
+      "get": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "Get custom context configuration",
+        "description": "Returns the current custom context prefix configuration.\n\n    Custom context configuration allows users to define additional\n    context directory prefixes that supplement or override platform defaults.",
+        "operationId": "get_custom_context_config_api_v1_settings_custom_context_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomContextConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "Update custom context configuration",
+        "description": "Update custom context prefix configuration.\n\n    Only provided fields will be updated; others remain unchanged.\n    The updated configuration is persisted to the TOML settings file.",
+        "operationId": "update_custom_context_config_api_v1_settings_custom_context_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomContextConfigUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomContextConfigResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tags": {
       "post": {
         "tags": [
@@ -17645,6 +18503,47 @@
         "title": "AddMemoryToModuleRequest",
         "description": "Request body for adding a memory item to a context module.\n\nAttributes:\n    memory_id: ID of the memory item to associate.\n    ordering: Display/priority order within the module (default 0)."
       },
+      "AllPlatformDefaultsResponse": {
+        "properties": {
+          "defaults": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PlatformDefaultsEntry"
+            },
+            "type": "object",
+            "title": "Defaults",
+            "description": "Dictionary of platform defaults keyed by platform name",
+            "examples": [
+              {
+                "claude": {
+                  "artifact_path_map": {
+                    "command": "commands",
+                    "skill": "skills"
+                  },
+                  "config_filenames": [
+                    "claude_config.toml"
+                  ],
+                  "context_prefixes": [
+                    "context",
+                    "docs"
+                  ],
+                  "root_dir": ".claude",
+                  "supported_artifact_types": [
+                    "skill",
+                    "command",
+                    "agent"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "defaults"
+        ],
+        "title": "AllPlatformDefaultsResponse",
+        "description": "Response schema for GET /platform-defaults.\n\nReturns default configurations for all supported platforms."
+      },
       "AllServersHealthResponse": {
         "properties": {
           "servers": {
@@ -17806,6 +18705,151 @@
           "total_events": 1337
         }
       },
+      "AnchorCreate": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Path"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "code",
+              "plan",
+              "doc",
+              "config",
+              "test"
+            ],
+            "title": "Type"
+          },
+          "line_start": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line Start"
+          },
+          "line_end": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line End"
+          },
+          "commit_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit Sha"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "type"
+        ],
+        "title": "AnchorCreate",
+        "description": "Structured anchor payload for create/update requests."
+      },
+      "AnchorResponse": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "code",
+              "plan",
+              "doc",
+              "config",
+              "test"
+            ],
+            "title": "Type"
+          },
+          "line_start": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line Start"
+          },
+          "line_end": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line End"
+          },
+          "commit_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit Sha"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "type"
+        ],
+        "title": "AnchorResponse",
+        "description": "Structured anchor in memory item responses."
+      },
       "ArtifactCollectionInfo": {
         "properties": {
           "id": {
@@ -17894,6 +18938,21 @@
             "title": "Tags",
             "description": "Tags to apply"
           },
+          "target_platforms": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Platform"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Platforms",
+            "description": "Optional deployment platform restrictions (null means deployable on all platforms)"
+          },
           "description": {
             "anyOf": [
               {
@@ -17925,6 +18984,10 @@
           "tags": [
             "design",
             "canvas"
+          ],
+          "target_platforms": [
+            "claude_code",
+            "codex"
           ]
         }
       },
@@ -18027,6 +19090,24 @@
             "title": "Strategy",
             "description": "Deployment strategy. 'overwrite' replaces existing files entirely (default, existing behavior). 'merge' performs file-level merge: new files are copied, project-only files are preserved, and conflicts (files modified on both sides) are reported.",
             "default": "overwrite"
+          },
+          "deployment_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment Profile Id",
+            "description": "Optional deployment profile ID (defaults to project primary profile)"
+          },
+          "all_profiles": {
+            "type": "boolean",
+            "title": "All Profiles",
+            "description": "Deploy to all deployment profiles for the project",
+            "default": false
           }
         },
         "type": "object",
@@ -18108,6 +19189,33 @@
               }
             ],
             "description": "Merge deployment details (only present when strategy='merge')"
+          },
+          "deployment_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment Profile Id",
+            "description": "Profile used for deployment (single-profile mode)"
+          },
+          "deployed_profiles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployed Profiles",
+            "description": "Profiles that received the deployment"
           }
         },
         "type": "object",
@@ -18680,6 +19788,21 @@
               ]
             ]
           },
+          "target_platforms": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Platform"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Platforms",
+            "description": "Optional deployment platform restrictions (null means deployable on all platforms)"
+          },
           "metadata": {
             "anyOf": [
               {
@@ -18783,6 +19906,9 @@
           "name": "pdf",
           "origin": "github",
           "source": "anthropics/skills/pdf",
+          "target_platforms": [
+            "claude_code"
+          ],
           "type": "skill",
           "updated": "2024-11-16T15:30:00Z",
           "upstream": {
@@ -20364,6 +21490,21 @@
                 "art"
               ]
             ]
+          },
+          "target_platforms": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Platform"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Platforms",
+            "description": "Optional platform restrictions override. If omitted for local imports, platform may be inferred from source path."
           },
           "scope": {
             "type": "string",
@@ -23737,7 +24878,7 @@
           "path_pattern": {
             "type": "string",
             "title": "Path Pattern",
-            "description": "Path pattern within .claude/ directory (must start with '.claude/', no '..')",
+            "description": "Path pattern within a profile root (must start with '.claude/'/'.codex/' etc, no '..')",
             "examples": [
               ".claude/rules/web/api-client.md"
             ]
@@ -23795,6 +24936,36 @@
             "examples": [
               "1.0.0"
             ]
+          },
+          "deployment_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment Profile Id",
+            "description": "Optional profile id used when validating/deploying this entity",
+            "examples": [
+              "claude_code"
+            ]
+          },
+          "target_platforms": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Platform"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Platforms",
+            "description": "Optional deployment platform restrictions (null means deployable on all platforms)"
           }
         },
         "type": "object",
@@ -23805,17 +24976,122 @@
           "path_pattern"
         ],
         "title": "ContextEntityCreateRequest",
-        "description": "Request schema for creating a context entity.\n\nContext entities are artifacts with special roles in Claude Code projects.\nThey support path-pattern matching for auto-loading and categorization.\n\nPath Pattern Security:\n- Must start with '.claude/' (enforced via validation)\n- Cannot contain '..' for path traversal prevention\n\nExamples:\n    >>> # Rule file that auto-loads for web path edits\n    >>> request = ContextEntityCreateRequest(\n    ...     name=\"web-hooks-rules\",\n    ...     entity_type=ContextEntityType.RULE_FILE,\n    ...     content=\"# Web Hooks Patterns\\n...\",\n    ...     path_pattern=\".claude/rules/web/hooks.md\",\n    ...     category=\"web\",\n    ...     auto_load=True\n    ... )",
+        "description": "Request schema for creating a context entity.\n\nContext entities are artifacts with special roles in Claude Code projects.\nThey support path-pattern matching for auto-loading and categorization.\n\nPath Pattern Security:\n- Must start with a profile root (e.g. '.claude/', '.codex/')\n- Cannot contain '..' for path traversal prevention\n\nExamples:\n    >>> # Rule file that auto-loads for web path edits\n    >>> request = ContextEntityCreateRequest(\n    ...     name=\"web-hooks-rules\",\n    ...     entity_type=ContextEntityType.RULE_FILE,\n    ...     content=\"# Web Hooks Patterns\\n...\",\n    ...     path_pattern=\".claude/rules/web/hooks.md\",\n    ...     category=\"web\",\n    ...     auto_load=True\n    ... )",
         "example": {
           "auto_load": true,
           "category": "web",
           "content": "# Web API Patterns\n\nFollow REST conventions...",
+          "deployment_profile_id": "claude_code",
           "description": "API client conventions for web frontend",
           "entity_type": "rule_file",
           "name": "web-api-patterns",
           "path_pattern": ".claude/rules/web/api-client.md",
+          "target_platforms": [
+            "claude_code",
+            "codex"
+          ],
           "version": "1.0.0"
         }
+      },
+      "ContextEntityDeployRequest": {
+        "properties": {
+          "project_path": {
+            "type": "string",
+            "title": "Project Path",
+            "description": "Target project path",
+            "examples": [
+              "/Users/me/my-project"
+            ]
+          },
+          "overwrite": {
+            "type": "boolean",
+            "title": "Overwrite",
+            "description": "Overwrite existing file when destination already exists",
+            "default": false
+          },
+          "deployment_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment Profile Id",
+            "description": "Optional deployment profile id (uses project primary profile when omitted)",
+            "examples": [
+              "codex"
+            ]
+          },
+          "all_profiles": {
+            "type": "boolean",
+            "title": "All Profiles",
+            "description": "Deploy to all configured project profiles",
+            "default": false
+          },
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "description": "Allow deployment when entity target_platforms exclude selected profile platform",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_path"
+        ],
+        "title": "ContextEntityDeployRequest",
+        "description": "Request schema for deploying a context entity to a project."
+      },
+      "ContextEntityDeployResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether deployment succeeded"
+          },
+          "entity_id": {
+            "type": "string",
+            "title": "Entity Id",
+            "description": "Context entity identifier"
+          },
+          "project_path": {
+            "type": "string",
+            "title": "Project Path",
+            "description": "Resolved project path"
+          },
+          "deployed_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Deployed Paths",
+            "description": "Paths written relative to project root"
+          },
+          "deployed_profiles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Deployed Profiles",
+            "description": "Deployment profile IDs that received the entity"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable deployment result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "entity_id",
+          "project_path",
+          "message"
+        ],
+        "title": "ContextEntityDeployResponse",
+        "description": "Response schema for context entity deployment."
       },
       "ContextEntityInfo": {
         "properties": {
@@ -23927,7 +25203,7 @@
           "path_pattern": {
             "type": "string",
             "title": "Path Pattern",
-            "description": "Path pattern within .claude/ directory",
+            "description": "Path pattern within profile root directory",
             "examples": [
               ".claude/rules/web/api-client.md"
             ]
@@ -23984,6 +25260,32 @@
             "examples": [
               "1.0.0"
             ]
+          },
+          "target_platforms": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Platform"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Platforms",
+            "description": "Platform restrictions for deployment (null means deployable anywhere)"
+          },
+          "deployed_to": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Deployed To",
+            "description": "Deployment paths grouped by profile/platform key"
           },
           "content_hash": {
             "anyOf": [
@@ -24109,7 +25411,7 @@
               }
             ],
             "title": "Path Pattern",
-            "description": "Updated path pattern (must start with '.claude/', no '..')",
+            "description": "Updated path pattern (must start with profile root, no '..')",
             "examples": [
               ".claude/rules/web/api-client-v2.md"
             ]
@@ -24173,6 +25475,36 @@
             "examples": [
               "2.0.0"
             ]
+          },
+          "deployment_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment Profile Id",
+            "description": "Updated deployment profile id",
+            "examples": [
+              "codex"
+            ]
+          },
+          "target_platforms": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Platform"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Platforms",
+            "description": "Updated platform restrictions"
           }
         },
         "type": "object",
@@ -24927,6 +26259,142 @@
           "trust_level": "verified"
         }
       },
+      "CustomContextConfigResponse": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Whether custom context configuration is enabled",
+            "examples": [
+              true
+            ]
+          },
+          "prefixes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Prefixes",
+            "description": "Custom context directory prefixes",
+            "examples": [
+              [
+                "custom-context",
+                "my-docs"
+              ]
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "description": "Application mode: 'override' or 'addendum'",
+            "examples": [
+              "addendum"
+            ]
+          },
+          "platforms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Platforms",
+            "description": "Platforms this configuration applies to",
+            "examples": [
+              [
+                "claude",
+                "continue"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "prefixes",
+          "mode",
+          "platforms"
+        ],
+        "title": "CustomContextConfigResponse",
+        "description": "Response schema for GET /custom-context.\n\nReturns the current custom context configuration."
+      },
+      "CustomContextConfigUpdateRequest": {
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled",
+            "description": "Enable or disable custom context configuration",
+            "examples": [
+              true
+            ]
+          },
+          "prefixes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefixes",
+            "description": "Custom context directory prefixes",
+            "examples": [
+              [
+                "custom-context",
+                "my-docs"
+              ]
+            ]
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode",
+            "description": "Application mode: 'override' or 'addendum'",
+            "examples": [
+              "addendum"
+            ]
+          },
+          "platforms": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platforms",
+            "description": "Platforms this configuration applies to",
+            "examples": [
+              [
+                "claude",
+                "continue"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "title": "CustomContextConfigUpdateRequest",
+        "description": "Request schema for PUT /custom-context.\n\nAll fields are optional to allow partial updates of custom context configuration."
+      },
       "DeployRequest": {
         "properties": {
           "artifact_id": {
@@ -24998,6 +26466,27 @@
               ".claude/skills/",
               ".claude/skills/dev/"
             ]
+          },
+          "deployment_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment Profile Id",
+            "description": "Optional deployment profile ID (uses primary profile when omitted)",
+            "examples": [
+              "codex-default"
+            ]
+          },
+          "all_profiles": {
+            "type": "boolean",
+            "title": "All Profiles",
+            "description": "Deploy to all project deployment profiles",
+            "default": false
           }
         },
         "type": "object",
@@ -25009,10 +26498,12 @@
         "title": "DeployRequest",
         "description": "Request to deploy an artifact to a project.",
         "example": {
+          "all_profiles": false,
           "artifact_id": "skill:pdf",
           "artifact_name": "pdf",
           "artifact_type": "skill",
           "collection_name": "default",
+          "deployment_profile_id": "codex-default",
           "dest_path": ".claude/skills/dev/",
           "overwrite": false,
           "project_path": "/path/to/project"
@@ -25061,6 +26552,21 @@
             "examples": [
               false
             ]
+          },
+          "deployment_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment Profile Id",
+            "description": "Optional deployment profile id to rewrite profile-rooted template paths (defaults to project primary profile)",
+            "examples": [
+              "codex"
+            ]
           }
         },
         "type": "object",
@@ -25071,6 +26577,7 @@
         "title": "DeployTemplateRequest",
         "description": "Request schema for deploying a project template.\n\nDeploys template entities to a target project path with variable substitution.\nSupports selective entity deployment and overwrite control.",
         "example": {
+          "deployment_profile_id": "codex",
           "overwrite": false,
           "project_path": "/path/to/project",
           "variables": {
@@ -25314,6 +26821,41 @@
             ],
             "title": "Merge Base Snapshot",
             "description": "Content hash (SHA-256) used as merge base for 3-way merges"
+          },
+          "deployment_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment Profile Id",
+            "description": "Deployment profile identifier used for this deployment"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Platform"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Platform associated with the deployment profile"
+          },
+          "profile_root_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Root Dir",
+            "description": "Resolved profile root directory used for deployment"
           }
         },
         "type": "object",
@@ -25354,6 +26896,17 @@
             "type": "array",
             "title": "Deployments",
             "description": "List of deployments"
+          },
+          "deployments_by_profile": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/DeploymentInfo"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Deployments By Profile",
+            "description": "Deployments grouped by deployment profile ID"
           },
           "total": {
             "type": "integer",
@@ -25484,6 +27037,262 @@
           "is_modified": true,
           "modification_detected_at": "2025-11-20T15:45:00Z"
         }
+      },
+      "DeploymentProfileCreate": {
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id",
+            "description": "Profile identifier unique per project"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/Platform",
+            "description": "Target platform for this profile"
+          },
+          "root_dir": {
+            "type": "string",
+            "title": "Root Dir",
+            "description": "Profile root directory"
+          },
+          "artifact_path_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Artifact Path Map"
+          },
+          "project_config_filenames": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Project Config Filenames"
+          },
+          "context_path_prefixes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Context Path Prefixes"
+          },
+          "supported_artifact_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Artifact Types"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "platform",
+          "root_dir"
+        ],
+        "title": "DeploymentProfileCreate",
+        "description": "Request schema for creating a deployment profile."
+      },
+      "DeploymentProfileInfo": {
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id",
+            "description": "Profile identifier unique within the project"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/Platform",
+            "description": "Platform associated with this profile"
+          },
+          "root_dir": {
+            "type": "string",
+            "title": "Root Dir",
+            "description": "Profile root directory",
+            "examples": [
+              ".claude"
+            ]
+          },
+          "artifact_path_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Artifact Path Map",
+            "description": "Artifact type to path mapping for this profile"
+          },
+          "context_path_prefixes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Context Path Prefixes",
+            "description": "Allowed context path prefixes for this profile"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "platform",
+          "root_dir"
+        ],
+        "title": "DeploymentProfileInfo",
+        "description": "Deployment profile metadata attached to a project response."
+      },
+      "DeploymentProfileRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/Platform"
+          },
+          "root_dir": {
+            "type": "string",
+            "title": "Root Dir"
+          },
+          "artifact_path_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Artifact Path Map"
+          },
+          "project_config_filenames": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Project Config Filenames"
+          },
+          "context_path_prefixes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Context Path Prefixes"
+          },
+          "supported_artifact_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Artifact Types"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "profile_id",
+          "platform",
+          "root_dir",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "DeploymentProfileRead",
+        "description": "Response schema for deployment profiles."
+      },
+      "DeploymentProfileUpdate": {
+        "properties": {
+          "platform": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Platform"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "root_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Dir"
+          },
+          "artifact_path_map": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Path Map"
+          },
+          "project_config_filenames": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Config Filenames"
+          },
+          "context_path_prefixes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Path Prefixes"
+          },
+          "supported_artifact_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supported Artifact Types"
+          }
+        },
+        "type": "object",
+        "title": "DeploymentProfileUpdate",
+        "description": "Request schema for updating a deployment profile.\n\nprofile_id is intentionally immutable and therefore excluded."
       },
       "DeploymentRequest": {
         "properties": {
@@ -27093,6 +28902,86 @@
               }
             ],
             "title": "Provenance"
+          },
+          "anchors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AnchorResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchors"
+          },
+          "git_branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Branch"
+          },
+          "git_commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Commit"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "agent_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Type"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
           }
         },
         "type": "object",
@@ -30441,7 +32330,14 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/AnchorCreate"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
                 },
                 "type": "array"
               },
@@ -30450,6 +32346,72 @@
               }
             ],
             "title": "Anchors"
+          },
+          "git_branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Branch"
+          },
+          "git_commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Commit"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "agent_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Type"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
           },
           "ttl_policy": {
             "anyOf": [
@@ -30573,7 +32535,14 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/AnchorResponse"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
                 },
                 "type": "array"
               },
@@ -30582,6 +32551,72 @@
               }
             ],
             "title": "Anchors"
+          },
+          "git_branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Branch"
+          },
+          "git_commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Commit"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "agent_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Type"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
           },
           "ttl_policy": {
             "anyOf": [
@@ -30732,7 +32767,14 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/AnchorCreate"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
                 },
                 "type": "array"
               },
@@ -30741,6 +32783,72 @@
               }
             ],
             "title": "Anchors"
+          },
+          "git_branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Branch"
+          },
+          "git_commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Commit"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "agent_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Type"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
           },
           "ttl_policy": {
             "anyOf": [
@@ -31878,6 +33986,301 @@
           "raw_path": "skills/ui-ux/canvas-design"
         }
       },
+      "Platform": {
+        "type": "string",
+        "enum": [
+          "claude_code",
+          "codex",
+          "gemini",
+          "cursor",
+          "other"
+        ],
+        "title": "Platform",
+        "description": "Supported platforms for artifact execution.\n\nRepresents the target execution environment where an artifact is designed\nto run. Used in frontmatter metadata to indicate platform compatibility.\n\nAttributes:\n    CLAUDE_CODE: Anthropic's Claude Code CLI tool\n    CODEX: OpenAI Codex CLI and integrations\n    GEMINI: Google Gemini CLI and integrations\n    CURSOR: Cursor AI editor\n    OTHER: Other platforms or unspecified\n\nExample:\n    >>> Platform.CLAUDE_CODE.value\n    'claude_code'\n    >>> Platform.CLAUDE_CODE == \"claude_code\"\n    True\n    >>> str(Platform.CURSOR)\n    'cursor'"
+      },
+      "PlatformDefaultsEntry": {
+        "properties": {
+          "root_dir": {
+            "type": "string",
+            "title": "Root Dir",
+            "description": "Root directory for the platform (e.g., '.claude', '.continue')",
+            "examples": [
+              ".claude"
+            ]
+          },
+          "artifact_path_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Artifact Path Map",
+            "description": "Mapping of artifact types to their relative paths within root_dir",
+            "examples": [
+              {
+                "command": "commands",
+                "skill": "skills"
+              }
+            ]
+          },
+          "config_filenames": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Config Filenames",
+            "description": "List of configuration filenames recognized by the platform",
+            "examples": [
+              [
+                "claude_config.toml",
+                "config.toml"
+              ]
+            ]
+          },
+          "supported_artifact_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Artifact Types",
+            "description": "List of artifact types supported by this platform",
+            "examples": [
+              [
+                "skill",
+                "command",
+                "agent",
+                "mcp",
+                "hook"
+              ]
+            ]
+          },
+          "context_prefixes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Context Prefixes",
+            "description": "List of directory prefixes for context files/documentation",
+            "examples": [
+              [
+                "context",
+                "docs",
+                "specs"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "root_dir",
+          "artifact_path_map",
+          "config_filenames",
+          "supported_artifact_types",
+          "context_prefixes"
+        ],
+        "title": "PlatformDefaultsEntry",
+        "description": "Platform-specific default configuration entry.\n\nRepresents the default settings for a single platform including\ndirectory structure, artifact mappings, and supported features."
+      },
+      "PlatformDefaultsResponse": {
+        "properties": {
+          "platform": {
+            "type": "string",
+            "title": "Platform",
+            "description": "Platform identifier (e.g., 'claude', 'continue')",
+            "examples": [
+              "claude"
+            ]
+          },
+          "root_dir": {
+            "type": "string",
+            "title": "Root Dir",
+            "description": "Root directory for the platform",
+            "examples": [
+              ".claude"
+            ]
+          },
+          "artifact_path_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Artifact Path Map",
+            "description": "Mapping of artifact types to their relative paths",
+            "examples": [
+              {
+                "command": "commands",
+                "skill": "skills"
+              }
+            ]
+          },
+          "config_filenames": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Config Filenames",
+            "description": "Configuration filenames recognized by the platform",
+            "examples": [
+              [
+                "claude_config.toml",
+                "config.toml"
+              ]
+            ]
+          },
+          "supported_artifact_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Artifact Types",
+            "description": "Artifact types supported by this platform",
+            "examples": [
+              [
+                "skill",
+                "command",
+                "agent",
+                "mcp",
+                "hook"
+              ]
+            ]
+          },
+          "context_prefixes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Context Prefixes",
+            "description": "Directory prefixes for context files",
+            "examples": [
+              [
+                "context",
+                "docs",
+                "specs"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "platform",
+          "root_dir",
+          "artifact_path_map",
+          "config_filenames",
+          "supported_artifact_types",
+          "context_prefixes"
+        ],
+        "title": "PlatformDefaultsResponse",
+        "description": "Response schema for GET /platform-defaults/{platform}.\n\nReturns the complete default configuration for a specific platform."
+      },
+      "PlatformDefaultsUpdateRequest": {
+        "properties": {
+          "root_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Dir",
+            "description": "Root directory for the platform",
+            "examples": [
+              ".claude"
+            ]
+          },
+          "artifact_path_map": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Path Map",
+            "description": "Mapping of artifact types to their relative paths",
+            "examples": [
+              {
+                "command": "commands",
+                "skill": "skills"
+              }
+            ]
+          },
+          "config_filenames": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Filenames",
+            "description": "Configuration filenames recognized by the platform",
+            "examples": [
+              [
+                "claude_config.toml",
+                "config.toml"
+              ]
+            ]
+          },
+          "supported_artifact_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supported Artifact Types",
+            "description": "Artifact types supported by this platform",
+            "examples": [
+              [
+                "skill",
+                "command",
+                "agent",
+                "mcp",
+                "hook"
+              ]
+            ]
+          },
+          "context_prefixes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Prefixes",
+            "description": "Directory prefixes for context files",
+            "examples": [
+              [
+                "context",
+                "docs",
+                "specs"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "title": "PlatformDefaultsUpdateRequest",
+        "description": "Request schema for PUT /platform-defaults/{platform}.\n\nAll fields are optional to allow partial updates of platform defaults."
+      },
       "PreviewArtifact": {
         "properties": {
           "name": {
@@ -32262,6 +34665,10 @@
                   "custom": 1,
                   "default": 4
                 },
+                "by_profile": {
+                  "claude_code": 4,
+                  "codex-default": 1
+                },
                 "by_type": {
                   "command": 2,
                   "skill": 3
@@ -32269,6 +34676,14 @@
                 "modified_count": 1
               }
             ]
+          },
+          "deployment_profiles": {
+            "items": {
+              "$ref": "#/components/schemas/DeploymentProfileInfo"
+            },
+            "type": "array",
+            "title": "Deployment Profiles",
+            "description": "Configured deployment profiles for this project"
           }
         },
         "type": "object",
@@ -32283,6 +34698,19 @@
         "description": "Detailed information about a project including all deployments.\n\nExtends ProjectSummary with complete list of deployed artifacts\nand aggregated statistics.",
         "example": {
           "deployment_count": 5,
+          "deployment_profiles": [
+            {
+              "artifact_path_map": {
+                "skill": "skills"
+              },
+              "context_path_prefixes": [
+                ".claude/context/"
+              ],
+              "platform": "claude_code",
+              "profile_id": "claude_code",
+              "root_dir": ".claude"
+            }
+          ],
           "deployments": [
             {
               "artifact_name": "canvas-design",
@@ -32302,6 +34730,9 @@
           "stats": {
             "by_collection": {
               "default": 5
+            },
+            "by_profile": {
+              "claude_code": 5
             },
             "by_type": {
               "command": 2,
@@ -35817,6 +38248,18 @@
             ],
             "title": "Project Path",
             "description": "Path to project directory (uses CWD if not specified)"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id",
+            "description": "Optional profile ID to undeploy from a single profile"
           }
         },
         "type": "object",
@@ -35829,6 +38272,7 @@
         "example": {
           "artifact_name": "pdf",
           "artifact_type": "skill",
+          "profile_id": "codex-default",
           "project_path": "/path/to/project"
         }
       },
@@ -37445,6 +39889,49 @@
             ],
             "title": "Deployed At",
             "description": "Timestamp of deployment"
+          },
+          "deployment_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment Profile Id",
+            "description": "Profile used for deployment (single-profile deploy)"
+          },
+          "deployed_profiles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Deployed Profiles",
+            "description": "Profiles that received the artifact deployment"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Platform"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Platform associated with deployment_profile_id"
+          },
+          "profile_root_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Root Dir",
+            "description": "Resolved profile root directory used for deployment"
           }
         },
         "type": "object",

@@ -77,6 +77,10 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   const [showDeprecated, setShowDeprecated] = useState(false);
   const [sortBy, setSortBy] = useState('newest');
   const [searchQuery, setSearchQuery] = useState('');
+  const [gitBranchFilter, setGitBranchFilter] = useState('');
+  const [agentTypeFilter, setAgentTypeFilter] = useState('');
+  const [modelFilter, setModelFilter] = useState('');
+  const [sourceTypeFilter, setSourceTypeFilter] = useState('all');
   const [activeTab, setActiveTab] = useState<'inbox' | 'modules' | 'packs'>('inbox');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [selectedMemoryId, setSelectedMemoryId] = useState<string | null>(null);
@@ -126,6 +130,10 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
     status: statusFilter !== 'all' ? (statusFilter as MemoryStatus) : undefined,
     type: typeFilter !== 'all' ? (typeFilter as MemoryType) : undefined,
     search: searchQuery || undefined,
+    gitBranch: gitBranchFilter.trim() || undefined,
+    agentType: agentTypeFilter.trim() || undefined,
+    model: modelFilter.trim() || undefined,
+    sourceType: sourceTypeFilter !== 'all' ? sourceTypeFilter : undefined,
     sortBy: apiSortBy,
     sortOrder: apiSortOrder,
   };
@@ -486,6 +494,14 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}
             counts={counts}
+            gitBranchFilter={gitBranchFilter}
+            onGitBranchFilterChange={setGitBranchFilter}
+            agentTypeFilter={agentTypeFilter}
+            onAgentTypeFilterChange={setAgentTypeFilter}
+            modelFilter={modelFilter}
+            onModelFilterChange={setModelFilter}
+            sourceTypeFilter={sourceTypeFilter}
+            onSourceTypeFilterChange={setSourceTypeFilter}
           />
 
           {/* View toggle */}

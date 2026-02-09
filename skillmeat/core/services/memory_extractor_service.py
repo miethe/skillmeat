@@ -33,6 +33,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -114,6 +115,10 @@ _PROFILE_BONUS = {
     "aggressive": 0.08,
 }
 _VALID_PROFILES = frozenset(_PROFILE_BONUS.keys())
+
+_ANCHOR_MUTATION_TOOLS = frozenset({"Edit", "Write"})
+_ANCHOR_READ_TOOLS = frozenset({"Read", "Grep", "Glob"})
+_ANCHOR_ALL_TOOLS = _ANCHOR_MUTATION_TOOLS | _ANCHOR_READ_TOOLS
 
 # System reminder markers to filter
 _SYSTEM_MARKERS: frozenset[str] = frozenset(
@@ -279,6 +284,7 @@ class MemoryExtractorService:
 
             # Two-path extraction: try JSONL parsing first, fall back to plain-text
             messages = self._parse_jsonl_messages(text_corpus)
+            resolved_commit_sha = commit_sha or self._detect_git_commit(messages)
 
             # Detect if we should fall back: empty messages but non-empty input
             has_input = bool(text_corpus and text_corpus.strip())
@@ -297,8 +303,32 @@ class MemoryExtractorService:
                     )
 
             if messages:
+                tool_refs_by_message = self._extract_tool_call_paths(messages)
                 content_blocks = self._extract_content_blocks(messages)
                 for content_text, provenance_meta in content_blocks:
+                    message_index = provenance_meta.get("message_index")
+                    if not isinstance(message_index, int):
+                        message_index = None
+                    anchors = self._build_anchors_for_message_window(
+                        tool_refs_by_message=tool_refs_by_message,
+                        message_index=message_index,
+                        commit_sha=resolved_commit_sha,
+                    )
+
+                    effective_session_id = (
+                        provenance_meta.get("session_id")
+                        or session_id
+                        or ""
+                    )
+                    effective_git_branch = provenance_meta.get("git_branch") or ""
+                    effective_git_commit = (
+                        provenance_meta.get("git_commit")
+                        or resolved_commit_sha
+                        or ""
+                    )
+                    effective_agent_type = provenance_meta.get("agent_type")
+                    effective_model = provenance_meta.get("model")
+
                     # Split each content block into candidate lines
                     block_lines = [
                         ln.strip(" -*\t") for ln in content_text.splitlines()
@@ -328,12 +358,22 @@ class MemoryExtractorService:
                             "source": "memory_extraction",
                             "format": "jsonl",
                             "run_id": run_id,
-                            "session_id": session_id,
-                            "commit_sha": commit_sha,
+                            "session_id": effective_session_id,
+                            "commit_sha": effective_git_commit,
                             "workflow_stage": "extraction",
                             "classification_method": "heuristic",
+                            "git_branch": effective_git_branch,
+                            "git_commit": effective_git_commit,
+                            "agent_type": effective_agent_type,
+                            "model": effective_model,
+                            "source_type": "extraction",
                         }
                         provenance.update(provenance_meta)
+                        provenance.pop("message_index", None)
+                        provenance["session_id"] = effective_session_id
+                        provenance["git_branch"] = effective_git_branch
+                        provenance["git_commit"] = effective_git_commit
+                        provenance["source_type"] = "extraction"
 
                         candidates.append(
                             {
@@ -343,7 +383,19 @@ class MemoryExtractorService:
                                 "status": "candidate",
                                 "duplicate_of": duplicate.id if duplicate else None,
                                 "provenance": provenance,
+                                "anchors": anchors,
+                                "git_branch": effective_git_branch,
+                                "git_commit": effective_git_commit,
+                                "session_id": effective_session_id,
+                                "agent_type": effective_agent_type,
+                                "model": effective_model,
+                                "source_type": "extraction",
                             }
+                        )
+                        logger.debug(
+                            "Built extraction candidate with %d anchors (message_index=%s)",
+                            len(anchors),
+                            message_index,
                         )
             else:
                 # Fallback: plain-text line extraction (backward compat)
@@ -375,11 +427,20 @@ class MemoryExtractorService:
                                 "source": "memory_extraction",
                                 "format": "plain_text",
                                 "run_id": run_id,
-                                "session_id": session_id,
-                                "commit_sha": commit_sha,
+                                "session_id": session_id or "",
+                                "commit_sha": resolved_commit_sha,
                                 "workflow_stage": "extraction",
                                 "classification_method": "heuristic",
+                                "git_commit": resolved_commit_sha,
+                                "source_type": "extraction",
                             },
+                            "anchors": [],
+                            "git_branch": "",
+                            "git_commit": resolved_commit_sha,
+                            "session_id": session_id or "",
+                            "agent_type": None,
+                            "model": None,
+                            "source_type": "extraction",
                         }
                     )
 
@@ -474,6 +535,13 @@ class MemoryExtractorService:
                     confidence=item["confidence"],
                     status="candidate",
                     provenance=item["provenance"],
+                    anchors=item.get("anchors"),
+                    git_branch=item.get("git_branch"),
+                    git_commit=item.get("git_commit"),
+                    session_id=item.get("session_id"),
+                    agent_type=item.get("agent_type"),
+                    model=item.get("model"),
+                    source_type=item.get("source_type"),
                 )
                 created.append(created_item)
 
@@ -682,7 +750,7 @@ class MemoryExtractorService:
 
         results: List[tuple[str, Dict]] = []
 
-        for message in messages:
+        for message_index, message in enumerate(messages):
             msg_type = message.get("type")
             msg_role = message.get("role")
 
@@ -741,13 +809,65 @@ class MemoryExtractorService:
                 continue
 
             # Build provenance metadata
+            metadata = message.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+
+            inner_metadata = (
+                inner_msg.get("metadata")
+                if isinstance(inner_msg, dict) and isinstance(inner_msg.get("metadata"), dict)
+                else {}
+            )
+
+            model = (
+                message.get("model")
+                or (inner_msg.get("model") if isinstance(inner_msg, dict) else None)
+                or metadata.get("model")
+                or inner_metadata.get("model")
+            )
+
+            agent_type = (
+                message.get("agent_type")
+                or message.get("agentType")
+                or metadata.get("agent_type")
+                or metadata.get("agentType")
+                or inner_metadata.get("agent_type")
+                or inner_metadata.get("agentType")
+            )
+
+            git_commit = (
+                message.get("git_commit")
+                or message.get("gitCommit")
+                or metadata.get("git_commit")
+                or metadata.get("gitCommit")
+                or metadata.get("commit_sha")
+                or metadata.get("commitSha")
+                or inner_metadata.get("git_commit")
+                or inner_metadata.get("gitCommit")
+                or inner_metadata.get("commit_sha")
+                or inner_metadata.get("commitSha")
+            )
+
             provenance = {
                 "message_uuid": message.get("uuid", ""),
                 "message_role": msg_type or msg_role or "unknown",
                 "timestamp": message.get("timestamp", ""),
-                "session_id": message.get("sessionId", ""),
-                "git_branch": message.get("gitBranch", ""),
+                "session_id": message.get("sessionId", "")
+                or message.get("session_id", "")
+                or metadata.get("session_id", "")
+                or metadata.get("sessionId", ""),
+                "git_branch": message.get("gitBranch", "")
+                or message.get("git_branch", "")
+                or metadata.get("git_branch", "")
+                or metadata.get("gitBranch", ""),
+                "message_index": message_index,
             }
+            if isinstance(model, str) and model.strip():
+                provenance["model"] = model.strip()
+            if isinstance(agent_type, str) and agent_type.strip():
+                provenance["agent_type"] = agent_type.strip()
+            if isinstance(git_commit, str) and git_commit.strip():
+                provenance["git_commit"] = git_commit.strip()
 
             results.append((content_text, provenance))
 
@@ -755,6 +875,227 @@ class MemoryExtractorService:
             f"Extracted {len(results)} content blocks from {len(messages)} messages"
         )
         return results
+
+    @staticmethod
+    def _tool_call_priority(tool_name: str) -> int:
+        """Rank mutation calls above read-only calls for anchor ordering."""
+        if tool_name in _ANCHOR_MUTATION_TOOLS:
+            return 0
+        return 1
+
+    @staticmethod
+    def classify_anchor_type(path: str) -> str:
+        """Classify an anchor path into code/test/doc/config/plan."""
+        normalized = path.strip().lower()
+        if not normalized:
+            return "code"
+
+        if "/tests/" in normalized or normalized.startswith("tests/"):
+            return "test"
+        basename = normalized.rsplit("/", 1)[-1]
+        if basename.startswith("test_"):
+            return "test"
+
+        if normalized.endswith(".md"):
+            if ".claude/progress/" in normalized or ".claude/worknotes/" in normalized:
+                return "plan"
+            if "/docs/" in normalized or normalized.startswith("docs/"):
+                return "doc"
+            if "project_plans/" in normalized:
+                return "doc"
+
+        config_exts = (".toml", ".yaml", ".yml", ".json", ".ini", ".cfg")
+        if normalized.endswith(config_exts):
+            return "config"
+        if basename == ".env" or basename.startswith(".env."):
+            return "config"
+
+        return "code"
+
+    @staticmethod
+    def _extract_path_from_tool_input(
+        tool_name: str, tool_input: Dict[str, Any]
+    ) -> tuple[Optional[str], Optional[int], Optional[int]]:
+        """Extract path and optional line range from a tool input payload."""
+        path: Optional[str] = None
+        if tool_name in {"Read", "Edit", "Write"}:
+            path = tool_input.get("file_path") or tool_input.get("path")
+        elif tool_name in {"Grep", "Glob"}:
+            path = tool_input.get("path")
+
+        if not isinstance(path, str) or not path.strip():
+            return None, None, None
+
+        line_start: Optional[int] = None
+        line_end: Optional[int] = None
+        if isinstance(tool_input.get("line_start"), int):
+            line_start = tool_input["line_start"]
+        elif isinstance(tool_input.get("start_line"), int):
+            line_start = tool_input["start_line"]
+        elif isinstance(tool_input.get("line"), int):
+            line_start = tool_input["line"]
+        elif isinstance(tool_input.get("start"), int):
+            line_start = tool_input["start"]
+
+        if isinstance(tool_input.get("line_end"), int):
+            line_end = tool_input["line_end"]
+        elif isinstance(tool_input.get("end_line"), int):
+            line_end = tool_input["end_line"]
+        elif isinstance(tool_input.get("end"), int):
+            line_end = tool_input["end"]
+
+        if line_start is not None and line_start < 1:
+            line_start = None
+        if line_end is not None and line_end < 1:
+            line_end = None
+        if line_start is not None and line_end is not None and line_end < line_start:
+            line_start = None
+            line_end = None
+
+        return path.strip(), line_start, line_end
+
+    def _extract_tool_call_paths(
+        self, messages: List[Dict[str, Any]]
+    ) -> Dict[int, List[Dict[str, Any]]]:
+        """Extract tool call path references grouped by message index."""
+        by_message: Dict[int, List[Dict[str, Any]]] = {}
+
+        for index, message in enumerate(messages):
+            inner_msg = message.get("message")
+            if isinstance(inner_msg, dict):
+                content = inner_msg.get("content")
+            else:
+                content = message.get("content")
+
+            if not isinstance(content, list):
+                continue
+
+            refs: List[Dict[str, Any]] = []
+            for block in content:
+                if not isinstance(block, dict) or block.get("type") != "tool_use":
+                    continue
+                tool_name = block.get("name")
+                if tool_name not in _ANCHOR_ALL_TOOLS:
+                    continue
+                tool_input = block.get("input") or {}
+                if not isinstance(tool_input, dict):
+                    continue
+
+                path, line_start, line_end = self._extract_path_from_tool_input(
+                    tool_name, tool_input
+                )
+                if not path:
+                    continue
+
+                ref: Dict[str, Any] = {
+                    "path": path,
+                    "tool_name": tool_name,
+                    "priority": self._tool_call_priority(tool_name),
+                }
+                if line_start is not None:
+                    ref["line_start"] = line_start
+                if line_end is not None:
+                    ref["line_end"] = line_end
+                refs.append(ref)
+
+            if refs:
+                by_message[index] = refs
+
+        return by_message
+
+    def _build_anchors_for_message_window(
+        self,
+        *,
+        tool_refs_by_message: Dict[int, List[Dict[str, Any]]],
+        message_index: Optional[int],
+        commit_sha: Optional[str],
+    ) -> List[Dict[str, Any]]:
+        """Construct ranked, deduplicated anchors for a candidate message window."""
+        if message_index is None:
+            return []
+
+        combined: List[Dict[str, Any]] = []
+        for idx in (message_index - 1, message_index, message_index + 1):
+            combined.extend(tool_refs_by_message.get(idx, []))
+
+        deduped: Dict[str, Dict[str, Any]] = {}
+
+        def range_width(ref: Dict[str, Any]) -> int:
+            start = ref.get("line_start")
+            end = ref.get("line_end")
+            if isinstance(start, int) and isinstance(end, int):
+                return end - start
+            if isinstance(start, int):
+                return 0
+            return 10**9
+
+        for ref in combined:
+            path = ref["path"]
+            existing = deduped.get(path)
+            if existing is None:
+                deduped[path] = ref
+                continue
+
+            if ref["priority"] < existing["priority"]:
+                deduped[path] = ref
+                continue
+
+            if ref["priority"] == existing["priority"] and range_width(ref) < range_width(
+                existing
+            ):
+                deduped[path] = ref
+
+        ordered = sorted(deduped.values(), key=lambda r: (r["priority"], r["path"]))
+        anchors: List[Dict[str, Any]] = []
+        for ref in ordered[:20]:
+            anchor: Dict[str, Any] = {
+                "path": ref["path"],
+                "type": self.classify_anchor_type(ref["path"]),
+            }
+            if "line_start" in ref:
+                anchor["line_start"] = ref["line_start"]
+            if "line_end" in ref:
+                anchor["line_end"] = ref["line_end"]
+            if commit_sha:
+                anchor["commit_sha"] = commit_sha
+            anchors.append(anchor)
+
+        return anchors
+
+    @staticmethod
+    def _detect_git_commit(messages: Optional[List[Dict[str, Any]]] = None) -> Optional[str]:
+        """Best-effort git commit detection from git CLI or message metadata."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            commit = result.stdout.strip()
+            if commit:
+                return commit
+        except Exception:
+            pass
+
+        if not messages:
+            return None
+
+        candidate_fields = ("git_commit", "gitCommit", "commit_sha", "commitSha", "commit")
+        for message in messages:
+            for field in candidate_fields:
+                value = message.get(field)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+            metadata = message.get("metadata")
+            if isinstance(metadata, dict):
+                for field in candidate_fields:
+                    value = metadata.get(field)
+                    if isinstance(value, str) and value.strip():
+                        return value.strip()
+
+        return None
 
     @staticmethod
     def _classify_type(line: str) -> str:

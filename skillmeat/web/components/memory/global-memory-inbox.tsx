@@ -116,6 +116,10 @@ export function GlobalMemoryInbox({ projectNameMap }: GlobalMemoryInboxProps) {
   const [typeFilter, setTypeFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [searchQuery, setSearchQuery] = useState('');
+  const [gitBranchFilter, setGitBranchFilter] = useState('');
+  const [agentTypeFilter, setAgentTypeFilter] = useState('');
+  const [modelFilter, setModelFilter] = useState('');
+  const [sourceTypeFilter, setSourceTypeFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
@@ -146,6 +150,10 @@ export function GlobalMemoryInbox({ projectNameMap }: GlobalMemoryInboxProps) {
     status: 'candidate',
     type: typeFilter !== 'all' ? (typeFilter as any) : undefined,
     search: searchQuery || undefined,
+    gitBranch: gitBranchFilter.trim() || undefined,
+    agentType: agentTypeFilter.trim() || undefined,
+    model: modelFilter.trim() || undefined,
+    sourceType: sourceTypeFilter !== 'all' ? sourceTypeFilter : undefined,
     sortBy: apiSortBy,
     sortOrder: apiSortOrder,
     limit: 100,
@@ -391,6 +399,14 @@ export function GlobalMemoryInbox({ projectNameMap }: GlobalMemoryInboxProps) {
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         counts={typeCounts}
+        gitBranchFilter={gitBranchFilter}
+        onGitBranchFilterChange={setGitBranchFilter}
+        agentTypeFilter={agentTypeFilter}
+        onAgentTypeFilterChange={setAgentTypeFilter}
+        modelFilter={modelFilter}
+        onModelFilterChange={setModelFilter}
+        sourceTypeFilter={sourceTypeFilter}
+        onSourceTypeFilterChange={setSourceTypeFilter}
       />
 
       {/* View toggle + Expand All/Collapse All toolbar */}

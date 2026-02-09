@@ -46,6 +46,12 @@ export interface MemoryItemFilters {
   status?: MemoryStatus;
   type?: MemoryType;
   shareScope?: 'private' | 'project' | 'global_candidate';
+  gitBranch?: string;
+  gitCommit?: string;
+  sessionId?: string;
+  agentType?: string;
+  model?: string;
+  sourceType?: string;
   minConfidence?: number;
   search?: string;
   sortBy?: string; // created_at | confidence | access_count
@@ -62,6 +68,12 @@ export interface GlobalMemoryItemFilters {
   status?: MemoryStatus;
   type?: MemoryType;
   shareScope?: 'private' | 'project' | 'global_candidate';
+  gitBranch?: string;
+  gitCommit?: string;
+  sessionId?: string;
+  agentType?: string;
+  model?: string;
+  sourceType?: string;
   minConfidence?: number;
   search?: string;
   sortBy?: string; // created_at | confidence | access_count
@@ -132,6 +144,12 @@ export function useMemoryItems(filters: MemoryItemFilters) {
       if (filters.status) params.set('status', filters.status);
       if (filters.type) params.set('type', filters.type);
       if (filters.shareScope) params.set('share_scope', filters.shareScope);
+      if (filters.gitBranch) params.set('git_branch', filters.gitBranch);
+      if (filters.gitCommit) params.set('git_commit', filters.gitCommit);
+      if (filters.sessionId) params.set('session_id', filters.sessionId);
+      if (filters.agentType) params.set('agent_type', filters.agentType);
+      if (filters.model) params.set('model', filters.model);
+      if (filters.sourceType) params.set('source_type', filters.sourceType);
       if (filters.search) params.set('search', filters.search);
       if (filters.minConfidence != null) params.set('min_confidence', String(filters.minConfidence));
       if (filters.limit != null) params.set('limit', String(filters.limit));
@@ -159,6 +177,12 @@ export function useGlobalMemoryItems(filters: GlobalMemoryItemFilters) {
       if (filters.status) params.set('status', filters.status);
       if (filters.type) params.set('type', filters.type);
       if (filters.shareScope) params.set('share_scope', filters.shareScope);
+      if (filters.gitBranch) params.set('git_branch', filters.gitBranch);
+      if (filters.gitCommit) params.set('git_commit', filters.gitCommit);
+      if (filters.sessionId) params.set('session_id', filters.sessionId);
+      if (filters.agentType) params.set('agent_type', filters.agentType);
+      if (filters.model) params.set('model', filters.model);
+      if (filters.sourceType) params.set('source_type', filters.sourceType);
       if (filters.search) params.set('search', filters.search);
       if (filters.minConfidence != null) params.set('min_confidence', String(filters.minConfidence));
       if (filters.limit != null) params.set('limit', String(filters.limit));

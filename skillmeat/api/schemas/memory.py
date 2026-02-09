@@ -12,9 +12,9 @@ Schema Groups:
 """
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # =============================================================================
@@ -54,6 +54,52 @@ class MemoryShareScope(str, Enum):
 # =============================================================================
 
 
+class AnchorCreate(BaseModel):
+    """Structured anchor payload for create/update requests."""
+
+    path: str = Field(min_length=1)
+    type: Literal["code", "plan", "doc", "config", "test"]
+    line_start: Optional[int] = Field(default=None, ge=1)
+    line_end: Optional[int] = Field(default=None, ge=1)
+    commit_sha: Optional[str] = None
+    description: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_line_range(self) -> "AnchorCreate":
+        if self.line_end is not None and self.line_start is None:
+            raise ValueError("line_start is required when line_end is provided")
+        if (
+            self.line_start is not None
+            and self.line_end is not None
+            and self.line_end < self.line_start
+        ):
+            raise ValueError("line_end must be greater than or equal to line_start")
+        return self
+
+
+class AnchorResponse(BaseModel):
+    """Structured anchor in memory item responses."""
+
+    path: str
+    type: Literal["code", "plan", "doc", "config", "test"]
+    line_start: Optional[int] = Field(default=None, ge=1)
+    line_end: Optional[int] = Field(default=None, ge=1)
+    commit_sha: Optional[str] = None
+    description: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_line_range(self) -> "AnchorResponse":
+        if self.line_end is not None and self.line_start is None:
+            raise ValueError("line_start is required when line_end is provided")
+        if (
+            self.line_start is not None
+            and self.line_end is not None
+            and self.line_end < self.line_start
+        ):
+            raise ValueError("line_end must be greater than or equal to line_start")
+        return self
+
+
 class MemoryItemCreateRequest(BaseModel):
     """Request body for creating a new memory item."""
 
@@ -63,7 +109,13 @@ class MemoryItemCreateRequest(BaseModel):
     status: MemoryStatus = MemoryStatus.CANDIDATE
     share_scope: MemoryShareScope = MemoryShareScope.PROJECT
     provenance: Optional[Dict[str, Any]] = None
-    anchors: Optional[List[str]] = None
+    anchors: Optional[List[Union[AnchorCreate, str]]] = None
+    git_branch: Optional[str] = None
+    git_commit: Optional[str] = None
+    session_id: Optional[str] = None
+    agent_type: Optional[str] = None
+    model: Optional[str] = None
+    source_type: Optional[str] = None
     ttl_policy: Optional[Dict[str, Any]] = None
 
 
@@ -76,7 +128,13 @@ class MemoryItemUpdateRequest(BaseModel):
     status: Optional[MemoryStatus] = None
     share_scope: Optional[MemoryShareScope] = None
     provenance: Optional[Dict[str, Any]] = None
-    anchors: Optional[List[str]] = None
+    anchors: Optional[List[Union[AnchorCreate, str]]] = None
+    git_branch: Optional[str] = None
+    git_commit: Optional[str] = None
+    session_id: Optional[str] = None
+    agent_type: Optional[str] = None
+    model: Optional[str] = None
+    source_type: Optional[str] = None
     ttl_policy: Optional[Dict[str, Any]] = None
 
 
@@ -92,7 +150,13 @@ class MemoryItemResponse(BaseModel):
     share_scope: str
     project_name: Optional[str] = None
     provenance: Optional[Dict[str, Any]] = None
-    anchors: Optional[List[str]] = None
+    anchors: Optional[List[Union[AnchorResponse, str]]] = None
+    git_branch: Optional[str] = None
+    git_commit: Optional[str] = None
+    session_id: Optional[str] = None
+    agent_type: Optional[str] = None
+    model: Optional[str] = None
+    source_type: Optional[str] = None
     ttl_policy: Optional[Dict[str, Any]] = None
     content_hash: Optional[str] = None
     access_count: int = 0
@@ -130,6 +194,13 @@ class ExtractionCandidate(BaseModel):
     status: MemoryStatus = MemoryStatus.CANDIDATE
     duplicate_of: Optional[str] = None
     provenance: Optional[Dict[str, Any]] = None
+    anchors: Optional[List[AnchorResponse]] = None
+    git_branch: Optional[str] = None
+    git_commit: Optional[str] = None
+    session_id: Optional[str] = None
+    agent_type: Optional[str] = None
+    model: Optional[str] = None
+    source_type: Optional[str] = None
 
 
 class MemoryExtractionPreviewRequest(BaseModel):

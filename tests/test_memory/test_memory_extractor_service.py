@@ -1229,3 +1229,138 @@ def test_preview_plaintext_filters_noise(seeded_db_path):
     assert any("Redis" in c["content"] for c in candidates) or any(
         "cache invalidation" in c["content"] for c in candidates
     )
+
+
+def test_extract_tool_call_paths_collects_supported_tools(seeded_db_path):
+    """Path extraction should support Read/Edit/Write/Grep/Glob tool calls."""
+    service = MemoryExtractorService(db_path=seeded_db_path)
+    messages = [
+        {
+            "type": "assistant",
+            "content": [
+                {"type": "tool_use", "name": "Read", "input": {"file_path": "a.py"}},
+                {"type": "tool_use", "name": "Edit", "input": {"file_path": "b.py", "line_start": 10, "line_end": 20}},
+                {"type": "tool_use", "name": "Write", "input": {"file_path": "c.py"}},
+                {"type": "tool_use", "name": "Grep", "input": {"path": "skillmeat/core"}},
+                {"type": "tool_use", "name": "Glob", "input": {"path": "tests/**/*.py"}},
+                {"type": "tool_use", "name": "Bash", "input": {"command": "pwd"}},
+            ],
+        }
+    ]
+
+    by_message = service._extract_tool_call_paths(messages)
+
+    assert 0 in by_message
+    refs = by_message[0]
+    assert {ref["path"] for ref in refs} == {
+        "a.py",
+        "b.py",
+        "c.py",
+        "skillmeat/core",
+        "tests/**/*.py",
+    }
+    edit_ref = next(ref for ref in refs if ref["path"] == "b.py")
+    assert edit_ref["line_start"] == 10
+    assert edit_ref["line_end"] == 20
+
+
+def test_anchor_classifier_covers_all_types():
+    """Anchor classifier should map paths into expected anchor types."""
+    assert MemoryExtractorService.classify_anchor_type("tests/test_api.py") == "test"
+    assert MemoryExtractorService.classify_anchor_type("docs/README.md") == "doc"
+    assert (
+        MemoryExtractorService.classify_anchor_type(
+            ".claude/progress/memory-anchors-provenance/tasks.md"
+        )
+        == "plan"
+    )
+    assert MemoryExtractorService.classify_anchor_type("settings.toml") == "config"
+    assert MemoryExtractorService.classify_anchor_type("skillmeat/core/services/memory_service.py") == "code"
+
+
+def test_anchor_build_prioritizes_mutations_and_caps_to_20(seeded_db_path):
+    """Mutation tools should rank first and anchor lists should be capped."""
+    service = MemoryExtractorService(db_path=seeded_db_path)
+    tool_refs = {
+        1: [
+            {"path": "skillmeat/core/services/memory_service.py", "tool_name": "Read", "priority": 1},
+            {"path": "skillmeat/core/services/memory_service.py", "tool_name": "Edit", "priority": 0, "line_start": 12, "line_end": 16},
+            {"path": "tests/test_memory_service.py", "tool_name": "Write", "priority": 0},
+        ],
+        2: [
+            {"path": f"extra/file_{index}.py", "tool_name": "Read", "priority": 1}
+            for index in range(30)
+        ],
+    }
+
+    anchors = service._build_anchors_for_message_window(
+        tool_refs_by_message=tool_refs,
+        message_index=1,
+        commit_sha="abc1234",
+    )
+
+    assert len(anchors) == 20
+    assert anchors[0]["path"] == "skillmeat/core/services/memory_service.py"
+    assert anchors[0]["type"] == "code"
+    assert anchors[0]["line_start"] == 12
+    assert anchors[0]["line_end"] == 16
+    assert anchors[0]["commit_sha"] == "abc1234"
+
+
+def test_preview_tool_sessions_meet_anchor_coverage_target(seeded_db_path):
+    """Tool-heavy JSONL sessions should attach anchors to >=80% of candidates."""
+    messages = [
+        {
+            "type": "assistant",
+            "content": [
+                {
+                    "type": "tool_use",
+                    "name": "Edit",
+                    "input": {
+                        "file_path": "skillmeat/core/services/memory_service.py",
+                        "line_start": 40,
+                        "line_end": 76,
+                    },
+                },
+                {
+                    "type": "tool_use",
+                    "name": "Read",
+                    "input": {"file_path": "tests/test_memory/test_memory_extractor_service.py"},
+                },
+                {
+                    "type": "text",
+                    "text": (
+                        "Decision: Keep promoted provenance fields in sync with provenance_json "
+                        "for backward compatibility."
+                    ),
+                },
+                {
+                    "type": "text",
+                    "text": (
+                        "Gotcha: mutation references should rank ahead of read-only file links "
+                        "to keep anchors relevant."
+                    ),
+                },
+            ],
+            "uuid": "msg-anchor-coverage",
+            "timestamp": "2024-01-20T10:00:00Z",
+            "sessionId": "sess-anchor-coverage",
+            "gitBranch": "feat/memory-anchors",
+        }
+    ]
+
+    service = MemoryExtractorService(db_path=seeded_db_path)
+    candidates = service.preview(
+        project_id=PROJECT_ID,
+        text_corpus="\n".join(json.dumps(message) for message in messages),
+        profile="balanced",
+        min_confidence=0.0,
+    )
+
+    assert len(candidates) >= 1
+    anchored_candidates = [candidate for candidate in candidates if candidate["anchors"]]
+    assert len(anchored_candidates) / len(candidates) >= 0.8
+
+    for candidate in candidates:
+        assert candidate["source_type"] == "extraction"
+        assert candidate["provenance"]["source_type"] == "extraction"

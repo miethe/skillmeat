@@ -66,6 +66,12 @@ const SORT_OPTIONS = [
   { value: 'most-used', label: 'Most Used' },
 ] as const;
 
+const SOURCE_TYPE_OPTIONS = [
+  { value: 'all', label: 'All Sources' },
+  { value: 'manual', label: 'Manual' },
+  { value: 'extraction', label: 'Extraction' },
+] as const;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -116,6 +122,22 @@ export interface MemoryFilterBarProps {
   onProjectFilterChange?: (id: string) => void;
   /** List of available projects for the dropdown. */
   projects?: Array<{ id: string; name: string }>;
+  /** Optional git branch filter value. */
+  gitBranchFilter?: string;
+  /** Optional callback for git branch filter updates. */
+  onGitBranchFilterChange?: (value: string) => void;
+  /** Optional agent type filter value. */
+  agentTypeFilter?: string;
+  /** Optional callback for agent type filter updates. */
+  onAgentTypeFilterChange?: (value: string) => void;
+  /** Optional model filter value. */
+  modelFilter?: string;
+  /** Optional callback for model filter updates. */
+  onModelFilterChange?: (value: string) => void;
+  /** Optional source type filter value ('all' | 'manual' | 'extraction'). */
+  sourceTypeFilter?: string;
+  /** Optional callback for source type filter updates. */
+  onSourceTypeFilterChange?: (value: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +185,21 @@ export function MemoryFilterBar({
   projectFilter,
   onProjectFilterChange,
   projects,
+  gitBranchFilter,
+  onGitBranchFilterChange,
+  agentTypeFilter,
+  onAgentTypeFilterChange,
+  modelFilter,
+  onModelFilterChange,
+  sourceTypeFilter,
+  onSourceTypeFilterChange,
 }: MemoryFilterBarProps) {
+  const showProvenanceFilters =
+    !!onGitBranchFilterChange ||
+    !!onAgentTypeFilterChange ||
+    !!onModelFilterChange ||
+    !!onSourceTypeFilterChange;
+
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       onSearchQueryChange(e.target.value);
@@ -294,6 +330,64 @@ export function MemoryFilterBar({
           />
         </div>
       </div>
+
+      {showProvenanceFilters && (
+        <div className="flex flex-wrap items-center gap-3 border-b px-6 py-2">
+          {onGitBranchFilterChange && (
+            <Input
+              value={gitBranchFilter ?? ''}
+              onChange={(e) => onGitBranchFilterChange(e.target.value)}
+              className="h-8 w-48"
+              placeholder="Git branch"
+              aria-label="Filter by git branch"
+            />
+          )}
+
+          {onAgentTypeFilterChange && (
+            <Input
+              value={agentTypeFilter ?? ''}
+              onChange={(e) => onAgentTypeFilterChange(e.target.value)}
+              className="h-8 w-48"
+              placeholder="Agent type"
+              aria-label="Filter by agent type"
+            />
+          )}
+
+          {onModelFilterChange && (
+            <Input
+              value={modelFilter ?? ''}
+              onChange={(e) => onModelFilterChange(e.target.value)}
+              className="h-8 w-48"
+              placeholder="Model"
+              aria-label="Filter by model"
+            />
+          )}
+
+          {onSourceTypeFilterChange && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8" aria-label="Filter by source type">
+                  {SOURCE_TYPE_OPTIONS.find((option) => option.value === (sourceTypeFilter ?? 'all'))?.label ??
+                    'All Sources'}
+                  <ChevronDown className="ml-2 h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuRadioGroup
+                  value={sourceTypeFilter ?? 'all'}
+                  onValueChange={onSourceTypeFilterChange}
+                >
+                  {SOURCE_TYPE_OPTIONS.map((option) => (
+                    <DropdownMenuRadioItem key={option.value} value={option.value}>
+                      {option.label}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      )}
     </>
   );
 }

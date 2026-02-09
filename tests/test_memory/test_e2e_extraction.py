@@ -712,6 +712,8 @@ class TestE2EApplyFlow:
             # Provenance should have been persisted
             assert prov.get("source") == "memory_extraction"
             assert prov.get("run_id") == "apply-run-1"
+            assert prov.get("source_type") == "extraction"
+            assert item.get("source_type") == "extraction"
 
     def test_apply_with_empty_corpus(self, seeded_db_path):
         """Applying an empty corpus should return empty results gracefully."""

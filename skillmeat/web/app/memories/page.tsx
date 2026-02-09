@@ -84,6 +84,10 @@ export default function MemoriesPage() {
   const [showDeprecated, setShowDeprecated] = useState(false);
   const [sortBy, setSortBy] = useState('newest');
   const [searchQuery, setSearchQuery] = useState('');
+  const [gitBranchFilter, setGitBranchFilter] = useState('');
+  const [agentTypeFilter, setAgentTypeFilter] = useState('');
+  const [modelFilter, setModelFilter] = useState('');
+  const [sourceTypeFilter, setSourceTypeFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
@@ -122,6 +126,10 @@ export default function MemoriesPage() {
     status: statusFilter !== 'all' ? (statusFilter as MemoryStatus) : undefined,
     type: typeFilter !== 'all' ? (typeFilter as MemoryType) : undefined,
     search: searchQuery.trim() || undefined,
+    gitBranch: gitBranchFilter.trim() || undefined,
+    agentType: agentTypeFilter.trim() || undefined,
+    model: modelFilter.trim() || undefined,
+    sourceType: sourceTypeFilter !== 'all' ? sourceTypeFilter : undefined,
     sortBy: apiSortBy,
     sortOrder: apiSortOrder,
     limit: 100,
@@ -393,6 +401,14 @@ export default function MemoriesPage() {
             projectFilter={projectFilter}
             onProjectFilterChange={setProjectFilter}
             projects={projectOptions}
+            gitBranchFilter={gitBranchFilter}
+            onGitBranchFilterChange={setGitBranchFilter}
+            agentTypeFilter={agentTypeFilter}
+            onAgentTypeFilterChange={setAgentTypeFilter}
+            modelFilter={modelFilter}
+            onModelFilterChange={setModelFilter}
+            sourceTypeFilter={sourceTypeFilter}
+            onSourceTypeFilterChange={setSourceTypeFilter}
           />
 
           {/* View toggle + count bar */}

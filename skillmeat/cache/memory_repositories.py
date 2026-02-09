@@ -192,6 +192,12 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
         status: Optional[str] = None,
         type: Optional[str] = None,
         share_scope: Optional[str] = None,
+        git_branch: Optional[str] = None,
+        git_commit: Optional[str] = None,
+        session_id: Optional[str] = None,
+        agent_type: Optional[str] = None,
+        model: Optional[str] = None,
+        source_type: Optional[str] = None,
         search: Optional[str] = None,
         min_confidence: Optional[float] = None,
         limit: int = 50,
@@ -227,6 +233,18 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
                 query = query.filter(MemoryItem.type == type)
             if share_scope is not None:
                 query = query.filter(MemoryItem.share_scope == share_scope)
+            if git_branch is not None:
+                query = query.filter(MemoryItem.git_branch == git_branch)
+            if git_commit is not None:
+                query = query.filter(MemoryItem.git_commit == git_commit)
+            if session_id is not None:
+                query = query.filter(MemoryItem.session_id == session_id)
+            if agent_type is not None:
+                query = query.filter(MemoryItem.agent_type == agent_type)
+            if model is not None:
+                query = query.filter(MemoryItem.model == model)
+            if source_type is not None:
+                query = query.filter(MemoryItem.source_type == source_type)
             if search:
                 query = query.filter(MemoryItem.content.ilike(f"%{search}%"))
             if min_confidence is not None:
@@ -274,7 +292,9 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
             logger.debug(
                 f"Listed {len(items)} memory items "
                 f"(project={project_id}, status={status}, type={type}, "
-                f"share_scope={share_scope}, "
+                f"share_scope={share_scope}, git_branch={git_branch}, "
+                f"git_commit={git_commit}, session_id={session_id}, "
+                f"agent_type={agent_type}, model={model}, source_type={source_type}, "
                 f"cursor={cursor}, has_more={has_more})"
             )
 

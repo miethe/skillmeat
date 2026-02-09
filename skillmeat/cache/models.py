@@ -2488,7 +2488,13 @@ class MemoryItem(Base):
         status: Lifecycle status (candidate, active, stable, deprecated)
         share_scope: Cross-project visibility scope (private, project, global_candidate)
         provenance_json: JSON object tracking origin/source of the memory
-        anchors_json: JSON array of file paths this memory is anchored to
+        anchors_json: JSON array of structured anchor objects
+        git_branch: Promoted git branch provenance field
+        git_commit: Promoted git commit provenance field
+        session_id: Promoted session identifier provenance field
+        agent_type: Promoted agent type provenance field
+        model: Promoted model provenance field
+        source_type: Promoted source type provenance field
         ttl_policy_json: JSON object with max_age_days, max_idle_days
         content_hash: SHA hash of content for deduplication (unique)
         access_count: Number of times this memory has been accessed
@@ -2530,6 +2536,14 @@ class MemoryItem(Base):
     # JSON fields (stored as Text, following codebase convention)
     provenance_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     anchors_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    git_branch: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    git_commit: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    session_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    agent_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    model: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    source_type: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default="manual", server_default="manual"
+    )
     ttl_policy_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Deduplication and access tracking
@@ -2573,6 +2587,12 @@ class MemoryItem(Base):
         Index("idx_memory_items_project_type", "project_id", "type"),
         Index("idx_memory_items_share_scope", "share_scope"),
         Index("idx_memory_items_created_at", "created_at"),
+        Index("idx_memory_items_git_branch", "git_branch"),
+        Index("idx_memory_items_git_commit", "git_commit"),
+        Index("idx_memory_items_session_id", "session_id"),
+        Index("idx_memory_items_agent_type", "agent_type"),
+        Index("idx_memory_items_model", "model"),
+        Index("idx_memory_items_source_type", "source_type"),
     )
 
     @property
@@ -2583,8 +2603,11 @@ class MemoryItem(Base):
         return None
 
     @property
-    def anchors(self) -> List[str]:
-        """Parse anchors_json into a list of file paths."""
+    def anchors(self) -> List[Any]:
+        """Parse anchors_json into a list of structured anchor objects.
+
+        Legacy records may still contain plain string paths until migrated.
+        """
         if self.anchors_json:
             return json.loads(self.anchors_json)
         return []

@@ -34,7 +34,7 @@ skillmeat remove <artifact-name>
 ## `memory item`
 
 ```bash
-skillmeat memory item create --project <project> --type decision --content "..." --confidence 0.8
+skillmeat memory item create --project <project> --type decision --content "..." --confidence 0.8 --status candidate --anchor "path:type:start-end"
 skillmeat memory item list --project <project> --status candidate --type gotcha
 skillmeat memory item show <item-id>
 skillmeat memory item update <item-id> --content "..." --confidence 0.9
@@ -45,6 +45,24 @@ skillmeat memory item merge --source <id> --target <id> --strategy combine --mer
 skillmeat memory item bulk-promote --ids <id1,id2,id3>
 skillmeat memory item bulk-deprecate --ids <id1,id2,id3>
 ```
+
+Anchor and provenance examples:
+
+```bash
+skillmeat memory item create --project <project> \
+  --type learning \
+  --content "..." \
+  --confidence 0.85 \
+  --status candidate \
+  --anchor "skillmeat/core/services/memory_service.py:code:120-220" \
+  --anchor "docs/project_plans/implementation_plans/features/memory-anchors-provenance-v1.md:doc" \
+  --provenance-branch "<branch>" \
+  --provenance-commit "<sha>" \
+  --provenance-agent-type "<agent>" \
+  --provenance-model "<model>"
+```
+
+`--anchor` format: `path:type` or `path:type:start-end`; types are `code|test|doc|config|plan`.
 
 ## `memory module`
 
@@ -105,4 +123,3 @@ skillmeat --help
 skillmeat memory --help
 skillmeat memory item --help
 ```
-

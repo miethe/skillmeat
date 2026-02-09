@@ -593,8 +593,17 @@ def _matches_file_patterns(item: Dict[str, Any], file_patterns: List[str]) -> bo
     if not isinstance(anchors, list) or not anchors:
         return False
     for anchor in anchors:
+        anchor_path: Optional[str] = None
+        if isinstance(anchor, str):
+            anchor_path = anchor
+        elif isinstance(anchor, dict):
+            maybe_path = anchor.get("path")
+            if isinstance(maybe_path, str):
+                anchor_path = maybe_path
+        if not anchor_path:
+            continue
         for pattern in file_patterns:
-            if fnmatch.fnmatch(anchor, pattern):
+            if fnmatch.fnmatch(anchor_path, pattern):
                 return True
     return False
 

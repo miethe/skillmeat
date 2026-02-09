@@ -347,6 +347,12 @@ async def list_global_memory_items(
     share_scope: Optional[MemoryShareScope] = Query(
         None, description="Filter by share scope"
     ),
+    git_branch: Optional[str] = Query(None, description="Filter by git branch"),
+    git_commit: Optional[str] = Query(None, description="Filter by git commit"),
+    session_id: Optional[str] = Query(None, description="Filter by session ID"),
+    agent_type: Optional[str] = Query(None, description="Filter by agent type"),
+    model: Optional[str] = Query(None, description="Filter by model"),
+    source_type: Optional[str] = Query(None, description="Filter by source type"),
     search: Optional[str] = Query(
         None, description="Case-insensitive substring match against memory content"
     ),
@@ -366,6 +372,12 @@ async def list_global_memory_items(
             status=status.value if status else None,
             type=type.value if type else None,
             share_scope=share_scope.value if share_scope else None,
+            git_branch=git_branch,
+            git_commit=git_commit,
+            session_id=session_id,
+            agent_type=agent_type,
+            model=model,
+            source_type=source_type,
             search=search,
             min_confidence=min_confidence,
             limit=limit,
@@ -601,6 +613,12 @@ async def list_memory_items(
     share_scope: Optional[MemoryShareScope] = Query(
         None, description="Filter by share scope"
     ),
+    git_branch: Optional[str] = Query(None, description="Filter by git branch"),
+    git_commit: Optional[str] = Query(None, description="Filter by git commit"),
+    session_id: Optional[str] = Query(None, description="Filter by session ID"),
+    agent_type: Optional[str] = Query(None, description="Filter by agent type"),
+    model: Optional[str] = Query(None, description="Filter by model"),
+    source_type: Optional[str] = Query(None, description="Filter by source type"),
     search: Optional[str] = Query(
         None, description="Case-insensitive substring match against memory content"
     ),
@@ -639,6 +657,12 @@ async def list_memory_items(
             status=status.value if status else None,
             type=type.value if type else None,
             share_scope=share_scope.value if share_scope else None,
+            git_branch=git_branch,
+            git_commit=git_commit,
+            session_id=session_id,
+            agent_type=agent_type,
+            model=model,
+            source_type=source_type,
             search=search,
             min_confidence=min_confidence,
             limit=limit,
@@ -709,6 +733,12 @@ async def create_memory_item(
             share_scope=request.share_scope.value,
             provenance=request.provenance,
             anchors=request.anchors,
+            git_branch=request.git_branch,
+            git_commit=request.git_commit,
+            session_id=request.session_id,
+            agent_type=request.agent_type,
+            model=request.model,
+            source_type=request.source_type,
             ttl_policy=request.ttl_policy,
         )
 
@@ -779,7 +809,8 @@ async def get_memory_item(item_id: str) -> MemoryItemResponse:
     description="""
     Update an existing memory item. Only provided fields are changed.
 
-    Updatable fields: type, content, confidence, status, provenance, anchors, ttl_policy.
+    Updatable fields: type, content, confidence, status, provenance, anchors, ttl_policy,
+    git_branch, git_commit, session_id, agent_type, model, source_type.
     """,
     responses={
         200: {"description": "Memory item updated successfully"},
@@ -824,6 +855,18 @@ async def update_memory_item(
             update_fields["provenance_json"] = json.dumps(request.provenance)
         if request.anchors is not None:
             update_fields["anchors_json"] = json.dumps(request.anchors)
+        if request.git_branch is not None:
+            update_fields["git_branch"] = request.git_branch
+        if request.git_commit is not None:
+            update_fields["git_commit"] = request.git_commit
+        if request.session_id is not None:
+            update_fields["session_id"] = request.session_id
+        if request.agent_type is not None:
+            update_fields["agent_type"] = request.agent_type
+        if request.model is not None:
+            update_fields["model"] = request.model
+        if request.source_type is not None:
+            update_fields["source_type"] = request.source_type
         if request.ttl_policy is not None:
             update_fields["ttl_policy_json"] = json.dumps(request.ttl_policy)
 

@@ -293,13 +293,14 @@ SkillMeat's memory system stores project-level development knowledge (patterns, 
 
 | Operation | Command |
 |-----------|---------|
-| Quick capture | `skillmeat memory item create --project <id> --type <type> --content "..." --confidence 0.85 --status candidate` |
+| Quick capture | `skillmeat memory item create --project <id> --type <type> --content "..." --confidence 0.85 --status candidate --anchor "skillmeat/core/services/foo.py:code:42-58" --provenance-branch "<branch>" --provenance-commit "<sha>" --provenance-agent-type "<agent>" --provenance-model "<model>"` |
 | Search memories | `skillmeat memory search "<query>" --project <id>` |
 | Preview context pack | `skillmeat memory pack preview --project <id> --budget 4000` |
 | Extract from logs | `skillmeat memory extract preview --project <id> --run-log <path>` |
 | Triage candidates | `skillmeat memory item list --project <id> --status candidate` |
 
 **Capture triggers**: Root cause discoveries, API gotchas, decision rationale, pattern findings.
+**Anchor format**: `path:type` or `path:type:start-end` where `type` is one of `code|test|doc|config|plan`.
 **Full guidance**: Use `skillmeat-cli` skill (route 6: Memory capture/consumption flows).
 **Safety**: All memories start as `candidate` — never auto-promote.
 
