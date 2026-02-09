@@ -43,6 +43,10 @@ from typing import Optional
 from sqlalchemy.orm import Session, joinedload
 
 from skillmeat.cache.models import Artifact, ProjectTemplate, TemplateEntity
+from skillmeat.core.validators.context_path_validator import (
+    resolve_project_profile,
+    rewrite_path_for_profile,
+)
 
 # Try importing aiofiles, fall back to sync I/O if not available
 try:
@@ -194,6 +198,7 @@ async def deploy_template_async(
     variables: dict[str, str],
     selected_entity_ids: Optional[list[str]] = None,
     overwrite: bool = False,
+    deployment_profile_id: Optional[str] = None,
 ) -> DeploymentResult:
     """Deploy a template to a project directory (async, optimized).
 
@@ -204,6 +209,7 @@ async def deploy_template_async(
         variables: Variable values for substitution
         selected_entity_ids: Optional subset of entity IDs to deploy
         overwrite: Whether to overwrite existing files
+        deployment_profile_id: Optional profile id used to rewrite profile-rooted paths
 
     Returns:
         DeploymentResult with deployed_files, skipped_files, success
@@ -243,6 +249,8 @@ async def deploy_template_async(
             raise PermissionError(
                 f"Cannot create project directory: {project_path}"
             ) from e
+
+    profile = resolve_project_profile(project_root, deployment_profile_id)
 
     # OPTIMIZATION 1: Fetch template with eager-loaded entities and artifacts
     # This eliminates N+1 query problem by loading everything in one query
@@ -317,8 +325,11 @@ async def deploy_template_async(
                 if not artifact or not artifact.path_pattern:
                     continue
 
-                target_path = resolve_file_path(artifact.path_pattern, project_root)
-                temp_path = resolve_file_path(artifact.path_pattern, temp_root)
+                effective_pattern = rewrite_path_for_profile(
+                    artifact.path_pattern, profile
+                )
+                target_path = resolve_file_path(effective_pattern, project_root)
+                temp_path = resolve_file_path(effective_pattern, temp_root)
 
                 unique_dirs.add(temp_path.parent)
 
@@ -338,8 +349,9 @@ async def deploy_template_async(
                 if not path_pattern:
                     continue
 
-                target_path = resolve_file_path(path_pattern, project_root)
-                temp_path = resolve_file_path(path_pattern, temp_root)
+                effective_pattern = rewrite_path_for_profile(path_pattern, profile)
+                target_path = resolve_file_path(effective_pattern, project_root)
+                temp_path = resolve_file_path(effective_pattern, temp_root)
 
                 # Check if file exists and overwrite flag
                 if target_path.exists() and not overwrite:
@@ -406,6 +418,7 @@ def deploy_template(
     variables: dict[str, str],
     selected_entity_ids: Optional[list[str]] = None,
     overwrite: bool = False,
+    deployment_profile_id: Optional[str] = None,
 ) -> DeploymentResult:
     """Deploy a template to a project directory (sync wrapper).
 
@@ -419,6 +432,7 @@ def deploy_template(
         variables: Variable values for substitution
         selected_entity_ids: Optional subset of entity IDs to deploy
         overwrite: Whether to overwrite existing files
+        deployment_profile_id: Optional profile id used to rewrite profile-rooted paths
 
     Returns:
         DeploymentResult with deployed_files, skipped_files, success
@@ -443,6 +457,7 @@ def deploy_template(
                 variables,
                 selected_entity_ids,
                 overwrite,
+                deployment_profile_id,
             )
         )
     else:
@@ -455,6 +470,7 @@ def deploy_template(
                 variables,
                 selected_entity_ids,
                 overwrite,
+                deployment_profile_id,
             )
         )
 
