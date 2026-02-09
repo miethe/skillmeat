@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from skillmeat.core.enums import Platform
+
 from .artifacts import ArtifactCollectionInfo
 from .common import PageInfo, PaginatedResponse
 
@@ -71,6 +73,22 @@ class CacheInfo(BaseModel):
     is_stale: bool = Field(
         default=False,
         description="Whether the cached data is considered stale (past TTL)",
+    )
+
+
+class DeploymentProfileInfo(BaseModel):
+    """Deployment profile metadata attached to a project response."""
+
+    profile_id: str = Field(description="Profile identifier unique within the project")
+    platform: Platform = Field(description="Platform associated with this profile")
+    root_dir: str = Field(description="Profile root directory", examples=[".claude"])
+    artifact_path_map: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Artifact type to path mapping for this profile",
+    )
+    context_path_prefixes: List[str] = Field(
+        default_factory=list,
+        description="Allowed context path prefixes for this profile",
     )
 
 
@@ -146,9 +164,14 @@ class ProjectDetail(BaseModel):
             {
                 "by_type": {"skill": 3, "command": 2},
                 "by_collection": {"default": 4, "custom": 1},
+                "by_profile": {"claude_code": 4, "codex-default": 1},
                 "modified_count": 1,
             }
         ],
+    )
+    deployment_profiles: List[DeploymentProfileInfo] = Field(
+        default_factory=list,
+        description="Configured deployment profiles for this project",
     )
 
     class Config:
@@ -176,8 +199,18 @@ class ProjectDetail(BaseModel):
                 "stats": {
                     "by_type": {"skill": 3, "command": 2},
                     "by_collection": {"default": 5},
+                    "by_profile": {"claude_code": 5},
                     "modified_count": 0,
                 },
+                "deployment_profiles": [
+                    {
+                        "profile_id": "claude_code",
+                        "platform": "claude_code",
+                        "root_dir": ".claude",
+                        "artifact_path_map": {"skill": "skills"},
+                        "context_path_prefixes": [".claude/context/"],
+                    }
+                ],
             }
         }
 

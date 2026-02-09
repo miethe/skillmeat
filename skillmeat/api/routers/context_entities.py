@@ -24,6 +24,7 @@ API Endpoints:
 import hashlib
 import logging
 import uuid
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
@@ -31,16 +32,25 @@ from sqlalchemy.exc import IntegrityError
 
 from skillmeat.api.schemas.context_entity import (
     ContextEntityCreateRequest,
+    ContextEntityDeployRequest,
+    ContextEntityDeployResponse,
     ContextEntityListResponse,
     ContextEntityResponse,
     ContextEntityType,
     ContextEntityUpdateRequest,
 )
 from skillmeat.api.schemas.common import PageInfo
+from skillmeat.core.path_resolver import default_project_config_filenames
 from skillmeat.core.validators.context_entity import validate_context_entity
-from skillmeat.core.validators.context_path_validator import validate_context_path
+from skillmeat.core.validators.context_path_validator import (
+    normalize_context_prefixes,
+    resolve_project_profile,
+    rewrite_path_for_profile,
+    validate_context_path,
+)
 
 from skillmeat.cache.models import Artifact, Project, get_session
+from skillmeat.cache.repositories import DeploymentProfileRepository
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +102,51 @@ def _as_target_platforms(raw: Optional[List[str]]) -> Optional[List[str]]:
 def _empty_deployed_to() -> dict:
     # Phase 3 adds response shape; deployment aggregation wiring is added separately.
     return {}
+
+
+def _profile_platform(profile: object) -> str:
+    platform = getattr(profile, "platform", None)
+    if hasattr(platform, "value"):
+        return str(platform.value)
+    return str(platform or "")
+
+
+def _profile_id(profile: object) -> str:
+    return str(getattr(profile, "profile_id", "claude_code"))
+
+
+def _resolve_deploy_profiles(
+    *,
+    session,
+    project_path: Path,
+    deployment_profile_id: Optional[str],
+    all_profiles: bool,
+) -> List[object]:
+    if not all_profiles:
+        return [resolve_project_profile(project_path, deployment_profile_id)]
+
+    project_row = (
+        session.query(Project)
+        .filter(Project.path == str(project_path))
+        .first()
+    )
+    if project_row:
+        repo = DeploymentProfileRepository()
+        profiles = repo.list_all_profiles(project_row.id)
+        if profiles:
+            # Deduplicate by profile_id in case repository data includes stale duplicates.
+            seen: set[str] = set()
+            unique_profiles = []
+            for profile in profiles:
+                pid = _profile_id(profile)
+                if pid in seen:
+                    continue
+                seen.add(pid)
+                unique_profiles.append(profile)
+            return unique_profiles
+
+    # Legacy projects may not have persisted deployment profiles.
+    return [resolve_project_profile(project_path, deployment_profile_id)]
 
 
 def compute_content_hash(content: str) -> str:
@@ -722,6 +777,174 @@ async def delete_context_entity(entity_id: str) -> None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete context entity",
+        ) from e
+    finally:
+        session.close()
+
+
+@router.post(
+    "/{entity_id}/deploy",
+    response_model=ContextEntityDeployResponse,
+    summary="Deploy context entity to a project",
+    description=(
+        "Deploy a context entity to the target project using a selected deployment "
+        "profile or all configured profiles."
+    ),
+    responses={
+        200: {"description": "Context entity deployed successfully"},
+        400: {"description": "Validation error"},
+        404: {"description": "Context entity not found"},
+        409: {"description": "Destination file exists and overwrite=false"},
+        500: {"description": "Internal server error"},
+    },
+)
+async def deploy_context_entity(
+    entity_id: str, request: ContextEntityDeployRequest
+) -> ContextEntityDeployResponse:
+    if request.all_profiles and request.deployment_profile_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="deployment_profile_id cannot be set when all_profiles=true",
+        )
+
+    project_path = Path(request.project_path).expanduser().resolve()
+    if not project_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Project path does not exist: {project_path}",
+        )
+
+    session = get_session()
+    try:
+        artifact = (
+            session.query(Artifact)
+            .filter(Artifact.id == entity_id)
+            .filter(Artifact.type.in_(CONTEXT_ENTITY_TYPES))
+            .first()
+        )
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Context entity '{entity_id}' not found",
+            )
+        if not artifact.path_pattern:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Context entity '{entity_id}' has no path_pattern",
+            )
+
+        profiles = _resolve_deploy_profiles(
+            session=session,
+            project_path=project_path,
+            deployment_profile_id=request.deployment_profile_id,
+            all_profiles=request.all_profiles,
+        )
+
+        target_platforms = _as_target_platforms(artifact.target_platforms)
+        content = artifact.content or ""
+        deployment_targets: List[tuple[str, Path]] = []
+
+        # Validate all targets before writing files to avoid partial multi-profile deploys.
+        for profile in profiles:
+            profile_id = _profile_id(profile)
+            profile_platform = _profile_platform(profile)
+
+            if (
+                target_platforms
+                and profile_platform not in target_platforms
+                and not request.force
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Entity target_platforms does not include selected profile platform "
+                        f"for profile '{profile_id}'"
+                    ),
+                )
+
+            selected_path = rewrite_path_for_profile(artifact.path_pattern, profile)
+            config_filenames = list(getattr(profile, "config_filenames", []) or [])
+            config_filenames.extend(
+                default_project_config_filenames(getattr(profile, "platform", None))
+            )
+
+            try:
+                validated = validate_context_path(
+                    selected_path,
+                    project=project_path,
+                    profile=profile,
+                    profile_id=profile_id,
+                    allowed_prefixes=normalize_context_prefixes(profile),
+                    config_filenames=config_filenames,
+                )
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(exc),
+                ) from exc
+
+            if validated.resolved_path is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to resolve deployment target path",
+                )
+            deployment_targets.append((profile_id, validated.resolved_path))
+
+        deployed_paths: List[str] = []
+        deployed_profiles: List[str] = []
+        for profile_id, target_path in deployment_targets:
+            should_write = True
+            if target_path.exists():
+                existing_content = target_path.read_text(encoding="utf-8")
+                if existing_content != content and not request.overwrite:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"File already exists: {target_path}",
+                    )
+                if existing_content == content and not request.overwrite:
+                    should_write = False
+
+            if should_write:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                target_path.write_text(content, encoding="utf-8")
+
+            relative_path = target_path.relative_to(project_path).as_posix()
+            deployed_paths.append(relative_path)
+            deployed_profiles.append(profile_id)
+
+        profile_label = (
+            "all configured profiles" if request.all_profiles else deployed_profiles[0]
+        )
+        logger.info(
+            "Deployed context entity %s to %s (%s)",
+            entity_id,
+            project_path,
+            profile_label,
+        )
+
+        return ContextEntityDeployResponse(
+            success=True,
+            entity_id=entity_id,
+            project_path=str(project_path),
+            deployed_paths=deployed_paths,
+            deployed_profiles=deployed_profiles,
+            message=(
+                f"Deployed '{artifact.name}' to {len(deployed_profiles)} profile(s)"
+            ),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed deploying context entity '%s' to '%s': %s",
+            entity_id,
+            project_path,
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to deploy context entity",
         ) from e
     finally:
         session.close()

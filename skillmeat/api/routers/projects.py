@@ -260,25 +260,44 @@ def build_project_detail(project_path: Path, db_session: Optional[Session] = Non
         ProjectDetail object
     """
     from skillmeat.api.services import CollectionService
-    from skillmeat.cache.models import get_session
+    from skillmeat.cache.models import Project, get_session
+    from skillmeat.cache.repositories import DeploymentProfileRepository
 
     deployments = DeploymentTracker.read_deployments(project_path)
 
+    session = db_session or get_session()
+    close_session = db_session is None
+
     # Fetch collection memberships for all artifacts (batch query)
     collections_map = {}
-    if deployments:
-        # Construct artifact IDs: {type}:{name}
-        artifact_ids = [f"{d.artifact_type}:{d.artifact_name}" for d in deployments]
-
-        # Use provided session or create new one
-        session = db_session or get_session()
-        try:
+    deployment_profiles = []
+    try:
+        if deployments:
+            # Construct artifact IDs: {type}:{name}
+            artifact_ids = [f"{d.artifact_type}:{d.artifact_name}" for d in deployments]
             collection_service = CollectionService(session)
             collections_map = collection_service.get_collection_membership_batch(artifact_ids)
-        finally:
-            # Only close session if we created it
-            if db_session is None:
-                session.close()
+
+        project_row = (
+            session.query(Project)
+            .filter(Project.path == str(project_path.resolve()))
+            .first()
+        )
+        if project_row:
+            profile_repo = DeploymentProfileRepository()
+            deployment_profiles = [
+                {
+                    "profile_id": profile.profile_id,
+                    "platform": profile.platform,
+                    "root_dir": profile.root_dir,
+                    "artifact_path_map": profile.artifact_path_map or {},
+                    "context_path_prefixes": profile.context_prefixes or [],
+                }
+                for profile in profile_repo.list_all_profiles(project_row.id)
+            ]
+    finally:
+        if close_session:
+            session.close()
 
     # Convert to API schema with collection memberships
     deployed_artifacts = [
@@ -299,17 +318,20 @@ def build_project_detail(project_path: Path, db_session: Optional[Session] = Non
     # Calculate statistics
     by_type = defaultdict(int)
     by_collection = defaultdict(int)
+    by_profile = defaultdict(int)
     modified_count = 0
 
     for d in deployments:
         by_type[d.artifact_type] += 1
         by_collection[d.from_collection] += 1
+        by_profile[d.deployment_profile_id or "claude_code"] += 1
         if d.local_modifications:
             modified_count += 1
 
     stats = {
         "by_type": dict(by_type),
         "by_collection": dict(by_collection),
+        "by_profile": dict(by_profile),
         "modified_count": modified_count,
     }
 
@@ -330,6 +352,7 @@ def build_project_detail(project_path: Path, db_session: Optional[Session] = Non
         last_deployment=last_deployment,
         deployments=deployed_artifacts,
         stats=stats,
+        deployment_profiles=deployment_profiles,
     )
 
 

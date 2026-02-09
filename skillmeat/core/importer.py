@@ -11,6 +11,7 @@ from skillmeat.core.artifact_detection import (
     ArtifactType as DetectionArtifactType,
     ARTIFACT_SIGNATURES,
 )
+from skillmeat.core.enums import Platform
 
 if TYPE_CHECKING:
     from skillmeat.api.schemas.discovery import ImportStatus
@@ -47,6 +48,7 @@ class BulkImportArtifactData:
     description: Optional[str] = None
     author: Optional[str] = None
     tags: List[str] = None
+    target_platforms: Optional[List[str]] = None
     scope: str = "user"
     path: Optional[str] = None
 
@@ -519,6 +521,45 @@ class ArtifactImporter:
             logger.warning(f"Error checking duplicate for {artifact.name}: {e}")
             return (False, None)
 
+    def _infer_target_platforms_from_source(
+        self, artifact: BulkImportArtifactData
+    ) -> Optional[List[Platform]]:
+        """Infer target platforms from source/path profile roots."""
+        source_candidates = [artifact.path, artifact.source]
+        source_candidates = [candidate for candidate in source_candidates if candidate]
+
+        profile_root_to_platform = {
+            ".claude": Platform.CLAUDE_CODE,
+            ".codex": Platform.CODEX,
+            ".gemini": Platform.GEMINI,
+            ".cursor": Platform.CURSOR,
+        }
+
+        detected: List[Platform] = []
+        for candidate in source_candidates:
+            normalized = str(candidate).replace("\\", "/")
+            for root_dir, platform in profile_root_to_platform.items():
+                root_token = f"/{root_dir}/"
+                if normalized.startswith(f"{root_dir}/") or root_token in normalized:
+                    if platform not in detected:
+                        detected.append(platform)
+
+        return detected or None
+
+    def _resolve_target_platforms(
+        self, artifact: BulkImportArtifactData
+    ) -> Optional[List[Platform]]:
+        """Resolve explicit or inferred target platforms for import."""
+        if artifact.target_platforms:
+            resolved: List[Platform] = []
+            for value in artifact.target_platforms:
+                platform = value if isinstance(value, Platform) else Platform(str(value))
+                if platform not in resolved:
+                    resolved.append(platform)
+            return resolved or None
+
+        return self._infer_target_platforms_from_source(artifact)
+
     def _classify_error(
         self, error: Exception, artifact_path: Optional[str] = None
     ) -> tuple[str, str, Optional[str]]:
@@ -829,6 +870,7 @@ class ArtifactImporter:
             # Extract name from source
             name = artifact.name or artifact.source.split("/")[-1].split("@")[0]
             artifact_type = ArtifactType(artifact.artifact_type)
+            target_platforms = self._resolve_target_platforms(artifact)
 
             # Route based on source type
             if artifact.source.startswith("local/"):
@@ -843,6 +885,7 @@ class ArtifactImporter:
                     collection_name=collection_name,
                     custom_name=name,
                     tags=artifact.tags if artifact.tags else None,
+                    target_platforms=target_platforms,
                     force=False,
                 )
             else:
@@ -853,6 +896,7 @@ class ArtifactImporter:
                     collection_name=collection_name,
                     custom_name=name,
                     tags=artifact.tags if artifact.tags else None,
+                    target_platforms=target_platforms,
                     force=False,
                 )
 
