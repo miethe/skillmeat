@@ -26,9 +26,62 @@ skillmeat memory pack generate --project <project> --module <module-id> --budget
 
 ---
 
-## Workflow B: Post-Run Memory Capture
+## Workflow A-bis: In-Session Manual Capture (Recommended)
 
-Use after completing implementation/debugging work with reusable learnings.
+Use proactively **during** implementation work when encountering reusable learnings.
+
+### When to Capture
+
+Trigger memory capture when you encounter:
+- **Root cause discoveries**: "The bug was caused by X because Y"
+- **API/framework gotchas**: "Function X requires parameter Y in format Z"
+- **Decision rationale**: "Chose approach A over B because of trade-off C"
+- **Pattern discoveries**: "This codebase uses pattern X for handling Y"
+- **Performance insights**: "Query Y is slow without index Z"
+
+### Quick Capture Command
+
+```bash
+skillmeat memory item create --project <project> \
+  --type <learning|gotcha|constraint|decision|style_rule> \
+  --content "Your learning here" \
+  --confidence 0.85 \
+  --status candidate
+```
+
+### Examples
+
+```bash
+# Root cause learning
+skillmeat memory item create --project skillmeat \
+  --type gotcha \
+  --content "useEffect with empty deps [] runs before refs are attached - use [dependency] to re-run after conditional render" \
+  --confidence 0.9 \
+  --status candidate
+
+# Pattern discovery
+skillmeat memory item create --project skillmeat \
+  --type learning \
+  --content "Write-through pattern: always write filesystem first, then call refresh_single_artifact_cache() to sync DB" \
+  --confidence 0.9 \
+  --status candidate
+```
+
+### Why Manual > Extraction
+
+| Aspect | Manual Capture | Post-Session Extraction |
+|--------|----------------|------------------------|
+| **Quality** | High (intentional) | Variable (heuristic filtering) |
+| **Context** | Captured in moment | Lost context |
+| **Confidence** | Self-assessed accurately | Estimated by algorithm |
+| **Noise** | None | Requires triage |
+
+---
+
+## Workflow B: Post-Run Memory Capture (Supplementary)
+
+Use as **backup** when in-session capture wasn't done, or to batch-process older sessions.
+Note: Extraction produces variable quality results requiring manual triage.
 
 1. Collect run artifact (session log, summary notes, diff highlights).
 2. Preview extraction results.

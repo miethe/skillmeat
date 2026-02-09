@@ -141,6 +141,14 @@ class MemoryExtractionPreviewRequest(BaseModel):
     run_id: Optional[str] = None
     session_id: Optional[str] = None
     commit_sha: Optional[str] = None
+    use_llm: bool = Field(
+        default=False, description="Enable LLM-based semantic classification"
+    )
+    llm_provider: Optional[str] = Field(
+        default=None, pattern="^(anthropic|openai|ollama|openai-compatible)$"
+    )
+    llm_model: Optional[str] = Field(default=None)
+    llm_base_url: Optional[str] = Field(default=None)
 
 
 class MemoryExtractionPreviewResponse(BaseModel):

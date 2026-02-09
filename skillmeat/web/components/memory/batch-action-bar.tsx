@@ -9,7 +9,7 @@
  * Design spec reference: section 3.9
  */
 
-import { Check, X } from 'lucide-react';
+import { Check, X, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +24,8 @@ export interface BatchActionBarProps {
   onApproveAll: () => void;
   /** Reject (deprecate) all selected items. */
   onRejectAll: () => void;
+  /** Permanently delete all selected items. */
+  onDeleteAll: () => void;
   /** Clear the current selection. */
   onClearSelection: () => void;
 }
@@ -53,6 +55,7 @@ export function BatchActionBar({
   selectedCount,
   onApproveAll,
   onRejectAll,
+  onDeleteAll,
   onClearSelection,
 }: BatchActionBarProps) {
   return (
@@ -93,6 +96,16 @@ export function BatchActionBar({
           >
             <X className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
             Reject
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={onDeleteAll}
+            aria-label={`Delete ${selectedCount} selected ${selectedCount === 1 ? 'item' : 'items'}`}
+          >
+            <Trash2 className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+            Delete
           </Button>
           <Button size="sm" onClick={onApproveAll} aria-label={`Approve ${selectedCount} selected ${selectedCount === 1 ? 'item' : 'items'}`}>
             <Check className="mr-2 h-3.5 w-3.5" aria-hidden="true" />

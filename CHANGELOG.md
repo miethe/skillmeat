@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Memory Extraction Pipeline v2 (2026-02-08)
+
+**JSONL Session Transcript Support**
+- Session transcript parser for Claude Code JSONL format — extracts structured messages (role, content, tool_name, tool_input, tool_output) from conversation logs
+- Message filtering pipeline — removes 80%+ noise (progress updates, system messages, file history) for cleaner extraction
+- CLI intelligent truncation — handles large sessions (>500KB) with line-aware truncation and clear warnings
+- Backward compatibility — auto-detects plain-text input and processes via legacy path
+
+**Provenance & Quality Signals**
+- Provenance extraction — captures session_id, git_branch, timestamp, message_uuid for all extracted memories
+- Quality scoring signals — confidence scores spread across 0.55-0.92 range with content quality indicators
+- Heuristic scoring baseline — 8+ distinct confidence values based on technical depth, workflow stage, and reusability markers
+
+**LLM-Based Classification (Optional)**
+- Semantic classification via `--use-llm` flag with multi-provider support (Anthropic, OpenAI, local models)
+- Exponential backoff and cost monitoring for LLM API calls
+- Fallback to heuristic mode on LLM failure — ensures extraction always succeeds
+- Usage tracking and cost estimation for LLM classification operations
+
+**API & CLI Enhancements**
+- Extraction preview and apply endpoints:
+  - `POST /api/v1/memory-items/extract/preview` — preview candidates without persistence
+  - `POST /api/v1/memory-items/extract/apply` — preview + persist to database
+- CLI extraction command with truncation handling and LLM toggle
+- Comprehensive docstrings documenting extraction pipeline v2 improvements
+
+**Performance & Testing**
+- E2E test suite covering 10+ diverse session types (coding, debugging, planning, research, refactoring, testing, config setup, review, documentation)
+- Performance benchmarks validating <5 sec heuristic mode across 100KB-2.5MB sessions
+- 37 E2E tests covering extraction quality, noise filtering, provenance, confidence spread, LLM enhancement
+- 65 LLM classifier tests covering all providers and error scenarios
+
 #### Memory & Context Intelligence System v1 (2026-02-06)
 
 **Project Memory Workspace**
@@ -256,6 +288,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rescan button and last sync time visibility improved
 
 ### Fixed
+
+#### Memory Extraction Pipeline v2 (2026-02-08)
+
+- Memory extraction pipeline now functional for JSONL input — was 0% useful (noise-filled), now 40%+ meaningful candidates
+- Large session handling no longer causes API errors — >500KB sessions truncated gracefully with line-aware boundaries
+- Confidence scores now show meaningful spread — was clustered at single value, now 8+ distinct scores (0.55-0.92)
+- Session transcript parsing handles Claude Code format — correctly extracts messages from JSONL conversation logs
 
 - DiffViewer scroll sync and spacer line visibility
 - Nested `<button>` inside `<button>` HTML violation in DiffViewer file list

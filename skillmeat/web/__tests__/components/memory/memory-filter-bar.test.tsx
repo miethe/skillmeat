@@ -20,6 +20,8 @@ function createDefaultProps(
     onTypeFilterChange: jest.fn(),
     statusFilter: 'all',
     onStatusFilterChange: jest.fn(),
+    showDeprecated: false,
+    onShowDeprecatedChange: jest.fn(),
     sortBy: 'newest',
     onSortByChange: jest.fn(),
     searchQuery: '',
@@ -104,7 +106,7 @@ describe('MemoryFilterBar', () => {
       render(<MemoryFilterBar {...props} />);
 
       expect(
-        screen.getByLabelText(/filter by status: all statuses/i)
+        screen.getByLabelText(/filter by status: all active/i)
       ).toBeInTheDocument();
     });
 

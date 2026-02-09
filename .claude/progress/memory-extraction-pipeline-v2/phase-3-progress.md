@@ -1,91 +1,121 @@
 ---
 type: progress
-prd: "memory-extraction-pipeline-v2"
+prd: memory-extraction-pipeline-v2
 phase: 3
-title: "LLM Integration - Semantic Classification (OPTIONAL)"
-status: "planning"
+title: LLM Integration - Semantic Classification (OPTIONAL)
+status: completed
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 0
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer"]
+owners:
+- python-backend-engineer
 contributors: []
-
 tasks:
-  - id: "MEX-3.1"
-    description: "Add _semantic_classify_batch() using Anthropic SDK - batch 10-20 candidates per API call, classification prompt with type/confidence/reasoning, parse JSON response"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["MEX-2.4"]
-    estimated_effort: "3h"
-    priority: "high"
-    model: "opus"
-
-  - id: "MEX-3.2"
-    description: "Add feature flag MEMORY_EXTRACTION_LLM_ENABLED (default false), --use-llm CLI flag, configurable model selection (haiku/sonnet)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["MEX-3.1"]
-    estimated_effort: "2h"
-    priority: "medium"
-    model: "sonnet"
-
-  - id: "MEX-3.3"
-    description: "Add fallback + error handling - silent fallback to heuristic on LLM failure, exponential backoff for rate limits, log warnings"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["MEX-3.1", "MEX-3.2"]
-    estimated_effort: "2h"
-    priority: "high"
-    model: "sonnet"
-
-  - id: "MEX-3.4"
-    description: "Cost monitoring + optimization - track API calls and token usage, test with real sessions, verify <$0.05/session, optimize batch size"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["MEX-3.1", "MEX-3.3"]
-    estimated_effort: "1h"
-    priority: "medium"
-    model: "sonnet"
-
-  - id: "MEX-3.5"
-    description: "Phase 3 tests - mock LLM responses, fallback behavior, feature flag toggling, performance test (500KB+LLM <15 sec)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["MEX-3.1", "MEX-3.2", "MEX-3.3", "MEX-3.4"]
-    estimated_effort: "2h"
-    priority: "high"
-    model: "sonnet"
-
+- id: MEX-3.1
+  description: Add _semantic_classify_batch() using Anthropic SDK - batch 10-20 candidates
+    per API call, classification prompt with type/confidence/reasoning, parse JSON
+    response
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - MEX-2.4
+  estimated_effort: 3h
+  priority: high
+  model: opus
+- id: MEX-3.2
+  description: Add feature flag MEMORY_EXTRACTION_LLM_ENABLED (default false), --use-llm
+    CLI flag, configurable model selection (haiku/sonnet)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - MEX-3.1
+  estimated_effort: 2h
+  priority: medium
+  model: sonnet
+- id: MEX-3.3
+  description: Add fallback + error handling - silent fallback to heuristic on LLM
+    failure, exponential backoff for rate limits, log warnings
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - MEX-3.1
+  - MEX-3.2
+  estimated_effort: 2h
+  priority: high
+  model: sonnet
+- id: MEX-3.4
+  description: Cost monitoring + optimization - track API calls and token usage, test
+    with real sessions, verify <$0.05/session, optimize batch size
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - MEX-3.1
+  - MEX-3.3
+  estimated_effort: 1h
+  priority: medium
+  model: sonnet
+- id: MEX-3.5
+  description: Phase 3 tests - mock LLM responses, fallback behavior, feature flag
+    toggling, performance test (500KB+LLM <15 sec)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - MEX-3.1
+  - MEX-3.2
+  - MEX-3.3
+  - MEX-3.4
+  estimated_effort: 2h
+  priority: high
+  model: sonnet
 parallelization:
-  batch_1: ["MEX-3.1"]
-  batch_2: ["MEX-3.2"]
-  batch_3: ["MEX-3.3", "MEX-3.4"]
-  batch_4: ["MEX-3.5"]
-  critical_path: ["MEX-3.1", "MEX-3.3", "MEX-3.5"]
-  estimated_total_time: "10h"
-
+  batch_1:
+  - MEX-3.1
+  batch_2:
+  - MEX-3.2
+  batch_3:
+  - MEX-3.3
+  - MEX-3.4
+  batch_4:
+  - MEX-3.5
+  critical_path:
+  - MEX-3.1
+  - MEX-3.3
+  - MEX-3.5
+  estimated_total_time: 10h
 blockers: []
-
 success_criteria:
-  - { id: "SC-3.1", description: "LLM integration batches candidates correctly (10-20 per call)", status: "pending" }
-  - { id: "SC-3.2", description: "Feature flag defaults to false (heuristic mode unchanged)", status: "pending" }
-  - { id: "SC-3.3", description: "Fallback to heuristic on API failure works silently", status: "pending" }
-  - { id: "SC-3.4", description: "Cost <$0.05 per session verified", status: "pending" }
-  - { id: "SC-3.5", description: "Latency <15 sec for 500KB session with LLM", status: "pending" }
-
+- id: SC-3.1
+  description: LLM integration batches candidates correctly (10-20 per call)
+  status: pending
+- id: SC-3.2
+  description: Feature flag defaults to false (heuristic mode unchanged)
+  status: pending
+- id: SC-3.3
+  description: Fallback to heuristic on API failure works silently
+  status: pending
+- id: SC-3.4
+  description: Cost <$0.05 per session verified
+  status: pending
+- id: SC-3.5
+  description: Latency <15 sec for 500KB session with LLM
+  status: pending
 files_modified:
-  - "skillmeat/core/services/memory_extractor_service.py"
-  - "skillmeat/cli.py"
-  - "tests/test_memory/test_memory_extractor_service.py"
+- skillmeat/core/services/memory_extractor_service.py
+- skillmeat/cli.py
+- tests/test_memory/test_memory_extractor_service.py
+progress: 100
+updated: '2026-02-07'
 ---
 
 # memory-extraction-pipeline-v2 - Phase 3: LLM Integration - Semantic Classification (OPTIONAL)

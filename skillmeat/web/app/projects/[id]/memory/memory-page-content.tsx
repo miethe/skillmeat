@@ -22,6 +22,7 @@ import {
   useUpdateMemoryItem,
   useBulkPromoteMemoryItems,
   useBulkDeprecateMemoryItems,
+  useBulkDeleteMemoryItems,
   useKeyboardShortcuts,
 } from '@/hooks';
 import type { MemoryStatus } from '@/sdk/models/MemoryStatus';
@@ -30,7 +31,7 @@ import type { MemoryItemResponse } from '@/sdk/models/MemoryItemResponse';
 import { MemoryFilterBar } from '@/components/memory/memory-filter-bar';
 import { MemoryList } from '@/components/memory/memory-list';
 import { BatchActionBar } from '@/components/memory/batch-action-bar';
-import { MemoryDetailPanel } from '@/components/memory/memory-detail-panel';
+import { MemoryDetailsModal } from '@/components/memory/memory-details-modal';
 import { ConfirmActionDialog } from '@/components/memory/confirm-action-dialog';
 import { MemoryFormModal } from '@/components/memory/memory-form-modal';
 import { MergeModal } from '@/components/memory/merge-modal';
@@ -73,6 +74,7 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   // ---------------------------------------------------------------------------
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [showDeprecated, setShowDeprecated] = useState(false);
   const [sortBy, setSortBy] = useState('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'inbox' | 'modules' | 'packs'>('inbox');
@@ -142,6 +144,9 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   const { data: counts } = useMemoryItemCounts({ projectId });
 
   const memories = memoryData?.items ?? [];
+  const filteredMemories = statusFilter === 'all' && !showDeprecated
+    ? memories.filter((m) => m.status !== 'deprecated')
+    : memories;
 
   // Fetch the selected memory item for the detail panel
   const { data: selectedMemory } = useMemoryItem(selectedMemoryId ?? undefined);
@@ -157,6 +162,7 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   const updateItem = useUpdateMemoryItem();
   const bulkPromote = useBulkPromoteMemoryItems();
   const bulkDeprecate = useBulkDeprecateMemoryItems();
+  const bulkDelete = useBulkDeleteMemoryItems();
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -258,9 +264,18 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
   const handleConfirmAction = useCallback(() => {
     if (!confirmAction) return;
     if (confirmAction.type === 'delete') {
-      deleteItem.mutate(confirmAction.memoryId, {
-        onSuccess: () => setConfirmAction(null),
-      });
+      if (confirmAction.memoryId === '__batch__') {
+        bulkDelete.mutate([...selectedIds], {
+          onSuccess: () => {
+            setConfirmAction(null);
+            clearSelection();
+          },
+        });
+      } else {
+        deleteItem.mutate(confirmAction.memoryId, {
+          onSuccess: () => setConfirmAction(null),
+        });
+      }
     } else {
       deprecateItem.mutate({
         itemId: confirmAction.memoryId,
@@ -272,7 +287,7 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
         },
       });
     }
-  }, [confirmAction, deprecateItem, deleteItem]);
+  }, [confirmAction, deprecateItem, deleteItem, bulkDelete, selectedIds, clearSelection]);
 
   /** Close the detail panel. */
   const handleCloseDetail = useCallback(() => {
@@ -302,6 +317,17 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
     );
   }, [selectedIds, bulkDeprecate, clearSelection]);
 
+  /** Batch delete all selected items -- opens confirm dialog. */
+  const handleBatchDelete = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    setConfirmAction({
+      type: 'delete',
+      memoryId: '__batch__',
+      title: `Delete ${selectedIds.size} ${selectedIds.size === 1 ? 'Memory' : 'Memories'}?`,
+      description: `This will permanently delete ${selectedIds.size} selected ${selectedIds.size === 1 ? 'memory item' : 'memory items'}. This action cannot be undone.`,
+    });
+  }, [selectedIds]);
+
   // ---------------------------------------------------------------------------
   // Keyboard shortcuts (A11Y-3.12)
   // ---------------------------------------------------------------------------
@@ -310,39 +336,40 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
     !!editingMemory ||
     !!mergingMemoryId ||
     !!confirmAction ||
-    helpModalOpen;
+    helpModalOpen ||
+    !!selectedMemoryId;
 
   useKeyboardShortcuts(
     containerRef,
     {
       onNavigateDown: () => {
-        setFocusedIndex((prev) => Math.min(prev + 1, memories.length - 1));
+        setFocusedIndex((prev) => Math.min(prev + 1, filteredMemories.length - 1));
       },
       onNavigateUp: () => {
         setFocusedIndex((prev) => Math.max(prev - 1, 0));
       },
       onApprove: () => {
-        const item = memories[focusedIndex];
+        const item = filteredMemories[focusedIndex];
         if (item) handleApprove(item.id);
       },
       onEdit: () => {
-        const item = memories[focusedIndex];
+        const item = filteredMemories[focusedIndex];
         if (item) handleEdit(item.id);
       },
       onReject: () => {
-        const item = memories[focusedIndex];
+        const item = filteredMemories[focusedIndex];
         if (item) handleReject(item.id);
       },
       onMerge: () => {
-        const item = memories[focusedIndex];
+        const item = filteredMemories[focusedIndex];
         if (item) handleMerge(item.id);
       },
       onToggleSelect: () => {
-        const item = memories[focusedIndex];
+        const item = filteredMemories[focusedIndex];
         if (item) toggleSelect(item.id);
       },
       onOpenDetail: () => {
-        const item = memories[focusedIndex];
+        const item = filteredMemories[focusedIndex];
         if (item) handleCardClick(item.id);
       },
       onDismiss: () => {
@@ -353,12 +380,12 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
         }
       },
       onSelectAll: () => {
-        selectAll(memories.map((m) => m.id));
+        selectAll(filteredMemories.map((m) => m.id));
       },
       onShowHelp: () => {
         setHelpModalOpen(true);
       },
-      itemCount: memories.length,
+      itemCount: filteredMemories.length,
     },
     activeTab === 'inbox' && !anyModalOpen
   );
@@ -452,6 +479,8 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
             onTypeFilterChange={setTypeFilter}
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
+            showDeprecated={showDeprecated}
+            onShowDeprecatedChange={setShowDeprecated}
             sortBy={sortBy}
             onSortByChange={setSortBy}
             searchQuery={searchQuery}
@@ -462,7 +491,7 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
           {/* View toggle */}
           <div className="flex items-center justify-between px-6 py-2 border-b">
             <div className="text-sm text-muted-foreground">
-              {memories.length} {memories.length === 1 ? 'memory' : 'memories'}
+              {filteredMemories.length} {filteredMemories.length === 1 ? 'memory' : 'memories'}
             </div>
             <div className="flex items-center gap-1 rounded-md border bg-background p-1" role="group" aria-label="View mode">
               <Button
@@ -491,7 +520,7 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
           <div className="flex flex-1 overflow-hidden">
             <div className="flex-1 overflow-y-auto" role="region" aria-label="Memory list">
               <MemoryList
-                memories={memories}
+                memories={filteredMemories}
                 isLoading={isLoading}
                 isError={isError}
                 error={error}
@@ -513,10 +542,11 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
             </div>
           </div>
 
-          <MemoryDetailPanel
+          <MemoryDetailsModal
             memory={selectedMemory ?? null}
-            isOpen={!!selectedMemoryId}
+            open={!!selectedMemoryId}
             onClose={handleCloseDetail}
+            projectId={projectId}
             onEdit={handleEdit}
             onApprove={handleApprove}
             onReject={handleReject}
@@ -524,12 +554,14 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
             onDeprecate={handleDeprecate}
             onReactivate={handleReactivate}
             onSetStatus={handleSetStatus}
+            onDelete={handleDelete}
           />
 
           <BatchActionBar
             selectedCount={selectedIds.size}
             onApproveAll={handleBatchApprove}
             onRejectAll={handleBatchReject}
+            onDeleteAll={handleBatchDelete}
             onClearSelection={clearSelection}
           />
         </>
@@ -591,7 +623,7 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
         }
         confirmVariant="destructive"
         onConfirm={handleConfirmAction}
-        isLoading={deprecateItem.isPending || deleteItem.isPending}
+        isLoading={deprecateItem.isPending || deleteItem.isPending || bulkDelete.isPending}
       />
 
       {/* Keyboard shortcuts help modal */}

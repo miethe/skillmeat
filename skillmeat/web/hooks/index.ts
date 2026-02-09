@@ -526,6 +526,7 @@ export {
   useDeprecateMemoryItem,
   useBulkPromoteMemoryItems,
   useBulkDeprecateMemoryItems,
+  useBulkDeleteMemoryItems,
   useMergeMemoryItems,
   useMemorySelection,
   type MemoryItemFilters,

@@ -1,78 +1,101 @@
 ---
 type: progress
-prd: "memory-extraction-pipeline-v2"
+prd: memory-extraction-pipeline-v2
 phase: 2
-title: "Quality Enhancement - Provenance & Scoring"
-status: "planning"
+title: Quality Enhancement - Provenance & Scoring
+status: completed
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 4
-completed_tasks: 0
+completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer"]
+owners:
+- python-backend-engineer
 contributors: []
-
 tasks:
-  - id: "MEX-2.1"
-    description: "Extract provenance from JSONL messages - capture sessionId, gitBranch, timestamp, uuid into ExtractionCandidate.provenance dict"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["MEX-1.2"]
-    estimated_effort: "1h"
-    priority: "high"
-    model: "sonnet"
-
-  - id: "MEX-2.2"
-    description: "Enhance _score() with content quality signals - first-person learning (+0.05), specificity (+0.03), questions (-0.03), vagueness (-0.04). Widen confidence spread to >=8 distinct values (0.55-0.92)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["MEX-1.4"]
-    estimated_effort: "2h"
-    priority: "high"
-    model: "sonnet"
-
-  - id: "MEX-2.3"
-    description: "Add backward compatibility - detect plain-text input (all JSONL parse failures), fall back to legacy _iter_candidate_lines()"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["MEX-1.1", "MEX-1.4"]
-    estimated_effort: "1h"
-    priority: "medium"
-    model: "sonnet"
-
-  - id: "MEX-2.4"
-    description: "Tests + documentation for Phase 2 - provenance fields, scoring signals, backward compat, docstrings, troubleshooting guide"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["MEX-2.1", "MEX-2.2", "MEX-2.3"]
-    estimated_effort: "1h"
-    priority: "high"
-    model: "sonnet"
-
+- id: MEX-2.1
+  description: Extract provenance from JSONL messages - capture sessionId, gitBranch,
+    timestamp, uuid into ExtractionCandidate.provenance dict
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - MEX-1.2
+  estimated_effort: 1h
+  priority: high
+  model: sonnet
+- id: MEX-2.2
+  description: Enhance _score() with content quality signals - first-person learning
+    (+0.05), specificity (+0.03), questions (-0.03), vagueness (-0.04). Widen confidence
+    spread to >=8 distinct values (0.55-0.92)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - MEX-1.4
+  estimated_effort: 2h
+  priority: high
+  model: sonnet
+- id: MEX-2.3
+  description: Add backward compatibility - detect plain-text input (all JSONL parse
+    failures), fall back to legacy _iter_candidate_lines()
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - MEX-1.1
+  - MEX-1.4
+  estimated_effort: 1h
+  priority: medium
+  model: sonnet
+- id: MEX-2.4
+  description: Tests + documentation for Phase 2 - provenance fields, scoring signals,
+    backward compat, docstrings, troubleshooting guide
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - MEX-2.1
+  - MEX-2.2
+  - MEX-2.3
+  estimated_effort: 1h
+  priority: high
+  model: sonnet
 parallelization:
-  batch_1: ["MEX-2.1", "MEX-2.2", "MEX-2.3"]
-  batch_2: ["MEX-2.4"]
-  critical_path: ["MEX-2.2", "MEX-2.4"]
-  estimated_total_time: "4h"
-
+  batch_1:
+  - MEX-2.1
+  - MEX-2.2
+  - MEX-2.3
+  batch_2:
+  - MEX-2.4
+  critical_path:
+  - MEX-2.2
+  - MEX-2.4
+  estimated_total_time: 4h
 blockers: []
-
 success_criteria:
-  - { id: "SC-2.1", description: "Provenance fields extracted and stored correctly (no nulls for valid JSONL)", status: "pending" }
-  - { id: "SC-2.2", description: "Confidence scores spread to >=8 distinct values in 0.55-0.92 range", status: "pending" }
-  - { id: "SC-2.3", description: "Plain-text input detected and handled via legacy fallback", status: "pending" }
-  - { id: "SC-2.4", description: ">80% coverage of Phase 2 new/modified code", status: "pending" }
-
+- id: SC-2.1
+  description: Provenance fields extracted and stored correctly (no nulls for valid
+    JSONL)
+  status: pending
+- id: SC-2.2
+  description: Confidence scores spread to >=8 distinct values in 0.55-0.92 range
+  status: pending
+- id: SC-2.3
+  description: Plain-text input detected and handled via legacy fallback
+  status: pending
+- id: SC-2.4
+  description: '>80% coverage of Phase 2 new/modified code'
+  status: pending
 files_modified:
-  - "skillmeat/core/services/memory_extractor_service.py"
-  - "tests/test_memory/test_memory_extractor_service.py"
+- skillmeat/core/services/memory_extractor_service.py
+- tests/test_memory/test_memory_extractor_service.py
+progress: 100
+updated: '2026-02-07'
 ---
 
 # memory-extraction-pipeline-v2 - Phase 2: Quality Enhancement - Provenance & Scoring

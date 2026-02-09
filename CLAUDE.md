@@ -287,18 +287,21 @@ Track bugs/enhancements via MeatyCapture request-logs.
 
 SkillMeat's memory system stores project-level development knowledge (patterns, decisions, gotchas, constraints) in the DB cache.
 
+**In-session** (preferred): Capture learnings immediately when discovered during work.
 **Pre-task**: Load relevant memories before substantial implementation work.
-**Post-task**: Capture reusable learnings after completing features/debugging.
+**Post-task** (fallback): Extract from session logs if in-session capture wasn't done.
 
 | Operation | Command |
 |-----------|---------|
+| Quick capture | `skillmeat memory item create --project <id> --type <type> --content "..." --confidence 0.85 --status candidate` |
 | Search memories | `skillmeat memory search "<query>" --project <id>` |
 | Preview context pack | `skillmeat memory pack preview --project <id> --budget 4000` |
-| Capture learnings | `skillmeat memory extract preview --project <id> --run-log <path>` |
+| Extract from logs | `skillmeat memory extract preview --project <id> --run-log <path>` |
 | Triage candidates | `skillmeat memory item list --project <id> --status candidate` |
 
+**Capture triggers**: Root cause discoveries, API gotchas, decision rationale, pattern findings.
 **Full guidance**: Use `skillmeat-cli` skill (route 6: Memory capture/consumption flows).
-**Safety**: Extracted memories start as `candidate` — never auto-promote.
+**Safety**: All memories start as `candidate` — never auto-promote.
 
 ---
 

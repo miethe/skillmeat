@@ -543,6 +543,41 @@ export function useBulkDeprecateMemoryItems(
 }
 
 /**
+ * Delete multiple memory items by looping individual DELETE calls.
+ *
+ * Since there is no bulk-delete API endpoint, this uses Promise.allSettled
+ * to fire individual deletions in parallel and reports success/failure counts.
+ *
+ * @example
+ * ```tsx
+ * const bulkDelete = useBulkDeleteMemoryItems();
+ * await bulkDelete.mutateAsync(['item-1', 'item-2', 'item-3']);
+ * ```
+ */
+export function useBulkDeleteMemoryItems(
+  options?: Pick<UseMutationOptions<{ deleted: number; failed: number }, Error, string[]>, 'onSuccess' | 'onError'>
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (itemIds: string[]): Promise<{ deleted: number; failed: number }> => {
+      const results = await Promise.allSettled(
+        itemIds.map((id) => apiRequest<void>(`/memory-items/${id}`, { method: 'DELETE' }))
+      );
+      const deleted = results.filter((r) => r.status === 'fulfilled').length;
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      return { deleted, failed };
+    },
+    onSuccess: (...args) => {
+      queryClient.invalidateQueries({ queryKey: memoryItemKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: memoryItemKeys.counts() });
+      options?.onSuccess?.(...args);
+    },
+    onError: options?.onError,
+  });
+}
+
+/**
  * Merge two memory items using a specified strategy.
  *
  * Strategies:

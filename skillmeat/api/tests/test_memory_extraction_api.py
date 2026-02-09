@@ -80,7 +80,7 @@ def test_preview_memory_extraction_endpoint():
             "provenance": {"source": "memory_extraction"},
         }
     ]
-    with patch("skillmeat.api.routers.memory_items._get_extractor_service", return_value=mock_extractor):
+    with patch("skillmeat.api.routers.memory_items.MemoryExtractorService", return_value=mock_extractor):
         response = _client().post(
             "/api/v1/memory-items/extract/preview?project_id=proj-1",
             json={"text_corpus": "Decision: Use strict mode", "profile": "balanced"},
@@ -106,7 +106,7 @@ def test_apply_memory_extraction_endpoint():
         "skipped_duplicates": [],
         "preview_total": 1,
     }
-    with patch("skillmeat.api.routers.memory_items._get_extractor_service", return_value=mock_extractor):
+    with patch("skillmeat.api.routers.memory_items.MemoryExtractorService", return_value=mock_extractor):
         response = _client().post(
             "/api/v1/memory-items/extract/apply?project_id=proj-1",
             json={"text_corpus": "Learned: Prefer retries", "profile": "balanced"},
