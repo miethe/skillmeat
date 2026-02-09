@@ -31,7 +31,7 @@ import type { MemoryItemResponse } from '@/sdk/models/MemoryItemResponse';
 import { MemoryFilterBar } from '@/components/memory/memory-filter-bar';
 import { MemoryList } from '@/components/memory/memory-list';
 import { BatchActionBar } from '@/components/memory/batch-action-bar';
-import { MemoryDetailPanel } from '@/components/memory/memory-detail-panel';
+import { MemoryDetailsModal } from '@/components/memory/memory-details-modal';
 import { ConfirmActionDialog } from '@/components/memory/confirm-action-dialog';
 import { MemoryFormModal } from '@/components/memory/memory-form-modal';
 import { MergeModal } from '@/components/memory/merge-modal';
@@ -336,7 +336,8 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
     !!editingMemory ||
     !!mergingMemoryId ||
     !!confirmAction ||
-    helpModalOpen;
+    helpModalOpen ||
+    !!selectedMemoryId;
 
   useKeyboardShortcuts(
     containerRef,
@@ -541,10 +542,11 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
             </div>
           </div>
 
-          <MemoryDetailPanel
+          <MemoryDetailsModal
             memory={selectedMemory ?? null}
-            isOpen={!!selectedMemoryId}
+            open={!!selectedMemoryId}
             onClose={handleCloseDetail}
+            projectId={projectId}
             onEdit={handleEdit}
             onApprove={handleApprove}
             onReject={handleReject}
@@ -552,6 +554,7 @@ export function MemoryPageContent({ projectId }: MemoryPageContentProps) {
             onDeprecate={handleDeprecate}
             onReactivate={handleReactivate}
             onSetStatus={handleSetStatus}
+            onDelete={handleDelete}
           />
 
           <BatchActionBar

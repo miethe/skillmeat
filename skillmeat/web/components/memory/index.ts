@@ -25,6 +25,12 @@ export type { BatchActionBarProps } from './batch-action-bar';
 export { MemoryDetailPanel } from './memory-detail-panel';
 export type { MemoryDetailPanelProps } from './memory-detail-panel';
 
+export { BaseMemoryModal } from './base-memory-modal';
+export type { BaseMemoryModalProps } from './base-memory-modal';
+
+export { MemoryDetailsModal } from './memory-details-modal';
+export type { MemoryDetailsModalProps, MemoryDetailsTab } from './memory-details-modal';
+
 export { ConfirmActionDialog } from './confirm-action-dialog';
 export type { ConfirmActionDialogProps } from './confirm-action-dialog';
 
