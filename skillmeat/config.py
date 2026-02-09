@@ -361,3 +361,57 @@ class ConfigManager:
         logger.info(f"Setting artifact_search.indexing_mode to '{value}'")
         self.set("artifact_search.indexing_mode", value)
         return self.get_indexing_mode()
+
+    def get_platform_defaults(self, platform: str) -> dict:
+        """Get TOML overrides for a specific platform.
+
+        Args:
+            platform: Platform name (e.g., "claude-code", "claude-web")
+
+        Returns:
+            Dictionary of platform defaults, or empty dict if none exist
+        """
+        return self.get(f"platform.defaults.{platform}", {})
+
+    def set_platform_defaults(self, platform: str, defaults: dict) -> None:
+        """Persist platform defaults override to TOML.
+
+        Args:
+            platform: Platform name
+            defaults: Dictionary of default overrides for this platform
+        """
+        self.set(f"platform.defaults.{platform}", defaults)
+
+    def delete_platform_defaults(self, platform: str) -> None:
+        """Remove platform defaults for a specific platform.
+
+        Args:
+            platform: Platform name to remove defaults for
+        """
+        self.delete(f"platform.defaults.{platform}")
+
+    def get_custom_context_config(self) -> dict:
+        """Get custom context configuration.
+
+        Returns:
+            Custom context configuration dict with keys:
+                - enabled: bool
+                - prefixes: list
+                - mode: str
+                - platforms: list
+        """
+        default = {
+            "enabled": False,
+            "prefixes": [],
+            "mode": "addendum",
+            "platforms": []
+        }
+        return self.get("platform.custom_context", default)
+
+    def set_custom_context_config(self, config: dict) -> None:
+        """Persist custom context configuration to TOML.
+
+        Args:
+            config: Dictionary with custom context configuration
+        """
+        self.set("platform.custom_context", config)
