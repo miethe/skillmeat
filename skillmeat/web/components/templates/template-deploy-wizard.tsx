@@ -28,7 +28,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { PlatformBadge } from '@/components/platform-badge';
 
 interface TemplateEntity {
   artifact_id: string;
@@ -65,6 +67,7 @@ export interface TemplateDeployWizardProps {
 interface FormData {
   projectName: string;
   projectPath: string;
+  deploymentProfileId: string;
   variables: {
     PROJECT_NAME: string;
     PROJECT_DESCRIPTION: string;
@@ -95,6 +98,7 @@ export function TemplateDeployWizard({
   const [formData, setFormData] = useState<FormData>({
     projectName: '',
     projectPath: '',
+    deploymentProfileId: 'claude_code',
     variables: {
       PROJECT_NAME: '',
       PROJECT_DESCRIPTION: '',
@@ -197,6 +201,7 @@ export function TemplateDeployWizard({
           variables: formData.variables,
           selected_entity_ids: formData.selectedEntityIds,
           overwrite: formData.overwrite,
+          deployment_profile_id: formData.deploymentProfileId || undefined,
         }),
       });
 
@@ -232,6 +237,7 @@ export function TemplateDeployWizard({
         setFormData({
           projectName: '',
           projectPath: '',
+          deploymentProfileId: 'claude_code',
           variables: {
             PROJECT_NAME: '',
             PROJECT_DESCRIPTION: '',
@@ -389,7 +395,48 @@ export function TemplateDeployWizard({
                   <p className="text-sm text-destructive">{validationErrors.projectPath}</p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Absolute path where .claude/ directory will be created
+                  Absolute path where profile root directories will be created
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="deploymentProfile">Deployment Profile</Label>
+                <Select
+                  value={formData.deploymentProfileId}
+                  onValueChange={(value) => updateFormData({ deploymentProfileId: value })}
+                >
+                  <SelectTrigger id="deploymentProfile">
+                    <SelectValue placeholder="Select deployment profile" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="claude_code">
+                      <div className="flex items-center gap-2">
+                        <PlatformBadge platform="claude_code" compact />
+                        <span>claude_code</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="codex">
+                      <div className="flex items-center gap-2">
+                        <PlatformBadge platform="codex" compact />
+                        <span>codex</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="gemini">
+                      <div className="flex items-center gap-2">
+                        <PlatformBadge platform="gemini" compact />
+                        <span>gemini</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="cursor">
+                      <div className="flex items-center gap-2">
+                        <PlatformBadge platform="cursor" compact />
+                        <span>cursor</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Template context entities will be deployed under the selected profile root.
                 </p>
               </div>
 
@@ -586,6 +633,10 @@ export function TemplateDeployWizard({
                 <div className="flex justify-between border-b pb-2">
                   <span className="text-sm font-medium">Project Path:</span>
                   <span className="truncate font-mono text-sm">{formData.projectPath}</span>
+                </div>
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-sm font-medium">Deployment Profile:</span>
+                  <span className="text-sm">{formData.deploymentProfileId}</span>
                 </div>
                 <div className="flex justify-between border-b pb-2">
                   <span className="text-sm font-medium">Selected Entities:</span>

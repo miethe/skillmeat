@@ -31,6 +31,7 @@ import type { Artifact, ArtifactType } from '@/types/artifact';
 import { getArtifactTypeConfig } from '@/types/artifact';
 import { Tool } from '@/types/enums';
 import { ScoreBadge } from '@/components/ScoreBadge';
+import { PlatformBadge } from '@/components/platform-badge';
 
 /**
  * Props for ArtifactBrowseCard component
@@ -354,6 +355,19 @@ export function ArtifactBrowseCard({
             aria-label={`${remainingTagsCount} more tags`}
           >
             +{remainingTagsCount} more
+          </Badge>
+        )}
+      </div>
+
+      {/* Target Platforms */}
+      <div className="flex flex-wrap items-center gap-1 px-4 pb-3" aria-label="Target platforms">
+        {artifact.targetPlatforms && artifact.targetPlatforms.length > 0 ? (
+          artifact.targetPlatforms.map((platform) => (
+            <PlatformBadge key={`${artifact.id}-${platform}`} platform={platform} compact />
+          ))
+        ) : (
+          <Badge variant="outline" className="text-xs text-muted-foreground">
+            Universal
           </Badge>
         )}
       </div>

@@ -21,7 +21,16 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import type { ContextEntity } from '@/types/context-entity';
-import { useProjects, useDeployContextEntity, useToast } from '@/hooks';
+import { ProfileSelector } from '@/components/profile-selector';
+import {
+  useProjects,
+  useDeployContextEntity,
+  useToast,
+  useDeploymentProfiles,
+  useProfileSelector,
+} from '@/hooks';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 export interface DeployToProjectDialogProps {
   entity: ContextEntity | null;
@@ -44,20 +53,46 @@ export function DeployToProjectDialog({
   onSuccess,
 }: DeployToProjectDialogProps) {
   const [selectedProject, setSelectedProject] = useState<string>('');
+  const [forceDeploy, setForceDeploy] = useState(false);
 
   // Real hooks for projects and deployment
   const { data: projects, isLoading: projectsLoading, error: projectsError } = useProjects();
   const deployEntity = useDeployContextEntity();
+  const { data: deploymentProfiles } = useDeploymentProfiles(selectedProject || undefined);
+  const { selectedProfileId, setSelectedProfileId, allProfiles, setAllProfiles } =
+    useProfileSelector('claude_code');
   const { toast } = useToast();
 
   const isDeploying = deployEntity.isPending;
+
+  const selectedProfile = deploymentProfiles?.find((p) => p.profile_id === selectedProfileId);
+  const hasPlatformMismatch =
+    !allProfiles &&
+    !!selectedProfile &&
+    !!entity?.target_platforms?.length &&
+    !entity.target_platforms.includes(selectedProfile.platform);
+
+  const rewritePathForProfilePreview = (pathPattern: string, rootDir?: string): string => {
+    if (!rootDir) return pathPattern;
+    const knownRoots = ['.claude', '.codex', '.gemini', '.cursor'];
+    for (const root of knownRoots) {
+      const prefix = `${root}/`;
+      if (pathPattern.startsWith(prefix)) {
+        return `${rootDir.replace(/\/$/, '')}/${pathPattern.slice(prefix.length)}`;
+      }
+    }
+    return pathPattern;
+  };
 
   // Compute target path based on selected project and entity path pattern
   const getTargetPath = () => {
     if (!selectedProject || !entity || !projects) return null;
     const project = projects.find((p) => p.id === selectedProject);
     if (!project) return null;
-    return `${project.path}/${entity.path_pattern}`;
+    if (allProfiles) return `${project.path}/<profile-root>/${entity.path_pattern}`;
+    const profileRoot = selectedProfile?.root_dir;
+    const effectivePattern = rewritePathForProfilePreview(entity.path_pattern, profileRoot);
+    return `${project.path}/${effectivePattern}`;
   };
 
   const targetPath = getTargetPath();
@@ -70,7 +105,12 @@ export function DeployToProjectDialog({
     try {
       await deployEntity.mutateAsync({
         id: entity.id,
-        projectPath: project.path,
+        data: {
+          project_path: project.path,
+          deployment_profile_id: allProfiles ? undefined : selectedProfileId || undefined,
+          all_profiles: allProfiles,
+          force: forceDeploy,
+        },
       });
 
       // Show success and close
@@ -91,6 +131,9 @@ export function DeployToProjectDialog({
       onOpenChange(false);
       // Reset state
       setSelectedProject('');
+      setSelectedProfileId('claude_code');
+      setAllProfiles(false);
+      setForceDeploy(false);
     }
   };
 
@@ -175,9 +218,20 @@ export function DeployToProjectDialog({
               </Select>
             )}
             <p className="text-xs text-muted-foreground">
-              The entity will be deployed to the project&apos;s .claude directory
+              The entity will be deployed to the selected deployment profile root
             </p>
           </div>
+
+          {selectedProject && (
+            <ProfileSelector
+              profiles={deploymentProfiles}
+              value={selectedProfileId}
+              onValueChange={setSelectedProfileId}
+              allProfiles={allProfiles}
+              onAllProfilesChange={setAllProfiles}
+              disabled={isDeploying}
+            />
+          )}
 
           {/* Target Path Preview */}
           {targetPath && (
@@ -190,6 +244,27 @@ export function DeployToProjectDialog({
                 <code className="break-all text-xs">{targetPath}</code>
               </div>
             </div>
+          )}
+
+          {hasPlatformMismatch && (
+            <Alert className="border-destructive/40 bg-destructive/10">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <AlertTitle>Platform Target Mismatch</AlertTitle>
+              <AlertDescription className="space-y-2">
+                <p>
+                  This entity targets {entity.target_platforms?.join(', ')}, but selected profile
+                  platform is {selectedProfile?.platform}.
+                </p>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="force-context-deploy"
+                    checked={forceDeploy}
+                    onCheckedChange={setForceDeploy}
+                  />
+                  <Label htmlFor="force-context-deploy">Force deploy anyway</Label>
+                </div>
+              </AlertDescription>
+            </Alert>
           )}
 
           {/* Overwrite Warning */}
@@ -218,7 +293,7 @@ export function DeployToProjectDialog({
           </Button>
           <Button
             onClick={handleDeploy}
-            disabled={!selectedProject || isDeploying}
+            disabled={!selectedProject || isDeploying || (hasPlatformMismatch && !forceDeploy)}
             aria-label={
               isDeploying
                 ? 'Deploying entity to project'

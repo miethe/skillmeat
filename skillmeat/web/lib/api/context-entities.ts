@@ -7,6 +7,8 @@ import type {
   UpdateContextEntityRequest,
   ContextEntityFilters,
   ContextEntityListResponse,
+  ContextEntityDeployRequest,
+  ContextEntityDeployResponse,
 } from '@/types/context-entity';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -149,15 +151,20 @@ export async function fetchContextEntityContent(id: string): Promise<string> {
 /**
  * Deploy context entity to a project
  */
-export async function deployContextEntity(id: string, projectPath: string): Promise<void> {
+export async function deployContextEntity(
+  id: string,
+  data: ContextEntityDeployRequest
+): Promise<ContextEntityDeployResponse> {
   const response = await fetch(buildUrl(`/context-entities/${id}/deploy`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ project_path: projectPath }),
+    body: JSON.stringify(data),
   });
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error(errorBody.detail || `Failed to deploy context entity: ${response.statusText}`);
   }
+
+  return response.json();
 }

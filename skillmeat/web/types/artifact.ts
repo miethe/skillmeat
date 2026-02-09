@@ -6,7 +6,7 @@
  * @version 2.0.0 - Unified Artifact interface consolidating former Artifact and Entity types
  */
 
-import { Tool } from './enums';
+import { Platform, Tool } from './enums';
 
 /**
  * Supported artifact types in SkillMeat.
@@ -201,6 +201,9 @@ export interface Artifact {
 
   /** List of artifact dependencies (artifact IDs or package names) */
   dependencies?: string[];
+
+  /** Optional platform targeting restrictions (undefined/null means universal) */
+  targetPlatforms?: Platform[];
 
   // ============================================================================
   // Source & Origin
@@ -673,6 +676,8 @@ export interface ArtifactFilters {
   type?: ArtifactType | 'all';
   status?: SyncStatus | 'all';
   scope?: ArtifactScope | 'all';
+  /** Platform filter; 'universal' means artifacts without target platform restrictions */
+  platform?: Platform | 'universal' | 'all';
   search?: string;
   /** Group ID for filtering artifacts by group (only applicable in specific collection context) */
   groupId?: string;
