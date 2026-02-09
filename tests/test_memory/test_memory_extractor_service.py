@@ -110,7 +110,9 @@ def test_invalid_profile_raises_value_error(seeded_db_path):
 
 def test_parse_jsonl_valid():
     """Multiple valid JSON lines should all be parsed as dicts."""
-    corpus = '{"role": "user", "content": "hello"}\n{"role": "assistant", "content": "hi"}'
+    corpus = (
+        '{"role": "user", "content": "hello"}\n{"role": "assistant", "content": "hi"}'
+    )
     result = MemoryExtractorService._parse_jsonl_messages(corpus)
 
     assert len(result) == 2
@@ -153,7 +155,9 @@ def test_parse_jsonl_escaped_newlines():
     """JSON-string-wrapped JSONL should be correctly unwrapped and parsed."""
     # Simulate what Claude CLI might export: entire JSONL corpus as a JSON string
     inner_jsonl = '{"role": "user"}\n{"role": "assistant"}'  # Actual newline in string
-    json_wrapped = json.dumps(inner_jsonl)  # Produces: '"{\\"role\\":\\"user\\"}\\n..."'
+    json_wrapped = json.dumps(
+        inner_jsonl
+    )  # Produces: '"{\\"role\\":\\"user\\"}\\n..."'
 
     result = MemoryExtractorService._parse_jsonl_messages(json_wrapped)
 
@@ -269,7 +273,10 @@ def test_filter_short_content():
     """Content less than 20 characters should be filtered out."""
     messages = [
         {"type": "human", "content": "Too short"},  # 9 chars
-        {"type": "human", "content": "This content is long enough to be extracted properly."},
+        {
+            "type": "human",
+            "content": "This content is long enough to be extracted properly.",
+        },
     ]
     result = MemoryExtractorService._extract_content_blocks(messages)
 
@@ -319,7 +326,10 @@ def test_preview_jsonl_full_pipeline(seeded_db_path):
         {
             "type": "assistant",
             "content": [
-                {"type": "text", "text": "Constraint: Database connections must be pooled."},
+                {
+                    "type": "text",
+                    "text": "Constraint: Database connections must be pooled.",
+                },
                 {"type": "tool_use", "name": "grep", "input": {"pattern": "db"}},
             ],
             "uuid": "msg-002",
@@ -403,9 +413,15 @@ def test_preview_jsonl_with_tool_use(seeded_db_path):
             "type": "assistant",
             "content": [
                 {"type": "tool_use", "name": "read_file", "input": {"path": "/config"}},
-                {"type": "text", "text": "Decision: Configuration stored in environment variables."},
+                {
+                    "type": "text",
+                    "text": "Decision: Configuration stored in environment variables.",
+                },
                 {"type": "tool_use", "name": "bash", "input": {"command": "ls"}},
-                {"type": "text", "text": "Constraint: Environment variables must be validated at startup."},
+                {
+                    "type": "text",
+                    "text": "Constraint: Environment variables must be validated at startup.",
+                },
             ],
             "uuid": "msg-100",
             "timestamp": "2024-01-05T00:00:00Z",
@@ -655,11 +671,16 @@ def test_score_distinct_values(seeded_db_path):
         "Style rule: prefer explicit type hints for public APIs.",
     ]
 
-    scores = [service._score(line, service._classify_type(line), "balanced") for line in test_lines]
+    scores = [
+        service._score(line, service._classify_type(line), "balanced")
+        for line in test_lines
+    ]
     distinct_scores = len(set(scores))
 
     # Must have at least 8 distinct score values
-    assert distinct_scores >= 8, f"Only {distinct_scores} distinct scores: {sorted(set(scores))}"
+    assert (
+        distinct_scores >= 8
+    ), f"Only {distinct_scores} distinct scores: {sorted(set(scores))}"
 
 
 # ============================================================================
@@ -739,7 +760,9 @@ def test_invalid_json_fallback(seeded_db_path):
 
     # Verify actual content was extracted
     all_content = " ".join(c["content"] for c in candidates)
-    assert "message queues" in all_content or any("message queues" in c["content"] for c in candidates)
+    assert "message queues" in all_content or any(
+        "message queues" in c["content"] for c in candidates
+    )
 
 
 # ============================================================================
@@ -778,11 +801,11 @@ def test_preview_with_mock_llm(seeded_db_path):
     llm_result_dict = {
         "type": "gotcha",
         "confidence": 0.95,
-        "reasoning": "Identifies a specific pitfall with clear context"
+        "reasoning": "Identifies a specific pitfall with clear context",
     }
 
     # Mock the _semantic_classify_batch method to return our result
-    with patch.object(service, '_semantic_classify_batch') as mock_batch:
+    with patch.object(service, "_semantic_classify_batch") as mock_batch:
         # Mock a classifier that's available
         mock_classifier = MagicMock()
         mock_classifier.is_available.return_value = True
@@ -812,7 +835,9 @@ def test_preview_with_mock_llm(seeded_db_path):
         # LLM provenance should be present
         prov = candidate["provenance"]
         assert prov["classification_method"] == "llm"
-        assert prov["llm_reasoning"] == "Identifies a specific pitfall with clear context"
+        assert (
+            prov["llm_reasoning"] == "Identifies a specific pitfall with clear context"
+        )
         assert prov["llm_provider"] == "anthropic"
 
 
@@ -859,10 +884,10 @@ def test_provenance_includes_llm_metadata(seeded_db_path):
     llm_result_dict = {
         "type": "learning",
         "confidence": 0.88,
-        "reasoning": "General development insight about testing patterns"
+        "reasoning": "General development insight about testing patterns",
     }
 
-    with patch.object(service, '_semantic_classify_batch') as mock_batch:
+    with patch.object(service, "_semantic_classify_batch") as mock_batch:
         mock_classifier = MagicMock()
         mock_classifier.is_available.return_value = True
         mock_classifier.provider_name = "openai"
@@ -886,7 +911,10 @@ def test_provenance_includes_llm_metadata(seeded_db_path):
 
         assert prov["classification_method"] == "llm"
         assert prov["llm_provider"] == "openai"
-        assert prov["llm_reasoning"] == "General development insight about testing patterns"
+        assert (
+            prov["llm_reasoning"]
+            == "General development insight about testing patterns"
+        )
 
 
 def test_env_var_enables_llm(seeded_db_path, monkeypatch):
@@ -898,7 +926,9 @@ def test_env_var_enables_llm(seeded_db_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
     # Mock get_classifier at the module level where it's imported
-    with patch('skillmeat.core.services.llm_classifier.get_classifier') as mock_get_classifier:
+    with patch(
+        "skillmeat.core.services.llm_classifier.get_classifier"
+    ) as mock_get_classifier:
         mock_classifier = MagicMock()
         mock_classifier.is_available.return_value = True
         mock_get_classifier.return_value = mock_classifier
@@ -920,7 +950,9 @@ def test_cli_flag_overrides_env(seeded_db_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
     # Mock get_classifier
-    with patch('skillmeat.core.services.llm_classifier.get_classifier') as mock_get_classifier:
+    with patch(
+        "skillmeat.core.services.llm_classifier.get_classifier"
+    ) as mock_get_classifier:
         mock_classifier = MagicMock()
         mock_classifier.is_available.return_value = True
         mock_get_classifier.return_value = mock_classifier
@@ -946,7 +978,7 @@ def test_llm_batch_classification(seeded_db_path):
         {"type": "gotcha", "confidence": 0.92, "reasoning": "test3"},
     ]
 
-    with patch.object(service, '_semantic_classify_batch') as mock_batch:
+    with patch.object(service, "_semantic_classify_batch") as mock_batch:
         mock_classifier = MagicMock()
         mock_classifier.is_available.return_value = True
         mock_classifier.provider_name = "anthropic"
@@ -990,7 +1022,7 @@ def test_llm_partial_failure(seeded_db_path):
         None,  # Second item failed
     ]
 
-    with patch.object(service, '_semantic_classify_batch') as mock_batch:
+    with patch.object(service, "_semantic_classify_batch") as mock_batch:
         mock_classifier = MagicMock()
         mock_classifier.is_available.return_value = True
         mock_classifier.provider_name = "anthropic"
@@ -1015,9 +1047,185 @@ def test_llm_partial_failure(seeded_db_path):
         assert len(candidates) >= 2
 
         # First should use LLM classification
-        llm_classified = [c for c in candidates if c["provenance"].get("classification_method") == "llm"]
-        heuristic_classified = [c for c in candidates if c["provenance"].get("classification_method") == "heuristic"]
+        llm_classified = [
+            c
+            for c in candidates
+            if c["provenance"].get("classification_method") == "llm"
+        ]
+        heuristic_classified = [
+            c
+            for c in candidates
+            if c["provenance"].get("classification_method") == "heuristic"
+        ]
 
         # Should have at least one of each
         assert len(llm_classified) >= 1
         assert len(heuristic_classified) >= 1
+
+
+# ============================================================================
+# Phase 4 Tests: Noise Filtering (Quality Improvements)
+# ============================================================================
+
+
+def test_is_noise_xml_tags():
+    """XML/HTML tags should be detected as noise."""
+    assert MemoryExtractorService._is_noise("<command-name>/clear</command-name>")
+    assert MemoryExtractorService._is_noise("<command-args></command-args>")
+    assert MemoryExtractorService._is_noise("<system-reminder>")
+    assert MemoryExtractorService._is_noise("</system-reminder>")
+    assert MemoryExtractorService._is_noise("<local-command-result>")
+    assert MemoryExtractorService._is_noise("<invoke>")
+
+
+def test_is_noise_table_syntax():
+    """Table syntax patterns should be detected as noise."""
+    assert MemoryExtractorService._is_noise("|-------|-----------|-----|")
+    assert MemoryExtractorService._is_noise("| **Header** | **Description** |")
+    assert MemoryExtractorService._is_noise("| Issue | Root Cause | Fix |")
+
+
+def test_is_noise_action_phrases():
+    """Conversational action phrases should be detected as noise."""
+    assert MemoryExtractorService._is_noise("Let me check the configuration files")
+    assert MemoryExtractorService._is_noise("I'll start by reading the schema")
+    assert MemoryExtractorService._is_noise("Now let me verify the test results")
+    assert MemoryExtractorService._is_noise("Hmm, the diff is empty")
+    assert MemoryExtractorService._is_noise("Good. Now I understand the pattern")
+
+
+def test_is_noise_not_triggered_on_valid_content():
+    """Valid learning content should NOT be detected as noise."""
+    assert not MemoryExtractorService._is_noise(
+        "Learned that uv resolves dependencies faster than pip"
+    )
+    assert not MemoryExtractorService._is_noise(
+        "Decision: Use SQLAlchemy for database operations"
+    )
+    assert not MemoryExtractorService._is_noise(
+        "Constraint: API timeout must be under 5 seconds"
+    )
+    assert not MemoryExtractorService._is_noise(
+        "Gotcha: Beware of N+1 query problems in ORM"
+    )
+
+
+def test_score_noise_penalty(seeded_db_path):
+    """Lines matching noise patterns should receive severe penalty."""
+    service = MemoryExtractorService(db_path=seeded_db_path)
+
+    # Noise content should score very low
+    noise_score = service._score(
+        "Let me check the configuration files", "learning", "balanced"
+    )
+    valid_score = service._score(
+        "Configuration files must use TOML format", "constraint", "balanced"
+    )
+
+    # Noise should be penalized significantly
+    assert noise_score < valid_score
+    assert noise_score < 0.6  # Should be below typical min_confidence
+
+
+def test_score_filler_penalty(seeded_db_path):
+    """Conversational filler should receive penalty."""
+    service = MemoryExtractorService(db_path=seeded_db_path)
+
+    filler_score = service._score(
+        "Here's what I found in the codebase today", "learning", "balanced"
+    )
+    direct_score = service._score(
+        "The codebase uses dependency injection pattern", "learning", "balanced"
+    )
+
+    assert filler_score < direct_score
+
+
+def test_score_structural_content_penalty(seeded_db_path):
+    """Lines with high non-alphanumeric ratio should be penalized."""
+    service = MemoryExtractorService(db_path=seeded_db_path)
+
+    # Line with lots of punctuation
+    structural_score = service._score(
+        "------- ******* ======= -------", "learning", "balanced"
+    )
+    # Normal prose
+    prose_score = service._score(
+        "Use dependency injection for testability", "decision", "balanced"
+    )
+
+    assert structural_score < prose_score
+
+
+def test_preview_filters_noise_early(seeded_db_path):
+    """Preview should filter noise patterns before scoring."""
+    messages = [
+        {
+            "type": "assistant",
+            "content": """<command-name>/clear</command-name>
+            | Issue | Root Cause | Fix |
+            |-------|-----------|-----|
+            Let me check the configuration files
+            Decision: Use SQLAlchemy for database operations.
+            Hmm, the diff seems empty
+            Gotcha: Beware of connection pooling timeouts.
+            """,
+            "uuid": "msg-noise-test",
+            "timestamp": "2024-01-01T00:00:00Z",
+        }
+    ]
+
+    jsonl_corpus = "\n".join(json.dumps(msg) for msg in messages)
+
+    service = MemoryExtractorService(db_path=seeded_db_path)
+    candidates = service.preview(
+        project_id=PROJECT_ID,
+        text_corpus=jsonl_corpus,
+        profile="balanced",
+        min_confidence=0.5,  # Lower threshold to see what passes
+    )
+
+    # Extract all content for verification
+    all_content = " ".join(c["content"] for c in candidates)
+
+    # Noise should be filtered out
+    assert "<command-name>" not in all_content
+    assert "|-------|" not in all_content
+    assert "Let me check" not in all_content
+    assert "Hmm, the diff" not in all_content
+
+    # Valid content should remain
+    assert any("SQLAlchemy" in c["content"] for c in candidates) or any(
+        "connection pooling" in c["content"] for c in candidates
+    )
+
+
+def test_preview_plaintext_filters_noise(seeded_db_path):
+    """Plain-text fallback path should also filter noise."""
+    corpus = """
+    <command-name>/clear</command-name>
+    Let me check the configuration
+    Decision: Use Redis for caching operations.
+    | Column1 | Column2 | Column3 |
+    Gotcha: Beware of cache invalidation bugs.
+    """
+
+    service = MemoryExtractorService(db_path=seeded_db_path)
+    candidates = service.preview(
+        project_id=PROJECT_ID,
+        text_corpus=corpus,
+        profile="balanced",
+        min_confidence=0.5,
+    )
+
+    all_content = " ".join(c["content"] for c in candidates)
+
+    # Noise should be filtered
+    assert "<command-name>" not in all_content
+    assert "Let me check" not in all_content
+    assert "| Column1 |" not in all_content
+
+    # Valid content should remain
+    assert any("Redis" in c["content"] for c in candidates) or any(
+        "cache invalidation" in c["content"] for c in candidates
+    )

@@ -11,11 +11,20 @@ Supports two input formats with automatic detection and fallback:
 - JSONL: Structured message logs with provenance metadata (sessionId, gitBranch, timestamp)
 - Plain text: Line-based extraction for backward compatibility
 
+Noise filtering (applied before scoring):
+- XML/HTML tags: <command-name>, <system-reminder>, etc.
+- Table syntax: separator rows (|---|---|), bold headers (| **Header** |)
+- Action phrases: "Let me check", "I'll start", "Now let me", "Hmm,"
+- System markers: <system-reminder> tags
+
 Quality signals for scoring (confidence 0.55-0.92):
 - First-person learning indicators (+0.05): "learned that", "discovered that"
 - Specificity (+0.03): file paths, function names, numbers
 - Question penalty (-0.03): ends with '?' or starts with question word
 - Vague language penalty (-0.04): "maybe", "probably", "might"
+- Noise pattern penalty (-0.25): matches XML, tables, or action phrases
+- Conversational filler penalty (-0.08): "let me", "here's what", "looks like"
+- Structural content penalty (-0.12): >40% non-alphanumeric characters
 """
 
 from __future__ import annotations
@@ -56,12 +65,63 @@ _TYPE_RULES: List[tuple[str, re.Pattern[str]]] = [
     ("learning", re.compile(r"\b(learned|learning|insight|remember)\b", re.I)),
 ]
 
+# Noise detection patterns - compiled once for performance
+_NOISE_PATTERNS: List[re.Pattern[str]] = [
+    # XML/HTML tag patterns
+    re.compile(r"^<[^>]+>.*</[^>]+>$"),  # Self-contained tag pairs
+    re.compile(r"^<[a-z-]+(?:\s[^>]*)?>$", re.I),  # Opening tags
+    re.compile(r"^</[a-z-]+>$", re.I),  # Closing tags
+    re.compile(
+        r"^<[a-z]+-[a-z-]+>", re.I
+    ),  # Tags like <command-name>, <local-command-*>
+    re.compile(r"^<[a-z-]+-[a-z-]+></[a-z-]+>$", re.I),  # Empty tag pairs
+    # Table syntax
+    re.compile(r"^\|[\s\-|]+\|$"),  # Separator rows |---|---|
+    re.compile(r"^\|\s*\*\*"),  # Bold table headers | **Header** |
+]
+
+# Conversational action phrases that indicate noise (case-insensitive prefixes)
+_NOISE_ACTION_PREFIXES: frozenset[str] = frozenset(
+    {
+        "let me ",
+        "i'll ",
+        "i will ",
+        "now let me",
+        "hmm,",
+        "hmm ",
+        "good.",
+        "good —",
+        "clean,",
+    }
+)
+
+# Conversational filler patterns for scoring penalty
+_FILLER_PATTERNS: frozenset[str] = frozenset(
+    {
+        "let me ",
+        "i'll start",
+        "i'll check",
+        "now i",
+        "here's what",
+        "looks like",
+        "seems like",
+    }
+)
+
 _PROFILE_BONUS = {
     "strict": -0.08,
     "balanced": 0.0,
     "aggressive": 0.08,
 }
 _VALID_PROFILES = frozenset(_PROFILE_BONUS.keys())
+
+# System reminder markers to filter
+_SYSTEM_MARKERS: frozenset[str] = frozenset(
+    {
+        "<system-reminder>",
+        "</system-reminder>",
+    }
+)
 
 
 class MemoryExtractorService:
@@ -246,6 +306,10 @@ class MemoryExtractorService:
                     block_lines = [ln for ln in block_lines if len(ln.strip()) >= 24]
 
                     for line in block_lines:
+                        # Skip noise patterns early (before scoring)
+                        if self._is_noise(line):
+                            continue
+
                         mem_type = self._classify_type(line)
                         confidence = self._score(line, mem_type, profile)
                         if confidence < min_confidence:
@@ -284,6 +348,10 @@ class MemoryExtractorService:
             else:
                 # Fallback: plain-text line extraction (backward compat)
                 for line in self._iter_candidate_lines(text_corpus):
+                    # Skip noise patterns early (before scoring)
+                    if self._is_noise(line):
+                        continue
+
                     mem_type = self._classify_type(line)
                     confidence = self._score(line, mem_type, profile)
                     if confidence < min_confidence:
@@ -428,6 +496,62 @@ class MemoryExtractorService:
     def _iter_candidate_lines(text_corpus: str) -> List[str]:
         lines = [line.strip(" -*\t") for line in text_corpus.splitlines()]
         return [line for line in lines if len(line.strip()) >= 24]
+
+    @staticmethod
+    def _is_noise(line: str) -> bool:
+        """Detect noise patterns that should be filtered before scoring.
+
+        Identifies content that is structural, conversational filler, or
+        non-substantive. Returns True for lines that match any noise pattern.
+
+        Noise categories detected:
+        1. XML/HTML tags: Opening, closing, self-contained, or empty tag pairs
+           Examples: <command-name>/clear</command-name>, <system-reminder>
+        2. Table syntax: Separator rows, bold headers, table-like structures
+           Examples: |-------|-----------|-----|, | **Header** |
+        3. Action phrases: Transitional or conversational starters
+           Examples: "Let me check", "Hmm, the diff is empty", "Good. Now I"
+        4. System markers: System reminder tags and similar structural markers
+
+        Args:
+            line: Candidate text line to check for noise patterns.
+
+        Returns:
+            True if the line matches any noise pattern, False otherwise.
+
+        Example:
+            >>> _is_noise("<command-name>/clear</command-name>")
+            True
+            >>> _is_noise("| Issue | Root Cause | Fix |")
+            True
+            >>> _is_noise("Let me check the configuration")
+            True
+            >>> _is_noise("Learned that uv resolves dependencies faster than pip")
+            False
+        """
+        line_stripped = line.strip()
+        line_lower = line_stripped.lower()
+
+        # Check compiled regex patterns (XML/HTML tags, table separators)
+        for pattern in _NOISE_PATTERNS:
+            if pattern.match(line_stripped):
+                return True
+
+        # Check action phrase prefixes (case-insensitive)
+        for prefix in _NOISE_ACTION_PREFIXES:
+            if line_lower.startswith(prefix):
+                return True
+
+        # Check system markers
+        for marker in _SYSTEM_MARKERS:
+            if marker in line_lower:
+                return True
+
+        # Table-like structure: 3+ pipe characters suggests table row
+        if line_stripped.count("|") >= 3:
+            return True
+
+        return False
 
     @staticmethod
     def _parse_jsonl_messages(text_corpus: str) -> list[dict]:
@@ -639,8 +763,8 @@ class MemoryExtractorService:
                 return mem_type
         return "learning"
 
-    @staticmethod
-    def _score(line: str, mem_type: str, profile: str) -> float:
+    @classmethod
+    def _score(cls, line: str, mem_type: str, profile: str) -> float:
         """Calculate confidence score for a candidate line using quality signals.
 
         Base scoring:
@@ -658,6 +782,11 @@ class MemoryExtractorService:
         - Vague language (-0.04): "maybe", "probably", "might", "perhaps",
           "possibly", "somehow", "something", "somewhere"
 
+        Noise penalties (post-quality signals):
+        - Noise pattern penalty (-0.25): XML/HTML tags, table syntax, action phrases
+        - Conversational filler penalty (-0.08): "let me ", "i'll start", etc.
+        - Structural content penalty (-0.12): Lines with >40% non-alphanumeric chars
+
         Args:
             line: Candidate text to score.
             mem_type: Memory type from classification (learning, constraint, etc.).
@@ -671,6 +800,8 @@ class MemoryExtractorService:
             0.76  # Base + length + learning pattern + specificity
             >>> _score("Maybe we should try this approach?", "learning", "balanced")
             0.58  # Base - question - vague language
+            >>> _score("Let me check the configuration files", "learning", "balanced")
+            0.50  # Base - filler penalty
         """
         base = 0.58
         base += min(len(line) / 200.0, 0.18)
@@ -737,6 +868,22 @@ class MemoryExtractorService:
         }
         if any(word in line_lower for word in vague_words):
             base -= 0.04
+
+        # 5. Noise pattern penalty (-0.25) - severe penalty to push below threshold
+        if cls._is_noise(line):
+            base -= 0.25
+
+        # 6. Conversational filler penalty (-0.08)
+        if any(pattern in line_lower for pattern in _FILLER_PATTERNS):
+            base -= 0.08
+
+        # 7. Pure structural content penalty (-0.12)
+        # Lines that are mostly punctuation/formatting (>40% non-alphanumeric)
+        if len(line) > 0:
+            non_alpha_count = sum(1 for c in line if not c.isalnum() and c != " ")
+            non_alpha_ratio = non_alpha_count / len(line)
+            if non_alpha_ratio > 0.4:
+                base -= 0.12
 
         return max(0.0, min(base, 0.98))
 
@@ -813,11 +960,13 @@ class MemoryExtractorService:
         )
 
         # Log usage stats
-        if hasattr(self._classifier, 'usage_stats'):
-            logger.info(self._classifier.usage_stats.summary(
-                provider=self._classifier.provider_name,
-                model=getattr(self._classifier, 'model', ''),
-            ))
+        if hasattr(self._classifier, "usage_stats"):
+            logger.info(
+                self._classifier.usage_stats.summary(
+                    provider=self._classifier.provider_name,
+                    model=getattr(self._classifier, "model", ""),
+                )
+            )
 
     def _semantic_classify_batch(
         self,
