@@ -344,3 +344,48 @@ class ContextEntityListResponse(PaginatedResponse[ContextEntityResponse]):
     """
 
     pass
+
+
+class ContextEntityDeployRequest(BaseModel):
+    """Request schema for deploying a context entity to a project."""
+
+    project_path: str = Field(
+        description="Target project path",
+        examples=["/Users/me/my-project"],
+    )
+    overwrite: bool = Field(
+        default=False,
+        description="Overwrite existing file when destination already exists",
+    )
+    deployment_profile_id: Optional[str] = Field(
+        default=None,
+        description="Optional deployment profile id (uses project primary profile when omitted)",
+        examples=["codex"],
+    )
+    all_profiles: bool = Field(
+        default=False,
+        description="Deploy to all configured project profiles",
+    )
+    force: bool = Field(
+        default=False,
+        description=(
+            "Allow deployment when entity target_platforms exclude selected profile platform"
+        ),
+    )
+
+
+class ContextEntityDeployResponse(BaseModel):
+    """Response schema for context entity deployment."""
+
+    success: bool = Field(description="Whether deployment succeeded")
+    entity_id: str = Field(description="Context entity identifier")
+    project_path: str = Field(description="Resolved project path")
+    deployed_paths: List[str] = Field(
+        default_factory=list,
+        description="Paths written relative to project root",
+    )
+    deployed_profiles: List[str] = Field(
+        default_factory=list,
+        description="Deployment profile IDs that received the entity",
+    )
+    message: str = Field(description="Human-readable deployment result")

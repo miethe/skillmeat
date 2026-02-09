@@ -29,6 +29,7 @@ def refresh_single_artifact_cache(
     artifact_mgr,
     artifact_id: str,
     collection_id: str = "default",
+    deployment_profile_id: Optional[str] = None,
 ) -> bool:
     """Refresh cache for a single artifact after file operation.
 
@@ -41,6 +42,7 @@ def refresh_single_artifact_cache(
         artifact_mgr: ArtifactManager instance with show() method
         artifact_id: Artifact ID in 'type:name' format
         collection_id: Collection to update (defaults to 'default')
+        deployment_profile_id: Optional profile context for logging/tracing
 
     Returns:
         True if refresh succeeded, False otherwise
@@ -125,7 +127,11 @@ def refresh_single_artifact_cache(
             except Exception as e:
                 logger.warning(f"Tag ORM sync failed for {artifact_id}: {e}")
 
-        logger.debug(f"Refreshed cache for artifact: {artifact_id}")
+        logger.debug(
+            "Refreshed cache for artifact: %s (profile=%s)",
+            artifact_id,
+            deployment_profile_id or "all",
+        )
         return True
 
     except Exception as e:
