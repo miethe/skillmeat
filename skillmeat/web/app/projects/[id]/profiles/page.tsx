@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,9 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast, useProject, useDeploymentProfiles, useCreateDeploymentProfile, useUpdateDeploymentProfile, useDeleteDeploymentProfile } from '@/hooks';
+import { useToast, useProject, useDeploymentProfiles, useCreateDeploymentProfile, useUpdateDeploymentProfile, useDeleteDeploymentProfile, usePlatformDefaults } from '@/hooks';
 import { PlatformBadge } from '@/components/platform-badge';
+import { PlatformChangeDialog } from '@/components/deployments/platform-change-dialog';
 import { Platform } from '@/types/enums';
+import { PLATFORM_DEFAULTS } from '@/lib/constants/platform-defaults';
+import type { PlatformDefaults } from '@/lib/constants/platform-defaults';
 import type {
   CreateDeploymentProfileRequest,
   DeploymentProfile,
@@ -35,19 +38,14 @@ function toList(value: string): string[] {
     .filter(Boolean);
 }
 
-function defaultRootDir(platform: Platform): string {
-  switch (platform) {
-    case Platform.CODEX:
-      return '.codex';
-    case Platform.GEMINI:
-      return '.gemini';
-    case Platform.CURSOR:
-      return '.cursor';
-    case Platform.CLAUDE_CODE:
-      return '.claude';
-    default:
-      return '.custom';
-  }
+function defaultsToFormFields(defaults: PlatformDefaults): Omit<ProfileFormState, 'profile_id' | 'platform'> {
+  return {
+    root_dir: defaults.root_dir,
+    artifact_path_map_json: JSON.stringify(defaults.artifact_path_map, null, 2),
+    project_config_filenames: defaults.config_filenames.join('\n'),
+    context_path_prefixes: defaults.context_prefixes.join('\n'),
+    supported_artifact_types: defaults.supported_artifact_types.join(', '),
+  };
 }
 
 function profileToForm(profile: DeploymentProfile): ProfileFormState {
@@ -97,17 +95,46 @@ export default function ProjectProfilesPage() {
   const updateProfile = useUpdateDeploymentProfile(projectId);
   const deleteProfile = useDeleteDeploymentProfile(projectId);
 
-  const [createForm, setCreateForm] = useState<ProfileFormState>({
-    profile_id: '',
-    platform: Platform.CLAUDE_CODE,
-    root_dir: '.claude',
-    artifact_path_map_json: '{}',
-    project_config_filenames: 'CLAUDE.md',
-    context_path_prefixes: '.claude/context/\n.claude/',
-    supported_artifact_types: 'skill, command, agent, hook, mcp',
+  const [createForm, setCreateForm] = useState<ProfileFormState>(() => {
+    // claude_code is always present in PLATFORM_DEFAULTS
+    const defaults = PLATFORM_DEFAULTS['claude_code']!;
+    return {
+      profile_id: '',
+      platform: Platform.CLAUDE_CODE,
+      ...defaultsToFormFields(defaults),
+    };
   });
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<ProfileFormState | null>(null);
+
+  // Platform defaults from API (with fallback to constants)
+  const { data: platformDefaultsData } = usePlatformDefaults();
+
+  // Resolve defaults for a platform — prefer API data, fall back to constants
+  const getDefaultsForPlatform = useCallback(
+    (platform: string): PlatformDefaults => {
+      const apiDefaults = platformDefaultsData?.defaults?.[platform];
+      if (apiDefaults) {
+        return {
+          root_dir: apiDefaults.root_dir,
+          artifact_path_map: apiDefaults.artifact_path_map,
+          config_filenames: apiDefaults.config_filenames,
+          supported_artifact_types: apiDefaults.supported_artifact_types,
+          context_prefixes: apiDefaults.context_prefixes,
+        };
+      }
+      // 'other' is always present as the fallback platform
+      return PLATFORM_DEFAULTS[platform] ?? PLATFORM_DEFAULTS['other']!;
+    },
+    [platformDefaultsData]
+  );
+
+  // Touched fields tracking for create form
+  const [touchedFields, setTouchedFields] = useState<Set<keyof ProfileFormState>>(new Set());
+
+  // Edit form dialog state
+  const [showPlatformChangeDialog, setShowPlatformChangeDialog] = useState(false);
+  const [pendingEditPlatform, setPendingEditPlatform] = useState<Platform | null>(null);
 
   const profileCountLabel = useMemo(() => `${profiles.length} profile(s) configured`, [profiles.length]);
 
@@ -118,6 +145,7 @@ export default function ProjectProfilesPage() {
         title: 'Profile created',
         description: `Created profile "${createForm.profile_id}"`,
       });
+      setTouchedFields(new Set());
       setCreateForm((prev) => ({
         ...prev,
         profile_id: '',
@@ -174,6 +202,70 @@ export default function ProjectProfilesPage() {
     }
   };
 
+  const handleEditPlatformKeep = useCallback(() => {
+    if (!pendingEditPlatform) return;
+    setEditForm((prev) =>
+      prev ? { ...prev, platform: pendingEditPlatform } : prev
+    );
+    setPendingEditPlatform(null);
+  }, [pendingEditPlatform]);
+
+  const handleEditPlatformOverwrite = useCallback(() => {
+    if (!pendingEditPlatform) return;
+    const defaults = getDefaultsForPlatform(pendingEditPlatform);
+    const newFields = defaultsToFormFields(defaults);
+    setEditForm((prev) =>
+      prev ? { ...prev, platform: pendingEditPlatform, ...newFields } : prev
+    );
+    setPendingEditPlatform(null);
+  }, [pendingEditPlatform, getDefaultsForPlatform]);
+
+  const handleEditPlatformAppend = useCallback(() => {
+    if (!pendingEditPlatform || !editForm) return;
+    const defaults = getDefaultsForPlatform(pendingEditPlatform);
+
+    // For single-value fields: use new default
+    const newRootDir = defaults.root_dir;
+
+    // For JSON map: deep merge
+    let mergedMap: Record<string, string> = {};
+    try {
+      mergedMap = JSON.parse(editForm.artifact_path_map_json || '{}');
+    } catch {
+      mergedMap = {};
+    }
+    for (const [key, val] of Object.entries(defaults.artifact_path_map)) {
+      if (!(key in mergedMap)) {
+        mergedMap[key] = val;
+      }
+    }
+
+    // For list fields: append + deduplicate
+    const existingConfigs = toList(editForm.project_config_filenames);
+    const mergedConfigs = [...new Set([...existingConfigs, ...defaults.config_filenames])];
+
+    const existingPrefixes = toList(editForm.context_path_prefixes);
+    const mergedPrefixes = [...new Set([...existingPrefixes, ...defaults.context_prefixes])];
+
+    const existingTypes = toList(editForm.supported_artifact_types);
+    const mergedTypes = [...new Set([...existingTypes, ...defaults.supported_artifact_types])];
+
+    setEditForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            platform: pendingEditPlatform,
+            root_dir: newRootDir,
+            artifact_path_map_json: JSON.stringify(mergedMap, null, 2),
+            project_config_filenames: mergedConfigs.join('\n'),
+            context_path_prefixes: mergedPrefixes.join('\n'),
+            supported_artifact_types: mergedTypes.join(', '),
+          }
+        : prev
+    );
+    setPendingEditPlatform(null);
+  }, [pendingEditPlatform, editForm, getDefaultsForPlatform]);
+
   return (
     <div className="space-y-6 p-6">
       <div className="space-y-4">
@@ -209,13 +301,25 @@ export default function ProjectProfilesPage() {
             <Label htmlFor="new-platform">Platform</Label>
             <Select
               value={createForm.platform}
-              onValueChange={(value) =>
-                setCreateForm((prev) => ({
-                  ...prev,
-                  platform: value as Platform,
-                  root_dir: defaultRootDir(value as Platform),
-                }))
-              }
+              onValueChange={(value) => {
+                const newPlatform = value as Platform;
+                const defaults = getDefaultsForPlatform(value);
+                const newFields = defaultsToFormFields(defaults);
+                setCreateForm((prev) => {
+                  const updated: ProfileFormState = {
+                    ...prev,
+                    platform: newPlatform,
+                  };
+                  // For each field, if the user has touched it, KEEP their value
+                  for (const [key, val] of Object.entries(newFields)) {
+                    const fieldKey = key as keyof typeof newFields;
+                    if (!touchedFields.has(fieldKey)) {
+                      (updated as Record<string, unknown>)[fieldKey] = val;
+                    }
+                  }
+                  return updated;
+                });
+              }}
             >
               <SelectTrigger id="new-platform">
                 <SelectValue />
@@ -234,7 +338,10 @@ export default function ProjectProfilesPage() {
             <Input
               id="new-root-dir"
               value={createForm.root_dir}
-              onChange={(e) => setCreateForm((prev) => ({ ...prev, root_dir: e.target.value }))}
+              onChange={(e) => {
+                setTouchedFields((prev) => new Set(prev).add('root_dir'));
+                setCreateForm((prev) => ({ ...prev, root_dir: e.target.value }));
+              }}
             />
           </div>
           <div className="space-y-2 md:col-span-2">
@@ -243,9 +350,10 @@ export default function ProjectProfilesPage() {
               id="new-artifact-map"
               rows={5}
               value={createForm.artifact_path_map_json}
-              onChange={(e) =>
-                setCreateForm((prev) => ({ ...prev, artifact_path_map_json: e.target.value }))
-              }
+              onChange={(e) => {
+                setTouchedFields((prev) => new Set(prev).add('artifact_path_map_json'));
+                setCreateForm((prev) => ({ ...prev, artifact_path_map_json: e.target.value }));
+              }}
             />
           </div>
           <div className="space-y-2">
@@ -254,9 +362,10 @@ export default function ProjectProfilesPage() {
               id="new-configs"
               rows={3}
               value={createForm.project_config_filenames}
-              onChange={(e) =>
-                setCreateForm((prev) => ({ ...prev, project_config_filenames: e.target.value }))
-              }
+              onChange={(e) => {
+                setTouchedFields((prev) => new Set(prev).add('project_config_filenames'));
+                setCreateForm((prev) => ({ ...prev, project_config_filenames: e.target.value }));
+              }}
             />
           </div>
           <div className="space-y-2">
@@ -265,9 +374,10 @@ export default function ProjectProfilesPage() {
               id="new-context-prefixes"
               rows={3}
               value={createForm.context_path_prefixes}
-              onChange={(e) =>
-                setCreateForm((prev) => ({ ...prev, context_path_prefixes: e.target.value }))
-              }
+              onChange={(e) => {
+                setTouchedFields((prev) => new Set(prev).add('context_path_prefixes'));
+                setCreateForm((prev) => ({ ...prev, context_path_prefixes: e.target.value }));
+              }}
             />
           </div>
           <div className="space-y-2 md:col-span-2">
@@ -275,9 +385,10 @@ export default function ProjectProfilesPage() {
             <Input
               id="new-supported-types"
               value={createForm.supported_artifact_types}
-              onChange={(e) =>
-                setCreateForm((prev) => ({ ...prev, supported_artifact_types: e.target.value }))
-              }
+              onChange={(e) => {
+                setTouchedFields((prev) => new Set(prev).add('supported_artifact_types'));
+                setCreateForm((prev) => ({ ...prev, supported_artifact_types: e.target.value }));
+              }}
             />
           </div>
           <div className="md:col-span-2">
@@ -318,11 +429,10 @@ export default function ProjectProfilesPage() {
                           <Label>Platform</Label>
                           <Select
                             value={editForm.platform}
-                            onValueChange={(value) =>
-                              setEditForm((prev) =>
-                                prev ? { ...prev, platform: value as Platform } : prev
-                              )
-                            }
+                            onValueChange={(value) => {
+                              setPendingEditPlatform(value as Platform);
+                              setShowPlatformChangeDialog(true);
+                            }}
                           >
                             <SelectTrigger>
                               <SelectValue />
@@ -356,6 +466,43 @@ export default function ProjectProfilesPage() {
                           onChange={(e) =>
                             setEditForm((prev) =>
                               prev ? { ...prev, artifact_path_map_json: e.target.value } : prev
+                            )
+                          }
+                        />
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Config Filenames (newline/comma separated)</Label>
+                          <Textarea
+                            rows={3}
+                            value={editForm.project_config_filenames}
+                            onChange={(e) =>
+                              setEditForm((prev) =>
+                                prev ? { ...prev, project_config_filenames: e.target.value } : prev
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Context Prefixes (newline/comma separated)</Label>
+                          <Textarea
+                            rows={3}
+                            value={editForm.context_path_prefixes}
+                            onChange={(e) =>
+                              setEditForm((prev) =>
+                                prev ? { ...prev, context_path_prefixes: e.target.value } : prev
+                              )
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Supported Artifact Types</Label>
+                        <Input
+                          value={editForm.supported_artifact_types}
+                          onChange={(e) =>
+                            setEditForm((prev) =>
+                              prev ? { ...prev, supported_artifact_types: e.target.value } : prev
                             )
                           }
                         />
@@ -410,6 +557,16 @@ export default function ProjectProfilesPage() {
           )}
         </CardContent>
       </Card>
+
+      <PlatformChangeDialog
+        open={showPlatformChangeDialog}
+        onOpenChange={setShowPlatformChangeDialog}
+        fromPlatform={editForm?.platform || ''}
+        toPlatform={pendingEditPlatform || ''}
+        onKeepChanges={handleEditPlatformKeep}
+        onOverwrite={handleEditPlatformOverwrite}
+        onAppend={handleEditPlatformAppend}
+      />
     </div>
   );
 }
