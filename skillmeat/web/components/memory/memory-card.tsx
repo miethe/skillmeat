@@ -150,7 +150,17 @@ export function MemoryCard({
       }}
     >
       {/* Checkbox */}
-      <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="flex items-center self-stretch -ml-6 pl-6 pr-3 cursor-pointer"
+        onClick={(e) => {
+          e.stopPropagation();
+          const target = e.target as HTMLElement;
+          if (!target.closest('button[role="checkbox"]')) {
+            onToggleSelect(memory.id);
+          }
+        }}
+        role="presentation"
+      >
         <Checkbox
           checked={selected}
           onCheckedChange={() => onToggleSelect(memory.id)}

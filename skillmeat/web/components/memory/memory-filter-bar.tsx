@@ -22,10 +22,12 @@ import {
   Wrench,
   Puzzle,
   Lightbulb,
+  Archive,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
@@ -49,11 +51,10 @@ const MEMORY_TYPES = [
 ] as const;
 
 const STATUS_OPTIONS = [
-  { value: 'all', label: 'All Statuses' },
+  { value: 'all', label: 'All Active' },
   { value: 'candidate', label: 'Candidate' },
   { value: 'active', label: 'Active' },
   { value: 'stable', label: 'Stable' },
-  { value: 'deprecated', label: 'Deprecated' },
 ] as const;
 
 const SORT_OPTIONS = [
@@ -69,7 +70,7 @@ const SORT_OPTIONS = [
 // ---------------------------------------------------------------------------
 
 function getStatusLabel(value: string): string {
-  return STATUS_OPTIONS.find((opt) => opt.value === value)?.label ?? 'All Statuses';
+  return STATUS_OPTIONS.find((opt) => opt.value === value)?.label ?? 'All Active';
 }
 
 function getSortLabel(value: string): string {
@@ -89,6 +90,10 @@ export interface MemoryFilterBarProps {
   statusFilter: string;
   /** Callback when the status filter changes. */
   onStatusFilterChange: (status: string) => void;
+  /** Whether to include deprecated items in the results. */
+  showDeprecated: boolean;
+  /** Callback when the deprecated toggle changes. */
+  onShowDeprecatedChange: (show: boolean) => void;
   /** Currently active sort value. */
   sortBy: string;
   /** Callback when the sort value changes. */
@@ -131,6 +136,8 @@ export function MemoryFilterBar({
   onTypeFilterChange,
   statusFilter,
   onStatusFilterChange,
+  showDeprecated,
+  onShowDeprecatedChange,
   sortBy,
   onSortByChange,
   searchQuery,
@@ -196,6 +203,19 @@ export function MemoryFilterBar({
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Deprecated toggle */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn('h-8', showDeprecated && 'bg-muted')}
+          onClick={() => onShowDeprecatedChange(!showDeprecated)}
+          aria-label={showDeprecated ? 'Hide deprecated items' : 'Show deprecated items'}
+          aria-pressed={showDeprecated}
+        >
+          <Archive className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+          Deprecated
+        </Button>
 
         {/* Sort control */}
         <DropdownMenu>
