@@ -376,6 +376,14 @@ class DeployTemplateRequest(BaseModel):
         description="Whether to overwrite existing files at target paths",
         examples=[False],
     )
+    deployment_profile_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional deployment profile id to rewrite profile-rooted template paths "
+            "(defaults to project primary profile)"
+        ),
+        examples=["codex"],
+    )
 
     @field_validator("project_path")
     @classmethod
@@ -410,6 +418,7 @@ class DeployTemplateRequest(BaseModel):
                 },
                 "selected_entity_ids": None,
                 "overwrite": False,
+                "deployment_profile_id": "codex",
             }
         }
 

@@ -56,6 +56,7 @@ export interface ArtifactsPaginatedResponse {
       version?: string;
       tags?: string[];
     };
+    target_platforms?: string[] | null;
     upstream?: {
       tracking_enabled: boolean;
       current_sha?: string;

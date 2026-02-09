@@ -104,6 +104,15 @@ export {
   useUndeployArtifact,
   useRefreshDeployments,
 } from './use-deployments';
+export {
+  deploymentProfileKeys,
+  useDeploymentProfiles,
+  useCreateDeploymentProfile,
+  useUpdateDeploymentProfile,
+  useDeleteDeploymentProfile,
+  useDeploymentStatus,
+  useProfileSelector,
+} from './use-deployment-profiles';
 
 /**
  * @deprecated Use `useDeployArtifact` and `useUndeployArtifact` from `use-deployments.ts` instead.

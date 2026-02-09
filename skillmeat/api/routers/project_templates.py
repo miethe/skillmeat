@@ -576,6 +576,7 @@ async def deploy_template_endpoint(
             variables=request.variables.model_dump(),
             selected_entity_ids=request.selected_entity_ids,
             overwrite=request.overwrite,
+            deployment_profile_id=request.deployment_profile_id,
         )
 
         if not result.success:

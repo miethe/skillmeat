@@ -13,6 +13,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
+from skillmeat.core.enums import Platform
+
 
 # ===========================
 # Discovery Schemas
@@ -389,6 +391,13 @@ class BulkImportArtifact(BaseModel):
         default_factory=list,
         description="Tags to apply",
         examples=[["design", "canvas", "art"]],
+    )
+    target_platforms: Optional[List[Platform]] = Field(
+        default=None,
+        description=(
+            "Optional platform restrictions override. "
+            "If omitted for local imports, platform may be inferred from source path."
+        ),
     )
     scope: str = Field(
         default="user",

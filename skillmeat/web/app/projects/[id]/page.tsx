@@ -28,6 +28,7 @@ import { useProject, useArtifacts, useProjectDiscovery, useToast } from '@/hooks
 import { DiscoveryBanner } from '@/components/discovery/DiscoveryBanner';
 import { DiscoveryTab } from '@/components/discovery/DiscoveryTab';
 import { BulkImportModal } from '@/components/discovery/BulkImportModal';
+import { PlatformBadge } from '@/components/platform-badge';
 import type { DeployedArtifact } from '@/types/project';
 import type { Entity, EntityType } from '@/types/entity';
 import type { DiscoveredArtifact, MatchType } from '@/types/discovery';
@@ -356,6 +357,10 @@ function ProjectDetailPageContent() {
                 <Settings className="mr-2 h-4 w-4" />
                 Manage Entities
               </Button>
+              <Button variant="outline" onClick={() => router.push(`/projects/${projectId}/profiles`)}>
+                <GitBranch className="mr-2 h-4 w-4" />
+                Manage Profiles
+              </Button>
               <Button variant="outline" asChild>
                 <a
                   href={`file://${project.path}`}
@@ -463,8 +468,47 @@ function ProjectDetailPageContent() {
                     ))}
                   </div>
                 </div>
+
+                {!!project.stats.by_profile && (
+                  <>
+                    <div className="my-4 border-t" />
+                    <div>
+                      <h3 className="mb-3 text-sm font-medium">By Profile</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(project.stats.by_profile).map(([profileId, count]) => (
+                          <Badge key={profileId} variant="outline" className="px-3 py-1.5">
+                            {profileId}: {count}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
+
+            {!!project.deployment_profiles?.length && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Deployment Profiles</CardTitle>
+                  <CardDescription>Configured profile roots for this project</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {project.deployment_profiles.map((profile) => (
+                    <div
+                      key={profile.profile_id}
+                      className="flex items-center justify-between rounded border p-2"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{profile.profile_id}</p>
+                        <p className="text-xs text-muted-foreground">{profile.root_dir}</p>
+                      </div>
+                      <PlatformBadge platform={profile.platform} compact />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Deployed Artifacts Tree */}
             <Card>

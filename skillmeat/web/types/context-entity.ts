@@ -11,6 +11,7 @@
  * These entities support path-pattern matching for auto-loading and categorization
  * for progressive disclosure patterns.
  */
+import { Platform } from './enums';
 
 /**
  * Type of context entity
@@ -48,6 +49,8 @@ export interface ContextEntity {
   auto_load: boolean;
   /** Version identifier (semantic versioning recommended) */
   version?: string;
+  /** Optional deployment platform restrictions (undefined means deployable on all platforms) */
+  target_platforms?: Platform[];
   /** SHA-256 hash of content (for change detection) */
   content_hash?: string;
   /** Timestamp when entity was created (ISO 8601) */
@@ -96,6 +99,10 @@ export interface CreateContextEntityRequest {
   auto_load?: boolean;
   /** Version identifier (semantic versioning recommended) */
   version?: string;
+  /** Optional deployment profile used during profile-aware validation */
+  deployment_profile_id?: string;
+  /** Optional platform restrictions */
+  target_platforms?: Platform[];
 }
 
 /**
@@ -121,6 +128,10 @@ export interface UpdateContextEntityRequest {
   auto_load?: boolean;
   /** Updated version */
   version?: string;
+  /** Updated deployment profile id */
+  deployment_profile_id?: string;
+  /** Updated platform restrictions */
+  target_platforms?: Platform[];
 }
 
 /**
@@ -167,4 +178,21 @@ export interface ContextEntityListResponse {
   items: ContextEntity[];
   /** Cursor-based pagination information */
   page_info: PageInfo;
+}
+
+export interface ContextEntityDeployRequest {
+  project_path: string;
+  overwrite?: boolean;
+  deployment_profile_id?: string;
+  all_profiles?: boolean;
+  force?: boolean;
+}
+
+export interface ContextEntityDeployResponse {
+  success: boolean;
+  entity_id: string;
+  project_path: string;
+  deployed_paths: string[];
+  deployed_profiles: string[];
+  message: string;
 }

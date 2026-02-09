@@ -984,6 +984,11 @@ async def bulk_import_artifacts(
                 description=a.description,
                 author=a.author,
                 tags=a.tags,
+                target_platforms=(
+                    [platform.value for platform in a.target_platforms]
+                    if a.target_platforms is not None
+                    else None
+                ),
                 scope=a.scope,
                 path=a.path,
             )
@@ -3057,7 +3062,12 @@ async def deploy_artifact(
             )
 
             # Refresh DB cache after successful deploy (non-blocking)
-            _refresh_cache_safe(artifact_mgr, artifact_id, collection_name)
+            _refresh_cache_safe(
+                artifact_mgr,
+                artifact_id,
+                collection_name,
+                deployment_profile_id=request.deployment_profile_id,
+            )
 
             return ArtifactDeployResponse(
                 success=True,
@@ -3092,13 +3102,22 @@ async def deploy_artifact(
         )
 
 
-def _refresh_cache_safe(artifact_mgr, artifact_id: str, collection_name: str) -> None:
+def _refresh_cache_safe(
+    artifact_mgr,
+    artifact_id: str,
+    collection_name: str,
+    deployment_profile_id: Optional[str] = None,
+) -> None:
     """Refresh DB cache after deploy, swallowing errors to avoid failing the deploy."""
     try:
         db_session = get_session()
         try:
             refresh_single_artifact_cache(
-                db_session, artifact_mgr, artifact_id, collection_name
+                db_session,
+                artifact_mgr,
+                artifact_id,
+                collection_name,
+                deployment_profile_id=deployment_profile_id,
             )
         finally:
             db_session.close()

@@ -12,6 +12,8 @@ export enum CliCommandType {
   BASIC = 'basic',
   WITH_OVERWRITE = 'overwrite',
   WITH_PROJECT = 'project',
+  WITH_PROFILE = 'profile',
+  ALL_PROFILES = 'all_profiles',
 }
 
 /**
@@ -22,6 +24,10 @@ export interface DeployCommandOptions {
   overwrite?: boolean;
   /** Target project path for deployment */
   projectPath?: string;
+  /** Deployment profile ID for profile-aware deployment */
+  profileId?: string;
+  /** Deploy to all configured profiles */
+  allProfiles?: boolean;
 }
 
 /**
@@ -62,7 +68,8 @@ export function generateDeployWithProjectCommand(artifactName: string, projectPa
 export function generateDeployCommand(
   artifactName: string,
   type: CliCommandType = CliCommandType.BASIC,
-  projectPath = '.'
+  projectPath = '.',
+  profileId?: string
 ): string {
   const trimmedName = artifactName.trim();
 
@@ -71,6 +78,10 @@ export function generateDeployCommand(
       return generateDeployWithOverwriteCommand(trimmedName);
     case CliCommandType.WITH_PROJECT:
       return generateDeployWithProjectCommand(trimmedName, projectPath);
+    case CliCommandType.WITH_PROFILE:
+      return `skillmeat deploy ${trimmedName} --profile ${profileId || 'claude_code'}`;
+    case CliCommandType.ALL_PROFILES:
+      return `skillmeat deploy ${trimmedName} --all-profiles`;
     case CliCommandType.BASIC:
     default:
       return generateBasicDeployCommand(trimmedName);
@@ -96,6 +107,12 @@ export function generateDeployCommandWithOptions(
 
   if (options.projectPath && options.projectPath !== '.') {
     parts.push('--project', options.projectPath);
+  }
+
+  if (options.allProfiles) {
+    parts.push('--all-profiles');
+  } else if (options.profileId) {
+    parts.push('--profile', options.profileId);
   }
 
   return parts.join(' ');

@@ -6,7 +6,7 @@ the watchdog library for cross-platform file monitoring.
 
 The watcher monitors:
 - ~/.skillmeat/manifest.toml - Global manifest changes
-- ./.claude/ directories - Project-specific artifact changes
+- Profile roots (e.g. .claude/, .codex/, .gemini/, custom) - Project artifact changes
 - Deployment directories - Artifact file modifications
 
 Features:
@@ -53,7 +53,7 @@ import re
 import threading
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 from watchdog.events import (
     FileSystemEvent,
@@ -66,6 +66,7 @@ from watchdog.events import (
 from watchdog.observers import Observer
 
 from skillmeat.cache.repository import CacheRepository
+from skillmeat.core.path_resolver import DEFAULT_PROFILE_ROOTS
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -165,10 +166,17 @@ class CacheFileEventHandler(FileSystemEventHandler):
         path_lower = path.lower()
         filename = os.path.basename(path)
 
+        in_profile_root = self.watcher._is_profile_scoped_path(path)
+        global_skillmeat_dir = os.path.normpath(str(Path.home() / ".skillmeat"))
+        in_global_skillmeat_dir = path.startswith(global_skillmeat_dir)
+
         # Ignore temporary and system files
         if any(
             [
-                filename.startswith(".") and ".claude" not in path,
+                filename.startswith(".")
+                and filename != ".skillmeat-deployed.toml"
+                and not in_profile_root
+                and not in_global_skillmeat_dir,
                 filename.endswith("~"),
                 filename.endswith(".tmp"),
                 filename.endswith(".swp"),
@@ -201,8 +209,8 @@ class CacheFileEventHandler(FileSystemEventHandler):
         ]:
             return True
 
-        # Check for markdown files in .claude directories
-        if ".claude" in path and filename.endswith(".md"):
+        # Check for markdown files in profile root directories
+        if in_profile_root and filename.endswith(".md"):
             return True
 
         return False
@@ -284,6 +292,11 @@ class FileWatcher:
         else:
             self.watch_paths = [os.path.normpath(p) for p in watch_paths]
 
+        # Track known profile roots so event routing works for both default and custom profiles.
+        self.profile_root_dirs: Set[str] = set(DEFAULT_PROFILE_ROOTS)
+        self.profile_root_dirs.update(self._discover_profile_roots())
+        self._refresh_profile_roots_from_watch_paths()
+
         # Observer management
         self.observers: Dict[str, Observer] = {}
         self.running = False
@@ -304,7 +317,7 @@ class FileWatcher:
         Returns:
             List of default paths to watch:
             - ~/.skillmeat/ (if exists)
-            - ./.claude/ (if exists)
+            - Existing profile roots in CWD (e.g. .claude/.codex/.gemini/custom)
         """
         paths = []
 
@@ -313,12 +326,80 @@ class FileWatcher:
         if global_path.exists():
             paths.append(str(global_path))
 
-        # Local project directory
-        local_path = Path.cwd() / ".claude"
-        if local_path.exists():
-            paths.append(str(local_path))
+        # Local project profile roots
+        project_root = Path.cwd()
+        known_profile_roots = set(DEFAULT_PROFILE_ROOTS)
+        known_profile_roots.update(self._discover_profile_roots(project_root))
+        for profile_root in sorted(known_profile_roots):
+            local_path = project_root / profile_root
+            if local_path.exists():
+                paths.append(str(local_path))
 
         return [os.path.normpath(p) for p in paths]
+
+    def _discover_profile_roots(self, project_root: Optional[Path] = None) -> Set[str]:
+        """Discover profile roots from deployment files in a project directory."""
+        root = (project_root or Path.cwd()).resolve()
+        discovered: Set[str] = set()
+
+        try:
+            for child in root.glob(".*"):
+                if not child.is_dir():
+                    continue
+                deployment_file = child / ".skillmeat-deployed.toml"
+                if deployment_file.exists():
+                    discovered.add(child.name)
+        except Exception as exc:
+            logger.debug("Failed discovering profile roots under %s: %s", root, exc)
+
+        return discovered
+
+    def _refresh_profile_roots_from_watch_paths(self) -> None:
+        """Derive additional profile roots from watch paths."""
+        for watch_path in self.watch_paths:
+            basename = Path(watch_path).name
+            if basename.startswith(".") and basename not in {
+                ".git",
+                ".next",
+                ".pytest_cache",
+                ".mypy_cache",
+                ".venv",
+            }:
+                self.profile_root_dirs.add(basename)
+
+    def _extract_profile_root(self, path: str) -> Optional[str]:
+        """Extract profile root segment from a filesystem path."""
+        normalized = os.path.normpath(path)
+        parts = normalized.split(os.sep)
+
+        for index, segment in enumerate(parts):
+            if not segment.startswith("."):
+                continue
+            if segment in {
+                ".git",
+                ".next",
+                ".pytest_cache",
+                ".mypy_cache",
+                ".venv",
+            }:
+                continue
+            if segment in self.profile_root_dirs:
+                return segment
+
+            # Custom profile roots can still be identified if they track deployments.
+            candidate_project = os.sep.join(parts[:index]) or os.sep
+            deployment_file = (
+                Path(candidate_project) / segment / ".skillmeat-deployed.toml"
+            )
+            if deployment_file.exists():
+                self.profile_root_dirs.add(segment)
+                return segment
+
+        return None
+
+    def _is_profile_scoped_path(self, path: str) -> bool:
+        """Return True when a path resolves to a known profile root."""
+        return self._extract_profile_root(path) is not None
 
     def start(self) -> None:
         """Start watching for file changes.
@@ -432,6 +513,7 @@ class FileWatcher:
             return False
 
         self.watch_paths.append(path)
+        self._refresh_profile_roots_from_watch_paths()
 
         # If watcher is running, start observer for this path
         if self.running:
@@ -514,9 +596,10 @@ class FileWatcher:
         """
         path = os.path.normpath(path)
         filename = os.path.basename(path)
+        profile_root = self._extract_profile_root(path)
 
         if filename == "manifest.toml":
-            self.on_manifest_modified(path)
+            self.on_manifest_modified(path, profile_root=profile_root)
         elif filename == ".skillmeat-deployed.toml":
             # Invalidate deployment stats cache when deployment tracking file changes
             from skillmeat.cache.deployment_stats_cache import (
@@ -534,11 +617,11 @@ class FileWatcher:
             "MCP.md",
             "HOOK.md",
         ]:
-            self.on_deployment_modified(path)
-        elif ".claude" in path and filename.endswith(".md"):
-            self.on_deployment_modified(path)
+            self.on_deployment_modified(path, profile_root=profile_root)
+        elif profile_root and filename.endswith(".md"):
+            self.on_deployment_modified(path, profile_root=profile_root)
 
-    def on_manifest_modified(self, path: str) -> None:
+    def on_manifest_modified(self, path: str, profile_root: Optional[str] = None) -> None:
         """Handle manifest file modification.
 
         Triggers cache invalidation for affected project.
@@ -551,14 +634,20 @@ class FileWatcher:
         """
         project_id = self._path_to_project_id(path)
         if project_id:
-            logger.info(f"Manifest modified, invalidating project: {project_id}")
-            self._queue_invalidation(project_id)
+            logger.info(
+                "Manifest modified, invalidating project: %s (profile=%s)",
+                project_id,
+                profile_root or "unknown",
+            )
+            self._queue_invalidation(project_id, profile_root=profile_root)
         else:
             # Global manifest - invalidate all
             logger.info("Global manifest modified, invalidating all projects")
             self._queue_invalidation(None)
 
-    def on_deployment_modified(self, path: str) -> None:
+    def on_deployment_modified(
+        self, path: str, profile_root: Optional[str] = None
+    ) -> None:
         """Handle deployment directory modification.
 
         Identifies affected artifact and invalidates its cache.
@@ -571,10 +660,16 @@ class FileWatcher:
         """
         project_id = self._path_to_project_id(path)
         if project_id:
-            logger.info(f"Deployment modified, invalidating project: {project_id}")
-            self._queue_invalidation(project_id)
+            logger.info(
+                "Deployment modified, invalidating project: %s (profile=%s)",
+                project_id,
+                profile_root or "unknown",
+            )
+            self._queue_invalidation(project_id, profile_root=profile_root)
 
-    def _queue_invalidation(self, project_id: Optional[str] = None) -> None:
+    def _queue_invalidation(
+        self, project_id: Optional[str] = None, profile_root: Optional[str] = None
+    ) -> None:
         """Queue an invalidation request with debouncing.
 
         Collects invalidation requests within the debounce window and
@@ -588,7 +683,14 @@ class FileWatcher:
         """
         with self.queue_lock:
             # Add to queue (use special key for global invalidation)
-            key = project_id if project_id else "__GLOBAL__"
+            if project_id:
+                key = (
+                    f"{project_id}::{profile_root}"
+                    if profile_root
+                    else project_id
+                )
+            else:
+                key = "__GLOBAL__"
             self.invalidation_queue.add(key)
 
             # Cancel existing timer
@@ -623,11 +725,17 @@ class FileWatcher:
                     self._invalidate_all_projects()
                 else:
                     # Project-specific invalidation
-                    self._invalidate_project(key)
+                    project_id, _, profile_root = key.partition("::")
+                    self._invalidate_project(
+                        project_id,
+                        profile_root=profile_root or None,
+                    )
             except Exception as e:
                 logger.error(f"Error invalidating {key}: {e}")
 
-    def _invalidate_project(self, project_id: str) -> None:
+    def _invalidate_project(
+        self, project_id: str, profile_root: Optional[str] = None
+    ) -> None:
         """Invalidate cache for a specific project.
 
         Args:
@@ -639,7 +747,11 @@ class FileWatcher:
                 self.cache_repository.update_project(
                     project_id, status="stale", error_message=None
                 )
-                logger.info(f"Invalidated project cache: {project_id}")
+                logger.info(
+                    "Invalidated project cache: %s (profile=%s)",
+                    project_id,
+                    profile_root or "all",
+                )
             else:
                 logger.debug(
                     f"Project not in cache, skipping invalidation: {project_id}"
@@ -661,6 +773,37 @@ class FileWatcher:
         except Exception as e:
             logger.error(f"Failed to invalidate all projects: {e}")
 
+    def _path_to_project_context(self, path: str) -> Tuple[Optional[str], Optional[str]]:
+        """Map a path to (project_id, profile_root)."""
+        path = os.path.normpath(path)
+
+        # Check if path is in global skillmeat directory
+        global_dir = os.path.normpath(str(Path.home() / ".skillmeat"))
+        if path.startswith(global_dir):
+            return None, None
+
+        profile_root = self._extract_profile_root(path)
+        if not profile_root:
+            logger.debug(f"Could not extract profile root from: {path}")
+            return None, None
+
+        parts = path.split(os.sep)
+        try:
+            profile_index = parts.index(profile_root)
+            # Project path is everything before profile root
+            project_path = os.sep.join(parts[:profile_index]) or os.sep
+
+            # Look up project in cache by path
+            project = self.cache_repository.get_project_by_path(project_path)
+            if project:
+                return project.id, profile_root
+
+            logger.debug(f"No cached project found for path: {project_path}")
+            return None, profile_root
+        except (ValueError, IndexError):
+            logger.debug(f"Could not extract project path from: {path}")
+            return None, profile_root
+
     def _path_to_project_id(self, path: str) -> Optional[str]:
         """Map a file path to a project ID for targeted invalidation.
 
@@ -678,28 +821,5 @@ class FileWatcher:
             >>> watcher._path_to_project_id("/home/user/project/.claude/skills/my-skill/SKILL.md")
             'proj-abc123'
         """
-        path = os.path.normpath(path)
-
-        # Check if path is in global skillmeat directory
-        global_dir = os.path.normpath(str(Path.home() / ".skillmeat"))
-        if path.startswith(global_dir):
-            return None
-
-        # Try to find .claude directory in path
-        parts = path.split(os.sep)
-        try:
-            claude_index = parts.index(".claude")
-            # Project path is everything before .claude
-            project_path = os.sep.join(parts[:claude_index])
-
-            # Look up project in cache by path
-            project = self.cache_repository.get_project_by_path(project_path)
-            if project:
-                return project.id
-
-            logger.debug(f"No cached project found for path: {project_path}")
-            return None
-        except (ValueError, IndexError):
-            # .claude not in path or path structure invalid
-            logger.debug(f"Could not extract project path from: {path}")
-            return None
+        project_id, _profile_root = self._path_to_project_context(path)
+        return project_id

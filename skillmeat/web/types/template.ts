@@ -112,26 +112,30 @@ export interface UpdateTemplateRequest {
 export interface DeployTemplateRequest {
   /** Target project path */
   project_path: string;
-  /** Optional list of artifact IDs to deploy (deploys all if not provided) */
-  artifact_ids?: string[];
-  /** Optional variable substitutions for template content */
-  variables?: Record<string, string>;
+  /** Variable substitutions for template content */
+  variables: Record<string, string>;
+  /** Optional list of selected entity IDs (deploy all if omitted) */
+  selected_entity_ids?: string[];
+  /** Overwrite existing files in target project */
+  overwrite?: boolean;
+  /** Optional deployment profile to target (e.g. codex, gemini) */
+  deployment_profile_id?: string;
 }
 
 /**
  * Response from template deployment
  */
 export interface DeployTemplateResponse {
-  /** Template ID that was deployed */
-  template_id: string;
+  /** Whether deployment succeeded */
+  success: boolean;
   /** Project path where template was deployed */
   project_path: string;
-  /** List of successfully deployed artifact IDs */
-  deployed_artifacts: string[];
-  /** Number of entities deployed */
-  deployed_count: number;
-  /** Optional message */
-  message?: string;
+  /** List of successfully deployed files */
+  deployed_files: string[];
+  /** Files skipped due to overwrite=false */
+  skipped_files: string[];
+  /** Deployment status message */
+  message: string;
 }
 
 /**

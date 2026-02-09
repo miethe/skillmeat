@@ -3,6 +3,7 @@
  *
  * Note: Types prefixed with "Artifact" to distinguish from MCP deployment types
  */
+import { Platform } from './enums';
 
 /** Artifact deployment status enum */
 export type ArtifactDeploymentStatus =
@@ -36,6 +37,10 @@ export interface ArtifactDeployRequest {
    * Examples: '.claude/skills/', '.claude/skills/dev/'
    */
   dest_path?: string;
+  /** Optional deployment profile ID for single-profile deploys */
+  deployment_profile_id?: string;
+  /** Deploy to every configured profile for the project */
+  all_profiles?: boolean;
 }
 
 /** Request to undeploy (remove) an artifact from a project */
@@ -68,6 +73,14 @@ export interface ArtifactDeploymentResponse {
   deployed_path: string;
   /** Timestamp of deployment (ISO 8601) */
   deployed_at?: string;
+  /** Profile used for single-profile deploys */
+  deployment_profile_id?: string;
+  /** Profile IDs deployed in this request */
+  deployed_profiles?: string[];
+  /** Platform associated with deployment_profile_id */
+  platform?: Platform;
+  /** Resolved root directory used for deployment */
+  profile_root_dir?: string;
 }
 
 /** Response from an artifact undeploy operation */
@@ -130,6 +143,66 @@ export interface ArtifactDeploymentInfo {
   local_modifications: boolean;
   /** Sync status: synced, modified, outdated */
   sync_status?: ArtifactSyncStatus;
+  /** Deployment profile identifier */
+  deployment_profile_id?: string;
+  /** Platform associated with deployment profile */
+  platform?: Platform;
+  /** Root directory used for deployment */
+  profile_root_dir?: string;
+}
+
+/** Deployment profile metadata for a project. */
+export interface DeploymentProfile {
+  id: string;
+  project_id: string;
+  profile_id: string;
+  platform: Platform;
+  root_dir: string;
+  artifact_path_map: Record<string, string>;
+  project_config_filenames: string[];
+  context_path_prefixes: string[];
+  supported_artifact_types: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** Input for creating a deployment profile. */
+export interface CreateDeploymentProfileRequest {
+  profile_id: string;
+  platform: Platform;
+  root_dir: string;
+  artifact_path_map?: Record<string, string>;
+  project_config_filenames?: string[];
+  context_path_prefixes?: string[];
+  supported_artifact_types?: string[];
+}
+
+/** Input for updating a deployment profile. */
+export interface UpdateDeploymentProfileRequest {
+  platform?: Platform;
+  root_dir?: string;
+  artifact_path_map?: Record<string, string>;
+  project_config_filenames?: string[];
+  context_path_prefixes?: string[];
+  supported_artifact_types?: string[];
+}
+
+/** Per-profile deployment status for a single artifact. */
+export interface ProfileDeploymentStatus {
+  profile_id: string;
+  platform?: Platform;
+  sync_status: ArtifactSyncStatus | 'missing' | 'unknown';
+  deployed_at?: string;
+  collection_sha?: string;
+  deployment?: ArtifactDeploymentInfo;
+}
+
+/** Aggregated deployment status for a single artifact across profiles. */
+export interface DeploymentStatus {
+  artifact_id: string;
+  project_path?: string;
+  by_profile: Record<string, ProfileDeploymentStatus>;
+  is_synced_across_profiles: boolean;
 }
 
 /** List of artifact deployments in a project */
@@ -138,6 +211,8 @@ export interface ArtifactDeploymentListResponse {
   project_path: string;
   /** List of deployments */
   deployments: ArtifactDeploymentInfo[];
+  /** Deployments grouped by profile ID */
+  deployments_by_profile?: Record<string, ArtifactDeploymentInfo[]>;
   /** Total number of deployments */
   total: number;
 }
