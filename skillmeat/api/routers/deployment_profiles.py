@@ -194,6 +194,7 @@ async def update_profile(
 @router.delete(
     "/{project_id}/profiles/{profile_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     responses={404: {"model": ErrorResponse, "description": "Profile not found"}},
 )
 async def delete_profile(
