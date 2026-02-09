@@ -10,6 +10,9 @@ version_lineage = [
     "2e7442e246b43330c40e3a09313bc002a3c08b28261f35ac64d1f6a4201944a5",
 ]
 collection_sha = "2e7442e246b43330c40e3a09313bc002a3c08b28261f35ac64d1f6a4201944a5"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "meatycapture-capture"
@@ -24,6 +27,9 @@ version_lineage = [
 ]
 merge_base_snapshot = "f8f68504d8e316c02ac25af2e49d31826a9f6a29a478d6e06c826d01abb94572"
 collection_sha = "f8f68504d8e316c02ac25af2e49d31826a9f6a29a478d6e06c826d01abb94572"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "Design Principles"
@@ -38,6 +44,9 @@ version_lineage = [
 ]
 merge_base_snapshot = "b399371c92d510b4f1dc7c59489ae4ff44db3bbeff6150d1b3b59baf9698bc06"
 collection_sha = "b399371c92d510b4f1dc7c59489ae4ff44db3bbeff6150d1b3b59baf9698bc06"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "prd-writer"
@@ -51,6 +60,9 @@ version_lineage = [
     "4c1dd9d428073f665d9b198c506da53b6337ca7676d80684b7126fae77bf5ff2",
 ]
 collection_sha = "4c1dd9d428073f665d9b198c506da53b6337ca7676d80684b7126fae77bf5ff2"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "aesthetic"
@@ -65,6 +77,9 @@ version_lineage = [
 ]
 merge_base_snapshot = "615241a9b73651094ccfe99f1a3b32ff54f1ba8b90063ec5a6ac3375ddabe36e"
 collection_sha = "615241a9b73651094ccfe99f1a3b32ff54f1ba8b90063ec5a6ac3375ddabe36e"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "design-principles"
@@ -78,6 +93,9 @@ version_lineage = [
     "b399371c92d510b4f1dc7c59489ae4ff44db3bbeff6150d1b3b59baf9698bc06",
 ]
 collection_sha = "b399371c92d510b4f1dc7c59489ae4ff44db3bbeff6150d1b3b59baf9698bc06"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "dev-execution"
@@ -91,6 +109,9 @@ version_lineage = [
     "896b14ec6bd13bf69a6f66018f0177f23009b3696aaaae18a91f721b8a08c5b2",
 ]
 collection_sha = "896b14ec6bd13bf69a6f66018f0177f23009b3696aaaae18a91f721b8a08c5b2"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "task-decomposition-expert"
@@ -104,6 +125,9 @@ version_lineage = [
     "61bfa4c32d09ce37901dffc61d5bf1b34b990510e8a5ccd14276b39dbe7a16ab",
 ]
 collection_sha = "61bfa4c32d09ce37901dffc61d5bf1b34b990510e8a5ccd14276b39dbe7a16ab"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "code-reviewer"
@@ -117,6 +141,9 @@ version_lineage = [
     "fc50d1dc14df412af6ea3a1c3a17f3aaeedbca5793f54151d2d8a07f732bdbef",
 ]
 collection_sha = "fc50d1dc14df412af6ea3a1c3a17f3aaeedbca5793f54151d2d8a07f732bdbef"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "api-librarian"
@@ -130,6 +157,9 @@ version_lineage = [
     "c0d68d554edaac808643978b7acea8a212615ad820185cf7b48f5963041f4498",
 ]
 collection_sha = "c0d68d554edaac808643978b7acea8a212615ad820185cf7b48f5963041f4498"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "telemetry-auditor"
@@ -143,6 +173,9 @@ version_lineage = [
     "80e02bf8cef9b98c4faf903eecee12697248dd5099dfa027316bead180715bad",
 ]
 collection_sha = "80e02bf8cef9b98c4faf903eecee12697248dd5099dfa027316bead180715bad"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "react-performance-optimizer"
@@ -156,6 +189,9 @@ version_lineage = [
     "1b9e4704d707e3bba97d3fcf318566b394dcb44e9f752a55d192f039ef339675",
 ]
 collection_sha = "1b9e4704d707e3bba97d3fcf318566b394dcb44e9f752a55d192f039ef339675"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "url-context-validator"
@@ -169,6 +205,9 @@ version_lineage = [
     "185a7e21876f45583f0441cf895adc6a520f83d65c8602f6a6136e8316505c13",
 ]
 collection_sha = "185a7e21876f45583f0441cf895adc6a520f83d65c8602f6a6136e8316505c13"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "url-link-extractor"
@@ -182,6 +221,9 @@ version_lineage = [
     "462bf5b31a014fde69e654f3e9518d2f6d3d2cea35494047711e3d86e71e696c",
 ]
 collection_sha = "462bf5b31a014fde69e654f3e9518d2f6d3d2cea35494047711e3d86e71e696c"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "web-accessibility-checker"
@@ -195,6 +237,9 @@ version_lineage = [
     "49712b3bd06007222fa8cf57b3dd63bc6b8b64e25319e92ba674812826bfac28",
 ]
 collection_sha = "49712b3bd06007222fa8cf57b3dd63bc6b8b64e25319e92ba674812826bfac28"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "python-pro"
@@ -208,6 +253,9 @@ version_lineage = [
     "d1483555b1b7f00b12ca06c82fc76dfb1402bcf4c13dbb9cc4d85f1678f2153d",
 ]
 collection_sha = "d1483555b1b7f00b12ca06c82fc76dfb1402bcf4c13dbb9cc4d85f1678f2153d"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "refactoring-expert"
@@ -221,6 +269,9 @@ version_lineage = [
     "074328d682e6481ad6245da5c892637d132710d7ffc545ccb83a869822ea3d0c",
 ]
 collection_sha = "074328d682e6481ad6245da5c892637d132710d7ffc545ccb83a869822ea3d0c"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "technical-writer"
@@ -234,6 +285,9 @@ version_lineage = [
     "c1cd9ec30155d2ec59f5cb74a21d4569e743435b779e36e45acbef9a479d6357",
 ]
 collection_sha = "c1cd9ec30155d2ec59f5cb74a21d4569e743435b779e36e45acbef9a479d6357"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "api-documenter"
@@ -247,6 +301,9 @@ version_lineage = [
     "424798154fafdde89a0584286a53ca6d276f640d317b1c9e050ed0f0d53357da",
 ]
 collection_sha = "424798154fafdde89a0584286a53ca6d276f640d317b1c9e050ed0f0d53357da"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "openapi-expert"
@@ -260,6 +317,9 @@ version_lineage = [
     "deceadc3cf651cd544105682e3d53f9483c245ada9fdf3fee6d01483490247e7",
 ]
 collection_sha = "deceadc3cf651cd544105682e3d53f9483c245ada9fdf3fee6d01483490247e7"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "changelog-generator"
@@ -273,6 +333,9 @@ version_lineage = [
     "11c6c7b2da49b3ca8c7c9397146e86a0d1d325f1a44a17d4a93d2868be8d063a",
 ]
 collection_sha = "11c6c7b2da49b3ca8c7c9397146e86a0d1d325f1a44a17d4a93d2868be8d063a"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "nextjs-architecture-expert"
@@ -286,6 +349,9 @@ version_lineage = [
     "dbd06e22e0b0998a832b6a09cb379cd29ff23716c4729db5694c01209164ae32",
 ]
 collection_sha = "dbd06e22e0b0998a832b6a09cb379cd29ff23716c4729db5694c01209164ae32"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "frontend-architect"
@@ -299,6 +365,9 @@ version_lineage = [
     "0b47fc0374cf7e60bf6b32de8d12d2512c66f3ddf050ce6e743f067a37d98feb",
 ]
 collection_sha = "0b47fc0374cf7e60bf6b32de8d12d2512c66f3ddf050ce6e743f067a37d98feb"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "devops-architect"
@@ -312,6 +381,9 @@ version_lineage = [
     "c341d7a6d145fcadb5c6394cf505ca83829c62fca72d01c6dd5b432f2e074b52",
 ]
 collection_sha = "c341d7a6d145fcadb5c6394cf505ca83829c62fca72d01c6dd5b432f2e074b52"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "system-architect"
@@ -325,6 +397,9 @@ version_lineage = [
     "d0b643737e2f5f2100449dc1545da5fb38f506e7804ae8b70bceb6fced79659e",
 ]
 collection_sha = "d0b643737e2f5f2100449dc1545da5fb38f506e7804ae8b70bceb6fced79659e"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "a11y-sheriff"
@@ -338,6 +413,9 @@ version_lineage = [
     "227959f8064a2227cfb81e29fdafb9ef737821945188d8d9c6b84de8fa6bd89c",
 ]
 collection_sha = "227959f8064a2227cfb81e29fdafb9ef737821945188d8d9c6b84de8fa6bd89c"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "ui-designer"
@@ -351,6 +429,9 @@ version_lineage = [
     "aa704f1000c5f105e696c9efafccce05958a2e3ec7c1b836234ce6501d5fa662",
 ]
 collection_sha = "aa704f1000c5f105e696c9efafccce05958a2e3ec7c1b836234ce6501d5fa662"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "prompt-engineer"
@@ -364,6 +445,9 @@ version_lineage = [
     "19a4d74003b2b785198e703a690804cdd82b6dd9d8a0edad02e39ca2f481a2dd",
 ]
 collection_sha = "19a4d74003b2b785198e703a690804cdd82b6dd9d8a0edad02e39ca2f481a2dd"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "search-specialist"
@@ -377,6 +461,9 @@ version_lineage = [
     "d74f9e7d3368d74672a24968e6e0e11e7ef050c88214554ef9fefec7cb3a999c",
 ]
 collection_sha = "d74f9e7d3368d74672a24968e6e0e11e7ef050c88214554ef9fefec7cb3a999c"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "mc"
@@ -390,6 +477,9 @@ version_lineage = [
     "65514080cb3ac6ba8acf9102ba8d3e6fa4f9fdb18056c40b476acb0791e816cd",
 ]
 collection_sha = "65514080cb3ac6ba8acf9102ba8d3e6fa4f9fdb18056c40b476acb0791e816cd"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "user_stories"
@@ -403,6 +493,9 @@ version_lineage = [
     "66a26f6ae2f93382634b8f6ea05b460c092064aca014bb21615e00a035557c41",
 ]
 collection_sha = "66a26f6ae2f93382634b8f6ea05b460c092064aca014bb21615e00a035557c41"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "pre-pr-validation"
@@ -416,6 +509,9 @@ version_lineage = [
     "1a39fb153b0a3339782404bc053b9eddca4d1e907592d4975fe69b04df5a0a77",
 ]
 collection_sha = "1a39fb153b0a3339782404bc053b9eddca4d1e907592d4975fe69b04df5a0a77"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "task_gen"
@@ -429,6 +525,9 @@ version_lineage = [
     "bd9cee39546c53ac0aafdabb1f131969b78e68c6dbccb2cefcddfda1d18e08fb",
 ]
 collection_sha = "bd9cee39546c53ac0aafdabb1f131969b78e68c6dbccb2cefcddfda1d18e08fb"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "create-adr"
@@ -442,6 +541,9 @@ version_lineage = [
     "49e62f6cb9fa103ae43f03e487e6690aab7915d28276426c671ca37ca239826c",
 ]
 collection_sha = "49e62f6cb9fa103ae43f03e487e6690aab7915d28276426c671ca37ca239826c"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "load-story"
@@ -455,6 +557,9 @@ version_lineage = [
     "d3179c740939436028335dc7c28e709b65bc75d2d418fc7a957a956303a4e903",
 ]
 collection_sha = "d3179c740939436028335dc7c28e709b65bc75d2d418fc7a957a956303a4e903"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "freeze-api-version"
@@ -468,6 +573,9 @@ version_lineage = [
     "407014e3500fe2edc42cadd72f8ede04c480761f17340d146f93cf61f86a288d",
 ]
 collection_sha = "407014e3500fe2edc42cadd72f8ede04c480761f17340d146f93cf61f86a288d"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "update-readmes"
@@ -481,6 +589,9 @@ version_lineage = [
     "5679b9fb475eebcf134bade0abc6c591290fd92765524e97eb80f401de0e86e4",
 ]
 collection_sha = "5679b9fb475eebcf134bade0abc6c591290fd92765524e97eb80f401de0e86e4"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "update-symbols-graph"
@@ -494,6 +605,9 @@ version_lineage = [
     "13e4708257ed164f80e503d1b3409d5f40308efc49d3ebf317c3af62a2365718",
 ]
 collection_sha = "13e4708257ed164f80e503d1b3409d5f40308efc49d3ebf317c3af62a2365718"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "post-implementation-updates"
@@ -507,6 +621,9 @@ version_lineage = [
     "258a2fb568462b3a90c9a384f4c474b71ad79fcbddd42a8ea8dccdd6e51444c8",
 ]
 collection_sha = "258a2fb568462b3a90c9a384f4c474b71ad79fcbddd42a8ea8dccdd6e51444c8"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "README"
@@ -520,6 +637,9 @@ version_lineage = [
     "d24a9c42d4b9d928c9c3f53bbea8d8158d1f7560c947cb4a67bdc77cf0221fcf",
 ]
 collection_sha = "d24a9c42d4b9d928c9c3f53bbea8d8158d1f7560c947cb4a67bdc77cf0221fcf"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "update-ai-hints"
@@ -533,6 +653,9 @@ version_lineage = [
     "4ac27a0a3964327eda292916765eb4eb8fe652fcd29875768ec112ef1dec9133",
 ]
 collection_sha = "4ac27a0a3964327eda292916765eb4eb8fe652fcd29875768ec112ef1dec9133"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "generate-api-docs"
@@ -546,6 +669,9 @@ version_lineage = [
     "a0008f8893fa5c09e8817c9d78d1859c067105368f66f1ec0b063c83c367c2fb",
 ]
 collection_sha = "a0008f8893fa5c09e8817c9d78d1859c067105368f66f1ec0b063c83c367c2fb"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "validate-contracts"
@@ -559,6 +685,9 @@ version_lineage = [
     "3994107f0234dc20e9a99bbc93a320e65d8d4c8406b7a61d787a5cbc651630cc",
 ]
 collection_sha = "3994107f0234dc20e9a99bbc93a320e65d8d4c8406b7a61d787a5cbc651630cc"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "update-codeowners"
@@ -572,6 +701,9 @@ version_lineage = [
     "614261a44a7688c17a7025335ad2e811c5199092d7631fa402b5837a5bad62f9",
 ]
 collection_sha = "614261a44a7688c17a7025335ad2e811c5199092d7631fa402b5837a5bad62f9"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "update-repo-map"
@@ -585,6 +717,9 @@ version_lineage = [
     "305baab3982110042cc4227a865c1322cfbb547acacc89aedd771740b759f123",
 ]
 collection_sha = "305baab3982110042cc4227a865c1322cfbb547acacc89aedd771740b759f123"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "refresh-ai-artifacts"
@@ -598,6 +733,9 @@ version_lineage = [
     "c2c6463fcd90fe2bc138594202b8e1df8a66835c4d1ea9c59bfcacf97b853970",
 ]
 collection_sha = "c2c6463fcd90fe2bc138594202b8e1df8a66835c4d1ea9c59bfcacf97b853970"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "validate-chunking"
@@ -611,6 +749,9 @@ version_lineage = [
     "9e7740b4d1e6e3d26d4584f44d0ae2712f1dec761f51320b8109dd6a010c1545",
 ]
 collection_sha = "9e7740b4d1e6e3d26d4584f44d0ae2712f1dec761f51320b8109dd6a010c1545"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "write-tests"
@@ -624,6 +765,9 @@ version_lineage = [
     "e8a41405465161355134051bb01dff767bc01ef89e876f1adec23b78a5a78896",
 ]
 collection_sha = "e8a41405465161355134051bb01dff767bc01ef89e876f1adec23b78a5a78896"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "test-stories"
@@ -637,6 +781,9 @@ version_lineage = [
     "20080c89a3b1ac67046ba3b987e14bccaf4861f68e678a500cbedc8dffa644d0",
 ]
 collection_sha = "20080c89a3b1ac67046ba3b987e14bccaf4861f68e678a500cbedc8dffa644d0"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "plan-story"
@@ -650,6 +797,9 @@ version_lineage = [
     "5297f650d5b2ea6ffd8d9c34a6531c63b20acda043dcd13526b3fd32a7213803",
 ]
 collection_sha = "5297f650d5b2ea6ffd8d9c34a6531c63b20acda043dcd13526b3fd32a7213803"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "spike"
@@ -663,6 +813,9 @@ version_lineage = [
     "8b6184546e9a8347b3a76307b205c2ed4d6f2f5983c25e76742ebdb0b55e346f",
 ]
 collection_sha = "8b6184546e9a8347b3a76307b205c2ed4d6f2f5983c25e76742ebdb0b55e346f"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "ultra_think"
@@ -676,6 +829,9 @@ version_lineage = [
     "e2a983b15479d305e16183f2558fff302ec0120408f4da1157a67e7dc9c1aee2",
 ]
 collection_sha = "e2a983b15479d305e16183f2558fff302ec0120408f4da1157a67e7dc9c1aee2"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "plan-feature"
@@ -689,6 +845,9 @@ version_lineage = [
     "cbc6d8505ba0557a8db7e6d568bee0db44207b8428abfc49384e5a29452cd663",
 ]
 collection_sha = "cbc6d8505ba0557a8db7e6d568bee0db44207b8428abfc49384e5a29452cd663"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "plan-from-gh"
@@ -702,6 +861,9 @@ version_lineage = [
     "5b21880c225a2eb0cb0950de7b9652b7822f3eecb458071186af568b991f5f00",
 ]
 collection_sha = "5b21880c225a2eb0cb0950de7b9652b7822f3eecb458071186af568b991f5f00"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "design"
@@ -715,6 +877,9 @@ version_lineage = [
     "6a5384f49a8bb7f8fc7241ce908a59cee5d94f5be7d3950f20a9d86e1727f5bc",
 ]
 collection_sha = "6a5384f49a8bb7f8fc7241ce908a59cee5d94f5be7d3950f20a9d86e1727f5bc"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "architecture-scenario-explorer"
@@ -728,6 +893,9 @@ version_lineage = [
     "81d98091c117211a0f818d01603788beaf58a4e26fcb824dc5923065b1ad1893",
 ]
 collection_sha = "81d98091c117211a0f818d01603788beaf58a4e26fcb824dc5923065b1ad1893"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "trello-add-card"
@@ -741,6 +909,9 @@ version_lineage = [
     "442cf0a1d317a28e3af3fcb9a264f888f2bbe00fd27079af0a1fca592060609e",
 ]
 collection_sha = "442cf0a1d317a28e3af3fcb9a264f888f2bbe00fd27079af0a1fca592060609e"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "github-create-issue"
@@ -754,6 +925,9 @@ version_lineage = [
     "5c6538386d1642b40116344cb3765d6345c4091602a3101c52f241f48eedeca4",
 ]
 collection_sha = "5c6538386d1642b40116344cb3765d6345c4091602a3101c52f241f48eedeca4"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "linear-create-task"
@@ -767,6 +941,9 @@ version_lineage = [
     "08cd47ace8786311a0f1acf58964bd043fdfb840b5678b060ab83dc9785f34ea",
 ]
 collection_sha = "08cd47ace8786311a0f1acf58964bd043fdfb840b5678b060ab83dc9785f34ea"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "memory-spring-cleaning"
@@ -780,6 +957,9 @@ version_lineage = [
     "8ca9a05d7e417771cf3f7969e4fb77c5171e100bfb9da371d5fde64364d497a8",
 ]
 collection_sha = "8ca9a05d7e417771cf3f7969e4fb77c5171e100bfb9da371d5fde64364d497a8"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "lyra"
@@ -793,6 +973,9 @@ version_lineage = [
     "cf15b8d6fb5ea3a436f3a1fc45419049c9e9e96e76cef59a322fbd82f3b55603",
 ]
 collection_sha = "cf15b8d6fb5ea3a436f3a1fc45419049c9e9e96e76cef59a322fbd82f3b55603"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "session-learning-capture"
@@ -806,6 +989,9 @@ version_lineage = [
     "4c854b91f3ad1b9b82cc682c90b35fbad51e4eb34c4ee2b6877758b9c9c79a44",
 ]
 collection_sha = "4c854b91f3ad1b9b82cc682c90b35fbad51e4eb34c4ee2b6877758b9c9c79a44"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "review-story"
@@ -819,6 +1005,9 @@ version_lineage = [
     "f0384fd35643c03ffd0a8060407308b5ae7bb54aee508045d2ab66c45e43f167",
 ]
 collection_sha = "f0384fd35643c03ffd0a8060407308b5ae7bb54aee508045d2ab66c45e43f167"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "code-review"
@@ -832,6 +1021,9 @@ version_lineage = [
     "35a0e40cc71018a791f802b87d3201d0769d32a25ccfb0148d0072fcb26335b9",
 ]
 collection_sha = "35a0e40cc71018a791f802b87d3201d0769d32a25ccfb0148d0072fcb26335b9"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "refractor"
@@ -845,6 +1037,9 @@ version_lineage = [
     "3b8f4b156b934c5d6b78598910ddea715d213a8c3f9e4062b2e3b401087c9e10",
 ]
 collection_sha = "3b8f4b156b934c5d6b78598910ddea715d213a8c3f9e4062b2e3b401087c9e10"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "debug"
@@ -858,6 +1053,9 @@ version_lineage = [
     "f49a7f3a99adb8366570e5ffcefbeda8e7b3a5cb5ea68e6c581838702f3c3a03",
 ]
 collection_sha = "f49a7f3a99adb8366570e5ffcefbeda8e7b3a5cb5ea68e6c581838702f3c3a03"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "bugfix-commit"
@@ -871,6 +1069,9 @@ version_lineage = [
     "a2ca8c07ac1f13caf2e625a3a6e63f8a86716e6ed5f6b3b8981b03dc4406381c",
 ]
 collection_sha = "a2ca8c07ac1f13caf2e625a3a6e63f8a86716e6ed5f6b3b8981b03dc4406381c"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "fix-gh-issue"
@@ -884,6 +1085,9 @@ version_lineage = [
     "69bf39f91823f64412b95bb2de32578a6b2595f9b8f23ee4e6b1260e8622a1d0",
 ]
 collection_sha = "69bf39f91823f64412b95bb2de32578a6b2595f9b8f23ee4e6b1260e8622a1d0"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "fix-arch-violation"
@@ -897,6 +1101,9 @@ version_lineage = [
     "1e281c18cff392f83a25f7edc047ba756863f0323ca9031838b12e587ea68ba2",
 ]
 collection_sha = "1e281c18cff392f83a25f7edc047ba756863f0323ca9031838b12e587ea68ba2"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "new-feature"
@@ -910,6 +1117,9 @@ version_lineage = [
     "97cff1b38200bb0f55747bf4232b9a5dd0629c8697085310f9997e2a7253efe1",
 ]
 collection_sha = "97cff1b38200bb0f55747bf4232b9a5dd0629c8697085310f9997e2a7253efe1"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "implement-story"
@@ -923,6 +1133,9 @@ version_lineage = [
     "c57fabc4dc2b942cfe3596086343ee35b1b34c4f6a01b78c4424426902771599",
 ]
 collection_sha = "c57fabc4dc2b942cfe3596086343ee35b1b34c4f6a01b78c4424426902771599"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "complete-user-story"
@@ -936,6 +1149,9 @@ version_lineage = [
     "28b91f01aad36044088a611c80ec1b89b7ee79ce7a60c40ed20c4558d62f543d",
 ]
 collection_sha = "28b91f01aad36044088a611c80ec1b89b7ee79ce7a60c40ed20c4558d62f543d"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "quick-feature"
@@ -949,6 +1165,9 @@ version_lineage = [
     "470bc87a1bcab9981d833d877e0e45286e306d3767b6d3ba684881a4707d6396",
 ]
 collection_sha = "470bc87a1bcab9981d833d877e0e45286e306d3767b6d3ba684881a4707d6396"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "execute-phase"
@@ -962,6 +1181,9 @@ version_lineage = [
     "366933096452b0b5b6cb27a4c0bda719b3b84e3005b30c9df9f64df5cf5cb9bc",
 ]
 collection_sha = "366933096452b0b5b6cb27a4c0bda719b3b84e3005b30c9df9f64df5cf5cb9bc"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "create-feature"
@@ -975,6 +1197,9 @@ version_lineage = [
     "048944216f6adbbb05f907a0f0ec45797deae93aa9b9f88107cfcab68e06b444",
 ]
 collection_sha = "048944216f6adbbb05f907a0f0ec45797deae93aa9b9f88107cfcab68e06b444"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "check-architecture"
@@ -988,6 +1213,9 @@ version_lineage = [
     "dc3cd2b393ae98eb44607cf4f9521a85c7107604fb45ca4c7c8ca93f0b13827c",
 ]
 collection_sha = "dc3cd2b393ae98eb44607cf4f9521a85c7107604fb45ca4c7c8ca93f0b13827c"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "check-file"
@@ -1001,6 +1229,9 @@ version_lineage = [
     "3bf110fb72ba6419fea50de0a420a4e3a43b5f761cba14f736a1783644fa2024",
 ]
 collection_sha = "3bf110fb72ba6419fea50de0a420a4e3a43b5f761cba14f736a1783644fa2024"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "scan-violations"
@@ -1014,6 +1245,9 @@ version_lineage = [
     "f4aa60e75075c42c044255ea96c867722e03a42dcd298e9025265442086bc7b1",
 ]
 collection_sha = "f4aa60e75075c42c044255ea96c867722e03a42dcd298e9025265442086bc7b1"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "analyze-codebase"
@@ -1027,6 +1261,9 @@ version_lineage = [
     "d10e25693b3e051513bb3c63450ede86b3b5380fcac860bd7788e623cd4c016e",
 ]
 collection_sha = "d10e25693b3e051513bb3c63450ede86b3b5380fcac860bd7788e623cd4c016e"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "symbols-update"
@@ -1040,6 +1277,9 @@ version_lineage = [
     "839df5594de7bc7a14edcbc7f6e2f1afb1801cbc2ff1f97fc9c8b29850d7e056",
 ]
 collection_sha = "839df5594de7bc7a14edcbc7f6e2f1afb1801cbc2ff1f97fc9c8b29850d7e056"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "load-symbols"
@@ -1053,6 +1293,9 @@ version_lineage = [
     "ac49755ad0b5823eee6401f2186c1edbf7fc697d20f6fc8904ee2d7e9b2f6737",
 ]
 collection_sha = "ac49755ad0b5823eee6401f2186c1edbf7fc697d20f6fc8904ee2d7e9b2f6737"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "symbols-search"
@@ -1066,6 +1309,9 @@ version_lineage = [
     "85b8e0bb69a4ee0e36f2615edf397698a66a2476ccd69c99912e78b647316036",
 ]
 collection_sha = "85b8e0bb69a4ee0e36f2615edf397698a66a2476ccd69c99912e78b647316036"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "architecture-review"
@@ -1079,6 +1325,9 @@ version_lineage = [
     "7dd204f83a80bedeb63878a5eedaae0f7db0c6ce4911b4d1c35156c391751875",
 ]
 collection_sha = "7dd204f83a80bedeb63878a5eedaae0f7db0c6ce4911b4d1c35156c391751875"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "lead-pm"
@@ -1092,6 +1341,9 @@ version_lineage = [
     "a650d67925ff8bcae12224d610fb643b670a1e56c53ce596a9079e65a3dd8494",
 ]
 collection_sha = "a650d67925ff8bcae12224d610fb643b670a1e56c53ce596a9079e65a3dd8494"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "feature-planner"
@@ -1105,6 +1357,9 @@ version_lineage = [
     "d36a84f53d753c8a56565576c2401df55cc3384d40bd82f7cde6ecdcf8bad77a",
 ]
 collection_sha = "d36a84f53d753c8a56565576c2401df55cc3384d40bd82f7cde6ecdcf8bad77a"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "spike-writer"
@@ -1118,6 +1373,9 @@ version_lineage = [
     "4ff850df786be763c56fd5a656c9ecad0822c2ea7aca601c4af8caf01e9a38d0",
 ]
 collection_sha = "4ff850df786be763c56fd5a656c9ecad0822c2ea7aca601c4af8caf01e9a38d0"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "implementation-planner"
@@ -1131,6 +1389,9 @@ version_lineage = [
     "4ea06a4928e4a2382a1c45d77316765431dd8ac9e26f041ea0ba55189da0c53e",
 ]
 collection_sha = "4ea06a4928e4a2382a1c45d77316765431dd8ac9e26f041ea0ba55189da0c53e"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "task-completion-validator"
@@ -1144,6 +1405,9 @@ version_lineage = [
     "cb83d5f04d3e1c64a6460ca1c9fad96ba09f19e8121b0fa72b913158dbbf274f",
 ]
 collection_sha = "cb83d5f04d3e1c64a6460ca1c9fad96ba09f19e8121b0fa72b913158dbbf274f"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "senior-code-reviewer"
@@ -1157,6 +1421,9 @@ version_lineage = [
     "cd30d4e21e5715cfa135b23add75ae345cccefe4769e009f98be41361a77bf51",
 ]
 collection_sha = "cd30d4e21e5715cfa135b23add75ae345cccefe4769e009f98be41361a77bf51"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "karen"
@@ -1170,6 +1437,9 @@ version_lineage = [
     "ec72ca95fe83aa74b4b47cd00fd687f213bb0ec24975005b02a641018eba414d",
 ]
 collection_sha = "ec72ca95fe83aa74b4b47cd00fd687f213bb0ec24975005b02a641018eba414d"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "mobile-app-builder"
@@ -1183,6 +1453,9 @@ version_lineage = [
     "6d91adba3d8676835876e3aca88abe008bccd4493513fba037fe91b0be4820ec",
 ]
 collection_sha = "6d91adba3d8676835876e3aca88abe008bccd4493513fba037fe91b0be4820ec"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "python-backend-engineer"
@@ -1196,6 +1469,9 @@ version_lineage = [
     "6d45e8494df92e0675f3b15b9203453c20210c9da24d4ec2bc0f8a8b8e764f85",
 ]
 collection_sha = "6d45e8494df92e0675f3b15b9203453c20210c9da24d4ec2bc0f8a8b8e764f85"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "ui-engineer-enhanced"
@@ -1209,6 +1485,9 @@ version_lineage = [
     "addeebf8281a947e9045e7dadd8c0b47eccffcfef5fdba3017f809ff3746acce",
 ]
 collection_sha = "addeebf8281a947e9045e7dadd8c0b47eccffcfef5fdba3017f809ff3746acce"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "frontend-developer"
@@ -1222,6 +1501,9 @@ version_lineage = [
     "1ef58b8e9645066d3e8d068549a10c2dcac4a0ec778583a362ba3e6962a4db38",
 ]
 collection_sha = "1ef58b8e9645066d3e8d068549a10c2dcac4a0ec778583a362ba3e6962a4db38"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "ultrathink-debugger"
@@ -1235,6 +1517,9 @@ version_lineage = [
     "2d034e122cb743d5cb990fde584cecb8b6f74672a73ea5037ce7f8e70de172a0",
 ]
 collection_sha = "2d034e122cb743d5cb990fde584cecb8b6f74672a73ea5037ce7f8e70de172a0"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "documentation-complex"
@@ -1248,6 +1533,9 @@ version_lineage = [
     "61a5a231dc04603e2b8c4fdbd721aca83a55fc47845e7d578ce1c546c9441832",
 ]
 collection_sha = "61a5a231dc04603e2b8c4fdbd721aca83a55fc47845e7d578ce1c546c9441832"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "documentation-expert"
@@ -1261,6 +1549,9 @@ version_lineage = [
     "8573927b3d64ee52b7fd4f8a3283cde64d36dc338b949e75d62d40fce5bfc3fa",
 ]
 collection_sha = "8573927b3d64ee52b7fd4f8a3283cde64d36dc338b949e75d62d40fce5bfc3fa"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "documentation-writer"
@@ -1274,6 +1565,9 @@ version_lineage = [
     "0cec42da93ca463bb3b556534f1de606520e62d88a062a0c42662505fb92e8de",
 ]
 collection_sha = "0cec42da93ca463bb3b556534f1de606520e62d88a062a0c42662505fb92e8de"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "documentation-planner"
@@ -1287,6 +1581,9 @@ version_lineage = [
     "ef72482c6a32a8a58156a5798439ac5d32c0cbe680f91c03d5eda6a18881cd06",
 ]
 collection_sha = "ef72482c6a32a8a58156a5798439ac5d32c0cbe680f91c03d5eda6a18881cd06"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "backend-architect"
@@ -1300,6 +1597,9 @@ version_lineage = [
     "25f2e335c8f7a529f042cb55b4692757866606ae342cf06e5cfa93cd43f1e6ad",
 ]
 collection_sha = "25f2e335c8f7a529f042cb55b4692757866606ae342cf06e5cfa93cd43f1e6ad"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "data-layer-expert"
@@ -1313,6 +1613,9 @@ version_lineage = [
     "00d77d773e356320f0c43e865996f7db9744c78afd485e17b037875dd8c864be",
 ]
 collection_sha = "00d77d773e356320f0c43e865996f7db9744c78afd485e17b037875dd8c864be"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "lead-architect"
@@ -1326,6 +1629,9 @@ version_lineage = [
     "a2d44bef98db66316f475f0ac08aa20436e97594bbdd492447c9efedc7c60309",
 ]
 collection_sha = "a2d44bef98db66316f475f0ac08aa20436e97594bbdd492447c9efedc7c60309"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "backend-typescript-architect"
@@ -1339,6 +1645,9 @@ version_lineage = [
     "40409d148dd6e32fd2ded57bdb36cbac6a35ca468d2d342b4c9a6ccabad57ed2",
 ]
 collection_sha = "40409d148dd6e32fd2ded57bdb36cbac6a35ca468d2d342b4c9a6ccabad57ed2"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "ui-engineer"
@@ -1352,6 +1661,9 @@ version_lineage = [
     "504c5a08a6d39ca39514f438a77c5bd5e156c72753e463e8154c1ef64691a7bd",
 ]
 collection_sha = "504c5a08a6d39ca39514f438a77c5bd5e156c72753e463e8154c1ef64691a7bd"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "ux-researcher"
@@ -1365,6 +1677,9 @@ version_lineage = [
     "67d7797b2c4fdc7a24c0f794cf8ee093000f706bfdca9e26b3965deffe89389a",
 ]
 collection_sha = "67d7797b2c4fdc7a24c0f794cf8ee093000f706bfdca9e26b3965deffe89389a"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "ai-artifacts-engineer"
@@ -1378,6 +1693,9 @@ version_lineage = [
     "b78d7f27808ed4074015a29cb094b34e80877b3693aadf4c042e44221c79232d",
 ]
 collection_sha = "b78d7f27808ed4074015a29cb094b34e80877b3693aadf4c042e44221c79232d"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "codebase-explorer"
@@ -1391,6 +1709,9 @@ version_lineage = [
     "3258e8c3a2bdd69ac2cfd9d81448ff32236cad199d1983daf1dd0ca7beb9c8d3",
 ]
 collection_sha = "3258e8c3a2bdd69ac2cfd9d81448ff32236cad199d1983daf1dd0ca7beb9c8d3"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "command-creator"
@@ -1404,6 +1725,9 @@ version_lineage = [
     "adfe19fb11ceb2751dff78e6ad0f3799883ea22ada2940d7c93ef5862c144aae",
 ]
 collection_sha = "adfe19fb11ceb2751dff78e6ad0f3799883ea22ada2940d7c93ef5862c144aae"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "ai-engineer"
@@ -1417,6 +1741,9 @@ version_lineage = [
     "1f661cd40116a9ef793827c0165caba23df930b1c87fb4e449792909fbe765ad",
 ]
 collection_sha = "1f661cd40116a9ef793827c0165caba23df930b1c87fb4e449792909fbe765ad"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "symbols-engineer"
@@ -1430,6 +1757,9 @@ version_lineage = [
     "5cb78dbbf7aeffc2c2c133907a77eaff9e3d0144cd40c98985716e69f613192a",
 ]
 collection_sha = "5cb78dbbf7aeffc2c2c133907a77eaff9e3d0144cd40c98985716e69f613192a"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "agent-expert"
@@ -1443,6 +1773,9 @@ version_lineage = [
     "b5493f41cc4f99ccf743d3e191770aee68e4faba0fb3e5b391713de0594ed05b",
 ]
 collection_sha = "b5493f41cc4f99ccf743d3e191770aee68e4faba0fb3e5b391713de0594ed05b"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "refactor-code"
@@ -1456,6 +1789,9 @@ version_lineage = [
     "50cae5572b870db245ea61d501571e8d07ed87ca5128a1c3553add6450dcb3b7",
 ]
 collection_sha = "50cae5572b870db245ea61d501571e8d07ed87ca5128a1c3553add6450dcb3b7"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "symbols-chunk"
@@ -1469,6 +1805,9 @@ version_lineage = [
     "bd078db9c15f5744c97f65a7412dc477bf208d35e5e0d3898c3e372344a1dee4",
 ]
 collection_sha = "bd078db9c15f5744c97f65a7412dc477bf208d35e5e0d3898c3e372344a1dee4"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "symbols-query"
@@ -1482,6 +1821,9 @@ version_lineage = [
     "7c24d7c8d215c2075e22d0f925b173b825be7ddbfef948c0ca2c06a638a39f81",
 ]
 collection_sha = "7c24d7c8d215c2075e22d0f925b173b825be7ddbfef948c0ca2c06a638a39f81"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "crafting-effective-readmes"
@@ -1496,6 +1838,9 @@ version_lineage = [
 ]
 merge_base_snapshot = "65e22cd81e06ed5344019427b98a77075c66baf38e0e55b9a3da29c7d4b718ae"
 collection_sha = "65e22cd81e06ed5344019427b98a77075c66baf38e0e55b9a3da29c7d4b718ae"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "gemini-orchestrator"
@@ -1510,6 +1855,9 @@ version_lineage = [
 ]
 merge_base_snapshot = "ab626801f8011325173b66ffb1a0182fa3261d515788851b5c60416a809dd2a1"
 collection_sha = "ab626801f8011325173b66ffb1a0182fa3261d515788851b5c60416a809dd2a1"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
 
 [[deployed]]
 artifact_name = "ui-ux-pro-max"
@@ -1521,3 +1869,6 @@ content_hash = "784e18fc35e71f36fff0c44da5e4f18416acbcd62dcae9bcf7b63d503b489798
 local_modifications = false
 merge_base_snapshot = "784e18fc35e71f36fff0c44da5e4f18416acbcd62dcae9bcf7b63d503b489798"
 collection_sha = "784e18fc35e71f36fff0c44da5e4f18416acbcd62dcae9bcf7b63d503b489798"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"

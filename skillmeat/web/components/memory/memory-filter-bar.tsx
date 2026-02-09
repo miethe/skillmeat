@@ -23,6 +23,7 @@ import {
   Puzzle,
   Lightbulb,
   Archive,
+  FolderKanban,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -77,6 +78,11 @@ function getSortLabel(value: string): string {
   return SORT_OPTIONS.find((opt) => opt.value === value)?.label ?? 'Newest First';
 }
 
+function getProjectLabel(value: string | undefined, projects: Array<{ id: string; name: string }>): string {
+  if (!value || value === 'all') return 'All Projects';
+  return projects.find((p) => p.id === value)?.name ?? 'All Projects';
+}
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -104,6 +110,12 @@ export interface MemoryFilterBarProps {
   onSearchQueryChange: (query: string) => void;
   /** Type counts for badge display (keyed by type value). */
   counts?: Record<string, number>;
+  /** Optional project filter for global memory page. */
+  projectFilter?: string;
+  /** Callback when the project filter changes. */
+  onProjectFilterChange?: (id: string) => void;
+  /** List of available projects for the dropdown. */
+  projects?: Array<{ id: string; name: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,6 +127,8 @@ export interface MemoryFilterBarProps {
  *
  * Renders type tabs (row 1) and status/sort/search controls (row 2),
  * each separated by `border-b`. Parent is responsible for state management.
+ *
+ * Optional project filter is rendered when `projects` prop is provided.
  *
  * @example
  * ```tsx
@@ -128,6 +142,9 @@ export interface MemoryFilterBarProps {
  *   searchQuery={searchQuery}
  *   onSearchQueryChange={setSearchQuery}
  *   counts={counts}
+ *   projectFilter={projectFilter}
+ *   onProjectFilterChange={setProjectFilter}
+ *   projects={projects}
  * />
  * ```
  */
@@ -143,6 +160,9 @@ export function MemoryFilterBar({
   searchQuery,
   onSearchQueryChange,
   counts,
+  projectFilter,
+  onProjectFilterChange,
+  projects,
 }: MemoryFilterBarProps) {
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,6 +204,29 @@ export function MemoryFilterBar({
         role="toolbar"
         aria-label="Memory filters"
       >
+        {/* Project filter (optional) */}
+        {projects && onProjectFilterChange && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8" aria-label={`Filter by project: ${getProjectLabel(projectFilter, projects)}`}>
+                <FolderKanban className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                {getProjectLabel(projectFilter, projects)}
+                <ChevronDown className="ml-2 h-3.5 w-3.5" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuRadioGroup value={projectFilter ?? 'all'} onValueChange={onProjectFilterChange}>
+                <DropdownMenuRadioItem value="all">All Projects</DropdownMenuRadioItem>
+                {projects.map((proj) => (
+                  <DropdownMenuRadioItem key={proj.id} value={proj.id}>
+                    {proj.name}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
         {/* Status filter */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
