@@ -502,6 +502,12 @@ class MemoryExtractorService:
     def _extract_content_blocks(messages: List[Dict]) -> List[tuple[str, Dict]]:
         """Extract content blocks from JSONL message structures with filtering.
 
+        Supports two JSONL formats:
+        1. Claude Code JSONL: content nested in a ``message`` sub-dict
+           ``{"type": "assistant", "message": {"role": "assistant", "content": [...]}, ...}``
+        2. Plain JSONL: content at the top level
+           ``{"type": "assistant", "content": "...", ...}``
+
         Applies noise filtering to skip non-content messages:
         - Skips message types: progress, file-history-snapshot, system, result
         - Skips meta messages (isMeta=true)
@@ -513,7 +519,12 @@ class MemoryExtractorService:
 
         Args:
             messages: List of message dictionaries from JSONL run log. Expected
-                structure per message:
+                structure per message (Claude Code format):
+                - type: "user" | "assistant" | "progress" | "system" | etc.
+                - message: {"role": "user"|"assistant", "content": str|list[dict]}
+                - timestamp, sessionId, gitBranch, uuid: metadata fields (top-level)
+
+                Plain format (backward-compatible):
                 - type: "human" | "assistant" | "progress" | "system" | etc.
                 - role: "user" | "assistant" (optional)
                 - content: str | list[dict] (text blocks or mixed content)
@@ -530,7 +541,7 @@ class MemoryExtractorService:
 
         Example:
             >>> messages = [
-            ...     {"type": "assistant", "content": "Learned that uv is faster", "sessionId": "s1", "gitBranch": "main"},
+            ...     {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "Learned that uv is faster"}]}, "sessionId": "s1", "gitBranch": "main"},
             ...     {"type": "progress", "content": "Working..."},  # Skipped (noise)
             ...     {"type": "assistant", "content": [{"type": "text", "text": "Important insight"}]}
             ... ]
@@ -565,15 +576,24 @@ class MemoryExtractorService:
                 continue
 
             # Determine if this is a user or assistant message
-            is_user = msg_type == "human" or msg_role == "user"
+            # Claude Code JSONL uses type="user", plain JSONL uses type="human"
+            is_user = msg_type in ("human", "user") or msg_role == "user"
             is_assistant = msg_type == "assistant" or msg_role == "assistant"
 
             if not (is_user or is_assistant):
                 logger.debug(f"Skipping message with type={msg_type}, role={msg_role}")
                 continue
 
-            # Extract content (handle both string and list formats)
-            content = message.get("content")
+            # Extract content - check nested message structure first (Claude Code JSONL),
+            # then fall back to top-level content (plain JSONL)
+            inner_msg = message.get("message")
+            if isinstance(inner_msg, dict):
+                content = inner_msg.get("content")
+                # Also get role from inner message if not at top level
+                if not msg_role:
+                    msg_role = inner_msg.get("role")
+            else:
+                content = message.get("content")
             if content is None:
                 continue
 
