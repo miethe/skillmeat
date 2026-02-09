@@ -75,6 +75,15 @@
           "screenshot": "deployments-flat.png"
         },
         {
+          "id": "multi-platform-profiles",
+          "name": "Multi-Platform Profiles",
+          "description": "Deploy artifacts across Claude, Codex, Gemini, and Cursor profile roots with per-profile status and context deployment support",
+          "shortDescription": "Profile-aware deploy",
+          "cliCommand": "skillmeat deploy --profile codex",
+          "webPage": "/deployments",
+          "since": "0.3.0"
+        },
+        {
           "id": "project-management",
           "name": "Project Management",
           "description": "Register and manage projects with deployment history and configuration",

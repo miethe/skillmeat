@@ -21,19 +21,19 @@ Phase 5 is the final phase that ensures backward compatibility. It creates a mig
 | P5-T2 | Backfill deployment records with profile metadata | Script (from P5-T1) also backfills existing deployment records to populate `deployment_profile_id`, `platform`, `profile_root_dir` fields; match based on artifact path (assume `.claude/` = `claude_code` profile) | Deployment records updated with profile info; no data loss; backward-compat queries still work with `None` values where applicable | 1 pt | python-backend-engineer | P2-T3, P1-T9 |
 | P5-T3 | Create regression test suite for Claude-only workflows | Build comprehensive test suite covering: `skillmeat deploy` (without --profile, uses default), `skillmeat status` (without --profile, shows all), `skillmeat undeploy`, `skillmeat init` (without --profile), artifact import, context entity deployment to `.claude/` — all should work exactly as before | Test suite covers all basic workflows; all tests pass; no behavioral changes for Claude-only users | 1.5 pts | testing-specialist | P2-T6, P2-T7, P2-T8 |
 | P5-T4 | Verify profile-aware features with fresh projects | Create test scenarios with new projects: init with --profile, deploy to multiple profiles, status per profile, cross-profile sync — verify features work as designed and documented | Test scenarios cover all new Phase 1-4 features; all tests pass; no regressions to old features | 1 pt | testing-specialist | P2-T1 through P4-T19 |
-| P5-T5 | Documentation: migration guide and upgrade notes | Create `docs/migration/multi-platform-deployment-upgrade.md` documenting: what changed, what stays the same, how to verify upgrade (regression tests), how to opt-in to multi-platform (new --profile flags), known limitations (symlink edge cases), troubleshooting; update README and CHANGELOG | Migration guide covers upgrade path; users can confidently upgrade; troubleshooting section addresses common issues | 1 pt | documentation-writer | P2-T1 through P4-T19 |
+| P5-T5 | Documentation: migration guide and upgrade notes | Create `docs/migration/multi-platform-deployment-upgrade.md` documenting: what changed, what stays the same, how to verify upgrade (regression tests), how to opt-in to multi-platform (new --profile flags), known limitations (symlink edge cases), troubleshooting; update README and CHANGELOG; update user-facing command docs to reflect profile-aware init/deploy/status/context deploy behavior | Migration guide covers upgrade path; users can confidently upgrade; troubleshooting section addresses common issues; top-level docs and command reference include profile-aware workflows | 1 pt | documentation-writer | P2-T1 through P4-T19 |
 
 ## Quality Gates
 
-- [ ] Migration script successfully identifies legacy projects
-- [ ] Default profiles created with correct directory mappings
-- [ ] Deployment records backfilled with profile metadata; all data preserved
-- [ ] Regression test suite passes: all Claude-only workflows unchanged
-- [ ] New profile features tested with fresh projects; all work as designed
-- [ ] Migration documentation clear and complete
-- [ ] Zero breaking changes for existing users
-- [ ] Upgrade can be automated (migration script runs on first startup or explicitly)
-- [ ] Post-upgrade, both old and new workflows function correctly
+- [x] Migration script successfully identifies legacy projects
+- [x] Default profiles created with correct directory mappings
+- [x] Deployment records backfilled with profile metadata; all data preserved
+- [x] Regression test suite passes: all Claude-only workflows unchanged
+- [x] New profile features tested with fresh projects; all work as designed
+- [x] Migration documentation clear and complete
+- [x] Zero breaking changes for existing users
+- [x] Upgrade can be automated (migration script runs explicitly)
+- [x] Post-upgrade, both old and new workflows function correctly
 
 ## Key Files
 
@@ -45,6 +45,9 @@ Phase 5 is the final phase that ensures backward compatibility. It creates a mig
 - `docs/migration/multi-platform-deployment-upgrade.md` — New migration guide (P5-T5)
 - `README.md` — Updated with multi-platform note and migration link (P5-T5)
 - `CHANGELOG.md` — Added entry for Phase 0-5 completion (P5-T5)
+- `docs/user/README.md` — Added migration guide in user docs index (P5-T5)
+- `docs/user/cli/commands.md` — Added profile-aware CLI command coverage (P5-T5)
+- `scripts/migrate_to_deployment_profiles_dryrun.md` — Dry-run walkthrough for migration safety validation (P5-T5)
 
 **Tests** (new):
 - `tests/test_claude_only_regression.py` — Regression test suite (P5-T3)
@@ -118,8 +121,8 @@ Tests should verify:
 
 ---
 
-**Phase Status**: Ready to start after Phase 4
-**Blocks**: Feature complete and ready for release
+**Phase Status**: Completed (2026-02-09)
+**Blocks**: None
 **Blocked By**: Phases 1-4 (Data Model, Deployment Engine, Context Entity, Discovery/Cache/UI)
 
 ---

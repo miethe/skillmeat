@@ -3,15 +3,15 @@ type: progress
 prd: "multi-platform-project-deployments-v1"
 phase: 5
 title: "Migration and Compatibility Hardening"
-status: "planning"
-started: null
-completed: null
+status: "completed"
+started: "2026-02-09"
+completed: "2026-02-09"
 
-overall_progress: 0
+overall_progress: 100
 completion_estimate: "on-track"
 
 total_tasks: 5
-completed_tasks: 0
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -22,7 +22,7 @@ contributors: []
 tasks:
   - id: "P5-T1"
     description: "Create migration script: infer default profiles - Create scripts/migrate_to_deployment_profiles.py that scans existing projects, creates default claude_code profile for projects without profiles; supports --dry-run and --verbose"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P2-T5", "P1-T6"]
     estimated_effort: "1.5 pts"
@@ -30,7 +30,7 @@ tasks:
 
   - id: "P5-T2"
     description: "Backfill deployment records with profile metadata - Script backfills existing deployment records to populate deployment_profile_id, platform, profile_root_dir fields; infer from artifact path; support rollback"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P2-T3", "P1-T9"]
     estimated_effort: "1 pt"
@@ -38,7 +38,7 @@ tasks:
 
   - id: "P5-T3"
     description: "Create regression test suite for Claude-only workflows - Test all basic workflows (deploy, status, undeploy, init, import, context entity) work exactly as before without --profile flag"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P2-T6", "P2-T7", "P2-T8"]
     estimated_effort: "1.5 pts"
@@ -46,7 +46,7 @@ tasks:
 
   - id: "P5-T4"
     description: "Verify profile-aware features with fresh projects - Test scenarios: init --profile, deploy to multiple profiles, status per profile, cross-profile sync; verify all Phase 1-4 features work"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P2-T1", "P4-T19"]
     estimated_effort: "1 pt"
@@ -54,7 +54,7 @@ tasks:
 
   - id: "P5-T5"
     description: "Documentation: migration guide and upgrade notes - Create docs/migration/multi-platform-deployment-upgrade.md; update README and CHANGELOG; cover upgrade path, opt-in, known limitations, troubleshooting"
-    status: "pending"
+    status: "completed"
     assigned_to: ["documentation-writer"]
     dependencies: ["P2-T1", "P4-T19"]
     estimated_effort: "1 pt"
@@ -69,19 +69,22 @@ parallelization:
 blockers: []
 
 success_criteria:
-  - { id: "SC-1", description: "Migration script identifies legacy projects and creates default profiles", status: "pending" }
-  - { id: "SC-2", description: "Deployment records backfilled with profile metadata; all data preserved", status: "pending" }
-  - { id: "SC-3", description: "Regression test suite passes: all Claude-only workflows unchanged", status: "pending" }
-  - { id: "SC-4", description: "New profile features tested with fresh projects; all work as designed", status: "pending" }
-  - { id: "SC-5", description: "Migration documentation clear and complete", status: "pending" }
-  - { id: "SC-6", description: "Zero breaking changes for existing users", status: "pending" }
-  - { id: "SC-7", description: "Post-upgrade both old and new workflows function correctly", status: "pending" }
+  - { id: "SC-1", description: "Migration script identifies legacy projects and creates default profiles", status: "completed" }
+  - { id: "SC-2", description: "Deployment records backfilled with profile metadata; all data preserved", status: "completed" }
+  - { id: "SC-3", description: "Regression test suite passes: all Claude-only workflows unchanged", status: "completed" }
+  - { id: "SC-4", description: "New profile features tested with fresh projects; all work as designed", status: "completed" }
+  - { id: "SC-5", description: "Migration documentation clear and complete", status: "completed" }
+  - { id: "SC-6", description: "Zero breaking changes for existing users", status: "completed" }
+  - { id: "SC-7", description: "Post-upgrade both old and new workflows function correctly", status: "completed" }
 
 files_modified:
   - "scripts/migrate_to_deployment_profiles.py"
+  - "scripts/migrate_to_deployment_profiles_dryrun.md"
   - "docs/migration/multi-platform-deployment-upgrade.md"
   - "README.md"
   - "CHANGELOG.md"
+  - "docs/user/README.md"
+  - "docs/user/cli/commands.md"
   - "tests/test_claude_only_regression.py"
   - "tests/test_multi_platform_fresh_projects.py"
   - "tests/test_migration_script.py"
@@ -153,4 +156,13 @@ Task("documentation-writer", "P5-T5: Documentation: migration guide and upgrade 
 
 ## Completion Notes
 
-_Fill in when phase is complete._
+- Added `scripts/migrate_to_deployment_profiles.py` with dry-run and verbose modes.
+- Backfill now infers and populates `deployment_profile_id`, `platform`, and `profile_root_dir` for legacy records.
+- Added dedicated migration and regression test suites:
+  - `tests/test_migration_script.py`
+  - `tests/test_claude_only_regression.py`
+  - `tests/test_multi_platform_fresh_projects.py`
+- Added migration and rollout docs across user and top-level docs:
+  - `docs/migration/multi-platform-deployment-upgrade.md`
+  - `scripts/migrate_to_deployment_profiles_dryrun.md`
+  - `README.md`, `CHANGELOG.md`, `docs/user/README.md`, `docs/user/cli/commands.md`

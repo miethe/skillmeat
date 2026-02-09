@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Multi-Platform Project Deployments Phase 5 (2026-02-09)
+
+**Migration & Backward Compatibility**
+- Added `scripts/migrate_to_deployment_profiles.py` to infer default `claude_code` profiles for legacy projects and backfill deployment record metadata (`deployment_profile_id`, `platform`, `profile_root_dir`)
+- Added migration dry-run reference docs: `scripts/migrate_to_deployment_profiles_dryrun.md`
+- Added user migration guide: `docs/migration/multi-platform-deployment-upgrade.md`
+
+**Regression & Verification Tests**
+- Added `tests/test_migration_script.py` for migration/backfill coverage
+- Added `tests/test_claude_only_regression.py` to validate Claude-only backward compatibility behavior
+- Added `tests/test_multi_platform_fresh_projects.py` to verify profile-aware behavior on fresh projects
+
+**Documentation**
+- Updated README and user docs with profile-aware deploy/init/status/context workflows
+- Added upgrade path documentation for teams adopting Codex/Gemini/Cursor profiles while preserving Claude-only defaults
+
 #### Memory Extraction Pipeline v2 (2026-02-08)
 
 **JSONL Session Transcript Support**

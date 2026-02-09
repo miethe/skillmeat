@@ -9,7 +9,7 @@
 As you build more complex agentic workflows with Claude Code, managing your **Skills, Commands, Agents, and MCP Servers** becomes a bottleneck.
 
 * **The Problem:** Artifacts are often trapped within individual projects. If you improve a "Code Review" skill in one repo, your other ten projects are now running an outdated version. Sharing these tools with a team usually involves brittle copy-pasting.
-* **The Solution:** SkillMeat provides a **centralized source of truth**. You manage your artifacts in a global collection and "deploy" them to projects. When you update the global version, SkillMeat handles the sync, drift detection, and versioning across every project on your machine.
+* **The Solution:** SkillMeat provides a **centralized source of truth**. You manage your artifacts in a global collection and "deploy" them to projects and deployment profiles (`claude_code`, `codex`, `gemini`, `cursor`). When you update the global version, SkillMeat handles the sync, drift detection, and versioning across every project on your machine.
 
 ## 🎯 Who is it for?
 
