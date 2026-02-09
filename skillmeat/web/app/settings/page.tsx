@@ -1,6 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Settings } from 'lucide-react';
 import { GitHubSettings } from '@/components/settings/github-settings';
+import { PlatformDefaultsSettings } from '@/components/settings/platform-defaults-settings';
+import { CustomContextSettings } from '@/components/settings/custom-context-settings';
 
 export default function SettingsPage() {
   return (
@@ -50,6 +52,8 @@ export default function SettingsPage() {
         </Card>
 
         <GitHubSettings />
+        <PlatformDefaultsSettings />
+        <CustomContextSettings />
       </div>
     </div>
   );

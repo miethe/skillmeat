@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast, useProject, useDeploymentProfiles, useCreateDeploymentProfile, useUpdateDeploymentProfile, useDeleteDeploymentProfile, usePlatformDefaults } from '@/hooks';
+import { Switch } from '@/components/ui/switch';
+import { useToast, useProject, useDeploymentProfiles, useCreateDeploymentProfile, useUpdateDeploymentProfile, useDeleteDeploymentProfile, usePlatformDefaults, useCustomContextConfig } from '@/hooks';
 import { PlatformBadge } from '@/components/platform-badge';
 import { PlatformChangeDialog } from '@/components/deployments/platform-change-dialog';
 import { Platform } from '@/types/enums';
@@ -109,6 +110,8 @@ export default function ProjectProfilesPage() {
 
   // Platform defaults from API (with fallback to constants)
   const { data: platformDefaultsData } = usePlatformDefaults();
+  const { data: customContextConfig } = useCustomContextConfig();
+  const [useCustomPrefixes, setUseCustomPrefixes] = useState(false);
 
   // Resolve defaults for a platform — prefer API data, fall back to constants
   const getDefaultsForPlatform = useCallback(
@@ -129,6 +132,24 @@ export default function ProjectProfilesPage() {
     [platformDefaultsData]
   );
 
+  const applyCustomContext = useCallback(
+    (currentPrefixes: string, platform: string): string => {
+      if (!customContextConfig?.enabled) return currentPrefixes;
+      if (customContextConfig.platforms.length > 0 && !customContextConfig.platforms.includes(platform)) {
+        return currentPrefixes;
+      }
+      const customPrefixes = customContextConfig.prefixes;
+      if (customContextConfig.mode === 'override') {
+        return customPrefixes.join('\n');
+      }
+      // addendum mode: append and deduplicate
+      const existing = currentPrefixes.split('\n').map(s => s.trim()).filter(Boolean);
+      const merged = [...new Set([...existing, ...customPrefixes])];
+      return merged.join('\n');
+    },
+    [customContextConfig]
+  );
+
   // Touched fields tracking for create form
   const [touchedFields, setTouchedFields] = useState<Set<keyof ProfileFormState>>(new Set());
 
@@ -146,6 +167,7 @@ export default function ProjectProfilesPage() {
         description: `Created profile "${createForm.profile_id}"`,
       });
       setTouchedFields(new Set());
+      setUseCustomPrefixes(false);
       setCreateForm((prev) => ({
         ...prev,
         profile_id: '',
@@ -380,6 +402,34 @@ export default function ProjectProfilesPage() {
               }}
             />
           </div>
+          {customContextConfig?.enabled &&
+            customContextConfig.platforms.includes(createForm.platform) && (
+              <div className="flex items-center gap-2 md:col-span-2">
+                <Switch
+                  id="use-custom-prefixes-create"
+                  checked={useCustomPrefixes}
+                  onCheckedChange={(checked) => {
+                    setUseCustomPrefixes(checked);
+                    if (checked) {
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        context_path_prefixes: applyCustomContext(prev.context_path_prefixes, prev.platform),
+                      }));
+                    } else {
+                      // Revert to platform defaults
+                      const defaults = getDefaultsForPlatform(createForm.platform);
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        context_path_prefixes: defaults.context_prefixes.join('\n'),
+                      }));
+                    }
+                  }}
+                />
+                <Label htmlFor="use-custom-prefixes-create" className="text-sm">
+                  Use custom context prefixes ({customContextConfig.mode} mode)
+                </Label>
+              </div>
+            )}
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="new-supported-types">Supported Artifact Types</Label>
             <Input
