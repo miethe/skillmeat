@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 import uuid
 from dataclasses import dataclass
@@ -32,13 +33,13 @@ else:
 import tomli_w
 from sqlalchemy.orm import sessionmaker
 
-from skillmeat.api.routers.projects import discover_projects
 from skillmeat.cache.models import Project, create_db_engine, create_tables
 from skillmeat.cache.repositories import DeploymentProfileRepository
 from skillmeat.core.enums import Platform
 from skillmeat.core.path_resolver import (
     DEFAULT_ARTIFACT_PATH_MAP,
     DEFAULT_PROFILE_ROOT_DIR,
+    DEFAULT_PROFILE_ROOTS,
     DEFAULT_PROJECT_CONFIG_FILENAMES_BY_PLATFORM,
 )
 from skillmeat.storage.deployment import DeploymentTracker
@@ -283,8 +284,62 @@ def ensure_default_profile(
     return True
 
 
+def discover_projects_with_deployments(
+    search_paths: Optional[List[Path]] = None,
+) -> List[Path]:
+    """Discover project roots that contain deployment tracker files.
+
+    This intentionally avoids importing API router helpers so the script can run
+    without initializing FastAPI route modules.
+    """
+    if search_paths is None:
+        home = Path.home()
+        search_paths = [
+            home / "projects",
+            home / "dev",
+            home / "workspace",
+            home / "src",
+            Path.cwd(),
+        ]
+
+    discovered: List[Path] = []
+    max_depth = 3
+
+    for search_path in search_paths:
+        if not search_path.exists() or not search_path.is_dir():
+            continue
+
+        try:
+            search_path = search_path.resolve()
+        except (RuntimeError, OSError):
+            continue
+
+        try:
+            for profile_root in DEFAULT_PROFILE_ROOTS:
+                pattern = os.path.join(profile_root, DeploymentTracker.DEPLOYMENT_FILE)
+                for deployment_file in search_path.rglob(pattern):
+                    project_path = deployment_file.parent.parent
+
+                    try:
+                        project_path = project_path.resolve()
+                        project_path.relative_to(search_path)
+                    except (ValueError, RuntimeError, OSError):
+                        continue
+
+                    depth = len(project_path.relative_to(search_path).parts)
+                    if depth > max_depth:
+                        continue
+
+                    if project_path not in discovered:
+                        discovered.append(project_path)
+        except (PermissionError, OSError):
+            continue
+
+    return discovered
+
+
 def _collect_candidate_projects(search_paths: Optional[List[Path]]) -> List[Path]:
-    discovered = discover_projects(search_paths=search_paths)
+    discovered = discover_projects_with_deployments(search_paths=search_paths)
     deduped: List[Path] = []
     seen = set()
     for project in discovered:
