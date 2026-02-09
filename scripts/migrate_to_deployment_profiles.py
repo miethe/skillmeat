@@ -17,11 +17,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
+import sqlite3
 import sys
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
@@ -31,18 +34,6 @@ else:
     import tomli as tomllib
 
 import tomli_w
-from sqlalchemy.orm import sessionmaker
-
-from skillmeat.cache.models import Project, create_db_engine, create_tables
-from skillmeat.cache.repositories import DeploymentProfileRepository
-from skillmeat.core.enums import Platform
-from skillmeat.core.path_resolver import (
-    DEFAULT_ARTIFACT_PATH_MAP,
-    DEFAULT_PROFILE_ROOT_DIR,
-    DEFAULT_PROFILE_ROOTS,
-    DEFAULT_PROJECT_CONFIG_FILENAMES_BY_PLATFORM,
-)
-from skillmeat.storage.deployment import DeploymentTracker
 
 logger = logging.getLogger("migrate_to_deployment_profiles")
 
@@ -53,6 +44,16 @@ PROFILE_TO_ROOT = {
     "cursor": ".cursor",
 }
 ROOT_TO_PROFILE = {v: k for k, v in PROFILE_TO_ROOT.items()}
+DEFAULT_PROFILE_ROOT_DIR = ".claude"
+DEFAULT_PROFILE_ROOTS = [".claude", ".codex", ".gemini", ".cursor"]
+DEFAULT_ARTIFACT_PATH_MAP = {
+    "skill": "skills",
+    "command": "commands",
+    "agent": "agents",
+    "hook": "hooks",
+    "mcp": "mcp",
+}
+DEPLOYMENT_FILE = ".skillmeat-deployed.toml"
 
 
 @dataclass
@@ -86,10 +87,9 @@ def _infer_root_from_artifact_path(artifact_path: str) -> Optional[str]:
 
 
 def _infer_platform(profile_id: str) -> str:
-    try:
-        return Platform(profile_id).value
-    except ValueError:
-        return Platform.OTHER.value
+    if profile_id in {"claude_code", "codex", "gemini", "cursor"}:
+        return profile_id
+    return "other"
 
 
 def infer_record_profile_metadata(
@@ -123,14 +123,14 @@ def infer_record_profile_metadata(
 def _find_deployment_files(project_path: Path) -> List[Path]:
     files: List[Path] = []
 
-    default_file = project_path / DEFAULT_PROFILE_ROOT_DIR / DeploymentTracker.DEPLOYMENT_FILE
+    default_file = project_path / DEFAULT_PROFILE_ROOT_DIR / DEPLOYMENT_FILE
     if default_file.exists():
         files.append(default_file)
 
     for profile_dir in sorted(project_path.glob(".*")):
         if not profile_dir.is_dir():
             continue
-        deployment_file = profile_dir / DeploymentTracker.DEPLOYMENT_FILE
+        deployment_file = profile_dir / DEPLOYMENT_FILE
         if deployment_file.exists() and deployment_file not in files:
             files.append(deployment_file)
 
@@ -219,31 +219,81 @@ def backfill_project_deployment_records(
     return (records_backfilled, records_already)
 
 
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def ensure_cache_tables(db_path: Path) -> None:
+    """Create minimal required tables when absent.
+
+    This avoids importing application packages (and FastAPI side effects).
+    """
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path))
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS projects (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                path TEXT NOT NULL UNIQUE,
+                description TEXT,
+                created_at TEXT,
+                updated_at TEXT,
+                last_fetched TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                error_message TEXT
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS deployment_profiles (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                profile_id TEXT NOT NULL,
+                platform TEXT NOT NULL,
+                root_dir TEXT NOT NULL,
+                artifact_path_map TEXT,
+                config_filenames TEXT,
+                context_prefixes TEXT,
+                supported_types TEXT,
+                created_at TEXT,
+                updated_at TEXT,
+                UNIQUE(project_id, profile_id)
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def _ensure_project_row(project_path: Path, db_path: Path, dry_run: bool) -> str:
     """Ensure project exists in cache DB and return project_id."""
-    engine = create_db_engine(db_path)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-    session = SessionLocal()
+    conn = sqlite3.connect(str(db_path))
     try:
-        existing = session.query(Project).filter(Project.path == str(project_path)).first()
-        if existing:
-            return existing.id
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM projects WHERE path = ?", (str(project_path),))
+        row = cur.fetchone()
+        if row:
+            return str(row[0])
 
         project_id = uuid.uuid4().hex
         if not dry_run:
-            session.add(
-                Project(
-                    id=project_id,
-                    name=project_path.name,
-                    path=str(project_path),
-                    status="active",
-                )
+            now = _utc_now()
+            cur.execute(
+                """
+                INSERT INTO projects (id, name, path, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (project_id, project_path.name, str(project_path), "active", now, now),
             )
-            session.commit()
+            conn.commit()
         return project_id
     finally:
-        session.close()
+        conn.close()
 
 
 def ensure_default_profile(
@@ -258,28 +308,50 @@ def ensure_default_profile(
     Returns True if a new profile would be/was created.
     """
     project_id = _ensure_project_row(project_path, db_path, dry_run)
-    repo = DeploymentProfileRepository(db_path=db_path)
-
-    existing = repo.read_by_project_and_profile_id(project_id, "claude_code")
-    if existing is not None:
-        return False
-
-    if verbose:
-        print(f"  creating default profile for {project_path}")
-
-    if not dry_run:
-        repo.create(
-            project_id=project_id,
-            profile_id="claude_code",
-            platform=Platform.CLAUDE_CODE.value,
-            root_dir=DEFAULT_PROFILE_ROOT_DIR,
-            artifact_path_map=DEFAULT_ARTIFACT_PATH_MAP.copy(),
-            config_filenames=DEFAULT_PROJECT_CONFIG_FILENAMES_BY_PLATFORM[
-                Platform.CLAUDE_CODE
-            ],
-            context_prefixes=[f"{DEFAULT_PROFILE_ROOT_DIR}/context/", f"{DEFAULT_PROFILE_ROOT_DIR}/"],
-            supported_types=["skill", "command", "agent", "hook", "mcp"],
+    conn = sqlite3.connect(str(db_path))
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id FROM deployment_profiles
+            WHERE project_id = ? AND profile_id = ?
+            """,
+            (project_id, "claude_code"),
         )
+        if cur.fetchone() is not None:
+            return False
+
+        if verbose:
+            print(f"  creating default profile for {project_path}")
+
+        if not dry_run:
+            now = _utc_now()
+            cur.execute(
+                """
+                INSERT INTO deployment_profiles (
+                    id, project_id, profile_id, platform, root_dir,
+                    artifact_path_map, config_filenames, context_prefixes,
+                    supported_types, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    uuid.uuid4().hex,
+                    project_id,
+                    "claude_code",
+                    "claude_code",
+                    DEFAULT_PROFILE_ROOT_DIR,
+                    json.dumps(DEFAULT_ARTIFACT_PATH_MAP),
+                    json.dumps(["CLAUDE.md", "AGENTS.md", ".skillmeat-project.toml"]),
+                    json.dumps([f"{DEFAULT_PROFILE_ROOT_DIR}/context/", f"{DEFAULT_PROFILE_ROOT_DIR}/"]),
+                    json.dumps(["skill", "command", "agent", "hook", "mcp"]),
+                    now,
+                    now,
+                ),
+            )
+            conn.commit()
+    finally:
+        conn.close()
 
     return True
 
@@ -316,7 +388,7 @@ def discover_projects_with_deployments(
 
         try:
             for profile_root in DEFAULT_PROFILE_ROOTS:
-                pattern = os.path.join(profile_root, DeploymentTracker.DEPLOYMENT_FILE)
+                pattern = os.path.join(profile_root, DEPLOYMENT_FILE)
                 for deployment_file in search_path.rglob(pattern):
                     project_path = deployment_file.parent.parent
 
@@ -430,7 +502,7 @@ def main() -> int:
     )
 
     db_path = Path(args.db_path).expanduser().resolve()
-    create_tables(db_path)
+    ensure_cache_tables(db_path)
 
     search_paths = [Path(p).expanduser().resolve() for p in (args.search_paths or [])]
     projects = _collect_candidate_projects(search_paths or None)
