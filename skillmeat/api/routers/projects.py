@@ -156,8 +156,19 @@ def discover_projects(
         List of project paths with deployments
     """
     if search_paths is None:
-        # Default search locations
-        # TODO: Make this configurable via settings
+        # Try to get from config
+        try:
+            from skillmeat.config import ConfigManager
+
+            config = ConfigManager()
+            paths = config.get_project_search_paths()
+            if paths:
+                search_paths = [Path(p) for p in paths]
+        except Exception as e:
+            logger.warning(f"Failed to load search paths from config: {e}")
+
+    if search_paths is None:
+        # Default search locations (fallback)
         home = Path.home()
         search_paths = [
             home / "projects",
