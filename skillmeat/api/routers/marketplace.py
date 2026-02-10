@@ -25,7 +25,9 @@ from skillmeat.api.schemas.marketplace import (
     PublishRequest,
     PublishResponse,
 )
+from skillmeat.api.services.artifact_cache_service import refresh_single_artifact_cache
 from skillmeat.api.utils.cache import get_cache_manager
+from skillmeat.cache.models import get_session
 from skillmeat.core.sharing.bundle import Bundle
 from skillmeat.core.sharing.importer import BundleImporter
 from skillmeat.marketplace.broker import (
@@ -542,6 +544,36 @@ async def install_listing(
             logger.info(
                 f"Imported {len(artifact_names)} artifacts from bundle: {artifact_names}"
             )
+
+            # Sync imported artifacts to DB cache for source field display
+            try:
+                db_session = get_session()
+                try:
+                    synced_count = 0
+                    for artifact in result.imported_artifacts:
+                        # Only sync successfully imported artifacts (not skipped)
+                        if artifact.resolution in ("imported", "forked", "merged"):
+                            artifact_id = f"{artifact.type}:{artifact.new_name or artifact.name}"
+                            try:
+                                refresh_single_artifact_cache(
+                                    db_session,
+                                    importer.artifact_mgr,
+                                    artifact_id,
+                                    "default",
+                                )
+                                synced_count += 1
+                            except Exception as cache_err:
+                                logger.warning(
+                                    f"Cache sync failed for {artifact_id}: {cache_err}"
+                                )
+                    logger.info(
+                        f"Synced {synced_count}/{len(artifact_names)} artifacts to DB cache"
+                    )
+                finally:
+                    db_session.close()
+            except Exception as e:
+                # Don't fail the entire install if cache sync fails
+                logger.warning(f"DB cache sync failed: {e}")
 
             # Invalidate listings cache after successful install
             cache_manager.invalidate_pattern("listings:*")
