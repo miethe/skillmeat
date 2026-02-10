@@ -114,6 +114,17 @@ class ProjectRegistry:
         if self._search_paths is not None:
             return self._search_paths
 
+        # Try to get from config
+        try:
+            from skillmeat.config import ConfigManager
+
+            config = ConfigManager()
+            paths = config.get_project_search_paths()
+            if paths:
+                return [Path(p) for p in paths]
+        except Exception:
+            pass
+
         home = Path.home()
         return [
             home / "projects",

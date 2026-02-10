@@ -3,7 +3,7 @@
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 # Handle tomli/tomllib import for different Python versions
 if sys.version_info >= (3, 11):
@@ -361,3 +361,53 @@ class ConfigManager:
         logger.info(f"Setting artifact_search.indexing_mode to '{value}'")
         self.set("artifact_search.indexing_mode", value)
         return self.get_indexing_mode()
+
+    def get_project_search_paths(self) -> List[str]:
+        """Get configured project search paths.
+
+        Returns:
+            List of project search paths. If not configured, returns default paths.
+        """
+        paths = self.get("settings.project-search-paths")
+        if paths is not None:
+            return paths
+
+        # Default paths
+        home = Path.home()
+        return [
+            str(home / "projects"),
+            str(home / "dev"),
+            str(home / "workspace"),
+            str(home / "src"),
+            str(Path.cwd()),
+        ]
+
+    def set_project_search_paths(self, paths: List[str]) -> None:
+        """Set project search paths.
+
+        Args:
+            paths: List of search paths
+        """
+        self.set("settings.project-search-paths", paths)
+
+    def add_project_search_path(self, path: str) -> None:
+        """Add a project search path.
+
+        Args:
+            path: Path to add
+        """
+        paths = self.get_project_search_paths()
+        if path not in paths:
+            paths.append(path)
+            self.set_project_search_paths(paths)
+
+    def remove_project_search_path(self, path: str) -> None:
+        """Remove a project search path.
+
+        Args:
+            path: Path to remove
+        """
+        paths = self.get_project_search_paths()
+        if path in paths:
+            paths.remove(path)
+            self.set_project_search_paths(paths)

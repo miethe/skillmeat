@@ -17,6 +17,8 @@ from skillmeat.api.schemas.settings import (
     GitHubTokenValidationResponse,
     IndexingModeResponse,
     MessageResponse,
+    ProjectSearchPathsRequest,
+    ProjectSearchPathsResponse,
 )
 from skillmeat.core.github_client import (
     GitHubAuthError,
@@ -382,3 +384,93 @@ async def get_indexing_mode(
     indexing_mode = config.get_indexing_mode()
     logger.debug(f"Retrieved indexing mode: {indexing_mode}")
     return IndexingModeResponse(indexing_mode=indexing_mode)
+
+
+@router.get(
+    "/project-search-paths",
+    response_model=ProjectSearchPathsResponse,
+    summary="Get project search paths",
+    description="Get the list of configured project search paths used for project discovery.",
+)
+async def get_project_search_paths(
+    config: ConfigManagerDep,
+) -> ProjectSearchPathsResponse:
+    """Get configured project search paths.
+
+    Args:
+        config: Configuration manager dependency
+
+    Returns:
+        List of configured project search paths
+    """
+    paths = config.get_project_search_paths()
+    return ProjectSearchPathsResponse(paths=paths)
+
+
+@router.post(
+    "/project-search-paths",
+    response_model=ProjectSearchPathsResponse,
+    summary="Set project search paths",
+    description="Update the list of project search paths.",
+)
+async def set_project_search_paths(
+    request: ProjectSearchPathsRequest,
+    config: ConfigManagerDep,
+) -> ProjectSearchPathsResponse:
+    """Set project search paths.
+
+    Args:
+        request: Request containing new search paths
+        config: Configuration manager dependency
+
+    Returns:
+        Updated list of search paths
+    """
+    config.set_project_search_paths(request.paths)
+    return ProjectSearchPathsResponse(paths=request.paths)
+
+
+@router.post(
+    "/project-search-paths/add",
+    response_model=ProjectSearchPathsResponse,
+    summary="Add project search path",
+    description="Add a new path to project search paths.",
+)
+async def add_project_search_path(
+    path: str,
+    config: ConfigManagerDep,
+) -> ProjectSearchPathsResponse:
+    """Add a project search path.
+
+    Args:
+        path: Path to add
+        config: Configuration manager dependency
+
+    Returns:
+        Updated list of search paths
+    """
+    config.add_project_search_path(path)
+    return ProjectSearchPathsResponse(paths=config.get_project_search_paths())
+
+
+@router.post(
+    "/project-search-paths/remove",
+    response_model=ProjectSearchPathsResponse,
+    summary="Remove project search path",
+    description="Remove a path from project search paths.",
+)
+async def remove_project_search_path(
+    path: str,
+    config: ConfigManagerDep,
+) -> ProjectSearchPathsResponse:
+    """Remove a project search path.
+
+    Args:
+        path: Path to remove
+        config: Configuration manager dependency
+
+    Returns:
+        Updated list of search paths
+    """
+    config.remove_project_search_path(path)
+    return ProjectSearchPathsResponse(paths=config.get_project_search_paths())

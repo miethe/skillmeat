@@ -113,3 +113,22 @@ class MessageResponse(BaseModel):
         description="Human-readable message describing the operation result",
         examples=["GitHub token configured successfully"],
     )
+
+
+class ProjectSearchPathsRequest(BaseModel):
+    """Request to update project search paths."""
+
+    paths: list[str] = Field(
+        ...,
+        description="List of project search paths",
+        examples=[["/home/user/projects", "/home/user/dev"]],
+    )
+
+
+class ProjectSearchPathsResponse(BaseModel):
+    """Response containing project search paths."""
+
+    paths: list[str] = Field(
+        description="List of configured project search paths",
+        examples=[["/home/user/projects", "/home/user/dev"]],
+    )
