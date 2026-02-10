@@ -241,6 +241,14 @@ class ArtifactSummary(BaseModel):
         default=None,
         description="Claude Code tools used by this artifact",
     )
+    origin: Optional[str] = Field(
+        default=None,
+        description="Origin of the artifact (e.g., 'marketplace', 'local')",
+    )
+    origin_source: Optional[str] = Field(
+        default=None,
+        description="Source identifier within the origin (e.g., marketplace source ID)",
+    )
     collections: Optional[List[ArtifactCollectionInfo]] = Field(
         default=None,
         description="Collections this artifact belongs to (for collection badges)",

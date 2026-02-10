@@ -125,7 +125,9 @@ def decode_cursor(cursor: str) -> str:
         )
 
 
-def parse_deployments(deployments_json: Optional[str]) -> Optional[List[DeploymentSummary]]:
+def parse_deployments(
+    deployments_json: Optional[str],
+) -> Optional[List[DeploymentSummary]]:
     """Parse deployments_json field from CollectionArtifact into DeploymentSummary list.
 
     Args:
@@ -149,7 +151,9 @@ def parse_deployments(deployments_json: Optional[str]) -> Optional[List[Deployme
                 # Parse deployed_at timestamp if it's a string
                 deployed_at = dep.get("deployed_at")
                 if isinstance(deployed_at, str):
-                    deployed_at = datetime.fromisoformat(deployed_at.replace("Z", "+00:00"))
+                    deployed_at = datetime.fromisoformat(
+                        deployed_at.replace("Z", "+00:00")
+                    )
                 elif not isinstance(deployed_at, datetime):
                     continue  # Skip invalid entries
 
@@ -814,9 +818,7 @@ def _refresh_single_collection_cache(
                 try:
                     tag_service.sync_artifact_tags(ca.artifact_id, file_artifact.tags)
                 except Exception as e:
-                    logger.warning(
-                        f"Tag ORM sync failed for {ca.artifact_id}: {e}"
-                    )
+                    logger.warning(f"Tag ORM sync failed for {ca.artifact_id}: {e}")
 
         except Exception as e:
             error_msg = f"Failed to refresh {ca.artifact_id}: {e}"
@@ -1564,6 +1566,8 @@ async def list_collection_artifacts(
                     author=assoc.author,
                     tags=tags,
                     tools=assoc.tools,
+                    origin=assoc.origin,
+                    origin_source=assoc.origin_source,
                     collections=_get_artifact_collections(session, assoc.artifact_id),
                     deployments=parse_deployments(assoc.deployments_json),
                 )
@@ -1620,6 +1624,8 @@ async def list_collection_artifacts(
                                 and file_artifact.metadata.tools
                                 else None
                             ),
+                            origin=getattr(file_artifact, "origin", None),
+                            origin_source=getattr(file_artifact, "origin_source", None),
                             collections=_get_artifact_collections(
                                 session, assoc.artifact_id
                             ),
@@ -1658,6 +1664,8 @@ async def list_collection_artifacts(
                             author=artifact_summary.author,
                             tags=artifact_summary.tags,
                             tools=artifact_summary.tools,
+                            origin=artifact_summary.origin,
+                            origin_source=artifact_summary.origin_source,
                             collections=artifact_summary.collections,
                             groups=groups,
                             deployments=artifact_summary.deployments,

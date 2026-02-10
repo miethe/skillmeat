@@ -3601,6 +3601,7 @@ async def import_artifacts(
     source_id: str,
     request: ImportRequest,
     collection_mgr: CollectionManagerDep,
+    artifact_mgr: ArtifactManagerDep,
     session: DbSessionDep,
 ) -> ImportResultDTO:
     """Import catalog entries to local collection.
@@ -3726,6 +3727,30 @@ async def import_artifacts(
             session.commit()
             logger.info(
                 f"Added {db_added_count} artifacts to default database collection"
+            )
+
+            # Refresh cache for each imported artifact to populate metadata
+            # (description, source, origin, origin_source, etc.) from filesystem
+            from skillmeat.api.services.artifact_cache_service import (
+                refresh_single_artifact_cache,
+            )
+
+            refresh_count = 0
+            for entry in import_result.entries:
+                if entry.status.value == "success":
+                    artifact_id = f"{entry.artifact_type}:{entry.name}"
+                    try:
+                        refreshed = refresh_single_artifact_cache(
+                            session, artifact_mgr, artifact_id
+                        )
+                        if refreshed:
+                            refresh_count += 1
+                    except Exception as refresh_err:
+                        logger.warning(
+                            f"Cache refresh failed for {artifact_id}: {refresh_err}"
+                        )
+            logger.info(
+                f"Refreshed cache for {refresh_count}/{db_added_count} imported artifacts"
             )
         except Exception as e:
             logger.error(f"Failed to add artifacts to database collection: {e}")
