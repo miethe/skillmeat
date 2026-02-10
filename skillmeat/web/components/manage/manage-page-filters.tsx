@@ -4,7 +4,6 @@ import * as React from 'react';
 import { Search, X, FolderKanban } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -13,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { TagFilterPopover } from '@/components/ui/tag-filter-popover';
+import { ActiveFilterRow, type ActiveFilterItem } from '@/components/shared/active-filter-row';
 import type { ArtifactType } from '@/types/artifact';
 
 /**
@@ -77,6 +77,7 @@ export interface ManagePageFiltersProps {
   // Data
   availableProjects: string[];
   availableTags?: Array<{ name: string; artifact_count: number }>;
+  showTypeFilter?: boolean;
 }
 
 /**
@@ -121,6 +122,7 @@ export function ManagePageFilters({
   onClearAll,
   availableProjects,
   availableTags,
+  showTypeFilter = true,
 }: ManagePageFiltersProps) {
   // Debounced search state
   const [searchInput, setSearchInput] = React.useState(search);
@@ -162,9 +164,48 @@ export function ManagePageFilters({
   // Count active filters (excluding search)
   const activeFilterCount =
     (status !== 'all' ? 1 : 0) +
-    (type !== 'all' ? 1 : 0) +
+    (showTypeFilter && type !== 'all' ? 1 : 0) +
     (project !== null ? 1 : 0) +
     tags.length;
+
+  const activeFilterItems: ActiveFilterItem[] = [
+    ...(project
+      ? [
+          {
+            id: `project:${project}`,
+            label: `Project: ${project}`,
+            onRemove: () => onProjectChange(null),
+            ariaLabel: `Remove project filter: ${project}`,
+          },
+        ]
+      : []),
+    ...(status !== 'all'
+      ? [
+          {
+            id: `status:${status}`,
+            label: `Status: ${STATUS_OPTIONS.find((o) => o.value === status)?.label}`,
+            onRemove: () => onStatusChange('all'),
+            ariaLabel: `Remove status filter: ${STATUS_OPTIONS.find((o) => o.value === status)?.label}`,
+          },
+        ]
+      : []),
+    ...(showTypeFilter && type !== 'all'
+      ? [
+          {
+            id: `type:${type}`,
+            label: `Type: ${TYPE_OPTIONS.find((o) => o.value === type)?.label}`,
+            onRemove: () => onTypeChange('all'),
+            ariaLabel: `Remove type filter: ${TYPE_OPTIONS.find((o) => o.value === type)?.label}`,
+          },
+        ]
+      : []),
+    ...tags.map((tagName) => ({
+      id: `tag:${tagName}`,
+      label: tagName,
+      onRemove: () => onTagsChange(tags.filter((t) => t !== tagName)),
+      ariaLabel: `Remove tag filter: ${tagName}`,
+    })),
+  ];
 
   return (
     <div className="space-y-3 border-b bg-muted/20 p-4" role="search" aria-label="Filter artifacts">
@@ -236,18 +277,23 @@ export function ManagePageFilters({
         </Select>
 
         {/* Type Filter */}
-        <Select value={type} onValueChange={(value) => onTypeChange(value as ArtifactType | 'all')}>
-          <SelectTrigger className="w-[140px]" aria-label="Filter by artifact type">
-            <SelectValue placeholder="All Types" />
-          </SelectTrigger>
-          <SelectContent>
-            {TYPE_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {showTypeFilter && (
+          <Select
+            value={type}
+            onValueChange={(value) => onTypeChange(value as ArtifactType | 'all')}
+          >
+            <SelectTrigger className="w-[140px]" aria-label="Filter by artifact type">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              {TYPE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {/* Tags Filter Popover */}
         <TagFilterPopover
@@ -271,76 +317,7 @@ export function ManagePageFilters({
       </div>
 
       {/* Active Filters Display (Chips) */}
-      {activeFilterCount > 0 && (
-        <div
-          className="flex flex-wrap items-center gap-2"
-          role="status"
-          aria-live="polite"
-          aria-label="Active filters"
-        >
-          <span className="text-sm text-muted-foreground">Active filters:</span>
-
-          {/* Project chip */}
-          {project && (
-            <Badge variant="secondary" className="gap-1">
-              Project: {project}
-              <button
-                type="button"
-                className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-ring"
-                onClick={() => onProjectChange(null)}
-                aria-label={`Remove project filter: ${project}`}
-              >
-                <X className="h-3 w-3" aria-hidden="true" />
-              </button>
-            </Badge>
-          )}
-
-          {/* Status chip */}
-          {status !== 'all' && (
-            <Badge variant="secondary" className="gap-1">
-              Status: {STATUS_OPTIONS.find((o) => o.value === status)?.label}
-              <button
-                type="button"
-                className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-ring"
-                onClick={() => onStatusChange('all')}
-                aria-label={`Remove status filter: ${STATUS_OPTIONS.find((o) => o.value === status)?.label}`}
-              >
-                <X className="h-3 w-3" aria-hidden="true" />
-              </button>
-            </Badge>
-          )}
-
-          {/* Type chip */}
-          {type !== 'all' && (
-            <Badge variant="secondary" className="gap-1">
-              Type: {TYPE_OPTIONS.find((o) => o.value === type)?.label}
-              <button
-                type="button"
-                className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-ring"
-                onClick={() => onTypeChange('all')}
-                aria-label={`Remove type filter: ${TYPE_OPTIONS.find((o) => o.value === type)?.label}`}
-              >
-                <X className="h-3 w-3" aria-hidden="true" />
-              </button>
-            </Badge>
-          )}
-
-          {/* Tag chips */}
-          {tags.map((tagName) => (
-            <Badge key={tagName} variant="secondary" className="gap-1">
-              {tagName}
-              <button
-                type="button"
-                className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-ring"
-                onClick={() => onTagsChange(tags.filter((t) => t !== tagName))}
-                aria-label={`Remove tag filter: ${tagName}`}
-              >
-                <X className="h-3 w-3" aria-hidden="true" />
-              </button>
-            </Badge>
-          ))}
-        </div>
-      )}
+      <ActiveFilterRow items={activeFilterItems} />
     </div>
   );
 }
