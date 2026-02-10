@@ -481,20 +481,19 @@ export function MemoryDetailsModal({
     projectId
   );
 
-  // Don't render the modal internals if no memory is provided
-  if (!memory) {
-    return null;
-  }
-
-  const normalizedAnchors = (memory.anchors ?? [])
-    .map((anchor) => normalizeAnchor(anchor))
-    .filter((anchor): anchor is AnchorEntry => anchor !== null)
-    .sort((a, b) => {
-      const left = ANCHOR_TYPE_ORDER[a.type] ?? 99;
-      const right = ANCHOR_TYPE_ORDER[b.type] ?? 99;
-      if (left !== right) return left - right;
-      return a.path.localeCompare(b.path);
-    });
+  // Compute normalized anchors and tabs BEFORE early return to satisfy Rules of Hooks
+  const normalizedAnchors = React.useMemo(() => {
+    if (!memory) return [];
+    return (memory.anchors ?? [])
+      .map((anchor) => normalizeAnchor(anchor))
+      .filter((anchor): anchor is AnchorEntry => anchor !== null)
+      .sort((a, b) => {
+        const left = ANCHOR_TYPE_ORDER[a.type] ?? 99;
+        const right = ANCHOR_TYPE_ORDER[b.type] ?? 99;
+        if (left !== right) return left - right;
+        return a.path.localeCompare(b.path);
+      });
+  }, [memory]);
   const anchorCount = normalizedAnchors.length;
 
   const tabs = React.useMemo(
@@ -506,6 +505,11 @@ export function MemoryDetailsModal({
       ),
     [anchorCount]
   );
+
+  // Don't render the modal internals if no memory is provided
+  if (!memory) {
+    return null;
+  }
 
   // Header actions: MemoryTypeBadge + status badge
   const headerActions = (
