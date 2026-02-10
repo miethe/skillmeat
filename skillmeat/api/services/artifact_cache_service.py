@@ -210,7 +210,11 @@ def populate_collection_artifact_from_import(
 
     # Combine ImportEntry data (already in memory) with filesystem data
     metadata = {
-        "description": entry.description,
+        "description": entry.description or (
+            file_artifact.metadata.description
+            if file_artifact and file_artifact.metadata
+            else None
+        ),
         "source": entry.upstream_url,
         "origin": "marketplace",
         "origin_source": "github",
