@@ -3270,6 +3270,9 @@ async def list_artifacts(
         description="Sort order: asc or desc",
         regex="^(asc|desc)$",
     ),
+    search: Optional[str] = Query(
+        None, description="Search artifacts by name (case-insensitive partial match)"
+    ),
     limit: int = Query(50, ge=1, le=100, description="Maximum items per page (1-100)"),
     cursor: Optional[str] = Query(
         None, description="Cursor for pagination (from previous response)"
@@ -3291,6 +3294,7 @@ async def list_artifacts(
         include_excluded: If True, include entries with status="excluded" (default: False)
         sort_by: Field to sort by - confidence, name, or date (detected_at). Default: confidence
         sort_order: Sort order - asc or desc. Default: desc (highest first)
+        search: Optional search string to filter artifacts by name (case-insensitive partial match)
         limit: Maximum items per page (1-100)
         cursor: Pagination cursor from previous response
 
@@ -3357,6 +3361,7 @@ async def list_artifacts(
             or effective_min_confidence
             or max_confidence
             or not include_excluded
+            or search
         )
 
         if needs_filtered_query:
@@ -3373,6 +3378,11 @@ async def list_artifacts(
             # This handles the case where no status filter was provided
             if not include_excluded and not status_filter:
                 entries = [e for e in entries if e.status != "excluded"]
+
+            # Apply name search filter (case-insensitive partial match)
+            if search:
+                search_lower = search.lower()
+                entries = [e for e in entries if search_lower in e.name.lower()]
 
             # Apply sorting before pagination
             if sort_by:
