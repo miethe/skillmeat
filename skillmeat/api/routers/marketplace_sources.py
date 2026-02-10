@@ -42,6 +42,7 @@ from typing import Annotated, Any, Dict, List, Literal, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from skillmeat.api.dependencies import ArtifactManagerDep, CollectionManagerDep
@@ -3701,7 +3702,8 @@ async def import_artifacts(
         )
         strategy = ConflictStrategy(request.conflict_strategy)
 
-        import_result = coordinator.import_entries(
+        import_result = await run_in_threadpool(
+            coordinator.import_entries,
             entries=entries_data,
             source_id=source_id,
             strategy=strategy,
@@ -3992,7 +3994,8 @@ async def reimport_catalog_entry(
             collection_mgr=collection_mgr,
         )
 
-        import_result = coordinator.import_entries(
+        import_result = await run_in_threadpool(
+            coordinator.import_entries,
             entries=entries_data,
             source_id=source_id,
             strategy=ConflictStrategy.OVERWRITE,  # Force overwrite for reimport
