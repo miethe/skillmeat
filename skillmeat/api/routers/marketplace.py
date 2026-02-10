@@ -6,6 +6,7 @@ through configured broker integrations.
 
 import base64
 import logging
+import asyncio
 from pathlib import Path
 from typing import List, Optional
 
@@ -507,7 +508,7 @@ async def install_listing(
 
         # Download bundle
         try:
-            bundle_path = broker_inst.download(install_req.listing_id)
+            bundle_path = await asyncio.to_thread(broker_inst.download, install_req.listing_id)
             logger.info(f"Downloaded bundle to: {bundle_path}")
         except DownloadError as e:
             raise HTTPException(
