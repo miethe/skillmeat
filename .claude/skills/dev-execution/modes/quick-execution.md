@@ -111,13 +111,13 @@ Execute steps that can be parallelized together (single message, multiple Task()
 
 ### 2.3 Incremental Verification
 
-After each major step:
+**Delegate validation — never run quality gates directly as Opus.**
 
-```bash
-pnpm typecheck  # No TypeScript errors
-pnpm test       # Tests pass
-pnpm lint       # Lint clean
-```
+After each major implementation step, delegate to a **task-completion-validator** or **code-reviewer** agent:
+
+> Verify the changes compile and are correct. Files changed: [paths]. Run `pnpm type-check` and report only NEW errors (pre-existing errors in tests/ and types/index.ts are known). Check that component prop interfaces match between caller and callee.
+
+This saves 10-20K tokens of orchestrator context vs. reading files and running commands yourself.
 
 ### 2.4 Commit Progress
 
@@ -132,16 +132,19 @@ Refs: quick-feature/{feature-slug}"
 
 ## Phase 3: Quality Gates
 
-All gates must pass before completion:
+**Delegate to a validation agent** — Opus does NOT run these directly.
 
-| Gate | Command |
-|------|---------|
-| Type checking | `pnpm typecheck` |
-| Tests | `pnpm test` |
-| Lint | `pnpm lint` |
-| Build | `pnpm build` |
+Use **task-completion-validator** or **code-reviewer** agent:
 
-If any fail, fix before proceeding.
+> Run full quality gates on the changes. Commands: `pnpm type-check`, `pnpm test`, `pnpm lint`. Report only NEW failures (document known pre-existing failures to ignore). Files changed: [list paths].
+
+| Gate | Command | Notes |
+|------|---------|-------|
+| Type checking | `pnpm type-check` | Known pre-existing errors in tests/, types/index.ts |
+| Tests | `pnpm test` | Known pre-existing failures in split-preview.tsx |
+| Lint | `pnpm lint` | Known pre-existing exhaustive-deps warnings |
+
+If the validation agent reports new failures, delegate fixes to the appropriate implementation agent.
 
 ## Phase 4: Completion
 
@@ -161,7 +164,7 @@ git commit -m "feat({scope}): {description}
 
 {Detailed commit body describing changes}
 
-Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+Co-Authored-By: Claude"
 ```
 
 ### 4.3 Update Request Log (if applicable)
