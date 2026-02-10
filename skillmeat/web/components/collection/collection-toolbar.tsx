@@ -56,6 +56,10 @@ interface CollectionToolbarProps {
   onToolsChange?: (tools: string[]) => void;
   /** Optional: If provided, use these tools instead of static list */
   availableTools?: AvailableTool[];
+  /** Show type filter in dropdown (disable when type tabs are rendered separately) */
+  showTypeFilter?: boolean;
+  /** Whether grouped view should be selectable */
+  allowGroupedView?: boolean;
 }
 
 /**
@@ -110,6 +114,8 @@ export function CollectionToolbar({
   selectedTools = [],
   onToolsChange,
   availableTools,
+  showTypeFilter = true,
+  allowGroupedView = true,
 }: CollectionToolbarProps) {
   // Local search state for immediate UI feedback
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -126,13 +132,6 @@ export function CollectionToolbar({
   useEffect(() => {
     setLocalSearch(searchQuery);
   }, [searchQuery]);
-
-  // Persist view mode to localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('collection-view-mode', viewMode);
-    }
-  }, [viewMode]);
 
   const handleFilterChange = useCallback(
     (key: keyof ArtifactFilters, value: string) => {
@@ -154,7 +153,11 @@ export function CollectionToolbar({
   // Calculate active filter count
   const activeFilterCount =
     Object.entries(filters).filter(
-      ([, value]) => value !== undefined && value !== 'all' && value !== ''
+      ([key, value]) =>
+        value !== undefined &&
+        value !== 'all' &&
+        value !== '' &&
+        (showTypeFilter || key !== 'type')
     ).length +
     (selectedTags.length > 0 ? 1 : 0) +
     (selectedTools.length > 0 ? 1 : 0);
@@ -216,27 +219,29 @@ export function CollectionToolbar({
               <DropdownMenuSeparator />
 
               {/* Type Filter */}
-              <div className="p-2">
-                <label htmlFor="type-filter" className="mb-1.5 block text-xs font-medium">
-                  Type
-                </label>
-                <Select
-                  value={filters.type || 'all'}
-                  onValueChange={(value) => handleFilterChange('type', value)}
-                >
-                  <SelectTrigger id="type-filter" className="h-8">
-                    <SelectValue placeholder="All Types" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="skill">Skills</SelectItem>
-                    <SelectItem value="command">Commands</SelectItem>
-                    <SelectItem value="agent">Agents</SelectItem>
-                    <SelectItem value="mcp">MCP Servers</SelectItem>
-                    <SelectItem value="hook">Hooks</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {showTypeFilter && (
+                <div className="p-2">
+                  <label htmlFor="type-filter" className="mb-1.5 block text-xs font-medium">
+                    Type
+                  </label>
+                  <Select
+                    value={filters.type || 'all'}
+                    onValueChange={(value) => handleFilterChange('type', value)}
+                  >
+                    <SelectTrigger id="type-filter" className="h-8">
+                      <SelectValue placeholder="All Types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="skill">Skills</SelectItem>
+                      <SelectItem value="command">Commands</SelectItem>
+                      <SelectItem value="agent">Agents</SelectItem>
+                      <SelectItem value="mcp">MCP Servers</SelectItem>
+                      <SelectItem value="hook">Hooks</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Status Filter */}
               <div className="p-2">
@@ -381,6 +386,7 @@ export function CollectionToolbar({
               aria-label="Grouped view"
               aria-pressed={viewMode === 'grouped'}
               className="h-8 w-8 p-0"
+              disabled={!allowGroupedView}
             >
               <Layers className="h-4 w-4" />
             </Button>

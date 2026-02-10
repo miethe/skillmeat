@@ -19,8 +19,9 @@ import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
 import { AddToGroupDialog } from '@/components/collection/add-to-group-dialog';
 import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
 import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
-import { TagFilterBar } from '@/components/ui/tag-filter-popover';
-import { ToolFilterBar } from '@/components/ui/tool-filter-popover';
+import { ArtifactTypeTabs } from '@/components/shared/artifact-type-tabs';
+import { ActiveFilterRow, type ActiveFilterItem } from '@/components/shared/active-filter-row';
+import { GroupedArtifactView } from '@/components/collection/grouped-artifact-view';
 import {
   EntityLifecycleProvider,
   useCollectionContext,
@@ -295,6 +296,13 @@ function CollectionPageContent() {
   // Determine if viewing a specific collection or "All Collections"
   const isSpecificCollection = !!selectedCollectionId && selectedCollectionId !== 'all';
 
+  // Grouped mode requires a specific collection context.
+  useEffect(() => {
+    if (!isSpecificCollection && viewMode === 'grouped') {
+      setViewMode('grid');
+    }
+  }, [isSpecificCollection, viewMode]);
+
   // Conditionally fetch artifacts based on selected collection
   // Both views use infinite scroll pagination for better performance
 
@@ -405,6 +413,16 @@ function CollectionPageContent() {
         scope: newFilters.scope && newFilters.scope !== 'all' ? newFilters.scope : null,
         platform:
           newFilters.platform && newFilters.platform !== 'all' ? newFilters.platform : null,
+      });
+    },
+    [updateUrlParams]
+  );
+
+  // Handle type tab changes
+  const handleTypeTabChange = useCallback(
+    (type: 'all' | ArtifactFilters['type']) => {
+      updateUrlParams({
+        type: type && type !== 'all' ? type : null,
       });
     },
     [updateUrlParams]
@@ -627,6 +645,59 @@ function CollectionPageContent() {
       .sort((a, b) => b.artifact_count - a.artifact_count); // Sort by count descending
   }, [infiniteCollectionData?.pages, infiniteAllArtifactsData?.pages, isSpecificCollection]);
 
+  const activeFilterItems = useMemo<ActiveFilterItem[]>(() => {
+    const items: ActiveFilterItem[] = [];
+
+    if (filters.status && filters.status !== 'all') {
+      items.push({
+        id: `status:${filters.status}`,
+        label: `Status: ${filters.status}`,
+        onRemove: () => updateUrlParams({ status: null }),
+      });
+    }
+    if (filters.scope && filters.scope !== 'all') {
+      items.push({
+        id: `scope:${filters.scope}`,
+        label: `Scope: ${filters.scope}`,
+        onRemove: () => updateUrlParams({ scope: null }),
+      });
+    }
+    if (filters.platform && filters.platform !== 'all') {
+      items.push({
+        id: `platform:${filters.platform}`,
+        label: `Platform: ${filters.platform}`,
+        onRemove: () => updateUrlParams({ platform: null }),
+      });
+    }
+
+    selectedTags.forEach((tag) => {
+      items.push({
+        id: `tag:${tag}`,
+        label: tag,
+        onRemove: () => handleTagsChange(selectedTags.filter((t) => t !== tag)),
+      });
+    });
+
+    selectedTools.forEach((tool) => {
+      items.push({
+        id: `tool:${tool}`,
+        label: `Tool: ${tool}`,
+        onRemove: () => handleToolsChange(selectedTools.filter((t) => t !== tool)),
+      });
+    });
+
+    return items;
+  }, [
+    filters.status,
+    filters.scope,
+    filters.platform,
+    selectedTags,
+    selectedTools,
+    updateUrlParams,
+    handleTagsChange,
+    handleToolsChange,
+  ]);
+
   // ==========================================================================
   // Deep Link: Auto-open modal from URL artifact param
   // ==========================================================================
@@ -767,21 +838,26 @@ function CollectionPageContent() {
         selectedTools={selectedTools}
         onToolsChange={handleToolsChange}
         availableTools={availableTools}
+        showTypeFilter={false}
+        allowGroupedView={isSpecificCollection}
       />
 
-      {/* Tag Filter Bar - Shows active tag filters */}
-      {selectedTags.length > 0 && (
-        <div className="border-b bg-muted/10 px-6 py-2">
-          <TagFilterBar selectedTags={selectedTags} onChange={handleTagsChange} />
-        </div>
-      )}
+      {/* Active filters row */}
+      <div className="border-b bg-muted/10 px-6 py-2">
+        <ActiveFilterRow items={activeFilterItems} />
+      </div>
 
-      {/* Tool Filter Bar - Shows active tool filters */}
-      {selectedTools.length > 0 && (
-        <div className="border-b bg-muted/10 px-6 py-2">
-          <ToolFilterBar selectedTools={selectedTools} onChange={handleToolsChange} />
-        </div>
-      )}
+      {/* Type tabs below filter bar and active-filters row */}
+      <div className="border-b px-6 py-2">
+        <ArtifactTypeTabs value={urlType as 'all' | ArtifactFilters['type']} onChange={handleTypeTabChange} />
+      </div>
+
+      {/* Result count line */}
+      <div className="border-b px-6 py-2 text-sm text-muted-foreground">
+        {isLoadingArtifacts
+          ? 'Loading artifacts...'
+          : `Showing ${filteredArtifacts.length} of ${totalCount} artifacts${hasNextPage ? ' (scroll for more)' : ''}`}
+      </div>
 
       <div className="flex-1 overflow-auto p-6">
         {/* Error State */}
@@ -825,14 +901,6 @@ function CollectionPageContent() {
         {/* Artifacts View */}
         {!error && !isLoadingArtifacts && filteredArtifacts.length > 0 && (
           <>
-            {/* Artifact count indicator with pagination info (works for BOTH views) */}
-            {totalCount > 0 && (
-              <div className="mb-4 text-sm text-muted-foreground">
-                Showing {filteredArtifacts.length} of {totalCount} artifacts
-                {hasNextPage && ' (scroll for more)'}
-              </div>
-            )}
-
             {viewMode === 'grid' ? (
               <ArtifactGrid
                 artifacts={filteredArtifacts}
@@ -857,9 +925,17 @@ function CollectionPageContent() {
                 onEdit={handleEditFromDropdown}
                 onDelete={handleDeleteFromDropdown}
               />
+            ) : isSpecificCollection && selectedCollectionId ? (
+              <GroupedArtifactView
+                collectionId={selectedCollectionId}
+                artifacts={filteredArtifacts}
+                onArtifactClick={handleArtifactClick}
+                onMoveToCollection={handleMoveToCollection}
+                onManageGroups={handleManageGroups}
+                onEdit={handleEditFromDropdown}
+                onDelete={handleDeleteFromDropdown}
+              />
             ) : (
-              // Grouped view placeholder for Phase 5
-              // For now, show grid view
               <ArtifactGrid
                 artifacts={filteredArtifacts}
                 isLoading={false}
