@@ -24,6 +24,57 @@ logger = logging.getLogger(__name__)
 DEFAULT_METADATA_TTL_SECONDS = 30 * 60
 
 
+def create_or_update_collection_artifact(
+    session: Session,
+    collection_id: str,
+    artifact_id: str,
+    metadata: dict,
+) -> CollectionArtifact:
+    """Create or update a CollectionArtifact row with full metadata.
+
+    Pure DB upsert -- no filesystem reads, no manager dependencies.
+    Sets synced_at = utcnow() automatically. On create, also sets added_at.
+
+    Args:
+        session: DB session
+        collection_id: Collection ID (e.g., "default")
+        artifact_id: Full artifact ID (e.g., "skill:1password")
+        metadata: Dict with metadata fields (description, source, origin,
+                  origin_source, tags_json, author, license, tools_json,
+                  version, resolved_sha, resolved_version, etc.)
+
+    Returns:
+        CollectionArtifact ORM instance (committed)
+    """
+    assoc = (
+        session.query(CollectionArtifact)
+        .filter_by(collection_id=collection_id, artifact_id=artifact_id)
+        .first()
+    )
+
+    metadata_with_timestamp = {
+        **metadata,
+        "synced_at": datetime.utcnow(),
+    }
+
+    if assoc:
+        for key, value in metadata_with_timestamp.items():
+            setattr(assoc, key, value)
+        logger.debug(f"Updated cache for artifact: {artifact_id}")
+    else:
+        assoc = CollectionArtifact(
+            collection_id=collection_id,
+            artifact_id=artifact_id,
+            added_at=datetime.utcnow(),
+            **metadata_with_timestamp,
+        )
+        session.add(assoc)
+        logger.debug(f"Created cache entry for artifact: {artifact_id}")
+
+    session.commit()
+    return assoc
+
+
 def refresh_single_artifact_cache(
     session: Session,
     artifact_mgr,
@@ -64,15 +115,8 @@ def refresh_single_artifact_cache(
             logger.warning(f"Artifact not found in file system: {artifact_id}")
             return False
 
-        # Find or create CollectionArtifact row
-        assoc = (
-            session.query(CollectionArtifact)
-            .filter_by(collection_id=collection_id, artifact_id=artifact_id)
-            .first()
-        )
-
-        # Build metadata fields from file artifact
-        metadata_fields = {
+        # Build metadata dict from file artifact
+        metadata = {
             "description": (
                 file_artifact.metadata.description if file_artifact.metadata else None
             ),
@@ -82,7 +126,9 @@ def refresh_single_artifact_cache(
             "license": (
                 file_artifact.metadata.license if file_artifact.metadata else None
             ),
-            "tags_json": json.dumps(file_artifact.tags) if file_artifact.tags else None,
+            "tags_json": (
+                json.dumps(file_artifact.tags) if file_artifact.tags else None
+            ),
             "tools_json": (
                 json.dumps(file_artifact.metadata.tools)
                 if file_artifact.metadata and file_artifact.metadata.tools
@@ -97,26 +143,12 @@ def refresh_single_artifact_cache(
             "origin_source": getattr(file_artifact, "origin_source", None),
             "resolved_sha": getattr(file_artifact, "resolved_sha", None),
             "resolved_version": getattr(file_artifact, "resolved_version", None),
-            "synced_at": datetime.utcnow(),
         }
 
-        if assoc:
-            # Update existing row
-            for key, value in metadata_fields.items():
-                setattr(assoc, key, value)
-            logger.debug(f"Updated cache for artifact: {artifact_id}")
-        else:
-            # Create new row
-            new_assoc = CollectionArtifact(
-                collection_id=collection_id,
-                artifact_id=artifact_id,
-                added_at=datetime.utcnow(),
-                **metadata_fields,
-            )
-            session.add(new_assoc)
-            logger.debug(f"Created cache entry for artifact: {artifact_id}")
-
-        session.commit()
+        # Delegate to shared upsert
+        create_or_update_collection_artifact(
+            session, collection_id, artifact_id, metadata
+        )
 
         # Sync tags to Tag ORM tables
         if file_artifact.tags:
@@ -141,6 +173,92 @@ def refresh_single_artifact_cache(
         except Exception:
             pass  # Ignore rollback errors
         return False
+
+
+def populate_collection_artifact_from_import(
+    session: Session,
+    artifact_mgr,
+    collection_id: str,
+    entry,
+) -> CollectionArtifact:
+    """Populate a CollectionArtifact from an import result and filesystem data.
+
+    Import-specific helper that combines data already available in memory
+    (from the ImportEntry) with filesystem artifact metadata (via
+    artifact_mgr.show()) to create a fully populated DB cache row in a
+    single operation.
+
+    Args:
+        session: DB session
+        artifact_mgr: ArtifactManager instance with show() method
+        collection_id: Collection ID (e.g., "default")
+        entry: An ImportEntry object with .name, .artifact_type, .description,
+               .upstream_url, .tags fields
+
+    Returns:
+        CollectionArtifact ORM instance (committed)
+
+    Raises:
+        Exception: If artifact_mgr.show() fails or DB commit fails.
+                   Callers should handle exceptions appropriately.
+    """
+    artifact_id = f"{entry.artifact_type}:{entry.name}"
+
+    # Read filesystem for fields not available in ImportEntry
+    # (author, license, tools, version, resolved_sha, resolved_version)
+    file_artifact = artifact_mgr.show(entry.name)
+
+    # Combine ImportEntry data (already in memory) with filesystem data
+    metadata = {
+        "description": entry.description,
+        "source": entry.upstream_url,
+        "origin": "marketplace",
+        "origin_source": "github",
+        "tags_json": json.dumps(entry.tags) if entry.tags else None,
+        # Fields only available from filesystem:
+        "author": (
+            file_artifact.metadata.author
+            if file_artifact and file_artifact.metadata
+            else None
+        ),
+        "license": (
+            file_artifact.metadata.license
+            if file_artifact and file_artifact.metadata
+            else None
+        ),
+        "tools_json": (
+            json.dumps(file_artifact.metadata.tools)
+            if file_artifact and file_artifact.metadata and file_artifact.metadata.tools
+            else None
+        ),
+        "version": (
+            file_artifact.metadata.version
+            if file_artifact and file_artifact.metadata
+            else None
+        ),
+        "resolved_sha": (
+            getattr(file_artifact, "resolved_sha", None) if file_artifact else None
+        ),
+        "resolved_version": (
+            getattr(file_artifact, "resolved_version", None) if file_artifact else None
+        ),
+    }
+
+    result = create_or_update_collection_artifact(
+        session, collection_id, artifact_id, metadata
+    )
+
+    # Sync tags to Tag ORM tables
+    tags = entry.tags or (file_artifact.tags if file_artifact else None)
+    if tags:
+        try:
+            from skillmeat.core.services import TagService
+
+            TagService().sync_artifact_tags(artifact_id, tags)
+        except Exception as e:
+            logger.warning(f"Tag ORM sync failed for {artifact_id}: {e}")
+
+    return result
 
 
 def invalidate_artifact_cache(
