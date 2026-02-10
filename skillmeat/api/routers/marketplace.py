@@ -25,7 +25,9 @@ from skillmeat.api.schemas.marketplace import (
     PublishRequest,
     PublishResponse,
 )
-from skillmeat.api.services.artifact_cache_service import refresh_single_artifact_cache
+from skillmeat.api.services.artifact_cache_service import (
+    populate_collection_artifact_from_import,
+)
 from skillmeat.api.utils.cache import get_cache_manager
 from skillmeat.cache.models import get_session
 from skillmeat.core.sharing.bundle import Bundle
@@ -545,21 +547,63 @@ async def install_listing(
                 f"Imported {len(artifact_names)} artifacts from bundle: {artifact_names}"
             )
 
-            # Sync imported artifacts to DB cache for source field display
+            # Sync imported artifacts to DB cache with source from bundle metadata
+            # (refresh_single_artifact_cache reads file_artifact.upstream which is empty
+            # for marketplace imports; we must use bundle.metadata.repository instead)
             try:
                 db_session = get_session()
                 try:
                     synced_count = 0
+                    # Get source URL from bundle metadata
+                    source_url = bundle.metadata.repository if bundle.metadata else None
+
+                    # Build a map of artifact name -> BundleArtifact for per-artifact metadata
+                    bundle_artifact_map = {a.name: a for a in bundle.artifacts}
+
+                    # Entry-like adapter for populate_collection_artifact_from_import
+                    class MarketplaceImportEntry:
+                        def __init__(
+                            self, name, artifact_type, description, upstream_url, tags
+                        ):
+                            self.name = name
+                            self.artifact_type = artifact_type
+                            self.description = description
+                            self.upstream_url = upstream_url
+                            self.tags = tags
+
                     for artifact in result.imported_artifacts:
                         # Only sync successfully imported artifacts (not skipped)
                         if artifact.resolution in ("imported", "forked", "merged"):
-                            artifact_id = f"{artifact.type}:{artifact.new_name or artifact.name}"
+                            artifact_name = artifact.new_name or artifact.name
+                            artifact_id = f"{artifact.type}:{artifact_name}"
+
+                            # Get per-artifact metadata from bundle if available
+                            bundle_artifact = bundle_artifact_map.get(artifact.name)
+                            artifact_metadata = (
+                                bundle_artifact.metadata if bundle_artifact else {}
+                            )
+
+                            entry = MarketplaceImportEntry(
+                                name=artifact_name,
+                                artifact_type=artifact.type,
+                                description=artifact_metadata.get("description")
+                                or (
+                                    bundle.metadata.description
+                                    if bundle.metadata
+                                    else None
+                                ),
+                                upstream_url=source_url,
+                                tags=(
+                                    bundle.metadata.tags if bundle.metadata else None
+                                ),
+                            )
+
                             try:
-                                refresh_single_artifact_cache(
+                                populate_collection_artifact_from_import(
                                     db_session,
                                     importer.artifact_mgr,
-                                    artifact_id,
                                     "default",
+                                    entry,
                                 )
                                 synced_count += 1
                             except Exception as cache_err:
