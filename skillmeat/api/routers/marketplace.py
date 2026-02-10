@@ -4,6 +4,7 @@ Provides REST API for browsing, installing, and publishing marketplace listings
 through configured broker integrations.
 """
 
+import asyncio
 import base64
 import logging
 from pathlib import Path
@@ -226,27 +227,36 @@ async def list_listings(
 
         # Aggregate listings from brokers
         all_listings: List[MarketplaceListing] = []
-        for broker_inst in brokers_to_query:
+
+        async def fetch_broker_listings(broker_inst) -> List[MarketplaceListing]:
+            """Helper to fetch listings from a single broker."""
             try:
-                broker_listings = broker_inst.listings(
+                # Run blocking I/O in thread pool
+                broker_listings = await asyncio.to_thread(
+                    broker_inst.listings,
                     filters=filters,
                     page=page,
                     page_size=limit,
                 )
-                all_listings.extend(broker_listings)
                 logger.debug(
                     f"Retrieved {len(broker_listings)} listings from {broker_inst.name}"
                 )
+                return broker_listings
             except RateLimitError as e:
                 logger.warning(
                     f"Rate limit exceeded for broker {broker_inst.name}: {e}"
                 )
-                # Continue with other brokers
-                continue
+                return []
             except MarketplaceBrokerError as e:
                 logger.error(f"Error fetching from broker {broker_inst.name}: {e}")
-                # Continue with other brokers
-                continue
+                return []
+
+        # Fetch from all brokers concurrently
+        tasks = [fetch_broker_listings(b) for b in brokers_to_query]
+        results = await asyncio.gather(*tasks)
+
+        for broker_listings in results:
+            all_listings.extend(broker_listings)
 
         # Sort by created_at (newest first)
         all_listings.sort(
