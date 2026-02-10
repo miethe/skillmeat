@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.concurrency import run_in_threadpool
 
 from skillmeat.api.dependencies import verify_api_key
 from skillmeat.api.middleware.auth import OptionalTokenDep, TokenDep
@@ -26,6 +27,7 @@ from skillmeat.api.schemas.marketplace import (
     PublishResponse,
 )
 from skillmeat.api.utils.cache import get_cache_manager
+from skillmeat.core.sharing.builder import inspect_bundle
 from skillmeat.core.sharing.bundle import Bundle
 from skillmeat.core.sharing.importer import BundleImporter
 from skillmeat.marketplace.broker import (
@@ -636,7 +638,7 @@ async def publish_bundle(
 
         # Load bundle
         try:
-            bundle = Bundle.from_file(bundle_path)
+            bundle = await run_in_threadpool(inspect_bundle, bundle_path)
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -655,7 +657,9 @@ async def publish_bundle(
 
         # Publish bundle
         try:
-            result = broker_inst.publish(bundle, metadata=publish_req.metadata)
+            result = await run_in_threadpool(
+                broker_inst.publish, bundle, metadata=publish_req.metadata
+            )
 
             logger.info(
                 f"Bundle published: submission_id={result.submission_id}, status={result.status}"
