@@ -182,6 +182,16 @@ Subagents can run in the background, allowing parallel work:
 - When results are immediately needed
 - When tasks have dependencies requiring sequential execution
 
+### Context Budget Discipline
+
+**Invariants**: `.claude/rules/context-budget.md` (auto-loaded every session)
+
+**Budget**: ~52K baseline leaves ~148K for work. Budget ~25-30K per phase.
+
+**Key rules**: No `TaskOutput()` for file-writing agents (verify on disk instead). Task prompts < 500 words (paths, not contents). Don't explore for work you'll delegate. Always scope Glob with `path`.
+
+**Verification pattern for background agents**: See `dev-execution/orchestration/batch-delegation.md`.
+
 ### Example Delegation
 
 ```text

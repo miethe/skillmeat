@@ -69,23 +69,28 @@ From YAML, identify:
 
 ### 2.3 Task Delegation Template
 
+**Budget: < 500 words per prompt (~2K tokens).** Reference patterns by file path — never embed file contents or code blocks. Subagents read files themselves.
+
 ```
 @{agent-from-assigned_to}
 
 Phase ${PHASE_NUM}, {task_id}: {task_title}
 
-{task_description}
+{task_description — keep to 2-3 sentences}
 
-Project Patterns to Follow:
-- Layered architecture: routers → services → repositories → DB
-- ErrorResponse envelopes for errors
-- Cursor pagination for lists
-- Telemetry spans and structured JSON logs
-- DTOs separate from ORM models
-
-Success criteria:
-- [What defines completion]
+Files to modify: {list file paths}
+Pattern to follow: {path to example file, e.g. "follow components/settings/github-settings.tsx"}
+Acceptance criteria:
+- [Criterion 1]
+- [Criterion 2]
+Validation: Run `pnpm type-check` and `pnpm lint` from `skillmeat/web/`
 ```
+
+**Anti-patterns in prompts** (waste 3-10K tokens each):
+- Embedding file contents or code blocks
+- Including import statements or boilerplate
+- Repeating information the subagent can read from files
+- Describing patterns that exist in a referenceable file
 
 **If subagent invocation fails**: Document in progress tracker and proceed with direct implementation.
 

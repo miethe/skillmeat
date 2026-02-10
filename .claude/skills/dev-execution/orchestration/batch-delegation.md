@@ -106,6 +106,35 @@ Task("frontend-architect", "TASK-2.2: Wire up page routing...")
 # 7. Continue through all batches
 ```
 
+## Background Task Verification
+
+When background agents write/modify files, do NOT use `TaskOutput()` to collect results.
+`TaskOutput()` returns ~7.5K tokens of raw agent transcript — mostly metadata noise.
+
+**Instead:**
+
+1. Verify expected files exist: `Glob("path/to/expected-file.*")`
+2. Run validation: `pnpm type-check`, `pnpm lint`
+3. Mark task complete via CLI: `update-batch.py`
+4. Only if errors suspected: `Read` the agent output file (last 20 lines only)
+
+```text
+# After launching background agents
+Task("ui-engineer", "Create component...", run_in_background=true)  # Returns task_id
+
+# DON'T (wastes ~7.5K tokens per call):
+TaskOutput(task_id)
+
+# DO (near-zero token cost):
+Glob("path/to/expected-component.tsx")      # Verify file exists
+Bash("cd skillmeat/web && pnpm type-check") # Verify it compiles
+```
+
+**When TaskOutput IS appropriate:**
+- Agent was doing exploration/analysis (no files written) and you need the findings
+- Agent hit an error and you need to diagnose what went wrong
+- In these cases, prefer `TaskOutput(task_id, block: false)` to check status first
+
 ## Handling Subagent Failures
 
 If a Task() call fails:
