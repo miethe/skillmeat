@@ -213,6 +213,22 @@ class DeploymentSummary(BaseModel):
     deployed_at: datetime = Field(
         description="Deployment timestamp",
     )
+    content_hash: Optional[str] = Field(
+        default=None,
+        description="SHA-256 content hash at deployment time",
+    )
+    deployment_profile_id: Optional[str] = Field(
+        default=None,
+        description="Deployment profile identifier (e.g., 'claude_code', 'codex')",
+    )
+    local_modifications: Optional[bool] = Field(
+        default=None,
+        description="Whether local drift has been detected",
+    )
+    platform: Optional[str] = Field(
+        default=None,
+        description="Target platform for the deployment",
+    )
 
     class Config:
         """Pydantic config."""
@@ -222,6 +238,10 @@ class DeploymentSummary(BaseModel):
                 "project_path": "/Users/user/project",
                 "project_name": "myproject",
                 "deployed_at": "2026-02-01T10:00:00Z",
+                "content_hash": "abc123def456",
+                "deployment_profile_id": "claude_code",
+                "local_modifications": False,
+                "platform": "claude-code",
             }
         }
 

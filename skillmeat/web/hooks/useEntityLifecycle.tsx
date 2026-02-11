@@ -414,6 +414,8 @@ export function EntityLifecycleProvider({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['entities'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
     },
   });
 
@@ -621,10 +623,7 @@ async function fetchCollectionEntities(
           params.set('after', cursor);
         }
 
-        const collectionPath = collectionId || 'default';
-        const response = await apiRequest<ArtifactListResponse>(
-          `/user-collections/${collectionPath}/artifacts?${params.toString()}`
-        );
+        const response = await apiRequest<ArtifactListResponse>(`/artifacts?${params.toString()}`);
         allItems = [...allItems, ...(response.items as ApiArtifactResponse[])];
 
         hasNextPage = response.page_info?.has_next_page ?? false;

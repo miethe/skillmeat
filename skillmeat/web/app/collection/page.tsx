@@ -142,8 +142,7 @@ function CollectionPageContent() {
       type: urlType !== 'all' ? (urlType as ArtifactFilters['type']) : undefined,
       status: urlStatus !== 'all' ? (urlStatus as ArtifactFilters['status']) : undefined,
       scope: urlScope !== 'all' ? (urlScope as ArtifactFilters['scope']) : undefined,
-      platform:
-        urlPlatform !== 'all' ? (urlPlatform as ArtifactFilters['platform']) : undefined,
+      platform: urlPlatform !== 'all' ? (urlPlatform as ArtifactFilters['platform']) : undefined,
     }),
     [urlType, urlStatus, urlScope, urlPlatform]
   );
@@ -317,6 +316,7 @@ function CollectionPageContent() {
     isFetchingNextPage: isFetchingNextCollectionPage,
   } = useInfiniteCollectionArtifacts(isSpecificCollection ? selectedCollectionId : undefined, {
     limit: 20,
+    artifact_type: filters.type && filters.type !== 'all' ? filters.type : undefined,
     enabled: isSpecificCollection,
   });
 
@@ -332,7 +332,7 @@ function CollectionPageContent() {
     isFetchingNextPage: isFetchingNextAllPage,
   } = useInfiniteArtifacts({
     limit: 20,
-    artifact_type: filters.type !== 'all' ? filters.type : undefined,
+    artifact_type: filters.type && filters.type !== 'all' ? filters.type : undefined,
     enabled: true, // Always fetch to support enrichment
   });
 
@@ -348,27 +348,6 @@ function CollectionPageContent() {
     rootMargin: '200px',
     enabled: hasNextPage && !isFetchingNextPage,
   });
-
-  // Trigger fetch when intersection observer detects scroll near bottom
-  useEffect(() => {
-    if (isIntersecting && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
-      // When viewing a specific collection, also fetch more full artifacts for enrichment
-      // This ensures metadata is available for artifacts beyond the initial page
-      if (isSpecificCollection && hasNextAllPage && !isFetchingNextAllPage) {
-        fetchNextAllPage();
-      }
-    }
-  }, [
-    isIntersecting,
-    hasNextPage,
-    isFetchingNextPage,
-    fetchNextPage,
-    isSpecificCollection,
-    hasNextAllPage,
-    isFetchingNextAllPage,
-    fetchNextAllPage,
-  ]);
 
   // Select the appropriate loading state and error based on selection
   const isLoadingArtifacts = isSpecificCollection
@@ -411,8 +390,7 @@ function CollectionPageContent() {
         type: newFilters.type && newFilters.type !== 'all' ? newFilters.type : null,
         status: newFilters.status && newFilters.status !== 'all' ? newFilters.status : null,
         scope: newFilters.scope && newFilters.scope !== 'all' ? newFilters.scope : null,
-        platform:
-          newFilters.platform && newFilters.platform !== 'all' ? newFilters.platform : null,
+        platform: newFilters.platform && newFilters.platform !== 'all' ? newFilters.platform : null,
       });
     },
     [updateUrlParams]
@@ -613,6 +591,66 @@ function CollectionPageContent() {
 
     return artifacts;
   }, [preTagFilterArtifacts, selectedTags, selectedTools, sortField, sortOrder]);
+
+  const hasActiveFilters = useMemo(
+    () =>
+      Boolean(
+        searchQuery ||
+          selectedTags.length > 0 ||
+          selectedTools.length > 0 ||
+          (filters.type && filters.type !== 'all') ||
+          (filters.status && filters.status !== 'all') ||
+          (filters.scope && filters.scope !== 'all') ||
+          (filters.platform && filters.platform !== 'all')
+      ),
+    [
+      searchQuery,
+      selectedTags.length,
+      selectedTools.length,
+      filters.type,
+      filters.status,
+      filters.scope,
+      filters.platform,
+    ]
+  );
+
+  // Unified pagination trigger:
+  // 1) normal infinite scroll when sentinel intersects,
+  // 2) auto-paging while active filters have no loaded matches yet.
+  useEffect(() => {
+    const shouldFetchForScroll = isIntersecting && hasNextPage && !isFetchingNextPage;
+    const shouldFetchForFilteredEmpty =
+      hasActiveFilters &&
+      filteredArtifacts.length === 0 &&
+      hasNextPage &&
+      !isFetchingNextPage &&
+      !isLoadingArtifacts &&
+      !error;
+
+    if (!shouldFetchForScroll && !shouldFetchForFilteredEmpty) {
+      return;
+    }
+
+    fetchNextPage();
+
+    // Keep enrichment data in sync while paging specific collections.
+    if (isSpecificCollection && hasNextAllPage && !isFetchingNextAllPage) {
+      fetchNextAllPage();
+    }
+  }, [
+    isIntersecting,
+    hasActiveFilters,
+    filteredArtifacts.length,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoadingArtifacts,
+    error,
+    fetchNextPage,
+    isSpecificCollection,
+    hasNextAllPage,
+    isFetchingNextAllPage,
+    fetchNextAllPage,
+  ]);
 
   // Compute unique tools with counts from ALL loaded artifacts (before tool filtering)
   // This is used by ToolFilterPopover
@@ -849,7 +887,10 @@ function CollectionPageContent() {
 
       {/* Type tabs below filter bar and active-filters row */}
       <div className="border-b px-6 py-2">
-        <ArtifactTypeTabs value={urlType as 'all' | ArtifactFilters['type']} onChange={handleTypeTabChange} />
+        <ArtifactTypeTabs
+          value={urlType as 'all' | ArtifactFilters['type']}
+          onChange={handleTypeTabChange}
+        />
       </div>
 
       {/* Result count line */}
@@ -948,22 +989,32 @@ function CollectionPageContent() {
                 onDelete={handleDeleteFromDropdown}
               />
             )}
+          </>
+        )}
 
-            {/* Infinite scroll trigger element - works for BOTH views */}
-            <div ref={targetRef} className="flex justify-center py-8" aria-hidden="true">
-              {isFetchingNextPage && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <span className="text-sm">Loading more artifacts...</span>
-                </div>
-              )}
-              {!hasNextPage && filteredArtifacts.length > 0 && totalCount > 0 && (
+        {/* Infinite scroll trigger element - keep mounted even in filtered-empty states */}
+        {!error && !isLoadingArtifacts && (
+          <div ref={targetRef} className="flex justify-center py-8">
+            {isFetchingNextPage && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="text-sm">Loading more artifacts...</span>
+              </div>
+            )}
+            {!isFetchingNextPage &&
+              hasActiveFilters &&
+              filteredArtifacts.length === 0 &&
+              hasNextPage && (
                 <span className="text-sm text-muted-foreground">
-                  All {totalCount} artifacts loaded
+                  Searching additional pages for matching artifacts...
                 </span>
               )}
-            </div>
-          </>
+            {!hasNextPage && filteredArtifacts.length > 0 && totalCount > 0 && (
+              <span className="text-sm text-muted-foreground">
+                All {totalCount} artifacts loaded
+              </span>
+            )}
+          </div>
         )}
       </div>
 

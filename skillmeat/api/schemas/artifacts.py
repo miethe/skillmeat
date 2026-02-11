@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 from skillmeat.core.enums import Platform
 
 from .common import PaginatedResponse
+from .deployments import DeploymentSummary
 
 
 class ArtifactSourceType(str, Enum):
@@ -318,6 +319,10 @@ class ArtifactResponse(BaseModel):
     deployment_stats: Optional["DeploymentStatistics"] = Field(
         default=None,
         description="Deployment statistics (included when include_deployments=true)",
+    )
+    deployments: Optional[List[DeploymentSummary]] = Field(
+        default=None,
+        description="List of project deployments for this artifact",
     )
     collections: List[ArtifactCollectionInfo] = Field(
         default_factory=list,

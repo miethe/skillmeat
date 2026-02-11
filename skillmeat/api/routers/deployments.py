@@ -23,7 +23,12 @@ from skillmeat.api.schemas.deployments import (
     UndeployRequest,
     UndeployResponse,
 )
+from skillmeat.api.services.artifact_cache_service import (
+    add_deployment_to_cache,
+    remove_deployment_from_cache,
+)
 from skillmeat.cache.deployment_stats_cache import get_deployment_stats_cache
+from skillmeat.cache.models import get_session
 from skillmeat.core.artifact import ArtifactType
 from skillmeat.core.deployment import DeploymentManager
 
@@ -150,9 +155,7 @@ async def deploy_artifact(
         if request.all_profiles and request.deployment_profile_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "deployment_profile_id cannot be set when all_profiles=true"
-                ),
+                detail=("deployment_profile_id cannot be set when all_profiles=true"),
             )
 
         # Parse artifact type
@@ -254,6 +257,39 @@ async def deploy_artifact(
                 f"({deployment.artifact_type}) to {project_path}"
             )
 
+            # Update DB cache with deployment info (write-through pattern)
+            session = get_session()
+            try:
+                for deployed in deployments:
+                    artifact_id = f"{deployed.artifact_type}:{deployed.artifact_name}"
+                    try:
+                        add_deployment_to_cache(
+                            session=session,
+                            artifact_id=artifact_id,
+                            project_path=str(project_path),
+                            project_name=project_path.name,
+                            deployed_at=deployed.deployed_at,
+                            content_hash=deployed.content_hash,
+                            deployment_profile_id=deployed.deployment_profile_id,
+                            local_modifications=deployed.local_modifications,
+                            platform=(
+                                deployed.platform.value if deployed.platform else None
+                            ),
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to update deployment cache for {artifact_id}: {e}"
+                        )
+                session.commit()
+            except Exception as e:
+                logger.warning(f"Failed to update deployment cache: {e}")
+                try:
+                    session.rollback()
+                except Exception:
+                    pass  # Ignore rollback errors
+            finally:
+                session.close()
+
             # Invalidate deployment stats cache
             get_deployment_stats_cache().invalidate_all()
 
@@ -342,6 +378,24 @@ async def undeploy_artifact(
                 project_path=project_path,
                 profile_id=request.profile_id,
             )
+
+            # Write through to DB cache after successful undeploy
+            session = get_session()
+            try:
+                artifact_id = f"{request.artifact_type}:{request.artifact_name}"
+                try:
+                    remove_deployment_from_cache(
+                        session=session,
+                        artifact_id=artifact_id,
+                        project_path=str(project_path),
+                        profile_id=request.profile_id,
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to update deployment cache after undeploy: {e}"
+                    )
+            finally:
+                session.close()
 
             response = UndeployResponse(
                 success=True,

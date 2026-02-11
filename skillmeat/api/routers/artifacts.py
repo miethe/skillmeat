@@ -116,6 +116,11 @@ from skillmeat.api.services import (
     delete_artifact_cache,
     refresh_single_artifact_cache,
 )
+from skillmeat.api.services.artifact_cache_service import (
+    add_deployment_to_cache,
+    parse_deployments,
+)
+from skillmeat.api.schemas.deployments import DeploymentSummary
 from skillmeat.cache.models import Collection, CollectionArtifact, get_session
 from skillmeat.cache.repositories import MarketplaceCatalogRepository
 
@@ -520,6 +525,7 @@ def artifact_to_response(
     has_local_modifications: Optional[bool] = None,
     collections_data: Optional[List[ArtifactCollectionInfo]] = None,
     db_source: Optional[str] = None,
+    deployments: Optional[List[DeploymentSummary]] = None,
 ) -> ArtifactResponse:
     """Convert Artifact model to API response schema.
 
@@ -589,6 +595,7 @@ def artifact_to_response(
         metadata=metadata_response,
         upstream=upstream_response,
         collections=collections_response,
+        deployments=deployments,
         added=artifact.added,
         updated=artifact.last_updated or artifact.added,
     )
@@ -868,6 +875,7 @@ async def bulk_import_artifacts(
         None,
         description="Base64-encoded project path to also record deployments for the imports",
     ),
+    session: Session = Depends(get_session),
 ) -> BulkImportResult:
     """
     Bulk import multiple artifacts with graceful error handling.
@@ -1178,6 +1186,47 @@ async def bulk_import_artifacts(
                             logger.info(
                                 f"Recorded deployments for {project_path} after import"
                             )
+
+                            # Also record deployments in DB cache for UI visibility
+                            for artifact_payload, import_result in zip(
+                                request.artifacts, results
+                            ):
+                                if import_result.status != ImportStatus.SUCCESS:
+                                    continue
+
+                                artifact_name = artifact_payload.name or (
+                                    PathLib(artifact_payload.path).stem
+                                    if artifact_payload.path
+                                    else None
+                                )
+                                if not artifact_name:
+                                    continue
+
+                                artifact_id = (
+                                    f"{artifact_payload.artifact_type}:{artifact_name}"
+                                )
+
+                                try:
+                                    add_deployment_to_cache(
+                                        session=session,
+                                        artifact_id=artifact_id,
+                                        project_path=str(project_path),
+                                        project_name=project_path.name,
+                                        deployed_at=datetime.now(timezone.utc),
+                                        content_hash=(
+                                            compute_content_hash(
+                                                PathLib(artifact_payload.path)
+                                            )
+                                            if artifact_payload.path
+                                            else None
+                                        ),
+                                        local_modifications=False,
+                                        collection_id=collection_name,
+                                    )
+                                except Exception as e:
+                                    logger.warning(
+                                        f"Failed to record deployment in cache for {artifact_id}: {e}"
+                                    )
                 except Exception as e:
                     logger.warning(
                         f"Failed to update project deployments for {project_path}: {e}"
@@ -1929,6 +1978,7 @@ async def list_artifacts(
         artifact_ids = [f"{a.type.value}:{a.name}" for a in page_artifacts]
         collections_map: Dict[str, List[ArtifactCollectionInfo]] = {}
         source_lookup: Dict[str, str] = {}
+        deployments_lookup: Dict[str, List[DeploymentSummary]] = {}
 
         if artifact_ids:
             try:
@@ -1937,17 +1987,22 @@ async def list_artifacts(
                 collections_map = collection_service.get_collection_membership_batch(
                     artifact_ids
                 )
-                # Query DB source for marketplace-imported artifacts
-                db_sources = (
+                # Query DB source and deployments for artifacts
+                db_rows = (
                     db_session.query(
                         CollectionArtifact.artifact_id,
                         CollectionArtifact.source,
+                        CollectionArtifact.deployments_json,
                     )
                     .filter(CollectionArtifact.artifact_id.in_(artifact_ids))
-                    .filter(CollectionArtifact.source.isnot(None))
                     .all()
                 )
-                source_lookup = {row.artifact_id: row.source for row in db_sources}
+                for row in db_rows:
+                    if row.source is not None:
+                        source_lookup[row.artifact_id] = row.source
+                    parsed = parse_deployments(row.deployments_json)
+                    if parsed:
+                        deployments_lookup[row.artifact_id] = parsed
                 db_session.close()
             except Exception as e:
                 logger.warning(f"Failed to query collection memberships: {e}")
@@ -1969,6 +2024,7 @@ async def list_artifacts(
                     has_local_modifications=has_modifications,
                     collections_data=collections_map.get(artifact_key, []),
                     db_source=source_lookup.get(artifact_key),
+                    deployments=deployments_lookup.get(artifact_key),
                 )
             )
 
@@ -3033,7 +3089,9 @@ async def deploy_artifact(
 
         # --- Strategy: overwrite (default, existing behavior) ---
         # Create deployment manager
-        from skillmeat.core.deployment import DeploymentManager as RuntimeDeploymentManager
+        from skillmeat.core.deployment import (
+            DeploymentManager as RuntimeDeploymentManager,
+        )
 
         deployment_mgr = RuntimeDeploymentManager(collection_mgr=collection_mgr)
 
@@ -3062,16 +3120,15 @@ async def deploy_artifact(
 
             deployment = deployments[0]
             deployed_profiles = sorted(
-                {
-                    item.deployment_profile_id or "claude_code"
-                    for item in deployments
-                }
+                {item.deployment_profile_id or "claude_code" for item in deployments}
             )
 
             # Determine deployed path
-            deployed_path = project_path / (
-                deployment.profile_root_dir or ".claude"
-            ) / deployment.artifact_path
+            deployed_path = (
+                project_path
+                / (deployment.profile_root_dir or ".claude")
+                / deployment.artifact_path
+            )
             logger.info(
                 f"Artifact '{artifact_name}' deployed successfully to {deployed_path}"
             )
@@ -3517,9 +3574,7 @@ async def sync_artifact(
             )
 
         if not collection_name:
-            collection_name = getattr(
-                target_deployment, "from_collection", "default"
-            )
+            collection_name = getattr(target_deployment, "from_collection", "default")
 
         # Verify collection exists
         if collection_name not in collection_mgr.list_collections():
@@ -4802,7 +4857,9 @@ async def get_artifact_source_project_diff(
                 upstream_artifact_path = fetch_result.fetch_result.artifact_path
             elif not fetch_result.has_update:
                 # No upstream update means collection matches upstream; use collection copy
-                collection_path = collection_mgr.config.get_collection_path(collection_name)
+                collection_path = collection_mgr.config.get_collection_path(
+                    collection_name
+                )
                 upstream_artifact_path = collection_path / artifact.path
             else:
                 raise HTTPException(
@@ -4896,7 +4953,9 @@ async def get_artifact_source_project_diff(
                         file_status = "modified"
                         summary["modified"] += 1
                         unified_diff = None
-                        if not is_binary_file(src_file) and not is_binary_file(proj_file):
+                        if not is_binary_file(src_file) and not is_binary_file(
+                            proj_file
+                        ):
                             try:
                                 with open(src_file, "r", encoding="utf-8") as f:
                                     src_lines = f.readlines()
@@ -4965,7 +5024,9 @@ async def get_artifact_source_project_diff(
                     )
 
             has_changes = (
-                summary["added"] > 0 or summary["modified"] > 0 or summary["deleted"] > 0
+                summary["added"] > 0
+                or summary["modified"] > 0
+                or summary["deleted"] > 0
             )
 
             logger.info(
@@ -4986,10 +5047,7 @@ async def get_artifact_source_project_diff(
         finally:
             # Clean up temp workspace if one was created
             try:
-                if (
-                    fetch_result.temp_workspace
-                    and fetch_result.temp_workspace.exists()
-                ):
+                if fetch_result.temp_workspace and fetch_result.temp_workspace.exists():
                     shutil.rmtree(fetch_result.temp_workspace, ignore_errors=True)
             except Exception as e:
                 logger.warning(f"Failed to clean up temp workspace: {e}")

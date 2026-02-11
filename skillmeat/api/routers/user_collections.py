@@ -39,6 +39,7 @@ from skillmeat.api.schemas.user_collections import (
 from skillmeat.api.services import get_artifact_metadata
 from skillmeat.api.services.artifact_cache_service import (
     invalidate_collection_artifacts,
+    parse_deployments,
 )
 from skillmeat.api.services.artifact_metadata_service import _get_artifact_collections
 from skillmeat.cache import get_collection_count_cache
@@ -123,56 +124,6 @@ def decode_cursor(cursor: str) -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid cursor format: {str(e)}",
         )
-
-
-def parse_deployments(
-    deployments_json: Optional[str],
-) -> Optional[List[DeploymentSummary]]:
-    """Parse deployments_json field from CollectionArtifact into DeploymentSummary list.
-
-    Args:
-        deployments_json: JSON string containing deployment data
-
-    Returns:
-        List of DeploymentSummary objects, or None if empty/invalid
-    """
-    if not deployments_json:
-        return None
-
-    try:
-        deployments_data = json.loads(deployments_json)
-        if not deployments_data or not isinstance(deployments_data, list):
-            return None
-
-        # Parse each deployment dict into DeploymentSummary
-        deployments = []
-        for dep in deployments_data:
-            try:
-                # Parse deployed_at timestamp if it's a string
-                deployed_at = dep.get("deployed_at")
-                if isinstance(deployed_at, str):
-                    deployed_at = datetime.fromisoformat(
-                        deployed_at.replace("Z", "+00:00")
-                    )
-                elif not isinstance(deployed_at, datetime):
-                    continue  # Skip invalid entries
-
-                deployments.append(
-                    DeploymentSummary(
-                        project_path=dep.get("project_path", ""),
-                        project_name=dep.get("project_name", ""),
-                        deployed_at=deployed_at,
-                    )
-                )
-            except (KeyError, ValueError, TypeError) as e:
-                logger.debug(f"Skipping invalid deployment entry: {e}")
-                continue
-
-        return deployments if deployments else None
-
-    except (json.JSONDecodeError, TypeError) as e:
-        logger.debug(f"Failed to parse deployments_json: {e}")
-        return None
 
 
 def collection_to_response(
@@ -1484,6 +1435,16 @@ async def list_collection_artifacts(
                 if assoc.artifact_id in group_artifact_ids
             ]
 
+        # Filter by artifact type BEFORE cursor pagination.
+        # This keeps page boundaries and total_count consistent with the selected tab.
+        if artifact_type:
+            type_prefix = f"{artifact_type}:"
+            all_associations = [
+                assoc
+                for assoc in all_associations
+                if assoc.artifact_id.startswith(type_prefix)
+            ]
+
         # Decode cursor if provided
         start_idx = 0
         if after:
@@ -1590,7 +1551,9 @@ async def list_collection_artifacts(
                         if file_artifact and file_artifact.upstream:
                             resolved_source = file_artifact.upstream
                     except Exception as e:
-                        logger.debug(f"Failed to read filesystem source for {assoc.artifact_id}: {e}")
+                        logger.debug(
+                            f"Failed to read filesystem source for {assoc.artifact_id}: {e}"
+                        )
 
                 # Use artifact_id as absolute last resort
                 if not resolved_source:
@@ -1688,31 +1651,29 @@ async def list_collection_artifacts(
             if artifact_summary and not artifact_summary.deployments:
                 artifact_summary.deployments = parse_deployments(assoc.deployments_json)
 
-            # Apply type filter if specified
-            if artifact_type is None or artifact_summary.type == artifact_type:
-                if include_groups:
-                    # Add groups field to artifact summary while preserving all metadata
-                    groups = artifact_groups_map.get(assoc.artifact_id, [])
-                    items.append(
-                        ArtifactSummary(
-                            id=assoc.artifact_id,
-                            name=artifact_summary.name,
-                            type=artifact_summary.type,
-                            version=artifact_summary.version,
-                            source=artifact_summary.source,
-                            description=artifact_summary.description,
-                            author=artifact_summary.author,
-                            tags=artifact_summary.tags,
-                            tools=artifact_summary.tools,
-                            origin=artifact_summary.origin,
-                            origin_source=artifact_summary.origin_source,
-                            collections=artifact_summary.collections,
-                            groups=groups,
-                            deployments=artifact_summary.deployments,
-                        )
+            if include_groups:
+                # Add groups field to artifact summary while preserving all metadata
+                groups = artifact_groups_map.get(assoc.artifact_id, [])
+                items.append(
+                    ArtifactSummary(
+                        id=assoc.artifact_id,
+                        name=artifact_summary.name,
+                        type=artifact_summary.type,
+                        version=artifact_summary.version,
+                        source=artifact_summary.source,
+                        description=artifact_summary.description,
+                        author=artifact_summary.author,
+                        tags=artifact_summary.tags,
+                        tools=artifact_summary.tools,
+                        origin=artifact_summary.origin,
+                        origin_source=artifact_summary.origin_source,
+                        collections=artifact_summary.collections,
+                        groups=groups,
+                        deployments=artifact_summary.deployments,
                     )
-                else:
-                    items.append(artifact_summary)
+                )
+            else:
+                items.append(artifact_summary)
 
         # Build pagination info
         has_next = end_idx < len(all_associations)
