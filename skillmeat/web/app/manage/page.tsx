@@ -290,6 +290,19 @@ function ManagePageContent() {
     [updateUrlParams]
   );
 
+  const handleArtifactClickWithTab = useCallback(
+    (artifact: Artifact, tab: OperationsModalTab) => {
+      setSelectedArtifact(artifact);
+      setDetailPanelOpen(true);
+      // Update URL with artifact ID and specific tab
+      updateUrlParams({
+        artifact: artifact.id,
+        tab: tab === 'status' ? null : tab,
+      });
+    },
+    [updateUrlParams]
+  );
+
   const handleEdit = useCallback((artifact: Artifact) => {
     setEditingArtifact(artifact);
   }, []);
@@ -482,6 +495,7 @@ function ManagePageContent() {
             cardVariant="operations"
             entities={filteredEntities}
             onEntityClick={handleArtifactClick}
+            onEntityClickWithTab={handleArtifactClickWithTab}
             onEdit={handleEdit}
             onDelete={handleDelete}
             onDeploy={handleDeploy}

@@ -84,6 +84,9 @@ export interface ArtifactOperationsCardProps {
   /** Click handler for opening operations modal */
   onClick: () => void;
 
+  /** Handler for opening modal with specific tab */
+  onOpenWithTab?: (tab: string) => void;
+
   /** Handler for sync action */
   onSync?: () => void;
 
@@ -224,6 +227,7 @@ function extractDisplayTags(tags?: string[]): string[] {
 export function ArtifactOperationsCard({
   artifact,
   onClick,
+  onOpenWithTab,
   onSync,
   onDeploy,
   onViewDiff,
@@ -246,7 +250,6 @@ export function ArtifactOperationsCard({
 
   // Deployment indicators
   const hasDeployments = (artifact.deployments?.length ?? 0) > 0;
-  const deploymentCount = artifact.deployments?.length ?? 0;
   const hasDeploymentDrift = artifact.deployments?.some((d) => d.local_modifications) ?? false;
 
   // Type-safe icon lookup with fallback
@@ -371,16 +374,6 @@ export function ArtifactOperationsCard({
         </div>
       )}
 
-      {/* Deployments Row */}
-      {artifact.deployments && artifact.deployments.length > 0 && (
-        <div className="border-t px-4 py-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Deployed to:</span>
-            <DeploymentBadgeStack deployments={artifact.deployments} maxBadges={2} />
-          </div>
-        </div>
-      )}
-
       {/* Status Row: Indicators, Deployed Badge, Last Synced */}
       <div className="flex flex-wrap items-center gap-2 border-t px-4 py-2">
         {/* Deployment Drift Badge (critical - shown first) */}
@@ -415,12 +408,30 @@ export function ArtifactOperationsCard({
           </Badge>
         )}
 
-        {/* Deployed Badge */}
+        {/* Deployed Badge with DeploymentBadgeStack */}
         {hasDeployments && (
-          <Badge variant="secondary" className="text-xs">
-            <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
-            <span>Deployed ({deploymentCount})</span>
-          </Badge>
+          <>
+            <Badge
+              variant="secondary"
+              className="gap-1 text-xs cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenWithTab ? onOpenWithTab('deployments') : onClick();
+              }}
+            >
+              <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+              Deployed
+            </Badge>
+            <div onClick={(e) => e.stopPropagation()}>
+              <DeploymentBadgeStack
+                deployments={artifact.deployments || []}
+                maxBadges={3}
+                onBadgeClick={(_deployment) => {
+                  onOpenWithTab ? onOpenWithTab('deployments') : onClick();
+                }}
+              />
+            </div>
+          </>
         )}
 
         {/* Last Synced */}
@@ -575,15 +586,6 @@ export function ArtifactOperationsCardSkeleton({ selectable = false }: { selecta
           <Skeleton className="h-5 w-14 rounded-full" aria-hidden="true" />
           <Skeleton className="h-5 w-16 rounded-full" aria-hidden="true" />
           <Skeleton className="h-5 w-12 rounded-full" aria-hidden="true" />
-        </div>
-      </div>
-
-      {/* Deployments Row */}
-      <div className="border-t px-4 py-2">
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-3 w-20" aria-hidden="true" />
-          <Skeleton className="h-5 w-24 rounded-full" aria-hidden="true" />
-          <Skeleton className="h-5 w-24 rounded-full" aria-hidden="true" />
         </div>
       </div>
 
