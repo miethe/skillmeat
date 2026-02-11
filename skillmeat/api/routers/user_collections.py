@@ -53,6 +53,7 @@ from skillmeat.cache.models import (
     CollectionArtifact,
     Group,
     GroupArtifact,
+    Project,
     get_session,
 )
 
@@ -485,41 +486,70 @@ def populate_collection_artifact_metadata(
                 skipped_count += 1
                 continue
 
-    # Populate deployments from DeploymentManager (MVP: scan current directory only)
+    # Populate deployments from DeploymentManager (scan ALL known projects)
     try:
         import os
         from pathlib import Path
         from sqlalchemy import update, and_
         from skillmeat.core.deployment import DeploymentManager
 
-        project_path = Path.cwd()
-        logger.debug(f"Scanning deployments in project: {project_path}")
-
         deployment_mgr = DeploymentManager()
-        all_deployments = deployment_mgr.list_deployments(project_path=project_path)
 
-        # Group deployments by artifact name
+        # Get all known projects from DB cache
+        all_projects = session.query(Project).all()
+        project_paths = []
+        for proj in all_projects:
+            proj_path = Path(proj.path)
+            if proj_path.exists():
+                project_paths.append((proj.name, proj_path))
+            else:
+                logger.debug(
+                    f"Skipping project '{proj.name}' — path does not exist: {proj.path}"
+                )
+
+        # Fallback: if no projects in DB, at least scan cwd
+        if not project_paths:
+            cwd = Path.cwd()
+            project_paths.append((os.path.basename(str(cwd)), cwd))
+
+        logger.debug(
+            f"Scanning deployments across {len(project_paths)} project(s): "
+            f"{[name for name, _ in project_paths]}"
+        )
+
+        # Aggregate deployments across all projects
         deployments_by_artifact = {}
-        for deployment in all_deployments:
-            artifact_name = deployment.artifact_name
-            if artifact_name not in deployments_by_artifact:
-                deployments_by_artifact[artifact_name] = []
+        for project_name, project_path in project_paths:
+            try:
+                project_deployments = deployment_mgr.list_deployments(
+                    project_path=project_path
+                )
+            except Exception as e:
+                logger.debug(
+                    f"Failed to scan deployments for project '{project_name}': {e}"
+                )
+                continue
 
-            deployments_by_artifact[artifact_name].append(
-                {
-                    "project_path": (
-                        str(deployment.project_path)
-                        if hasattr(deployment, "project_path")
-                        else str(project_path)
-                    ),
-                    "project_name": os.path.basename(str(project_path)),
-                    "deployed_at": (
-                        deployment.deployed_at.isoformat()
-                        if hasattr(deployment.deployed_at, "isoformat")
-                        else str(deployment.deployed_at)
-                    ),
-                }
-            )
+            for deployment in project_deployments:
+                artifact_name = deployment.artifact_name
+                if artifact_name not in deployments_by_artifact:
+                    deployments_by_artifact[artifact_name] = []
+
+                deployments_by_artifact[artifact_name].append(
+                    {
+                        "project_path": (
+                            str(deployment.project_path)
+                            if hasattr(deployment, "project_path")
+                            else str(project_path)
+                        ),
+                        "project_name": project_name,
+                        "deployed_at": (
+                            deployment.deployed_at.isoformat()
+                            if hasattr(deployment.deployed_at, "isoformat")
+                            else str(deployment.deployed_at)
+                        ),
+                    }
+                )
 
         # Update cache entries with deployment data
         deployment_update_count = 0
@@ -539,7 +569,8 @@ def populate_collection_artifact_metadata(
 
         if deployment_update_count > 0:
             logger.info(
-                f"Updated deployment data for {deployment_update_count} artifact(s)"
+                f"Updated deployment data for {deployment_update_count} artifact(s) "
+                f"across {len(project_paths)} project(s)"
             )
 
     except Exception as e:
