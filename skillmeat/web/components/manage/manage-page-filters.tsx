@@ -163,14 +163,16 @@ export function ManagePageFilters({
   const hasActiveFilters =
     search !== '' || status !== 'all' || type !== 'all' || project !== null || tags.length > 0;
 
+  const projectName = projectsData?.find((p) => p.path === project)?.name ?? project;
+
   const activeFilterItems: ActiveFilterItem[] = [
     ...(project
       ? [
           {
             id: `project:${project}`,
-            label: `Project: ${project}`,
+            label: `Project: ${projectName}`,
             onRemove: () => onProjectChange(null),
-            ariaLabel: `Remove project filter: ${project}`,
+            ariaLabel: `Remove project filter: ${projectName}`,
           },
         ]
       : []),

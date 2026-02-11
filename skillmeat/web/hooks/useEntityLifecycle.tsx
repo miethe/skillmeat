@@ -621,7 +621,10 @@ async function fetchCollectionEntities(
           params.set('after', cursor);
         }
 
-        const response = await apiRequest<ArtifactListResponse>(`/artifacts?${params.toString()}`);
+        const collectionPath = collectionId || 'default';
+        const response = await apiRequest<ArtifactListResponse>(
+          `/user-collections/${collectionPath}/artifacts?${params.toString()}`
+        );
         allItems = [...allItems, ...(response.items as ApiArtifactResponse[])];
 
         hasNextPage = response.page_info?.has_next_page ?? false;
