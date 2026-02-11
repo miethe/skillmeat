@@ -581,20 +581,9 @@ async function fetchCollectionEntities(
   searchQuery: string,
   collectionId?: string
 ): Promise<Entity[]> {
-  const params = new URLSearchParams({
-    limit: '100',
-  });
-
-  if (typeFilter) {
-    params.set('artifact_type', typeFilter);
-  }
-
-  const processResponse = (response: ArtifactListResponse): Entity[] => {
+  const processItems = (items: ApiArtifactResponse[]): Entity[] => {
     // Use centralized mapper with 'collection' context
-    const entities: Entity[] = mapArtifactsToEntities(
-      response.items as ApiArtifactResponse[],
-      'collection'
-    );
+    const entities: Entity[] = mapArtifactsToEntities(items, 'collection');
 
     // Attach collection info if provided (mapper doesn't have access to external collectionId)
     const entitiesWithCollection: Entity[] = entities.map((entity) => ({
@@ -618,8 +607,28 @@ async function fetchCollectionEntities(
 
   return withMockFallback(
     async () => {
-      const response = await apiRequest<ArtifactListResponse>(`/artifacts?${params.toString()}`);
-      return processResponse(response);
+      // Fetch all pages automatically to ensure manage page shows all artifacts
+      let allItems: ApiArtifactResponse[] = [];
+      let cursor: string | null = null;
+      let hasNextPage = true;
+
+      while (hasNextPage) {
+        const params = new URLSearchParams({ limit: '100' });
+        if (typeFilter) {
+          params.set('artifact_type', typeFilter);
+        }
+        if (cursor) {
+          params.set('after', cursor);
+        }
+
+        const response = await apiRequest<ArtifactListResponse>(`/artifacts?${params.toString()}`);
+        allItems = [...allItems, ...(response.items as ApiArtifactResponse[])];
+
+        hasNextPage = response.page_info?.has_next_page ?? false;
+        cursor = response.page_info?.end_cursor ?? null;
+      }
+
+      return processItems(allItems);
     },
     () => generateMockCollectionEntities(typeFilter, searchQuery, collectionId),
     'Collection'

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Search, X, FolderKanban } from 'lucide-react';
+import { Search, X, FolderKanban, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -126,11 +126,6 @@ export function ManagePageFilters({
   // Load projects from API
   const { data: projectsData, isLoading: projectsLoading } = useProjects();
 
-  // Map projects to names for dropdown
-  const availableProjects = React.useMemo(() => {
-    return projectsData?.map((p) => p.name) || [];
-  }, [projectsData]);
-
   // Debounced search state
   const [searchInput, setSearchInput] = React.useState(search);
   const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -247,14 +242,18 @@ export function ManagePageFilters({
           disabled={projectsLoading}
         >
           <SelectTrigger className="w-[200px]" aria-label="Filter by project">
-            <FolderKanban className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            {projectsLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />
+            ) : (
+              <FolderKanban className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            )}
             <SelectValue placeholder={projectsLoading ? 'Loading...' : 'All Projects'} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Projects</SelectItem>
-            {availableProjects.map((proj) => (
-              <SelectItem key={proj} value={proj}>
-                {proj}
+            {projectsData?.map((proj) => (
+              <SelectItem key={proj.path} value={proj.path}>
+                {proj.name}
               </SelectItem>
             ))}
           </SelectContent>

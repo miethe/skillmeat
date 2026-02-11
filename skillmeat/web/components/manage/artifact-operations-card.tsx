@@ -289,7 +289,7 @@ export function ArtifactOperationsCard({
   return (
     <Card
       className={cn(
-        'cursor-pointer border-l-4 transition-all hover:border-primary/50 hover:shadow-md',
+        'flex flex-col cursor-pointer border-l-4 transition-all hover:border-primary/50 hover:shadow-md',
         'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
         artifactTypeBorderAccents[artifact.type],
         artifactTypeCardTints[artifact.type],
@@ -304,6 +304,8 @@ export function ArtifactOperationsCard({
       onKeyDown={handleKeyDown}
       aria-label={`Manage ${artifact.name}, ${artifact.type} artifact. Status: ${artifact.syncStatus}`}
     >
+      {/* Content wrapper - grows to fill available space */}
+      <div className="flex-1">
       {/* Header Row: Checkbox, Icon, Name, Status, Health */}
       <div className="flex items-start gap-3 p-4 pb-2">
         {/* Checkbox (when selectable) */}
@@ -427,9 +429,10 @@ export function ArtifactOperationsCard({
           <span>Last synced: {formatRelativeTime(lastSynced)}</span>
         </div>
       </div>
+      </div>
 
-      {/* Actions Row */}
-      <div className="flex items-center gap-2 border-t px-4 py-3">
+      {/* Actions Row - pinned to bottom */}
+      <div className="mt-auto flex items-center gap-2 border-t px-4 py-3">
         {/* Sync Button */}
         <Button
           variant="outline"

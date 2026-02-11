@@ -154,11 +154,6 @@ function ManagePageContent() {
   }, [urlArtifactId, entities, selectedArtifact]);
 
   // Filter entities by tags and project client-side
-  const toProjectKey = useCallback((projectPath: string) => {
-    const segments = projectPath.split('/').filter(Boolean);
-    return (segments[segments.length - 1] || projectPath).toLowerCase();
-  }, []);
-
   const filteredEntities = useMemo(() => {
     let result = entities;
 
@@ -167,18 +162,15 @@ function ManagePageContent() {
       result = result.filter((entity) => urlTags.some((tag) => entity.tags?.includes(tag)));
     }
 
-    // Filter by project from URL
+    // Filter by project from URL (urlProject is now project.path)
     if (urlProject) {
-      const selectedProjectKey = urlProject.toLowerCase();
-      result = result.filter((entity) => {
-        return entity.deployments?.some((d) =>
-          d.project_path ? toProjectKey(d.project_path) === selectedProjectKey : false
-        );
-      });
+      result = result.filter((entity) =>
+        entity.deployments?.some((d) => d.project_path === urlProject)
+      );
     }
 
     return result;
-  }, [entities, urlTags, urlProject, toProjectKey]);
+  }, [entities, urlTags, urlProject]);
 
 
   // Compute context-aware available tags from entities matching current filters
@@ -187,12 +179,9 @@ function ManagePageContent() {
     // Apply project filter first (same logic as filteredEntities)
     let result = entities;
     if (urlProject) {
-      const selectedProjectKey = urlProject.toLowerCase();
-      result = result.filter((entity) => {
-        return entity.deployments?.some((d) =>
-          d.project_path ? toProjectKey(d.project_path) === selectedProjectKey : false
-        );
-      });
+      result = result.filter((entity) =>
+        entity.deployments?.some((d) => d.project_path === urlProject)
+      );
     }
 
     // Compute tag counts from the filtered set
@@ -206,7 +195,7 @@ function ManagePageContent() {
     return Array.from(tagCounts.entries())
       .map(([name, count]) => ({ name, artifact_count: count }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [entities, urlProject, toProjectKey]);
+  }, [entities, urlProject]);
 
   // ==========================================================================
   // Filter Change Handlers (update URL)
