@@ -3270,6 +3270,9 @@ async def list_artifacts(
         description="Sort order: asc or desc",
         regex="^(asc|desc)$",
     ),
+    search: Optional[str] = Query(
+        None, description="Search artifacts by name (case-insensitive partial match)"
+    ),
     limit: int = Query(50, ge=1, le=100, description="Maximum items per page (1-100)"),
     cursor: Optional[str] = Query(
         None, description="Cursor for pagination (from previous response)"
@@ -3291,6 +3294,7 @@ async def list_artifacts(
         include_excluded: If True, include entries with status="excluded" (default: False)
         sort_by: Field to sort by - confidence, name, or date (detected_at). Default: confidence
         sort_order: Sort order - asc or desc. Default: desc (highest first)
+        search: Optional search string to filter artifacts by name (case-insensitive partial match)
         limit: Maximum items per page (1-100)
         cursor: Pagination cursor from previous response
 
@@ -3357,6 +3361,7 @@ async def list_artifacts(
             or effective_min_confidence
             or max_confidence
             or not include_excluded
+            or search
         )
 
         if needs_filtered_query:
@@ -3373,6 +3378,11 @@ async def list_artifacts(
             # This handles the case where no status filter was provided
             if not include_excluded and not status_filter:
                 entries = [e for e in entries if e.status != "excluded"]
+
+            # Apply name search filter (case-insensitive partial match)
+            if search:
+                search_lower = search.lower()
+                entries = [e for e in entries if search_lower in e.name.lower()]
 
             # Apply sorting before pagination
             if sort_by:
@@ -3709,48 +3719,29 @@ async def import_artifacts(
             source_ref=source.ref,
         )
 
-        # Add imported artifacts to default database collection
+        # Add imported artifacts to default database collection with full metadata
         try:
             ensure_default_collection(session)
+            from skillmeat.api.services.artifact_cache_service import (
+                populate_collection_artifact_from_import,
+            )
+
             db_added_count = 0
             for entry in import_result.entries:
                 if entry.status.value == "success":
-                    artifact_id = f"{entry.artifact_type}:{entry.name}"
-                    # Use merge to handle duplicates gracefully (idempotent)
-                    association = CollectionArtifact(
-                        collection_id=DEFAULT_COLLECTION_ID,
-                        artifact_id=artifact_id,
-                        added_at=datetime.utcnow(),
-                    )
-                    session.merge(association)
-                    db_added_count += 1
-            session.commit()
-            logger.info(
-                f"Added {db_added_count} artifacts to default database collection"
-            )
-
-            # Refresh cache for each imported artifact to populate metadata
-            # (description, source, origin, origin_source, etc.) from filesystem
-            from skillmeat.api.services.artifact_cache_service import (
-                refresh_single_artifact_cache,
-            )
-
-            refresh_count = 0
-            for entry in import_result.entries:
-                if entry.status.value == "success":
-                    artifact_id = f"{entry.artifact_type}:{entry.name}"
                     try:
-                        refreshed = refresh_single_artifact_cache(
-                            session, artifact_mgr, artifact_id
+                        populate_collection_artifact_from_import(
+                            session, artifact_mgr, DEFAULT_COLLECTION_ID, entry
                         )
-                        if refreshed:
-                            refresh_count += 1
-                    except Exception as refresh_err:
+                        db_added_count += 1
+                    except Exception as cache_err:
                         logger.warning(
-                            f"Cache refresh failed for {artifact_id}: {refresh_err}"
+                            f"Cache population failed for "
+                            f"{entry.artifact_type}:{entry.name}: {cache_err}"
                         )
             logger.info(
-                f"Refreshed cache for {refresh_count}/{db_added_count} imported artifacts"
+                f"Added {db_added_count} artifacts to default database collection "
+                f"with full metadata"
             )
         except Exception as e:
             logger.error(f"Failed to add artifacts to database collection: {e}")
@@ -4043,19 +4034,35 @@ async def reimport_catalog_entry(
         with transaction_handler.import_transaction(source_id) as ctx:
             ctx.mark_imported([entry_id], import_result.import_id)
 
-        # Add to default database collection
+        # Add to default database collection with full metadata
         try:
             ensure_default_collection(session)
-            association = CollectionArtifact(
-                collection_id=DEFAULT_COLLECTION_ID,
-                artifact_id=artifact_id,
-                added_at=datetime.utcnow(),
+            from skillmeat.api.services.artifact_cache_service import (
+                populate_collection_artifact_from_import,
             )
-            session.merge(association)
-            session.commit()
+
+            # Build a lightweight entry-like object from the catalog entry data
+            # import_result.entries[0] has the ImportEntry with full context
+            import_entry = import_result.entries[0] if import_result.entries else None
+            if import_entry and import_entry.status.value == "success":
+                populate_collection_artifact_from_import(
+                    session, artifact_mgr, DEFAULT_COLLECTION_ID, import_entry
+                )
+                logger.info(
+                    f"Added artifact to database collection with full metadata: "
+                    f"{artifact_id}"
+                )
+            else:
+                logger.warning(
+                    f"No successful import entry to populate cache for: "
+                    f"{artifact_id}"
+                )
         except Exception as e:
             logger.warning(f"Failed to add artifact to database collection: {e}")
-            session.rollback()
+            try:
+                session.rollback()
+            except Exception:
+                pass
 
         # Restore deployments if requested
         deployments_restored = 0

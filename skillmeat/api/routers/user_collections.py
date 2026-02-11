@@ -1501,6 +1501,21 @@ async def list_collection_artifacts(
         end_idx = start_idx + limit
         page_associations = all_associations[start_idx:end_idx]
 
+        # Batch fetch sources from DB (avoids N+1 queries and artifact_id fallback)
+        source_lookup: dict[str, str] = {}
+        if page_associations:
+            page_artifact_ids = [assoc.artifact_id for assoc in page_associations]
+            db_sources = (
+                session.query(
+                    CollectionArtifact.artifact_id,
+                    CollectionArtifact.source,
+                )
+                .filter(CollectionArtifact.artifact_id.in_(page_artifact_ids))
+                .filter(CollectionArtifact.source.isnot(None))
+                .all()
+            )
+            source_lookup = {row.artifact_id: row.source for row in db_sources}
+
         # Batch fetch group memberships if requested (avoids N+1 queries)
         artifact_groups_map: dict[str, list[ArtifactGroupMembership]] = {}
         if include_groups and page_associations:
@@ -1556,12 +1571,37 @@ async def list_collection_artifacts(
                     except (json.JSONDecodeError, TypeError):
                         tags = None
 
+                # Resolve source: DB lookup > filesystem > artifact_id fallback
+                db_source = source_lookup.get(assoc.artifact_id)
+                resolved_source = db_source or assoc.source
+                if not resolved_source:
+                    # Last resort: read from filesystem
+                    try:
+                        artifact_type_enum = None
+                        try:
+                            artifact_type_enum = CoreArtifactType(type_str)
+                        except ValueError:
+                            pass
+
+                        file_artifact = artifact_mgr.show(
+                            artifact_name=artifact_name,
+                            artifact_type=artifact_type_enum,
+                        )
+                        if file_artifact and file_artifact.upstream:
+                            resolved_source = file_artifact.upstream
+                    except Exception as e:
+                        logger.debug(f"Failed to read filesystem source for {assoc.artifact_id}: {e}")
+
+                # Use artifact_id as absolute last resort
+                if not resolved_source:
+                    resolved_source = assoc.artifact_id
+
                 artifact_summary = ArtifactSummary(
                     id=assoc.artifact_id,
                     name=artifact_name,
                     type=type_str,
                     version=assoc.version,
-                    source=assoc.source or assoc.artifact_id,
+                    source=resolved_source,
                     description=assoc.description,
                     author=assoc.author,
                     tags=tags,

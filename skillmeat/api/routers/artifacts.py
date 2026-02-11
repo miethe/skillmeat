@@ -519,6 +519,7 @@ def artifact_to_response(
     drift_status: Optional[str] = None,
     has_local_modifications: Optional[bool] = None,
     collections_data: Optional[List[ArtifactCollectionInfo]] = None,
+    db_source: Optional[str] = None,
 ) -> ArtifactResponse:
     """Convert Artifact model to API response schema.
 
@@ -527,6 +528,7 @@ def artifact_to_response(
         drift_status: Optional drift status ("none", "modified", "deleted", "added")
         has_local_modifications: Optional flag indicating local modifications
         collections_data: Optional list of ArtifactCollectionInfo from CollectionService
+        db_source: Optional source from DB cache (overrides filesystem source)
 
     Returns:
         ArtifactResponse schema
@@ -577,7 +579,7 @@ def artifact_to_response(
         id=f"{artifact.type.value}:{artifact.name}",
         name=artifact.name,
         type=artifact.type.value,
-        source=artifact.upstream if artifact.upstream else "local",
+        source=db_source or (artifact.upstream if artifact.upstream else "local"),
         origin=artifact.origin,
         origin_source=artifact.origin_source,
         version=version,
@@ -1923,9 +1925,10 @@ async def list_artifacts(
                 logger.warning(f"Failed to check drift: {e}")
                 # Continue without drift info rather than failing the request
 
-        # Query database for collection memberships using CollectionService
+        # Query database for collection memberships and source metadata
         artifact_ids = [f"{a.type.value}:{a.name}" for a in page_artifacts]
         collections_map: Dict[str, List[ArtifactCollectionInfo]] = {}
+        source_lookup: Dict[str, str] = {}
 
         if artifact_ids:
             try:
@@ -1934,6 +1937,17 @@ async def list_artifacts(
                 collections_map = collection_service.get_collection_membership_batch(
                     artifact_ids
                 )
+                # Query DB source for marketplace-imported artifacts
+                db_sources = (
+                    db_session.query(
+                        CollectionArtifact.artifact_id,
+                        CollectionArtifact.source,
+                    )
+                    .filter(CollectionArtifact.artifact_id.in_(artifact_ids))
+                    .filter(CollectionArtifact.source.isnot(None))
+                    .all()
+                )
+                source_lookup = {row.artifact_id: row.source for row in db_sources}
                 db_session.close()
             except Exception as e:
                 logger.warning(f"Failed to query collection memberships: {e}")
@@ -1954,6 +1968,7 @@ async def list_artifacts(
                     drift_status=drift_status,
                     has_local_modifications=has_modifications,
                     collections_data=collections_map.get(artifact_key, []),
+                    db_source=source_lookup.get(artifact_key),
                 )
             )
 
