@@ -12,7 +12,7 @@ import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path as PathLib
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated, Dict, Iterator, List, Optional
 
 from fastapi import (
     APIRouter,
@@ -126,6 +126,37 @@ from skillmeat.cache.repositories import MarketplaceCatalogRepository
 
 logger = logging.getLogger(__name__)
 
+# Exclusion patterns for diff operations - skip non-content directories
+DIFF_EXCLUDE_DIRS = {
+    ".git",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "venv",
+    ".tox",
+    ".pytest_cache",
+    ".mypy_cache",
+    "dist",
+    "build",
+    ".next",
+    ".turbo",
+}
+
+
+def iter_artifact_files(base_path: PathLib) -> Iterator[PathLib]:
+    """Iterate artifact files, excluding common non-content directories.
+
+    Filters out directories like node_modules, .git, __pycache__, etc. that would
+    cause significant performance degradation during diff operations.
+    """
+    for f in base_path.rglob("*"):
+        if f.is_file():
+            # Skip if any parent directory is in exclusion list
+            if not any(
+                part in DIFF_EXCLUDE_DIRS for part in f.relative_to(base_path).parts
+            ):
+                yield f
+
 
 def _decode_project_id_param(raw_project_id: str) -> Optional[PathLib]:
     """Decode project identifier passed to bulk import.
@@ -197,6 +228,43 @@ def _get_possible_artifact_paths(artifact_type: ArtifactType, name: str) -> List
         paths = [f"mcp/{name}"]
 
     return paths
+
+
+# Common file extensions that may be incorrectly included in artifact IDs
+_ARTIFACT_ID_EXTENSIONS = (".md", ".txt", ".json", ".yaml", ".yml")
+
+
+def parse_artifact_id(artifact_id: str) -> tuple[str, str]:
+    """Parse artifact_id into (type, name), normalizing the name.
+
+    Handles cases where the frontend sends artifact IDs with file extensions
+    (e.g., 'agent:prd-writer.md' instead of 'agent:prd-writer').
+
+    Args:
+        artifact_id: The artifact identifier in 'type:name' format
+
+    Returns:
+        Tuple of (artifact_type_str, artifact_name) with normalized name
+
+    Raises:
+        ValueError: If artifact_id is not in 'type:name' format
+    """
+    if ":" not in artifact_id:
+        raise ValueError("Invalid artifact ID format. Expected 'type:name'")
+
+    artifact_type_str, artifact_name = artifact_id.split(":", 1)
+
+    # Strip common file extensions that may be incorrectly included
+    original_name = artifact_name
+    for ext in _ARTIFACT_ID_EXTENSIONS:
+        if artifact_name.endswith(ext):
+            artifact_name = artifact_name[: -len(ext)]
+            logger.warning(
+                f"Stripped extension from artifact ID: '{original_name}' -> '{artifact_name}'"
+            )
+            break
+
+    return artifact_type_str, artifact_name
 
 
 router = APIRouter(
@@ -2129,7 +2197,7 @@ async def get_artifact(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -2250,7 +2318,7 @@ async def check_artifact_upstream(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -2419,7 +2487,7 @@ async def update_artifact(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -2620,7 +2688,7 @@ async def update_artifact_parameters(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -2859,7 +2927,7 @@ async def delete_artifact(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -3031,7 +3099,7 @@ async def deploy_artifact(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -3278,8 +3346,7 @@ async def _deploy_merge(
         if target_path.is_dir():
             copied_files = sorted(
                 str(f.relative_to(target_path))
-                for f in target_path.rglob("*")
-                if f.is_file()
+                for f in iter_artifact_files(target_path)
             )
         else:
             copied_files = [target_path.name]
@@ -3325,8 +3392,7 @@ async def _deploy_merge(
     if source_path.is_dir():
         source_files = {
             str(f.relative_to(source_path))
-            for f in source_path.rglob("*")
-            if f.is_file()
+            for f in iter_artifact_files(source_path)
         }
     else:
         source_files = {source_path.name}
@@ -3334,8 +3400,7 @@ async def _deploy_merge(
     if target_path.is_dir():
         target_files = {
             str(f.relative_to(target_path))
-            for f in target_path.rglob("*")
-            if f.is_file()
+            for f in iter_artifact_files(target_path)
         }
     else:
         target_files = {target_path.name}
@@ -3491,7 +3556,7 @@ async def sync_artifact(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -3638,7 +3703,9 @@ async def sync_artifact(
                 )
                 artifact_path = collection_path / artifact.path
                 if artifact_path.exists():
-                    synced_files_count = len(list(artifact_path.rglob("*")))
+                    synced_files_count = sum(
+                        1 for _ in iter_artifact_files(artifact_path)
+                    )
 
             logger.info(
                 f"Artifact '{artifact_name}' sync completed: status={sync_result.status}, "
@@ -3730,7 +3797,7 @@ async def undeploy_artifact(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -3879,7 +3946,7 @@ async def get_version_graph(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -4012,7 +4079,7 @@ async def get_artifact_diff(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -4102,8 +4169,7 @@ async def get_artifact_diff(
         if collection_artifact_path.is_dir():
             collection_files = {
                 str(f.relative_to(collection_artifact_path))
-                for f in collection_artifact_path.rglob("*")
-                if f.is_file()
+                for f in iter_artifact_files(collection_artifact_path)
             }
         else:
             collection_files = {collection_artifact_path.name}
@@ -4111,8 +4177,7 @@ async def get_artifact_diff(
         if project_artifact_path.is_dir():
             project_files = {
                 str(f.relative_to(project_artifact_path))
-                for f in project_artifact_path.rglob("*")
-                if f.is_file()
+                for f in iter_artifact_files(project_artifact_path)
             }
         else:
             project_files = {project_artifact_path.name}
@@ -4377,7 +4442,7 @@ async def get_artifact_upstream_diff(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -4491,8 +4556,7 @@ async def get_artifact_upstream_diff(
         if collection_artifact_path.is_dir():
             collection_files = {
                 str(f.relative_to(collection_artifact_path))
-                for f in collection_artifact_path.rglob("*")
-                if f.is_file()
+                for f in iter_artifact_files(collection_artifact_path)
             }
         else:
             collection_files = {collection_artifact_path.name}
@@ -4500,8 +4564,7 @@ async def get_artifact_upstream_diff(
         if upstream_artifact_path.is_dir():
             upstream_files = {
                 str(f.relative_to(upstream_artifact_path))
-                for f in upstream_artifact_path.rglob("*")
-                if f.is_file()
+                for f in iter_artifact_files(upstream_artifact_path)
             }
         else:
             upstream_files = {upstream_artifact_path.name}
@@ -4753,7 +4816,7 @@ async def get_artifact_source_project_diff(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -4888,8 +4951,7 @@ async def get_artifact_source_project_diff(
             if upstream_artifact_path.is_dir():
                 source_files = {
                     str(f.relative_to(upstream_artifact_path))
-                    for f in upstream_artifact_path.rglob("*")
-                    if f.is_file()
+                    for f in iter_artifact_files(upstream_artifact_path)
                 }
             else:
                 source_files = {upstream_artifact_path.name}
@@ -4897,8 +4959,7 @@ async def get_artifact_source_project_diff(
             if project_artifact_path.is_dir():
                 project_files = {
                     str(f.relative_to(project_artifact_path))
-                    for f in project_artifact_path.rglob("*")
-                    if f.is_file()
+                    for f in iter_artifact_files(project_artifact_path)
                 }
             else:
                 project_files = {project_artifact_path.name}
@@ -5141,7 +5202,7 @@ async def list_artifact_files(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -5376,7 +5437,7 @@ async def get_artifact_file_content(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -5649,7 +5710,7 @@ async def update_artifact_file_content(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -5941,7 +6002,7 @@ async def create_artifact_file(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -6225,7 +6286,7 @@ async def delete_artifact_file(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -7058,7 +7119,7 @@ async def update_artifact_tags(
 
         # Parse artifact ID (format: type:name)
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -7261,7 +7322,7 @@ async def create_linked_artifact(
 
         # Parse source artifact ID
         try:
-            source_type_str, source_name = artifact_id.split(":", 1)
+            source_type_str, source_name = parse_artifact_id(artifact_id)
             source_type = ArtifactType(source_type_str)
         except ValueError:
             raise HTTPException(
@@ -7271,7 +7332,7 @@ async def create_linked_artifact(
 
         # Parse target artifact ID
         try:
-            target_type_str, target_name = request.target_artifact_id.split(":", 1)
+            target_type_str, target_name = parse_artifact_id(request.target_artifact_id)
             target_type = ArtifactType(target_type_str)
         except ValueError:
             raise HTTPException(
@@ -7448,7 +7509,7 @@ async def delete_linked_artifact(
 
         # Parse source artifact ID
         try:
-            source_type_str, source_name = artifact_id.split(":", 1)
+            source_type_str, source_name = parse_artifact_id(artifact_id)
             source_type = ArtifactType(source_type_str)
         except ValueError:
             raise HTTPException(
@@ -7580,7 +7641,7 @@ async def list_linked_artifacts(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -7715,7 +7776,7 @@ async def get_unlinked_references(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
