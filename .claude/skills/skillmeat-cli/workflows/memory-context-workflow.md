@@ -161,12 +161,59 @@ skillmeat memory module update <module-id> --min-confidence 0.75
 
 ## API Fallback Procedure
 
-If `skillmeat memory --help` fails:
+Use API fallback when CLI `memory item create` returns 422/400 errors (common with project ID resolution), or when provenance metadata must be preserved.
 
-1. Switch to API mode.
-2. Use equivalent `/api/v1/*` endpoints.
-3. Tell user: "Memory CLI is unavailable in this install, using API fallback."
-4. Continue workflow with the same review-first safety controls.
+### Project ID Resolution
+
+The API requires the **base64-encoded project path** as `project_id`. The CLI `--project` flag sometimes fails to resolve names correctly for write operations.
+
+```bash
+# Find project ID via API
+curl -s "http://localhost:8080/api/v1/projects" | python3 -c "
+import sys, json
+for p in json.load(sys.stdin)['items']:
+    print(f'{p[\"name\"]}: {p[\"id\"]}')"
+
+# SkillMeat project ID (stable):
+# L1VzZXJzL21pZXRoZS9kZXYvaG9tZWxhYi9kZXZlbG9wbWVudC9za2lsbG1lYXQ=
+```
+
+### Create Memory Item via API (Proven Pattern)
+
+```bash
+PROJECT_ID="L1VzZXJzL21pZXRoZS9kZXYvaG9tZWxhYi9kZXZlbG9wbWVudC9za2lsbG1lYXQ="
+
+curl -s "http://localhost:8080/api/v1/memory-items?project_id=$PROJECT_ID" \
+  -X POST -H "Content-Type: application/json" -d '{
+  "type": "learning",
+  "content": "Your learning here",
+  "confidence": 0.85,
+  "status": "candidate",
+  "anchors": [
+    "skillmeat/path/to/file.py:code",
+    "skillmeat/path/to/test.py:test:100-150"
+  ]
+}'
+```
+
+### Key API Gotchas
+
+| Issue | Wrong | Correct |
+|-------|-------|---------|
+| Project ID | `?project_id=skillmeat` | `?project_id=<base64-encoded-path>` |
+| Type field | `"type": "pattern"` | `"type": "learning"` (see valid types below) |
+| Anchors | `[{"path": "...", "type": "code"}]` | `["path/to/file:code"]` (strings) |
+| Provenance | CLI `--provenance-*` flags (may not propagate) | Omit or set via separate API call |
+
+### Valid Memory Types
+
+`decision` | `constraint` | `gotcha` | `style_rule` | `learning`
+
+### List/Verify via API
+
+```bash
+curl -s "http://localhost:8080/api/v1/memory-items?project_id=$PROJECT_ID&status=candidate"
+```
 
 ---
 

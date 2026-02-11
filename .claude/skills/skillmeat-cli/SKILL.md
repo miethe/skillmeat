@@ -91,11 +91,12 @@ When user asks for memory operations:
 skillmeat memory --help
 ```
 
-3. If unavailable, use API fallback and explain:
-- `/api/v1/memory-items`
-- `/api/v1/context-modules`
-- `/api/v1/context-packs/preview`
-- `/api/v1/context-packs/generate`
+3. If CLI returns 422/400 (common for `memory item create`), use API fallback:
+- `POST /api/v1/memory-items?project_id=<BASE64_ID>` — create items (anchors as string array)
+- `GET /api/v1/memory-items?project_id=<BASE64_ID>&status=candidate` — list items
+- `/api/v1/context-modules` — module operations
+- `/api/v1/context-packs/preview` and `/generate` — pack operations
+- See `workflows/memory-context-workflow.md` § "API Fallback Procedure" for proven curl patterns
 
 4. Safety defaults:
 - Keep extracted memories as `candidate`

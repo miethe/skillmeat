@@ -67,13 +67,31 @@ skillmeat memory extract preview --project <project> --run-log ./run.log --profi
 skillmeat memory extract apply --project <project> --run-log ./run.log --min-confidence 0.65
 ```
 
-### API Fallback (Current-Compatible)
+### API Fallback (Recommended for `memory item create`)
 
+The CLI `memory item create` may return 422/400 due to project ID resolution issues. Use the API directly:
+
+```bash
+PROJECT_ID="L1VzZXJzL21pZXRoZS9kZXYvaG9tZWxhYi9kZXZlbG9wbWVudC9za2lsbG1lYXQ="
+
+curl -s "http://localhost:8080/api/v1/memory-items?project_id=$PROJECT_ID" \
+  -X POST -H "Content-Type: application/json" -d '{
+  "type": "learning",
+  "content": "Your learning here",
+  "confidence": 0.85,
+  "status": "candidate",
+  "anchors": ["skillmeat/path/to/file.py:code"]
+}'
+```
+
+**Key gotchas**: Valid types are `decision|constraint|gotcha|style_rule|learning`. Anchors must be strings (`"path:type"`), not objects. Project ID is the base64-encoded path.
+
+Other API endpoints:
 - `POST /api/v1/context-packs/preview`
 - `POST /api/v1/context-packs/generate`
-- `POST /api/v1/memory-items` and lifecycle endpoints
+- `GET /api/v1/memory-items?project_id=<ID>&status=candidate` — list items
 
-If CLI memory commands are missing, state fallback mode explicitly.
+If CLI memory commands fail, state fallback mode explicitly.
 
 ---
 
