@@ -84,6 +84,8 @@ export interface DeploymentSummary {
   project_name: string;
   /** ISO 8601 timestamp when artifact was deployed to this project */
   deployed_at: string;
+  /** Whether local modifications have been detected in this deployment */
+  local_modifications?: boolean;
 }
 
 /**

@@ -14,6 +14,7 @@ import {
 import { TagFilterPopover } from '@/components/ui/tag-filter-popover';
 import { ActiveFilterRow, type ActiveFilterItem } from '@/components/shared/active-filter-row';
 import type { ArtifactType } from '@/types/artifact';
+import { useProjects } from '@/hooks';
 
 /**
  * Status filter options specific to the manage/operations page.
@@ -75,7 +76,6 @@ export interface ManagePageFiltersProps {
   onClearAll: () => void;
 
   // Data
-  availableProjects: string[];
   availableTags?: Array<{ name: string; artifact_count: number }>;
   showTypeFilter?: boolean;
 }
@@ -120,10 +120,17 @@ export function ManagePageFilters({
   onProjectChange,
   onTagsChange,
   onClearAll,
-  availableProjects,
   availableTags,
   showTypeFilter = true,
 }: ManagePageFiltersProps) {
+  // Load projects from API
+  const { data: projectsData, isLoading: projectsLoading } = useProjects();
+
+  // Map projects to names for dropdown
+  const availableProjects = React.useMemo(() => {
+    return projectsData?.map((p) => p.name) || [];
+  }, [projectsData]);
+
   // Debounced search state
   const [searchInput, setSearchInput] = React.useState(search);
   const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -160,13 +167,6 @@ export function ManagePageFilters({
   // Check if any filters are active
   const hasActiveFilters =
     search !== '' || status !== 'all' || type !== 'all' || project !== null || tags.length > 0;
-
-  // Count active filters (excluding search)
-  const activeFilterCount =
-    (status !== 'all' ? 1 : 0) +
-    (showTypeFilter && type !== 'all' ? 1 : 0) +
-    (project !== null ? 1 : 0) +
-    tags.length;
 
   const activeFilterItems: ActiveFilterItem[] = [
     ...(project
@@ -244,10 +244,11 @@ export function ManagePageFilters({
         <Select
           value={project || 'all'}
           onValueChange={(value) => onProjectChange(value === 'all' ? null : value)}
+          disabled={projectsLoading}
         >
           <SelectTrigger className="w-[200px]" aria-label="Filter by project">
             <FolderKanban className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            <SelectValue placeholder="All Projects" />
+            <SelectValue placeholder={projectsLoading ? 'Loading...' : 'All Projects'} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Projects</SelectItem>

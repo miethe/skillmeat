@@ -180,19 +180,6 @@ function ManagePageContent() {
     return result;
   }, [entities, urlTags, urlProject, toProjectKey]);
 
-  // Compute available projects from all entity deployments
-  const availableProjects = useMemo(() => {
-    const projectMap = new Map<string, string>();
-    entities.forEach((entity) => {
-      entity.deployments?.forEach((d) => {
-        if (d.project_path) {
-          const projectName = d.project_path.split('/').filter(Boolean).pop() || d.project_path;
-          projectMap.set(projectName.toLowerCase(), projectName);
-        }
-      });
-    });
-    return Array.from(projectMap.values()).sort((a, b) => a.localeCompare(b));
-  }, [entities]);
 
   // Compute context-aware available tags from entities matching current filters
   // (type/status/search applied by API, project applied here, but NOT tag filter)
@@ -478,7 +465,6 @@ function ManagePageContent() {
           onProjectChange={handleProjectChange}
           onTagsChange={handleTagsChange}
           onClearAll={handleClearAllFilters}
-          availableProjects={availableProjects}
           availableTags={availableTags}
           showTypeFilter={false}
         />

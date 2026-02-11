@@ -13,6 +13,19 @@ import type { ArtifactType } from '@/types/artifact';
 // Polyfill scrollIntoView for Radix UI components
 Element.prototype.scrollIntoView = jest.fn();
 
+// Mock useProjects hook
+jest.mock('@/hooks', () => ({
+  useProjects: () => ({
+    data: [
+      { id: '1', name: 'project-1', path: '/path/to/project-1', deployment_count: 5, last_deployment: '2024-01-01' },
+      { id: '2', name: 'project-2', path: '/path/to/project-2', deployment_count: 3, last_deployment: '2024-01-02' },
+      { id: '3', name: 'project-3', path: '/path/to/project-3', deployment_count: 1, last_deployment: '2024-01-03' },
+    ],
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 // Mock useTags hook used by TagFilterPopover
 jest.mock('@/hooks/use-tags', () => ({
   useTags: () => ({
@@ -59,7 +72,6 @@ function createDefaultProps() {
     onProjectChange: jest.fn(),
     onTagsChange: jest.fn(),
     onClearAll: jest.fn(),
-    availableProjects: ['project-1', 'project-2', 'project-3'],
     availableTags: [
       { name: 'tag-1', artifact_count: 3 },
       { name: 'tag-2', artifact_count: 5 },
@@ -552,9 +564,9 @@ describe('ManagePageFilters', () => {
   });
 
   describe('edge cases', () => {
-    it('handles empty availableProjects array', () => {
+    it('handles empty projects from API', () => {
       const props = createDefaultProps();
-      renderWithQueryClient(<ManagePageFilters {...props} availableProjects={[]} />);
+      renderWithQueryClient(<ManagePageFilters {...props} />);
 
       expect(screen.getByLabelText('Filter by project')).toBeInTheDocument();
     });

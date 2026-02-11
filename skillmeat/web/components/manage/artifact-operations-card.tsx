@@ -42,8 +42,10 @@ import {
   Download,
   GitCompare,
   MoreHorizontal,
-  AlertTriangle,
   ArrowRight,
+  ArrowUp,
+  ArrowDown,
+  CheckCircle2,
   Clock,
   Trash2,
 } from 'lucide-react';
@@ -69,6 +71,7 @@ import {
 import { DeploymentBadgeStack } from '@/components/shared/deployment-badge-stack';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 import { getArtifactTypeConfig } from '@/types/artifact';
+import { Tool } from '@/types/enums';
 
 // ============================================================================
 // Types
@@ -179,6 +182,24 @@ function getVersionDisplay(artifact: Artifact): {
   };
 }
 
+// Known tool names from the Tool enum for filtering tags
+const TOOL_NAMES = new Set(Object.values(Tool));
+
+/**
+ * Check if a tag represents a Claude Code tool
+ */
+function isToolTag(tag: string): boolean {
+  return TOOL_NAMES.has(tag as Tool);
+}
+
+/**
+ * Extract non-tool tags for display as a tag cloud
+ */
+function extractDisplayTags(tags?: string[]): string[] {
+  if (!tags) return [];
+  return tags.filter((tag) => !isToolTag(tag));
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -217,6 +238,16 @@ export function ArtifactOperationsCard({
   const health = deriveHealthStatus(artifact);
   const versionInfo = getVersionDisplay(artifact);
   const lastSynced = artifact.upstream?.lastChecked;
+
+  // Tag cloud
+  const displayTags = extractDisplayTags(artifact.tags);
+  const visibleTags = displayTags.slice(0, 3);
+  const remainingTagsCount = displayTags.length - visibleTags.length;
+
+  // Deployment indicators
+  const hasDeployments = (artifact.deployments?.length ?? 0) > 0;
+  const deploymentCount = artifact.deployments?.length ?? 0;
+  const hasDeploymentDrift = artifact.deployments?.some((d) => d.local_modifications) ?? false;
 
   // Type-safe icon lookup with fallback
   const iconName = config?.icon ?? 'FileText';
@@ -322,6 +353,22 @@ export function ArtifactOperationsCard({
         </div>
       </div>
 
+      {/* Tag Cloud Row */}
+      {visibleTags.length > 0 && (
+        <div className="flex min-h-[28px] flex-wrap items-center gap-1 border-t px-4 py-2">
+          {visibleTags.map((tag) => (
+            <Badge key={tag} variant="secondary" className="text-xs">
+              {tag}
+            </Badge>
+          ))}
+          {remainingTagsCount > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              +{remainingTagsCount} more
+            </Badge>
+          )}
+        </div>
+      )}
+
       {/* Deployments Row */}
       {artifact.deployments && artifact.deployments.length > 0 && (
         <div className="border-t px-4 py-2">
@@ -332,16 +379,27 @@ export function ArtifactOperationsCard({
         </div>
       )}
 
-      {/* Status Row: Drift, Update Available, Last Synced */}
+      {/* Status Row: Indicators, Deployed Badge, Last Synced */}
       <div className="flex flex-wrap items-center gap-2 border-t px-4 py-2">
-        {/* Drift Badge */}
+        {/* Deployment Drift Badge (critical - shown first) */}
+        {hasDeploymentDrift && (
+          <Badge
+            variant="outline"
+            className="border-purple-500/20 bg-purple-500/10 text-purple-600 dark:text-purple-400"
+          >
+            <ArrowDown className="mr-1 h-3 w-3" aria-hidden="true" />
+            Deployment Drift
+          </Badge>
+        )}
+
+        {/* Pushable Badge (modified locally) */}
         {artifact.syncStatus === 'modified' && (
           <Badge
             variant="outline"
-            className="border-yellow-500/20 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+            className="border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400"
           >
-            <AlertTriangle className="mr-1 h-3 w-3" aria-hidden="true" />
-            Has Drift
+            <ArrowUp className="mr-1 h-3 w-3" aria-hidden="true" />
+            Pushable
           </Badge>
         )}
 
@@ -352,6 +410,14 @@ export function ArtifactOperationsCard({
             className="border-orange-500/20 bg-orange-500/10 text-orange-600 dark:text-orange-400"
           >
             Update Available
+          </Badge>
+        )}
+
+        {/* Deployed Badge */}
+        {hasDeployments && (
+          <Badge variant="secondary" className="text-xs">
+            <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
+            <span>Deployed ({deploymentCount})</span>
           </Badge>
         )}
 
@@ -497,6 +563,15 @@ export function ArtifactOperationsCardSkeleton({ selectable = false }: { selecta
         <div className="flex items-center gap-2">
           <Skeleton className="h-5 w-16 rounded-full" aria-hidden="true" />
           <Skeleton className="h-4 w-4 rounded-full" aria-hidden="true" />
+        </div>
+      </div>
+
+      {/* Tag Cloud Row */}
+      <div className="border-t px-4 py-2">
+        <div className="flex items-center gap-1">
+          <Skeleton className="h-5 w-14 rounded-full" aria-hidden="true" />
+          <Skeleton className="h-5 w-16 rounded-full" aria-hidden="true" />
+          <Skeleton className="h-5 w-12 rounded-full" aria-hidden="true" />
         </div>
       </div>
 
