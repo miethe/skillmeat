@@ -338,6 +338,7 @@ export function useCreateMemoryItem(
     },
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: memoryItemKeys.globalLists() });
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.counts() });
       options?.onSuccess?.(...args);
     },
@@ -379,6 +380,7 @@ export function useUpdateMemoryItem(
       const [, { itemId }] = args;
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.detail(itemId) });
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: memoryItemKeys.globalLists() });
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.counts() });
       options?.onSuccess?.(...args);
     },
@@ -406,6 +408,7 @@ export function useDeleteMemoryItem(
     },
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: memoryItemKeys.globalLists() });
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.counts() });
       options?.onSuccess?.(...args);
     },
@@ -450,6 +453,7 @@ export function usePromoteMemoryItem(
       const [, { itemId }] = args;
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.detail(itemId) });
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: memoryItemKeys.globalLists() });
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.counts() });
       options?.onSuccess?.(...args);
     },
@@ -493,6 +497,7 @@ export function useDeprecateMemoryItem(
       const [, { itemId }] = args;
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.detail(itemId) });
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: memoryItemKeys.globalLists() });
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.counts() });
       options?.onSuccess?.(...args);
     },
@@ -526,6 +531,7 @@ export function useBulkPromoteMemoryItems(
     },
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: memoryItemKeys.globalLists() });
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.counts() });
       options?.onSuccess?.(...args);
     },
@@ -559,6 +565,7 @@ export function useBulkDeprecateMemoryItems(
     },
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: memoryItemKeys.globalLists() });
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.counts() });
       options?.onSuccess?.(...args);
     },
@@ -594,6 +601,7 @@ export function useBulkDeleteMemoryItems(
     },
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: memoryItemKeys.globalLists() });
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.counts() });
       options?.onSuccess?.(...args);
     },
@@ -634,6 +642,7 @@ export function useMergeMemoryItems(
     },
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: memoryItemKeys.globalLists() });
       queryClient.invalidateQueries({ queryKey: memoryItemKeys.counts() });
       // Invalidate both source and target details
       const [, variables] = args;

@@ -21,6 +21,7 @@ import {
 import {
   useGlobalMemoryItems,
   useProjects,
+  useMemoryItem,
   useMemorySelection,
   usePromoteMemoryItem,
   useDeprecateMemoryItem,
@@ -33,6 +34,7 @@ import {
 import type { MemoryStatus } from '@/sdk/models/MemoryStatus';
 import type { MemoryType } from '@/sdk/models/MemoryType';
 import type { MemoryItemResponse } from '@/sdk/models/MemoryItemResponse';
+import { MemoryDetailsModal } from '@/components/memory/memory-details-modal';
 import { MemoryFilterBar } from '@/components/memory/memory-filter-bar';
 import { MemoryList } from '@/components/memory/memory-list';
 import { MemoryCard } from '@/components/memory/memory-card';
@@ -104,6 +106,7 @@ export default function MemoriesPage() {
   // ---------------------------------------------------------------------------
   // Modal state
   // ---------------------------------------------------------------------------
+  const [selectedMemoryId, setSelectedMemoryId] = useState<string | null>(null);
   const [editingMemory, setEditingMemory] = useState<MemoryItemResponse | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
     type: 'reject' | 'deprecate' | 'delete';
@@ -150,6 +153,9 @@ export default function MemoriesPage() {
     limit: 100,
   });
   const candidateCount = candidateData?.items?.length ?? 0;
+
+  // Fetch selected memory item for the detail modal
+  const { data: selectedMemory } = useMemoryItem(selectedMemoryId ?? undefined);
 
   // ---------------------------------------------------------------------------
   // Derived data
@@ -245,8 +251,8 @@ export default function MemoriesPage() {
     // No-op on global page; merge is project-scoped
   }, []);
 
-  const handleCardClick = useCallback((_id: string) => {
-    // No-op on global page; no detail panel
+  const handleCardClick = useCallback((id: string) => {
+    setSelectedMemoryId(id);
   }, []);
 
   const handleDeprecate = useCallback((id: string) => {
@@ -268,6 +274,20 @@ export default function MemoriesPage() {
     },
     [updateItem]
   );
+
+  const handleSetStatus = useCallback(
+    (id: string, status: MemoryStatus) => {
+      updateItem.mutate({
+        itemId: id,
+        data: { status },
+      });
+    },
+    [updateItem]
+  );
+
+  const handleCloseDetail = useCallback(() => {
+    setSelectedMemoryId(null);
+  }, []);
 
   const handleDelete = useCallback((id: string) => {
     setConfirmAction({
@@ -653,6 +673,22 @@ export default function MemoriesPage() {
       {/* ------------------------------------------------------------------ */}
       {/* Shared Modals                                                      */}
       {/* ------------------------------------------------------------------ */}
+
+      {/* Memory details modal */}
+      <MemoryDetailsModal
+        memory={selectedMemory ?? null}
+        open={!!selectedMemoryId}
+        onClose={handleCloseDetail}
+        projectId={selectedMemory?.project_id ?? ''}
+        onEdit={handleEdit}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        onMerge={handleMerge}
+        onDeprecate={handleDeprecate}
+        onReactivate={handleReactivate}
+        onSetStatus={handleSetStatus}
+        onDelete={handleDelete}
+      />
 
       {/* Edit memory form modal */}
       <MemoryFormModal
