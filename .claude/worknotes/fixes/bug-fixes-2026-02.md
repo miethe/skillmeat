@@ -90,7 +90,55 @@ Added `_normalize_artifact_name()` helper to `skillmeat/storage/deployment.py` t
 - All 31 deployment-related unit tests pass (`test_deployment_tracker.py`, `test_deployment_manager.py`)
 - Normalization correctly handles: `test.md` → `test`, `test.yaml` → `test`, `test` → `test`
 
-**Commits**: (pending)
+**Commits**: 0ba10070
+
+**Status**: RESOLVED
+
+---
+
+## Sync Status Tab 404 Errors - Collection Name Normalization and Case Sensitivity
+
+**Date Fixed**: 2026-02-12
+**Severity**: high
+**Component**: collection-core, artifacts-api
+
+**Issue**: Continued 404 errors for some artifacts in ArtifactOperationsModal (Contents tab and Sync Status tab) despite previous normalization fixes in API and DeploymentTracker layers.
+
+Example errors:
+- `GET /api/v1/artifacts/agent:prd-writer/files?collection=470c5a19e5054768adf543c6fcfadcef` → 404
+- `GET /api/v1/artifacts/agent:supabase-realtime-optimizer.md/files?collection=default` → 404
+
+**Root Causes**:
+
+1. **Collection.find_artifact() lacked name normalization**: While `parse_artifact_id()` in the API layer stripped extensions from incoming requests, `Collection.find_artifact()` did exact string matching. Stored name `"supabase-realtime-optimizer.md"` didn't match normalized search `"supabase-realtime-optimizer"`.
+
+2. **Case-sensitive collection name matching**: When `resolve_collection_name()` resolved a UUID to a collection name via DB lookup, it returned the DB name (e.g., `"Test"`), but filesystem has `"test"` (lowercase). The subsequent check `collection_record.name in collection_names` failed due to case mismatch.
+
+**Fix**:
+
+1. **Collection.find_artifact() normalization** (`skillmeat/core/collection.py`):
+   - Added `_ARTIFACT_EXTENSIONS` tuple matching API layer
+   - Added `_normalize_name()` helper that strips common extensions
+   - Modified `find_artifact()` to normalize both search term and stored artifact.name
+
+2. **Case-insensitive collection matching** (`skillmeat/api/routers/artifacts.py`):
+   - Modified `resolve_collection_name()` to create lowercase lookup dictionary
+   - Matches DB name (lowercased) against filesystem names (lowercased)
+   - Returns filesystem name (preserves original case on disk)
+
+**Files Modified**:
+- `skillmeat/core/collection.py`:
+  - Added `_ARTIFACT_EXTENSIONS` constant (line 20)
+  - Added `_normalize_name()` helper (lines 23-43)
+  - Modified `find_artifact()` to use normalization (lines 80-84)
+- `skillmeat/api/routers/artifacts.py`:
+  - Modified `resolve_collection_name()` for case-insensitive matching (lines 333-348)
+
+**Testing**:
+- All 14 collection unit tests pass
+- Normalization handles: `foo.md` → `foo`, case mismatch `Test` → `test`
+
+**Commits**: ddbbaca5
 
 **Status**: RESOLVED
 
