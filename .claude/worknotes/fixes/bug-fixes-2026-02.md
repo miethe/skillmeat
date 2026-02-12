@@ -140,6 +140,52 @@ Example errors:
 
 **Commits**: ddbbaca5
 
+**Status**: RESOLVED (normalization layer; see below for remaining lookup issue)
+
+---
+
+## Artifact 404 Errors - Collection-Scoped Lookup with No Fallback
+
+**Date Fixed**: 2026-02-12
+**Severity**: high
+**Component**: artifacts-api, entity-mapper
+
+**Issue**: After normalization and case-insensitive collection matching were fixed, 404s persisted. `agent:prd-writer/files` still 404'd despite collection UUID resolving correctly to "test". `/diff` endpoints also still 404'd for artifacts with `.md` extensions.
+
+**Root Cause**: Three compounding issues:
+
+1. **No fallback across collections**: 8 endpoints only searched the specified collection. When the frontend sent a collection UUID that resolved to "test" but the artifact only existed in "default" (stale DB association), lookup failed with no fallback.
+
+2. **UUID used as filesystem path**: After `resolve_collection_name()` resolved the UUID, some endpoints still used the raw UUID string as the collection path (e.g., `~/.skillmeat/collections/470c5a19.../`) instead of the resolved name.
+
+3. **Frontend sends collection UUID**: `extractPrimaryCollection()` in `entity-mapper.ts` returns `collections[0].id` (DB UUID), not the filesystem name.
+
+**Fix**:
+
+Added `_find_artifact_in_collections()` helper:
+- Accepts optional `preferred_collection` (name or UUID)
+- Tries preferred collection first (resolving UUID as needed)
+- Falls back to searching ALL collections when not found
+- Returns `(artifact, collection_name)` tuple with filesystem collection name
+- Logs warning when fallback is triggered (identifies stale associations)
+
+Updated 8 endpoints to use this helper:
+- `GET /{id}/files`, `GET/PUT/POST/DELETE /{id}/files/{path}`
+- `GET /{id}/diff`, `GET /{id}/upstream-diff`, `GET /{id}/source-project-diff`
+
+Net result: -89 lines (311 changes: +116, -205) — consolidated duplicated inline lookup logic.
+
+**Files Modified**:
+- `skillmeat/api/routers/artifacts.py`: Added `_find_artifact_in_collections()`, updated 8 endpoints
+- `skillmeat/web/lib/api/entity-mapper.ts`: Updated JSDoc for `extractPrimaryCollection()`
+
+**Testing**:
+- All 14 collection unit tests pass
+- All 31 deployment tests pass
+- Python imports validated
+
+**Commits**: 07290bc3
+
 **Status**: RESOLVED
 
 ---
