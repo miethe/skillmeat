@@ -196,6 +196,27 @@ class APISettings(BaseSettings):
         description="Enable automatic memory extraction from conversations (Phase 5 feature)",
     )
 
+    # Diff operation configuration
+    diff_exclude_dirs: List[str] = Field(
+        default=[
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            "venv",
+            ".tox",
+            ".pytest_cache",
+            ".mypy_cache",
+            "dist",
+            "build",
+            ".next",
+            ".turbo",
+        ],
+        description="Directories to exclude from artifact diff operations. "
+        "Files inside these directories are skipped during collection/project/upstream diff comparisons. "
+        "Add patterns like 'vendor' or '.cache' for your environment.",
+    )
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, v: str) -> str:

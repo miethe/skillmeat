@@ -30,6 +30,7 @@ from skillmeat.api.dependencies import (
     ArtifactManagerDep,
     CollectionManagerDep,
     ConfigManagerDep,
+    SettingsDep,
     SyncManagerDep,
     get_app_state,
     verify_api_key,
@@ -143,18 +144,23 @@ DIFF_EXCLUDE_DIRS = {
 }
 
 
-def iter_artifact_files(base_path: PathLib) -> Iterator[PathLib]:
-    """Iterate artifact files, excluding common non-content directories.
+def iter_artifact_files(
+    base_path: PathLib, exclude_dirs: Optional[set[str]] = None
+) -> Iterator[PathLib]:
+    """Iterate artifact files, excluding specified directories.
 
     Filters out directories like node_modules, .git, __pycache__, etc. that would
     cause significant performance degradation during diff operations.
+
+    Args:
+        base_path: Root path to iterate
+        exclude_dirs: Set of directory names to exclude (defaults to DIFF_EXCLUDE_DIRS)
     """
+    exclusions = exclude_dirs or DIFF_EXCLUDE_DIRS
     for f in base_path.rglob("*"):
         if f.is_file():
             # Skip if any parent directory is in exclusion list
-            if not any(
-                part in DIFF_EXCLUDE_DIRS for part in f.relative_to(base_path).parts
-            ):
+            if not any(part in exclusions for part in f.relative_to(base_path).parts):
                 yield f
 
 
@@ -288,6 +294,54 @@ def get_db_session():
 
 
 DbSessionDep = Annotated[Session, Depends(get_db_session)]
+
+
+def resolve_collection_name(
+    collection_param: str,
+    collection_mgr,
+    db_session=None,
+) -> Optional[str]:
+    """Resolve a collection parameter to a collection name.
+
+    Accepts either a collection name or UUID. If a UUID is provided,
+    looks up the name from the database.
+
+    Args:
+        collection_param: Collection name or UUID string
+        collection_mgr: CollectionManager instance
+        db_session: Optional SQLAlchemy session. If None, creates one internally.
+
+    Returns:
+        The collection name if found, None if not resolvable.
+    """
+    # Fast path: check as a name first
+    collection_names = collection_mgr.list_collections()
+    if collection_param in collection_names:
+        return collection_param
+
+    # Try as a UUID - look up in DB
+    owns_session = db_session is None
+    if owns_session:
+        db_session = get_session()
+    try:
+        collection_record = (
+            db_session.query(Collection)
+            .filter(Collection.id == collection_param)
+            .first()
+        )
+        if collection_record and collection_record.name in collection_names:
+            logger.warning(
+                "Resolved collection UUID '%s' to name '%s'. "
+                "Frontend should send collection name instead of UUID.",
+                collection_param,
+                collection_record.name,
+            )
+            return collection_record.name
+    finally:
+        if owns_session:
+            db_session.close()
+
+    return None
 
 
 def encode_cursor(value: str) -> str:
@@ -1630,12 +1684,14 @@ async def create_artifact(
                         detail="No collections found. Create a collection first.",
                     )
         else:
-            # Verify collection exists
-            if collection_name not in collection_mgr.list_collections():
+            # Verify collection exists (resolve UUID if needed)
+            resolved = resolve_collection_name(collection_name, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection_name}' not found",
                 )
+            collection_name = resolved
 
         # Create artifact based on source type
         artifact = None
@@ -1920,12 +1976,14 @@ async def list_artifacts(
 
         # Get artifacts from specified collection or all collections
         if collection:
-            # Check if collection exists
-            if collection not in collection_mgr.list_collections():
+            # Check if collection exists (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             artifacts = artifact_mgr.list_artifacts(
                 collection_name=collection,
                 artifact_type=type_filter,
@@ -2208,12 +2266,14 @@ async def get_artifact(
         # Search for artifact
         artifact = None
         if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
+            # Search in specified collection (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 artifact = artifact_mgr.show(
                     artifact_name=artifact_name,
@@ -2330,11 +2390,13 @@ async def check_artifact_upstream(
         artifact = None
         collection_name = collection
         if collection:
-            if collection not in collection_mgr.list_collections():
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 artifact = artifact_mgr.show(
                     artifact_name=artifact_name,
@@ -2501,12 +2563,14 @@ async def update_artifact(
         target_collection = None
 
         if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
+            # Search in specified collection (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 target_collection = collection_mgr.load_collection(collection)
                 artifact = target_collection.find_artifact(artifact_name, artifact_type)
@@ -2702,12 +2766,14 @@ async def update_artifact_parameters(
         target_collection = None
 
         if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
+            # Search in specified collection (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 target_collection = collection_mgr.load_collection(collection)
                 artifact = target_collection.find_artifact(artifact_name, artifact_type)
@@ -2940,12 +3006,14 @@ async def delete_artifact(
         found = False
 
         if collection:
-            # Check specified collection
-            if collection not in collection_mgr.list_collections():
+            # Check specified collection (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 target_collection = collection_mgr.load_collection(collection)
                 artifact = target_collection.find_artifact(artifact_name, artifact_type)
@@ -3055,6 +3123,7 @@ async def deploy_artifact(
     request: ArtifactDeployRequest,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    settings: SettingsDep,
     token: TokenDep,
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
@@ -3117,11 +3186,13 @@ async def deploy_artifact(
 
         # Get or create collection
         if collection:
-            if collection not in collection_mgr.list_collections():
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             collection_name = collection
         else:
             collections = collection_mgr.list_collections()
@@ -3153,6 +3224,7 @@ async def deploy_artifact(
                 collection_mgr=collection_mgr,
                 artifact_mgr=artifact_mgr,
                 project_path=project_path,
+                settings=settings,
             )
 
         # --- Strategy: overwrite (default, existing behavior) ---
@@ -3275,6 +3347,7 @@ async def _deploy_merge(
     collection_mgr,
     artifact_mgr,
     project_path: PathLib,
+    settings: SettingsDep,
 ) -> ArtifactDeployResponse:
     """Perform a merge deployment: file-level merge between collection and project.
 
@@ -3346,7 +3419,9 @@ async def _deploy_merge(
         if target_path.is_dir():
             copied_files = sorted(
                 str(f.relative_to(target_path))
-                for f in iter_artifact_files(target_path)
+                for f in iter_artifact_files(
+                    target_path, set(settings.diff_exclude_dirs)
+                )
             )
         else:
             copied_files = [target_path.name]
@@ -3389,10 +3464,11 @@ async def _deploy_merge(
         return hasher.hexdigest()
 
     # Collect relative file paths from source and target
+    exclude_dirs = set(settings.diff_exclude_dirs)
     if source_path.is_dir():
         source_files = {
             str(f.relative_to(source_path))
-            for f in iter_artifact_files(source_path)
+            for f in iter_artifact_files(source_path, exclude_dirs)
         }
     else:
         source_files = {source_path.name}
@@ -3400,7 +3476,7 @@ async def _deploy_merge(
     if target_path.is_dir():
         target_files = {
             str(f.relative_to(target_path))
-            for f in iter_artifact_files(target_path)
+            for f in iter_artifact_files(target_path, exclude_dirs)
         }
     else:
         target_files = {target_path.name}
@@ -3525,6 +3601,7 @@ async def sync_artifact(
     sync_mgr: SyncManagerDep,
     collection_mgr: CollectionManagerDep,
     artifact_mgr: ArtifactManagerDep,
+    settings: SettingsDep,
     _token: TokenDep,
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
@@ -3641,12 +3718,14 @@ async def sync_artifact(
         if not collection_name:
             collection_name = getattr(target_deployment, "from_collection", "default")
 
-        # Verify collection exists
-        if collection_name not in collection_mgr.list_collections():
+        # Verify collection exists (resolve UUID if needed)
+        resolved = resolve_collection_name(collection_name, collection_mgr)
+        if not resolved:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_name}' not found",
             )
+        collection_name = resolved
 
         # Load collection and verify artifact exists
         coll = collection_mgr.load_collection(collection_name)
@@ -3704,7 +3783,10 @@ async def sync_artifact(
                 artifact_path = collection_path / artifact.path
                 if artifact_path.exists():
                     synced_files_count = sum(
-                        1 for _ in iter_artifact_files(artifact_path)
+                        1
+                        for _ in iter_artifact_files(
+                            artifact_path, set(settings.diff_exclude_dirs)
+                        )
                     )
 
             logger.info(
@@ -4012,6 +4094,7 @@ async def get_artifact_diff(
     artifact_id: str,
     _artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    settings: SettingsDep,
     _token: TokenDep,
     project_path: str = Query(
         ...,
@@ -4128,12 +4211,14 @@ async def get_artifact_diff(
                     detail=f"Artifact '{artifact_id}' not found in project {project_path}",
                 )
 
-        # Verify collection exists
-        if collection_name not in collection_mgr.list_collections():
+        # Verify collection exists (resolve UUID if needed)
+        resolved = resolve_collection_name(collection_name, collection_mgr)
+        if not resolved:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_name}' not found",
             )
+        collection_name = resolved
 
         # Load collection and find artifact
         coll = collection_mgr.load_collection(collection_name)
@@ -4165,11 +4250,12 @@ async def get_artifact_diff(
         # Collect all files from both locations
         collection_files = set()
         project_files = set()
+        exclude_dirs = set(settings.diff_exclude_dirs)
 
         if collection_artifact_path.is_dir():
             collection_files = {
                 str(f.relative_to(collection_artifact_path))
-                for f in iter_artifact_files(collection_artifact_path)
+                for f in iter_artifact_files(collection_artifact_path, exclude_dirs)
             }
         else:
             collection_files = {collection_artifact_path.name}
@@ -4177,7 +4263,7 @@ async def get_artifact_diff(
         if project_artifact_path.is_dir():
             project_files = {
                 str(f.relative_to(project_artifact_path))
-                for f in iter_artifact_files(project_artifact_path)
+                for f in iter_artifact_files(project_artifact_path, exclude_dirs)
             }
         else:
             project_files = {project_artifact_path.name}
@@ -4372,6 +4458,7 @@ async def get_artifact_upstream_diff(
     artifact_id: str,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    settings: SettingsDep,
     _token: TokenDep,
     collection: Optional[str] = Query(
         default=None,
@@ -4454,11 +4541,13 @@ async def get_artifact_upstream_diff(
         artifact = None
         collection_name = collection
         if collection:
-            if collection not in collection_mgr.list_collections():
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 coll = collection_mgr.load_collection(collection)
                 artifact = coll.find_artifact(artifact_name, artifact_type)
@@ -4552,11 +4641,12 @@ async def get_artifact_upstream_diff(
         # Collect all files from both locations
         collection_files = set()
         upstream_files = set()
+        exclude_dirs = set(settings.diff_exclude_dirs)
 
         if collection_artifact_path.is_dir():
             collection_files = {
                 str(f.relative_to(collection_artifact_path))
-                for f in iter_artifact_files(collection_artifact_path)
+                for f in iter_artifact_files(collection_artifact_path, exclude_dirs)
             }
         else:
             collection_files = {collection_artifact_path.name}
@@ -4564,7 +4654,7 @@ async def get_artifact_upstream_diff(
         if upstream_artifact_path.is_dir():
             upstream_files = {
                 str(f.relative_to(upstream_artifact_path))
-                for f in iter_artifact_files(upstream_artifact_path)
+                for f in iter_artifact_files(upstream_artifact_path, exclude_dirs)
             }
         else:
             upstream_files = {upstream_artifact_path.name}
@@ -4779,6 +4869,7 @@ async def get_artifact_source_project_diff(
     artifact_id: str,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    settings: SettingsDep,
     _token: TokenDep,
     project_path: str = Query(
         ...,
@@ -4947,11 +5038,12 @@ async def get_artifact_source_project_diff(
             # Collect files from both locations
             source_files = set()
             project_files = set()
+            exclude_dirs = set(settings.diff_exclude_dirs)
 
             if upstream_artifact_path.is_dir():
                 source_files = {
                     str(f.relative_to(upstream_artifact_path))
-                    for f in iter_artifact_files(upstream_artifact_path)
+                    for f in iter_artifact_files(upstream_artifact_path, exclude_dirs)
                 }
             else:
                 source_files = {upstream_artifact_path.name}
@@ -4959,7 +5051,7 @@ async def get_artifact_source_project_diff(
             if project_artifact_path.is_dir():
                 project_files = {
                     str(f.relative_to(project_artifact_path))
-                    for f in iter_artifact_files(project_artifact_path)
+                    for f in iter_artifact_files(project_artifact_path, exclude_dirs)
                 }
             else:
                 project_files = {project_artifact_path.name}
@@ -5214,12 +5306,14 @@ async def list_artifact_files(
         artifact = None
         collection_name = collection
         if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
+            # Search in specified collection (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 coll = collection_mgr.load_collection(collection)
                 artifact = coll.find_artifact(artifact_name, artifact_type)
@@ -5449,12 +5543,14 @@ async def get_artifact_file_content(
         artifact = None
         collection_name = collection
         if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
+            # Search in specified collection (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 coll = collection_mgr.load_collection(collection)
                 artifact = coll.find_artifact(artifact_name, artifact_type)
@@ -5722,12 +5818,14 @@ async def update_artifact_file_content(
         artifact = None
         collection_name = collection
         if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
+            # Search in specified collection (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 coll = collection_mgr.load_collection(collection)
                 artifact = coll.find_artifact(artifact_name, artifact_type)
@@ -6014,12 +6112,14 @@ async def create_artifact_file(
         artifact = None
         collection_name = collection
         if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
+            # Search in specified collection (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 coll = collection_mgr.load_collection(collection)
                 artifact = coll.find_artifact(artifact_name, artifact_type)
@@ -6298,12 +6398,14 @@ async def delete_artifact_file(
         artifact = None
         collection_name = collection
         if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
+            # Search in specified collection (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 coll = collection_mgr.load_collection(collection)
                 artifact = coll.find_artifact(artifact_name, artifact_type)
