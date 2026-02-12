@@ -52,6 +52,46 @@
 
 **Commits**: 71dc777d, 8e0c3713
 
+**Status**: PARTIALLY RESOLVED (see below for fourth root cause)
+
+---
+
+## Sync Status Tab 404 Errors - Deployment Name Mismatch
+
+**Date Fixed**: 2026-02-11
+**Severity**: high
+**Component**: deployment-tracker, sync-status-tab
+
+**Issue**: Continued 404 errors on Sync Status tab after previous fixes. Artifacts with extensions in their names (e.g., `agent:supabase-realtime-optimizer.md`) still failed to load despite `parse_artifact_id()` fix in API layer.
+
+**Root Cause**: The deployment records were stored WITH the `.md` extension in `artifact_name` field (e.g., `artifact_name = "supabase-realtime-optimizer.md"`), but after `parse_artifact_id()` normalizes the request to remove the extension, `DeploymentTracker.get_deployment()` does an exact string match and fails.
+
+Example from `.skillmeat-deployed.toml`:
+```toml
+artifact_name = "supabase-realtime-optimizer.md"   # Extension in stored name
+artifact_path = "agents/supabase-realtime-optimizer.md.md"  # Double extension (corruption)
+```
+
+**Fix**:
+Added `_normalize_artifact_name()` helper to `skillmeat/storage/deployment.py` that strips common extensions (`.md`, `.txt`, `.json`, `.yaml`, `.yml`) before comparison. Updated 3 locations:
+
+1. `get_deployment()` - Normalizes both search term and stored names before comparison
+2. `remove_deployment()` - Same normalization for consistency
+3. `save_deployment()` - Normalizes when checking for existing deployments to update
+
+**Files Modified**:
+- `skillmeat/storage/deployment.py`:
+  - Added `_ARTIFACT_EXTENSIONS` tuple and `_normalize_artifact_name()` helper (lines 29-56)
+  - Updated `get_deployment()` to normalize before comparison (lines 254-261)
+  - Updated `remove_deployment()` to normalize before comparison (lines 288-298)
+  - Updated `save_deployment()` to normalize before comparison (lines 203-208)
+
+**Testing**:
+- All 31 deployment-related unit tests pass (`test_deployment_tracker.py`, `test_deployment_manager.py`)
+- Normalization correctly handles: `test.md` → `test`, `test.yaml` → `test`, `test` → `test`
+
+**Commits**: (pending)
+
 **Status**: RESOLVED
 
 ---
