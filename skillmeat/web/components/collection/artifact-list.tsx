@@ -248,7 +248,7 @@ export function ArtifactList({
               const typeLabel = artifactTypeLabels[artifact.type] || artifact.type || 'Unknown';
               return (
                 <TableRow
-                  key={`${artifact.id}-${index}`}
+                  key={artifact.id}
                   className={`cursor-pointer border-l-2 ${borderAccent} ${rowTint}`}
                   onClick={() => onArtifactClick(artifact)}
                   role="button"

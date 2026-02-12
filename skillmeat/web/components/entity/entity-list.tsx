@@ -154,7 +154,7 @@ export function EntityList({
     (artifact: Artifact, index: number) => {
       return (
         <EntityCard
-          key={`${artifact.id}-${index}`}
+          key={artifact.id}
           entity={artifact}
           selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}
@@ -190,7 +190,7 @@ export function EntityList({
     (artifact: Artifact, index: number) => {
       return (
         <ArtifactOperationsCard
-          key={`${artifact.id}-${index}`}
+          key={artifact.id}
           artifact={artifact}
           selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}
@@ -223,7 +223,7 @@ export function EntityList({
     (artifact: Artifact, index: number) => {
       return (
         <EntityRow
-          key={`${artifact.id}-${index}`}
+          key={artifact.id}
           entity={artifact}
           selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}
