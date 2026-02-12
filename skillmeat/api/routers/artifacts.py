@@ -164,6 +164,42 @@ def iter_artifact_files(
                 yield f
 
 
+def _normalize_artifact_path(path_str: str) -> str:
+    """Normalize artifact path by removing duplicate extensions.
+
+    Detects and fixes double extensions like .md.md, .txt.txt, etc.
+
+    Args:
+        path_str: Artifact path from manifest
+
+    Returns:
+        Normalized path with duplicate extensions removed
+    """
+    from pathlib import Path
+
+    path = Path(path_str)
+    stem = path.stem
+    suffix = path.suffix
+
+    # Check if the filename has duplicate extension (e.g., "file.md.md")
+    # path.stem would be "file.md" and suffix would be ".md"
+    # So we check if stem ends with suffix (without the dot)
+    if suffix:
+        # Remove the leading dot from suffix for comparison
+        suffix_no_dot = suffix[1:]
+        # Check if stem ends with the same extension
+        if stem.endswith(f".{suffix_no_dot}"):
+            # Build normalized path: parent / stem (which already has one extension)
+            # stem already includes the extension once, so we don't add suffix again
+            normalized = str(Path(path.parent) / stem)
+            logger.warning(
+                f"Normalized artifact path with duplicate extension: {path_str} -> {normalized}"
+            )
+            return normalized
+
+    return path_str
+
+
 def _decode_project_id_param(raw_project_id: str) -> Optional[PathLib]:
     """Decode project identifier passed to bulk import.
 
@@ -4297,21 +4333,36 @@ async def get_artifact_diff(
             )
         collection_name = resolved_collection
 
+        # Normalize artifact path to handle duplicate extensions
+        normalized_artifact_path = _normalize_artifact_path(artifact.path)
+
         # Get paths
         collection_path = collection_mgr.config.get_collection_path(collection_name)
-        collection_artifact_path = collection_path / artifact.path
+        collection_artifact_path = collection_path / normalized_artifact_path
         project_artifact_path = proj_path / ".claude" / inferred_artifact_path
 
-        if not collection_artifact_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Collection artifact path does not exist: {collection_artifact_path}",
-            )
+        # Handle missing collection artifact (project has files that aren't in collection)
+        collection_exists = collection_artifact_path.exists()
+        project_exists = project_artifact_path.exists()
 
-        if not project_artifact_path.exists():
+        if not collection_exists and not project_exists:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project artifact path does not exist: {project_artifact_path}",
+                detail=f"Artifact '{artifact_id}' not found in either collection or project",
+            )
+
+        # Log resilience cases
+        if not collection_exists:
+            logger.warning(
+                f"Collection artifact missing but project exists: {artifact_id} "
+                f"(collection_path={collection_artifact_path}, project_path={project_artifact_path}). "
+                "Returning diff with all project files marked as 'deleted'."
+            )
+        elif not project_exists:
+            logger.warning(
+                f"Project artifact missing but collection exists: {artifact_id} "
+                f"(collection_path={collection_artifact_path}, project_path={project_artifact_path}). "
+                "Returning diff with all collection files marked as 'added'."
             )
 
         # Collect all files from both locations
@@ -4319,21 +4370,23 @@ async def get_artifact_diff(
         project_files = set()
         exclude_dirs = set(settings.diff_exclude_dirs)
 
-        if collection_artifact_path.is_dir():
-            collection_files = {
-                str(f.relative_to(collection_artifact_path))
-                for f in iter_artifact_files(collection_artifact_path, exclude_dirs)
-            }
-        else:
-            collection_files = {collection_artifact_path.name}
+        if collection_exists:
+            if collection_artifact_path.is_dir():
+                collection_files = {
+                    str(f.relative_to(collection_artifact_path))
+                    for f in iter_artifact_files(collection_artifact_path, exclude_dirs)
+                }
+            else:
+                collection_files = {collection_artifact_path.name}
 
-        if project_artifact_path.is_dir():
-            project_files = {
-                str(f.relative_to(project_artifact_path))
-                for f in iter_artifact_files(project_artifact_path, exclude_dirs)
-            }
-        else:
-            project_files = {project_artifact_path.name}
+        if project_exists:
+            if project_artifact_path.is_dir():
+                project_files = {
+                    str(f.relative_to(project_artifact_path))
+                    for f in iter_artifact_files(project_artifact_path, exclude_dirs)
+                }
+            else:
+                project_files = {project_artifact_path.name}
 
         # Get all unique files
         all_files = sorted(collection_files | project_files)
@@ -4431,16 +4484,21 @@ async def get_artifact_diff(
                 )
 
             elif in_collection and not in_project:
-                # File deleted in project (only in collection)
-                file_status = "deleted"
-                summary["deleted"] += 1
+                # File only in collection (treat as "added" if comparing from project perspective,
+                # or "deleted" if project artifact doesn't exist at all)
+                # For collection-vs-project diff: files in collection but not project are "added"
+                # (because deploying from collection would add them to project)
+                file_status = "added"
+                summary["added"] += 1
 
-                if collection_artifact_path.is_dir():
-                    coll_file_path = collection_artifact_path / file_rel_path
+                if collection_exists:
+                    if collection_artifact_path.is_dir():
+                        coll_file_path = collection_artifact_path / file_rel_path
+                    else:
+                        coll_file_path = collection_artifact_path
+                    coll_hash = compute_file_hash(coll_file_path)
                 else:
-                    coll_file_path = collection_artifact_path
-
-                coll_hash = compute_file_hash(coll_file_path)
+                    coll_hash = None
 
                 file_diffs.append(
                     FileDiff(
@@ -4453,16 +4511,18 @@ async def get_artifact_diff(
                 )
 
             elif not in_collection and in_project:
-                # File added in project (only in project)
-                file_status = "added"
-                summary["added"] += 1
+                # File only in project (treat as "deleted" if comparing from collection perspective)
+                file_status = "deleted"
+                summary["deleted"] += 1
 
-                if project_artifact_path.is_dir():
-                    proj_file_path = project_artifact_path / file_rel_path
+                if project_exists:
+                    if project_artifact_path.is_dir():
+                        proj_file_path = project_artifact_path / file_rel_path
+                    else:
+                        proj_file_path = project_artifact_path
+                    proj_hash = compute_file_hash(proj_file_path)
                 else:
-                    proj_file_path = project_artifact_path
-
-                proj_hash = compute_file_hash(proj_file_path)
+                    proj_hash = None
 
                 file_diffs.append(
                     FileDiff(
@@ -4664,21 +4724,36 @@ async def get_artifact_upstream_diff(
                 detail="Failed to fetch upstream artifact",
             )
 
+        # Normalize artifact path to handle duplicate extensions
+        normalized_artifact_path = _normalize_artifact_path(artifact.path)
+
         # Get paths
         collection_path = collection_mgr.config.get_collection_path(collection_name)
-        collection_artifact_path = collection_path / artifact.path
+        collection_artifact_path = collection_path / normalized_artifact_path
         upstream_artifact_path = fetch_result.fetch_result.artifact_path
 
-        if not collection_artifact_path.exists():
+        # Handle missing artifacts gracefully
+        collection_exists = collection_artifact_path.exists()
+        upstream_exists = upstream_artifact_path.exists()
+
+        if not collection_exists and not upstream_exists:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Collection artifact path does not exist: {collection_artifact_path}",
+                detail=f"Neither collection nor upstream artifact exists for {artifact_id}",
             )
 
-        if not upstream_artifact_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Upstream artifact path does not exist: {upstream_artifact_path}",
+        # Log resilience cases
+        if not collection_exists:
+            logger.warning(
+                f"Collection artifact missing but upstream exists: {artifact_id} "
+                f"(collection_path={collection_artifact_path}). "
+                "Returning diff with all upstream files marked as 'added'."
+            )
+        elif not upstream_exists:
+            logger.warning(
+                f"Upstream artifact missing but collection exists: {artifact_id} "
+                f"(upstream_path={upstream_artifact_path}). "
+                "Returning diff with all collection files marked as 'deleted'."
             )
 
         # Collect all files from both locations
@@ -4686,21 +4761,23 @@ async def get_artifact_upstream_diff(
         upstream_files = set()
         exclude_dirs = set(settings.diff_exclude_dirs)
 
-        if collection_artifact_path.is_dir():
-            collection_files = {
-                str(f.relative_to(collection_artifact_path))
-                for f in iter_artifact_files(collection_artifact_path, exclude_dirs)
-            }
-        else:
-            collection_files = {collection_artifact_path.name}
+        if collection_exists:
+            if collection_artifact_path.is_dir():
+                collection_files = {
+                    str(f.relative_to(collection_artifact_path))
+                    for f in iter_artifact_files(collection_artifact_path, exclude_dirs)
+                }
+            else:
+                collection_files = {collection_artifact_path.name}
 
-        if upstream_artifact_path.is_dir():
-            upstream_files = {
-                str(f.relative_to(upstream_artifact_path))
-                for f in iter_artifact_files(upstream_artifact_path, exclude_dirs)
-            }
-        else:
-            upstream_files = {upstream_artifact_path.name}
+        if upstream_exists:
+            if upstream_artifact_path.is_dir():
+                upstream_files = {
+                    str(f.relative_to(upstream_artifact_path))
+                    for f in iter_artifact_files(upstream_artifact_path, exclude_dirs)
+                }
+            else:
+                upstream_files = {upstream_artifact_path.name}
 
         # Get all unique files
         all_files = sorted(collection_files | upstream_files)
@@ -4802,12 +4879,14 @@ async def get_artifact_upstream_diff(
                 file_status = "deleted"
                 summary["deleted"] += 1
 
-                if collection_artifact_path.is_dir():
-                    coll_file_path = collection_artifact_path / file_rel_path
+                if collection_exists:
+                    if collection_artifact_path.is_dir():
+                        coll_file_path = collection_artifact_path / file_rel_path
+                    else:
+                        coll_file_path = collection_artifact_path
+                    coll_hash = compute_file_hash(coll_file_path)
                 else:
-                    coll_file_path = collection_artifact_path
-
-                coll_hash = compute_file_hash(coll_file_path)
+                    coll_hash = None
 
                 file_diffs.append(
                     FileDiff(
@@ -4824,12 +4903,14 @@ async def get_artifact_upstream_diff(
                 file_status = "added"
                 summary["added"] += 1
 
-                if upstream_artifact_path.is_dir():
-                    upstream_file_path = upstream_artifact_path / file_rel_path
+                if upstream_exists:
+                    if upstream_artifact_path.is_dir():
+                        upstream_file_path = upstream_artifact_path / file_rel_path
+                    else:
+                        upstream_file_path = upstream_artifact_path
+                    upstream_hash = compute_file_hash(upstream_file_path)
                 else:
-                    upstream_file_path = upstream_artifact_path
-
-                upstream_hash = compute_file_hash(upstream_file_path)
+                    upstream_hash = None
 
                 file_diffs.append(
                     FileDiff(
@@ -5035,6 +5116,9 @@ async def get_artifact_source_project_diff(
                     detail=f"Failed to fetch upstream: {fetch_result.error}",
                 )
 
+            # Normalize artifact path to handle duplicate extensions
+            normalized_artifact_path = _normalize_artifact_path(artifact.path)
+
             # Determine upstream artifact path
             if fetch_result.has_update and fetch_result.fetch_result:
                 upstream_artifact_path = fetch_result.fetch_result.artifact_path
@@ -5043,7 +5127,7 @@ async def get_artifact_source_project_diff(
                 collection_path = collection_mgr.config.get_collection_path(
                     collection_name
                 )
-                upstream_artifact_path = collection_path / artifact.path
+                upstream_artifact_path = collection_path / normalized_artifact_path
             else:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -5052,16 +5136,28 @@ async def get_artifact_source_project_diff(
 
             project_artifact_path = proj_path / ".claude" / inferred_artifact_path
 
-            if not upstream_artifact_path.exists():
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Upstream artifact path does not exist: {upstream_artifact_path}",
-                )
+            # Handle missing artifacts gracefully
+            upstream_exists = upstream_artifact_path.exists()
+            project_exists = project_artifact_path.exists()
 
-            if not project_artifact_path.exists():
+            if not upstream_exists and not project_exists:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Project artifact path does not exist: {project_artifact_path}",
+                    detail=f"Neither upstream nor project artifact exists for {artifact_id}",
+                )
+
+            # Log resilience cases
+            if not upstream_exists:
+                logger.warning(
+                    f"Upstream artifact missing but project exists: {artifact_id} "
+                    f"(upstream_path={upstream_artifact_path}, project_path={project_artifact_path}). "
+                    "Returning diff with all project files marked as 'deleted'."
+                )
+            elif not project_exists:
+                logger.warning(
+                    f"Project artifact missing but upstream exists: {artifact_id} "
+                    f"(upstream_path={upstream_artifact_path}, project_path={project_artifact_path}). "
+                    "Returning diff with all upstream files marked as 'added'."
                 )
 
             # Collect files from both locations
@@ -5069,21 +5165,23 @@ async def get_artifact_source_project_diff(
             project_files = set()
             exclude_dirs = set(settings.diff_exclude_dirs)
 
-            if upstream_artifact_path.is_dir():
-                source_files = {
-                    str(f.relative_to(upstream_artifact_path))
-                    for f in iter_artifact_files(upstream_artifact_path, exclude_dirs)
-                }
-            else:
-                source_files = {upstream_artifact_path.name}
+            if upstream_exists:
+                if upstream_artifact_path.is_dir():
+                    source_files = {
+                        str(f.relative_to(upstream_artifact_path))
+                        for f in iter_artifact_files(upstream_artifact_path, exclude_dirs)
+                    }
+                else:
+                    source_files = {upstream_artifact_path.name}
 
-            if project_artifact_path.is_dir():
-                project_files = {
-                    str(f.relative_to(project_artifact_path))
-                    for f in iter_artifact_files(project_artifact_path, exclude_dirs)
-                }
-            else:
-                project_files = {project_artifact_path.name}
+            if project_exists:
+                if project_artifact_path.is_dir():
+                    project_files = {
+                        str(f.relative_to(project_artifact_path))
+                        for f in iter_artifact_files(project_artifact_path, exclude_dirs)
+                    }
+                else:
+                    project_files = {project_artifact_path.name}
 
             all_files = sorted(source_files | project_files)
 
@@ -5168,14 +5266,18 @@ async def get_artifact_source_project_diff(
                     )
 
                 elif in_source and not in_project:
-                    file_status = "deleted"
-                    summary["deleted"] += 1
-                    src_file = (
-                        upstream_artifact_path / file_rel_path
-                        if upstream_artifact_path.is_dir()
-                        else upstream_artifact_path
-                    )
-                    src_hash = compute_file_hash(src_file)
+                    # File only in source (would be added when deploying)
+                    file_status = "added"
+                    summary["added"] += 1
+                    if upstream_exists:
+                        src_file = (
+                            upstream_artifact_path / file_rel_path
+                            if upstream_artifact_path.is_dir()
+                            else upstream_artifact_path
+                        )
+                        src_hash = compute_file_hash(src_file)
+                    else:
+                        src_hash = None
                     file_diffs.append(
                         FileDiff(
                             file_path=file_rel_path,
@@ -5187,14 +5289,18 @@ async def get_artifact_source_project_diff(
                     )
 
                 elif not in_source and in_project:
-                    file_status = "added"
-                    summary["added"] += 1
-                    proj_file = (
-                        project_artifact_path / file_rel_path
-                        if project_artifact_path.is_dir()
-                        else project_artifact_path
-                    )
-                    proj_hash = compute_file_hash(proj_file)
+                    # File only in project (would be deleted when syncing from source)
+                    file_status = "deleted"
+                    summary["deleted"] += 1
+                    if project_exists:
+                        proj_file = (
+                            project_artifact_path / file_rel_path
+                            if project_artifact_path.is_dir()
+                            else project_artifact_path
+                        )
+                        proj_hash = compute_file_hash(proj_file)
+                    else:
+                        proj_hash = None
                     file_diffs.append(
                         FileDiff(
                             file_path=file_rel_path,
