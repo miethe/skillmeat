@@ -311,8 +311,14 @@ function mapDeployments(artifact: ApiArtifactResponse): DeploymentSummary[] | nu
 /**
  * Extract primary collection identifier from various API response formats.
  *
- * Returns the collection `id` (e.g., "default") which matches the filesystem
- * collection name that the API expects, not the display `name` (e.g., "Default Collection").
+ * Returns the collection `id` which may be a filesystem name (e.g., "default")
+ * or a UUID (e.g., "470c5a19e5054768adf543c6fcfadcef"). The backend API
+ * `collection` query parameter accepts both formats and resolves UUIDs
+ * via `resolve_collection_name()`.
+ *
+ * NOTE: The `id` for user-created collections is a UUID, NOT the filesystem
+ * name. The backend falls back to searching all collections if the artifact
+ * is not found in the specified collection (handles stale DB associations).
  *
  * @param artifact - Raw API response object
  * @returns Primary collection id or undefined

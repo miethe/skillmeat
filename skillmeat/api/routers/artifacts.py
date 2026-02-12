@@ -353,6 +353,70 @@ def resolve_collection_name(
     return None
 
 
+def _find_artifact_in_collections(
+    artifact_name: str,
+    artifact_type: ArtifactType,
+    collection_mgr,
+    preferred_collection: Optional[str] = None,
+    db_session=None,
+) -> tuple:
+    """Find an artifact across collections, with optional preferred collection hint.
+
+    When a preferred collection is specified (name or UUID), searches there first.
+    If the artifact is not found in the preferred collection (e.g., stale DB
+    association), falls back to searching all collections.
+
+    This prevents 404 errors caused by the frontend sending a collection UUID
+    from a stale DB association while the artifact actually lives in a different
+    collection on the filesystem.
+
+    Args:
+        artifact_name: Normalized artifact name (extension already stripped)
+        artifact_type: Artifact type enum
+        collection_mgr: CollectionManager instance
+        preferred_collection: Optional collection name or UUID to search first
+        db_session: Optional SQLAlchemy session for UUID resolution
+
+    Returns:
+        Tuple of (artifact, collection_name) where collection_name is the
+        filesystem collection name. Returns (None, None) if not found anywhere.
+    """
+    # If a preferred collection is specified, try it first
+    if preferred_collection:
+        resolved = resolve_collection_name(
+            preferred_collection, collection_mgr, db_session=db_session
+        )
+        if resolved:
+            try:
+                coll = collection_mgr.load_collection(resolved)
+                artifact = coll.find_artifact(artifact_name, artifact_type)
+                if artifact:
+                    return artifact, resolved
+            except ValueError:
+                pass  # Collection load or ambiguous name error
+            # Artifact not found in preferred collection - fall through to search all
+            logger.warning(
+                "Artifact '%s:%s' not found in preferred collection '%s' "
+                "(resolved from '%s'). Falling back to searching all collections.",
+                artifact_type.value,
+                artifact_name,
+                resolved,
+                preferred_collection,
+            )
+
+    # Search across all collections
+    for coll_name in collection_mgr.list_collections():
+        try:
+            coll = collection_mgr.load_collection(coll_name)
+            artifact = coll.find_artifact(artifact_name, artifact_type)
+            if artifact:
+                return artifact, coll_name
+        except ValueError:
+            continue
+
+    return None, None
+
+
 def encode_cursor(value: str) -> str:
     """Encode a cursor value to base64.
 
@@ -4220,24 +4284,18 @@ async def get_artifact_diff(
                     detail=f"Artifact '{artifact_id}' not found in project {project_path}",
                 )
 
-        # Verify collection exists (resolve UUID if needed)
-        resolved = resolve_collection_name(collection_name, collection_mgr)
-        if not resolved:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Collection '{collection_name}' not found",
-            )
-        collection_name = resolved
-
-        # Load collection and find artifact
-        coll = collection_mgr.load_collection(collection_name)
-        artifact = coll.find_artifact(artifact_name, artifact_type)
+        # Find artifact in collection (with fallback across all collections)
+        artifact, resolved_collection = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection_name,
+        )
 
         if not artifact:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifact '{artifact_id}' not found in collection '{collection_name}'",
+                detail=f"Artifact '{artifact_id}' not found in any collection",
             )
+        collection_name = resolved_collection
 
         # Get paths
         collection_path = collection_mgr.config.get_collection_path(collection_name)
@@ -4546,40 +4604,16 @@ async def get_artifact_upstream_diff(
                 detail="Invalid artifact ID format. Expected 'type:name'",
             )
 
-        # Find artifact in collection
-        artifact = None
-        collection_name = collection
-        if collection:
-            resolved = resolve_collection_name(collection, collection_mgr)
-            if not resolved:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Collection '{collection}' not found",
-                )
-            collection = resolved
-            try:
-                coll = collection_mgr.load_collection(collection)
-                artifact = coll.find_artifact(artifact_name, artifact_type)
-                if artifact:
-                    collection_name = collection
-            except ValueError:
-                pass
-        else:
-            # Search across all collections
-            for coll_name in collection_mgr.list_collections():
-                try:
-                    coll = collection_mgr.load_collection(coll_name)
-                    artifact = coll.find_artifact(artifact_name, artifact_type)
-                    if artifact:  # Only break when actually found
-                        collection_name = coll_name
-                        break
-                except ValueError:
-                    continue
+        # Find artifact (with fallback across collections)
+        artifact, collection_name = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection,
+        )
 
         if not artifact:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifact '{artifact_id}' not found in collection",
+                detail=f"Artifact '{artifact_id}' not found in any collection",
             )
 
         # Check if artifact has upstream tracking
@@ -4960,32 +4994,18 @@ async def get_artifact_source_project_diff(
                     detail=f"Artifact '{artifact_id}' not found in project {project_path}",
                 )
 
-        # Find artifact in collection (needed for upstream info)
-        artifact = None
-        if collection_name and collection_name in collection_mgr.list_collections():
-            try:
-                coll = collection_mgr.load_collection(collection_name)
-                artifact = coll.find_artifact(artifact_name, artifact_type)
-            except ValueError:
-                pass
-
-        if not artifact:
-            # Search across all collections
-            for coll_name in collection_mgr.list_collections():
-                try:
-                    coll = collection_mgr.load_collection(coll_name)
-                    artifact = coll.find_artifact(artifact_name, artifact_type)
-                    if artifact:
-                        collection_name = coll_name
-                        break
-                except ValueError:
-                    continue
+        # Find artifact in collection (with fallback across all collections)
+        artifact, resolved_collection = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection_name,
+        )
 
         if not artifact:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Artifact '{artifact_id}' not found in any collection",
             )
+        collection_name = resolved_collection
 
         # Check upstream support
         if artifact.origin != "github":
@@ -5311,34 +5331,11 @@ async def list_artifact_files(
                 detail="Invalid artifact ID format. Expected 'type:name'",
             )
 
-        # Find artifact
-        artifact = None
-        collection_name = collection
-        if collection:
-            # Search in specified collection (resolve UUID if needed)
-            resolved = resolve_collection_name(collection, collection_mgr)
-            if not resolved:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Collection '{collection}' not found",
-                )
-            collection = resolved
-            try:
-                coll = collection_mgr.load_collection(collection)
-                artifact = coll.find_artifact(artifact_name, artifact_type)
-            except ValueError:
-                pass  # Not found in this collection
-        else:
-            # Search across all collections
-            for coll_name in collection_mgr.list_collections():
-                try:
-                    coll = collection_mgr.load_collection(coll_name)
-                    artifact = coll.find_artifact(artifact_name, artifact_type)
-                    if artifact:  # Only break when actually found
-                        collection_name = coll_name
-                        break
-                except ValueError:
-                    continue
+        # Find artifact (with fallback across collections)
+        artifact, collection_name = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection,
+        )
 
         if not artifact:
             raise HTTPException(
@@ -5548,34 +5545,11 @@ async def get_artifact_file_content(
                 detail="Invalid artifact ID format. Expected 'type:name'",
             )
 
-        # Find artifact
-        artifact = None
-        collection_name = collection
-        if collection:
-            # Search in specified collection (resolve UUID if needed)
-            resolved = resolve_collection_name(collection, collection_mgr)
-            if not resolved:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Collection '{collection}' not found",
-                )
-            collection = resolved
-            try:
-                coll = collection_mgr.load_collection(collection)
-                artifact = coll.find_artifact(artifact_name, artifact_type)
-            except ValueError:
-                pass  # Not found in this collection
-        else:
-            # Search across all collections
-            for coll_name in collection_mgr.list_collections():
-                try:
-                    coll = collection_mgr.load_collection(coll_name)
-                    artifact = coll.find_artifact(artifact_name, artifact_type)
-                    if artifact:  # Only break when actually found
-                        collection_name = coll_name
-                        break
-                except ValueError:
-                    continue
+        # Find artifact (with fallback across collections)
+        artifact, collection_name = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection,
+        )
 
         if not artifact:
             raise HTTPException(
@@ -5823,34 +5797,11 @@ async def update_artifact_file_content(
                 detail="Invalid artifact ID format. Expected 'type:name'",
             )
 
-        # Find artifact
-        artifact = None
-        collection_name = collection
-        if collection:
-            # Search in specified collection (resolve UUID if needed)
-            resolved = resolve_collection_name(collection, collection_mgr)
-            if not resolved:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Collection '{collection}' not found",
-                )
-            collection = resolved
-            try:
-                coll = collection_mgr.load_collection(collection)
-                artifact = coll.find_artifact(artifact_name, artifact_type)
-            except ValueError:
-                pass  # Not found in this collection
-        else:
-            # Search across all collections
-            for coll_name in collection_mgr.list_collections():
-                try:
-                    coll = collection_mgr.load_collection(coll_name)
-                    artifact = coll.find_artifact(artifact_name, artifact_type)
-                    if artifact:  # Only break when actually found
-                        collection_name = coll_name
-                        break
-                except ValueError:
-                    continue
+        # Find artifact (with fallback across collections)
+        artifact, collection_name = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection,
+        )
 
         if not artifact:
             raise HTTPException(
@@ -6117,34 +6068,11 @@ async def create_artifact_file(
                 detail="Invalid artifact ID format. Expected 'type:name'",
             )
 
-        # Find artifact
-        artifact = None
-        collection_name = collection
-        if collection:
-            # Search in specified collection (resolve UUID if needed)
-            resolved = resolve_collection_name(collection, collection_mgr)
-            if not resolved:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Collection '{collection}' not found",
-                )
-            collection = resolved
-            try:
-                coll = collection_mgr.load_collection(collection)
-                artifact = coll.find_artifact(artifact_name, artifact_type)
-            except ValueError:
-                pass  # Not found in this collection
-        else:
-            # Search across all collections
-            for coll_name in collection_mgr.list_collections():
-                try:
-                    coll = collection_mgr.load_collection(coll_name)
-                    artifact = coll.find_artifact(artifact_name, artifact_type)
-                    if artifact:  # Only break when actually found
-                        collection_name = coll_name
-                        break
-                except ValueError:
-                    continue
+        # Find artifact (with fallback across collections)
+        artifact, collection_name = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection,
+        )
 
         if not artifact:
             raise HTTPException(
@@ -6403,34 +6331,11 @@ async def delete_artifact_file(
                 detail="Invalid artifact ID format. Expected 'type:name'",
             )
 
-        # Find artifact
-        artifact = None
-        collection_name = collection
-        if collection:
-            # Search in specified collection (resolve UUID if needed)
-            resolved = resolve_collection_name(collection, collection_mgr)
-            if not resolved:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Collection '{collection}' not found",
-                )
-            collection = resolved
-            try:
-                coll = collection_mgr.load_collection(collection)
-                artifact = coll.find_artifact(artifact_name, artifact_type)
-            except ValueError:
-                pass  # Not found in this collection
-        else:
-            # Search across all collections
-            for coll_name in collection_mgr.list_collections():
-                try:
-                    coll = collection_mgr.load_collection(coll_name)
-                    artifact = coll.find_artifact(artifact_name, artifact_type)
-                    if artifact:  # Only break when actually found
-                        collection_name = coll_name
-                        break
-                except ValueError:
-                    continue
+        # Find artifact (with fallback across collections)
+        artifact, collection_name = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection,
+        )
 
         if not artifact:
             raise HTTPException(
