@@ -329,14 +329,23 @@ def resolve_collection_name(
             .filter(Collection.id == collection_param)
             .first()
         )
-        if collection_record and collection_record.name in collection_names:
-            logger.warning(
-                "Resolved collection UUID '%s' to name '%s'. "
-                "Frontend should send collection name instead of UUID.",
-                collection_param,
-                collection_record.name,
-            )
-            return collection_record.name
+        if collection_record:
+            # Case-insensitive match: compare lowercase versions
+            collection_names_lower = {name.lower(): name for name in collection_names}
+            db_name_lower = collection_record.name.lower()
+
+            if db_name_lower in collection_names_lower:
+                # Return the filesystem name (preserves original case)
+                filesystem_name = collection_names_lower[db_name_lower]
+                logger.warning(
+                    "Resolved collection UUID '%s' to name '%s' (DB: '%s', filesystem: '%s'). "
+                    "Frontend should send collection name instead of UUID.",
+                    collection_param,
+                    filesystem_name,
+                    collection_record.name,
+                    filesystem_name,
+                )
+                return filesystem_name
     finally:
         if owns_session:
             db_session.close()
