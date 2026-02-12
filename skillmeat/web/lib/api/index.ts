@@ -13,6 +13,7 @@ export * from './templates';
 export * from './context-sync';
 export * from './snapshots';
 export * from './merge';
+export * from './platform-defaults';
 export * from './tags';
 export * from './marketplace';
 export * from './settings';

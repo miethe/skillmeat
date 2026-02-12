@@ -51,7 +51,13 @@ def _make_memory_item(
     status: str = "candidate",
     share_scope: str = "project",
     provenance: Optional[Dict[str, Any]] = None,
-    anchors: Optional[List[str]] = None,
+    anchors: Optional[List[Any]] = None,
+    git_branch: Optional[str] = None,
+    git_commit: Optional[str] = None,
+    session_id: Optional[str] = None,
+    agent_type: Optional[str] = None,
+    model: Optional[str] = None,
+    source_type: Optional[str] = None,
     ttl_policy: Optional[Dict[str, Any]] = None,
     content_hash: str = "abc123",
     access_count: int = 0,
@@ -70,6 +76,12 @@ def _make_memory_item(
         "share_scope": share_scope,
         "provenance": provenance,
         "anchors": anchors,
+        "git_branch": git_branch,
+        "git_commit": git_commit,
+        "session_id": session_id,
+        "agent_type": agent_type,
+        "model": model,
+        "source_type": source_type,
         "ttl_policy": ttl_policy,
         "content_hash": content_hash,
         "access_count": access_count,
@@ -251,6 +263,35 @@ class TestMemoryItemList:
         assert response.status_code == 200
         call_kwargs = mock_service.list_items.call_args.kwargs
         assert call_kwargs["share_scope"] == "global_candidate"
+
+    @patch("skillmeat.api.routers.memory_items._get_service")
+    def test_list_with_promoted_provenance_filters(
+        self, mock_get_service, client: TestClient
+    ):
+        """Promoted provenance query params should pass through to service."""
+        mock_service = MagicMock()
+        mock_service.list_items.return_value = _make_list_result(items=[], total=0)
+        mock_get_service.return_value = mock_service
+
+        response = client.get(
+            "/api/v1/memory-items"
+            "?project_id=proj-1"
+            "&git_branch=feat%2Fanchors"
+            "&git_commit=abc1234"
+            "&session_id=session-123"
+            "&agent_type=backend-typescript-architect"
+            "&model=claude-opus-4-6"
+            "&source_type=extraction"
+        )
+
+        assert response.status_code == 200
+        call_kwargs = mock_service.list_items.call_args.kwargs
+        assert call_kwargs["git_branch"] == "feat/anchors"
+        assert call_kwargs["git_commit"] == "abc1234"
+        assert call_kwargs["session_id"] == "session-123"
+        assert call_kwargs["agent_type"] == "backend-typescript-architect"
+        assert call_kwargs["model"] == "claude-opus-4-6"
+        assert call_kwargs["source_type"] == "extraction"
 
     def test_list_invalid_status_returns_422(self, client: TestClient):
         """Invalid status enum value should return 422."""
@@ -450,8 +491,21 @@ class TestMemoryItemCreate:
     ):
         """Create with all optional fields should succeed."""
         item = _make_memory_item(
-            provenance={"source": "agent"},
-            anchors=["file.py:10"],
+            provenance={"source": "agent", "git_branch": "feat/anchors"},
+            anchors=[
+                {
+                    "path": "skillmeat/core/services/memory_service.py",
+                    "type": "code",
+                    "line_start": 10,
+                    "line_end": 20,
+                }
+            ],
+            git_branch="feat/anchors",
+            git_commit="abc1234",
+            session_id="session-xyz",
+            agent_type="backend-typescript-architect",
+            model="claude-opus-4-6",
+            source_type="manual",
             ttl_policy={"ttl_days": 30},
         )
         mock_service = MagicMock()
@@ -465,17 +519,40 @@ class TestMemoryItemCreate:
                 "content": "Use pytest for testing",
                 "confidence": 0.85,
                 "status": "active",
-                "provenance": {"source": "agent"},
-                "anchors": ["file.py:10"],
+                "provenance": {"source": "agent", "git_branch": "feat/anchors"},
+                "anchors": [
+                    {
+                        "path": "skillmeat/core/services/memory_service.py",
+                        "type": "code",
+                        "line_start": 10,
+                        "line_end": 20,
+                    }
+                ],
+                "git_branch": "feat/anchors",
+                "git_commit": "abc1234",
+                "session_id": "session-xyz",
+                "agent_type": "backend-typescript-architect",
+                "model": "claude-opus-4-6",
+                "source_type": "manual",
                 "ttl_policy": {"ttl_days": 30},
             },
         )
 
         assert response.status_code == 201
         data = response.json()
-        assert data["provenance"] == {"source": "agent"}
-        assert data["anchors"] == ["file.py:10"]
+        assert data["provenance"] == {"source": "agent", "git_branch": "feat/anchors"}
+        assert data["anchors"][0]["path"] == "skillmeat/core/services/memory_service.py"
+        assert data["git_branch"] == "feat/anchors"
+        assert data["source_type"] == "manual"
         assert data["ttl_policy"] == {"ttl_days": 30}
+
+        kwargs = mock_service.create.call_args.kwargs
+        assert kwargs["git_branch"] == "feat/anchors"
+        assert kwargs["git_commit"] == "abc1234"
+        assert kwargs["session_id"] == "session-xyz"
+        assert kwargs["agent_type"] == "backend-typescript-architect"
+        assert kwargs["model"] == "claude-opus-4-6"
+        assert kwargs["source_type"] == "manual"
 
     @patch("skillmeat.api.routers.memory_items._get_service")
     def test_create_duplicate_returns_409(self, mock_get_service, client: TestClient):

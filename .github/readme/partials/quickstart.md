@@ -28,6 +28,19 @@ skillmeat deploy canvas --scope user
 skillmeat list
 ```
 
+### Multi-Platform Deployments
+
+```bash
+# Scaffold all profile roots for a project
+skillmeat init --project-path /path/to/project --all-profiles
+
+# Deploy to one profile
+skillmeat deploy canvas --project /path/to/project --profile codex
+
+# Deploy to all profiles
+skillmeat deploy canvas --project /path/to/project --all-profiles
+```
+
 ### Web Interface
 
 ```bash
@@ -37,4 +50,4 @@ skillmeat web dev
 # Open http://localhost:3000 to access the dashboard
 ```
 
-For complete documentation, see the [Quickstart Guide](docs/user/quickstart.md).
+For complete documentation, see the [Quickstart Guide](docs/user/quickstart.md) and [Multi-Platform Deployment Upgrade Guide](docs/migration/multi-platform-deployment-upgrade.md).

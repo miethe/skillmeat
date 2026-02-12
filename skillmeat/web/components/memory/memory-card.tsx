@@ -14,8 +14,10 @@ import * as React from 'react';
 import {
   MoreVertical,
   Check,
+  CheckCircle2,
   Pencil,
   X,
+  XCircle,
   ShieldCheck,
   RotateCcw,
   Archive,
@@ -233,6 +235,38 @@ export function MemoryCard({
           )}
         </div>
       </div>
+
+      {/* Quick-action buttons for candidate triage */}
+      {memory.status === 'candidate' && (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+            aria-label={`Approve memory: ${memory.content.slice(0, 40)}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onApprove(memory.id);
+            }}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="text-xs">Approve</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+            aria-label={`Deny memory: ${memory.content.slice(0, 40)}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onReject(memory.id);
+            }}
+          >
+            <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="text-xs">Deny</span>
+          </Button>
+        </div>
+      )}
 
       {/* Meatballs dropdown menu (always visible) */}
       <div className="flex items-center">

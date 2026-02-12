@@ -9,11 +9,11 @@ import { PageHeader } from '@/components/shared/page-header';
 import { EntityLifecycleProvider, useEntityLifecycle, useReturnTo } from '@/hooks';
 import { EntityList } from '@/components/entity/entity-list';
 import { EntityForm } from '@/components/entity/entity-form';
-import { EntityTabs } from './components/entity-tabs';
 import {
   ManagePageFilters,
   type ManageStatusFilter,
 } from '@/components/manage/manage-page-filters';
+import { ArtifactTypeTabs } from '@/components/shared/artifact-type-tabs';
 import {
   ArtifactOperationsModal,
   type OperationsModalTab,
@@ -71,7 +71,12 @@ function ManagePageContent() {
   // Get URL params for deep linking - all filter state comes from URL
   const urlArtifactId = searchParams.get('artifact');
   const urlTab = searchParams.get('tab') as OperationsModalTab | null;
-  const urlType = (searchParams.get('type') as ArtifactType) || 'skill';
+  const rawUrlType = searchParams.get('type');
+  const allowedTypes: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook'];
+  const urlType: ArtifactType | 'all' =
+    rawUrlType && allowedTypes.includes(rawUrlType as ArtifactType)
+      ? (rawUrlType as ArtifactType)
+      : 'all';
   const urlSearch = searchParams.get('search') || '';
   const urlStatus = (searchParams.get('status') as ManageStatusFilter) || 'all';
   const urlProject = searchParams.get('project') || null;
@@ -90,7 +95,7 @@ function ManagePageContent() {
 
   // Sync URL state to hook state for API filtering
   useEffect(() => {
-    setTypeFilter(urlType);
+    setTypeFilter(urlType === 'all' ? null : urlType);
   }, [urlType, setTypeFilter]);
 
   useEffect(() => {
@@ -157,32 +162,16 @@ function ManagePageContent() {
       result = result.filter((entity) => urlTags.some((tag) => entity.tags?.includes(tag)));
     }
 
-    // Filter by project from URL
+    // Filter by project from URL (urlProject is now project.path)
     if (urlProject) {
-      result = result.filter((entity) => {
-        // Check deployments for project path matching
-        return entity.deployments?.some((d) => d.project_path?.includes(urlProject));
-      });
+      result = result.filter((entity) =>
+        entity.deployments?.some((d) => d.project_path === urlProject)
+      );
     }
 
     return result;
   }, [entities, urlTags, urlProject]);
 
-  // Compute available projects from all entity deployments
-  const availableProjects = useMemo(() => {
-    const projectSet = new Set<string>();
-    entities.forEach((entity) => {
-      entity.deployments?.forEach((d) => {
-        if (d.project_path) {
-          // Extract project name from path (last segment or meaningful name)
-          const segments = d.project_path.split('/').filter(Boolean);
-          const projectName = segments[segments.length - 1] || d.project_path;
-          projectSet.add(projectName);
-        }
-      });
-    });
-    return Array.from(projectSet).sort();
-  }, [entities]);
 
   // Compute context-aware available tags from entities matching current filters
   // (type/status/search applied by API, project applied here, but NOT tag filter)
@@ -190,9 +179,9 @@ function ManagePageContent() {
     // Apply project filter first (same logic as filteredEntities)
     let result = entities;
     if (urlProject) {
-      result = result.filter((entity) => {
-        return entity.deployments?.some((d) => d.project_path?.includes(urlProject));
-      });
+      result = result.filter((entity) =>
+        entity.deployments?.some((d) => d.project_path === urlProject)
+      );
     }
 
     // Compute tag counts from the filtered set
@@ -228,7 +217,7 @@ function ManagePageContent() {
 
   const handleTypeChange = useCallback(
     (type: ArtifactType | 'all') => {
-      updateUrlParams({ type: type === 'skill' ? null : type }); // skill is default
+      updateUrlParams({ type: type === 'all' ? null : type });
     },
     [updateUrlParams]
   );
@@ -296,6 +285,19 @@ function ManagePageContent() {
       // Update URL with new tab
       updateUrlParams({
         tab: tab === 'status' ? null : tab, // Don't clutter URL with default tab
+      });
+    },
+    [updateUrlParams]
+  );
+
+  const handleArtifactClickWithTab = useCallback(
+    (artifact: Artifact, tab: OperationsModalTab) => {
+      setSelectedArtifact(artifact);
+      setDetailPanelOpen(true);
+      // Update URL with artifact ID and specific tab
+      updateUrlParams({
+        artifact: artifact.id,
+        tab: tab === 'status' ? null : tab,
       });
     },
     [updateUrlParams]
@@ -452,58 +454,57 @@ function ManagePageContent() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <EntityTabs>
-          {(_entityType) => (
-            <div className="flex h-full flex-col">
-              {/* Filters - URL-driven state */}
-              <ManagePageFilters
-                search={urlSearch}
-                status={urlStatus}
-                type={urlType}
-                project={urlProject}
-                tags={urlTags}
-                onSearchChange={handleSearchChange}
-                onStatusChange={handleStatusChange}
-                onTypeChange={handleTypeChange}
-                onProjectChange={handleProjectChange}
-                onTagsChange={handleTagsChange}
-                onClearAll={handleClearAllFilters}
-                availableProjects={availableProjects}
-                availableTags={availableTags}
-              />
+        {/* Filters - URL-driven state */}
+        <ManagePageFilters
+          search={urlSearch}
+          status={urlStatus}
+          type={urlType}
+          project={urlProject}
+          tags={urlTags}
+          onSearchChange={handleSearchChange}
+          onStatusChange={handleStatusChange}
+          onTypeChange={handleTypeChange}
+          onProjectChange={handleProjectChange}
+          onTagsChange={handleTagsChange}
+          onClearAll={handleClearAllFilters}
+          availableTags={availableTags}
+          showTypeFilter={false}
+        />
 
-              {/* Entity count */}
-              <div className="border-b px-4 py-2 text-sm text-muted-foreground">
-                {isLoading ? (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading...
-                  </div>
-                ) : (
-                  `${filteredEntities.length} ${filteredEntities.length === 1 ? 'artifact' : 'artifacts'} found`
-                )}
-              </div>
+        {/* Artifact type tabs */}
+        <div className="border-b px-4 py-2">
+          <ArtifactTypeTabs value={urlType} onChange={handleTypeChange} />
+        </div>
 
-              {/* Entity List with operations card variant for manage page */}
-              <div className="flex-1 overflow-hidden">
-                <EntityList
-                  viewMode={viewMode}
-                  cardVariant="operations"
-                  entities={filteredEntities}
-                  onEntityClick={handleArtifactClick}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onDeploy={handleDeploy}
-                  onSync={handleSync}
-                  onViewDiff={handleViewDiff}
-                  onRollback={handleRollback}
-                  onManage={handleManage}
-                />
-              </div>
+        {/* Entity count */}
+        <div className="border-b px-4 py-2 text-sm text-muted-foreground">
+          {isLoading ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading...
             </div>
+          ) : (
+            `${filteredEntities.length} ${filteredEntities.length === 1 ? 'artifact' : 'artifacts'} found`
           )}
-        </EntityTabs>
+        </div>
+
+        {/* Entity List with operations card variant for manage page */}
+        <div className="flex-1 overflow-hidden">
+          <EntityList
+            viewMode={viewMode}
+            cardVariant="operations"
+            entities={filteredEntities}
+            onEntityClick={handleArtifactClick}
+            onEntityClickWithTab={handleArtifactClickWithTab}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onDeploy={handleDeploy}
+            onSync={handleSync}
+            onViewDiff={handleViewDiff}
+            onRollback={handleRollback}
+            onManage={handleManage}
+          />
+        </div>
       </div>
 
       {/* Artifact Operations Modal - Operations-focused modal with status as default tab */}

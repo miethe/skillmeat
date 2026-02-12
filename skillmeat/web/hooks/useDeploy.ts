@@ -80,6 +80,7 @@ export function useDeploy(options: UseDeployOptions = {}) {
       // AWAIT all invalidations to ensure cache is fresh before mutation completes
       await queryClient.invalidateQueries({ queryKey: ['artifacts'] });
       await queryClient.invalidateQueries({ queryKey: ['deployments'] });
+      await queryClient.invalidateQueries({ queryKey: ['entities'] }); // For manage page
 
       // Only invalidate the specific project if we have the project path
       if (variables.projectPath) {
@@ -166,6 +167,7 @@ export function useUndeploy(options: UseDeployOptions = {}) {
       // AWAIT all invalidations to ensure cache is fresh before mutation completes
       await queryClient.invalidateQueries({ queryKey: ['artifacts'] });
       await queryClient.invalidateQueries({ queryKey: ['deployments'] });
+      await queryClient.invalidateQueries({ queryKey: ['entities'] }); // For manage page
 
       // Only invalidate the specific project if we have the project path
       if (variables.projectPath) {

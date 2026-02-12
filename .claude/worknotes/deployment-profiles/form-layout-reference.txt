@@ -1,0 +1,240 @@
+================================================================================
+DEPLOYMENT PROFILES MANAGEMENT PAGE - UI LAYOUT
+================================================================================
+
+Page: /projects/[id]/profiles
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ HEADER                                                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ < Back to Project                                                           │
+│                                                                             │
+│ Deployment Profiles                                                         │
+│ Project Name: X profile(s) configured                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CREATE PROFILE CARD                                                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Title: Create Profile                                                       │
+│ Description: Add a new platform profile and path mappings.                  │
+│                                                                             │
+│ FORM LAYOUT (2 columns on desktop, 1 column on mobile):                     │
+│                                                                             │
+│ [Profile ID]        [Platform Dropdown *]                                   │
+│ codex-default       ▼ Claude Code                                           │
+│                       - Claude Code                                         │
+│                       - Codex                                               │
+│                       - Gemini                                              │
+│                       - Cursor                                              │
+│                       - Other                                               │
+│                     ↳ Updates Root Dir when selected                        │
+│                                                                             │
+│ [Root Dir (full width)]                                                     │
+│ .claude                                                                     │
+│ (auto-populated from platform, user-overridable)                           │
+│                                                                             │
+│ [Artifact Path Map - JSON (full width)]                                     │
+│ {                                                                           │
+│   "skill": "skills/",                                                       │
+│   "command": "commands/",                                                   │
+│   "agent": "agents/"                                                        │
+│ }                                                                           │
+│ (5 rows textarea)                                                           │
+│                                                                             │
+│ [Config Filenames]  [Context Prefixes]                                      │
+│ CLAUDE.md           .claude/context/                                        │
+│ .claude.config      .claude/                                                │
+│ project.config      .config/                                                │
+│ (3 rows textarea)   (3 rows textarea)                                       │
+│ (newline/comma-separated)                                                   │
+│                                                                             │
+│ [Supported Artifact Types (full width)]                                     │
+│ skill, command, agent, hook, mcp                                            │
+│ (comma-separated)                                                           │
+│                                                                             │
+│ [+ Create Profile]                                                          │
+│ (button disabled if profile_id empty or creating)                           │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CONFIGURED PROFILES CARD                                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Title: Configured Profiles                                                  │
+│ Description: Edit profile mappings and path roots for this project.         │
+│                                                                             │
+│ FOR EACH PROFILE (two modes):                                               │
+│                                                                             │
+│ ┌────────────────────── DISPLAY MODE ──────────────────────┐               │
+│ │ Profile ID                          [Claude Code BADGE]  │               │
+│ │ .claude                                                  │               │
+│ │                                                          │               │
+│ │ {                                                        │               │
+│ │   "skill": "skills/",                                    │               │
+│ │   "command": "commands/"                                 │               │
+│ │ }                                                        │               │
+│ │ (background: muted/30, monospace)                        │               │
+│ │                                                          │               │
+│ │ [Edit]  [Delete]                                         │               │
+│ └────────────────────────────────────────────────────────────┘               │
+│                                                                             │
+│ ┌────────────────────── EDIT MODE ────────────────────────┐                │
+│ │ Profile ID (display)            [Codex BADGE] (compact) │                │
+│ │                                                          │                │
+│ │ [Platform Select]      [Root Dir Input]                  │                │
+│ │ ▼ Codex                .codex                            │                │
+│ │                                                          │                │
+│ │ [Artifact Path Map (full width)]                         │                │
+│ │ {                                                        │                │
+│ │   "skill": "skills/"                                     │                │
+│ │ }                                                        │                │
+│ │ (4 rows textarea)                                        │                │
+│ │                                                          │                │
+│ │ [Save]  [Cancel]                                         │                │
+│ │ (Save disabled if updating)                              │                │
+│ └────────────────────────────────────────────────────────────┘                │
+│                                                                             │
+│ IF NO PROFILES:                                                             │
+│ "No deployment profiles found."                                             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+FIELD REFERENCE
+================================================================================
+
+FIELD                           TYPE        REQUIRED  AUTO-POPULATE  NOTES
+─────────────────────────────────────────────────────────────────────────────
+Profile ID                      Text        Yes       No             Unique per project
+                                                                      Immutable after creation
+
+Platform                        Dropdown    Yes       No             5 options:
+                                                                      - Claude Code
+                                                                      - Codex
+                                                                      - Gemini
+                                                                      - Cursor
+                                                                      - Other
+
+Root Dir                         Text        Yes       Yes            Auto-populated based on
+                                                                      platform, but user-
+                                                                      overridable
+
+Artifact Path Map               JSON        No        No             Maps artifact type →
+(JSON Textarea)                                                       target directory
+                                                                      Pretty-printed with 2-
+                                                                      space indent
+
+Config Filenames                Textarea    No        No             Newline or comma-separated
+                                                                      List of config files to
+                                                                      scan
+
+Context Prefixes                Textarea    No        No             Newline or comma-separated
+                                                                      Allowed context dirs
+
+Supported Artifact Types        Text        No        No             Comma-separated
+                                                                      Artifact types deployable
+                                                                      to this profile
+
+================================================================================
+DEFAULT VALUES (NEW PROFILE)
+================================================================================
+
+Profile ID:          '' (empty)
+Platform:            'claude_code'
+Root Dir:            '.claude'
+Artifact Path Map:   '{}'
+Config Filenames:    'CLAUDE.md'
+Context Prefixes:    '.claude/context/\n.claude/'
+Supported Types:     'skill, command, agent, hook, mcp'
+
+================================================================================
+PLATFORM → ROOT DIR MAPPING
+================================================================================
+
+Platform            Root Dir (default)
+──────────────────────────────────────
+Claude Code         .claude
+Codex               .codex
+Gemini              .gemini
+Cursor              .cursor
+Other               .custom
+
+User can override any of these defaults
+
+================================================================================
+INTERACTION FLOWS
+================================================================================
+
+CREATE FLOW:
+1. User enters Profile ID
+2. User selects Platform
+   → Root Dir auto-updates
+3. User overrides fields as needed
+4. Click [Create Profile]
+5. Form validates
+6. API call: POST /projects/{projectId}/profiles
+7. Toast: "Profile created"
+8. Form reset (profile_id cleared)
+9. New profile appears in list
+
+EDIT FLOW:
+1. User clicks [Edit] on profile row
+2. Form switches to EDIT MODE
+3. User modifies fields (can change platform!)
+4. User clicks [Save]
+5. API call: PUT /projects/{projectId}/profiles/{profileId}
+6. Toast: "Profile updated"
+7. Form switches back to DISPLAY MODE
+8. Profile list updates
+
+DELETE FLOW:
+1. User clicks [Delete] on profile row
+2. API call: DELETE /projects/{projectId}/profiles/{profileId}
+3. Toast: "Profile deleted"
+4. Profile removed from list
+
+PLATFORM CHANGE:
+1. User selects new platform in dropdown (create or edit)
+2. onValueChange event fires
+3. defaultRootDir() called with new platform
+4. Root Dir field auto-updates
+5. User can override if needed
+
+================================================================================
+VALIDATION RULES
+================================================================================
+
+Profile ID:
+  - Required (cannot be empty)
+  - Must be unique within the project
+  - Cannot contain special characters (alphanumeric + hyphens/underscores)
+  - Immutable after creation (cannot edit)
+
+Platform:
+  - Required
+  - Must be one of 5 values: claude_code, codex, gemini, cursor, other
+
+Root Dir:
+  - Required
+  - Must be non-empty after strip()
+  - Relative path (no absolute paths)
+  - No path traversal (..)
+
+Artifact Path Map:
+  - Must be valid JSON if provided
+  - Keys and values can be arbitrary strings
+
+Config Filenames / Context Prefixes:
+  - Each item trimmed and filtered (no empty strings)
+  - Can contain spaces/special chars if needed
+
+Supported Artifact Types:
+  - Each item trimmed and filtered (no empty strings)
+  - Typically: skill, command, agent, hook, mcp
+
+API-level Validation:
+  - Unique constraint: (project_id, profile_id)
+  - Check constraint: platform IN ('claude_code', 'codex', 'gemini', 'cursor', 'other')
+
+================================================================================

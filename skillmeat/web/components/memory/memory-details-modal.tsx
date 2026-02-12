@@ -33,7 +33,6 @@ import {
   Layers,
   Anchor,
   Activity,
-  Clock,
   FileText,
   Hash,
   Pencil,
@@ -152,6 +151,78 @@ const TABS: Tab[] = [
   { value: 'activity', label: 'Activity', icon: Activity },
 ];
 
+const ANCHOR_TYPE_ORDER: Record<string, number> = {
+  code: 0,
+  test: 1,
+  doc: 2,
+  config: 3,
+  plan: 4,
+};
+
+const ANCHOR_TYPE_BADGE_CLASS: Record<string, string> = {
+  code: 'bg-blue-100 text-blue-800 border-blue-200',
+  test: 'bg-green-100 text-green-800 border-green-200',
+  doc: 'bg-violet-100 text-violet-800 border-violet-200',
+  config: 'bg-orange-100 text-orange-800 border-orange-200',
+  plan: 'bg-teal-100 text-teal-800 border-teal-200',
+};
+
+type AnchorEntry = {
+  path: string;
+  type: 'code' | 'test' | 'doc' | 'config' | 'plan';
+  line_start?: number;
+  line_end?: number;
+  commit_sha?: string;
+  description?: string;
+};
+
+function normalizeAnchor(raw: unknown): AnchorEntry | null {
+  if (typeof raw === 'string') {
+    const path = raw.trim();
+    if (!path) return null;
+    return { path, type: 'code' };
+  }
+
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const record = raw as Record<string, unknown>;
+  const path = typeof record.path === 'string' ? record.path.trim() : '';
+  if (!path) return null;
+
+  const rawType = typeof record.type === 'string' ? record.type : 'code';
+  const type: AnchorEntry['type'] = (['code', 'test', 'doc', 'config', 'plan'].includes(rawType)
+    ? rawType
+    : 'code') as AnchorEntry['type'];
+
+  const lineStart =
+    typeof record.line_start === 'number' && Number.isInteger(record.line_start)
+      ? record.line_start
+      : undefined;
+  const lineEnd =
+    typeof record.line_end === 'number' && Number.isInteger(record.line_end)
+      ? record.line_end
+      : undefined;
+  const commitSha =
+    typeof record.commit_sha === 'string' && record.commit_sha.trim()
+      ? record.commit_sha.trim()
+      : undefined;
+  const description =
+    typeof record.description === 'string' && record.description.trim()
+      ? record.description.trim()
+      : undefined;
+
+  return {
+    path,
+    type,
+    line_start: lineStart,
+    line_end: lineEnd,
+    commit_sha: commitSha,
+    description,
+  };
+}
+
 // ============================================================================
 // Sub-components
 // ============================================================================
@@ -215,11 +286,57 @@ function formatDate(dateString: string): string {
  * since it occupies its own dedicated tab.
  */
 function ProvenanceContent({
+  memory,
   provenance,
 }: {
+  memory: MemoryItemResponse;
   provenance?: Record<string, any> | null;
 }) {
-  if (!provenance || typeof provenance !== 'object') {
+  const provenanceObject =
+    provenance && typeof provenance === 'object' ? provenance : {};
+  const promotedFields: { key: string; label: string; icon: React.ElementType; value: unknown }[] = [
+    {
+      key: 'source_type',
+      label: 'Source Type',
+      icon: Activity,
+      value: memory.source_type ?? provenanceObject.source_type,
+    },
+    {
+      key: 'git_branch',
+      label: 'Git Branch',
+      icon: GitCommit,
+      value: memory.git_branch ?? provenanceObject.git_branch,
+    },
+    {
+      key: 'git_commit',
+      label: 'Git Commit',
+      icon: GitCommit,
+      value: memory.git_commit ?? provenanceObject.git_commit ?? provenanceObject.commit_sha,
+    },
+    {
+      key: 'session_id',
+      label: 'Session ID',
+      icon: Hash,
+      value: memory.session_id ?? provenanceObject.session_id,
+    },
+    {
+      key: 'agent_type',
+      label: 'Agent Type',
+      icon: Activity,
+      value: memory.agent_type ?? provenanceObject.agent_type,
+    },
+    {
+      key: 'model',
+      label: 'Model',
+      icon: Layers,
+      value: memory.model ?? provenanceObject.model,
+    },
+  ];
+  const visiblePromoted = promotedFields.filter(
+    (field) => field.value !== undefined && field.value !== null && String(field.value).trim() !== ''
+  );
+
+  if (!visiblePromoted.length && Object.keys(provenanceObject).length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
         <Hash className="mb-2 h-8 w-8 opacity-40" aria-hidden="true" />
@@ -227,77 +344,58 @@ function ProvenanceContent({
       </div>
     );
   }
-
-  const fields: { key: string; label: string; icon: React.ElementType }[] = [
-    { key: 'source_type', label: 'Source', icon: Activity },
-    { key: 'session_id', label: 'Session', icon: Hash },
-    { key: 'extracted_at', label: 'Extracted', icon: Clock },
-    { key: 'files', label: 'Files', icon: FileText },
-    { key: 'commit_sha', label: 'Commit', icon: GitCommit },
-  ];
+  const promotedKeys = new Set([
+    'source_type',
+    'git_branch',
+    'git_commit',
+    'commit_sha',
+    'session_id',
+    'agent_type',
+    'model',
+  ]);
 
   return (
     <div className="space-y-6">
-      {/* Known fields */}
-      <dl className="space-y-3">
-        {fields.map(({ key, label, icon: Icon }) => {
-          const value = provenance[key];
-          if (value === undefined || value === null) return null;
+      {!!visiblePromoted.length && (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {visiblePromoted.map(({ key, label, icon: Icon, value }) => {
+            const displayValue =
+              Array.isArray(value)
+                ? value.join(', ')
+                : typeof value === 'string' && (key === 'git_commit' || key === 'commit_sha')
+                  ? value.slice(0, 7)
+                  : String(value);
 
-          const displayValue = Array.isArray(value)
-            ? value.join(', ')
-            : typeof value === 'string' && key === 'extracted_at'
-              ? formatDate(value)
-              : typeof value === 'string' && key === 'commit_sha'
-                ? value.slice(0, 7)
-                : String(value);
-
-          return (
-            <div key={key} className="flex items-start gap-3">
-              <Icon
-                className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <div className="min-w-0 flex-1">
-                <dt className="text-xs font-medium text-muted-foreground">
+            return (
+              <div key={key} className="rounded-md border bg-muted/30 p-3">
+                <div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                   {label}
-                </dt>
-                <dd className="text-sm break-all">{displayValue}</dd>
+                </div>
+                <div className="break-all text-sm">{displayValue}</div>
               </div>
-            </div>
-          );
-        })}
-      </dl>
+            );
+          })}
+        </div>
+      )}
 
       {/* Extra keys not in known fields list */}
-      {Object.entries(provenance).filter(
-        ([key]) => !fields.some((f) => f.key === key) && key !== 'llm_reasoning'
+      {Object.entries(provenanceObject).filter(
+        ([key]) => !promotedKeys.has(key) && key !== 'llm_reasoning'
       ).length > 0 && (
-        <div className="border-t pt-4">
-          <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <details className="rounded-md border p-3">
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Additional Data
-          </h4>
-          <dl className="space-y-3">
-            {Object.entries(provenance)
-              .filter(
-                ([key]) =>
-                  !fields.some((f) => f.key === key) &&
-                  key !== 'llm_reasoning'
-              )
+          </summary>
+          <dl className="mt-3 space-y-3">
+            {Object.entries(provenanceObject)
+              .filter(([key]) => !promotedKeys.has(key) && key !== 'llm_reasoning')
               .map(([key, value]) => {
                 if (value === undefined || value === null) return null;
-                let displayValue: string;
-                if (Array.isArray(value)) {
-                  if (value.length > 0 && typeof value[0] === 'object') {
-                    displayValue = JSON.stringify(value, null, 2);
-                  } else {
-                    displayValue = value.join(', ');
-                  }
-                } else if (typeof value === 'object') {
-                  displayValue = JSON.stringify(value, null, 2);
-                } else {
-                  displayValue = String(value);
-                }
+                const displayValue =
+                  typeof value === 'object'
+                    ? JSON.stringify(value, null, 2)
+                    : String(value);
                 return (
                   <div key={key} className="flex items-start gap-3">
                     <Hash
@@ -309,8 +407,7 @@ function ProvenanceContent({
                         {key}
                       </dt>
                       <dd className="text-sm break-all">
-                        {displayValue.startsWith('[') ||
-                        displayValue.startsWith('{') ? (
+                        {displayValue.startsWith('[') || displayValue.startsWith('{') ? (
                           <pre className="whitespace-pre-wrap font-mono text-xs">
                             {displayValue}
                           </pre>
@@ -323,18 +420,18 @@ function ProvenanceContent({
                 );
               })}
           </dl>
-        </div>
+        </details>
       )}
 
       {/* LLM Reasoning */}
-      {provenance.llm_reasoning && (
+      {provenanceObject.llm_reasoning && (
         <div className="border-t pt-4">
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             LLM Reasoning
           </h4>
           <div className="rounded-md border bg-muted/30 p-3">
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-              {String(provenance.llm_reasoning)}
+              {String(provenanceObject.llm_reasoning)}
             </p>
           </div>
         </div>
@@ -382,6 +479,31 @@ export function MemoryDetailsModal({
   // Fetch context modules for the Contexts tab
   const { data: modulesData, isLoading: modulesLoading } = useContextModules(
     projectId
+  );
+
+  // Compute normalized anchors and tabs BEFORE early return to satisfy Rules of Hooks
+  const normalizedAnchors = React.useMemo(() => {
+    if (!memory) return [];
+    return (memory.anchors ?? [])
+      .map((anchor) => normalizeAnchor(anchor))
+      .filter((anchor): anchor is AnchorEntry => anchor !== null)
+      .sort((a, b) => {
+        const left = ANCHOR_TYPE_ORDER[a.type] ?? 99;
+        const right = ANCHOR_TYPE_ORDER[b.type] ?? 99;
+        if (left !== right) return left - right;
+        return a.path.localeCompare(b.path);
+      });
+  }, [memory]);
+  const anchorCount = normalizedAnchors.length;
+
+  const tabs = React.useMemo(
+    () =>
+      TABS.map((tab) =>
+        tab.value === 'anchors'
+          ? { ...tab, label: `Anchors (${anchorCount})` }
+          : tab
+      ),
+    [anchorCount]
   );
 
   // Don't render the modal internals if no memory is provided
@@ -853,7 +975,7 @@ export function MemoryDetailsModal({
   // -----------------------------------------------------------------------
   const provenanceTab = (
     <TabContentWrapper value="provenance">
-      <ProvenanceContent provenance={memory.provenance} />
+      <ProvenanceContent memory={memory} provenance={memory.provenance} />
     </TabContentWrapper>
   );
 
@@ -910,33 +1032,66 @@ export function MemoryDetailsModal({
   // -----------------------------------------------------------------------
   // Tab: Anchors
   // -----------------------------------------------------------------------
-  const anchors = memory.anchors ?? [];
   const anchorsTab = (
     <TabContentWrapper value="anchors">
-      {anchors.length === 0 ? (
+      {anchorCount === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <Anchor className="mb-2 h-8 w-8 opacity-40" aria-hidden="true" />
-          <p className="text-sm">No file anchors</p>
+          <p className="text-sm">No anchors</p>
           <p className="mt-1 text-xs">
             File anchors link this memory to specific source files.
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {anchors.map((anchor, idx) => (
+        <div className="space-y-3">
+          {normalizedAnchors.map((anchor, idx) => {
+            const lineRange =
+              anchor.line_start != null
+                ? anchor.line_end != null
+                  ? `L${anchor.line_start}-${anchor.line_end}`
+                  : `L${anchor.line_start}`
+                : null;
+            return (
             <div
               key={idx}
-              className="flex items-center gap-3 rounded-md border px-3 py-2"
+              className="space-y-2 rounded-md border px-3 py-3"
             >
-              <FileText
-                className="h-4 w-4 flex-shrink-0 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <span className="min-w-0 flex-1 break-all font-mono text-sm">
-                {anchor}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'capitalize',
+                    ANCHOR_TYPE_BADGE_CLASS[anchor.type] ?? ANCHOR_TYPE_BADGE_CLASS.code
+                  )}
+                >
+                  {anchor.type}
+                </Badge>
+                {lineRange && (
+                  <Badge variant="secondary" className="font-mono text-[11px]">
+                    {lineRange}
+                  </Badge>
+                )}
+                {anchor.commit_sha && (
+                  <Badge variant="secondary" className="font-mono text-[11px]">
+                    {anchor.commit_sha.slice(0, 7)}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-start gap-2">
+                <FileText
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 flex-1 break-all font-mono text-sm">
+                  {anchor.path}
+                </span>
+              </div>
+              {anchor.description && (
+                <p className="text-sm text-muted-foreground">{anchor.description}</p>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </TabContentWrapper>
@@ -1068,7 +1223,7 @@ export function MemoryDetailsModal({
       onClose={onClose}
       activeTab={activeTab}
       onTabChange={setActiveTab}
-      tabs={TABS}
+      tabs={tabs}
       headerActions={headerActions}
       footer={footer}
     >

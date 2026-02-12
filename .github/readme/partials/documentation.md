@@ -5,6 +5,7 @@ Comprehensive guides and references to help you get the most out of SkillMeat.
 ### User Guides
 
 - [Quickstart Guide](docs/user/quickstart.md) - Installation, setup, and first steps
+- [Multi-Platform Upgrade Guide](docs/migration/multi-platform-deployment-upgrade.md) - Upgrade legacy projects and adopt deployment profiles
 - [Memory & Context Guide](docs/user/guides/memory-context-system.md) - Memory Inbox, modules, and context pack workflows
 - [Memory Inbox Guide](docs/user/guides/memory-inbox.md) - Triage, lifecycle, and keyboard-first memory review
 - [Context Modules Guide](docs/user/guides/context-modules.md) - Selector-driven modules and pack generation

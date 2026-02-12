@@ -11818,6 +11818,57 @@ def _memory_output(
     console.print_json(data=data)
 
 
+def _parse_anchor_option(raw: str) -> Dict[str, Any]:
+    """Parse --anchor values as path:type or path:type:start-end."""
+    if not raw or ":" not in raw:
+        raise ValueError(
+            "anchor must use format 'path:type' or 'path:type:start-end'"
+        )
+
+    anchor_types = {"code", "plan", "doc", "config", "test"}
+    line_start: Optional[int] = None
+    line_end: Optional[int] = None
+
+    parts = raw.split(":")
+    path = raw
+    anchor_type = "code"
+
+    if len(parts) >= 2 and parts[-1] in anchor_types:
+        path = ":".join(parts[:-1]).strip()
+        anchor_type = parts[-1]
+    elif len(parts) >= 3 and parts[-2] in anchor_types:
+        maybe_range = parts[-1].strip()
+        if "-" not in maybe_range:
+            raise ValueError(
+                f"invalid anchor range '{maybe_range}' (expected start-end)"
+            )
+        start_raw, end_raw = maybe_range.split("-", 1)
+        if not start_raw.isdigit() or not end_raw.isdigit():
+            raise ValueError(
+                f"invalid anchor range '{maybe_range}' (expected numeric start-end)"
+            )
+        line_start = int(start_raw)
+        line_end = int(end_raw)
+        if line_end < line_start:
+            raise ValueError("anchor line_end must be >= line_start")
+        path = ":".join(parts[:-2]).strip()
+        anchor_type = parts[-2]
+    else:
+        raise ValueError(
+            "anchor type must be one of: code, plan, doc, config, test"
+        )
+
+    if not path:
+        raise ValueError("anchor path cannot be empty")
+
+    parsed: Dict[str, Any] = {"path": path, "type": anchor_type}
+    if line_start is not None:
+        parsed["line_start"] = line_start
+    if line_end is not None:
+        parsed["line_end"] = line_end
+    return parsed
+
+
 @main.group()
 def memory():
     """Manage memory items, modules, packs, extraction, and search."""
@@ -11837,21 +11888,79 @@ def memory_item():
 @click.option("--confidence", type=float, default=0.5)
 @click.option("--status", "memory_status", default="candidate")
 @click.option(
+    "--anchor",
+    "anchors",
+    multiple=True,
+    help="Structured anchor: path:type or path:type:start-end",
+)
+@click.option(
+    "--provenance-branch",
+    default=None,
+    help="Promoted provenance git branch value",
+)
+@click.option(
+    "--provenance-commit",
+    default=None,
+    help="Promoted provenance git commit SHA value",
+)
+@click.option(
+    "--provenance-model",
+    default=None,
+    help="Promoted provenance model value",
+)
+@click.option(
+    "--provenance-agent-type",
+    default=None,
+    help="Promoted provenance agent type value",
+)
+@click.option(
     "--share-scope",
     type=click.Choice(["private", "project", "global_candidate"]),
     default="project",
 )
 @click.option("--json", "as_json", is_flag=True)
 def memory_item_create(
-    project_id, memory_type, content, confidence, memory_status, share_scope, as_json
+    project_id,
+    memory_type,
+    content,
+    confidence,
+    memory_status,
+    anchors,
+    provenance_branch,
+    provenance_commit,
+    provenance_model,
+    provenance_agent_type,
+    share_scope,
+    as_json,
 ):
+    parsed_anchors: List[Dict[str, Any]] = []
+    try:
+        parsed_anchors = [_parse_anchor_option(raw_anchor) for raw_anchor in anchors]
+    except ValueError as e:
+        console.print(f"[red]Invalid --anchor value: {e}[/red]")
+        sys.exit(1)
+
+    provenance: Dict[str, Any] = {"source_type": "manual"}
+    if provenance_branch:
+        provenance["git_branch"] = provenance_branch
+    if provenance_commit:
+        provenance["git_commit"] = provenance_commit
+    if provenance_model:
+        provenance["model"] = provenance_model
+    if provenance_agent_type:
+        provenance["agent_type"] = provenance_agent_type
+
     payload = {
         "type": memory_type,
         "content": content,
         "confidence": confidence,
         "status": memory_status,
         "share_scope": share_scope,
+        "provenance": provenance,
+        "source_type": "manual",
     }
+    if parsed_anchors:
+        payload["anchors"] = parsed_anchors
     try:
         response = _memory_request(
             "POST",

@@ -197,6 +197,19 @@ export {
 } from './use-detection-patterns';
 
 // ============================================================================
+// PLATFORM DEFAULTS (5 hooks)
+// ============================================================================
+// Platform defaults and custom context configuration
+export {
+  platformDefaultsKeys,
+  usePlatformDefaults,
+  useUpdatePlatformDefault,
+  useResetPlatformDefault,
+  useCustomContextConfig,
+  useUpdateCustomContextConfig,
+} from './use-platform-defaults';
+
+// ============================================================================
 // MARKETPLACE (5 hooks + 13 source hooks + 1 search hook + 1 folder hook)
 // ============================================================================
 // Marketplace listings, brokers, and artifact sourcing

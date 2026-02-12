@@ -225,7 +225,7 @@ function TagInput({
                   <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs text-xs">
+              <TooltipContent side="top" align="start" collisionPadding={16} className="max-w-xs text-xs">
                 <p>{tooltip}</p>
               </TooltipContent>
             </Tooltip>
@@ -930,15 +930,30 @@ export function ModuleEditor({
                   </p>
                 )}
                 {availableMemories.map((memory) => (
-                  <div key={memory.id} className="flex items-center gap-2 rounded border p-2">
-                    <MemoryTypeBadge type={memory.type} />
-                    <p className="flex-1 truncate text-sm" title={memory.content}>
-                      {memory.content}
-                    </p>
+                  <div key={memory.id} className="flex items-start gap-2 rounded border p-2">
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <MemoryTypeBadge type={memory.type} />
+                        {'confidence' in memory && typeof memory.confidence === 'number' && (
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                            {Math.round(memory.confidence * 100)}%
+                          </span>
+                        )}
+                        {'status' in memory && memory.status && (
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                            {memory.status}
+                          </span>
+                        )}
+                      </div>
+                      <p className="line-clamp-2 text-sm text-muted-foreground" title={memory.content}>
+                        {memory.content}
+                      </p>
+                    </div>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
+                      className="shrink-0"
                       onClick={() => handleAddMemory(memory.id)}
                       disabled={addMutation.isPending}
                     >

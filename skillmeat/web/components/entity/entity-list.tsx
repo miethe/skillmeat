@@ -44,6 +44,8 @@ export interface EntityListProps {
   entities?: Artifact[];
   /** Callback when an artifact is clicked (outside of action menu) */
   onEntityClick?: (artifact: Artifact) => void;
+  /** Callback when opening modal with specific tab (used with operations variant) */
+  onEntityClickWithTab?: (artifact: Artifact, tab: string) => void;
   /** Whether artifacts can be selected via checkbox */
   selectable?: boolean;
   /** Callback for edit action on artifact */
@@ -103,6 +105,7 @@ export function EntityList({
   cardVariant = 'default',
   entities: entitiesProp,
   onEntityClick,
+  onEntityClickWithTab,
   selectable = false,
   onEdit,
   onDelete,
@@ -151,7 +154,7 @@ export function EntityList({
     (artifact: Artifact, index: number) => {
       return (
         <EntityCard
-          key={`${artifact.id}-${index}`}
+          key={artifact.id}
           entity={artifact}
           selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}
@@ -187,12 +190,13 @@ export function EntityList({
     (artifact: Artifact, index: number) => {
       return (
         <ArtifactOperationsCard
-          key={`${artifact.id}-${index}`}
+          key={artifact.id}
           artifact={artifact}
           selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}
           onSelect={(selected) => handleSelect(artifact, selected)}
           onClick={() => handleEntityClick(artifact)}
+          onOpenWithTab={onEntityClickWithTab ? (tab) => onEntityClickWithTab(artifact, tab) : undefined}
           onSync={onSync ? () => onSync(artifact) : undefined}
           onDeploy={onDeploy ? () => onDeploy(artifact) : undefined}
           onViewDiff={onViewDiff ? () => onViewDiff(artifact) : undefined}
@@ -206,6 +210,7 @@ export function EntityList({
       selectable,
       handleSelect,
       handleEntityClick,
+      onEntityClickWithTab,
       onSync,
       onDeploy,
       onViewDiff,
@@ -218,7 +223,7 @@ export function EntityList({
     (artifact: Artifact, index: number) => {
       return (
         <EntityRow
-          key={`${artifact.id}-${index}`}
+          key={artifact.id}
           entity={artifact}
           selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}

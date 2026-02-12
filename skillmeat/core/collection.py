@@ -15,6 +15,33 @@ logger = logging.getLogger(__name__)
 
 from .mcp.metadata import MCPServerMetadata
 
+# Extensions to strip when normalizing artifact names.
+# Matches behavior of parse_artifact_id in artifacts.py router.
+_ARTIFACT_EXTENSIONS = (".md", ".txt", ".json", ".yaml", ".yml")
+
+
+def _normalize_name(name: str) -> str:
+    """Strip common artifact extensions for comparison.
+
+    Normalizes artifact names to handle cases where the stored name includes
+    an extension (e.g., 'supabase-realtime-optimizer.md') but the search term
+    doesn't (e.g., 'supabase-realtime-optimizer').
+
+    Args:
+        name: Artifact name, possibly with extension
+
+    Returns:
+        Artifact name without common extensions
+    """
+    original = name
+    for ext in _ARTIFACT_EXTENSIONS:
+        if name.endswith(ext):
+            name = name[: -len(ext)]
+            break
+    if name != original:
+        logger.debug(f"Normalized artifact name for search: '{original}' -> '{name}'")
+    return name
+
 
 @dataclass
 class Collection:
@@ -37,6 +64,9 @@ class Collection:
     ) -> Optional[Artifact]:
         """Find artifact by name, optionally filtered by type.
 
+        Normalizes both the search name and stored artifact names to handle
+        extension mismatches (e.g., searching for 'foo' when stored as 'foo.md').
+
         Args:
             name: The artifact name to search for
             artifact_type: Optional type filter
@@ -47,9 +77,11 @@ class Collection:
         Raises:
             ValueError: If name is ambiguous (multiple artifacts with same name but different types)
         """
+        normalized_search = _normalize_name(name)
         matches = []
         for artifact in self.artifacts:
-            if artifact.name == name:
+            # Normalize stored artifact name for comparison
+            if _normalize_name(artifact.name) == normalized_search:
                 if artifact_type is None:
                     matches.append(artifact)
                 elif artifact.type == artifact_type:
@@ -63,7 +95,7 @@ class Collection:
             # Multiple artifacts with same name but different types
             types = ", ".join([a.type.value for a in matches])
             raise ValueError(
-                f"Ambiguous artifact name '{name}' matches multiple types: {types}. "
+                f"Ambiguous artifact name '{normalized_search}' matches multiple types: {types}. "
                 f"Please specify type explicitly."
             )
 

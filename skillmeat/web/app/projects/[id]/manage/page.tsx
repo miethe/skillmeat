@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Grid3x3, List, Loader2, ArrowLeft, Package, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useProject, useArtifacts } from '@/hooks';
+import { useProject, useArtifacts, useDeploymentList } from '@/hooks';
 import { mapArtifactToEntity } from '@/lib/api/entity-mapper';
 
 interface ProjectManagePageContentProps {
@@ -53,6 +53,18 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
 
   // Fetch all artifacts from collection to enrich project entities
   const { data: artifactsData } = useArtifacts();
+
+  // Fetch deployments for this project to identify already-deployed artifacts
+  const { data: deploymentData } = useDeploymentList(projectPath);
+
+  // Compute deployed artifact keys (name + type) for the deploy dialog
+  const deployedArtifacts = useMemo(() => {
+    if (!deploymentData?.deployments) return [];
+    return deploymentData.deployments.map((d) => ({
+      name: d.artifact_name,
+      type: d.artifact_type,
+    }));
+  }, [deploymentData]);
 
   // Local state
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -302,8 +314,10 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
         projectPath={projectPath}
         open={deployDialogOpen}
         onOpenChange={setDeployDialogOpen}
+        deployedArtifacts={deployedArtifacts}
         onSuccess={() => {
           setDeployDialogOpen(false);
+          refetch();
         }}
       />
 

@@ -16,12 +16,64 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from skillmeat.api.schemas.deployments import DeploymentSummary
 from skillmeat.cache.models import CollectionArtifact
 
 logger = logging.getLogger(__name__)
 
 # Default TTL for artifact metadata cache: 30 minutes
 DEFAULT_METADATA_TTL_SECONDS = 30 * 60
+
+
+def create_or_update_collection_artifact(
+    session: Session,
+    collection_id: str,
+    artifact_id: str,
+    metadata: dict,
+) -> CollectionArtifact:
+    """Create or update a CollectionArtifact row with full metadata.
+
+    Pure DB upsert -- no filesystem reads, no manager dependencies.
+    Sets synced_at = utcnow() automatically. On create, also sets added_at.
+
+    Args:
+        session: DB session
+        collection_id: Collection ID (e.g., "default")
+        artifact_id: Full artifact ID (e.g., "skill:1password")
+        metadata: Dict with metadata fields (description, source, origin,
+                  origin_source, tags_json, author, license, tools_json,
+                  version, resolved_sha, resolved_version, etc.)
+
+    Returns:
+        CollectionArtifact ORM instance (committed)
+    """
+    assoc = (
+        session.query(CollectionArtifact)
+        .filter_by(collection_id=collection_id, artifact_id=artifact_id)
+        .first()
+    )
+
+    metadata_with_timestamp = {
+        **metadata,
+        "synced_at": datetime.utcnow(),
+    }
+
+    if assoc:
+        for key, value in metadata_with_timestamp.items():
+            setattr(assoc, key, value)
+        logger.debug(f"Updated cache for artifact: {artifact_id}")
+    else:
+        assoc = CollectionArtifact(
+            collection_id=collection_id,
+            artifact_id=artifact_id,
+            added_at=datetime.utcnow(),
+            **metadata_with_timestamp,
+        )
+        session.add(assoc)
+        logger.debug(f"Created cache entry for artifact: {artifact_id}")
+
+    session.commit()
+    return assoc
 
 
 def refresh_single_artifact_cache(
@@ -64,15 +116,8 @@ def refresh_single_artifact_cache(
             logger.warning(f"Artifact not found in file system: {artifact_id}")
             return False
 
-        # Find or create CollectionArtifact row
-        assoc = (
-            session.query(CollectionArtifact)
-            .filter_by(collection_id=collection_id, artifact_id=artifact_id)
-            .first()
-        )
-
-        # Build metadata fields from file artifact
-        metadata_fields = {
+        # Build metadata dict from file artifact
+        metadata = {
             "description": (
                 file_artifact.metadata.description if file_artifact.metadata else None
             ),
@@ -82,13 +127,14 @@ def refresh_single_artifact_cache(
             "license": (
                 file_artifact.metadata.license if file_artifact.metadata else None
             ),
-            "tags_json": json.dumps(file_artifact.tags) if file_artifact.tags else None,
+            "tags_json": (
+                json.dumps(file_artifact.tags) if file_artifact.tags else None
+            ),
             "tools_json": (
                 json.dumps(file_artifact.metadata.tools)
                 if file_artifact.metadata and file_artifact.metadata.tools
                 else None
             ),
-            "deployments_json": None,  # Populated at collection level, not per-artifact
             "version": (
                 file_artifact.metadata.version if file_artifact.metadata else None
             ),
@@ -97,26 +143,12 @@ def refresh_single_artifact_cache(
             "origin_source": getattr(file_artifact, "origin_source", None),
             "resolved_sha": getattr(file_artifact, "resolved_sha", None),
             "resolved_version": getattr(file_artifact, "resolved_version", None),
-            "synced_at": datetime.utcnow(),
         }
 
-        if assoc:
-            # Update existing row
-            for key, value in metadata_fields.items():
-                setattr(assoc, key, value)
-            logger.debug(f"Updated cache for artifact: {artifact_id}")
-        else:
-            # Create new row
-            new_assoc = CollectionArtifact(
-                collection_id=collection_id,
-                artifact_id=artifact_id,
-                added_at=datetime.utcnow(),
-                **metadata_fields,
-            )
-            session.add(new_assoc)
-            logger.debug(f"Created cache entry for artifact: {artifact_id}")
-
-        session.commit()
+        # Delegate to shared upsert
+        create_or_update_collection_artifact(
+            session, collection_id, artifact_id, metadata
+        )
 
         # Sync tags to Tag ORM tables
         if file_artifact.tags:
@@ -141,6 +173,97 @@ def refresh_single_artifact_cache(
         except Exception:
             pass  # Ignore rollback errors
         return False
+
+
+def populate_collection_artifact_from_import(
+    session: Session,
+    artifact_mgr,
+    collection_id: str,
+    entry,
+) -> CollectionArtifact:
+    """Populate a CollectionArtifact from an import result and filesystem data.
+
+    Import-specific helper that combines data already available in memory
+    (from the ImportEntry) with filesystem artifact metadata (via
+    artifact_mgr.show()) to create a fully populated DB cache row in a
+    single operation.
+
+    Args:
+        session: DB session
+        artifact_mgr: ArtifactManager instance with show() method
+        collection_id: Collection ID (e.g., "default")
+        entry: An ImportEntry object with .name, .artifact_type, .description,
+               .upstream_url, .tags fields
+
+    Returns:
+        CollectionArtifact ORM instance (committed)
+
+    Raises:
+        Exception: If artifact_mgr.show() fails or DB commit fails.
+                   Callers should handle exceptions appropriately.
+    """
+    artifact_id = f"{entry.artifact_type}:{entry.name}"
+
+    # Read filesystem for fields not available in ImportEntry
+    # (author, license, tools, version, resolved_sha, resolved_version)
+    file_artifact = artifact_mgr.show(entry.name)
+
+    # Combine ImportEntry data (already in memory) with filesystem data
+    metadata = {
+        "description": entry.description
+        or (
+            file_artifact.metadata.description
+            if file_artifact and file_artifact.metadata
+            else None
+        ),
+        "source": entry.upstream_url,
+        "origin": "marketplace",
+        "origin_source": "github",
+        "tags_json": json.dumps(entry.tags) if entry.tags else None,
+        # Fields only available from filesystem:
+        "author": (
+            file_artifact.metadata.author
+            if file_artifact and file_artifact.metadata
+            else None
+        ),
+        "license": (
+            file_artifact.metadata.license
+            if file_artifact and file_artifact.metadata
+            else None
+        ),
+        "tools_json": (
+            json.dumps(file_artifact.metadata.tools)
+            if file_artifact and file_artifact.metadata and file_artifact.metadata.tools
+            else None
+        ),
+        "version": (
+            file_artifact.metadata.version
+            if file_artifact and file_artifact.metadata
+            else None
+        ),
+        "resolved_sha": (
+            getattr(file_artifact, "resolved_sha", None) if file_artifact else None
+        ),
+        "resolved_version": (
+            getattr(file_artifact, "resolved_version", None) if file_artifact else None
+        ),
+    }
+
+    result = create_or_update_collection_artifact(
+        session, collection_id, artifact_id, metadata
+    )
+
+    # Sync tags to Tag ORM tables
+    tags = entry.tags or (file_artifact.tags if file_artifact else None)
+    if tags:
+        try:
+            from skillmeat.core.services import TagService
+
+            TagService().sync_artifact_tags(artifact_id, tags)
+        except Exception as e:
+            logger.warning(f"Tag ORM sync failed for {artifact_id}: {e}")
+
+    return result
 
 
 def invalidate_artifact_cache(
@@ -384,3 +507,271 @@ def log_cache_metrics(
     )
 
     return stats
+
+
+# =============================================================================
+# Deployment JSON Parsing
+# =============================================================================
+
+
+def parse_deployments(
+    deployments_json: Optional[str],
+) -> Optional[list[DeploymentSummary]]:
+    """Parse deployments_json field from CollectionArtifact into DeploymentSummary list.
+
+    Handles both old-format JSON (project_path, project_name, deployed_at only)
+    and new-format JSON (with content_hash, deployment_profile_id,
+    local_modifications, platform).
+
+    Args:
+        deployments_json: JSON string containing deployment data
+
+    Returns:
+        List of DeploymentSummary objects, or None if empty/invalid
+    """
+    if not deployments_json:
+        return None
+
+    try:
+        deployments_data = json.loads(deployments_json)
+        if not deployments_data or not isinstance(deployments_data, list):
+            return None
+
+        # Parse each deployment dict into DeploymentSummary
+        deployments = []
+        for dep in deployments_data:
+            try:
+                # Parse deployed_at timestamp if it's a string
+                deployed_at = dep.get("deployed_at")
+                if isinstance(deployed_at, str):
+                    deployed_at = datetime.fromisoformat(
+                        deployed_at.replace("Z", "+00:00")
+                    )
+                elif not isinstance(deployed_at, datetime):
+                    continue  # Skip invalid entries
+
+                deployments.append(
+                    DeploymentSummary(
+                        project_path=dep.get("project_path", ""),
+                        project_name=dep.get("project_name", ""),
+                        deployed_at=deployed_at,
+                        content_hash=dep.get("content_hash"),
+                        deployment_profile_id=dep.get("deployment_profile_id"),
+                        local_modifications=dep.get("local_modifications"),
+                        platform=dep.get("platform"),
+                    )
+                )
+            except (KeyError, ValueError, TypeError) as e:
+                logger.debug(f"Skipping invalid deployment entry: {e}")
+                continue
+
+        return deployments if deployments else None
+
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.debug(f"Failed to parse deployments_json: {e}")
+        return None
+
+
+# =============================================================================
+# Surgical Deployment Cache Helpers
+# =============================================================================
+
+
+def add_deployment_to_cache(
+    session: Session,
+    artifact_id: str,
+    project_path: str,
+    project_name: str,
+    deployed_at: datetime | str,
+    content_hash: Optional[str] = None,
+    deployment_profile_id: Optional[str] = None,
+    local_modifications: bool = False,
+    platform: Optional[str] = None,
+    collection_id: str = "default",
+) -> bool:
+    """Add or update a deployment entry in an artifact's deployments_json cache.
+
+    Performs a surgical update of the deployments_json column without requiring
+    a full cache refresh. If an entry with matching project_path +
+    deployment_profile_id already exists, it is updated in-place; otherwise a
+    new entry is appended.
+
+    Args:
+        session: Database session
+        artifact_id: Artifact ID in 'type:name' format
+        project_path: Filesystem path of the project deployment target
+        project_name: Human-readable project name
+        deployed_at: Deployment timestamp (datetime or ISO string)
+        content_hash: Optional hash of deployed content
+        deployment_profile_id: Optional deployment profile identifier
+        local_modifications: Whether local modifications exist
+        platform: Optional platform identifier
+        collection_id: Collection to update (defaults to 'default')
+
+    Returns:
+        True if update succeeded, False otherwise
+    """
+    try:
+        assoc = (
+            session.query(CollectionArtifact)
+            .filter_by(collection_id=collection_id, artifact_id=artifact_id)
+            .first()
+        )
+        if not assoc:
+            logger.warning(
+                "Cannot add deployment cache — artifact not found: %s (collection=%s)",
+                artifact_id,
+                collection_id,
+            )
+            return False
+
+        # Parse existing deployments
+        deployments: list[dict] = []
+        if assoc.deployments_json:
+            try:
+                deployments = json.loads(assoc.deployments_json)
+                if not isinstance(deployments, list):
+                    logger.warning(
+                        "Malformed deployments_json for %s — resetting to empty list",
+                        artifact_id,
+                    )
+                    deployments = []
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(
+                    "Unparseable deployments_json for %s — resetting to empty list",
+                    artifact_id,
+                )
+                deployments = []
+
+        # Normalize deployed_at to ISO string
+        if isinstance(deployed_at, datetime):
+            deployed_at_str = deployed_at.isoformat()
+        else:
+            deployed_at_str = str(deployed_at)
+
+        # Build entry dict
+        entry = {
+            "project_path": project_path,
+            "project_name": project_name,
+            "deployed_at": deployed_at_str,
+            "content_hash": content_hash,
+            "deployment_profile_id": deployment_profile_id,
+            "local_modifications": local_modifications,
+            "platform": platform,
+        }
+
+        # Check for existing entry with matching project_path + profile
+        found = False
+        for i, existing in enumerate(deployments):
+            if (
+                existing.get("project_path") == project_path
+                and existing.get("deployment_profile_id") == deployment_profile_id
+            ):
+                deployments[i] = entry
+                found = True
+                break
+
+        if not found:
+            deployments.append(entry)
+
+        assoc.deployments_json = json.dumps(deployments)
+        session.flush()
+
+        logger.debug(
+            "Added deployment to cache for %s → %s (profile=%s)",
+            artifact_id,
+            project_path,
+            deployment_profile_id or "none",
+        )
+        return True
+
+    except Exception as e:
+        logger.warning("Failed to add deployment to cache for %s: %s", artifact_id, e)
+        try:
+            session.rollback()
+        except Exception:
+            pass
+        return False
+
+
+def remove_deployment_from_cache(
+    session: Session,
+    artifact_id: str,
+    project_path: str,
+    collection_id: str = "default",
+    profile_id: Optional[str] = None,
+) -> bool:
+    """Remove a deployment entry from an artifact's deployments_json cache.
+
+    Filters out entries matching the given project_path (and optionally
+    profile_id) without requiring a full cache refresh.
+
+    Args:
+        session: Database session
+        artifact_id: Artifact ID in 'type:name' format
+        project_path: Filesystem path to match for removal
+        collection_id: Collection to update (defaults to 'default')
+        profile_id: If provided, only remove entries that also match this
+                     deployment_profile_id
+
+    Returns:
+        True if update succeeded, False otherwise
+    """
+    try:
+        assoc = (
+            session.query(CollectionArtifact)
+            .filter_by(collection_id=collection_id, artifact_id=artifact_id)
+            .first()
+        )
+        if not assoc:
+            logger.warning(
+                "Cannot remove deployment cache — artifact not found: %s (collection=%s)",
+                artifact_id,
+                collection_id,
+            )
+            return False
+
+        if not assoc.deployments_json:
+            # Nothing to remove
+            return True
+
+        try:
+            deployments = json.loads(assoc.deployments_json)
+            if not isinstance(deployments, list):
+                deployments = []
+        except (json.JSONDecodeError, TypeError):
+            # Malformed — treat as already empty
+            return True
+
+        # Filter out matching entries
+        filtered = [
+            d
+            for d in deployments
+            if not (
+                d.get("project_path") == project_path
+                and (profile_id is None or d.get("deployment_profile_id") == profile_id)
+            )
+        ]
+
+        assoc.deployments_json = json.dumps(filtered) if filtered else None
+        session.flush()
+
+        removed_count = len(deployments) - len(filtered)
+        logger.debug(
+            "Removed %d deployment(s) from cache for %s (path=%s, profile=%s)",
+            removed_count,
+            artifact_id,
+            project_path,
+            profile_id or "any",
+        )
+        return True
+
+    except Exception as e:
+        logger.warning(
+            "Failed to remove deployment from cache for %s: %s", artifact_id, e
+        )
+        try:
+            session.rollback()
+        except Exception:
+            pass
+        return False

@@ -22,6 +22,39 @@ from skillmeat.core.path_resolver import (
 )
 from skillmeat.utils.filesystem import compute_content_hash
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Extensions to strip when normalizing artifact names.
+# Matches the behavior of parse_artifact_id in artifacts.py.
+# Kept local to avoid circular imports.
+_ARTIFACT_EXTENSIONS = (".md", ".txt", ".json", ".yaml", ".yml")
+
+
+def _normalize_artifact_name(name: str) -> str:
+    """Strip common artifact extensions for comparison.
+
+    The deployment record may store artifact names with extensions (e.g.,
+    "supabase-realtime-optimizer.md") while the API searches without them
+    (e.g., "supabase-realtime-optimizer" after parse_artifact_id strips
+    the extension). This helper normalizes both sides for matching.
+
+    Args:
+        name: Artifact name, possibly with extension
+
+    Returns:
+        Artifact name without common extensions
+    """
+    original = name
+    for ext in _ARTIFACT_EXTENSIONS:
+        if name.endswith(ext):
+            name = name[: -len(ext)]
+            break
+    if name != original:
+        logger.debug(f"Normalized artifact name: '{original}' -> '{name}'")
+    return name
+
 
 class DeploymentTracker:
     """Tracks artifact deployments in .skillmeat-deployed.toml"""
@@ -167,10 +200,12 @@ class DeploymentTracker:
                 artifact_path = Path(base) / f"{artifact.name}.md"
 
         # Check if deployment already exists (update it)
+        # Use normalization to handle extension mismatches (see get_deployment)
         existing = None
+        normalized_name = _normalize_artifact_name(artifact.name)
         for i, dep in enumerate(deployments):
             if (
-                dep.artifact_name == artifact.name
+                _normalize_artifact_name(dep.artifact_name) == normalized_name
                 and dep.artifact_type == artifact.type.value
                 and (dep.deployment_profile_id or "claude_code")
                 == (deployment_profile_id or "claude_code")
@@ -218,9 +253,14 @@ class DeploymentTracker:
         """
         deployments = DeploymentTracker.read_deployments(project_path, profile_root_dir=None)
 
+        # Normalize artifact_name to handle extension mismatches.
+        # The deployment record may store names with extensions (e.g., "foo.md")
+        # while the API searches without them (e.g., "foo" from parse_artifact_id).
+        normalized_search = _normalize_artifact_name(artifact_name)
+
         for dep in deployments:
             if (
-                dep.artifact_name == artifact_name
+                _normalize_artifact_name(dep.artifact_name) == normalized_search
                 and dep.artifact_type == artifact_type
                 and (
                     profile_id is None
@@ -247,12 +287,16 @@ class DeploymentTracker:
         """
         deployments = DeploymentTracker.read_deployments(project_path, profile_root_dir=None)
 
+        # Normalize artifact_name to handle extension mismatches (see get_deployment).
+        normalized_search = _normalize_artifact_name(artifact_name)
+
         # Filter out the deployment
         deployments = [
             d
             for d in deployments
             if not (
-                d.artifact_name == artifact_name and d.artifact_type == artifact_type
+                _normalize_artifact_name(d.artifact_name) == normalized_search
+                and d.artifact_type == artifact_type
                 and (
                     profile_id is None
                     or (d.deployment_profile_id or "claude_code") == profile_id

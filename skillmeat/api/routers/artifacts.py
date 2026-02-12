@@ -12,7 +12,7 @@ import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path as PathLib
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated, Dict, Iterator, List, Optional
 
 from fastapi import (
     APIRouter,
@@ -30,6 +30,7 @@ from skillmeat.api.dependencies import (
     ArtifactManagerDep,
     CollectionManagerDep,
     ConfigManagerDep,
+    SettingsDep,
     SyncManagerDep,
     get_app_state,
     verify_api_key,
@@ -116,10 +117,87 @@ from skillmeat.api.services import (
     delete_artifact_cache,
     refresh_single_artifact_cache,
 )
+from skillmeat.api.services.artifact_cache_service import (
+    add_deployment_to_cache,
+    parse_deployments,
+)
+from skillmeat.api.schemas.deployments import DeploymentSummary
 from skillmeat.cache.models import Collection, CollectionArtifact, get_session
 from skillmeat.cache.repositories import MarketplaceCatalogRepository
 
 logger = logging.getLogger(__name__)
+
+# Exclusion patterns for diff operations - skip non-content directories
+DIFF_EXCLUDE_DIRS = {
+    ".git",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "venv",
+    ".tox",
+    ".pytest_cache",
+    ".mypy_cache",
+    "dist",
+    "build",
+    ".next",
+    ".turbo",
+}
+
+
+def iter_artifact_files(
+    base_path: PathLib, exclude_dirs: Optional[set[str]] = None
+) -> Iterator[PathLib]:
+    """Iterate artifact files, excluding specified directories.
+
+    Filters out directories like node_modules, .git, __pycache__, etc. that would
+    cause significant performance degradation during diff operations.
+
+    Args:
+        base_path: Root path to iterate
+        exclude_dirs: Set of directory names to exclude (defaults to DIFF_EXCLUDE_DIRS)
+    """
+    exclusions = exclude_dirs or DIFF_EXCLUDE_DIRS
+    for f in base_path.rglob("*"):
+        if f.is_file():
+            # Skip if any parent directory is in exclusion list
+            if not any(part in exclusions for part in f.relative_to(base_path).parts):
+                yield f
+
+
+def _normalize_artifact_path(path_str: str) -> str:
+    """Normalize artifact path by removing duplicate extensions.
+
+    Detects and fixes double extensions like .md.md, .txt.txt, etc.
+
+    Args:
+        path_str: Artifact path from manifest
+
+    Returns:
+        Normalized path with duplicate extensions removed
+    """
+    from pathlib import Path
+
+    path = Path(path_str)
+    stem = path.stem
+    suffix = path.suffix
+
+    # Check if the filename has duplicate extension (e.g., "file.md.md")
+    # path.stem would be "file.md" and suffix would be ".md"
+    # So we check if stem ends with suffix (without the dot)
+    if suffix:
+        # Remove the leading dot from suffix for comparison
+        suffix_no_dot = suffix[1:]
+        # Check if stem ends with the same extension
+        if stem.endswith(f".{suffix_no_dot}"):
+            # Build normalized path: parent / stem (which already has one extension)
+            # stem already includes the extension once, so we don't add suffix again
+            normalized = str(Path(path.parent) / stem)
+            logger.warning(
+                f"Normalized artifact path with duplicate extension: {path_str} -> {normalized}"
+            )
+            return normalized
+
+    return path_str
 
 
 def _decode_project_id_param(raw_project_id: str) -> Optional[PathLib]:
@@ -194,6 +272,43 @@ def _get_possible_artifact_paths(artifact_type: ArtifactType, name: str) -> List
     return paths
 
 
+# Common file extensions that may be incorrectly included in artifact IDs
+_ARTIFACT_ID_EXTENSIONS = (".md", ".txt", ".json", ".yaml", ".yml")
+
+
+def parse_artifact_id(artifact_id: str) -> tuple[str, str]:
+    """Parse artifact_id into (type, name), normalizing the name.
+
+    Handles cases where the frontend sends artifact IDs with file extensions
+    (e.g., 'agent:prd-writer.md' instead of 'agent:prd-writer').
+
+    Args:
+        artifact_id: The artifact identifier in 'type:name' format
+
+    Returns:
+        Tuple of (artifact_type_str, artifact_name) with normalized name
+
+    Raises:
+        ValueError: If artifact_id is not in 'type:name' format
+    """
+    if ":" not in artifact_id:
+        raise ValueError("Invalid artifact ID format. Expected 'type:name'")
+
+    artifact_type_str, artifact_name = artifact_id.split(":", 1)
+
+    # Strip common file extensions that may be incorrectly included
+    original_name = artifact_name
+    for ext in _ARTIFACT_ID_EXTENSIONS:
+        if artifact_name.endswith(ext):
+            artifact_name = artifact_name[: -len(ext)]
+            logger.warning(
+                f"Stripped extension from artifact ID: '{original_name}' -> '{artifact_name}'"
+            )
+            break
+
+    return artifact_type_str, artifact_name
+
+
 router = APIRouter(
     prefix="/artifacts",
     tags=["artifacts"],
@@ -215,6 +330,127 @@ def get_db_session():
 
 
 DbSessionDep = Annotated[Session, Depends(get_db_session)]
+
+
+def resolve_collection_name(
+    collection_param: str,
+    collection_mgr,
+    db_session=None,
+) -> Optional[str]:
+    """Resolve a collection parameter to a collection name.
+
+    Accepts either a collection name or UUID. If a UUID is provided,
+    looks up the name from the database.
+
+    Args:
+        collection_param: Collection name or UUID string
+        collection_mgr: CollectionManager instance
+        db_session: Optional SQLAlchemy session. If None, creates one internally.
+
+    Returns:
+        The collection name if found, None if not resolvable.
+    """
+    # Fast path: check as a name first
+    collection_names = collection_mgr.list_collections()
+    if collection_param in collection_names:
+        return collection_param
+
+    # Try as a UUID - look up in DB
+    owns_session = db_session is None
+    if owns_session:
+        db_session = get_session()
+    try:
+        collection_record = (
+            db_session.query(Collection)
+            .filter(Collection.id == collection_param)
+            .first()
+        )
+        if collection_record:
+            # Case-insensitive match: compare lowercase versions
+            collection_names_lower = {name.lower(): name for name in collection_names}
+            db_name_lower = collection_record.name.lower()
+
+            if db_name_lower in collection_names_lower:
+                # Return the filesystem name (preserves original case)
+                filesystem_name = collection_names_lower[db_name_lower]
+                logger.warning(
+                    "Resolved collection UUID '%s' to name '%s' (DB: '%s', filesystem: '%s'). "
+                    "Frontend should send collection name instead of UUID.",
+                    collection_param,
+                    filesystem_name,
+                    collection_record.name,
+                    filesystem_name,
+                )
+                return filesystem_name
+    finally:
+        if owns_session:
+            db_session.close()
+
+    return None
+
+
+def _find_artifact_in_collections(
+    artifact_name: str,
+    artifact_type: ArtifactType,
+    collection_mgr,
+    preferred_collection: Optional[str] = None,
+    db_session=None,
+) -> tuple:
+    """Find an artifact across collections, with optional preferred collection hint.
+
+    When a preferred collection is specified (name or UUID), searches there first.
+    If the artifact is not found in the preferred collection (e.g., stale DB
+    association), falls back to searching all collections.
+
+    This prevents 404 errors caused by the frontend sending a collection UUID
+    from a stale DB association while the artifact actually lives in a different
+    collection on the filesystem.
+
+    Args:
+        artifact_name: Normalized artifact name (extension already stripped)
+        artifact_type: Artifact type enum
+        collection_mgr: CollectionManager instance
+        preferred_collection: Optional collection name or UUID to search first
+        db_session: Optional SQLAlchemy session for UUID resolution
+
+    Returns:
+        Tuple of (artifact, collection_name) where collection_name is the
+        filesystem collection name. Returns (None, None) if not found anywhere.
+    """
+    # If a preferred collection is specified, try it first
+    if preferred_collection:
+        resolved = resolve_collection_name(
+            preferred_collection, collection_mgr, db_session=db_session
+        )
+        if resolved:
+            try:
+                coll = collection_mgr.load_collection(resolved)
+                artifact = coll.find_artifact(artifact_name, artifact_type)
+                if artifact:
+                    return artifact, resolved
+            except ValueError:
+                pass  # Collection load or ambiguous name error
+            # Artifact not found in preferred collection - fall through to search all
+            logger.warning(
+                "Artifact '%s:%s' not found in preferred collection '%s' "
+                "(resolved from '%s'). Falling back to searching all collections.",
+                artifact_type.value,
+                artifact_name,
+                resolved,
+                preferred_collection,
+            )
+
+    # Search across all collections
+    for coll_name in collection_mgr.list_collections():
+        try:
+            coll = collection_mgr.load_collection(coll_name)
+            artifact = coll.find_artifact(artifact_name, artifact_type)
+            if artifact:
+                return artifact, coll_name
+        except ValueError:
+            continue
+
+    return None, None
 
 
 def encode_cursor(value: str) -> str:
@@ -519,6 +755,8 @@ def artifact_to_response(
     drift_status: Optional[str] = None,
     has_local_modifications: Optional[bool] = None,
     collections_data: Optional[List[ArtifactCollectionInfo]] = None,
+    db_source: Optional[str] = None,
+    deployments: Optional[List[DeploymentSummary]] = None,
 ) -> ArtifactResponse:
     """Convert Artifact model to API response schema.
 
@@ -527,6 +765,7 @@ def artifact_to_response(
         drift_status: Optional drift status ("none", "modified", "deleted", "added")
         has_local_modifications: Optional flag indicating local modifications
         collections_data: Optional list of ArtifactCollectionInfo from CollectionService
+        db_source: Optional source from DB cache (overrides filesystem source)
 
     Returns:
         ArtifactResponse schema
@@ -577,7 +816,7 @@ def artifact_to_response(
         id=f"{artifact.type.value}:{artifact.name}",
         name=artifact.name,
         type=artifact.type.value,
-        source=artifact.upstream if artifact.upstream else "local",
+        source=db_source or (artifact.upstream if artifact.upstream else "local"),
         origin=artifact.origin,
         origin_source=artifact.origin_source,
         version=version,
@@ -587,6 +826,7 @@ def artifact_to_response(
         metadata=metadata_response,
         upstream=upstream_response,
         collections=collections_response,
+        deployments=deployments,
         added=artifact.added,
         updated=artifact.last_updated or artifact.added,
     )
@@ -866,6 +1106,7 @@ async def bulk_import_artifacts(
         None,
         description="Base64-encoded project path to also record deployments for the imports",
     ),
+    session: Session = Depends(get_session),
 ) -> BulkImportResult:
     """
     Bulk import multiple artifacts with graceful error handling.
@@ -1176,6 +1417,47 @@ async def bulk_import_artifacts(
                             logger.info(
                                 f"Recorded deployments for {project_path} after import"
                             )
+
+                            # Also record deployments in DB cache for UI visibility
+                            for artifact_payload, import_result in zip(
+                                request.artifacts, results
+                            ):
+                                if import_result.status != ImportStatus.SUCCESS:
+                                    continue
+
+                                artifact_name = artifact_payload.name or (
+                                    PathLib(artifact_payload.path).stem
+                                    if artifact_payload.path
+                                    else None
+                                )
+                                if not artifact_name:
+                                    continue
+
+                                artifact_id = (
+                                    f"{artifact_payload.artifact_type}:{artifact_name}"
+                                )
+
+                                try:
+                                    add_deployment_to_cache(
+                                        session=session,
+                                        artifact_id=artifact_id,
+                                        project_path=str(project_path),
+                                        project_name=project_path.name,
+                                        deployed_at=datetime.now(timezone.utc),
+                                        content_hash=(
+                                            compute_content_hash(
+                                                PathLib(artifact_payload.path)
+                                            )
+                                            if artifact_payload.path
+                                            else None
+                                        ),
+                                        local_modifications=False,
+                                        collection_id=collection_name,
+                                    )
+                                except Exception as e:
+                                    logger.warning(
+                                        f"Failed to record deployment in cache for {artifact_id}: {e}"
+                                    )
                 except Exception as e:
                     logger.warning(
                         f"Failed to update project deployments for {project_path}: {e}"
@@ -1511,12 +1793,14 @@ async def create_artifact(
                         detail="No collections found. Create a collection first.",
                     )
         else:
-            # Verify collection exists
-            if collection_name not in collection_mgr.list_collections():
+            # Verify collection exists (resolve UUID if needed)
+            resolved = resolve_collection_name(collection_name, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection_name}' not found",
                 )
+            collection_name = resolved
 
         # Create artifact based on source type
         artifact = None
@@ -1801,12 +2085,14 @@ async def list_artifacts(
 
         # Get artifacts from specified collection or all collections
         if collection:
-            # Check if collection exists
-            if collection not in collection_mgr.list_collections():
+            # Check if collection exists (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             artifacts = artifact_mgr.list_artifacts(
                 collection_name=collection,
                 artifact_type=type_filter,
@@ -1923,9 +2209,11 @@ async def list_artifacts(
                 logger.warning(f"Failed to check drift: {e}")
                 # Continue without drift info rather than failing the request
 
-        # Query database for collection memberships using CollectionService
+        # Query database for collection memberships and source metadata
         artifact_ids = [f"{a.type.value}:{a.name}" for a in page_artifacts]
         collections_map: Dict[str, List[ArtifactCollectionInfo]] = {}
+        source_lookup: Dict[str, str] = {}
+        deployments_lookup: Dict[str, List[DeploymentSummary]] = {}
 
         if artifact_ids:
             try:
@@ -1934,6 +2222,22 @@ async def list_artifacts(
                 collections_map = collection_service.get_collection_membership_batch(
                     artifact_ids
                 )
+                # Query DB source and deployments for artifacts
+                db_rows = (
+                    db_session.query(
+                        CollectionArtifact.artifact_id,
+                        CollectionArtifact.source,
+                        CollectionArtifact.deployments_json,
+                    )
+                    .filter(CollectionArtifact.artifact_id.in_(artifact_ids))
+                    .all()
+                )
+                for row in db_rows:
+                    if row.source is not None:
+                        source_lookup[row.artifact_id] = row.source
+                    parsed = parse_deployments(row.deployments_json)
+                    if parsed:
+                        deployments_lookup[row.artifact_id] = parsed
                 db_session.close()
             except Exception as e:
                 logger.warning(f"Failed to query collection memberships: {e}")
@@ -1954,6 +2258,8 @@ async def list_artifacts(
                     drift_status=drift_status,
                     has_local_modifications=has_modifications,
                     collections_data=collections_map.get(artifact_key, []),
+                    db_source=source_lookup.get(artifact_key),
+                    deployments=deployments_lookup.get(artifact_key),
                 )
             )
 
@@ -2058,7 +2364,7 @@ async def get_artifact(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -2069,12 +2375,14 @@ async def get_artifact(
         # Search for artifact
         artifact = None
         if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
+            # Search in specified collection (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 artifact = artifact_mgr.show(
                     artifact_name=artifact_name,
@@ -2179,7 +2487,7 @@ async def check_artifact_upstream(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -2191,11 +2499,13 @@ async def check_artifact_upstream(
         artifact = None
         collection_name = collection
         if collection:
-            if collection not in collection_mgr.list_collections():
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 artifact = artifact_mgr.show(
                     artifact_name=artifact_name,
@@ -2348,7 +2658,7 @@ async def update_artifact(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -2362,12 +2672,14 @@ async def update_artifact(
         target_collection = None
 
         if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
+            # Search in specified collection (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 target_collection = collection_mgr.load_collection(collection)
                 artifact = target_collection.find_artifact(artifact_name, artifact_type)
@@ -2549,7 +2861,7 @@ async def update_artifact_parameters(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -2563,12 +2875,14 @@ async def update_artifact_parameters(
         target_collection = None
 
         if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
+            # Search in specified collection (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 target_collection = collection_mgr.load_collection(collection)
                 artifact = target_collection.find_artifact(artifact_name, artifact_type)
@@ -2788,7 +3102,7 @@ async def delete_artifact(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -2801,12 +3115,14 @@ async def delete_artifact(
         found = False
 
         if collection:
-            # Check specified collection
-            if collection not in collection_mgr.list_collections():
+            # Check specified collection (resolve UUID if needed)
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             try:
                 target_collection = collection_mgr.load_collection(collection)
                 artifact = target_collection.find_artifact(artifact_name, artifact_type)
@@ -2916,6 +3232,7 @@ async def deploy_artifact(
     request: ArtifactDeployRequest,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    settings: SettingsDep,
     token: TokenDep,
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
@@ -2960,7 +3277,7 @@ async def deploy_artifact(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -2978,11 +3295,13 @@ async def deploy_artifact(
 
         # Get or create collection
         if collection:
-            if collection not in collection_mgr.list_collections():
+            resolved = resolve_collection_name(collection, collection_mgr)
+            if not resolved:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Collection '{collection}' not found",
                 )
+            collection = resolved
             collection_name = collection
         else:
             collections = collection_mgr.list_collections()
@@ -3014,11 +3333,14 @@ async def deploy_artifact(
                 collection_mgr=collection_mgr,
                 artifact_mgr=artifact_mgr,
                 project_path=project_path,
+                settings=settings,
             )
 
         # --- Strategy: overwrite (default, existing behavior) ---
         # Create deployment manager
-        from skillmeat.core.deployment import DeploymentManager as RuntimeDeploymentManager
+        from skillmeat.core.deployment import (
+            DeploymentManager as RuntimeDeploymentManager,
+        )
 
         deployment_mgr = RuntimeDeploymentManager(collection_mgr=collection_mgr)
 
@@ -3047,16 +3369,15 @@ async def deploy_artifact(
 
             deployment = deployments[0]
             deployed_profiles = sorted(
-                {
-                    item.deployment_profile_id or "claude_code"
-                    for item in deployments
-                }
+                {item.deployment_profile_id or "claude_code" for item in deployments}
             )
 
             # Determine deployed path
-            deployed_path = project_path / (
-                deployment.profile_root_dir or ".claude"
-            ) / deployment.artifact_path
+            deployed_path = (
+                project_path
+                / (deployment.profile_root_dir or ".claude")
+                / deployment.artifact_path
+            )
             logger.info(
                 f"Artifact '{artifact_name}' deployed successfully to {deployed_path}"
             )
@@ -3135,6 +3456,7 @@ async def _deploy_merge(
     collection_mgr,
     artifact_mgr,
     project_path: PathLib,
+    settings: SettingsDep,
 ) -> ArtifactDeployResponse:
     """Perform a merge deployment: file-level merge between collection and project.
 
@@ -3206,8 +3528,9 @@ async def _deploy_merge(
         if target_path.is_dir():
             copied_files = sorted(
                 str(f.relative_to(target_path))
-                for f in target_path.rglob("*")
-                if f.is_file()
+                for f in iter_artifact_files(
+                    target_path, set(settings.diff_exclude_dirs)
+                )
             )
         else:
             copied_files = [target_path.name]
@@ -3250,11 +3573,11 @@ async def _deploy_merge(
         return hasher.hexdigest()
 
     # Collect relative file paths from source and target
+    exclude_dirs = set(settings.diff_exclude_dirs)
     if source_path.is_dir():
         source_files = {
             str(f.relative_to(source_path))
-            for f in source_path.rglob("*")
-            if f.is_file()
+            for f in iter_artifact_files(source_path, exclude_dirs)
         }
     else:
         source_files = {source_path.name}
@@ -3262,8 +3585,7 @@ async def _deploy_merge(
     if target_path.is_dir():
         target_files = {
             str(f.relative_to(target_path))
-            for f in target_path.rglob("*")
-            if f.is_file()
+            for f in iter_artifact_files(target_path, exclude_dirs)
         }
     else:
         target_files = {target_path.name}
@@ -3388,6 +3710,7 @@ async def sync_artifact(
     sync_mgr: SyncManagerDep,
     collection_mgr: CollectionManagerDep,
     artifact_mgr: ArtifactManagerDep,
+    settings: SettingsDep,
     _token: TokenDep,
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
@@ -3419,7 +3742,7 @@ async def sync_artifact(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -3502,16 +3825,16 @@ async def sync_artifact(
             )
 
         if not collection_name:
-            collection_name = getattr(
-                target_deployment, "from_collection", "default"
-            )
+            collection_name = getattr(target_deployment, "from_collection", "default")
 
-        # Verify collection exists
-        if collection_name not in collection_mgr.list_collections():
+        # Verify collection exists (resolve UUID if needed)
+        resolved = resolve_collection_name(collection_name, collection_mgr)
+        if not resolved:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_name}' not found",
             )
+        collection_name = resolved
 
         # Load collection and verify artifact exists
         coll = collection_mgr.load_collection(collection_name)
@@ -3568,7 +3891,12 @@ async def sync_artifact(
                 )
                 artifact_path = collection_path / artifact.path
                 if artifact_path.exists():
-                    synced_files_count = len(list(artifact_path.rglob("*")))
+                    synced_files_count = sum(
+                        1
+                        for _ in iter_artifact_files(
+                            artifact_path, set(settings.diff_exclude_dirs)
+                        )
+                    )
 
             logger.info(
                 f"Artifact '{artifact_name}' sync completed: status={sync_result.status}, "
@@ -3660,7 +3988,7 @@ async def undeploy_artifact(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -3809,7 +4137,7 @@ async def get_version_graph(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -3875,6 +4203,7 @@ async def get_artifact_diff(
     artifact_id: str,
     _artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    settings: SettingsDep,
     _token: TokenDep,
     project_path: str = Query(
         ...,
@@ -3942,7 +4271,7 @@ async def get_artifact_diff(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -3991,61 +4320,73 @@ async def get_artifact_diff(
                     detail=f"Artifact '{artifact_id}' not found in project {project_path}",
                 )
 
-        # Verify collection exists
-        if collection_name not in collection_mgr.list_collections():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Collection '{collection_name}' not found",
-            )
-
-        # Load collection and find artifact
-        coll = collection_mgr.load_collection(collection_name)
-        artifact = coll.find_artifact(artifact_name, artifact_type)
+        # Find artifact in collection (with fallback across all collections)
+        artifact, resolved_collection = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection_name,
+        )
 
         if not artifact:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifact '{artifact_id}' not found in collection '{collection_name}'",
+                detail=f"Artifact '{artifact_id}' not found in any collection",
             )
+        collection_name = resolved_collection
+
+        # Normalize artifact path to handle duplicate extensions
+        normalized_artifact_path = _normalize_artifact_path(artifact.path)
 
         # Get paths
         collection_path = collection_mgr.config.get_collection_path(collection_name)
-        collection_artifact_path = collection_path / artifact.path
+        collection_artifact_path = collection_path / normalized_artifact_path
         project_artifact_path = proj_path / ".claude" / inferred_artifact_path
 
-        if not collection_artifact_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Collection artifact path does not exist: {collection_artifact_path}",
-            )
+        # Handle missing collection artifact (project has files that aren't in collection)
+        collection_exists = collection_artifact_path.exists()
+        project_exists = project_artifact_path.exists()
 
-        if not project_artifact_path.exists():
+        if not collection_exists and not project_exists:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project artifact path does not exist: {project_artifact_path}",
+                detail=f"Artifact '{artifact_id}' not found in either collection or project",
+            )
+
+        # Log resilience cases
+        if not collection_exists:
+            logger.warning(
+                f"Collection artifact missing but project exists: {artifact_id} "
+                f"(collection_path={collection_artifact_path}, project_path={project_artifact_path}). "
+                "Returning diff with all project files marked as 'deleted'."
+            )
+        elif not project_exists:
+            logger.warning(
+                f"Project artifact missing but collection exists: {artifact_id} "
+                f"(collection_path={collection_artifact_path}, project_path={project_artifact_path}). "
+                "Returning diff with all collection files marked as 'added'."
             )
 
         # Collect all files from both locations
         collection_files = set()
         project_files = set()
+        exclude_dirs = set(settings.diff_exclude_dirs)
 
-        if collection_artifact_path.is_dir():
-            collection_files = {
-                str(f.relative_to(collection_artifact_path))
-                for f in collection_artifact_path.rglob("*")
-                if f.is_file()
-            }
-        else:
-            collection_files = {collection_artifact_path.name}
+        if collection_exists:
+            if collection_artifact_path.is_dir():
+                collection_files = {
+                    str(f.relative_to(collection_artifact_path))
+                    for f in iter_artifact_files(collection_artifact_path, exclude_dirs)
+                }
+            else:
+                collection_files = {collection_artifact_path.name}
 
-        if project_artifact_path.is_dir():
-            project_files = {
-                str(f.relative_to(project_artifact_path))
-                for f in project_artifact_path.rglob("*")
-                if f.is_file()
-            }
-        else:
-            project_files = {project_artifact_path.name}
+        if project_exists:
+            if project_artifact_path.is_dir():
+                project_files = {
+                    str(f.relative_to(project_artifact_path))
+                    for f in iter_artifact_files(project_artifact_path, exclude_dirs)
+                }
+            else:
+                project_files = {project_artifact_path.name}
 
         # Get all unique files
         all_files = sorted(collection_files | project_files)
@@ -4143,16 +4484,21 @@ async def get_artifact_diff(
                 )
 
             elif in_collection and not in_project:
-                # File deleted in project (only in collection)
-                file_status = "deleted"
-                summary["deleted"] += 1
+                # File only in collection (treat as "added" if comparing from project perspective,
+                # or "deleted" if project artifact doesn't exist at all)
+                # For collection-vs-project diff: files in collection but not project are "added"
+                # (because deploying from collection would add them to project)
+                file_status = "added"
+                summary["added"] += 1
 
-                if collection_artifact_path.is_dir():
-                    coll_file_path = collection_artifact_path / file_rel_path
+                if collection_exists:
+                    if collection_artifact_path.is_dir():
+                        coll_file_path = collection_artifact_path / file_rel_path
+                    else:
+                        coll_file_path = collection_artifact_path
+                    coll_hash = compute_file_hash(coll_file_path)
                 else:
-                    coll_file_path = collection_artifact_path
-
-                coll_hash = compute_file_hash(coll_file_path)
+                    coll_hash = None
 
                 file_diffs.append(
                     FileDiff(
@@ -4165,16 +4511,18 @@ async def get_artifact_diff(
                 )
 
             elif not in_collection and in_project:
-                # File added in project (only in project)
-                file_status = "added"
-                summary["added"] += 1
+                # File only in project (treat as "deleted" if comparing from collection perspective)
+                file_status = "deleted"
+                summary["deleted"] += 1
 
-                if project_artifact_path.is_dir():
-                    proj_file_path = project_artifact_path / file_rel_path
+                if project_exists:
+                    if project_artifact_path.is_dir():
+                        proj_file_path = project_artifact_path / file_rel_path
+                    else:
+                        proj_file_path = project_artifact_path
+                    proj_hash = compute_file_hash(proj_file_path)
                 else:
-                    proj_file_path = project_artifact_path
-
-                proj_hash = compute_file_hash(proj_file_path)
+                    proj_hash = None
 
                 file_diffs.append(
                     FileDiff(
@@ -4237,6 +4585,7 @@ async def get_artifact_upstream_diff(
     artifact_id: str,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    settings: SettingsDep,
     _token: TokenDep,
     collection: Optional[str] = Query(
         default=None,
@@ -4307,7 +4656,7 @@ async def get_artifact_upstream_diff(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -4315,38 +4664,16 @@ async def get_artifact_upstream_diff(
                 detail="Invalid artifact ID format. Expected 'type:name'",
             )
 
-        # Find artifact in collection
-        artifact = None
-        collection_name = collection
-        if collection:
-            if collection not in collection_mgr.list_collections():
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Collection '{collection}' not found",
-                )
-            try:
-                coll = collection_mgr.load_collection(collection)
-                artifact = coll.find_artifact(artifact_name, artifact_type)
-                if artifact:
-                    collection_name = collection
-            except ValueError:
-                pass
-        else:
-            # Search across all collections
-            for coll_name in collection_mgr.list_collections():
-                try:
-                    coll = collection_mgr.load_collection(coll_name)
-                    artifact = coll.find_artifact(artifact_name, artifact_type)
-                    if artifact:  # Only break when actually found
-                        collection_name = coll_name
-                        break
-                except ValueError:
-                    continue
+        # Find artifact (with fallback across collections)
+        artifact, collection_name = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection,
+        )
 
         if not artifact:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifact '{artifact_id}' not found in collection",
+                detail=f"Artifact '{artifact_id}' not found in any collection",
             )
 
         # Check if artifact has upstream tracking
@@ -4397,44 +4724,60 @@ async def get_artifact_upstream_diff(
                 detail="Failed to fetch upstream artifact",
             )
 
+        # Normalize artifact path to handle duplicate extensions
+        normalized_artifact_path = _normalize_artifact_path(artifact.path)
+
         # Get paths
         collection_path = collection_mgr.config.get_collection_path(collection_name)
-        collection_artifact_path = collection_path / artifact.path
+        collection_artifact_path = collection_path / normalized_artifact_path
         upstream_artifact_path = fetch_result.fetch_result.artifact_path
 
-        if not collection_artifact_path.exists():
+        # Handle missing artifacts gracefully
+        collection_exists = collection_artifact_path.exists()
+        upstream_exists = upstream_artifact_path.exists()
+
+        if not collection_exists and not upstream_exists:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Collection artifact path does not exist: {collection_artifact_path}",
+                detail=f"Neither collection nor upstream artifact exists for {artifact_id}",
             )
 
-        if not upstream_artifact_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Upstream artifact path does not exist: {upstream_artifact_path}",
+        # Log resilience cases
+        if not collection_exists:
+            logger.warning(
+                f"Collection artifact missing but upstream exists: {artifact_id} "
+                f"(collection_path={collection_artifact_path}). "
+                "Returning diff with all upstream files marked as 'added'."
+            )
+        elif not upstream_exists:
+            logger.warning(
+                f"Upstream artifact missing but collection exists: {artifact_id} "
+                f"(upstream_path={upstream_artifact_path}). "
+                "Returning diff with all collection files marked as 'deleted'."
             )
 
         # Collect all files from both locations
         collection_files = set()
         upstream_files = set()
+        exclude_dirs = set(settings.diff_exclude_dirs)
 
-        if collection_artifact_path.is_dir():
-            collection_files = {
-                str(f.relative_to(collection_artifact_path))
-                for f in collection_artifact_path.rglob("*")
-                if f.is_file()
-            }
-        else:
-            collection_files = {collection_artifact_path.name}
+        if collection_exists:
+            if collection_artifact_path.is_dir():
+                collection_files = {
+                    str(f.relative_to(collection_artifact_path))
+                    for f in iter_artifact_files(collection_artifact_path, exclude_dirs)
+                }
+            else:
+                collection_files = {collection_artifact_path.name}
 
-        if upstream_artifact_path.is_dir():
-            upstream_files = {
-                str(f.relative_to(upstream_artifact_path))
-                for f in upstream_artifact_path.rglob("*")
-                if f.is_file()
-            }
-        else:
-            upstream_files = {upstream_artifact_path.name}
+        if upstream_exists:
+            if upstream_artifact_path.is_dir():
+                upstream_files = {
+                    str(f.relative_to(upstream_artifact_path))
+                    for f in iter_artifact_files(upstream_artifact_path, exclude_dirs)
+                }
+            else:
+                upstream_files = {upstream_artifact_path.name}
 
         # Get all unique files
         all_files = sorted(collection_files | upstream_files)
@@ -4536,12 +4879,14 @@ async def get_artifact_upstream_diff(
                 file_status = "deleted"
                 summary["deleted"] += 1
 
-                if collection_artifact_path.is_dir():
-                    coll_file_path = collection_artifact_path / file_rel_path
+                if collection_exists:
+                    if collection_artifact_path.is_dir():
+                        coll_file_path = collection_artifact_path / file_rel_path
+                    else:
+                        coll_file_path = collection_artifact_path
+                    coll_hash = compute_file_hash(coll_file_path)
                 else:
-                    coll_file_path = collection_artifact_path
-
-                coll_hash = compute_file_hash(coll_file_path)
+                    coll_hash = None
 
                 file_diffs.append(
                     FileDiff(
@@ -4558,12 +4903,14 @@ async def get_artifact_upstream_diff(
                 file_status = "added"
                 summary["added"] += 1
 
-                if upstream_artifact_path.is_dir():
-                    upstream_file_path = upstream_artifact_path / file_rel_path
+                if upstream_exists:
+                    if upstream_artifact_path.is_dir():
+                        upstream_file_path = upstream_artifact_path / file_rel_path
+                    else:
+                        upstream_file_path = upstream_artifact_path
+                    upstream_hash = compute_file_hash(upstream_file_path)
                 else:
-                    upstream_file_path = upstream_artifact_path
-
-                upstream_hash = compute_file_hash(upstream_file_path)
+                    upstream_hash = None
 
                 file_diffs.append(
                     FileDiff(
@@ -4646,6 +4993,7 @@ async def get_artifact_source_project_diff(
     artifact_id: str,
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    settings: SettingsDep,
     _token: TokenDep,
     project_path: str = Query(
         ...,
@@ -4683,7 +5031,7 @@ async def get_artifact_source_project_diff(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -4727,32 +5075,18 @@ async def get_artifact_source_project_diff(
                     detail=f"Artifact '{artifact_id}' not found in project {project_path}",
                 )
 
-        # Find artifact in collection (needed for upstream info)
-        artifact = None
-        if collection_name and collection_name in collection_mgr.list_collections():
-            try:
-                coll = collection_mgr.load_collection(collection_name)
-                artifact = coll.find_artifact(artifact_name, artifact_type)
-            except ValueError:
-                pass
-
-        if not artifact:
-            # Search across all collections
-            for coll_name in collection_mgr.list_collections():
-                try:
-                    coll = collection_mgr.load_collection(coll_name)
-                    artifact = coll.find_artifact(artifact_name, artifact_type)
-                    if artifact:
-                        collection_name = coll_name
-                        break
-                except ValueError:
-                    continue
+        # Find artifact in collection (with fallback across all collections)
+        artifact, resolved_collection = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection_name,
+        )
 
         if not artifact:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Artifact '{artifact_id}' not found in any collection",
             )
+        collection_name = resolved_collection
 
         # Check upstream support
         if artifact.origin != "github":
@@ -4782,13 +5116,18 @@ async def get_artifact_source_project_diff(
                     detail=f"Failed to fetch upstream: {fetch_result.error}",
                 )
 
+            # Normalize artifact path to handle duplicate extensions
+            normalized_artifact_path = _normalize_artifact_path(artifact.path)
+
             # Determine upstream artifact path
             if fetch_result.has_update and fetch_result.fetch_result:
                 upstream_artifact_path = fetch_result.fetch_result.artifact_path
             elif not fetch_result.has_update:
                 # No upstream update means collection matches upstream; use collection copy
-                collection_path = collection_mgr.config.get_collection_path(collection_name)
-                upstream_artifact_path = collection_path / artifact.path
+                collection_path = collection_mgr.config.get_collection_path(
+                    collection_name
+                )
+                upstream_artifact_path = collection_path / normalized_artifact_path
             else:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -4797,39 +5136,52 @@ async def get_artifact_source_project_diff(
 
             project_artifact_path = proj_path / ".claude" / inferred_artifact_path
 
-            if not upstream_artifact_path.exists():
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Upstream artifact path does not exist: {upstream_artifact_path}",
-                )
+            # Handle missing artifacts gracefully
+            upstream_exists = upstream_artifact_path.exists()
+            project_exists = project_artifact_path.exists()
 
-            if not project_artifact_path.exists():
+            if not upstream_exists and not project_exists:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Project artifact path does not exist: {project_artifact_path}",
+                    detail=f"Neither upstream nor project artifact exists for {artifact_id}",
+                )
+
+            # Log resilience cases
+            if not upstream_exists:
+                logger.warning(
+                    f"Upstream artifact missing but project exists: {artifact_id} "
+                    f"(upstream_path={upstream_artifact_path}, project_path={project_artifact_path}). "
+                    "Returning diff with all project files marked as 'deleted'."
+                )
+            elif not project_exists:
+                logger.warning(
+                    f"Project artifact missing but upstream exists: {artifact_id} "
+                    f"(upstream_path={upstream_artifact_path}, project_path={project_artifact_path}). "
+                    "Returning diff with all upstream files marked as 'added'."
                 )
 
             # Collect files from both locations
             source_files = set()
             project_files = set()
+            exclude_dirs = set(settings.diff_exclude_dirs)
 
-            if upstream_artifact_path.is_dir():
-                source_files = {
-                    str(f.relative_to(upstream_artifact_path))
-                    for f in upstream_artifact_path.rglob("*")
-                    if f.is_file()
-                }
-            else:
-                source_files = {upstream_artifact_path.name}
+            if upstream_exists:
+                if upstream_artifact_path.is_dir():
+                    source_files = {
+                        str(f.relative_to(upstream_artifact_path))
+                        for f in iter_artifact_files(upstream_artifact_path, exclude_dirs)
+                    }
+                else:
+                    source_files = {upstream_artifact_path.name}
 
-            if project_artifact_path.is_dir():
-                project_files = {
-                    str(f.relative_to(project_artifact_path))
-                    for f in project_artifact_path.rglob("*")
-                    if f.is_file()
-                }
-            else:
-                project_files = {project_artifact_path.name}
+            if project_exists:
+                if project_artifact_path.is_dir():
+                    project_files = {
+                        str(f.relative_to(project_artifact_path))
+                        for f in iter_artifact_files(project_artifact_path, exclude_dirs)
+                    }
+                else:
+                    project_files = {project_artifact_path.name}
 
             all_files = sorted(source_files | project_files)
 
@@ -4881,7 +5233,9 @@ async def get_artifact_source_project_diff(
                         file_status = "modified"
                         summary["modified"] += 1
                         unified_diff = None
-                        if not is_binary_file(src_file) and not is_binary_file(proj_file):
+                        if not is_binary_file(src_file) and not is_binary_file(
+                            proj_file
+                        ):
                             try:
                                 with open(src_file, "r", encoding="utf-8") as f:
                                     src_lines = f.readlines()
@@ -4912,14 +5266,18 @@ async def get_artifact_source_project_diff(
                     )
 
                 elif in_source and not in_project:
-                    file_status = "deleted"
-                    summary["deleted"] += 1
-                    src_file = (
-                        upstream_artifact_path / file_rel_path
-                        if upstream_artifact_path.is_dir()
-                        else upstream_artifact_path
-                    )
-                    src_hash = compute_file_hash(src_file)
+                    # File only in source (would be added when deploying)
+                    file_status = "added"
+                    summary["added"] += 1
+                    if upstream_exists:
+                        src_file = (
+                            upstream_artifact_path / file_rel_path
+                            if upstream_artifact_path.is_dir()
+                            else upstream_artifact_path
+                        )
+                        src_hash = compute_file_hash(src_file)
+                    else:
+                        src_hash = None
                     file_diffs.append(
                         FileDiff(
                             file_path=file_rel_path,
@@ -4931,14 +5289,18 @@ async def get_artifact_source_project_diff(
                     )
 
                 elif not in_source and in_project:
-                    file_status = "added"
-                    summary["added"] += 1
-                    proj_file = (
-                        project_artifact_path / file_rel_path
-                        if project_artifact_path.is_dir()
-                        else project_artifact_path
-                    )
-                    proj_hash = compute_file_hash(proj_file)
+                    # File only in project (would be deleted when syncing from source)
+                    file_status = "deleted"
+                    summary["deleted"] += 1
+                    if project_exists:
+                        proj_file = (
+                            project_artifact_path / file_rel_path
+                            if project_artifact_path.is_dir()
+                            else project_artifact_path
+                        )
+                        proj_hash = compute_file_hash(proj_file)
+                    else:
+                        proj_hash = None
                     file_diffs.append(
                         FileDiff(
                             file_path=file_rel_path,
@@ -4950,7 +5312,9 @@ async def get_artifact_source_project_diff(
                     )
 
             has_changes = (
-                summary["added"] > 0 or summary["modified"] > 0 or summary["deleted"] > 0
+                summary["added"] > 0
+                or summary["modified"] > 0
+                or summary["deleted"] > 0
             )
 
             logger.info(
@@ -4971,10 +5335,7 @@ async def get_artifact_source_project_diff(
         finally:
             # Clean up temp workspace if one was created
             try:
-                if (
-                    fetch_result.temp_workspace
-                    and fetch_result.temp_workspace.exists()
-                ):
+                if fetch_result.temp_workspace and fetch_result.temp_workspace.exists():
                     shutil.rmtree(fetch_result.temp_workspace, ignore_errors=True)
             except Exception as e:
                 logger.warning(f"Failed to clean up temp workspace: {e}")
@@ -5068,7 +5429,7 @@ async def list_artifact_files(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -5076,32 +5437,11 @@ async def list_artifact_files(
                 detail="Invalid artifact ID format. Expected 'type:name'",
             )
 
-        # Find artifact
-        artifact = None
-        collection_name = collection
-        if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Collection '{collection}' not found",
-                )
-            try:
-                coll = collection_mgr.load_collection(collection)
-                artifact = coll.find_artifact(artifact_name, artifact_type)
-            except ValueError:
-                pass  # Not found in this collection
-        else:
-            # Search across all collections
-            for coll_name in collection_mgr.list_collections():
-                try:
-                    coll = collection_mgr.load_collection(coll_name)
-                    artifact = coll.find_artifact(artifact_name, artifact_type)
-                    if artifact:  # Only break when actually found
-                        collection_name = coll_name
-                        break
-                except ValueError:
-                    continue
+        # Find artifact (with fallback across collections)
+        artifact, collection_name = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection,
+        )
 
         if not artifact:
             raise HTTPException(
@@ -5303,7 +5643,7 @@ async def get_artifact_file_content(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -5311,32 +5651,11 @@ async def get_artifact_file_content(
                 detail="Invalid artifact ID format. Expected 'type:name'",
             )
 
-        # Find artifact
-        artifact = None
-        collection_name = collection
-        if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Collection '{collection}' not found",
-                )
-            try:
-                coll = collection_mgr.load_collection(collection)
-                artifact = coll.find_artifact(artifact_name, artifact_type)
-            except ValueError:
-                pass  # Not found in this collection
-        else:
-            # Search across all collections
-            for coll_name in collection_mgr.list_collections():
-                try:
-                    coll = collection_mgr.load_collection(coll_name)
-                    artifact = coll.find_artifact(artifact_name, artifact_type)
-                    if artifact:  # Only break when actually found
-                        collection_name = coll_name
-                        break
-                except ValueError:
-                    continue
+        # Find artifact (with fallback across collections)
+        artifact, collection_name = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection,
+        )
 
         if not artifact:
             raise HTTPException(
@@ -5576,7 +5895,7 @@ async def update_artifact_file_content(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -5584,32 +5903,11 @@ async def update_artifact_file_content(
                 detail="Invalid artifact ID format. Expected 'type:name'",
             )
 
-        # Find artifact
-        artifact = None
-        collection_name = collection
-        if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Collection '{collection}' not found",
-                )
-            try:
-                coll = collection_mgr.load_collection(collection)
-                artifact = coll.find_artifact(artifact_name, artifact_type)
-            except ValueError:
-                pass  # Not found in this collection
-        else:
-            # Search across all collections
-            for coll_name in collection_mgr.list_collections():
-                try:
-                    coll = collection_mgr.load_collection(coll_name)
-                    artifact = coll.find_artifact(artifact_name, artifact_type)
-                    if artifact:  # Only break when actually found
-                        collection_name = coll_name
-                        break
-                except ValueError:
-                    continue
+        # Find artifact (with fallback across collections)
+        artifact, collection_name = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection,
+        )
 
         if not artifact:
             raise HTTPException(
@@ -5868,7 +6166,7 @@ async def create_artifact_file(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -5876,32 +6174,11 @@ async def create_artifact_file(
                 detail="Invalid artifact ID format. Expected 'type:name'",
             )
 
-        # Find artifact
-        artifact = None
-        collection_name = collection
-        if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Collection '{collection}' not found",
-                )
-            try:
-                coll = collection_mgr.load_collection(collection)
-                artifact = coll.find_artifact(artifact_name, artifact_type)
-            except ValueError:
-                pass  # Not found in this collection
-        else:
-            # Search across all collections
-            for coll_name in collection_mgr.list_collections():
-                try:
-                    coll = collection_mgr.load_collection(coll_name)
-                    artifact = coll.find_artifact(artifact_name, artifact_type)
-                    if artifact:  # Only break when actually found
-                        collection_name = coll_name
-                        break
-                except ValueError:
-                    continue
+        # Find artifact (with fallback across collections)
+        artifact, collection_name = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection,
+        )
 
         if not artifact:
             raise HTTPException(
@@ -6152,7 +6429,7 @@ async def delete_artifact_file(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -6160,32 +6437,11 @@ async def delete_artifact_file(
                 detail="Invalid artifact ID format. Expected 'type:name'",
             )
 
-        # Find artifact
-        artifact = None
-        collection_name = collection
-        if collection:
-            # Search in specified collection
-            if collection not in collection_mgr.list_collections():
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Collection '{collection}' not found",
-                )
-            try:
-                coll = collection_mgr.load_collection(collection)
-                artifact = coll.find_artifact(artifact_name, artifact_type)
-            except ValueError:
-                pass  # Not found in this collection
-        else:
-            # Search across all collections
-            for coll_name in collection_mgr.list_collections():
-                try:
-                    coll = collection_mgr.load_collection(coll_name)
-                    artifact = coll.find_artifact(artifact_name, artifact_type)
-                    if artifact:  # Only break when actually found
-                        collection_name = coll_name
-                        break
-                except ValueError:
-                    continue
+        # Find artifact (with fallback across collections)
+        artifact, collection_name = _find_artifact_in_collections(
+            artifact_name, artifact_type, collection_mgr,
+            preferred_collection=collection,
+        )
 
         if not artifact:
             raise HTTPException(
@@ -6985,7 +7241,7 @@ async def update_artifact_tags(
 
         # Parse artifact ID (format: type:name)
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -7188,7 +7444,7 @@ async def create_linked_artifact(
 
         # Parse source artifact ID
         try:
-            source_type_str, source_name = artifact_id.split(":", 1)
+            source_type_str, source_name = parse_artifact_id(artifact_id)
             source_type = ArtifactType(source_type_str)
         except ValueError:
             raise HTTPException(
@@ -7198,7 +7454,7 @@ async def create_linked_artifact(
 
         # Parse target artifact ID
         try:
-            target_type_str, target_name = request.target_artifact_id.split(":", 1)
+            target_type_str, target_name = parse_artifact_id(request.target_artifact_id)
             target_type = ArtifactType(target_type_str)
         except ValueError:
             raise HTTPException(
@@ -7375,7 +7631,7 @@ async def delete_linked_artifact(
 
         # Parse source artifact ID
         try:
-            source_type_str, source_name = artifact_id.split(":", 1)
+            source_type_str, source_name = parse_artifact_id(artifact_id)
             source_type = ArtifactType(source_type_str)
         except ValueError:
             raise HTTPException(
@@ -7507,7 +7763,7 @@ async def list_linked_artifacts(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(
@@ -7642,7 +7898,7 @@ async def get_unlinked_references(
 
         # Parse artifact ID
         try:
-            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
             artifact_type = ArtifactType(artifact_type_str)
         except ValueError:
             raise HTTPException(

@@ -370,6 +370,40 @@ class TestMemoryItemList:
         assert len(result.items) == 1
         assert result.items[0].content == "match"
 
+    def test_list_filter_by_promoted_provenance_fields(self, memory_repo, project_id):
+        """Promoted provenance columns should be filterable with AND semantics."""
+        memory_repo.create(
+            _make_memory_data(
+                project_id,
+                content="match",
+                git_branch="feat/anchors",
+                agent_type="backend-typescript-architect",
+                model="claude-opus-4-6",
+                source_type="extraction",
+            )
+        )
+        memory_repo.create(
+            _make_memory_data(
+                project_id,
+                content="wrong-branch",
+                git_branch="main",
+                agent_type="backend-typescript-architect",
+                model="claude-opus-4-6",
+                source_type="extraction",
+            )
+        )
+
+        result = memory_repo.list_items(
+            project_id,
+            git_branch="feat/anchors",
+            agent_type="backend-typescript-architect",
+            model="claude-opus-4-6",
+            source_type="extraction",
+        )
+
+        assert len(result.items) == 1
+        assert result.items[0].content == "match"
+
     def test_pagination_first_page(self, memory_repo, project_id):
         """First page with limit returns correct item count and has_more flag."""
         for i in range(5):

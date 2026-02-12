@@ -182,6 +182,16 @@ Subagents can run in the background, allowing parallel work:
 - When results are immediately needed
 - When tasks have dependencies requiring sequential execution
 
+### Context Budget Discipline
+
+**Invariants**: `.claude/rules/context-budget.md` (auto-loaded every session)
+
+**Budget**: ~52K baseline leaves ~148K for work. Budget ~25-30K per phase.
+
+**Key rules**: No `TaskOutput()` for file-writing agents (verify on disk instead). Task prompts < 500 words (paths, not contents). Don't explore for work you'll delegate. Always scope Glob with `path`.
+
+**Verification pattern for background agents**: See `dev-execution/orchestration/batch-delegation.md`.
+
 ### Example Delegation
 
 ```text
@@ -293,13 +303,17 @@ SkillMeat's memory system stores project-level development knowledge (patterns, 
 
 | Operation | Command |
 |-----------|---------|
-| Quick capture | `skillmeat memory item create --project <id> --type <type> --content "..." --confidence 0.85 --status candidate` |
+| Quick capture (CLI) | `skillmeat memory item create --project <id> --type <type> --content "..." --confidence 0.85 --status candidate --anchor "skillmeat/core/services/foo.py:code:42-58" --provenance-branch "<branch>" --provenance-commit "<sha>" --provenance-agent-type "<agent>" --provenance-model "<model>"` |
+| Quick capture (API) | `curl -s "http://localhost:8080/api/v1/memory-items?project_id=<BASE64_ID>" -X POST -H "Content-Type: application/json" -d '{"type":"<type>","content":"...","confidence":0.85,"status":"candidate","anchors":["path:type"]}'` |
 | Search memories | `skillmeat memory search "<query>" --project <id>` |
 | Preview context pack | `skillmeat memory pack preview --project <id> --budget 4000` |
 | Extract from logs | `skillmeat memory extract preview --project <id> --run-log <path>` |
 | Triage candidates | `skillmeat memory item list --project <id> --status candidate` |
 
+**Valid memory types**: `decision`, `constraint`, `gotcha`, `style_rule`, `learning`
 **Capture triggers**: Root cause discoveries, API gotchas, decision rationale, pattern findings.
+**Anchor format**: `path:type` or `path:type:start-end` where `type` is one of `code|test|doc|config|plan`.
+**API note**: CLI `memory item create` may return 422 — use API fallback with base64 project ID. See `.claude/rules/memory.md`.
 **Full guidance**: Use `skillmeat-cli` skill (route 6: Memory capture/consumption flows).
 **Safety**: All memories start as `candidate` — never auto-promote.
 
@@ -565,6 +579,7 @@ Never use PyGithub directly; always go through the wrapper.
 - `.claude/context/key-context/deprecation-and-sunset-registry.md` - Active deprecations + sunset dates
 - `.claude/context/key-context/layered-context-governance.md` - Layer policy and token budgets
 - `.claude/context/key-context/data-flow-patterns.md` - Stale times, cache invalidation graph, write-through patterns
+- `.claude/context/key-context/marketplace-import-flows.md` - Import endpoints, source display, DB sync invariants
 - `.claude/context/key-context/debugging-patterns.md` - Bug categories, delegation patterns
 - `.claude/context/key-context/router-patterns.md` - Full FastAPI examples
 - `.claude/context/key-context/component-patterns.md` - React/shadcn patterns

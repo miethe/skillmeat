@@ -9,6 +9,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Platform Defaults Auto-Population (2026-02-09)
+
+**Profile Form Auto-Population**
+- Selecting a platform (Claude Code, Codex, Gemini, Cursor) in the deployment profile form now auto-populates all fields (root dir, artifact path map, config filenames, supported artifact types, context prefixes) with platform-specific defaults
+- Touched-field tracking preserves user-edited fields when switching platforms instead of overwriting them
+- Create form starts with Claude Code defaults populated by default
+
+**Platform Change Dialog**
+- 3-option confirmation dialog (Keep Changes / Overwrite / Append) when changing platform on existing deployment profiles
+- Keep Changes option preserves existing values and only updates the platform field
+- Overwrite option replaces all fields with new platform defaults
+- Append option merges new defaults into existing values, deduplicating lists and deep-merging JSON objects
+
+**Settings Page Customization**
+- New settings page section to customize per-platform default values for all 5 platforms
+- Edit any platform's root directory, artifact path mappings, configuration filenames, supported artifact types, and context prefixes
+- Save button persists changes to TOML config file
+- Reset to Defaults button reverts to built-in defaults for individual platforms
+- Toast feedback on save and reset actions
+
+**Custom Context Prefixes**
+- Configurable custom context directory prefixes with override/addendum modes and per-platform targeting
+- Settings page editor allows enabling/disabling custom context globally
+- Textarea input for custom prefixes (newline-separated format)
+- Mode selection: Override (replace platform prefixes) or Addendum (append after platform defaults)
+- Platform checkboxes with Select All option to specify which platforms use custom prefixes
+- Deploy profile form shows Use custom prefixes toggle when feature is enabled for the current platform
+
+**API Endpoints**
+- `GET /api/v1/settings/platform-defaults` — Get all platform defaults
+- `GET /api/v1/settings/platform-defaults/{platform}` — Get single platform defaults
+- `PUT /api/v1/settings/platform-defaults/{platform}` — Update platform defaults
+- `DELETE /api/v1/settings/platform-defaults/{platform}` — Reset to built-in defaults
+- `GET /api/v1/settings/custom-context` — Get custom context configuration
+- `PUT /api/v1/settings/custom-context` — Update custom context configuration
+
+**Configuration Support**
+- TOML config support via `~/.skillmeat/config.toml` under `[platform.defaults.*]` and `[platform.custom_context]` sections
+- Environment variable override via `SKILLMEAT_PLATFORM_DEFAULTS_JSON` for temporary or CI-based customization
+- Configuration resolution order: hardcoded defaults → TOML overrides → environment variable overrides
+
+**Platform-Specific Defaults**
+- Claude Code: `.claude` root with 5 artifact types (skills, commands, agents, hooks, MCP), supports `.claude/context/` and `.claude/` prefixes
+- Codex: `.codex` root with 3 artifact types (skills, commands, agents), supports `.codex/context/` and `.codex/` prefixes
+- Gemini: `.gemini` root with 2 artifact types (skills, commands), supports `.gemini/context/` and `.gemini/` prefixes
+- Cursor: `.cursor` root with 3 artifact types (skills, commands, agents), supports `.cursor/context/` and `.cursor/` prefixes
+- Other: `.custom` root with single skill support, no preset prefixes
+
+#### Multi-Platform Project Deployments Phase 5 (2026-02-09)
+
+**Migration & Backward Compatibility**
+- Added `scripts/migrate_to_deployment_profiles.py` to infer default `claude_code` profiles for legacy projects and backfill deployment record metadata (`deployment_profile_id`, `platform`, `profile_root_dir`)
+- Added migration dry-run reference docs: `scripts/migrate_to_deployment_profiles_dryrun.md`
+- Added user migration guide: `docs/migration/multi-platform-deployment-upgrade.md`
+
+**Regression & Verification Tests**
+- Added `tests/test_migration_script.py` for migration/backfill coverage
+- Added `tests/test_claude_only_regression.py` to validate Claude-only backward compatibility behavior
+- Added `tests/test_multi_platform_fresh_projects.py` to verify profile-aware behavior on fresh projects
+
+**Documentation**
+- Updated README and user docs with profile-aware deploy/init/status/context workflows
+- Added upgrade path documentation for teams adopting Codex/Gemini/Cursor profiles while preserving Claude-only defaults
+
 #### Memory Extraction Pipeline v2 (2026-02-08)
 
 **JSONL Session Transcript Support**

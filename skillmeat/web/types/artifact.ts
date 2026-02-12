@@ -84,6 +84,14 @@ export interface DeploymentSummary {
   project_name: string;
   /** ISO 8601 timestamp when artifact was deployed to this project */
   deployed_at: string;
+  /** Whether local modifications have been detected in this deployment */
+  local_modifications?: boolean;
+  /** SHA-256 content hash at deployment time */
+  content_hash?: string;
+  /** Deployment profile ID (e.g., "claude_code", "codex") */
+  deployment_profile_id?: string;
+  /** Target platform for this deployment */
+  platform?: string;
 }
 
 /**

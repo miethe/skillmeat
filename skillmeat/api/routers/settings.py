@@ -11,6 +11,13 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, status
 
 from skillmeat.api.dependencies import ConfigManagerDep
+from skillmeat.api.schemas.platform_defaults import (
+    AllPlatformDefaultsResponse,
+    CustomContextConfigResponse,
+    CustomContextConfigUpdateRequest,
+    PlatformDefaultsResponse,
+    PlatformDefaultsUpdateRequest,
+)
 from skillmeat.api.schemas.settings import (
     GitHubTokenRequest,
     GitHubTokenStatusResponse,
@@ -22,6 +29,11 @@ from skillmeat.core.github_client import (
     GitHubAuthError,
     GitHubClientWrapper,
     GitHubRateLimitError,
+)
+from skillmeat.core.platform_defaults import (
+    PLATFORM_DEFAULTS,
+    resolve_all_platform_defaults,
+    resolve_platform_defaults,
 )
 
 logger = logging.getLogger(__name__)
@@ -382,3 +394,239 @@ async def get_indexing_mode(
     indexing_mode = config.get_indexing_mode()
     logger.debug(f"Retrieved indexing mode: {indexing_mode}")
     return IndexingModeResponse(indexing_mode=indexing_mode)
+
+
+@router.get(
+    "/platform-defaults",
+    response_model=AllPlatformDefaultsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get all platform defaults",
+    description="""
+    Returns resolved default configurations for all supported platforms.
+
+    Each platform's defaults include:
+    - root_dir: Platform root directory
+    - artifact_path_map: Artifact type to path mappings
+    - config_filenames: Recognized configuration files
+    - supported_artifact_types: Supported artifact types
+    - context_prefixes: Context directory prefixes
+    """,
+)
+async def get_all_platform_defaults(
+    config: ConfigManagerDep,
+) -> AllPlatformDefaultsResponse:
+    """Get all platform defaults.
+
+    Args:
+        config: Configuration manager dependency
+
+    Returns:
+        All platform defaults with resolved overrides
+    """
+    defaults = resolve_all_platform_defaults()
+    logger.debug(f"Retrieved defaults for {len(defaults)} platforms")
+    return AllPlatformDefaultsResponse(defaults=defaults)
+
+
+@router.get(
+    "/platform-defaults/{platform}",
+    response_model=PlatformDefaultsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get platform defaults",
+    description="""
+    Returns resolved default configuration for a specific platform.
+
+    The returned configuration includes any TOML overrides merged with
+    hardcoded defaults.
+    """,
+)
+async def get_platform_defaults(
+    platform: str,
+    config: ConfigManagerDep,
+) -> PlatformDefaultsResponse:
+    """Get platform-specific defaults.
+
+    Args:
+        platform: Platform identifier
+        config: Configuration manager dependency
+
+    Returns:
+        Platform defaults with resolved overrides
+
+    Raises:
+        HTTPException 400: If platform is not recognized
+    """
+    if platform not in PLATFORM_DEFAULTS:
+        logger.warning(f"Invalid platform requested: {platform}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Platform '{platform}' is not recognized. Valid platforms: {', '.join(PLATFORM_DEFAULTS.keys())}",
+        )
+
+    defaults = resolve_platform_defaults(platform)
+    logger.debug(f"Retrieved defaults for platform: {platform}")
+    return PlatformDefaultsResponse(platform=platform, **defaults)
+
+
+@router.put(
+    "/platform-defaults/{platform}",
+    response_model=PlatformDefaultsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update platform defaults",
+    description="""
+    Update TOML overrides for a platform's default configuration.
+
+    Only provided fields will be updated; others remain unchanged.
+    The updated configuration is persisted to the TOML settings file.
+    """,
+)
+async def update_platform_defaults(
+    platform: str,
+    request: PlatformDefaultsUpdateRequest,
+    config: ConfigManagerDep,
+) -> PlatformDefaultsResponse:
+    """Update platform defaults.
+
+    Args:
+        platform: Platform identifier
+        request: Update request with optional field overrides
+        config: Configuration manager dependency
+
+    Returns:
+        Updated platform defaults
+
+    Raises:
+        HTTPException 400: If platform is not recognized
+    """
+    if platform not in PLATFORM_DEFAULTS:
+        logger.warning(f"Invalid platform for update: {platform}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Platform '{platform}' is not recognized. Valid platforms: {', '.join(PLATFORM_DEFAULTS.keys())}",
+        )
+
+    # Get current overrides from ConfigManager
+    current = config.get_platform_defaults(platform)
+
+    # Merge non-None fields from request
+    updates = request.model_dump(exclude_none=True)
+    current.update(updates)
+
+    # Save merged overrides
+    config.set_platform_defaults(platform, current)
+    logger.info(f"Updated platform defaults for {platform}: {updates}")
+
+    # Return resolved defaults
+    defaults = resolve_platform_defaults(platform)
+    return PlatformDefaultsResponse(platform=platform, **defaults)
+
+
+@router.delete(
+    "/platform-defaults/{platform}",
+    response_model=PlatformDefaultsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Reset platform defaults",
+    description="""
+    Reset a platform to its hardcoded defaults by clearing all TOML overrides.
+
+    Returns the platform's hardcoded defaults after reset.
+    """,
+)
+async def reset_platform_defaults(
+    platform: str,
+    config: ConfigManagerDep,
+) -> PlatformDefaultsResponse:
+    """Reset platform to hardcoded defaults.
+
+    Args:
+        platform: Platform identifier
+        config: Configuration manager dependency
+
+    Returns:
+        Platform's hardcoded defaults
+
+    Raises:
+        HTTPException 400: If platform is not recognized
+    """
+    if platform not in PLATFORM_DEFAULTS:
+        logger.warning(f"Invalid platform for reset: {platform}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Platform '{platform}' is not recognized. Valid platforms: {', '.join(PLATFORM_DEFAULTS.keys())}",
+        )
+
+    # Clear TOML overrides
+    config.delete_platform_defaults(platform)
+    logger.info(f"Reset platform defaults for {platform}")
+
+    # Return hardcoded defaults
+    defaults = resolve_platform_defaults(platform)
+    return PlatformDefaultsResponse(platform=platform, **defaults)
+
+
+@router.get(
+    "/custom-context",
+    response_model=CustomContextConfigResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get custom context configuration",
+    description="""
+    Returns the current custom context prefix configuration.
+
+    Custom context configuration allows users to define additional
+    context directory prefixes that supplement or override platform defaults.
+    """,
+)
+async def get_custom_context_config(
+    config: ConfigManagerDep,
+) -> CustomContextConfigResponse:
+    """Get custom context configuration.
+
+    Args:
+        config: Configuration manager dependency
+
+    Returns:
+        Current custom context configuration
+    """
+    context_config = config.get_custom_context_config()
+    logger.debug(f"Retrieved custom context config: {context_config}")
+    return CustomContextConfigResponse(**context_config)
+
+
+@router.put(
+    "/custom-context",
+    response_model=CustomContextConfigResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update custom context configuration",
+    description="""
+    Update custom context prefix configuration.
+
+    Only provided fields will be updated; others remain unchanged.
+    The updated configuration is persisted to the TOML settings file.
+    """,
+)
+async def update_custom_context_config(
+    request: CustomContextConfigUpdateRequest,
+    config: ConfigManagerDep,
+) -> CustomContextConfigResponse:
+    """Update custom context configuration.
+
+    Args:
+        request: Update request with optional field overrides
+        config: Configuration manager dependency
+
+    Returns:
+        Updated custom context configuration
+    """
+    # Get current config
+    current = config.get_custom_context_config()
+
+    # Merge non-None fields from request
+    updates = request.model_dump(exclude_none=True)
+    current.update(updates)
+
+    # Save merged config
+    config.set_custom_context_config(current)
+    logger.info(f"Updated custom context config: {updates}")
+
+    # Return updated config
+    return CustomContextConfigResponse(**current)

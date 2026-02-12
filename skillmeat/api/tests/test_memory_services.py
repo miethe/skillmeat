@@ -55,6 +55,12 @@ def _make_mock_memory_item(
     provenance_json: Optional[str] = None,
     anchors_json: Optional[str] = None,
     ttl_policy_json: Optional[str] = None,
+    git_branch: Optional[str] = None,
+    git_commit: Optional[str] = None,
+    session_id: Optional[str] = None,
+    agent_type: Optional[str] = None,
+    model: Optional[str] = None,
+    source_type: Optional[str] = None,
 ) -> MagicMock:
     """Create a mock MemoryItem ORM instance."""
     item = MagicMock()
@@ -73,6 +79,12 @@ def _make_mock_memory_item(
     item.provenance_json = provenance_json
     item.anchors_json = anchors_json
     item.ttl_policy_json = ttl_policy_json
+    item.git_branch = git_branch
+    item.git_commit = git_commit
+    item.session_id = session_id
+    item.agent_type = agent_type
+    item.model = model
+    item.source_type = source_type
     # Property-like accessors used by _item_to_dict
     item.provenance = json.loads(provenance_json) if provenance_json else None
     item.anchors = json.loads(anchors_json) if anchors_json else None
@@ -183,9 +195,44 @@ class TestMemoryServiceCreate:
 
         # Verify JSON serialization happened in the call
         call_data = memory_service.repo.create.call_args[0][0]
-        assert call_data["provenance_json"] == '{"source": "test"}'
-        assert call_data["anchors_json"] == '["file.py"]'
+        assert json.loads(call_data["provenance_json"]) == {
+            "source": "test",
+            "source_type": "manual",
+        }
+        assert json.loads(call_data["anchors_json"]) == [
+            {"path": "file.py", "type": "code"}
+        ]
         assert call_data["ttl_policy_json"] == '{"max_age_days": 30}'
+
+    def test_create_promoted_provenance_fields_write_through(self, memory_service):
+        """Promoted provenance fields should populate both columns and provenance_json."""
+        mock_item = _make_mock_memory_item()
+        memory_service.repo.create.return_value = mock_item
+
+        memory_service.create(
+            project_id="proj-1",
+            type="decision",
+            content="Keep promoted provenance columns in sync with JSON",
+            provenance={
+                "git_branch": "feat/new-memory",
+                "git_commit": "abc1234",
+                "session_id": "session-1",
+                "agent_type": "backend-typescript-architect",
+                "model": "claude-opus-4-6",
+                "source_type": "extraction",
+            },
+        )
+
+        call_data = memory_service.repo.create.call_args[0][0]
+        assert call_data["git_branch"] == "feat/new-memory"
+        assert call_data["git_commit"] == "abc1234"
+        assert call_data["session_id"] == "session-1"
+        assert call_data["agent_type"] == "backend-typescript-architect"
+        assert call_data["model"] == "claude-opus-4-6"
+        assert call_data["source_type"] == "extraction"
+        serialized_provenance = json.loads(call_data["provenance_json"])
+        assert serialized_provenance["git_branch"] == "feat/new-memory"
+        assert serialized_provenance["source_type"] == "extraction"
 
     def test_create_duplicate_content_returns_existing(self, memory_service):
         """Duplicate content_hash returns existing item with duplicate flag."""
@@ -436,6 +483,12 @@ class TestMemoryServiceListItems:
             status="active",
             type="decision",
             share_scope=None,
+            git_branch=None,
+            git_commit=None,
+            session_id=None,
+            agent_type=None,
+            model=None,
+            source_type=None,
             search=None,
             min_confidence=0.7,
             limit=10,
@@ -455,6 +508,30 @@ class TestMemoryServiceListItems:
 
         assert result["has_more"] is True
         assert result["next_cursor"] == "cursor123"
+
+    def test_list_items_with_promoted_filters(self, memory_service):
+        """Promoted provenance filters should pass through to repository."""
+        memory_service.repo.list_items.return_value = PaginatedResult(
+            items=[], next_cursor=None, has_more=False
+        )
+
+        memory_service.list_items(
+            "proj-1",
+            git_branch="feat/one",
+            git_commit="abc1234",
+            session_id="session-123",
+            agent_type="backend-typescript-architect",
+            model="claude-opus-4-6",
+            source_type="manual",
+        )
+
+        kwargs = memory_service.repo.list_items.call_args.kwargs
+        assert kwargs["git_branch"] == "feat/one"
+        assert kwargs["git_commit"] == "abc1234"
+        assert kwargs["session_id"] == "session-123"
+        assert kwargs["agent_type"] == "backend-typescript-architect"
+        assert kwargs["model"] == "claude-opus-4-6"
+        assert kwargs["source_type"] == "manual"
 
 
 class TestMemoryServiceUpdate:
@@ -532,10 +609,39 @@ class TestMemoryServiceUpdate:
             "share_scope": "global_candidate",
             "provenance_json": '{"key": "val"}',
             "anchors_json": '["a.py"]',
+            "git_branch": "feat/example",
+            "git_commit": "abc1234",
+            "session_id": "session-123",
+            "agent_type": "backend-typescript-architect",
+            "model": "claude-opus-4-6",
+            "source_type": "manual",
             "ttl_policy_json": '{"max_age_days": 7}',
         }
         memory_service.update("mem-1", **{field: value_map[field]})
         memory_service.repo.update.assert_called_once()
+
+    def test_update_syncs_promoted_provenance(self, memory_service):
+        """Updating promoted fields should also update provenance_json."""
+        existing = _make_mock_memory_item(
+            provenance_json='{"source": "manual", "git_branch": "main"}',
+            source_type="manual",
+        )
+        updated_item = _make_mock_memory_item(
+            git_branch="feat/update",
+            source_type="manual",
+            provenance_json='{"source": "manual", "git_branch": "feat/update"}',
+        )
+        memory_service.repo.get_by_id.return_value = existing
+        memory_service.repo.update.return_value = updated_item
+
+        memory_service.update("mem-1", git_branch="feat/update")
+
+        update_data = memory_service.repo.update.call_args[0][1]
+        assert update_data["git_branch"] == "feat/update"
+        assert update_data["source_type"] == "manual"
+        merged = json.loads(update_data["provenance_json"])
+        assert merged["git_branch"] == "feat/update"
+        assert merged["source_type"] == "manual"
 
 
 class TestMemoryServiceDelete:
@@ -1127,7 +1233,10 @@ class TestMemoryServiceItemToDict:
         result = MemoryService._item_to_dict(item)
 
         assert result["provenance"] == {"source": "code_review"}
-        assert result["anchors"] == ["api/server.py", "core/service.py"]
+        assert result["anchors"] == [
+            {"path": "api/server.py", "type": "code"},
+            {"path": "core/service.py", "type": "code"},
+        ]
         assert result["ttl_policy"] == {"max_age_days": 30, "max_idle_days": 7}
 
     def test_null_json_fields(self):
@@ -1139,6 +1248,22 @@ class TestMemoryServiceItemToDict:
         assert result["provenance"] is None
         assert result["anchors"] is None
         assert result["ttl_policy"] is None
+
+    def test_promoted_columns_override_provenance_json(self):
+        """Promoted columns should take precedence over blob values on read."""
+        item = _make_mock_memory_item(
+            provenance_json='{"git_branch": "old-branch", "source_type": "manual"}',
+            git_branch="feat/new-branch",
+            git_commit="abc1234",
+            source_type="extraction",
+        )
+
+        result = MemoryService._item_to_dict(item)
+
+        assert result["git_branch"] == "feat/new-branch"
+        assert result["source_type"] == "extraction"
+        assert result["provenance"]["git_branch"] == "feat/new-branch"
+        assert result["provenance"]["source_type"] == "extraction"
 
 
 # =============================================================================
@@ -1894,6 +2019,34 @@ class TestContextPackerServiceAdditionalEdgeCases:
 
         # The seeded item has no matching anchors/provenance stage metadata.
         assert len(result) == 0
+
+    def test_apply_module_selectors_with_structured_anchor_paths(self, packer_service):
+        """Structured anchor objects should work with file pattern filters."""
+        packer_service.memory_service.list_items.side_effect = [
+            {
+                "items": [
+                    {
+                        "id": "mem-1",
+                        "type": "decision",
+                        "content": "test",
+                        "confidence": 0.9,
+                        "created_at": "2025-01-15T10:00:00Z",
+                        "anchors": [{"path": "skillmeat/core/services/memory_service.py", "type": "code"}],
+                    }
+                ],
+                "next_cursor": None,
+                "has_more": False,
+                "total": None,
+            },
+            {"items": [], "next_cursor": None, "has_more": False, "total": None},
+        ]
+
+        result = packer_service.apply_module_selectors(
+            "proj-1",
+            {"file_patterns": ["skillmeat/core/services/*.py"]},
+        )
+
+        assert len(result) == 1
 
     def test_estimate_tokens_unicode(self):
         """Token estimation handles unicode text."""

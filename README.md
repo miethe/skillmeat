@@ -1,5 +1,5 @@
 <!-- AUTO-GENERATED: Do not edit directly. See .github/readme/ -->
-<!-- GENERATED: 2026-02-06T17:59:27.995Z -->
+<!-- GENERATED: 2026-02-09T18:48:53.531Z -->
 <!-- VERSION: 0.3.0-beta -->
 
 <!-- BEGIN:hero -->
@@ -27,7 +27,7 @@ Organize, deploy, and sync your Claude Code skills, commands, agents, hooks, and
 As you build more complex agentic workflows with Claude Code, managing your **Skills, Commands, Agents, and MCP Servers** becomes a bottleneck.
 
 * **The Problem:** Artifacts are often trapped within individual projects. If you improve a "Code Review" skill in one repo, your other ten projects are now running an outdated version. Sharing these tools with a team usually involves brittle copy-pasting.
-* **The Solution:** SkillMeat provides a **centralized source of truth**. You manage your artifacts in a global collection and "deploy" them to projects. When you update the global version, SkillMeat handles the sync, drift detection, and versioning across every project on your machine.
+* **The Solution:** SkillMeat provides a **centralized source of truth**. You manage your artifacts in a global collection and "deploy" them to projects and deployment profiles (`claude_code`, `codex`, `gemini`, `cursor`). When you update the global version, SkillMeat handles the sync, drift detection, and versioning across every project on your machine.
 
 ## 🎯 Who is it for?
 
@@ -135,6 +135,19 @@ skillmeat deploy canvas --scope user
 skillmeat list
 ```
 
+### Multi-Platform Deployments
+
+```bash
+# Scaffold all profile roots for a project
+skillmeat init --project-path /path/to/project --all-profiles
+
+# Deploy to one profile
+skillmeat deploy canvas --project /path/to/project --profile codex
+
+# Deploy to all profiles
+skillmeat deploy canvas --project /path/to/project --all-profiles
+```
+
 ### Web Interface
 
 ```bash
@@ -144,7 +157,7 @@ skillmeat web dev
 # Open http://localhost:3000 to access the dashboard
 ```
 
-For complete documentation, see the [Quickstart Guide](docs/user/quickstart.md).
+For complete documentation, see the [Quickstart Guide](docs/user/quickstart.md) and [Multi-Platform Deployment Upgrade Guide](docs/migration/multi-platform-deployment-upgrade.md).
 <!-- END:quickstart -->
 
 <!-- BEGIN:features -->
@@ -171,6 +184,7 @@ _Deploy anywhere, track everything_
 |---------|-------------|
 | **One-Command Deploy** | Deploy in seconds (`skillmeat deploy`) |
 | Deployment Tracking | Track all deployments (`skillmeat status`) |
+| Multi-Platform Profiles | Profile-aware deploy (`skillmeat deploy --profile codex`) |
 | Project Management | Manage projects |
 | Update Alerts | Update notifications |
 
@@ -297,7 +311,7 @@ SkillMeat provides **116+ commands** across **23 command groups**.
 | Category | Commands |
 |----------|----------|
 | **Collection Management** | &#x60;skillmeat collection create&#x60; |
-| **Deployment &amp; Projects** | &#x60;skillmeat deploy&#x60;, &#x60;skillmeat status&#x60; |
+| **Deployment &amp; Projects** | &#x60;skillmeat deploy&#x60;, &#x60;skillmeat status&#x60;, &#x60;skillmeat deploy --profile codex&#x60; |
 | **Intelligence &amp; Sync** | &#x60;skillmeat sync check&#x60;, &#x60;skillmeat sync pull&#x60;, &#x60;skillmeat sync preview&#x60; |
 | **Marketplace &amp; Discovery** | &#x60;skillmeat marketplace-publish&#x60; |
 | **Analytics &amp; Insights** | &#x60;skillmeat analytics usage&#x60;, &#x60;skillmeat analytics top&#x60;, &#x60;skillmeat analytics cleanup&#x60;, &#x60;skillmeat analytics trends&#x60; |
@@ -350,6 +364,7 @@ skillmeat web start               # Start production servers
 |---------|-------------|
 | `skillmeat deploy` | Deploy in seconds |
 | `skillmeat status` | Track all deployments |
+| `skillmeat deploy --profile codex` | Profile-aware deploy |
 
 </details>
 <details>
@@ -457,6 +472,7 @@ Comprehensive guides and references to help you get the most out of SkillMeat.
 ### User Guides
 
 - [Quickstart Guide](docs/user/quickstart.md) - Installation, setup, and first steps
+- [Multi-Platform Upgrade Guide](docs/migration/multi-platform-deployment-upgrade.md) - Upgrade legacy projects and adopt deployment profiles
 - [Memory & Context Guide](docs/user/guides/memory-context-system.md) - Memory Inbox, modules, and context pack workflows
 - [Memory Inbox Guide](docs/user/guides/memory-inbox.md) - Triage, lifecycle, and keyboard-first memory review
 - [Context Modules Guide](docs/user/guides/context-modules.md) - Selector-driven modules and pack generation

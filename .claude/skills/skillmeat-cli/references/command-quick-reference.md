@@ -33,8 +33,10 @@ skillmeat remove <artifact-name>
 
 ## `memory item`
 
+**Valid memory types**: `decision` | `constraint` | `gotcha` | `style_rule` | `learning`
+
 ```bash
-skillmeat memory item create --project <project> --type decision --content "..." --confidence 0.8
+skillmeat memory item create --project <project> --type learning --content "..." --confidence 0.85 --status candidate --anchor "path:type:start-end"
 skillmeat memory item list --project <project> --status candidate --type gotcha
 skillmeat memory item show <item-id>
 skillmeat memory item update <item-id> --content "..." --confidence 0.9
@@ -45,6 +47,47 @@ skillmeat memory item merge --source <id> --target <id> --strategy combine --mer
 skillmeat memory item bulk-promote --ids <id1,id2,id3>
 skillmeat memory item bulk-deprecate --ids <id1,id2,id3>
 ```
+
+Anchor and provenance examples:
+
+```bash
+skillmeat memory item create --project <project> \
+  --type learning \
+  --content "..." \
+  --confidence 0.85 \
+  --status candidate \
+  --anchor "skillmeat/core/services/memory_service.py:code:120-220" \
+  --anchor "docs/project_plans/implementation_plans/features/memory-anchors-provenance-v1.md:doc" \
+  --provenance-branch "<branch>" \
+  --provenance-commit "<sha>" \
+  --provenance-agent-type "<agent>" \
+  --provenance-model "<model>"
+```
+
+`--anchor` format: `path:type` or `path:type:start-end`; types are `code|test|doc|config|plan`.
+
+### API Fallback (when CLI `memory item create` returns 422/400)
+
+The CLI `--project` flag may fail to resolve project names for write operations. Use the API directly with the base64-encoded project ID.
+
+```bash
+# SkillMeat project ID (stable):
+PROJECT_ID="L1VzZXJzL21pZXRoZS9kZXYvaG9tZWxhYi9kZXZlbG9wbWVudC9za2lsbG1lYXQ="
+
+curl -s "http://localhost:8080/api/v1/memory-items?project_id=$PROJECT_ID" \
+  -X POST -H "Content-Type: application/json" -d '{
+  "type": "learning",
+  "content": "Your learning here",
+  "confidence": 0.85,
+  "status": "candidate",
+  "anchors": ["skillmeat/path/to/file.py:code", "skillmeat/other/file.ts:code:100-150"]
+}'
+
+# Verify:
+curl -s "http://localhost:8080/api/v1/memory-items?project_id=$PROJECT_ID&status=candidate"
+```
+
+**API gotchas**: Anchors must be **strings** (`"path:type"`), not objects. The `type` field is required and must be one of the 5 valid types above.
 
 ## `memory module`
 
@@ -105,4 +148,3 @@ skillmeat --help
 skillmeat memory --help
 skillmeat memory item --help
 ```
-

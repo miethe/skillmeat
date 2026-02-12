@@ -60,6 +60,15 @@ except Exception:  # pragma: no cover - metrics are optional in some envs
 VALID_TYPES = {"decision", "constraint", "gotcha", "style_rule", "learning"}
 VALID_STATUSES = {"candidate", "active", "stable", "deprecated"}
 VALID_SHARE_SCOPES = {"private", "project", "global_candidate"}
+VALID_ANCHOR_TYPES = {"code", "plan", "doc", "config", "test"}
+PROMOTED_PROVENANCE_FIELDS = (
+    "git_branch",
+    "git_commit",
+    "session_id",
+    "agent_type",
+    "model",
+    "source_type",
+)
 
 # Fields that may be updated through the update() method
 UPDATABLE_FIELDS = {
@@ -70,6 +79,12 @@ UPDATABLE_FIELDS = {
     "share_scope",
     "provenance_json",
     "anchors_json",
+    "git_branch",
+    "git_commit",
+    "session_id",
+    "agent_type",
+    "model",
+    "source_type",
     "ttl_policy_json",
 }
 
@@ -112,7 +127,13 @@ class MemoryService:
         status: str = "candidate",
         share_scope: str = "project",
         provenance: Optional[Dict[str, Any]] = None,
-        anchors: Optional[List[str]] = None,
+        anchors: Optional[List[Any]] = None,
+        git_branch: Optional[str] = None,
+        git_commit: Optional[str] = None,
+        session_id: Optional[str] = None,
+        agent_type: Optional[str] = None,
+        model: Optional[str] = None,
+        source_type: Optional[str] = None,
         ttl_policy: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Create a new memory item with validation.
@@ -161,10 +182,33 @@ class MemoryService:
                 "share_scope": share_scope,
             }
 
-            if provenance is not None:
-                data["provenance_json"] = json.dumps(provenance)
+            promoted_inputs = {
+                key: value
+                for key, value in {
+                    "git_branch": git_branch,
+                    "git_commit": git_commit,
+                    "session_id": session_id,
+                    "agent_type": agent_type,
+                    "model": model,
+                    "source_type": source_type,
+                }.items()
+                if value is not None
+            }
+            merged_provenance = self._merge_promoted_provenance(
+                provenance=provenance,
+                promoted_inputs=promoted_inputs,
+                existing_provenance=None,
+                ensure_source_type_default=True,
+            )
+
+            for field in PROMOTED_PROVENANCE_FIELDS:
+                if field in merged_provenance:
+                    data[field] = merged_provenance.get(field)
+
+            if merged_provenance:
+                data["provenance_json"] = json.dumps(merged_provenance)
             if anchors is not None:
-                data["anchors_json"] = json.dumps(anchors)
+                data["anchors_json"] = json.dumps(self._normalize_anchors(anchors))
             if ttl_policy is not None:
                 data["ttl_policy_json"] = json.dumps(ttl_policy)
 
@@ -244,6 +288,12 @@ class MemoryService:
         status: Optional[str] = None,
         type: Optional[str] = None,
         share_scope: Optional[str] = None,
+        git_branch: Optional[str] = None,
+        git_commit: Optional[str] = None,
+        session_id: Optional[str] = None,
+        agent_type: Optional[str] = None,
+        model: Optional[str] = None,
+        source_type: Optional[str] = None,
         search: Optional[str] = None,
         min_confidence: Optional[float] = None,
         limit: int = 50,
@@ -275,6 +325,12 @@ class MemoryService:
                 status=status,
                 type=type,
                 share_scope=share_scope,
+                git_branch=git_branch,
+                git_commit=git_commit,
+                session_id=session_id,
+                agent_type=agent_type,
+                model=model,
+                source_type=source_type,
                 search=search,
                 min_confidence=min_confidence,
                 limit=limit,
@@ -336,6 +392,18 @@ class MemoryService:
             if not update_data:
                 raise ValueError("No updatable fields provided")
 
+            if "anchors_json" in update_data:
+                if update_data["anchors_json"] is None:
+                    pass
+                else:
+                    anchors_value = self._parse_json_field(
+                        update_data["anchors_json"],
+                        field_name="anchors_json",
+                    )
+                    update_data["anchors_json"] = json.dumps(
+                        self._normalize_anchors(anchors_value)
+                    )
+
             # Validate values if present
             if "confidence" in update_data:
                 self._validate_confidence(update_data["confidence"])
@@ -345,6 +413,40 @@ class MemoryService:
                 self._validate_status(update_data["status"])
             if "share_scope" in update_data:
                 self._validate_share_scope(update_data["share_scope"])
+
+            needs_provenance_sync = "provenance_json" in update_data or any(
+                field in update_data for field in PROMOTED_PROVENANCE_FIELDS
+            )
+            if needs_provenance_sync:
+                existing_item = self.repo.get_by_id(item_id)
+                existing_provenance = existing_item.provenance if existing_item else None
+                incoming_provenance = (
+                    self._parse_json_field(
+                        update_data["provenance_json"],
+                        field_name="provenance_json",
+                    )
+                    if "provenance_json" in update_data
+                    and update_data["provenance_json"] is not None
+                    else None
+                )
+
+                promoted_inputs = {
+                    field: update_data[field]
+                    for field in PROMOTED_PROVENANCE_FIELDS
+                    if field in update_data
+                }
+
+                merged_provenance = self._merge_promoted_provenance(
+                    provenance=incoming_provenance,
+                    promoted_inputs=promoted_inputs,
+                    existing_provenance=existing_provenance,
+                    ensure_source_type_default=True,
+                )
+
+                update_data["provenance_json"] = json.dumps(merged_provenance)
+                for field in PROMOTED_PROVENANCE_FIELDS:
+                    if field in promoted_inputs or field in merged_provenance:
+                        update_data[field] = merged_provenance.get(field)
 
             span.set_attribute("fields_updated", list(update_data.keys()))
             if "status" in update_data:
@@ -851,6 +953,134 @@ class MemoryService:
     # =========================================================================
 
     @staticmethod
+    def _parse_json_field(value: Any, field_name: str) -> Any:
+        """Parse a JSON field that may already be decoded."""
+        if value is None:
+            return None
+        if isinstance(value, (dict, list)):
+            return value
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{field_name} must be valid JSON") from exc
+        raise ValueError(f"{field_name} must be a JSON string, dict, or list")
+
+    @staticmethod
+    def _normalize_anchor_entry(entry: Any) -> Dict[str, Any]:
+        """Normalize an anchor entry to the structured anchor format."""
+        if isinstance(entry, str):
+            raw = entry.strip()
+            if not raw:
+                raise ValueError("anchor path cannot be empty")
+
+            path = raw
+            anchor_type = "code"
+            line_start: Optional[int] = None
+            line_end: Optional[int] = None
+
+            parts = raw.split(":")
+            if len(parts) >= 2 and parts[-1] in VALID_ANCHOR_TYPES:
+                path = ":".join(parts[:-1]).strip()
+                anchor_type = parts[-1]
+            elif len(parts) >= 3 and parts[-2] in VALID_ANCHOR_TYPES:
+                maybe_range = parts[-1]
+                if "-" in maybe_range:
+                    start_raw, end_raw = maybe_range.split("-", 1)
+                    if start_raw.isdigit() and end_raw.isdigit():
+                        path = ":".join(parts[:-2]).strip()
+                        anchor_type = parts[-2]
+                        line_start = int(start_raw)
+                        line_end = int(end_raw)
+
+            if not path:
+                raise ValueError("anchor path cannot be empty")
+
+            normalized = {"path": path, "type": anchor_type}
+            if line_start is not None:
+                normalized["line_start"] = line_start
+            if line_end is not None:
+                normalized["line_end"] = line_end
+            return normalized
+
+        if not isinstance(entry, dict):
+            raise ValueError("anchor must be a string or object")
+
+        path = entry.get("path")
+        if not isinstance(path, str) or not path.strip():
+            raise ValueError("anchor.path is required")
+
+        anchor_type = entry.get("type", "code")
+        if anchor_type not in VALID_ANCHOR_TYPES:
+            raise ValueError(
+                f"anchor.type must be one of {sorted(VALID_ANCHOR_TYPES)}"
+            )
+
+        normalized: Dict[str, Any] = {"path": path.strip(), "type": anchor_type}
+        line_start = entry.get("line_start")
+        line_end = entry.get("line_end")
+
+        if line_start is not None:
+            if not isinstance(line_start, int) or line_start < 1:
+                raise ValueError("anchor.line_start must be a positive integer")
+            normalized["line_start"] = line_start
+        if line_end is not None:
+            if not isinstance(line_end, int) or line_end < 1:
+                raise ValueError("anchor.line_end must be a positive integer")
+            if line_start is None:
+                raise ValueError("anchor.line_start is required when line_end is set")
+            if line_end < line_start:
+                raise ValueError("anchor.line_end must be >= line_start")
+            normalized["line_end"] = line_end
+
+        commit_sha = entry.get("commit_sha")
+        if isinstance(commit_sha, str) and commit_sha.strip():
+            normalized["commit_sha"] = commit_sha.strip()
+        description = entry.get("description")
+        if isinstance(description, str) and description.strip():
+            normalized["description"] = description.strip()
+
+        return normalized
+
+    @staticmethod
+    def _normalize_anchors(anchors: Any) -> List[Dict[str, Any]]:
+        """Normalize anchors input into structured anchor objects."""
+        if anchors is None:
+            return []
+        if not isinstance(anchors, list):
+            raise ValueError("anchors must be a list")
+        return [MemoryService._normalize_anchor_entry(entry) for entry in anchors]
+
+    @staticmethod
+    def _merge_promoted_provenance(
+        *,
+        provenance: Optional[Dict[str, Any]],
+        promoted_inputs: Dict[str, Any],
+        existing_provenance: Optional[Dict[str, Any]],
+        ensure_source_type_default: bool,
+    ) -> Dict[str, Any]:
+        """Merge provenance with promoted columns while preserving compatibility."""
+        merged: Dict[str, Any] = {}
+        if isinstance(existing_provenance, dict):
+            merged.update(existing_provenance)
+        if provenance is not None:
+            if not isinstance(provenance, dict):
+                raise ValueError("provenance must be an object")
+            merged.update(provenance)
+
+        for field in PROMOTED_PROVENANCE_FIELDS:
+            if field in promoted_inputs:
+                if promoted_inputs[field] is None:
+                    merged.pop(field, None)
+                else:
+                    merged[field] = promoted_inputs[field]
+
+        if ensure_source_type_default and not merged.get("source_type"):
+            merged["source_type"] = "manual"
+
+        return merged
+
+    @staticmethod
     def _item_to_dict(
         item: Any, *, project_name: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -886,9 +1116,23 @@ class MemoryService:
         if project_name is not None:
             result["project_name"] = project_name
 
-        # Parse JSON fields using the model's property helpers
-        result["provenance"] = item.provenance
-        result["anchors"] = item.anchors
+        # Parse JSON fields using the model's property helpers.
+        provenance = item.provenance if isinstance(item.provenance, dict) else {}
+        for field in PROMOTED_PROVENANCE_FIELDS:
+            column_value = getattr(item, field, None)
+            if column_value is not None:
+                provenance[field] = column_value
+            result[field] = (
+                column_value if column_value is not None else provenance.get(field)
+            )
+
+        result["provenance"] = provenance or None
+        anchors = item.anchors
+        result["anchors"] = (
+            MemoryService._normalize_anchors(anchors)
+            if isinstance(anchors, list) and anchors
+            else None
+        )
         result["ttl_policy"] = item.ttl_policy
 
         return result

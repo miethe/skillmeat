@@ -39,6 +39,7 @@ from skillmeat.api.schemas.user_collections import (
 from skillmeat.api.services import get_artifact_metadata
 from skillmeat.api.services.artifact_cache_service import (
     invalidate_collection_artifacts,
+    parse_deployments,
 )
 from skillmeat.api.services.artifact_metadata_service import _get_artifact_collections
 from skillmeat.cache import get_collection_count_cache
@@ -52,6 +53,7 @@ from skillmeat.cache.models import (
     CollectionArtifact,
     Group,
     GroupArtifact,
+    Project,
     get_session,
 )
 
@@ -123,52 +125,6 @@ def decode_cursor(cursor: str) -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid cursor format: {str(e)}",
         )
-
-
-def parse_deployments(deployments_json: Optional[str]) -> Optional[List[DeploymentSummary]]:
-    """Parse deployments_json field from CollectionArtifact into DeploymentSummary list.
-
-    Args:
-        deployments_json: JSON string containing deployment data
-
-    Returns:
-        List of DeploymentSummary objects, or None if empty/invalid
-    """
-    if not deployments_json:
-        return None
-
-    try:
-        deployments_data = json.loads(deployments_json)
-        if not deployments_data or not isinstance(deployments_data, list):
-            return None
-
-        # Parse each deployment dict into DeploymentSummary
-        deployments = []
-        for dep in deployments_data:
-            try:
-                # Parse deployed_at timestamp if it's a string
-                deployed_at = dep.get("deployed_at")
-                if isinstance(deployed_at, str):
-                    deployed_at = datetime.fromisoformat(deployed_at.replace("Z", "+00:00"))
-                elif not isinstance(deployed_at, datetime):
-                    continue  # Skip invalid entries
-
-                deployments.append(
-                    DeploymentSummary(
-                        project_path=dep.get("project_path", ""),
-                        project_name=dep.get("project_name", ""),
-                        deployed_at=deployed_at,
-                    )
-                )
-            except (KeyError, ValueError, TypeError) as e:
-                logger.debug(f"Skipping invalid deployment entry: {e}")
-                continue
-
-        return deployments if deployments else None
-
-    except (json.JSONDecodeError, TypeError) as e:
-        logger.debug(f"Failed to parse deployments_json: {e}")
-        return None
 
 
 def collection_to_response(
@@ -530,41 +486,70 @@ def populate_collection_artifact_metadata(
                 skipped_count += 1
                 continue
 
-    # Populate deployments from DeploymentManager (MVP: scan current directory only)
+    # Populate deployments from DeploymentManager (scan ALL known projects)
     try:
         import os
         from pathlib import Path
         from sqlalchemy import update, and_
         from skillmeat.core.deployment import DeploymentManager
 
-        project_path = Path.cwd()
-        logger.debug(f"Scanning deployments in project: {project_path}")
-
         deployment_mgr = DeploymentManager()
-        all_deployments = deployment_mgr.list_deployments(project_path=project_path)
 
-        # Group deployments by artifact name
+        # Get all known projects from DB cache
+        all_projects = session.query(Project).all()
+        project_paths = []
+        for proj in all_projects:
+            proj_path = Path(proj.path)
+            if proj_path.exists():
+                project_paths.append((proj.name, proj_path))
+            else:
+                logger.debug(
+                    f"Skipping project '{proj.name}' — path does not exist: {proj.path}"
+                )
+
+        # Fallback: if no projects in DB, at least scan cwd
+        if not project_paths:
+            cwd = Path.cwd()
+            project_paths.append((os.path.basename(str(cwd)), cwd))
+
+        logger.debug(
+            f"Scanning deployments across {len(project_paths)} project(s): "
+            f"{[name for name, _ in project_paths]}"
+        )
+
+        # Aggregate deployments across all projects
         deployments_by_artifact = {}
-        for deployment in all_deployments:
-            artifact_name = deployment.artifact_name
-            if artifact_name not in deployments_by_artifact:
-                deployments_by_artifact[artifact_name] = []
+        for project_name, project_path in project_paths:
+            try:
+                project_deployments = deployment_mgr.list_deployments(
+                    project_path=project_path
+                )
+            except Exception as e:
+                logger.debug(
+                    f"Failed to scan deployments for project '{project_name}': {e}"
+                )
+                continue
 
-            deployments_by_artifact[artifact_name].append(
-                {
-                    "project_path": (
-                        str(deployment.project_path)
-                        if hasattr(deployment, "project_path")
-                        else str(project_path)
-                    ),
-                    "project_name": os.path.basename(str(project_path)),
-                    "deployed_at": (
-                        deployment.deployed_at.isoformat()
-                        if hasattr(deployment.deployed_at, "isoformat")
-                        else str(deployment.deployed_at)
-                    ),
-                }
-            )
+            for deployment in project_deployments:
+                artifact_name = deployment.artifact_name
+                if artifact_name not in deployments_by_artifact:
+                    deployments_by_artifact[artifact_name] = []
+
+                deployments_by_artifact[artifact_name].append(
+                    {
+                        "project_path": (
+                            str(deployment.project_path)
+                            if hasattr(deployment, "project_path")
+                            else str(project_path)
+                        ),
+                        "project_name": project_name,
+                        "deployed_at": (
+                            deployment.deployed_at.isoformat()
+                            if hasattr(deployment.deployed_at, "isoformat")
+                            else str(deployment.deployed_at)
+                        ),
+                    }
+                )
 
         # Update cache entries with deployment data
         deployment_update_count = 0
@@ -584,7 +569,8 @@ def populate_collection_artifact_metadata(
 
         if deployment_update_count > 0:
             logger.info(
-                f"Updated deployment data for {deployment_update_count} artifact(s)"
+                f"Updated deployment data for {deployment_update_count} artifact(s) "
+                f"across {len(project_paths)} project(s)"
             )
 
     except Exception as e:
@@ -814,9 +800,7 @@ def _refresh_single_collection_cache(
                 try:
                     tag_service.sync_artifact_tags(ca.artifact_id, file_artifact.tags)
                 except Exception as e:
-                    logger.warning(
-                        f"Tag ORM sync failed for {ca.artifact_id}: {e}"
-                    )
+                    logger.warning(f"Tag ORM sync failed for {ca.artifact_id}: {e}")
 
         except Exception as e:
             error_msg = f"Failed to refresh {ca.artifact_id}: {e}"
@@ -1482,6 +1466,16 @@ async def list_collection_artifacts(
                 if assoc.artifact_id in group_artifact_ids
             ]
 
+        # Filter by artifact type BEFORE cursor pagination.
+        # This keeps page boundaries and total_count consistent with the selected tab.
+        if artifact_type:
+            type_prefix = f"{artifact_type}:"
+            all_associations = [
+                assoc
+                for assoc in all_associations
+                if assoc.artifact_id.startswith(type_prefix)
+            ]
+
         # Decode cursor if provided
         start_idx = 0
         if after:
@@ -1498,6 +1492,21 @@ async def list_collection_artifacts(
         # Paginate
         end_idx = start_idx + limit
         page_associations = all_associations[start_idx:end_idx]
+
+        # Batch fetch sources from DB (avoids N+1 queries and artifact_id fallback)
+        source_lookup: dict[str, str] = {}
+        if page_associations:
+            page_artifact_ids = [assoc.artifact_id for assoc in page_associations]
+            db_sources = (
+                session.query(
+                    CollectionArtifact.artifact_id,
+                    CollectionArtifact.source,
+                )
+                .filter(CollectionArtifact.artifact_id.in_(page_artifact_ids))
+                .filter(CollectionArtifact.source.isnot(None))
+                .all()
+            )
+            source_lookup = {row.artifact_id: row.source for row in db_sources}
 
         # Batch fetch group memberships if requested (avoids N+1 queries)
         artifact_groups_map: dict[str, list[ArtifactGroupMembership]] = {}
@@ -1554,16 +1563,45 @@ async def list_collection_artifacts(
                     except (json.JSONDecodeError, TypeError):
                         tags = None
 
+                # Resolve source: DB lookup > filesystem > artifact_id fallback
+                db_source = source_lookup.get(assoc.artifact_id)
+                resolved_source = db_source or assoc.source
+                if not resolved_source:
+                    # Last resort: read from filesystem
+                    try:
+                        artifact_type_enum = None
+                        try:
+                            artifact_type_enum = CoreArtifactType(type_str)
+                        except ValueError:
+                            pass
+
+                        file_artifact = artifact_mgr.show(
+                            artifact_name=artifact_name,
+                            artifact_type=artifact_type_enum,
+                        )
+                        if file_artifact and file_artifact.upstream:
+                            resolved_source = file_artifact.upstream
+                    except Exception as e:
+                        logger.debug(
+                            f"Failed to read filesystem source for {assoc.artifact_id}: {e}"
+                        )
+
+                # Use artifact_id as absolute last resort
+                if not resolved_source:
+                    resolved_source = assoc.artifact_id
+
                 artifact_summary = ArtifactSummary(
                     id=assoc.artifact_id,
                     name=artifact_name,
                     type=type_str,
                     version=assoc.version,
-                    source=assoc.source or assoc.artifact_id,
+                    source=resolved_source,
                     description=assoc.description,
                     author=assoc.author,
                     tags=tags,
                     tools=assoc.tools,
+                    origin=assoc.origin,
+                    origin_source=assoc.origin_source,
                     collections=_get_artifact_collections(session, assoc.artifact_id),
                     deployments=parse_deployments(assoc.deployments_json),
                 )
@@ -1620,6 +1658,8 @@ async def list_collection_artifacts(
                                 and file_artifact.metadata.tools
                                 else None
                             ),
+                            origin=getattr(file_artifact, "origin", None),
+                            origin_source=getattr(file_artifact, "origin_source", None),
                             collections=_get_artifact_collections(
                                 session, assoc.artifact_id
                             ),
@@ -1642,29 +1682,29 @@ async def list_collection_artifacts(
             if artifact_summary and not artifact_summary.deployments:
                 artifact_summary.deployments = parse_deployments(assoc.deployments_json)
 
-            # Apply type filter if specified
-            if artifact_type is None or artifact_summary.type == artifact_type:
-                if include_groups:
-                    # Add groups field to artifact summary while preserving all metadata
-                    groups = artifact_groups_map.get(assoc.artifact_id, [])
-                    items.append(
-                        ArtifactSummary(
-                            id=assoc.artifact_id,
-                            name=artifact_summary.name,
-                            type=artifact_summary.type,
-                            version=artifact_summary.version,
-                            source=artifact_summary.source,
-                            description=artifact_summary.description,
-                            author=artifact_summary.author,
-                            tags=artifact_summary.tags,
-                            tools=artifact_summary.tools,
-                            collections=artifact_summary.collections,
-                            groups=groups,
-                            deployments=artifact_summary.deployments,
-                        )
+            if include_groups:
+                # Add groups field to artifact summary while preserving all metadata
+                groups = artifact_groups_map.get(assoc.artifact_id, [])
+                items.append(
+                    ArtifactSummary(
+                        id=assoc.artifact_id,
+                        name=artifact_summary.name,
+                        type=artifact_summary.type,
+                        version=artifact_summary.version,
+                        source=artifact_summary.source,
+                        description=artifact_summary.description,
+                        author=artifact_summary.author,
+                        tags=artifact_summary.tags,
+                        tools=artifact_summary.tools,
+                        origin=artifact_summary.origin,
+                        origin_source=artifact_summary.origin_source,
+                        collections=artifact_summary.collections,
+                        groups=groups,
+                        deployments=artifact_summary.deployments,
                     )
-                else:
-                    items.append(artifact_summary)
+                )
+            else:
+                items.append(artifact_summary)
 
         # Build pagination info
         has_next = end_idx < len(all_associations)

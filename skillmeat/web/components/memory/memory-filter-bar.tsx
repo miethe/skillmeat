@@ -23,6 +23,7 @@ import {
   Puzzle,
   Lightbulb,
   Archive,
+  FolderKanban,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,6 +66,12 @@ const SORT_OPTIONS = [
   { value: 'most-used', label: 'Most Used' },
 ] as const;
 
+const SOURCE_TYPE_OPTIONS = [
+  { value: 'all', label: 'All Sources' },
+  { value: 'manual', label: 'Manual' },
+  { value: 'extraction', label: 'Extraction' },
+] as const;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -75,6 +82,11 @@ function getStatusLabel(value: string): string {
 
 function getSortLabel(value: string): string {
   return SORT_OPTIONS.find((opt) => opt.value === value)?.label ?? 'Newest First';
+}
+
+function getProjectLabel(value: string | undefined, projects: Array<{ id: string; name: string }>): string {
+  if (!value || value === 'all') return 'All Projects';
+  return projects.find((p) => p.id === value)?.name ?? 'All Projects';
 }
 
 // ---------------------------------------------------------------------------
@@ -104,6 +116,28 @@ export interface MemoryFilterBarProps {
   onSearchQueryChange: (query: string) => void;
   /** Type counts for badge display (keyed by type value). */
   counts?: Record<string, number>;
+  /** Optional project filter for global memory page. */
+  projectFilter?: string;
+  /** Callback when the project filter changes. */
+  onProjectFilterChange?: (id: string) => void;
+  /** List of available projects for the dropdown. */
+  projects?: Array<{ id: string; name: string }>;
+  /** Optional git branch filter value. */
+  gitBranchFilter?: string;
+  /** Optional callback for git branch filter updates. */
+  onGitBranchFilterChange?: (value: string) => void;
+  /** Optional agent type filter value. */
+  agentTypeFilter?: string;
+  /** Optional callback for agent type filter updates. */
+  onAgentTypeFilterChange?: (value: string) => void;
+  /** Optional model filter value. */
+  modelFilter?: string;
+  /** Optional callback for model filter updates. */
+  onModelFilterChange?: (value: string) => void;
+  /** Optional source type filter value ('all' | 'manual' | 'extraction'). */
+  sourceTypeFilter?: string;
+  /** Optional callback for source type filter updates. */
+  onSourceTypeFilterChange?: (value: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,6 +149,8 @@ export interface MemoryFilterBarProps {
  *
  * Renders type tabs (row 1) and status/sort/search controls (row 2),
  * each separated by `border-b`. Parent is responsible for state management.
+ *
+ * Optional project filter is rendered when `projects` prop is provided.
  *
  * @example
  * ```tsx
@@ -128,6 +164,9 @@ export interface MemoryFilterBarProps {
  *   searchQuery={searchQuery}
  *   onSearchQueryChange={setSearchQuery}
  *   counts={counts}
+ *   projectFilter={projectFilter}
+ *   onProjectFilterChange={setProjectFilter}
+ *   projects={projects}
  * />
  * ```
  */
@@ -143,7 +182,24 @@ export function MemoryFilterBar({
   searchQuery,
   onSearchQueryChange,
   counts,
+  projectFilter,
+  onProjectFilterChange,
+  projects,
+  gitBranchFilter,
+  onGitBranchFilterChange,
+  agentTypeFilter,
+  onAgentTypeFilterChange,
+  modelFilter,
+  onModelFilterChange,
+  sourceTypeFilter,
+  onSourceTypeFilterChange,
 }: MemoryFilterBarProps) {
+  const showProvenanceFilters =
+    !!onGitBranchFilterChange ||
+    !!onAgentTypeFilterChange ||
+    !!onModelFilterChange ||
+    !!onSourceTypeFilterChange;
+
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       onSearchQueryChange(e.target.value);
@@ -184,6 +240,29 @@ export function MemoryFilterBar({
         role="toolbar"
         aria-label="Memory filters"
       >
+        {/* Project filter (optional) */}
+        {projects && onProjectFilterChange && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8" aria-label={`Filter by project: ${getProjectLabel(projectFilter, projects)}`}>
+                <FolderKanban className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                {getProjectLabel(projectFilter, projects)}
+                <ChevronDown className="ml-2 h-3.5 w-3.5" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuRadioGroup value={projectFilter ?? 'all'} onValueChange={onProjectFilterChange}>
+                <DropdownMenuRadioItem value="all">All Projects</DropdownMenuRadioItem>
+                {projects.map((proj) => (
+                  <DropdownMenuRadioItem key={proj.id} value={proj.id}>
+                    {proj.name}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
         {/* Status filter */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -251,6 +330,64 @@ export function MemoryFilterBar({
           />
         </div>
       </div>
+
+      {showProvenanceFilters && (
+        <div className="flex flex-wrap items-center gap-3 border-b px-6 py-2">
+          {onGitBranchFilterChange && (
+            <Input
+              value={gitBranchFilter ?? ''}
+              onChange={(e) => onGitBranchFilterChange(e.target.value)}
+              className="h-8 w-48"
+              placeholder="Git branch"
+              aria-label="Filter by git branch"
+            />
+          )}
+
+          {onAgentTypeFilterChange && (
+            <Input
+              value={agentTypeFilter ?? ''}
+              onChange={(e) => onAgentTypeFilterChange(e.target.value)}
+              className="h-8 w-48"
+              placeholder="Agent type"
+              aria-label="Filter by agent type"
+            />
+          )}
+
+          {onModelFilterChange && (
+            <Input
+              value={modelFilter ?? ''}
+              onChange={(e) => onModelFilterChange(e.target.value)}
+              className="h-8 w-48"
+              placeholder="Model"
+              aria-label="Filter by model"
+            />
+          )}
+
+          {onSourceTypeFilterChange && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8" aria-label="Filter by source type">
+                  {SOURCE_TYPE_OPTIONS.find((option) => option.value === (sourceTypeFilter ?? 'all'))?.label ??
+                    'All Sources'}
+                  <ChevronDown className="ml-2 h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuRadioGroup
+                  value={sourceTypeFilter ?? 'all'}
+                  onValueChange={onSourceTypeFilterChange}
+                >
+                  {SOURCE_TYPE_OPTIONS.map((option) => (
+                    <DropdownMenuRadioItem key={option.value} value={option.value}>
+                      {option.label}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      )}
     </>
   );
 }

@@ -137,17 +137,20 @@ Complete reference for all SkillMeat CLI commands.
 
 ### init
 
-Initialize a new collection.
+Initialize a collection or scaffold project deployment roots.
 
 **Syntax:**
 
 ```bash
-skillmeat init [--name NAME]
+skillmeat init [--name NAME] [--project-path PATH] [--profile PROFILE | --all-profiles]
 ```
 
 **Options:**
 
 - `-n, --name TEXT` - Collection name (default: 'default')
+- `--project-path PATH` - Optional project path to scaffold deployment roots
+- `--profile [claude_code|codex|gemini|cursor]` - Initialize a single profile root
+- `--all-profiles` - Initialize all built-in profile roots
 
 **Examples:**
 
@@ -157,6 +160,12 @@ skillmeat init
 
 # Create named collection
 skillmeat init --name work
+
+# Initialize Codex profile for a project
+skillmeat init --project-path /path/to/project --profile codex
+
+# Initialize all profile roots
+skillmeat init --project-path /path/to/project --all-profiles
 ```
 
 **Output:**
@@ -169,8 +178,9 @@ Collection 'default' initialized
 
 **Notes:**
 
-- Creates collection directory structure
+- Creates collection directory structure (collection mode)
 - Initializes empty collection.toml manifest
+- In project mode, scaffolds profile roots like `.claude/`, `.codex/`, `.gemini/`, `.cursor/`
 - Safe to run multiple times (won't overwrite existing)
 
 ---
@@ -446,7 +456,7 @@ skillmeat add agent ./my-agent.md
 
 ### deploy
 
-Deploy artifacts to a project's .claude/ directory.
+Deploy artifacts to a project profile root (defaults to Claude profile for legacy workflows).
 
 **Syntax:**
 
@@ -463,6 +473,8 @@ skillmeat deploy NAMES... [OPTIONS]
 - `-c, --collection TEXT` - Collection name (default: active collection)
 - `-p, --project PATH` - Project path (default: current directory)
 - `-t, --type [skill|command|agent]` - Artifact type (required if names are ambiguous)
+- `--profile TEXT` - Deploy to one profile (for example `claude_code`, `codex`)
+- `--all-profiles` - Deploy to all configured project profiles
 
 **Examples:**
 
@@ -478,6 +490,12 @@ skillmeat deploy canvas --project /path/to/project
 
 # Deploy with type filter
 skillmeat deploy review --type command
+
+# Deploy to Codex profile
+skillmeat deploy canvas --project /path/to/project --profile codex
+
+# Deploy to all profiles
+skillmeat deploy canvas --project /path/to/project --all-profiles
 ```
 
 **Output:**
@@ -492,9 +510,10 @@ Deployed 3 artifact(s)
 
 **Notes:**
 
-- Creates `.claude/` directory if it doesn't exist
+- Creates profile root directory if it doesn't exist
 - Creates deployment tracking file `.skillmeat-deployed.toml`
 - Preserves artifact structure (skills as directories, commands as files)
+- Without `--profile`, legacy behavior targets the default Claude profile
 
 ---
 
@@ -553,6 +572,7 @@ skillmeat status [OPTIONS]
 
 - `-c, --collection TEXT` - Collection name (default: active collection)
 - `-p, --project PATH` - Project path for deployment status (default: current directory)
+- `--profile TEXT` - Filter deployment status to a single profile
 
 **Examples:**
 
@@ -565,6 +585,9 @@ skillmeat status --collection work
 
 # Check deployment status for project
 skillmeat status --project /path/to/project
+
+# Check status for Codex profile only
+skillmeat status --project /path/to/project --profile codex
 ```
 
 **Output:**
@@ -2975,6 +2998,8 @@ skillmeat context deploy NAME [OPTIONS]
 
 - `-c, --collection TEXT` - Collection name (default: active)
 - `--to-project PATH` - Target project path (default: current directory)
+- `--profile TEXT` - Deploy entity to a specific profile root
+- `--all-profiles` - Deploy to all configured profile roots
 - `--force` - Overwrite existing files
 
 **Examples:**
@@ -2985,6 +3010,12 @@ skillmeat context deploy doc-policy-spec
 
 # Deploy to specific project
 skillmeat context deploy api-rules --to-project ~/projects/backend
+
+# Deploy to Gemini profile
+skillmeat context deploy api-rules --to-project ~/projects/backend --profile gemini
+
+# Deploy to all profiles
+skillmeat context deploy doc-policy-spec --to-project ~/projects/backend --all-profiles
 
 # Force overwrite
 skillmeat context deploy CLAUDE.md --to-project ~/myapp --force
