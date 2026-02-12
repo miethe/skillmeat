@@ -87,9 +87,10 @@ Root (/)
 
 **Groups (/groups)**
 - Collection selector
-- Group selector
-- Grid display
-- Same artifact interactions as Collection
+- Group cards for CRUD management
+- Metadata management: tags, color, icon
+- Search, sort, and tag filtering
+- Primary action routes to filtered Collection view
 
 ---
 
