@@ -81,7 +81,10 @@ export const collectionKeys = {
   details: () => [...collectionKeys.all, 'detail'] as const,
   detail: (id: string) => [...collectionKeys.details(), id] as const,
   artifacts: (id: string) => [...collectionKeys.detail(id), 'artifacts'] as const,
-  infiniteArtifacts: (id: string, options?: { artifact_type?: string }) =>
+  infiniteArtifacts: (
+    id: string,
+    options?: { artifact_type?: string; group_id?: string; include_groups?: boolean }
+  ) =>
     [...collectionKeys.detail(id), 'infinite-artifacts', options] as const,
 };
 
@@ -244,6 +247,10 @@ export interface InfiniteArtifactsOptions {
   limit?: number;
   /** Filter by artifact type */
   artifact_type?: string;
+  /** Filter by group membership */
+  group_id?: string;
+  /** Include group memberships in artifact payloads */
+  include_groups?: boolean;
   /** Whether the query should be enabled */
   enabled?: boolean;
 }
@@ -278,15 +285,22 @@ export function useInfiniteCollectionArtifacts(
   id: string | undefined,
   options?: InfiniteArtifactsOptions
 ) {
-  const { limit = 20, artifact_type, enabled = true } = options || {};
+  const { limit = 20, artifact_type, group_id, include_groups = false, enabled = true } =
+    options || {};
 
   return useInfiniteQuery({
-    queryKey: collectionKeys.infiniteArtifacts(id!, { artifact_type }),
+    queryKey: collectionKeys.infiniteArtifacts(id!, {
+      artifact_type,
+      group_id,
+      include_groups,
+    }),
     queryFn: async ({ pageParam }): Promise<CollectionArtifactsPaginatedResponse> => {
       return fetchCollectionArtifactsPaginated(id!, {
         limit,
         after: pageParam,
         artifact_type,
+        group_id,
+        include_groups,
       });
     },
     initialPageParam: undefined as string | undefined,

@@ -81,6 +81,7 @@ function CollectionPageContent() {
   const {
     selectedCollectionId,
     currentCollection,
+    currentGroups,
     isLoadingCollection,
     setSelectedCollectionId,
     selectedGroupId,
@@ -317,6 +318,8 @@ function CollectionPageContent() {
   } = useInfiniteCollectionArtifacts(isSpecificCollection ? selectedCollectionId : undefined, {
     limit: 20,
     artifact_type: filters.type && filters.type !== 'all' ? filters.type : undefined,
+    group_id: isSpecificCollection ? selectedGroupId ?? undefined : undefined,
+    include_groups: isSpecificCollection && !!selectedGroupId,
     enabled: isSpecificCollection,
   });
 
@@ -601,7 +604,8 @@ function CollectionPageContent() {
           (filters.type && filters.type !== 'all') ||
           (filters.status && filters.status !== 'all') ||
           (filters.scope && filters.scope !== 'all') ||
-          (filters.platform && filters.platform !== 'all')
+          (filters.platform && filters.platform !== 'all') ||
+          selectedGroupId
       ),
     [
       searchQuery,
@@ -611,6 +615,7 @@ function CollectionPageContent() {
       filters.status,
       filters.scope,
       filters.platform,
+      selectedGroupId,
     ]
   );
 
@@ -724,6 +729,15 @@ function CollectionPageContent() {
       });
     });
 
+    if (isSpecificCollection && selectedGroupId) {
+      const selectedGroup = currentGroups.find((group) => group.id === selectedGroupId);
+      items.push({
+        id: `group:${selectedGroupId}`,
+        label: `Group: ${selectedGroup?.name ?? selectedGroupId}`,
+        onRemove: () => setSelectedGroupId(null),
+      });
+    }
+
     return items;
   }, [
     filters.status,
@@ -731,9 +745,13 @@ function CollectionPageContent() {
     filters.platform,
     selectedTags,
     selectedTools,
+    selectedGroupId,
+    isSpecificCollection,
+    currentGroups,
     updateUrlParams,
     handleTagsChange,
     handleToolsChange,
+    setSelectedGroupId,
   ]);
 
   // ==========================================================================

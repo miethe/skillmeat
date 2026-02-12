@@ -18,6 +18,7 @@ API Endpoints:
     POST /groups/{id}/reorder-artifacts - Bulk reorder artifacts in group
 """
 
+import json
 import logging
 import uuid
 from typing import List, Optional
@@ -53,6 +54,46 @@ router = APIRouter(
     prefix="/groups",
     tags=["groups"],
 )
+
+
+def _parse_group_tags(tags_json: Optional[str]) -> list[str]:
+    """Parse group tags JSON safely."""
+    if not tags_json:
+        return []
+    try:
+        parsed = json.loads(tags_json)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [tag for tag in parsed if isinstance(tag, str)]
+
+
+def _build_group_response(
+    session,
+    group: Group,
+    *,
+    artifact_count: Optional[int] = None,
+) -> GroupResponse:
+    """Map ORM Group model to API response with metadata fields."""
+    count = (
+        artifact_count
+        if artifact_count is not None
+        else session.query(GroupArtifact).filter_by(group_id=group.id).count()
+    )
+    return GroupResponse(
+        id=group.id,
+        collection_id=group.collection_id,
+        name=group.name,
+        description=group.description,
+        tags=_parse_group_tags(group.tags_json),
+        color=group.color or "slate",
+        icon=group.icon or "layers",
+        position=group.position,
+        created_at=group.created_at,
+        updated_at=group.updated_at,
+        artifact_count=count,
+    )
 
 
 # =============================================================================
@@ -116,6 +157,9 @@ async def create_group(request: GroupCreateRequest) -> GroupResponse:
             collection_id=request.collection_id,
             name=request.name,
             description=request.description,
+            tags_json=json.dumps(request.tags or []),
+            color=request.color,
+            icon=request.icon,
             position=request.position,
         )
 
@@ -127,21 +171,7 @@ async def create_group(request: GroupCreateRequest) -> GroupResponse:
             f"Created group: {group.id} ('{group.name}') in collection {group.collection_id}"
         )
 
-        # Get artifact count
-        artifact_count = (
-            session.query(GroupArtifact).filter_by(group_id=group.id).count()
-        )
-
-        return GroupResponse(
-            id=group.id,
-            collection_id=group.collection_id,
-            name=group.name,
-            description=group.description,
-            position=group.position,
-            created_at=group.created_at,
-            updated_at=group.updated_at,
-            artifact_count=artifact_count,
-        )
+        return _build_group_response(session, group, artifact_count=0)
 
     except HTTPException:
         session.rollback()
@@ -233,14 +263,9 @@ async def list_groups(
                 session.query(GroupArtifact).filter_by(group_id=group.id).count()
             )
             group_responses.append(
-                GroupResponse(
-                    id=group.id,
-                    collection_id=group.collection_id,
-                    name=group.name,
-                    description=group.description,
-                    position=group.position,
-                    created_at=group.created_at,
-                    updated_at=group.updated_at,
+                _build_group_response(
+                    session,
+                    group,
                     artifact_count=artifact_count,
                 )
             )
@@ -324,6 +349,9 @@ async def get_group(group_id: str) -> GroupWithArtifactsResponse:
             collection_id=group.collection_id,
             name=group.name,
             description=group.description,
+            tags=_parse_group_tags(group.tags_json),
+            color=group.color or "slate",
+            icon=group.icon or "layers",
             position=group.position,
             created_at=group.created_at,
             updated_at=group.updated_at,
@@ -395,6 +423,12 @@ async def update_group(group_id: str, request: GroupUpdateRequest) -> GroupRespo
             group.name = request.name
         if request.description is not None:
             group.description = request.description
+        if request.tags is not None:
+            group.tags_json = json.dumps(request.tags)
+        if request.color is not None:
+            group.color = request.color
+        if request.icon is not None:
+            group.icon = request.icon
         if request.position is not None:
             group.position = request.position
 
@@ -403,21 +437,7 @@ async def update_group(group_id: str, request: GroupUpdateRequest) -> GroupRespo
 
         logger.info(f"Updated group {group_id}")
 
-        # Get artifact count
-        artifact_count = (
-            session.query(GroupArtifact).filter_by(group_id=group.id).count()
-        )
-
-        return GroupResponse(
-            id=group.id,
-            collection_id=group.collection_id,
-            name=group.name,
-            description=group.description,
-            position=group.position,
-            created_at=group.created_at,
-            updated_at=group.updated_at,
-            artifact_count=artifact_count,
-        )
+        return _build_group_response(session, group)
 
     except HTTPException:
         session.rollback()
@@ -576,6 +596,9 @@ async def copy_group(
             collection_id=request.target_collection_id,
             name=new_group_name,
             description=source_group.description,
+            tags_json=source_group.tags_json or "[]",
+            color=source_group.color or "slate",
+            icon=source_group.icon or "layers",
             position=new_position,
         )
         session.add(new_group)
@@ -625,21 +648,7 @@ async def copy_group(
             f"with {len(source_artifacts)} artifacts"
         )
 
-        # Get artifact count for response
-        artifact_count = (
-            session.query(GroupArtifact).filter_by(group_id=new_group.id).count()
-        )
-
-        return GroupResponse(
-            id=new_group.id,
-            collection_id=new_group.collection_id,
-            name=new_group.name,
-            description=new_group.description,
-            position=new_group.position,
-            created_at=new_group.created_at,
-            updated_at=new_group.updated_at,
-            artifact_count=artifact_count,
-        )
+        return _build_group_response(session, new_group, artifact_count=len(source_artifacts))
 
     except HTTPException:
         session.rollback()
@@ -727,14 +736,9 @@ async def reorder_groups(request: GroupReorderRequest) -> GroupListResponse:
                 session.query(GroupArtifact).filter_by(group_id=group.id).count()
             )
             group_responses.append(
-                GroupResponse(
-                    id=group.id,
-                    collection_id=group.collection_id,
-                    name=group.name,
-                    description=group.description,
-                    position=group.position,
-                    created_at=group.created_at,
-                    updated_at=group.updated_at,
+                _build_group_response(
+                    session,
+                    group,
                     artifact_count=artifact_count,
                 )
             )
@@ -872,6 +876,9 @@ async def add_artifacts_to_group(
             collection_id=group.collection_id,
             name=group.name,
             description=group.description,
+            tags=_parse_group_tags(group.tags_json),
+            color=group.color or "slate",
+            icon=group.icon or "layers",
             position=group.position,
             created_at=group.created_at,
             updated_at=group.updated_at,
@@ -1152,6 +1159,9 @@ async def reorder_artifacts_in_group(
             collection_id=group.collection_id,
             name=group.name,
             description=group.description,
+            tags=_parse_group_tags(group.tags_json),
+            color=group.color or "slate",
+            icon=group.icon or "layers",
             position=group.position,
             created_at=group.created_at,
             updated_at=group.updated_at,

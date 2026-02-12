@@ -17,6 +17,18 @@ export type GroupUpdateRequest = {
    */
   description?: string | null;
   /**
+   * Updated group-local tags
+   */
+  tags?: Array<string> | null;
+  /**
+   * Updated visual color token
+   */
+  color?: 'slate' | 'blue' | 'green' | 'amber' | 'rose' | null;
+  /**
+   * Updated icon token
+   */
+  icon?: 'layers' | 'folder' | 'tag' | 'sparkles' | 'book' | 'wrench' | null;
+  /**
    * New position in collection
    */
   position?: number | null;

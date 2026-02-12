@@ -1,9 +1,63 @@
 """Groups API schemas for request and response models."""
 
 from datetime import datetime
+import re
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+GROUP_COLOR_OPTIONS = {"slate", "blue", "green", "amber", "rose"}
+GROUP_ICON_OPTIONS = {"layers", "folder", "tag", "sparkles", "book", "wrench"}
+GROUP_TAG_PATTERN = re.compile(r"^[a-z0-9_-]{1,32}$")
+GROUP_MAX_TAGS = 20
+
+
+def _normalize_and_validate_tags(value: object) -> List[str]:
+    """Normalize tags to a lowercase unique list with strict token validation."""
+    if value is None:
+        return []
+
+    if not isinstance(value, list):
+        raise ValueError("tags must be a list of strings")
+
+    normalized: List[str] = []
+    seen = set()
+    for raw in value:
+        if not isinstance(raw, str):
+            raise ValueError("tags must be a list of strings")
+        tag = raw.strip().lower()
+        if not tag:
+            continue
+        if tag in seen:
+            continue
+        if not GROUP_TAG_PATTERN.match(tag):
+            raise ValueError(
+                "invalid tag token: use 1-32 chars from [a-z0-9_-] only"
+            )
+        normalized.append(tag)
+        seen.add(tag)
+
+    if len(normalized) > GROUP_MAX_TAGS:
+        raise ValueError(f"maximum {GROUP_MAX_TAGS} tags are allowed")
+
+    return normalized
+
+
+def _normalize_and_validate_choice(
+    value: object,
+    *,
+    options: set[str],
+    field_name: str,
+) -> str:
+    """Normalize a string enum-like field and validate against known options."""
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a string")
+    normalized = value.strip().lower()
+    if normalized not in options:
+        allowed = ", ".join(sorted(options))
+        raise ValueError(f"{field_name} must be one of: {allowed}")
+    return normalized
 
 
 class GroupCreateRequest(BaseModel):
@@ -27,12 +81,49 @@ class GroupCreateRequest(BaseModel):
         description="Optional detailed description of the group",
         examples=["Skills and tools for frontend development"],
     )
+    tags: List[str] = Field(
+        default_factory=list,
+        description="Group-local tags used for categorization and filtering",
+        examples=[["frontend", "critical"]],
+    )
+    color: str = Field(
+        default="slate",
+        description="Visual color token for group card accents",
+        examples=["slate", "blue", "green"],
+    )
+    icon: str = Field(
+        default="layers",
+        description="Icon token used for group display",
+        examples=["layers", "folder", "tag"],
+    )
     position: int = Field(
         default=0,
         ge=0,
         description="Display order within collection (0-based)",
         examples=[0, 1, 2],
     )
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def validate_tags(cls, value: object) -> List[str]:
+        """Validate and normalize group tags."""
+        return _normalize_and_validate_tags(value)
+
+    @field_validator("color", mode="before")
+    @classmethod
+    def validate_color(cls, value: object) -> str:
+        """Validate color token."""
+        return _normalize_and_validate_choice(
+            value, options=GROUP_COLOR_OPTIONS, field_name="color"
+        )
+
+    @field_validator("icon", mode="before")
+    @classmethod
+    def validate_icon(cls, value: object) -> str:
+        """Validate icon token."""
+        return _normalize_and_validate_choice(
+            value, options=GROUP_ICON_OPTIONS, field_name="icon"
+        )
 
 
 class GroupUpdateRequest(BaseModel):
@@ -53,12 +144,55 @@ class GroupUpdateRequest(BaseModel):
         description="New description",
         examples=["Updated description"],
     )
+    tags: Optional[List[str]] = Field(
+        default=None,
+        description="Updated group-local tags",
+        examples=[["frontend", "critical"]],
+    )
+    color: Optional[str] = Field(
+        default=None,
+        description="Updated visual color token",
+        examples=["slate", "blue", "green"],
+    )
+    icon: Optional[str] = Field(
+        default=None,
+        description="Updated icon token",
+        examples=["layers", "folder", "tag"],
+    )
     position: Optional[int] = Field(
         default=None,
         ge=0,
         description="New position in collection",
         examples=[0, 1, 2],
     )
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def validate_tags(cls, value: object) -> Optional[List[str]]:
+        """Validate and normalize tags when supplied."""
+        if value is None:
+            return None
+        return _normalize_and_validate_tags(value)
+
+    @field_validator("color", mode="before")
+    @classmethod
+    def validate_color(cls, value: object) -> Optional[str]:
+        """Validate color token when supplied."""
+        if value is None:
+            return None
+        return _normalize_and_validate_choice(
+            value, options=GROUP_COLOR_OPTIONS, field_name="color"
+        )
+
+    @field_validator("icon", mode="before")
+    @classmethod
+    def validate_icon(cls, value: object) -> Optional[str]:
+        """Validate icon token when supplied."""
+        if value is None:
+            return None
+        return _normalize_and_validate_choice(
+            value, options=GROUP_ICON_OPTIONS, field_name="icon"
+        )
 
 
 class GroupPositionUpdate(BaseModel):
@@ -170,6 +304,19 @@ class GroupResponse(BaseModel):
         description="Group description",
         examples=["Skills and tools for frontend development"],
     )
+    tags: List[str] = Field(
+        default_factory=list,
+        description="Group-local tags",
+        examples=[["frontend", "critical"]],
+    )
+    color: str = Field(
+        description="Visual color token for group card accents",
+        examples=["slate", "blue"],
+    )
+    icon: str = Field(
+        description="Icon token for group display",
+        examples=["layers", "folder"],
+    )
     position: int = Field(
         description="Display order in collection",
         examples=[0, 1, 2],
@@ -194,6 +341,9 @@ class GroupResponse(BaseModel):
                 "collection_id": "default",
                 "name": "Frontend Development",
                 "description": "Skills and tools for frontend development",
+                "tags": ["frontend", "critical"],
+                "color": "blue",
+                "icon": "layers",
                 "position": 0,
                 "created_at": "2024-11-16T12:00:00Z",
                 "updated_at": "2024-11-16T15:30:00Z",
@@ -219,6 +369,9 @@ class GroupWithArtifactsResponse(GroupResponse):
                 "collection_id": "default",
                 "name": "Frontend Development",
                 "description": "Skills and tools for frontend development",
+                "tags": ["frontend", "critical"],
+                "color": "blue",
+                "icon": "layers",
                 "position": 0,
                 "created_at": "2024-11-16T12:00:00Z",
                 "updated_at": "2024-11-16T15:30:00Z",
@@ -275,6 +428,9 @@ class GroupListResponse(BaseModel):
                         "collection_id": "default",
                         "name": "Frontend Development",
                         "description": "Skills and tools for frontend development",
+                        "tags": ["frontend", "critical"],
+                        "color": "blue",
+                        "icon": "layers",
                         "position": 0,
                         "created_at": "2024-11-16T12:00:00Z",
                         "updated_at": "2024-11-16T15:30:00Z",

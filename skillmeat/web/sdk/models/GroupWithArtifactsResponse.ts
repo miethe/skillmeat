@@ -24,6 +24,18 @@ export type GroupWithArtifactsResponse = {
    */
   description?: string | null;
   /**
+   * Group-local tags
+   */
+  tags?: Array<string>;
+  /**
+   * Visual color token for group card accents
+   */
+  color: 'slate' | 'blue' | 'green' | 'amber' | 'rose';
+  /**
+   * Icon token for group display
+   */
+  icon: 'layers' | 'folder' | 'tag' | 'sparkles' | 'book' | 'wrench';
+  /**
    * Display order in collection
    */
   position: number;
