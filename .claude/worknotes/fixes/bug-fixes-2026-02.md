@@ -189,3 +189,47 @@ Net result: -89 lines (311 changes: +116, -205) — consolidated duplicated inli
 **Status**: RESOLVED
 
 ---
+
+## Artifact 404 Errors - Orphaned Deployments and Corrupted Manifest Data
+
+**Date Fixed**: 2026-02-12
+**Severity**: high
+**Component**: artifacts-api, collection-data
+
+**Issue**: After all code-level fixes (normalization, case-insensitive matching, collection fallback), two specific artifacts still failed:
+1. `supabase-realtime-optimizer.md` — diff endpoint returned 404 because deployed file was deleted from project but deployment record remained (orphaned)
+2. `prd-writer` — frontend sent "Test" collection UUID (stale DB association) instead of "default"
+
+Working artifacts didn't have these data-level issues, explaining why the problem was isolated.
+
+**Root Causes**:
+
+1. **Corrupted manifest data**: Collection manifest stored `name = "supabase-realtime-optimizer.md"` (extension baked in) and `path = "agents/supabase-realtime-optimizer.md.md"` (double extension) from original import
+2. **Orphaned deployment record**: Family-shopping-dashboard had a deployment record but the actual file was deleted
+3. **No graceful handling of missing files**: Diff endpoints returned hard 404/500 when one side of the comparison didn't exist
+
+**Data Fixes**:
+- Renamed `~/.skillmeat/collections/default/agents/supabase-realtime-optimizer.md.md` → `supabase-realtime-optimizer.md`
+- Fixed collection manifest: name `"supabase-realtime-optimizer"`, path `"agents/supabase-realtime-optimizer.md"`
+- Fixed deployment record in family-shopping-dashboard: same corrections
+
+**Code Resilience** (`skillmeat/api/routers/artifacts.py`):
+- Added `_normalize_artifact_path()` helper to detect and fix double extensions (`.md.md` → `.md`)
+- All 3 diff endpoints now handle missing files gracefully:
+  - Missing project file → return diff with all collection files as `status: "added"`
+  - Missing collection file → return diff with all project files as `status: "deleted"`
+  - Both missing → return 404 (truly not found)
+
+**Files Modified**:
+- `skillmeat/api/routers/artifacts.py`: +213, -107 lines
+- `~/.skillmeat/collections/default/collection.toml`: manifest data fix
+- `~/.skillmeat/collections/default/agents/supabase-realtime-optimizer.md`: file rename
+- `family-shopping-dashboard/.claude/.skillmeat-deployed.toml`: deployment record fix
+
+**Testing**: All 45 unit tests pass (collection + deployment)
+
+**Commits**: 1311ba04
+
+**Status**: RESOLVED
+
+---
