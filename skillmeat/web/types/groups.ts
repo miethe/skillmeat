@@ -2,6 +2,8 @@
  * Group type definitions for organizing artifacts within collections
  */
 
+import type { GroupIcon } from '@/lib/group-constants';
+
 /** Represents a group within a collection */
 export interface Group {
   /** Group unique identifier (UUID-like) */
@@ -17,7 +19,7 @@ export interface Group {
   /** Visual accent token or custom HEX color (#RRGGBB) */
   color?: string;
   /** Icon token for group cards */
-  icon?: 'layers' | 'folder' | 'tag' | 'sparkles' | 'book' | 'wrench';
+  icon?: GroupIcon;
   /** Display order within collection (0-based) */
   position: number;
   /** Number of artifacts in this group */
@@ -41,7 +43,7 @@ export interface CreateGroupRequest {
   /** Visual accent token or custom HEX color (#RRGGBB) */
   color?: string;
   /** Icon token */
-  icon?: 'layers' | 'folder' | 'tag' | 'sparkles' | 'book' | 'wrench';
+  icon?: GroupIcon;
   /** Display order within collection (default: 0) */
   position?: number;
 }
@@ -57,7 +59,7 @@ export interface UpdateGroupRequest {
   /** Updated visual accent token or custom HEX color (#RRGGBB) */
   color?: string;
   /** Updated icon token */
-  icon?: 'layers' | 'folder' | 'tag' | 'sparkles' | 'book' | 'wrench';
+  icon?: GroupIcon;
   /** New position in collection */
   position?: number;
 }

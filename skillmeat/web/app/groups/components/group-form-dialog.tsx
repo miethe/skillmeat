@@ -15,12 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  GroupMetadataEditor,
-  type GroupColor,
-  type GroupIcon,
-  sanitizeGroupTags,
-} from './group-metadata-editor';
+import type { GroupColor, GroupIcon } from '@/lib/group-constants';
+import { GroupMetadataEditor, sanitizeGroupTags } from './group-metadata-editor';
 
 interface GroupFormDialogProps {
   open: boolean;

@@ -1,21 +1,27 @@
 'use client';
 
-import { Book, Check, Folder, Layers, Plus, Sparkles, Tag, Wrench, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type ComponentType } from 'react';
-import type { ColorResult } from '@uiw/color-convert';
+import { Check, Plus, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Sketch from '@uiw/react-color-sketch';
 import { TagEditor } from '@/components/shared/tag-editor';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import {
+  COLOR_OPTIONS,
+  ICON_OPTIONS,
+  dedupeHexColors,
+  getClosestColorToken,
+  isColorToken,
+  isPresetHex,
+  normalizeHex,
+  resolveColorHex,
+  type GroupColor,
+  type GroupIcon,
+} from '@/lib/group-constants';
 
-export const GROUP_COLORS = ['slate', 'blue', 'green', 'amber', 'rose'] as const;
-export const GROUP_ICONS = ['layers', 'folder', 'tag', 'sparkles', 'book', 'wrench'] as const;
-
-export type GroupColorToken = (typeof GROUP_COLORS)[number];
-export type GroupColor = GroupColorToken | string;
-export type GroupIcon = (typeof GROUP_ICONS)[number];
+export type { GroupColor, GroupIcon };
 
 const GROUP_TAG_PATTERN = /^[a-z0-9_-]{1,32}$/;
 const GROUP_TAG_LIMIT = 20;
@@ -62,110 +68,6 @@ export function sanitizeGroupTags(values: string[]): SanitizedGroupTagsResult {
   return { tags, invalidTags, truncated };
 }
 
-const COLOR_OPTIONS: Array<{
-  value: GroupColorToken;
-  label: string;
-  hex: string;
-}> = [
-  { value: 'slate', label: 'Slate', hex: '#64748b' },
-  { value: 'blue', label: 'Blue', hex: '#3b82f6' },
-  { value: 'green', label: 'Green', hex: '#22c55e' },
-  { value: 'amber', label: 'Amber', hex: '#f59e0b' },
-  { value: 'rose', label: 'Rose', hex: '#f43f5e' },
-];
-
-const ICON_OPTIONS: Array<{
-  value: GroupIcon;
-  label: string;
-  Icon: ComponentType<{ className?: string }>;
-}> = [
-  { value: 'layers', label: 'Layers', Icon: Layers },
-  { value: 'folder', label: 'Folder', Icon: Folder },
-  { value: 'tag', label: 'Tag', Icon: Tag },
-  { value: 'sparkles', label: 'Sparkles', Icon: Sparkles },
-  { value: 'book', label: 'Book', Icon: Book },
-  { value: 'wrench', label: 'Wrench', Icon: Wrench },
-];
-
-const COLOR_HEX_BY_TOKEN: Record<GroupColorToken, string> = Object.fromEntries(
-  COLOR_OPTIONS.map((option) => [option.value, option.hex.toLowerCase()])
-) as Record<GroupColorToken, string>;
-
-function isColorToken(value: string): value is GroupColorToken {
-  return value in COLOR_HEX_BY_TOKEN;
-}
-
-function normalizeHex(value: string): string {
-  const hex = value.trim().replace(/^#/, '').toLowerCase();
-  if (/^[0-9a-f]{8}$/.test(hex)) {
-    return `#${hex.slice(0, 6)}`;
-  }
-  if (/^[0-9a-f]{3}$/.test(hex)) {
-    return `#${hex
-      .split('')
-      .map((part) => `${part}${part}`)
-      .join('')}`;
-  }
-  if (/^[0-9a-f]{6}$/.test(hex)) {
-    return `#${hex}`;
-  }
-  return COLOR_HEX_BY_TOKEN.slate;
-}
-
-function resolveColorHex(value: GroupColor): string {
-  if (isColorToken(value)) {
-    return COLOR_HEX_BY_TOKEN[value];
-  }
-  return normalizeHex(value);
-}
-
-function dedupeHexColors(values: string[]): string[] {
-  const seen = new Set<string>();
-  const normalized: string[] = [];
-  for (const value of values) {
-    const next = normalizeHex(value);
-    if (seen.has(next)) {
-      continue;
-    }
-    seen.add(next);
-    normalized.push(next);
-  }
-  return normalized;
-}
-
-function hexToRgb(hex: string): [number, number, number] {
-  const normalized = normalizeHex(hex).replace('#', '');
-  const r = parseInt(normalized.slice(0, 2), 16);
-  const g = parseInt(normalized.slice(2, 4), 16);
-  const b = parseInt(normalized.slice(4, 6), 16);
-  return [r, g, b];
-}
-
-function getClosestColorToken(hex: string): GroupColorToken {
-  const normalizedHex = normalizeHex(hex);
-  const normalizedRgb = hexToRgb(normalizedHex);
-
-  let nearest: GroupColorToken = 'slate';
-  let minDistance = Number.POSITIVE_INFINITY;
-
-  for (const option of COLOR_OPTIONS) {
-    const [r, g, b] = hexToRgb(option.hex);
-    const distance =
-      (normalizedRgb[0] - r) ** 2 + (normalizedRgb[1] - g) ** 2 + (normalizedRgb[2] - b) ** 2;
-    if (distance < minDistance) {
-      nearest = option.value;
-      minDistance = distance;
-    }
-  }
-
-  return nearest;
-}
-
-/** Returns true if `hex` exactly matches one of the preset COLOR_OPTIONS hex values. */
-function isPresetHex(hex: string): boolean {
-  return COLOR_OPTIONS.some((option) => normalizeHex(option.hex) === hex);
-}
-
 interface GroupMetadataEditorProps {
   tags: string[];
   onTagsChange: (tags: string[]) => void;
@@ -189,7 +91,7 @@ export function GroupMetadataEditor({
   disabled = false,
   className,
 }: GroupMetadataEditorProps) {
-  const selectedIcon = ICON_OPTIONS.find((option) => option.value === icon) ?? ICON_OPTIONS[0];
+  const selectedIcon = ICON_OPTIONS.find((option) => option.value === icon) ?? ICON_OPTIONS[0]!;
   const [customColors, setCustomColors] = useState<string[]>([]);
   const [sketchColor, setSketchColor] = useState('#6366f1');
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -396,7 +298,7 @@ export function GroupMetadataEditor({
                 <div className="flex flex-col gap-3">
                   <Sketch
                     color={sketchColor}
-                    onChange={(nextColor: ColorResult) => {
+                    onChange={(nextColor) => {
                       setSketchColor(nextColor.hex);
                     }}
                     disableAlpha
@@ -439,17 +341,15 @@ export function GroupMetadataEditor({
           onValueChange={(value) => onIconChange(value as GroupIcon)}
           disabled={disabled}
         >
-          <SelectTrigger aria-label="Group icon" className="w-full sm:w-1/2">
-            <span className="inline-flex items-center gap-2">
-              <selectedIcon.Icon className="h-4 w-4" />
-              {selectedIcon.label}
-            </span>
+          <SelectTrigger aria-label="Group icon" className="w-full [&>span]:!inline-flex [&>span]:items-center [&>span]:gap-2 sm:w-1/2">
+            <selectedIcon.Icon className="h-4 w-4 shrink-0" />
+            {selectedIcon.label}
           </SelectTrigger>
           <SelectContent>
             {ICON_OPTIONS.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 <span className="inline-flex items-center gap-2">
-                  <option.Icon className="h-4 w-4" />
+                  <option.Icon className="h-4 w-4 shrink-0" />
                   {option.label}
                 </span>
               </SelectItem>

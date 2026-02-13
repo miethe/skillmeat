@@ -1,28 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { Book, Folder, Layers, Sparkles, Tag, Trash2, Wrench, Copy, Edit3 } from 'lucide-react';
+import { Copy, Edit3, Layers, Trash2 } from 'lucide-react';
 import type { Group } from '@/types/groups';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-
-const colorClassMap: Record<string, string> = {
-  slate: 'border-l-slate-500',
-  blue: 'border-l-blue-500',
-  green: 'border-l-green-500',
-  amber: 'border-l-amber-500',
-  rose: 'border-l-rose-500',
-};
-
-const iconMap = {
-  layers: Layers,
-  folder: Folder,
-  tag: Tag,
-  sparkles: Sparkles,
-  book: Book,
-  wrench: Wrench,
-} as const;
+import { COLOR_TAILWIND_CLASSES, ICON_MAP } from '@/lib/group-constants';
 
 function normalizeHexColor(value: string): string | null {
   const hex = value.trim().replace(/^#/, '').toLowerCase();
@@ -47,9 +31,9 @@ interface GroupCardProps {
 }
 
 export function GroupCard({ group, onOpenDetails, onEdit, onDelete, onCopy }: GroupCardProps) {
-  const GroupIcon = iconMap[group.icon ?? 'layers'] ?? Layers;
+  const GroupIcon = ICON_MAP[group.icon ?? 'layers'] ?? Layers;
   const tags = group.tags ?? [];
-  const tokenColorClass = colorClassMap[group.color ?? 'slate'] ?? colorClassMap.slate;
+  const tokenColorClass = COLOR_TAILWIND_CLASSES[group.color ?? 'slate'] ?? COLOR_TAILWIND_CLASSES.slate;
   const customColor = group.color ? normalizeHexColor(group.color) : null;
   const colorClass = customColor ? 'border-l-border' : tokenColorClass;
 

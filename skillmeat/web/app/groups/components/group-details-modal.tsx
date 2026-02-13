@@ -17,12 +17,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  GroupMetadataEditor,
-  type GroupColor,
-  type GroupIcon,
-  sanitizeGroupTags,
-} from './group-metadata-editor';
+import type { GroupColor, GroupIcon } from '@/lib/group-constants';
+import { GroupMetadataEditor, sanitizeGroupTags } from './group-metadata-editor';
 
 interface GroupDetailsModalProps {
   open: boolean;
