@@ -219,8 +219,9 @@ function CollectionPageContent() {
   }, [urlCollectionId, selectedCollectionId, setSelectedCollectionId]);
 
   useEffect(() => {
-    if (urlGroupId && urlGroupId !== selectedGroupId) {
-      setSelectedGroupId(urlGroupId);
+    const normalizedUrlGroupId = urlGroupId || null;
+    if (normalizedUrlGroupId !== selectedGroupId) {
+      setSelectedGroupId(normalizedUrlGroupId);
     }
   }, [urlGroupId, selectedGroupId, setSelectedGroupId]);
 
@@ -734,7 +735,10 @@ function CollectionPageContent() {
       items.push({
         id: `group:${selectedGroupId}`,
         label: `Group: ${selectedGroup?.name ?? selectedGroupId}`,
-        onRemove: () => setSelectedGroupId(null),
+        onRemove: () => {
+          setSelectedGroupId(null);
+          updateUrlParams({ group: null });
+        },
       });
     }
 
