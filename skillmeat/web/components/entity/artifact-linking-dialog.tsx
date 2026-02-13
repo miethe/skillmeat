@@ -233,7 +233,7 @@ export function ArtifactLinkingDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 overflow-hidden">
           {/* Search Input */}
           <div className="space-y-2">
             <Label htmlFor="artifact-search">Search Artifacts</Label>
@@ -262,7 +262,7 @@ export function ArtifactLinkingDialog({
               onValueChange={(value) => setTypeFilter(value as ArtifactType | 'all')}
               disabled={isLoading}
             >
-              <SelectTrigger id="type-filter">
+              <SelectTrigger id="type-filter" className="w-full">
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
@@ -351,12 +351,12 @@ export function ArtifactLinkingDialog({
               onValueChange={(value) => setLinkType(value as LinkType)}
               disabled={isLoading}
             >
-              <SelectTrigger id="link-type">
+              <SelectTrigger id="link-type" className="w-full">
                 <SelectValue placeholder="Select relationship" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="requires">
-                  <div className="flex flex-col">
+                  <div className="flex flex-col min-w-0">
                     <span>Requires</span>
                     <span className="text-xs text-muted-foreground">
                       This artifact depends on the linked artifact
@@ -364,7 +364,7 @@ export function ArtifactLinkingDialog({
                   </div>
                 </SelectItem>
                 <SelectItem value="enables">
-                  <div className="flex flex-col">
+                  <div className="flex flex-col min-w-0">
                     <span>Enables</span>
                     <span className="text-xs text-muted-foreground">
                       This artifact unlocks or enhances the linked artifact
@@ -372,7 +372,7 @@ export function ArtifactLinkingDialog({
                   </div>
                 </SelectItem>
                 <SelectItem value="related">
-                  <div className="flex flex-col">
+                  <div className="flex flex-col min-w-0">
                     <span>Related</span>
                     <span className="text-xs text-muted-foreground">
                       Artifacts are related but not dependent
