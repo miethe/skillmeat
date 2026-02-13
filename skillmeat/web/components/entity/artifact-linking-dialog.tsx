@@ -67,6 +67,8 @@ interface SearchResponse {
   items: SearchArtifact[];
   page_info: {
     total_count: number;
+    has_next_page?: boolean;
+    end_cursor?: string | null;
   };
 }
 
@@ -146,19 +148,29 @@ export function ArtifactLinkingDialog({
   } = useQuery<SearchResponse>({
     queryKey: ['artifact-search', typeFilter, artifactId],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (typeFilter !== 'all') params.set('artifact_type', typeFilter);
-      params.set('limit', '100');
+      const allItems: SearchArtifact[] = [];
+      let cursor: string | undefined = undefined;
 
-      const queryString = params.toString();
-      const response = await fetch(buildUrl(`/artifacts?${queryString}`));
+      // Fetch all pages of artifacts
+      do {
+        const params = new URLSearchParams();
+        if (typeFilter !== 'all') params.set('artifact_type', typeFilter);
+        params.set('limit', '100');
+        if (cursor) params.set('after', cursor);
 
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}));
-        throw new Error(errorBody.detail || 'Failed to search artifacts');
-      }
+        const response = await fetch(buildUrl(`/artifacts?${params.toString()}`));
 
-      return response.json();
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => ({}));
+          throw new Error(errorBody.detail || 'Failed to search artifacts');
+        }
+
+        const data: SearchResponse = await response.json();
+        allItems.push(...data.items);
+        cursor = data.page_info.has_next_page ? (data.page_info.end_cursor ?? undefined) : undefined;
+      } while (cursor);
+
+      return { items: allItems, page_info: { total_count: allItems.length } };
     },
     enabled: open,
     staleTime: 30000, // Cache search results for 30 seconds
@@ -275,7 +287,7 @@ export function ArtifactLinkingDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-lg" onKeyDown={handleKeyDown}>
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto [&>*]:min-w-0" onKeyDown={handleKeyDown}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <LinkIcon className="h-5 w-5" />
@@ -287,7 +299,7 @@ export function ArtifactLinkingDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4 overflow-visible px-2 -mx-2">
+        <div className="space-y-4 py-4">
           {/* Search Input */}
           <div className="space-y-2">
             <Label htmlFor="artifact-search">Search Artifacts</Label>
@@ -456,10 +468,9 @@ export function ArtifactLinkingDialog({
                 </RadioGroup>
               )}
             </div>
-            {searchResults?.page_info?.total_count && searchResults.page_info.total_count > 100 && (
+            {filteredResults.length > 0 && (debouncedSearch || hasActiveAdvancedFilters || typeFilter !== 'all') && (
               <p className="text-xs text-muted-foreground">
-                Showing top results of {searchResults.page_info.total_count} artifacts. Use filters
-                to narrow your search.
+                Showing {filteredResults.length} of {searchResults?.page_info?.total_count ?? 0} artifacts
               </p>
             )}
           </div>
@@ -472,36 +483,22 @@ export function ArtifactLinkingDialog({
               onValueChange={(value) => setLinkType(value as LinkType)}
               disabled={isLoading}
             >
-              <SelectTrigger id="link-type" className="w-full text-left">
+              <SelectTrigger id="link-type" className="w-full">
                 <SelectValue placeholder="Select relationship" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="requires" textValue="Requires">
-                  <div className="flex flex-col min-w-0">
-                    <span>Requires</span>
-                    <span className="text-xs text-muted-foreground">
-                      This artifact depends on the linked artifact
-                    </span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="enables" textValue="Enables">
-                  <div className="flex flex-col min-w-0">
-                    <span>Enables</span>
-                    <span className="text-xs text-muted-foreground">
-                      This artifact unlocks or enhances the linked artifact
-                    </span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="related" textValue="Related">
-                  <div className="flex flex-col min-w-0">
-                    <span>Related</span>
-                    <span className="text-xs text-muted-foreground">
-                      Artifacts are related but not dependent
-                    </span>
-                  </div>
-                </SelectItem>
+                <SelectItem value="requires">Requires</SelectItem>
+                <SelectItem value="enables">Enables</SelectItem>
+                <SelectItem value="related">Related</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              {linkType === 'requires'
+                ? 'This artifact depends on the linked artifact'
+                : linkType === 'enables'
+                  ? 'This artifact unlocks or enhances the linked artifact'
+                  : 'Artifacts are related but not dependent'}
+            </p>
           </div>
 
           {/* Error Display */}
