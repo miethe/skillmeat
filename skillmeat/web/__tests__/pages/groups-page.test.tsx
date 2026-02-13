@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GroupsPageClient } from '@/app/groups/components/groups-page-client';
 import {
@@ -59,14 +60,25 @@ jest.mock('next/navigation', () => ({
 
 // Mock next/link
 jest.mock('next/link', () => {
-  return ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => (
+  const MockNextLink = ({
+    children,
+    href,
+    ...rest
+  }: {
+    children: React.ReactNode;
+    href: string;
+  }) => (
     <a href={href} {...rest}>
       {children}
     </a>
   );
+  MockNextLink.displayName = 'MockNextLink';
+  return MockNextLink;
 });
 
-const mockUseCollectionContext = useCollectionContext as jest.MockedFunction<typeof useCollectionContext>;
+const mockUseCollectionContext = useCollectionContext as jest.MockedFunction<
+  typeof useCollectionContext
+>;
 const mockUseGroups = useGroups as jest.MockedFunction<typeof useGroups>;
 const mockUseGroup = useGroup as jest.MockedFunction<typeof useGroup>;
 const mockUseGroupArtifacts = useGroupArtifacts as jest.MockedFunction<typeof useGroupArtifacts>;
@@ -124,7 +136,16 @@ describe('GroupsPageClient', () => {
     mockUseDeleteGroup.mockReturnValue({ mutateAsync: jest.fn(), isPending: false } as any);
 
     mockUseCollectionContext.mockReturnValue({
-      collections: [{ id: 'collection-1', name: 'Main', version: '1.0.0', artifact_count: 10, created_at: '', updated_at: '' }] as any,
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'Main',
+          version: '1.0.0',
+          artifact_count: 10,
+          created_at: '',
+          updated_at: '',
+        },
+      ] as any,
       selectedCollectionId: 'collection-1',
       selectedGroupId: null,
       currentCollection: null,
@@ -204,7 +225,16 @@ describe('GroupsPageClient', () => {
 
   it('renders select collection state', () => {
     mockUseCollectionContext.mockReturnValue({
-      collections: [{ id: 'collection-1', name: 'Main', version: '1.0.0', artifact_count: 10, created_at: '', updated_at: '' }] as any,
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'Main',
+          version: '1.0.0',
+          artifact_count: 10,
+          created_at: '',
+          updated_at: '',
+        },
+      ] as any,
       selectedCollectionId: null,
       selectedGroupId: null,
       currentCollection: null,
@@ -263,5 +293,29 @@ describe('GroupsPageClient', () => {
       screen.queryByText(/Group details, artifacts, and change history/i)
     ).not.toBeInTheDocument();
     expect(screen.getByText('Edit Group')).toBeInTheDocument();
+  });
+
+  it('shows typed artifact rows with deep-linking to collection artifact modal', async () => {
+    const user = userEvent.setup();
+    renderComponent();
+    await user.click(screen.getByRole('button', { name: /Open details for Development Tools/i }));
+    await user.click(screen.getByRole('tab', { name: /Artifacts/i }));
+
+    const artifactLink = await screen.findByRole('link', { name: /Artifact A/i });
+    expect(screen.getByText('Skill')).toBeInTheDocument();
+    expect(artifactLink).toHaveAttribute(
+      'href',
+      expect.stringContaining(
+        '/collection?collection=collection-1&group=group-1&artifact=skill%3Aartifact-a'
+      )
+    );
+  });
+
+  it('uses metadata editor controls in the edit dialog', () => {
+    renderComponent();
+    fireEvent.click(screen.getAllByRole('button', { name: /^Edit$/i })[0]);
+
+    expect(screen.getByRole('button', { name: /Set group color to Blue/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Set group icon to Layers/i })).toBeInTheDocument();
   });
 });

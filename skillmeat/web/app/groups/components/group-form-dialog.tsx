@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Group } from '@/types/groups';
 import { useCreateGroup, useToast, useUpdateGroup } from '@/hooks';
 import {
@@ -16,18 +16,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-
-const GROUP_COLORS = ['slate', 'blue', 'green', 'amber', 'rose'] as const;
-const GROUP_ICONS = ['layers', 'folder', 'tag', 'sparkles', 'book', 'wrench'] as const;
-
-type GroupColor = (typeof GROUP_COLORS)[number];
-type GroupIcon = (typeof GROUP_ICONS)[number];
+  GroupMetadataEditor,
+  type GroupColor,
+  type GroupIcon,
+  sanitizeGroupTags,
+} from './group-metadata-editor';
 
 interface GroupFormDialogProps {
   open: boolean;
@@ -35,23 +28,6 @@ interface GroupFormDialogProps {
   collectionId: string;
   group?: Group | null;
   defaultPosition?: number;
-}
-
-function normalizeTags(input: string): string[] {
-  if (!input.trim()) {
-    return [];
-  }
-  const seen = new Set<string>();
-  const tags: string[] = [];
-  for (const raw of input.split(',')) {
-    const tag = raw.trim().toLowerCase();
-    if (!tag || seen.has(tag)) {
-      continue;
-    }
-    tags.push(tag);
-    seen.add(tag);
-  }
-  return tags;
 }
 
 export function GroupFormDialog({
@@ -68,7 +44,7 @@ export function GroupFormDialog({
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [tagsInput, setTagsInput] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [color, setColor] = useState<GroupColor>('slate');
   const [icon, setIcon] = useState<GroupIcon>('layers');
 
@@ -79,19 +55,18 @@ export function GroupFormDialog({
     if (group) {
       setName(group.name);
       setDescription(group.description ?? '');
-      setTagsInput((group.tags ?? []).join(', '));
+      setTags(group.tags ?? []);
       setColor((group.color as GroupColor) ?? 'slate');
       setIcon((group.icon as GroupIcon) ?? 'layers');
       return;
     }
     setName('');
     setDescription('');
-    setTagsInput('');
+    setTags([]);
     setColor('slate');
     setIcon('layers');
   }, [open, group]);
 
-  const tags = useMemo(() => normalizeTags(tagsInput), [tagsInput]);
   const isPending = createGroup.isPending || updateGroup.isPending;
 
   const handleSave = async () => {
@@ -104,6 +79,21 @@ export function GroupFormDialog({
       return;
     }
 
+    const sanitizedTags = sanitizeGroupTags(tags);
+    if (sanitizedTags.invalidTags.length > 0) {
+      toast({
+        title: 'Invalid tags removed',
+        description: 'Use 1-32 characters from [a-z0-9_-].',
+        variant: 'destructive',
+      });
+    }
+    if (sanitizedTags.truncated) {
+      toast({
+        title: 'Tag limit reached',
+        description: 'A group can have up to 20 tags.',
+      });
+    }
+
     try {
       if (isEditing && group) {
         await updateGroup.mutateAsync({
@@ -111,7 +101,7 @@ export function GroupFormDialog({
           data: {
             name: name.trim(),
             description: description.trim() || undefined,
-            tags,
+            tags: sanitizedTags.tags,
             color,
             icon,
           },
@@ -125,7 +115,7 @@ export function GroupFormDialog({
           collection_id: collectionId,
           name: name.trim(),
           description: description.trim() || undefined,
-          tags,
+          tags: sanitizedTags.tags,
           color,
           icon,
           position: defaultPosition,
@@ -180,48 +170,17 @@ export function GroupFormDialog({
             />
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="group-tags">Tags (comma separated)</Label>
-            <Input
-              id="group-tags"
-              value={tagsInput}
-              onChange={(event) => setTagsInput(event.target.value)}
-              placeholder="frontend, critical, research"
+          <div className="rounded-lg border p-4">
+            <GroupMetadataEditor
+              tags={tags}
+              onTagsChange={setTags}
+              color={color}
+              onColorChange={setColor}
+              icon={icon}
+              onIconChange={setIcon}
+              availableTags={tags}
+              disabled={isPending}
             />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="group-color">Color</Label>
-              <Select value={color} onValueChange={(value) => setColor(value as GroupColor)}>
-                <SelectTrigger id="group-color">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {GROUP_COLORS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="group-icon">Icon</Label>
-              <Select value={icon} onValueChange={(value) => setIcon(value as GroupIcon)}>
-                <SelectTrigger id="group-icon">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {GROUP_ICONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </div>
 

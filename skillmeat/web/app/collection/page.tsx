@@ -319,7 +319,7 @@ function CollectionPageContent() {
   } = useInfiniteCollectionArtifacts(isSpecificCollection ? selectedCollectionId : undefined, {
     limit: 20,
     artifact_type: filters.type && filters.type !== 'all' ? filters.type : undefined,
-    group_id: isSpecificCollection ? selectedGroupId ?? undefined : undefined,
+    group_id: isSpecificCollection ? (selectedGroupId ?? undefined) : undefined,
     include_groups: isSpecificCollection && !!selectedGroupId,
     enabled: isSpecificCollection,
   });
@@ -531,7 +531,6 @@ function CollectionPageContent() {
     isSpecificCollection,
     infiniteCollectionData,
     infiniteAllArtifactsData,
-    currentCollection,
     filters,
     searchQuery,
   ]);
@@ -735,10 +734,7 @@ function CollectionPageContent() {
       items.push({
         id: `group:${selectedGroupId}`,
         label: `Group: ${selectedGroup?.name ?? selectedGroupId}`,
-        onRemove: () => {
-          setSelectedGroupId(null);
-          updateUrlParams({ group: null });
-        },
+        onRemove: () => updateUrlParams({ group: null }),
       });
     }
 
@@ -755,7 +751,6 @@ function CollectionPageContent() {
     updateUrlParams,
     handleTagsChange,
     handleToolsChange,
-    setSelectedGroupId,
   ]);
 
   // ==========================================================================
@@ -792,7 +787,7 @@ function CollectionPageContent() {
     });
   };
 
-  const handleDetailClose = () => {
+  const handleDetailClose = useCallback(() => {
     // Set closing flag FIRST to prevent race condition with auto-open useEffect
     isClosingRef.current = true;
     setIsDetailOpen(false);
@@ -806,7 +801,7 @@ function CollectionPageContent() {
     setTimeout(() => {
       isClosingRef.current = false;
     }, 0);
-  };
+  }, [updateUrlParams]);
 
   // Handler for Delete action from modal (must be after handleDetailClose)
   const handleDeleteFromModal = useCallback(() => {
