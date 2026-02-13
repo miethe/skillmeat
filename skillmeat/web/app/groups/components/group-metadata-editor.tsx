@@ -341,11 +341,9 @@ export function GroupMetadataEditor({
           onValueChange={(value) => onIconChange(value as GroupIcon)}
           disabled={disabled}
         >
-          <SelectTrigger aria-label="Group icon" className="w-full sm:w-1/2">
-            <span className="inline-flex items-center gap-2">
-              <selectedIcon.Icon className="h-4 w-4 shrink-0" />
-              {selectedIcon.label}
-            </span>
+          <SelectTrigger aria-label="Group icon" className="w-full [&>span]:!flex [&>span]:items-center [&>span]:gap-2 sm:w-1/2">
+            <selectedIcon.Icon className="h-4 w-4 shrink-0" />
+            {selectedIcon.label}
           </SelectTrigger>
           <SelectContent>
             {ICON_OPTIONS.map((option) => (
