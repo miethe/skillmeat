@@ -162,6 +162,7 @@ export function ArtifactLinkingDialog({
     },
     enabled: open,
     staleTime: 30000, // Cache search results for 30 seconds
+    refetchOnMount: 'always', // Always refetch when dialog opens
   });
 
   // Create link mutation
@@ -274,7 +275,7 @@ export function ArtifactLinkingDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-lg overflow-visible" onKeyDown={handleKeyDown}>
+      <DialogContent className="sm:max-w-lg" onKeyDown={handleKeyDown}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <LinkIcon className="h-5 w-5" />
