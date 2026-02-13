@@ -1,6 +1,6 @@
 'use client';
 
-import { Book, Check, Folder, Layers, Sparkles, Tag, Wrench } from 'lucide-react';
+import { Book, Folder, Layers, Sparkles, Tag, Wrench } from 'lucide-react';
 import type { ComponentType } from 'react';
 import type { ColorResult } from '@uiw/color-convert';
 import Compact from '@uiw/react-color-compact';
@@ -89,6 +89,9 @@ const COLOR_HEX_BY_TOKEN: Record<GroupColor, string> = Object.fromEntries(
 
 function normalizeHex(value: string): string {
   const hex = value.trim().replace(/^#/, '').toLowerCase();
+  if (/^[0-9a-f]{8}$/.test(hex)) {
+    return `#${hex.slice(0, 6)}`;
+  }
   if (/^[0-9a-f]{3}$/.test(hex)) {
     return `#${hex
       .split('')
@@ -153,6 +156,8 @@ export function GroupMetadataEditor({
   className,
 }: GroupMetadataEditorProps) {
   const selectedIcon = ICON_OPTIONS.find((option) => option.value === icon) ?? ICON_OPTIONS[0];
+  const selectedColorLabel =
+    COLOR_OPTIONS.find((option) => option.value === color)?.label ?? 'Slate';
 
   return (
     <div className={cn('space-y-5', className)}>
@@ -181,13 +186,20 @@ export function GroupMetadataEditor({
           )}
         >
           <Compact
+            prefixCls="group-color-compact"
             color={COLOR_HEX_BY_TOKEN[color]}
             colors={COLOR_OPTIONS.map((option) => option.hex)}
             onChange={(nextColor: ColorResult) => {
-              const nextToken = getClosestColorToken(nextColor.hexa || nextColor.hex);
+              const nextToken = getClosestColorToken(nextColor.hex);
               onColorChange(nextToken);
             }}
-            style={{ width: '100%', backgroundColor: 'transparent', padding: 0 }}
+            style={{
+              width: 240,
+              maxWidth: '100%',
+              display: 'block',
+              backgroundColor: 'transparent',
+              padding: 0,
+            }}
             rectProps={{
               style: {
                 width: 22,
@@ -202,7 +214,7 @@ export function GroupMetadataEditor({
             className="h-3.5 w-3.5 rounded-full border"
             style={{ backgroundColor: COLOR_HEX_BY_TOKEN[color] }}
           />
-          {COLOR_OPTIONS.find((option) => option.value === color)?.label}
+          {selectedColorLabel}
         </div>
       </div>
 
@@ -213,7 +225,7 @@ export function GroupMetadataEditor({
           onValueChange={(value) => onIconChange(value as GroupIcon)}
           disabled={disabled}
         >
-          <SelectTrigger aria-label="Group icon">
+          <SelectTrigger aria-label="Group icon" className="w-full sm:w-1/2">
             <span className="inline-flex items-center gap-2">
               <selectedIcon.Icon className="h-4 w-4" />
               {selectedIcon.label}
@@ -226,7 +238,6 @@ export function GroupMetadataEditor({
                   <option.Icon className="h-4 w-4" />
                   {option.label}
                 </span>
-                {option.value === icon && <Check className="ml-auto h-3.5 w-3.5 opacity-70" />}
               </SelectItem>
             ))}
           </SelectContent>
