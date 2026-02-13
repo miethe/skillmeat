@@ -569,14 +569,14 @@ class TestGroupMetadataCRUD:
         assert data["icon"] == "layers"
 
     def test_create_group_with_metadata_normalization(self, client, source_collection):
-        """Create group should normalize tags and accept valid color/icon tokens."""
+        """Create group should normalize tags and accept valid color/icon values."""
         response = client.post(
             "/api/v1/groups",
             json={
                 "collection_id": source_collection.id,
                 "name": "Normalized Group",
                 "tags": [" Frontend ", "frontend", "Critical_Path"],
-                "color": "Blue",
+                "color": "#22C55E",
                 "icon": "Folder",
             },
         )
@@ -584,7 +584,7 @@ class TestGroupMetadataCRUD:
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["tags"] == ["frontend", "critical_path"]
-        assert data["color"] == "blue"
+        assert data["color"] == "#22c55e"
         assert data["icon"] == "folder"
 
     @pytest.mark.parametrize(
@@ -592,6 +592,7 @@ class TestGroupMetadataCRUD:
         [
             {"tags": ["invalid tag!"]},
             {"color": "purple"},
+            {"color": "#12"},
             {"icon": "rocket"},
             {"tags": [f"t{i}" for i in range(21)]},
         ],
@@ -643,7 +644,7 @@ class TestGroupMetadataCRUD:
                 "name": "Edited Group",
                 "description": "Updated description",
                 "tags": ["Ops", "on_call"],
-                "color": "amber",
+                "color": "#f59e0b",
                 "icon": "wrench",
             },
         )
@@ -652,7 +653,7 @@ class TestGroupMetadataCRUD:
         assert full_data["name"] == "Edited Group"
         assert full_data["description"] == "Updated description"
         assert full_data["tags"] == ["ops", "on_call"]
-        assert full_data["color"] == "amber"
+        assert full_data["color"] == "#f59e0b"
         assert full_data["icon"] == "wrench"
 
     def test_list_and_detail_include_metadata_fields(

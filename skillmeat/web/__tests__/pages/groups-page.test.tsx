@@ -316,6 +316,7 @@ describe('GroupsPageClient', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /^Edit$/i })[0]);
 
     expect(screen.getByRole('group', { name: /Group color picker/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Add custom group color/i })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: /Group icon/i })).toBeInTheDocument();
   });
 });

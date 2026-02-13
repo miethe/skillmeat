@@ -25,9 +25,9 @@ export type GroupCreateRequest = {
    */
   tags?: Array<string>;
   /**
-   * Visual color token for group card accents
+   * Visual color token or custom HEX color for group card accents
    */
-  color?: 'slate' | 'blue' | 'green' | 'amber' | 'rose';
+  color?: string;
   /**
    * Icon token used for group display
    */

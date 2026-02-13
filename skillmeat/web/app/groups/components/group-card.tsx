@@ -24,6 +24,20 @@ const iconMap = {
   wrench: Wrench,
 } as const;
 
+function normalizeHexColor(value: string): string | null {
+  const hex = value.trim().replace(/^#/, '').toLowerCase();
+  if (/^[0-9a-f]{3}$/.test(hex)) {
+    return `#${hex
+      .split('')
+      .map((part) => `${part}${part}`)
+      .join('')}`;
+  }
+  if (/^[0-9a-f]{6}$/.test(hex)) {
+    return `#${hex}`;
+  }
+  return null;
+}
+
 interface GroupCardProps {
   group: Group;
   onOpenDetails: (group: Group) => void;
@@ -35,11 +49,14 @@ interface GroupCardProps {
 export function GroupCard({ group, onOpenDetails, onEdit, onDelete, onCopy }: GroupCardProps) {
   const GroupIcon = iconMap[group.icon ?? 'layers'] ?? Layers;
   const tags = group.tags ?? [];
-  const colorClass = colorClassMap[group.color ?? 'slate'] ?? colorClassMap.slate;
+  const tokenColorClass = colorClassMap[group.color ?? 'slate'] ?? colorClassMap.slate;
+  const customColor = group.color ? normalizeHexColor(group.color) : null;
+  const colorClass = customColor ? 'border-l-border' : tokenColorClass;
 
   return (
     <Card
       className={`border-l-4 ${colorClass} cursor-pointer transition-shadow hover:shadow-md`}
+      style={customColor ? { borderLeftColor: customColor } : undefined}
       role="button"
       tabIndex={0}
       onClick={() => onOpenDetails(group)}

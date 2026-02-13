@@ -21,9 +21,9 @@ export type GroupUpdateRequest = {
    */
   tags?: Array<string> | null;
   /**
-   * Updated visual color token
+   * Updated visual color token or custom HEX color
    */
-  color?: 'slate' | 'blue' | 'green' | 'amber' | 'rose' | null;
+  color?: string | null;
   /**
    * Updated icon token
    */

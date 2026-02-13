@@ -1,7 +1,7 @@
 'use client';
 
-import { Book, Folder, Layers, Sparkles, Tag, Wrench } from 'lucide-react';
-import type { ComponentType } from 'react';
+import { Book, Folder, Layers, Plus, Sparkles, Tag, Wrench } from 'lucide-react';
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import type { ColorResult } from '@uiw/color-convert';
 import Compact from '@uiw/react-color-compact';
 import { TagEditor } from '@/components/shared/tag-editor';
@@ -12,11 +12,15 @@ import { cn } from '@/lib/utils';
 export const GROUP_COLORS = ['slate', 'blue', 'green', 'amber', 'rose'] as const;
 export const GROUP_ICONS = ['layers', 'folder', 'tag', 'sparkles', 'book', 'wrench'] as const;
 
-export type GroupColor = (typeof GROUP_COLORS)[number];
+export type GroupColorToken = (typeof GROUP_COLORS)[number];
+export type GroupColor = GroupColorToken | string;
 export type GroupIcon = (typeof GROUP_ICONS)[number];
 
 const GROUP_TAG_PATTERN = /^[a-z0-9_-]{1,32}$/;
 const GROUP_TAG_LIMIT = 20;
+const CUSTOM_COLORS_STORAGE_KEY = 'skillmeat-group-custom-colors-v1';
+const MAX_CUSTOM_COLORS = 20;
+const DEFAULT_CUSTOM_COLOR_HEX = '#ffffff';
 
 export interface SanitizedGroupTagsResult {
   tags: string[];
@@ -59,7 +63,7 @@ export function sanitizeGroupTags(values: string[]): SanitizedGroupTagsResult {
 }
 
 const COLOR_OPTIONS: Array<{
-  value: GroupColor;
+  value: GroupColorToken;
   label: string;
   hex: string;
 }> = [
@@ -83,9 +87,13 @@ const ICON_OPTIONS: Array<{
   { value: 'wrench', label: 'Wrench', Icon: Wrench },
 ];
 
-const COLOR_HEX_BY_TOKEN: Record<GroupColor, string> = Object.fromEntries(
+const COLOR_HEX_BY_TOKEN: Record<GroupColorToken, string> = Object.fromEntries(
   COLOR_OPTIONS.map((option) => [option.value, option.hex.toLowerCase()])
-) as Record<GroupColor, string>;
+) as Record<GroupColorToken, string>;
+
+function isColorToken(value: string): value is GroupColorToken {
+  return value in COLOR_HEX_BY_TOKEN;
+}
 
 function normalizeHex(value: string): string {
   const hex = value.trim().replace(/^#/, '').toLowerCase();
@@ -104,6 +112,27 @@ function normalizeHex(value: string): string {
   return COLOR_HEX_BY_TOKEN.slate;
 }
 
+function resolveColorHex(value: GroupColor): string {
+  if (isColorToken(value)) {
+    return COLOR_HEX_BY_TOKEN[value];
+  }
+  return normalizeHex(value);
+}
+
+function dedupeHexColors(values: string[]): string[] {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const value of values) {
+    const next = normalizeHex(value);
+    if (seen.has(next)) {
+      continue;
+    }
+    seen.add(next);
+    normalized.push(next);
+  }
+  return normalized;
+}
+
 function hexToRgb(hex: string): [number, number, number] {
   const normalized = normalizeHex(hex).replace('#', '');
   const r = parseInt(normalized.slice(0, 2), 16);
@@ -112,11 +141,11 @@ function hexToRgb(hex: string): [number, number, number] {
   return [r, g, b];
 }
 
-function getClosestColorToken(hex: string): GroupColor {
+function getClosestColorToken(hex: string): GroupColorToken {
   const normalizedHex = normalizeHex(hex);
   const normalizedRgb = hexToRgb(normalizedHex);
 
-  let nearest: GroupColor = 'slate';
+  let nearest: GroupColorToken = 'slate';
   let minDistance = Number.POSITIVE_INFINITY;
 
   for (const option of COLOR_OPTIONS) {
@@ -156,8 +185,59 @@ export function GroupMetadataEditor({
   className,
 }: GroupMetadataEditorProps) {
   const selectedIcon = ICON_OPTIONS.find((option) => option.value === icon) ?? ICON_OPTIONS[0];
+  const [customColors, setCustomColors] = useState<string[]>([]);
+
+  const selectedColorHex = resolveColorHex(color);
   const selectedColorLabel =
-    COLOR_OPTIONS.find((option) => option.value === color)?.label ?? 'Slate';
+    COLOR_OPTIONS.find((option) => option.value === color)?.label ?? 'Custom';
+
+  const persistCustomColors = (nextColors: string[]) => {
+    const sanitized = dedupeHexColors(nextColors).slice(0, MAX_CUSTOM_COLORS);
+    setCustomColors(sanitized);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(CUSTOM_COLORS_STORAGE_KEY, JSON.stringify(sanitized));
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    try {
+      const stored = window.localStorage.getItem(CUSTOM_COLORS_STORAGE_KEY);
+      if (!stored) {
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) {
+        return;
+      }
+      const sanitized = dedupeHexColors(parsed.filter((entry) => typeof entry === 'string')).slice(
+        0,
+        MAX_CUSTOM_COLORS
+      );
+      setCustomColors(sanitized);
+    } catch {
+      // Ignore malformed localStorage content.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isColorToken(color)) {
+      return;
+    }
+    const normalized = normalizeHex(color);
+    if (customColors.includes(normalized)) {
+      return;
+    }
+    persistCustomColors([...customColors, normalized]);
+  }, [color, customColors]);
+
+  const swatchColors = useMemo(
+    () => [...COLOR_OPTIONS.map((option) => option.hex), ...customColors],
+    [customColors]
+  );
+  const canAddCustomColor = customColors.length < MAX_CUSTOM_COLORS;
 
   return (
     <div className={cn('space-y-5', className)}>
@@ -187,19 +267,72 @@ export function GroupMetadataEditor({
         >
           <Compact
             prefixCls="group-color-compact"
-            color={COLOR_HEX_BY_TOKEN[color]}
-            colors={COLOR_OPTIONS.map((option) => option.hex)}
+            color={selectedColorHex}
+            colors={swatchColors}
             onChange={(nextColor: ColorResult) => {
-              const nextToken = getClosestColorToken(nextColor.hex);
-              onColorChange(nextToken);
+              const nextHex = normalizeHex(nextColor.hex);
+              const nextToken = getClosestColorToken(nextHex);
+              const isPresetHex = COLOR_OPTIONS.some(
+                (option) => normalizeHex(option.hex) === nextHex
+              );
+
+              if (isColorToken(color)) {
+                if (!isPresetHex && !customColors.includes(nextHex)) {
+                  persistCustomColors([...customColors, nextHex]);
+                }
+              } else {
+                const currentHex = normalizeHex(color);
+                if (customColors.includes(currentHex)) {
+                  if (isPresetHex) {
+                    persistCustomColors(customColors.filter((entry) => entry !== currentHex));
+                  } else if (currentHex !== nextHex) {
+                    const replaced = customColors.map((entry) =>
+                      entry === currentHex ? nextHex : entry
+                    );
+                    persistCustomColors(replaced);
+                  }
+                } else if (!isPresetHex && !customColors.includes(nextHex)) {
+                  persistCustomColors([...customColors, nextHex]);
+                }
+              }
+
+              onColorChange(isPresetHex ? nextToken : nextHex);
             }}
             style={{
               width: 240,
               maxWidth: '100%',
-              display: 'block',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
               backgroundColor: 'transparent',
               padding: 0,
             }}
+            addonAfter={
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (!canAddCustomColor) {
+                    return;
+                  }
+
+                  const nextColors = customColors.includes(DEFAULT_CUSTOM_COLOR_HEX)
+                    ? customColors
+                    : [...customColors, DEFAULT_CUSTOM_COLOR_HEX];
+                  persistCustomColors(nextColors);
+                  onColorChange(DEFAULT_CUSTOM_COLOR_HEX);
+                }}
+                disabled={disabled || !canAddCustomColor}
+                aria-label="Add custom group color"
+                className={cn(
+                  'flex h-[22px] w-[22px] items-center justify-center rounded-md border border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-primary',
+                  (disabled || !canAddCustomColor) && 'cursor-not-allowed opacity-50'
+                )}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            }
             rectProps={{
               style: {
                 width: 22,
@@ -212,7 +345,7 @@ export function GroupMetadataEditor({
         <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
           <span
             className="h-3.5 w-3.5 rounded-full border"
-            style={{ backgroundColor: COLOR_HEX_BY_TOKEN[color] }}
+            style={{ backgroundColor: selectedColorHex }}
           />
           {selectedColorLabel}
         </div>
@@ -243,6 +376,20 @@ export function GroupMetadataEditor({
           </SelectContent>
         </Select>
       </div>
+
+      <style jsx global>{`
+        .group-color-compact-input-wrapper {
+          width: 100%;
+          margin: 0 !important;
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 8px;
+        }
+
+        .group-color-compact-input-wrapper > * {
+          width: 100%;
+        }
+      `}</style>
     </div>
   );
 }

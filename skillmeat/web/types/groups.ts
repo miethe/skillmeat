@@ -14,8 +14,8 @@ export interface Group {
   description?: string;
   /** Group-local tags used for categorization and filtering */
   tags?: string[];
-  /** Visual accent token for group cards */
-  color?: 'slate' | 'blue' | 'green' | 'amber' | 'rose';
+  /** Visual accent token or custom HEX color (#RRGGBB) */
+  color?: string;
   /** Icon token for group cards */
   icon?: 'layers' | 'folder' | 'tag' | 'sparkles' | 'book' | 'wrench';
   /** Display order within collection (0-based) */
@@ -38,8 +38,8 @@ export interface CreateGroupRequest {
   description?: string;
   /** Group-local tags */
   tags?: string[];
-  /** Visual accent token */
-  color?: 'slate' | 'blue' | 'green' | 'amber' | 'rose';
+  /** Visual accent token or custom HEX color (#RRGGBB) */
+  color?: string;
   /** Icon token */
   icon?: 'layers' | 'folder' | 'tag' | 'sparkles' | 'book' | 'wrench';
   /** Display order within collection (default: 0) */
@@ -54,8 +54,8 @@ export interface UpdateGroupRequest {
   description?: string;
   /** Updated group-local tags */
   tags?: string[];
-  /** Updated visual accent token */
-  color?: 'slate' | 'blue' | 'green' | 'amber' | 'rose';
+  /** Updated visual accent token or custom HEX color (#RRGGBB) */
+  color?: string;
   /** Updated icon token */
   icon?: 'layers' | 'folder' | 'tag' | 'sparkles' | 'book' | 'wrench';
   /** New position in collection */

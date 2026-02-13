@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 GROUP_COLOR_OPTIONS = {"slate", "blue", "green", "amber", "rose"}
 GROUP_ICON_OPTIONS = {"layers", "folder", "tag", "sparkles", "book", "wrench"}
 GROUP_TAG_PATTERN = re.compile(r"^[a-z0-9_-]{1,32}$")
+GROUP_HEX_COLOR_PATTERN = re.compile(r"^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$")
 GROUP_MAX_TAGS = 20
 
 
@@ -60,6 +61,29 @@ def _normalize_and_validate_choice(
     return normalized
 
 
+def _normalize_and_validate_color(value: object) -> str:
+    """Normalize and validate group color as token or HEX."""
+    if not isinstance(value, str):
+        raise ValueError("color must be a string")
+
+    normalized = value.strip().lower()
+    if normalized in GROUP_COLOR_OPTIONS:
+        return normalized
+
+    if GROUP_HEX_COLOR_PATTERN.match(normalized):
+        hex_value = normalized[1:]
+        if len(hex_value) == 3:
+            hex_value = "".join(ch * 2 for ch in hex_value)
+        elif len(hex_value) == 8:
+            hex_value = hex_value[:6]
+        return f"#{hex_value}"
+
+    allowed = ", ".join(sorted(GROUP_COLOR_OPTIONS))
+    raise ValueError(
+        f"color must be one of: {allowed}, or a HEX value like #22c55e"
+    )
+
+
 class GroupCreateRequest(BaseModel):
     """Request schema for creating a new group in a collection.
 
@@ -88,8 +112,8 @@ class GroupCreateRequest(BaseModel):
     )
     color: str = Field(
         default="slate",
-        description="Visual color token for group card accents",
-        examples=["slate", "blue", "green"],
+        description="Visual color token or custom HEX color for group card accents",
+        examples=["slate", "blue", "#22c55e"],
     )
     icon: str = Field(
         default="layers",
@@ -113,9 +137,7 @@ class GroupCreateRequest(BaseModel):
     @classmethod
     def validate_color(cls, value: object) -> str:
         """Validate color token."""
-        return _normalize_and_validate_choice(
-            value, options=GROUP_COLOR_OPTIONS, field_name="color"
-        )
+        return _normalize_and_validate_color(value)
 
     @field_validator("icon", mode="before")
     @classmethod
@@ -151,8 +173,8 @@ class GroupUpdateRequest(BaseModel):
     )
     color: Optional[str] = Field(
         default=None,
-        description="Updated visual color token",
-        examples=["slate", "blue", "green"],
+        description="Updated visual color token or custom HEX color",
+        examples=["slate", "blue", "#22c55e"],
     )
     icon: Optional[str] = Field(
         default=None,
@@ -180,9 +202,7 @@ class GroupUpdateRequest(BaseModel):
         """Validate color token when supplied."""
         if value is None:
             return None
-        return _normalize_and_validate_choice(
-            value, options=GROUP_COLOR_OPTIONS, field_name="color"
-        )
+        return _normalize_and_validate_color(value)
 
     @field_validator("icon", mode="before")
     @classmethod
@@ -310,8 +330,8 @@ class GroupResponse(BaseModel):
         examples=[["frontend", "critical"]],
     )
     color: str = Field(
-        description="Visual color token for group card accents",
-        examples=["slate", "blue"],
+        description="Visual color token or custom HEX color for group card accents",
+        examples=["slate", "blue", "#22c55e"],
     )
     icon: str = Field(
         description="Icon token for group display",
