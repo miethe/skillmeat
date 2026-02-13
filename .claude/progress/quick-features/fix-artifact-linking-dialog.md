@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: completed
 created: 2026-02-13
 feature: Fix ArtifactLinkingDialog - focus borders, alignment, search, advanced filters
 files:

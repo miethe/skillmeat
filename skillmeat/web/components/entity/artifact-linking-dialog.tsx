@@ -274,7 +274,7 @@ export function ArtifactLinkingDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-lg" onKeyDown={handleKeyDown}>
+      <DialogContent className="sm:max-w-lg overflow-visible" onKeyDown={handleKeyDown}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <LinkIcon className="h-5 w-5" />
@@ -286,7 +286,7 @@ export function ArtifactLinkingDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4 overflow-visible px-1 -mx-1">
+        <div className="space-y-4 py-4 overflow-visible px-2 -mx-2">
           {/* Search Input */}
           <div className="space-y-2">
             <Label htmlFor="artifact-search">Search Artifacts</Label>
@@ -475,7 +475,7 @@ export function ArtifactLinkingDialog({
                 <SelectValue placeholder="Select relationship" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="requires">
+                <SelectItem value="requires" textValue="Requires">
                   <div className="flex flex-col min-w-0">
                     <span>Requires</span>
                     <span className="text-xs text-muted-foreground">
@@ -483,7 +483,7 @@ export function ArtifactLinkingDialog({
                     </span>
                   </div>
                 </SelectItem>
-                <SelectItem value="enables">
+                <SelectItem value="enables" textValue="Enables">
                   <div className="flex flex-col min-w-0">
                     <span>Enables</span>
                     <span className="text-xs text-muted-foreground">
@@ -491,7 +491,7 @@ export function ArtifactLinkingDialog({
                     </span>
                   </div>
                 </SelectItem>
-                <SelectItem value="related">
+                <SelectItem value="related" textValue="Related">
                   <div className="flex flex-col min-w-0">
                     <span>Related</span>
                     <span className="text-xs text-muted-foreground">
