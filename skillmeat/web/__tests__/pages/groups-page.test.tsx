@@ -315,7 +315,7 @@ describe('GroupsPageClient', () => {
     renderComponent();
     fireEvent.click(screen.getAllByRole('button', { name: /^Edit$/i })[0]);
 
-    expect(screen.getByRole('button', { name: /Set group color to Blue/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Set group icon to Layers/i })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /Group color picker/i })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /Group icon/i })).toBeInTheDocument();
   });
 });

@@ -2,8 +2,11 @@
 
 import { Book, Check, Folder, Layers, Sparkles, Tag, Wrench } from 'lucide-react';
 import type { ComponentType } from 'react';
+import type { ColorResult } from '@uiw/color-convert';
+import Compact from '@uiw/react-color-compact';
 import { TagEditor } from '@/components/shared/tag-editor';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 export const GROUP_COLORS = ['slate', 'blue', 'green', 'amber', 'rose'] as const;
@@ -58,13 +61,13 @@ export function sanitizeGroupTags(values: string[]): SanitizedGroupTagsResult {
 const COLOR_OPTIONS: Array<{
   value: GroupColor;
   label: string;
-  swatchClassName: string;
+  hex: string;
 }> = [
-  { value: 'slate', label: 'Slate', swatchClassName: 'bg-slate-500 border-slate-600' },
-  { value: 'blue', label: 'Blue', swatchClassName: 'bg-blue-500 border-blue-600' },
-  { value: 'green', label: 'Green', swatchClassName: 'bg-green-500 border-green-600' },
-  { value: 'amber', label: 'Amber', swatchClassName: 'bg-amber-500 border-amber-600' },
-  { value: 'rose', label: 'Rose', swatchClassName: 'bg-rose-500 border-rose-600' },
+  { value: 'slate', label: 'Slate', hex: '#64748b' },
+  { value: 'blue', label: 'Blue', hex: '#3b82f6' },
+  { value: 'green', label: 'Green', hex: '#22c55e' },
+  { value: 'amber', label: 'Amber', hex: '#f59e0b' },
+  { value: 'rose', label: 'Rose', hex: '#f43f5e' },
 ];
 
 const ICON_OPTIONS: Array<{
@@ -79,6 +82,52 @@ const ICON_OPTIONS: Array<{
   { value: 'book', label: 'Book', Icon: Book },
   { value: 'wrench', label: 'Wrench', Icon: Wrench },
 ];
+
+const COLOR_HEX_BY_TOKEN: Record<GroupColor, string> = Object.fromEntries(
+  COLOR_OPTIONS.map((option) => [option.value, option.hex.toLowerCase()])
+) as Record<GroupColor, string>;
+
+function normalizeHex(value: string): string {
+  const hex = value.trim().replace(/^#/, '').toLowerCase();
+  if (/^[0-9a-f]{3}$/.test(hex)) {
+    return `#${hex
+      .split('')
+      .map((part) => `${part}${part}`)
+      .join('')}`;
+  }
+  if (/^[0-9a-f]{6}$/.test(hex)) {
+    return `#${hex}`;
+  }
+  return COLOR_HEX_BY_TOKEN.slate;
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const normalized = normalizeHex(hex).replace('#', '');
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  return [r, g, b];
+}
+
+function getClosestColorToken(hex: string): GroupColor {
+  const normalizedHex = normalizeHex(hex);
+  const normalizedRgb = hexToRgb(normalizedHex);
+
+  let nearest: GroupColor = 'slate';
+  let minDistance = Number.POSITIVE_INFINITY;
+
+  for (const option of COLOR_OPTIONS) {
+    const [r, g, b] = hexToRgb(option.hex);
+    const distance =
+      (normalizedRgb[0] - r) ** 2 + (normalizedRgb[1] - g) ** 2 + (normalizedRgb[2] - b) ** 2;
+    if (distance < minDistance) {
+      nearest = option.value;
+      minDistance = distance;
+    }
+  }
+
+  return nearest;
+}
 
 interface GroupMetadataEditorProps {
   tags: string[];
@@ -103,6 +152,8 @@ export function GroupMetadataEditor({
   disabled = false,
   className,
 }: GroupMetadataEditorProps) {
+  const selectedIcon = ICON_OPTIONS.find((option) => option.value === icon) ?? ICON_OPTIONS[0];
+
   return (
     <div className={cn('space-y-5', className)}>
       <div className="space-y-2">
@@ -121,55 +172,65 @@ export function GroupMetadataEditor({
 
       <div className="space-y-2">
         <Label>Color</Label>
-        <div className="flex flex-wrap gap-2">
-          {COLOR_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onColorChange(option.value)}
-              disabled={disabled}
-              className={cn(
-                'inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm transition-colors',
-                color === option.value
-                  ? 'border-primary bg-primary/10 text-foreground'
-                  : 'border-border hover:bg-muted/60',
-                disabled && 'cursor-not-allowed opacity-60'
-              )}
-              aria-pressed={color === option.value}
-              aria-label={`Set group color to ${option.label}`}
-            >
-              <span className={cn('h-3.5 w-3.5 rounded-full border', option.swatchClassName)} />
-              <span>{option.label}</span>
-              {color === option.value && <Check className="h-3.5 w-3.5" />}
-            </button>
-          ))}
+        <div
+          role="group"
+          aria-label="Group color picker"
+          className={cn(
+            'rounded-md border p-2',
+            disabled && 'pointer-events-none cursor-not-allowed opacity-60'
+          )}
+        >
+          <Compact
+            color={COLOR_HEX_BY_TOKEN[color]}
+            colors={COLOR_OPTIONS.map((option) => option.hex)}
+            onChange={(nextColor: ColorResult) => {
+              const nextToken = getClosestColorToken(nextColor.hexa || nextColor.hex);
+              onColorChange(nextToken);
+            }}
+            style={{ width: '100%', backgroundColor: 'transparent', padding: 0 }}
+            rectProps={{
+              style: {
+                width: 22,
+                height: 22,
+                borderRadius: 6,
+              },
+            }}
+          />
+        </div>
+        <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+          <span
+            className="h-3.5 w-3.5 rounded-full border"
+            style={{ backgroundColor: COLOR_HEX_BY_TOKEN[color] }}
+          />
+          {COLOR_OPTIONS.find((option) => option.value === color)?.label}
         </div>
       </div>
 
       <div className="space-y-2">
         <Label>Icon</Label>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {ICON_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onIconChange(option.value)}
-              disabled={disabled}
-              className={cn(
-                'inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm transition-colors',
-                icon === option.value
-                  ? 'border-primary bg-primary/10 text-foreground'
-                  : 'border-border hover:bg-muted/60',
-                disabled && 'cursor-not-allowed opacity-60'
-              )}
-              aria-pressed={icon === option.value}
-              aria-label={`Set group icon to ${option.label}`}
-            >
-              <option.Icon className="h-4 w-4" />
-              <span>{option.label}</span>
-            </button>
-          ))}
-        </div>
+        <Select
+          value={icon}
+          onValueChange={(value) => onIconChange(value as GroupIcon)}
+          disabled={disabled}
+        >
+          <SelectTrigger aria-label="Group icon">
+            <span className="inline-flex items-center gap-2">
+              <selectedIcon.Icon className="h-4 w-4" />
+              {selectedIcon.label}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            {ICON_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                <span className="inline-flex items-center gap-2">
+                  <option.Icon className="h-4 w-4" />
+                  {option.label}
+                </span>
+                {option.value === icon && <Check className="ml-auto h-3.5 w-3.5 opacity-70" />}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

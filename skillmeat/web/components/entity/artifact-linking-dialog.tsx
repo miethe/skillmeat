@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -19,12 +19,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Search, Loader2, AlertCircle, Link as LinkIcon } from 'lucide-react';
+import {
+  Search,
+  Loader2,
+  AlertCircle,
+  Link as LinkIcon,
+  ChevronDown,
+  ChevronRight,
+  X,
+} from 'lucide-react';
 import { useDebounce } from '@/hooks';
+import { TagFilterPopover } from '@/components/ui/tag-filter-popover';
+import { ToolFilterPopover } from '@/components/ui/tool-filter-popover';
 import type { ArtifactType } from '@/types/artifact';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -41,8 +56,10 @@ interface SearchArtifact {
   name: string;
   type: ArtifactType;
   source?: string;
+  tags?: string[];
   metadata?: {
     description?: string;
+    tools?: string[];
   };
 }
 
@@ -65,11 +82,12 @@ interface ArtifactLinkingDialogProps {
  * ArtifactLinkingDialog - Modal dialog for searching and linking artifacts
  *
  * Allows users to search for existing artifacts and create links between them.
- * Supports filtering by artifact type and selecting the relationship type.
+ * Supports filtering by artifact type, tags, tools, and selecting the relationship type.
  *
  * Features:
- * - Debounced search input (300ms)
+ * - Debounced search input (300ms) with client-side filtering
  * - Type filter dropdown
+ * - Collapsible advanced filters (tags, tools)
  * - Single-select mode with radio buttons
  * - Link type selector (requires, enables, related)
  * - Loading and error states
@@ -99,6 +117,9 @@ export function ArtifactLinkingDialog({
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
   const [linkType, setLinkType] = useState<LinkType>('related');
   const [error, setError] = useState<string | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedTools, setSelectedTools] = useState<string[]>([]);
 
   // Debounced search query
   const debouncedSearch = useDebounce(searchQuery, 300);
@@ -111,22 +132,23 @@ export function ArtifactLinkingDialog({
       setSelectedArtifactId(null);
       setLinkType('related');
       setError(null);
+      setAdvancedOpen(false);
+      setSelectedTags([]);
+      setSelectedTools([]);
     }
   }, [open]);
 
-  // Search artifacts query
+  // Fetch artifacts from API (type filter is server-side, search is client-side)
   const {
     data: searchResults,
     isLoading: isSearching,
     error: searchError,
   } = useQuery<SearchResponse>({
-    queryKey: ['artifact-search', debouncedSearch, typeFilter, artifactId],
+    queryKey: ['artifact-search', typeFilter, artifactId],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (debouncedSearch) params.set('search', debouncedSearch);
       if (typeFilter !== 'all') params.set('artifact_type', typeFilter);
-      params.set('exclude_id', artifactId);
-      params.set('limit', '20');
+      params.set('limit', '100');
 
       const queryString = params.toString();
       const response = await fetch(buildUrl(`/artifacts?${queryString}`));
@@ -138,7 +160,7 @@ export function ArtifactLinkingDialog({
 
       return response.json();
     },
-    enabled: open && debouncedSearch.length > 0,
+    enabled: open,
     staleTime: 30000, // Cache search results for 30 seconds
   });
 
@@ -212,9 +234,40 @@ export function ArtifactLinkingDialog({
     }
   };
 
-  // Filter out the current artifact from results (extra safety in case backend doesn't support exclude_id)
-  const filteredResults =
-    searchResults?.items?.filter((artifact) => artifact.id !== artifactId) || [];
+  // Client-side filtering: search text, tags, tools, and exclude current artifact
+  const filteredResults = useMemo(() => {
+    const items = searchResults?.items ?? [];
+
+    return items.filter((artifact) => {
+      // Exclude current artifact
+      if (artifact.id === artifactId) return false;
+
+      // Search text filter (match name, description, or source)
+      if (debouncedSearch) {
+        const searchLower = debouncedSearch.toLowerCase();
+        const nameMatch = artifact.name.toLowerCase().includes(searchLower);
+        const descMatch = artifact.metadata?.description?.toLowerCase().includes(searchLower);
+        const sourceMatch = artifact.source?.toLowerCase().includes(searchLower);
+        if (!nameMatch && !descMatch && !sourceMatch) return false;
+      }
+
+      // Tag filter
+      if (selectedTags.length > 0) {
+        const artifactTags = artifact.tags ?? [];
+        if (!artifactTags.some((tag) => selectedTags.includes(tag))) return false;
+      }
+
+      // Tool filter
+      if (selectedTools.length > 0) {
+        const artifactTools = artifact.metadata?.tools ?? [];
+        if (!artifactTools.some((tool) => selectedTools.includes(tool))) return false;
+      }
+
+      return true;
+    });
+  }, [searchResults, artifactId, debouncedSearch, selectedTags, selectedTools]);
+
+  const hasActiveAdvancedFilters = selectedTags.length > 0 || selectedTools.length > 0;
 
   const isLoading = createLinkMutation.isPending;
   const displayError = error || (searchError instanceof Error ? searchError.message : null);
@@ -233,7 +286,7 @@ export function ArtifactLinkingDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4 overflow-hidden">
+        <div className="space-y-4 py-4 overflow-visible px-1 -mx-1">
           {/* Search Input */}
           <div className="space-y-2">
             <Label htmlFor="artifact-search">Search Artifacts</Label>
@@ -276,22 +329,89 @@ export function ArtifactLinkingDialog({
             </Select>
           </div>
 
+          {/* Advanced Filters (collapsible) */}
+          <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex w-full items-center justify-between px-0 hover:bg-transparent"
+              >
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  Advanced Filters
+                  {hasActiveAdvancedFilters && (
+                    <Badge variant="secondary" className="rounded-full px-2 text-xs">
+                      {selectedTags.length + selectedTools.length}
+                    </Badge>
+                  )}
+                </span>
+                {advancedOpen ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+              <div className="flex flex-wrap items-center gap-2 pt-2">
+                <TagFilterPopover selectedTags={selectedTags} onChange={setSelectedTags} />
+                <ToolFilterPopover selectedTools={selectedTools} onChange={setSelectedTools} />
+              </div>
+              {/* Active filter badges */}
+              {hasActiveAdvancedFilters && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {selectedTags.map((tag) => (
+                    <Badge key={`tag-${tag}`} variant="secondary" className="gap-1 text-xs">
+                      {tag}
+                      <X
+                        className="h-3 w-3 cursor-pointer hover:opacity-70"
+                        onClick={() => setSelectedTags(selectedTags.filter((t) => t !== tag))}
+                      />
+                    </Badge>
+                  ))}
+                  {selectedTools.map((tool) => (
+                    <Badge
+                      key={`tool-${tool}`}
+                      variant="secondary"
+                      className="gap-1 font-mono text-xs"
+                    >
+                      {tool}
+                      <X
+                        className="h-3 w-3 cursor-pointer hover:opacity-70"
+                        onClick={() => setSelectedTools(selectedTools.filter((t) => t !== tool))}
+                      />
+                    </Badge>
+                  ))}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 px-1.5 text-xs"
+                    onClick={() => {
+                      setSelectedTags([]);
+                      setSelectedTools([]);
+                    }}
+                  >
+                    Clear all
+                  </Button>
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+
           {/* Search Results */}
           <div className="space-y-2">
             <Label>Select Artifact</Label>
             <div className="max-h-48 overflow-y-auto rounded-md border">
-              {!debouncedSearch ? (
-                <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
-                  Type to search for artifacts
-                </div>
-              ) : isSearching ? (
+              {isSearching ? (
                 <div className="flex items-center justify-center p-4">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
+                  <span className="ml-2 text-sm text-muted-foreground">Loading artifacts...</span>
                 </div>
               ) : filteredResults.length === 0 ? (
                 <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
-                  No artifacts found
+                  {debouncedSearch || hasActiveAdvancedFilters
+                    ? 'No artifacts match your filters'
+                    : 'No artifacts available'}
                 </div>
               ) : (
                 <RadioGroup
@@ -335,10 +455,10 @@ export function ArtifactLinkingDialog({
                 </RadioGroup>
               )}
             </div>
-            {searchResults?.page_info?.total_count && searchResults.page_info.total_count > 20 && (
+            {searchResults?.page_info?.total_count && searchResults.page_info.total_count > 100 && (
               <p className="text-xs text-muted-foreground">
-                Showing 20 of {searchResults.page_info.total_count} results. Refine your search for
-                more specific results.
+                Showing top results of {searchResults.page_info.total_count} artifacts. Use filters
+                to narrow your search.
               </p>
             )}
           </div>
@@ -351,7 +471,7 @@ export function ArtifactLinkingDialog({
               onValueChange={(value) => setLinkType(value as LinkType)}
               disabled={isLoading}
             >
-              <SelectTrigger id="link-type" className="w-full">
+              <SelectTrigger id="link-type" className="w-full text-left">
                 <SelectValue placeholder="Select relationship" />
               </SelectTrigger>
               <SelectContent>
