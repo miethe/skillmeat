@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CopyGroupDialog } from '@/components/collection/copy-group-dialog';
 import { GroupCard } from './group-card';
 import { GroupDeleteDialog } from './group-delete-dialog';
+import { GroupDetailsModal } from './group-details-modal';
 import { GroupFormDialog } from './group-form-dialog';
 import { GroupsToolbar, type GroupSortField } from './groups-toolbar';
 import type { Group } from '@/types/groups';
@@ -74,6 +75,7 @@ export function GroupsPageClient() {
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [deletingGroup, setDeletingGroup] = useState<Group | null>(null);
   const [copyingGroup, setCopyingGroup] = useState<Group | null>(null);
+  const [detailsGroup, setDetailsGroup] = useState<Group | null>(null);
 
   // Sync URL with collection context changes
   useEffect(() => {
@@ -214,6 +216,7 @@ export function GroupsPageClient() {
                 <GroupCard
                   key={group.id}
                   group={group}
+                  onOpenDetails={setDetailsGroup}
                   onEdit={setEditingGroup}
                   onDelete={setDeletingGroup}
                   onCopy={setCopyingGroup}
@@ -257,6 +260,12 @@ export function GroupsPageClient() {
           onSuccess={() => setCopyingGroup(null)}
         />
       )}
+
+      <GroupDetailsModal
+        open={!!detailsGroup}
+        onOpenChange={(open) => !open && setDetailsGroup(null)}
+        group={detailsGroup}
+      />
     </div>
   );
 }

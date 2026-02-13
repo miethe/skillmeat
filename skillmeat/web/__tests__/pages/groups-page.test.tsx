@@ -6,12 +6,25 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GroupsPageClient } from '@/app/groups/components/groups-page-client';
-import { useCollectionContext, useCreateGroup, useDeleteGroup, useGroups, useToast, useUpdateGroup } from '@/hooks';
+import {
+  useArtifact,
+  useCollectionContext,
+  useCreateGroup,
+  useDeleteGroup,
+  useGroup,
+  useGroupArtifacts,
+  useGroups,
+  useToast,
+  useUpdateGroup,
+} from '@/hooks';
 import type { Group } from '@/types/groups';
 
 jest.mock('@/hooks', () => ({
   useCollectionContext: jest.fn(),
   useGroups: jest.fn(),
+  useGroup: jest.fn(),
+  useGroupArtifacts: jest.fn(),
+  useArtifact: jest.fn(),
   useToast: jest.fn(),
   useCreateGroup: jest.fn(),
   useUpdateGroup: jest.fn(),
@@ -55,6 +68,9 @@ jest.mock('next/link', () => {
 
 const mockUseCollectionContext = useCollectionContext as jest.MockedFunction<typeof useCollectionContext>;
 const mockUseGroups = useGroups as jest.MockedFunction<typeof useGroups>;
+const mockUseGroup = useGroup as jest.MockedFunction<typeof useGroup>;
+const mockUseGroupArtifacts = useGroupArtifacts as jest.MockedFunction<typeof useGroupArtifacts>;
+const mockUseArtifact = useArtifact as jest.MockedFunction<typeof useArtifact>;
 const mockUseToast = useToast as jest.MockedFunction<typeof useToast>;
 const mockUseCreateGroup = useCreateGroup as jest.MockedFunction<typeof useCreateGroup>;
 const mockUseUpdateGroup = useUpdateGroup as jest.MockedFunction<typeof useUpdateGroup>;
@@ -127,6 +143,30 @@ describe('GroupsPageClient', () => {
 
     mockUseGroups.mockReturnValue({
       data: { groups: mockGroups, total: mockGroups.length },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockUseGroup.mockReturnValue({
+      data: mockGroups[0],
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockUseGroupArtifacts.mockReturnValue({
+      data: [
+        {
+          artifact_id: 'skill:artifact-a',
+          position: 0,
+          added_at: '2024-01-01T00:00:00Z',
+        },
+      ],
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockUseArtifact.mockReturnValue({
+      data: { name: 'Artifact A' },
       isLoading: false,
       error: null,
     } as any);
@@ -208,5 +248,20 @@ describe('GroupsPageClient', () => {
       target: { value: 'missing-group' },
     });
     expect(screen.getByText(/No matching groups/i)).toBeInTheDocument();
+  });
+
+  it('opens details modal when card surface is clicked', () => {
+    renderComponent();
+    fireEvent.click(screen.getByRole('button', { name: /Open details for Development Tools/i }));
+    expect(screen.getByText(/Group details, artifacts, and change history/i)).toBeInTheDocument();
+  });
+
+  it('does not open details modal when action button is clicked', () => {
+    renderComponent();
+    fireEvent.click(screen.getAllByRole('button', { name: /^Edit$/i })[0]);
+    expect(
+      screen.queryByText(/Group details, artifacts, and change history/i)
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Edit Group')).toBeInTheDocument();
   });
 });

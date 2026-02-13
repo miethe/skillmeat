@@ -26,18 +26,31 @@ const iconMap = {
 
 interface GroupCardProps {
   group: Group;
+  onOpenDetails: (group: Group) => void;
   onEdit: (group: Group) => void;
   onDelete: (group: Group) => void;
   onCopy: (group: Group) => void;
 }
 
-export function GroupCard({ group, onEdit, onDelete, onCopy }: GroupCardProps) {
+export function GroupCard({ group, onOpenDetails, onEdit, onDelete, onCopy }: GroupCardProps) {
   const GroupIcon = iconMap[group.icon ?? 'layers'] ?? Layers;
   const tags = group.tags ?? [];
   const colorClass = colorClassMap[group.color ?? 'slate'] ?? colorClassMap.slate;
 
   return (
-    <Card className={`border-l-4 ${colorClass}`}>
+    <Card
+      className={`border-l-4 ${colorClass} cursor-pointer transition-shadow hover:shadow-md`}
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpenDetails(group)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpenDetails(group);
+        }
+      }}
+      aria-label={`Open details for ${group.name}`}
+    >
       <CardHeader className="space-y-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
@@ -68,7 +81,7 @@ export function GroupCard({ group, onEdit, onDelete, onCopy }: GroupCardProps) {
           Updated {new Date(group.updated_at).toLocaleDateString()}
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
           <Button asChild size="sm">
             <Link href={`/collection?collection=${group.collection_id}&group=${group.id}`}>
               Open Artifacts
