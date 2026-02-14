@@ -80,7 +80,8 @@ export function TagInput({
         // Match by name or slug
         return tag.name.toLowerCase().includes(query) || tag.slug.toLowerCase().includes(query);
       })
-      .slice(0, 10); // Limit to 10 suggestions
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, 10);
   }, [suggestions, inputValue, value]);
 
   // Get tag object from ID or name

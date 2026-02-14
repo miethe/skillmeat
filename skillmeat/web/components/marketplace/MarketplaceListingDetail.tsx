@@ -147,7 +147,7 @@ export function MarketplaceListingDetail({
         <Card className="p-4">
           <h3 className="mb-3 text-sm font-medium">Tags</h3>
           <div className="flex flex-wrap gap-2">
-            {listing.tags.map((tag) => (
+            {[...listing.tags].sort((a, b) => a.localeCompare(b)).map((tag) => (
               <Badge key={tag} variant="secondary">
                 {tag}
               </Badge>

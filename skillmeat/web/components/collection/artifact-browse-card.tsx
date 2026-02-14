@@ -151,8 +151,9 @@ export function ArtifactBrowseCard({
   // Extract tools and display tags
   const tools = extractToolsFromTags(artifact.tags);
   const displayTags = extractDisplayTags(artifact.tags);
-  const visibleTags = displayTags.slice(0, 3);
-  const remainingTagsCount = displayTags.length - visibleTags.length;
+  const sortedDisplayTags = [...displayTags].sort((a, b) => a.localeCompare(b));
+  const visibleTags = sortedDisplayTags.slice(0, 3);
+  const remainingTagsCount = sortedDisplayTags.length - visibleTags.length;
 
   // Determine author/source display
   const authorDisplay = artifact.author || artifact.source?.split('/')[0] || 'Unknown';

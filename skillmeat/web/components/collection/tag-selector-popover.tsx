@@ -168,7 +168,7 @@ export function TagSelectorPopover({
   const removeTag = useRemoveTagFromArtifact();
   const createTagMutation = useCreateTag();
 
-  const allTags = React.useMemo(() => allTagsResponse?.items ?? [], [allTagsResponse?.items]);
+  const allTags = React.useMemo(() => [...(allTagsResponse?.items ?? [])].sort((a, b) => a.name.localeCompare(b.name)), [allTagsResponse?.items]);
   const appliedTagIds = React.useMemo(
     () => new Set((artifactTags ?? []).map((t) => t.id)),
     [artifactTags]

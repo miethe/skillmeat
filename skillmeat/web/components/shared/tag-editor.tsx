@@ -152,7 +152,7 @@ function AddTagPopover({ availableTags, currentTags, onAddTag, disabled }: AddTa
       // Filter by search
       if (search && !tagLower.includes(search.toLowerCase())) return false;
       return true;
-    });
+    }).sort((a, b) => a.localeCompare(b));
   }, [availableTags, currentTags, search]);
 
   // Check if search text matches an existing available tag (case-insensitive)
@@ -307,7 +307,7 @@ export function TagEditor({
       role="group"
       aria-label="Tag editor"
     >
-      {tags.map((tag) => (
+      {[...tags].sort((a, b) => a.localeCompare(b)).map((tag) => (
         <EditableTagBadge key={tag} tag={tag} onRemove={handleRemoveTag} disabled={disabled} />
       ))}
       <AddTagPopover

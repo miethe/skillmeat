@@ -87,7 +87,7 @@ export function MarketplaceListingCard({ listing, onClick }: MarketplaceListingC
       {/* Tags */}
       {listing.tags.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-1.5">
-          {listing.tags.slice(0, 3).map((tag) => (
+          {[...listing.tags].sort((a, b) => a.localeCompare(b)).slice(0, 3).map((tag) => (
             <Badge key={tag} variant="secondary" className="text-xs">
               <Tag className="mr-1 h-3 w-3" />
               {tag}
