@@ -26,7 +26,9 @@
 'use client';
 
 import * as React from 'react';
+import { Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useArtifactGroups } from '@/hooks';
@@ -47,6 +49,8 @@ export interface ArtifactGroupBadgesProps {
   maxVisible?: number;
   /** Icon-only mode with name shown in tooltip (default: false) */
   compact?: boolean;
+  /** When provided, renders a '+' button after the badges to add to a group */
+  onAddToGroup?: () => void;
   /** Additional CSS classes for the container */
   className?: string;
 }
@@ -159,13 +163,31 @@ export function ArtifactGroupBadges({
   collectionId,
   maxVisible = 3,
   compact = false,
+  onAddToGroup,
   className,
 }: ArtifactGroupBadgesProps) {
   const { data: groups, isLoading } = useArtifactGroups(artifactId, collectionId);
 
-  // Render nothing when loading or no groups
-  if (isLoading || !groups || groups.length === 0) {
-    return null;
+  // Render nothing when loading or no groups (unless we have the add button)
+  if (isLoading || (!groups || groups.length === 0)) {
+    if (!onAddToGroup) return null;
+    // Show just the add button when no groups exist
+    return (
+      <div className={cn('flex items-center gap-1 overflow-hidden', className)}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-5 w-5 rounded-full"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddToGroup();
+          }}
+          aria-label="Add to group"
+        >
+          <Plus className="h-3 w-3" />
+        </Button>
+      </div>
+    );
   }
 
   const visibleGroups = groups.slice(0, maxVisible);
@@ -186,6 +208,20 @@ export function ArtifactGroupBadges({
         <div role="listitem" className="flex-shrink-0">
           <OverflowBadge groups={overflowGroups} />
         </div>
+      )}
+      {onAddToGroup && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-5 w-5 flex-shrink-0 rounded-full"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddToGroup();
+          }}
+          aria-label="Add to group"
+        >
+          <Plus className="h-3 w-3" />
+        </Button>
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 ---
 type: quick-feature
-status: in-progress
+status: completed
 feature: Collection Card Enhancements (Group Dialog + Tag/Group Add Buttons)
 created: 2026-02-13
 tasks:

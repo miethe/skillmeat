@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Layers, Plus, Loader2, ChevronLeft, FolderOpen, X } from 'lucide-react';
+import { resolveColorHex, ICON_MAP, COLOR_HEX_BY_TOKEN } from '@/lib/group-constants';
+import type { GroupIcon } from '@/lib/group-constants';
 import {
   Dialog,
   DialogContent,
@@ -322,7 +324,7 @@ export function AddToGroupDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[460px]">
         <DialogHeader>
           <DialogTitle>Add to Group</DialogTitle>
           <DialogDescription>
@@ -478,7 +480,7 @@ export function AddToGroupDialog({
                 )}
               </div>
             ) : (
-              <ScrollArea className="h-[200px] rounded-md border">
+              <ScrollArea className="max-h-[60vh] rounded-md border">
                 {/* Create new group section */}
                 <div className="border-b p-2">
                   {isCreatingGroup ? (
@@ -560,11 +562,30 @@ export function AddToGroupDialog({
                           <Label
                             htmlFor={`group-${group.id}`}
                             className={cn(
-                              'block text-sm font-medium',
+                              'flex items-center gap-2 text-sm font-medium',
                               isAlreadyInGroup ? 'cursor-default' : 'cursor-pointer'
                             )}
                           >
-                            {group.name}
+                            {(() => {
+                              const colorHex = group.color
+                                ? resolveColorHex(group.color)
+                                : COLOR_HEX_BY_TOKEN.slate;
+                              const IconComponent = group.icon
+                                ? ICON_MAP[group.icon as GroupIcon]
+                                : null;
+                              return (
+                                <span
+                                  className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
+                                  style={{ backgroundColor: colorHex }}
+                                  aria-hidden="true"
+                                >
+                                  {IconComponent && (
+                                    <IconComponent className="h-3 w-3 text-white" />
+                                  )}
+                                </span>
+                              );
+                            })()}
+                            <span className="truncate">{group.name}</span>
                           </Label>
                           <div className="mt-0.5 flex items-center gap-2">
                             {isAlreadyInGroup ? (

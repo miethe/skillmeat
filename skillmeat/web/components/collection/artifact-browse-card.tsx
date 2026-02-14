@@ -33,6 +33,7 @@ import { Tool } from '@/types/enums';
 import { ScoreBadge } from '@/components/ScoreBadge';
 import { PlatformBadge } from '@/components/platform-badge';
 import { ArtifactGroupBadges } from '@/components/collection/artifact-group-badges';
+import { TagSelectorPopover } from '@/components/collection/tag-selector-popover';
 
 /**
  * Props for ArtifactBrowseCard component
@@ -358,6 +359,19 @@ export function ArtifactBrowseCard({
             +{remainingTagsCount} more
           </Badge>
         )}
+        <TagSelectorPopover
+          artifactId={artifact.id}
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 rounded-full"
+              aria-label="Add tags"
+            >
+              <LucideIcons.Plus className="h-3 w-3" />
+            </Button>
+          }
+        />
       </div>
 
       {/* Target Platforms */}
@@ -378,6 +392,7 @@ export function ArtifactBrowseCard({
         artifactId={artifact.id}
         collectionId={artifact.collections?.[0]?.id}
         maxVisible={3}
+        onAddToGroup={onAddToGroup}
         className="mt-auto px-3 pb-1"
       />
 
