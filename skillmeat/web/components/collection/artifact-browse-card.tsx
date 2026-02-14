@@ -32,6 +32,7 @@ import { getArtifactTypeConfig } from '@/types/artifact';
 import { Tool } from '@/types/enums';
 import { ScoreBadge } from '@/components/ScoreBadge';
 import { PlatformBadge } from '@/components/platform-badge';
+import { ArtifactGroupBadges } from '@/components/collection/artifact-group-badges';
 
 /**
  * Props for ArtifactBrowseCard component
@@ -371,6 +372,14 @@ export function ArtifactBrowseCard({
           </Badge>
         )}
       </div>
+
+      {/* Group badges */}
+      <ArtifactGroupBadges
+        artifactId={artifact.id}
+        collectionId={artifact.collections?.[0]?.id}
+        maxVisible={3}
+        className="mt-auto px-3 pb-1"
+      />
 
       {/* Footer: Tools, Deployed Badge, Score */}
       <div className="flex items-center justify-between border-t px-4 py-3">
