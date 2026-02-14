@@ -1,11 +1,14 @@
 ---
 status: completed
 created: 2026-02-13
+completed: 2026-02-13
 feature: Fix ArtifactLinkingDialog - focus borders, alignment, search, advanced filters
 files:
   - skillmeat/web/components/entity/artifact-linking-dialog.tsx
   - skillmeat/web/components/ui/tag-filter-popover.tsx (reuse)
   - skillmeat/web/components/ui/tool-filter-popover.tsx (reuse)
+commits:
+  - 8f84d4ac fix(web): structural fix for ArtifactLinkingDialog overflow
 ---
 
 # Fix ArtifactLinkingDialog
@@ -19,7 +22,11 @@ files:
 
 ## Tasks
 
-- [ ] TASK-1: Fix focus border clipping (padding/overflow on dialog content)
-- [ ] TASK-2: Fix Relationship Type select text alignment (left-align selected value)
-- [ ] TASK-3: Fix search filtering to actually filter artifact results
-- [ ] TASK-4: Add collapsible Advanced Filters section with TagFilterPopover and ToolFilterPopover
+- [x] TASK-1: Fix focus border clipping (structural fix with [&>*]:min-w-0 on DialogContent)
+- [x] TASK-2: Fix Relationship Type select text alignment (simplified SelectItems with helper text)
+- [x] TASK-3: Fix search filtering to actually filter artifact results (client-side useMemo filter)
+- [x] TASK-4: Add collapsible Advanced Filters section with TagFilterPopover and ToolFilterPopover
+
+## Root Cause
+
+CSS Grid items have `min-width: auto` by default. Long artifact source URLs (e.g., GitHub paths) forced grid children to 887px inside a 512px dialog. The fix `[&>*]:min-w-0` allows grid items to shrink below content width.
