@@ -236,6 +236,16 @@ function ManagePageContent() {
     [updateUrlParams]
   );
 
+  // Handle clicking a tag badge on a card to add it to filters
+  const handleTagClick = useCallback(
+    (tagName: string) => {
+      if (!urlTags.includes(tagName)) {
+        handleTagsChange([...urlTags, tagName]);
+      }
+    },
+    [urlTags, handleTagsChange]
+  );
+
   const handleClearAllFilters = useCallback(() => {
     updateUrlParams({
       search: null,
@@ -503,6 +513,7 @@ function ManagePageContent() {
             onViewDiff={handleViewDiff}
             onRollback={handleRollback}
             onManage={handleManage}
+            onTagClick={handleTagClick}
           />
         </div>
       </div>

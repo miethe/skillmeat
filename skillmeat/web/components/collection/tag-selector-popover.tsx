@@ -62,7 +62,8 @@ interface TagItemProps {
 }
 
 function TagItem({ tag, isApplied, isPending, onToggle }: TagItemProps) {
-  const color = getTagColor(tag.name);
+  // Prefer DB-configured color, fall back to hash-based color
+  const color = tag.color || getTagColor(tag.name);
 
   return (
     <CommandItem

@@ -51,6 +51,8 @@ export interface ArtifactGroupBadgesProps {
   compact?: boolean;
   /** When provided, renders a '+' button after the badges to add to a group */
   onAddToGroup?: () => void;
+  /** Handler when a group badge is clicked (for filtering) */
+  onGroupClick?: (groupId: string) => void;
   /** Additional CSS classes for the container */
   className?: string;
 }
@@ -69,20 +71,28 @@ const ICON_SIZE = 'h-3 w-3';
 interface GroupBadgeItemProps {
   group: Group;
   compact: boolean;
+  onClick?: (groupId: string) => void;
 }
 
 /**
  * Single group badge with color, icon, and optional tooltip for compact mode.
  */
-function GroupBadgeItem({ group, compact }: GroupBadgeItemProps) {
+function GroupBadgeItem({ group, compact, onClick }: GroupBadgeItemProps) {
   const colorHex = group.color ? resolveColorHex(group.color) : DEFAULT_COLOR_HEX;
   const IconComponent = group.icon ? ICON_MAP[group.icon as GroupIcon] : null;
 
   const badge = (
     <Badge
       colorStyle={colorHex}
-      className="px-1.5 py-0 text-[11px]"
+      className={cn(
+        'px-1.5 py-0 text-[11px]',
+        onClick && 'cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all'
+      )}
       aria-label={`Group: ${group.name}`}
+      onClick={onClick ? (e) => {
+        e.stopPropagation();
+        onClick(group.id);
+      } : undefined}
     >
       {IconComponent && <IconComponent className={cn(ICON_SIZE, !compact && 'mr-1')} aria-hidden="true" />}
       {!compact && <span className="truncate">{group.name}</span>}
@@ -164,6 +174,7 @@ export function ArtifactGroupBadges({
   maxVisible = 3,
   compact = false,
   onAddToGroup,
+  onGroupClick,
   className,
 }: ArtifactGroupBadgesProps) {
   const { data: groups, isLoading } = useArtifactGroups(artifactId, collectionId);
@@ -174,18 +185,27 @@ export function ArtifactGroupBadges({
     // Show just the add button when no groups exist
     return (
       <div className={cn('flex items-center gap-1 overflow-hidden', className)}>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5 rounded-full"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddToGroup();
-          }}
-          aria-label="Add to group"
-        >
-          <Plus className="h-3 w-3" />
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 rounded-full"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddToGroup();
+                }}
+                aria-label="Add to group"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Add to Group</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     );
   }
@@ -201,7 +221,7 @@ export function ArtifactGroupBadges({
     >
       {visibleGroups.map((group) => (
         <div key={group.id} role="listitem" className="flex-shrink-0">
-          <GroupBadgeItem group={group} compact={compact} />
+          <GroupBadgeItem group={group} compact={compact} onClick={onGroupClick} />
         </div>
       ))}
       {overflowGroups.length > 0 && (
@@ -210,18 +230,27 @@ export function ArtifactGroupBadges({
         </div>
       )}
       {onAddToGroup && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5 flex-shrink-0 rounded-full"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddToGroup();
-          }}
-          aria-label="Add to group"
-        >
-          <Plus className="h-3 w-3" />
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 flex-shrink-0 rounded-full"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddToGroup();
+                }}
+                aria-label="Add to group"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Add to Group</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
     </div>
   );

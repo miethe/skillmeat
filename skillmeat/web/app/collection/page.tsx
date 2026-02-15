@@ -441,6 +441,24 @@ function CollectionPageContent() {
     [updateUrlParams]
   );
 
+  // Handle clicking a tag badge on a card to add it to filters
+  const handleTagClick = useCallback(
+    (tagName: string) => {
+      if (!selectedTags.includes(tagName)) {
+        handleTagsChange([...selectedTags, tagName]);
+      }
+    },
+    [selectedTags, handleTagsChange]
+  );
+
+  // Handle clicking a group badge on a card to set group filter
+  const handleGroupClick = useCallback(
+    (groupId: string) => {
+      updateUrlParams({ group: groupId });
+    },
+    [updateUrlParams]
+  );
+
   // Helper function to map API artifact response to Artifact type
   // Uses the centralized mapper from @/lib/api/mappers
   const mapApiArtifactToArtifact = (apiArtifact: ArtifactResponse): Artifact => {
@@ -970,6 +988,8 @@ function CollectionPageContent() {
                 onManageGroups={handleManageGroups}
                 onEdit={handleEditFromDropdown}
                 onDelete={handleDeleteFromDropdown}
+                onTagClick={handleTagClick}
+                onGroupClick={handleGroupClick}
               />
             ) : viewMode === 'list' ? (
               <ArtifactList
@@ -1004,6 +1024,8 @@ function CollectionPageContent() {
                 onManageGroups={handleManageGroups}
                 onEdit={handleEditFromDropdown}
                 onDelete={handleDeleteFromDropdown}
+                onTagClick={handleTagClick}
+                onGroupClick={handleGroupClick}
               />
             )}
           </>
