@@ -7325,12 +7325,19 @@ async def update_artifact_tags(
     summary="Add tag to artifact",
     description="Associate a tag with an artifact",
 )
-async def add_tag_to_artifact(artifact_id: str, tag_id: str) -> dict[str, str]:
+async def add_tag_to_artifact(
+    artifact_id: str,
+    tag_id: str,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+) -> dict[str, str]:
     """Add a tag to an artifact.
 
     Args:
         artifact_id: Unique identifier of the artifact
         tag_id: Unique identifier of the tag
+        collection_mgr: Collection manager dependency
+        token: API token for authentication
 
     Returns:
         Success message with artifact and tag IDs
@@ -7345,6 +7352,43 @@ async def add_tag_to_artifact(artifact_id: str, tag_id: str) -> dict[str, str]:
 
     try:
         service.add_tag_to_artifact(artifact_id, tag_id)
+
+        # Write-through: sync tags to CollectionArtifact.tags_json and filesystem
+        updated_tags = [t.name for t in service.get_artifact_tags(artifact_id)]
+
+        # Update CollectionArtifact.tags_json in DB cache
+        try:
+            db_session = get_session()
+            cas = (
+                db_session.query(CollectionArtifact)
+                .filter_by(artifact_id=artifact_id)
+                .all()
+            )
+            for ca in cas:
+                ca.tags_json = json.dumps(updated_tags) if updated_tags else None
+            db_session.commit()
+            db_session.close()
+        except Exception as cache_err:
+            logger.warning(
+                f"Failed to update CollectionArtifact tags cache: {cache_err}"
+            )
+
+        # Update filesystem artifact
+        try:
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
+            artifact_type = ArtifactType(artifact_type_str)
+            collection_name = collection_mgr.get_active_collection_name()
+            coll = collection_mgr.load_collection(collection_name)
+            artifact = coll.find_artifact(artifact_name, artifact_type)
+            if artifact:
+                artifact.tags = updated_tags
+                collection_mgr.save_collection(coll)
+                logger.info(
+                    f"Updated filesystem tags for {artifact_id}: {updated_tags}"
+                )
+        except Exception as fs_err:
+            logger.warning(f"Failed to update filesystem artifact tags: {fs_err}")
+
         return {"message": f"Tag {tag_id} added to artifact {artifact_id}"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -7358,12 +7402,19 @@ async def add_tag_to_artifact(artifact_id: str, tag_id: str) -> dict[str, str]:
     summary="Remove tag from artifact",
     description="Remove a tag from an artifact",
 )
-async def remove_tag_from_artifact(artifact_id: str, tag_id: str) -> None:
+async def remove_tag_from_artifact(
+    artifact_id: str,
+    tag_id: str,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+) -> None:
     """Remove a tag from an artifact.
 
     Args:
         artifact_id: Unique identifier of the artifact
         tag_id: Unique identifier of the tag
+        collection_mgr: Collection manager dependency
+        token: API token for authentication
 
     Returns:
         None (204 No Content)
@@ -7379,6 +7430,43 @@ async def remove_tag_from_artifact(artifact_id: str, tag_id: str) -> None:
     try:
         if not service.remove_tag_from_artifact(artifact_id, tag_id):
             raise HTTPException(status_code=404, detail="Tag association not found")
+
+        # Write-through: sync tags to CollectionArtifact.tags_json and filesystem
+        updated_tags = [t.name for t in service.get_artifact_tags(artifact_id)]
+
+        # Update CollectionArtifact.tags_json in DB cache
+        try:
+            db_session = get_session()
+            cas = (
+                db_session.query(CollectionArtifact)
+                .filter_by(artifact_id=artifact_id)
+                .all()
+            )
+            for ca in cas:
+                ca.tags_json = json.dumps(updated_tags) if updated_tags else None
+            db_session.commit()
+            db_session.close()
+        except Exception as cache_err:
+            logger.warning(
+                f"Failed to update CollectionArtifact tags cache: {cache_err}"
+            )
+
+        # Update filesystem artifact
+        try:
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
+            artifact_type = ArtifactType(artifact_type_str)
+            collection_name = collection_mgr.get_active_collection_name()
+            coll = collection_mgr.load_collection(collection_name)
+            artifact = coll.find_artifact(artifact_name, artifact_type)
+            if artifact:
+                artifact.tags = updated_tags
+                collection_mgr.save_collection(coll)
+                logger.info(
+                    f"Updated filesystem tags for {artifact_id}: {updated_tags}"
+                )
+        except Exception as fs_err:
+            logger.warning(f"Failed to update filesystem artifact tags: {fs_err}")
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
