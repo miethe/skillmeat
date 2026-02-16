@@ -28,6 +28,7 @@ import {
   ExternalLink,
   ArrowRight,
   MoreVertical,
+  Plus,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
@@ -74,13 +75,13 @@ import {
   useProjects,
   usePendingContextChanges,
   useTags,
-  useUpdateArtifactTags,
   useSources,
 } from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import { getCollectionColor } from '@/lib/utils/collection-colors';
+import { getTagColor } from '@/lib/utils/tag-colors';
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
-import { TagEditor } from '@/components/shared/tag-editor';
+import { TagSelectorPopover } from '@/components/collection/tag-selector-popover';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
 import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments';
 import { ContextSyncStatus } from '@/components/entity/context-sync-status';
@@ -390,7 +391,6 @@ export function UnifiedEntityModal({
   const [_isDeploying, _setIsDeploying] = useState(false);
   const [_isSyncing, _setIsSyncing] = useState(false);
   const [showRollbackDialog, setShowRollbackDialog] = useState(false);
-  const [localTags, setLocalTags] = useState<string[] | null>(null);
   const [showMergeWorkflow, setShowMergeWorkflow] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -472,15 +472,8 @@ export function UnifiedEntityModal({
     }
   }, [entity, open, onNavigateToSource, onNavigateToDeployment]);
 
-  // Fetch available tags for autocomplete
-  const { data: tagsData, isLoading: isTagsLoading } = useTags(100);
-  const availableTags = useMemo(() => {
-    if (!tagsData?.items) return [];
-    return tagsData.items.map((tag) => tag.name);
-  }, [tagsData]);
-
-  // Tag update mutation
-  const { mutate: updateTags, isPending: isUpdatingTags } = useUpdateArtifactTags();
+  // Fetch tags (for loading state display, TagSelectorPopover handles its own data)
+  const { isLoading: isTagsLoading } = useTags(100);
 
   // Fetch marketplace sources for Sources tab
   const { data: sourcesData } = useSources(100);
@@ -904,11 +897,6 @@ export function UnifiedEntityModal({
 
   // Auto-select first deployment's project when viewing from collection mode
   // This ensures the Sync Status tab shows data immediately instead of "No project deployment found"
-  // Reset local tags when entity changes
-  useEffect(() => {
-    setLocalTags(null);
-  }, [entity?.id]);
-
   useEffect(() => {
     // Only auto-select if:
     // 1. Entity has no projectPath (collection mode)
@@ -1357,39 +1345,6 @@ export function UnifiedEntityModal({
       });
       throw error;
     }
-  };
-
-  // Handle tag changes from TagEditor
-  const handleTagsChange = (newTags: string[]) => {
-    if (!entity) return;
-
-    updateTags(
-      {
-        artifactId: entity.id,
-        tags: newTags,
-        collection: entity.collection || undefined,
-      },
-      {
-        onSuccess: () => {
-          // Update local state immediately for instant UI update
-          setLocalTags(newTags);
-          toast({
-            title: 'Tags Updated',
-            description: `Updated tags for ${entity.name}`,
-          });
-          // Refresh entity data
-          refetch();
-        },
-        onError: (error) => {
-          console.error('Tag update failed:', error);
-          toast({
-            title: 'Update Failed',
-            description: error instanceof Error ? error.message : 'Failed to update tags',
-            variant: 'destructive',
-          });
-        },
-      }
-    );
   };
 
   // Handle linked artifacts callbacks
@@ -2021,13 +1976,28 @@ export function UnifiedEntityModal({
                       <Tag className="h-4 w-4" />
                       Tags
                     </h3>
-                    <TagEditor
-                      tags={localTags ?? entity.tags ?? []}
-                      onTagsChange={handleTagsChange}
-                      availableTags={availableTags}
-                      isLoading={isTagsLoading || isUpdatingTags}
-                      disabled={isUpdatingTags}
-                    />
+                    {isTagsLoading ? (
+                      <div className="flex items-center gap-1">
+                        <div className="h-5 w-16 animate-pulse rounded-md bg-muted" />
+                        <div className="h-5 w-12 animate-pulse rounded-md bg-muted" />
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {[...(entity.tags ?? [])].sort((a, b) => a.localeCompare(b)).map((tag) => (
+                          <Badge key={tag} colorStyle={getTagColor(tag)} className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                        <TagSelectorPopover
+                          artifactId={entity.id}
+                          trigger={
+                            <Button variant="outline" size="sm" className="h-6 w-6 rounded-full p-0">
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          }
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Aliases */}

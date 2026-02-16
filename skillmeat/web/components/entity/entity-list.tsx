@@ -62,6 +62,8 @@ export interface EntityListProps {
   onRollback?: (artifact: Artifact) => void;
   /** Callback for manage action (used with operations variant) */
   onManage?: (artifact: Artifact) => void;
+  /** Handler when a tag badge is clicked (for filtering) */
+  onTagClick?: (tagName: string) => void;
 }
 
 /**
@@ -114,6 +116,7 @@ export function EntityList({
   onViewDiff,
   onRollback,
   onManage,
+  onTagClick,
 }: EntityListProps) {
   // Use entities from context if not provided
   const context = useEntityLifecycle();
@@ -202,6 +205,7 @@ export function EntityList({
           onViewDiff={onViewDiff ? () => onViewDiff(artifact) : undefined}
           onManage={onManage ? () => onManage(artifact) : undefined}
           onDelete={onDelete ? () => onDelete(artifact) : undefined}
+          onTagClick={onTagClick}
         />
       );
     },
@@ -216,6 +220,7 @@ export function EntityList({
       onViewDiff,
       onManage,
       onDelete,
+      onTagClick,
     ]
   );
 

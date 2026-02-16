@@ -31,6 +31,10 @@ interface ArtifactGridProps {
   /** @deprecated Not currently used by ArtifactBrowseCard - kept for API stability */
   onEdit?: (artifact: Artifact) => void;
   onDelete?: (artifact: Artifact) => void;
+  /** Handler when a tag badge is clicked (for filtering) */
+  onTagClick?: (tagName: string) => void;
+  /** Handler when a group badge is clicked (for filtering) */
+  onGroupClick?: (groupId: string) => void;
 }
 
 function ArtifactGridSkeleton() {
@@ -56,6 +60,8 @@ export function ArtifactGrid({
   onManageGroups,
   onEdit: _onEdit,
   onDelete,
+  onTagClick,
+  onGroupClick,
 }: ArtifactGridProps) {
   const [deleteArtifact, setDeleteArtifact] = useState<Artifact | null>(null);
   const [deployArtifact, setDeployArtifact] = useState<Artifact | null>(null);
@@ -110,6 +116,8 @@ export function ArtifactGrid({
             onViewDetails={() => onArtifactClick(artifact)}
             showCollectionBadge={showCollectionBadge}
             onCollectionClick={onCollectionClick}
+            onTagClick={onTagClick}
+            onGroupClick={onGroupClick}
           />
         ))}
       </div>
