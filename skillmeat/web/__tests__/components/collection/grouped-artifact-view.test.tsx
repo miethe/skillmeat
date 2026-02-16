@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GroupedArtifactView } from '@/components/collection/grouped-artifact-view';
 import type { Artifact } from '@/types/artifact';
@@ -65,6 +65,17 @@ jest.mock('sonner', () => ({
     error: jest.fn(),
     info: jest.fn(),
   },
+}));
+
+// Mock GroupFormDialog (it uses useToast internally which is not mocked here)
+jest.mock('@/app/groups/components/group-form-dialog', () => ({
+  GroupFormDialog: ({ open, onOpenChange, group }: { open: boolean; onOpenChange: (o: boolean) => void; group?: unknown }) => (
+    open ? (
+      <div data-testid={group ? 'edit-group-dialog' : 'create-group-dialog'}>
+        <button onClick={() => onOpenChange(false)}>Close</button>
+      </div>
+    ) : null
+  ),
 }));
 
 // Import mocked modules for beforeEach setup
@@ -394,29 +405,19 @@ describe('GroupedArtifactView', () => {
   // Create Group button
   // ─────────────────────────────────────────────────────────────────────────
 
-  it('"Create Group" button triggers group creation', async () => {
-    const createdGroup = { ...testGroup, id: 'new-group', name: 'New Group 1' };
-    const createMutateAsync = jest.fn().mockResolvedValue(createdGroup);
-    (useCreateGroup as jest.Mock).mockReturnValue({ mutateAsync: createMutateAsync });
-
+  it('"Create Group" button opens the GroupFormDialog', () => {
     setupHooks({ groups: [] });
 
     renderComponent();
 
-    const createBtn = screen.getByRole('button', { name: /create group/i });
-    expect(createBtn).toBeInTheDocument();
+    // Dialog should not be visible yet
+    expect(screen.queryByTestId('create-group-dialog')).not.toBeInTheDocument();
 
+    const createBtn = screen.getByRole('button', { name: /create group/i });
     fireEvent.click(createBtn);
 
-    await waitFor(() => {
-      expect(createMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          collection_id: 'test-collection',
-          name: 'New Group 1',
-          position: 0,
-        })
-      );
-    });
+    // Dialog should now be open
+    expect(screen.getByTestId('create-group-dialog')).toBeInTheDocument();
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -454,7 +455,7 @@ describe('GroupedArtifactView', () => {
   // Remove-from-group zone visibility
   // ─────────────────────────────────────────────────────────────────────────
 
-  it('shows remove-from-group zone only when viewing a specific group', () => {
+  it('hides remove-from-group zone when not dragging, even on a specific group', () => {
     setupHooks({
       groups: [testGroup],
       groupArtifactMap: {
@@ -467,9 +468,9 @@ describe('GroupedArtifactView', () => {
     // On "All Artifacts" pane, no remove zone
     expect(screen.queryByText(/Remove from/i)).not.toBeInTheDocument();
 
-    // Switch to group pane
+    // Switch to group pane -- still hidden because activeId is null (no drag in progress)
     fireEvent.click(screen.getByText('Design Tools'));
 
-    expect(screen.getByText('Remove from Design Tools')).toBeInTheDocument();
+    expect(screen.queryByText(/Remove from/i)).not.toBeInTheDocument();
   });
 });

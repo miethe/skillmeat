@@ -19,7 +19,7 @@ import { useState, useRef, useMemo, useCallback } from 'react';
 import {
   DndContext,
   DragOverlay,
-  closestCenter,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -33,8 +33,9 @@ import {
   sortableKeyboardCoordinates,
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Package } from 'lucide-react';
+import { Package, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -52,7 +53,6 @@ import {
   useAddArtifactToGroup,
   useRemoveArtifactFromGroup,
   useReorderArtifactsInGroup,
-  useCreateGroup,
   useDndAnimations,
 } from '@/hooks';
 import type { GroupArtifact } from '@/types/groups';
@@ -60,6 +60,7 @@ import { GroupSidebar, type PaneSelection } from './group-sidebar';
 import { MiniArtifactCard, DraggableMiniArtifactCard } from './mini-artifact-card';
 import { RemoveFromGroupDropZone } from './remove-from-group-zone';
 import { DropIntoGroupOverlay, PoofParticles } from './dnd-animations';
+import { GroupFormDialog } from '@/app/groups/components/group-form-dialog';
 
 // ---------------------------------------------------------------------------
 // Props interface (preserved for parent compatibility)
@@ -112,26 +113,6 @@ function GroupedViewSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
-// PaneHeader
-// ---------------------------------------------------------------------------
-
-interface PaneHeaderProps {
-  title: string;
-  count: number;
-}
-
-function PaneHeader({ title, count }: PaneHeaderProps) {
-  return (
-    <div className="flex items-center gap-2 pb-3">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <span className="text-sm text-muted-foreground">
-        ({count} {count === 1 ? 'artifact' : 'artifacts'})
-      </span>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // EmptyState
 // ---------------------------------------------------------------------------
 
@@ -157,6 +138,8 @@ export function GroupedArtifactView({
   const [selectedPane, setSelectedPane] = useState<PaneSelection>('all');
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const lastDraggedArtifactRef = useRef<Artifact | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
 
   // ── DnD Animations ────────────────────────────────────────────────────
   const { animState, triggerDropIntoGroup, triggerRemovePoof, reset: resetAnim } = useDndAnimations();
@@ -189,7 +172,6 @@ export function GroupedArtifactView({
   const addArtifactToGroup = useAddArtifactToGroup();
   const removeArtifactFromGroup = useRemoveArtifactFromGroup();
   const reorderArtifactsInGroup = useReorderArtifactsInGroup();
-  const createGroup = useCreateGroup();
 
   // ── Derived data ───────────────────────────────────────────────────────
 
@@ -402,22 +384,9 @@ export function GroupedArtifactView({
   );
 
   // ── Create group handler ───────────────────────────────────────────────
-  const handleCreateGroup = useCallback(async () => {
-    // Simple inline creation -- prompt-free, creates with default name
-    // A more complete dialog can be added later
-    const name = `New Group ${groups.length + 1}`;
-    try {
-      const created = await createGroup.mutateAsync({
-        collection_id: collectionId,
-        name,
-        position: groups.length,
-      });
-      setSelectedPane(created.id);
-      toast.success(`Created "${name}"`);
-    } catch {
-      toast.error('Failed to create group');
-    }
-  }, [collectionId, createGroup, groups.length]);
+  const handleCreateGroup = useCallback(() => {
+    setCreateDialogOpen(true);
+  }, []);
 
   // ── Drag overlay artifact ──────────────────────────────────────────────
   const draggedArtifact = useMemo(
@@ -439,7 +408,7 @@ export function GroupedArtifactView({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
@@ -486,11 +455,22 @@ export function GroupedArtifactView({
 
           {/* Pane header (fixed) */}
           <div className="shrink-0 px-4 pt-4">
-            <PaneHeader title={paneName} count={paneArtifacts.length} />
+            <div className="flex items-center gap-2 pb-3">
+              <h2 className="text-lg font-semibold">{paneName}</h2>
+              <span className="text-sm text-muted-foreground">
+                ({paneArtifacts.length} {paneArtifacts.length === 1 ? 'artifact' : 'artifacts'})
+              </span>
+              {selectedGroup && (
+                <Button variant="ghost" size="sm" onClick={() => setEditingGroup(selectedGroup)}>
+                  <Settings className="h-4 w-4" />
+                  <span className="sr-only">Manage Group</span>
+                </Button>
+              )}
+            </div>
 
-            {/* Remove-from-group drop zone */}
-            {isSpecificGroup && selectedGroup && (
-              <div className="mb-3">
+            {/* Remove-from-group drop zone (visible only during drag) */}
+            {isSpecificGroup && selectedGroup && activeId && (
+              <div className="mb-3 animate-in fade-in slide-in-from-top-1 duration-200">
                 <RemoveFromGroupDropZone
                   groupName={selectedGroup.name}
                   isPoofing={animState.phase === 'dropping-remove'}
@@ -573,6 +553,21 @@ export function GroupedArtifactView({
           <PoofParticles />
         </div>
       )}
+      {/* Create group dialog */}
+      <GroupFormDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        collectionId={collectionId}
+        defaultPosition={groups.length}
+      />
+
+      {/* Edit group dialog */}
+      <GroupFormDialog
+        open={!!editingGroup}
+        onOpenChange={(open) => !open && setEditingGroup(null)}
+        collectionId={collectionId}
+        group={editingGroup}
+      />
     </DndContext>
   );
 }
