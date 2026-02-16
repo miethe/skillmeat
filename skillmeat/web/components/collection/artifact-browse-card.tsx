@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { getSourceDisplay } from '@/lib/source-utils';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 import { getArtifactTypeConfig } from '@/types/artifact';
 import { Tool } from '@/types/enums';
@@ -185,8 +186,12 @@ export function ArtifactBrowseCard({
   const visibleTags = sortedDisplayTags.slice(0, 3);
   const remainingTagsCount = sortedDisplayTags.length - visibleTags.length;
 
-  // Determine author/source display
-  const authorDisplay = artifact.author || artifact.source?.split('/')[0] || 'Unknown';
+  // Determine source display info
+  const sourceDisplay = getSourceDisplay(artifact);
+  const authorDisplay =
+    artifact.author ||
+    (sourceDisplay.type === 'github' ? sourceDisplay.displayName : null) ||
+    (sourceDisplay.type === 'local' ? 'Local' : 'Unknown');
 
   // Check deployment count
   const deploymentCount = artifact.deployments?.length ?? 0;
@@ -254,9 +259,23 @@ export function ArtifactBrowseCard({
               <h3 className="truncate font-semibold leading-tight" title={artifact.name}>
                 {artifact.name}
               </h3>
-              <p className="truncate text-sm text-muted-foreground" title={authorDisplay}>
-                {authorDisplay}
-              </p>
+              {sourceDisplay.type === 'github' ? (
+                <a
+                  href={sourceDisplay.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 truncate text-sm text-blue-600 hover:underline dark:text-blue-400"
+                  title={sourceDisplay.displayName}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <LucideIcons.Github className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+                  <span className="truncate">{sourceDisplay.displayName}</span>
+                </a>
+              ) : (
+                <p className="truncate text-sm text-muted-foreground" title={authorDisplay}>
+                  {authorDisplay}
+                </p>
+              )}
             </div>
           </div>
 
