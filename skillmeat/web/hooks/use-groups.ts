@@ -586,6 +586,8 @@ export function useAddArtifactToGroup(): UseMutationResult<
       // Invalidate group artifacts and detail to update artifact_count
       queryClient.invalidateQueries({ queryKey: groupKeys.artifacts(groupId) });
       queryClient.invalidateQueries({ queryKey: groupKeys.detail(groupId) });
+      // Invalidate all group lists so counts update in filters/dialogs
+      queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
       // Cross-hook invalidation: artifact's group membership has changed
       // This ensures useArtifactGroups queries reflect the new membership
       queryClient.invalidateQueries({ queryKey: artifactGroupKeys.all });
@@ -643,6 +645,8 @@ export function useRemoveArtifactFromGroup(): UseMutationResult<
       // Invalidate group artifacts and detail to update artifact_count
       queryClient.invalidateQueries({ queryKey: groupKeys.artifacts(groupId) });
       queryClient.invalidateQueries({ queryKey: groupKeys.detail(groupId) });
+      // Invalidate all group lists so counts update in filters/dialogs
+      queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
       // Cross-hook invalidation: artifact's group membership has changed
       // This ensures useArtifactGroups queries reflect the removal
       queryClient.invalidateQueries({ queryKey: artifactGroupKeys.all });
@@ -785,6 +789,8 @@ export function useMoveArtifactToGroup(): UseMutationResult<
       queryClient.invalidateQueries({ queryKey: groupKeys.artifacts(targetGroupId) });
       queryClient.invalidateQueries({ queryKey: groupKeys.detail(sourceGroupId) });
       queryClient.invalidateQueries({ queryKey: groupKeys.detail(targetGroupId) });
+      // Invalidate all group lists so counts update in filters/dialogs
+      queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
       // Cross-hook invalidation: artifact's group membership has changed
       // Moving between groups changes which groups the artifact belongs to
       queryClient.invalidateQueries({ queryKey: artifactGroupKeys.all });

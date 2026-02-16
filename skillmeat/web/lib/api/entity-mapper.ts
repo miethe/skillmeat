@@ -98,6 +98,13 @@ export interface ApiArtifactResponse {
   }>;
   collection?: string | { id: string; name: string };
 
+  // Groups - organizational grouping within collections
+  groups?: Array<{
+    id: string;
+    name: string;
+    position?: number;
+  }> | null;
+
   // Deployments - list of projects where this artifact is deployed
   deployments?: ApiDeploymentSummary[] | null;
 
@@ -485,6 +492,7 @@ export function mapArtifactToEntity(
     collections, // ALWAYS include collections array (may be empty)
     ...(projectPath && { projectPath }),
     ...(deployments !== null && { deployments }), // Include if present (even if empty array)
+    ...(artifact.groups && artifact.groups.length > 0 && { groups: artifact.groups }),
 
     // Metadata (flattened)
     ...(description && { description }),

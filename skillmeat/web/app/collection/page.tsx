@@ -37,8 +37,28 @@ import type { Artifact, ArtifactFilters } from '@/types/artifact';
 import type { ArtifactParameters } from '@/types/discovery';
 import { mapApiResponseToArtifact, type ArtifactResponse } from '@/lib/api/mappers';
 import { mapArtifactsToEntities } from '@/lib/api/entity-mapper';
+import type { FilterMode } from '@/components/collection/collection-toolbar';
 
 type ViewMode = 'grid' | 'list' | 'grouped';
+
+// ==========================================================================
+// Filter Combination Logic
+// ==========================================================================
+
+/**
+ * The filterMode (AND/OR) controls how values WITHIN each filter category
+ * combine. Across categories, filters always combine with AND.
+ *
+ * - AND mode (within category): artifact must match ALL selected values
+ *   e.g., Groups=["A","B"] with AND -> artifact must be in both A and B
+ * - OR mode (within category): artifact must match ANY selected value
+ *   e.g., Groups=["A","B"] with OR -> artifact in A or B
+ *
+ * For single-value fields (status, scope), AND with multiple selections
+ * will match nothing (an artifact can't be both "active" and "modified"),
+ * which is technically correct. The main value of AND mode is for
+ * multi-value fields like groups, tags, and tools.
+ */
 
 function CollectionPageSkeleton() {
   return (
@@ -123,6 +143,7 @@ function CollectionPageContent() {
   const urlType = searchParams.get('type') || 'all';
   const urlSort = searchParams.get('sort') || 'confidence';
   const urlOrder = (searchParams.get('order') as 'asc' | 'desc') || 'desc';
+  const filterMode: FilterMode = (searchParams.get('filterMode') as FilterMode) || 'and';
 
   // Multi-select filters from URL (comma-separated)
   const selectedStatuses = useMemo(() => {
@@ -507,6 +528,31 @@ function CollectionPageContent() {
     [updateUrlParams]
   );
 
+  // Handle filter mode (AND/OR) changes
+  const handleFilterModeChange = useCallback(
+    (mode: FilterMode) => {
+      updateUrlParams({
+        filterMode: mode === 'and' ? null : mode, // 'and' is default, don't write to URL
+      });
+    },
+    [updateUrlParams]
+  );
+
+  // Clear ALL filters in a single URL update to avoid stale searchParams race condition
+  const handleClearAllFilters = useCallback(() => {
+    updateUrlParams({
+      status: null,
+      scope: null,
+      platform: null,
+      groups: null,
+      tags: null,
+      tools: null,
+      search: null,
+      filterMode: null,
+      // Don't clear: type, sort, order, collection, view (navigation, not filters)
+    });
+  }, [updateUrlParams]);
+
   // Helper function to map API artifact response to Artifact type
   // Uses the centralized mapper from @/lib/api/mappers
   const mapApiArtifactToArtifact = (apiArtifact: ArtifactResponse): Artifact => {
@@ -553,48 +599,12 @@ function CollectionPageContent() {
       });
     }
 
-    // Type filter
+    // Type filter is always AND (it's a primary category selector, not a cross-category filter)
     if (filters.type && filters.type !== 'all') {
       artifacts = artifacts.filter((artifact) => artifact.type === filters.type);
     }
 
-    // Status filter (multi-select, uses syncStatus)
-    if (selectedStatuses.length > 0) {
-      artifacts = artifacts.filter((artifact) =>
-        selectedStatuses.includes(artifact.syncStatus || '')
-      );
-    }
-
-    // Scope filter (multi-select)
-    if (selectedScopes.length > 0) {
-      artifacts = artifacts.filter((artifact) =>
-        selectedScopes.includes(artifact.scope || '')
-      );
-    }
-
-    // Target platform filter (multi-select)
-    if (selectedPlatforms.length > 0) {
-      artifacts = artifacts.filter((artifact) => {
-        if (selectedPlatforms.includes('universal')) {
-          // Include artifacts with no platform (universal) OR matching any selected platform
-          const isUniversal = !artifact.targetPlatforms || artifact.targetPlatforms.length === 0;
-          const matchesPlatform = artifact.targetPlatforms?.some((p) =>
-            selectedPlatforms.includes(p)
-          );
-          return isUniversal || matchesPlatform;
-        }
-        return artifact.targetPlatforms?.some((p) => selectedPlatforms.includes(p));
-      });
-    }
-
-    // Group filter (multi-select, client-side when >1 group selected)
-    if (selectedGroups.length > 1) {
-      artifacts = artifacts.filter((artifact) =>
-        artifact.groups?.some((g) => selectedGroups.includes(g.id)) ?? false
-      );
-    }
-
-    // Search
+    // Search is always AND (narrows results regardless of filter mode)
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       artifacts = artifacts.filter((a) => {
@@ -603,6 +613,44 @@ function CollectionPageContent() {
         const tagMatch = a.tags?.some((tag: string) => tag.toLowerCase().includes(query));
         return nameMatch || descMatch || tagMatch;
       });
+    }
+
+    // Apply filter categories — always AND across categories.
+    // The filterMode controls how values WITHIN each category combine:
+    //   'and' -> .every() (artifact must match ALL selected values)
+    //   'or'  -> .some()  (artifact must match ANY selected value)
+    const withinMode = filterMode === 'and' ? 'every' : 'some';
+
+    if (selectedStatuses.length > 0) {
+      artifacts = artifacts.filter((artifact) =>
+        selectedStatuses[withinMode]((s) => (artifact.syncStatus || '') === s)
+      );
+    }
+
+    if (selectedScopes.length > 0) {
+      artifacts = artifacts.filter((artifact) =>
+        selectedScopes[withinMode]((s) => (artifact.scope || '') === s)
+      );
+    }
+
+    if (selectedPlatforms.length > 0) {
+      artifacts = artifacts.filter((artifact) => {
+        const matchesPlatform = (p: string) => {
+          if (p === 'universal') {
+            return !artifact.targetPlatforms || artifact.targetPlatforms.length === 0;
+          }
+          return artifact.targetPlatforms?.includes(p) ?? false;
+        };
+        return selectedPlatforms[withinMode](matchesPlatform);
+      });
+    }
+
+    if (selectedGroups.length > 1) {
+      artifacts = artifacts.filter((artifact) =>
+        selectedGroups[withinMode]((gId) =>
+          artifact.groups?.some((g) => g.id === gId) ?? false
+        )
+      );
     }
 
     return artifacts;
@@ -616,6 +664,7 @@ function CollectionPageContent() {
     selectedScopes,
     selectedPlatforms,
     selectedGroups,
+    filterMode,
   ]);
 
   // Compute available tags from artifacts matching current filters (excluding tag filter)
@@ -635,18 +684,20 @@ function CollectionPageContent() {
   const filteredArtifacts = useMemo(() => {
     let artifacts = preTagFilterArtifacts;
 
-    // Tag filter
+    // Tag filter — AND/OR mode applies within this category too
     if (selectedTags.length > 0) {
-      artifacts = artifacts.filter((artifact) => {
-        return artifact.tags?.some((tag: string) => selectedTags.includes(tag)) ?? false;
-      });
+      const tagWithinMode = filterMode === 'and' ? 'every' : 'some';
+      artifacts = artifacts.filter((artifact) =>
+        selectedTags[tagWithinMode]((tag) => artifact.tags?.includes(tag) ?? false)
+      );
     }
 
-    // Tool filter
+    // Tool filter — AND/OR mode applies within this category too
     if (selectedTools.length > 0) {
-      artifacts = artifacts.filter((artifact) => {
-        return artifact.tools?.some((tool: string) => selectedTools.includes(tool)) ?? false;
-      });
+      const toolWithinMode = filterMode === 'and' ? 'every' : 'some';
+      artifacts = artifacts.filter((artifact) =>
+        selectedTools[toolWithinMode]((tool) => artifact.tools?.includes(tool) ?? false)
+      );
     }
 
     // Apply client-side sorting (confidence sorting requires client-side since backend doesn't support it)
@@ -676,7 +727,7 @@ function CollectionPageContent() {
     }
 
     return artifacts;
-  }, [preTagFilterArtifacts, selectedTags, selectedTools, sortField, sortOrder]);
+  }, [preTagFilterArtifacts, selectedTags, selectedTools, filterMode, sortField, sortOrder]);
 
   const hasActiveFilters = useMemo(
     () =>
@@ -994,6 +1045,9 @@ function CollectionPageContent() {
         onPlatformsChange={handlePlatformsChange}
         showTypeFilter={false}
         allowGroupedView={isSpecificCollection}
+        filterMode={filterMode}
+        onFilterModeChange={handleFilterModeChange}
+        onClearAllFilters={handleClearAllFilters}
       />
 
       {/* Active filters row */}

@@ -24,9 +24,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { TagFilterPopover } from '@/components/ui/tag-filter-popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { ArtifactFilters } from '@/types/artifact';
 import type { Group } from '@/types/groups';
+
+/** Controls how values WITHIN each filter category combine: AND = must match all, OR = match any. Across categories is always AND. */
+export type FilterMode = 'and' | 'or';
 
 interface AvailableTag {
   name: string;
@@ -81,6 +85,12 @@ interface CollectionToolbarProps {
   showTypeFilter?: boolean;
   /** Whether grouped view should be selectable */
   allowGroupedView?: boolean;
+  /** Filter combination mode: AND (all values within each category must match) or OR (any value within each category can match). Across categories is always AND. */
+  filterMode?: FilterMode;
+  /** Handler for filter mode changes */
+  onFilterModeChange?: (mode: FilterMode) => void;
+  /** Handler to clear all filters in a single URL update (avoids stale searchParams race) */
+  onClearAllFilters?: () => void;
 }
 
 /**
@@ -146,6 +156,9 @@ export function CollectionToolbar({
   onPlatformsChange,
   showTypeFilter = true,
   allowGroupedView = true,
+  filterMode = 'and',
+  onFilterModeChange,
+  onClearAllFilters,
 }: CollectionToolbarProps) {
   // Local search state for immediate UI feedback
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -174,15 +187,21 @@ export function CollectionToolbar({
   );
 
   const handleClearFilters = useCallback(() => {
-    onFiltersChange({});
+    if (onClearAllFilters) {
+      // Use single-call clear to avoid stale searchParams race condition
+      onClearAllFilters();
+    } else {
+      // Fallback: call individual handlers (may race on URL updates)
+      onFiltersChange({});
+      onTagsChange?.([]);
+      onToolsChange?.([]);
+      onGroupsChange?.([]);
+      onStatusesChange?.([]);
+      onScopesChange?.([]);
+      onPlatformsChange?.([]);
+    }
     setLocalSearch('');
-    onTagsChange?.([]);
-    onToolsChange?.([]);
-    onGroupsChange?.([]);
-    onStatusesChange?.([]);
-    onScopesChange?.([]);
-    onPlatformsChange?.([]);
-  }, [onFiltersChange, onTagsChange, onToolsChange, onGroupsChange, onStatusesChange, onScopesChange, onPlatformsChange]);
+  }, [onClearAllFilters, onFiltersChange, onTagsChange, onToolsChange, onGroupsChange, onStatusesChange, onScopesChange, onPlatformsChange]);
 
   // Calculate active filter count (includes all filters in the dropdown)
   const activeFilterCount =
@@ -237,7 +256,67 @@ export function CollectionToolbar({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>Filter By</DropdownMenuLabel>
+              <div className="flex items-center justify-between px-2 py-1.5">
+                <span className="text-sm font-semibold">Filter By</span>
+                {onFilterModeChange && (
+                  <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div
+                          className="flex items-center rounded-md border bg-muted/50 p-0.5"
+                          role="radiogroup"
+                          aria-label="Filter combination mode"
+                        >
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={filterMode === 'and'}
+                            className={cn(
+                              'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
+                              filterMode === 'and'
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                            )}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onFilterModeChange('and');
+                            }}
+                          >
+                            AND
+                          </button>
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={filterMode === 'or'}
+                            className={cn(
+                              'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
+                              filterMode === 'or'
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                            )}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onFilterModeChange('or');
+                            }}
+                          >
+                            OR
+                          </button>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[220px] text-xs">
+                        Applies within each filter. Across filters is always AND.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+              {onFilterModeChange && (
+                <p className="px-2 pb-1 text-[10px] leading-tight text-muted-foreground">
+                  {filterMode === 'and' ? 'Match all' : 'Match any'} selected values within each filter. Across filters is always AND.
+                </p>
+              )}
               <DropdownMenuSeparator />
 
               {/* Type Filter */}
