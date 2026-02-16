@@ -9,6 +9,8 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { resolveColorHex, ICON_MAP } from '@/lib/group-constants';
 import type { Group } from '@/types/groups';
+import type { DndAnimState } from '@/hooks';
+import { SuccessCheckmark } from './dnd-animations';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,6 +25,8 @@ export interface GroupSidebarProps {
   artifactCount: number;
   ungroupedCount: number;
   onCreateGroup: () => void;
+  /** Animation state from useDndAnimations for badge/checkmark feedback */
+  animState?: DndAnimState;
 }
 
 // ---------------------------------------------------------------------------
@@ -33,9 +37,10 @@ interface DroppableGroupItemProps {
   group: Group;
   isSelected: boolean;
   onSelect: () => void;
+  animState?: DndAnimState;
 }
 
-function DroppableGroupItem({ group, isSelected, onSelect }: DroppableGroupItemProps) {
+function DroppableGroupItem({ group, isSelected, onSelect, animState }: DroppableGroupItemProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `group-drop-${group.id}`,
     data: {
@@ -48,10 +53,17 @@ function DroppableGroupItem({ group, isSelected, onSelect }: DroppableGroupItemP
   const iconKey = group.icon ?? 'layers';
   const IconComponent = ICON_MAP[iconKey] ?? ICON_MAP.layers;
 
+  // Determine badge animation class based on animation state
+  const isTargetForAdd =
+    animState?.phase === 'success-feedback' && animState.targetGroupId === group.id;
+  const isSourceForRemove =
+    animState?.phase === 'remove-feedback' && animState.sourceGroupId === group.id;
+
   return (
     <button
       ref={setNodeRef}
       type="button"
+      data-group-drop-id={group.id}
       onClick={onSelect}
       className={cn(
         'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors',
@@ -65,8 +77,15 @@ function DroppableGroupItem({ group, isSelected, onSelect }: DroppableGroupItemP
         <IconComponent className="h-4 w-4" />
       </span>
       <span className="min-w-0 flex-1 truncate">{group.name}</span>
-      <span className="shrink-0 text-xs text-muted-foreground">
+      <span
+        className={cn(
+          'relative shrink-0 text-xs text-muted-foreground',
+          isTargetForAdd && 'animate-dnd-badge-pop',
+          isSourceForRemove && 'animate-dnd-badge-shrink'
+        )}
+      >
         {group.artifact_count}
+        {isTargetForAdd && <SuccessCheckmark />}
       </span>
     </button>
   );
@@ -83,6 +102,7 @@ export function GroupSidebar({
   artifactCount,
   ungroupedCount,
   onCreateGroup,
+  animState,
 }: GroupSidebarProps) {
   return (
     <div className="flex h-full w-[280px] shrink-0 flex-col border-r bg-background">
@@ -132,6 +152,7 @@ export function GroupSidebar({
               group={group}
               isSelected={selectedPane === group.id}
               onSelect={() => onSelectPane(group.id)}
+              animState={animState}
             />
           ))}
 

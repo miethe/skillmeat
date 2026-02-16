@@ -15,7 +15,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -34,6 +34,7 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { Package } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -52,10 +53,12 @@ import {
   useRemoveArtifactFromGroup,
   useReorderArtifactsInGroup,
   useCreateGroup,
+  useDndAnimations,
 } from '@/hooks';
 import { GroupSidebar, type PaneSelection } from './group-sidebar';
 import { MiniArtifactCard, DraggableMiniArtifactCard } from './mini-artifact-card';
 import { RemoveFromGroupDropZone } from './remove-from-group-zone';
+import { DropIntoGroupOverlay, PoofParticles } from './dnd-animations';
 
 // ---------------------------------------------------------------------------
 // Props interface (preserved for parent compatibility)
@@ -152,6 +155,10 @@ export function GroupedArtifactView({
   // ── State ──────────────────────────────────────────────────────────────
   const [selectedPane, setSelectedPane] = useState<PaneSelection>('all');
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+  const lastDraggedArtifactRef = useRef<Artifact | null>(null);
+
+  // ── DnD Animations ────────────────────────────────────────────────────
+  const { animState, triggerDropIntoGroup, triggerRemovePoof, reset: resetAnim } = useDndAnimations();
 
   // ── Queries ────────────────────────────────────────────────────────────
   const { data: groupsData, isLoading: isLoadingGroups } = useGroups(collectionId);
@@ -263,7 +270,9 @@ export function GroupedArtifactView({
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id);
-  }, []);
+    const found = artifacts.find((a) => a.id === event.active.id);
+    if (found) lastDraggedArtifactRef.current = found;
+  }, [artifacts]);
 
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
@@ -297,13 +306,20 @@ export function GroupedArtifactView({
           return;
         }
 
+        // Trigger drop-into animation
+        const targetEl = document.querySelector(`[data-group-drop-id="${targetGroupId}"]`);
+        if (targetEl) {
+          const rect = targetEl.getBoundingClientRect();
+          triggerDropIntoGroup(targetGroupId, rect);
+        }
+
         try {
           await addArtifactToGroup.mutateAsync({
             groupId: targetGroupId,
             artifactId: draggedArtifactId,
           });
-          toast.success(`Added to ${targetName}`);
         } catch {
+          resetAnim();
           toast.error('Failed to add to group');
         }
         return;
@@ -311,13 +327,16 @@ export function GroupedArtifactView({
 
       // ── Dropped on remove zone ───────────────────────────────────────
       if (overData?.type === 'remove-zone' && selectedGroup) {
+        // Trigger poof animation
+        triggerRemovePoof(selectedGroup.id);
+
         try {
           await removeArtifactFromGroup.mutateAsync({
             groupId: selectedGroup.id,
             artifactId: draggedArtifactId,
           });
-          toast.success(`Removed from ${selectedGroup.name}`);
         } catch {
+          resetAnim();
           toast.error('Failed to remove from group');
         }
         return;
@@ -362,6 +381,9 @@ export function GroupedArtifactView({
       addArtifactToGroup,
       removeArtifactFromGroup,
       reorderArtifactsInGroup,
+      triggerDropIntoGroup,
+      triggerRemovePoof,
+      resetAnim,
     ]
   );
 
@@ -417,6 +439,7 @@ export function GroupedArtifactView({
             artifactCount={artifacts.length}
             ungroupedCount={ungroupedArtifacts.length}
             onCreateGroup={handleCreateGroup}
+            animState={animState}
           />
         </div>
 
@@ -454,7 +477,10 @@ export function GroupedArtifactView({
             {/* Remove-from-group drop zone */}
             {isSpecificGroup && selectedGroup && (
               <div className="mb-3">
-                <RemoveFromGroupDropZone groupName={selectedGroup.name} />
+                <RemoveFromGroupDropZone
+                  groupName={selectedGroup.name}
+                  isPoofing={animState.phase === 'dropping-remove'}
+                />
               </div>
             )}
           </div>
@@ -493,15 +519,46 @@ export function GroupedArtifactView({
       </div>
 
       {/* Drag overlay (portal) */}
-      <DragOverlay>
+      <DragOverlay dropAnimation={null}>
         {draggedArtifact ? (
-          <MiniArtifactCard
-            artifact={draggedArtifact}
-            onClick={() => {}}
-            className="shadow-lg"
-          />
+          <div className="animate-dnd-pickup">
+            <MiniArtifactCard
+              artifact={draggedArtifact}
+              onClick={() => {}}
+              className="shadow-lg"
+            />
+          </div>
         ) : null}
       </DragOverlay>
+
+      {/* Drop-into-group animation overlay */}
+      {animState.phase === 'dropping-into-group' &&
+        animState.targetRect &&
+        lastDraggedArtifactRef.current && (
+          <DropIntoGroupOverlay
+            artifact={lastDraggedArtifactRef.current}
+            targetRect={animState.targetRect}
+          />
+        )}
+
+      {/* Poof animation overlay (centered on remove zone) */}
+      {animState.phase === 'dropping-remove' && (
+        <div className={cn(
+          'pointer-events-none fixed inset-0 z-50',
+          'flex items-center justify-center'
+        )}>
+          <div className="animate-dnd-poof">
+            {lastDraggedArtifactRef.current && (
+              <MiniArtifactCard
+                artifact={lastDraggedArtifactRef.current}
+                onClick={() => {}}
+                className="w-40 shadow-lg"
+              />
+            )}
+          </div>
+          <PoofParticles />
+        </div>
+      )}
     </DndContext>
   );
 }

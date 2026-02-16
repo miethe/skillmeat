@@ -119,6 +119,101 @@ module.exports = {
             transform: 'scale(1.1)',
           },
         },
+        'dnd-pickup': {
+          '0%': {
+            transform: 'scale(1) rotate(0deg)',
+            opacity: '1',
+            boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)',
+          },
+          '100%': {
+            transform: 'scale(0.6) rotate(2.5deg)',
+            opacity: '0.7',
+            boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+          },
+        },
+        'dnd-drop-into': {
+          '0%': {
+            transform: 'scale(0.6)',
+            opacity: '0.7',
+          },
+          '100%': {
+            transform: 'scale(0.3)',
+            opacity: '0',
+          },
+        },
+        'dnd-success-check': {
+          '0%': {
+            transform: 'scale(0)',
+            opacity: '0',
+          },
+          '50%': {
+            transform: 'scale(1.2)',
+            opacity: '1',
+          },
+          '75%': {
+            transform: 'scale(0.9)',
+          },
+          '100%': {
+            transform: 'scale(1)',
+            opacity: '1',
+          },
+        },
+        'dnd-success-check-out': {
+          '0%': {
+            transform: 'scale(1)',
+            opacity: '1',
+          },
+          '100%': {
+            transform: 'scale(0.8)',
+            opacity: '0',
+          },
+        },
+        'dnd-badge-pop': {
+          '0%': {
+            transform: 'scale(1)',
+          },
+          '50%': {
+            transform: 'scale(1.2)',
+          },
+          '100%': {
+            transform: 'scale(1)',
+          },
+        },
+        'dnd-badge-shrink': {
+          '0%': {
+            transform: 'scale(1)',
+          },
+          '50%': {
+            transform: 'scale(0.9)',
+          },
+          '100%': {
+            transform: 'scale(1)',
+          },
+        },
+        'dnd-poof': {
+          '0%': {
+            transform: 'scale(0.6)',
+            opacity: '0.7',
+          },
+          '15%': {
+            transform: 'scale(0.66)',
+            opacity: '0.6',
+          },
+          '100%': {
+            transform: 'scale(0)',
+            opacity: '0',
+          },
+        },
+        'dnd-particle': {
+          '0%': {
+            transform: 'translate(0, 0) scale(1)',
+            opacity: '1',
+          },
+          '100%': {
+            transform: 'translate(var(--particle-x), var(--particle-y)) scale(0)',
+            opacity: '0',
+          },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -126,6 +221,14 @@ module.exports = {
         'collapsible-down': 'collapsible-down 0.2s ease-out',
         'collapsible-up': 'collapsible-up 0.2s ease-out',
         'notification-pulse': 'notification-pulse 0.5s ease-in-out',
+        'dnd-pickup': 'dnd-pickup 200ms cubic-bezier(0.2, 0, 0.13, 1.5) forwards',
+        'dnd-drop-into': 'dnd-drop-into 300ms cubic-bezier(0.55, 0, 1, 0.45) forwards',
+        'dnd-success-check': 'dnd-success-check 350ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+        'dnd-success-check-out': 'dnd-success-check-out 200ms cubic-bezier(0.55, 0, 1, 0.45) forwards',
+        'dnd-badge-pop': 'dnd-badge-pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'dnd-badge-shrink': 'dnd-badge-shrink 300ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'dnd-poof': 'dnd-poof 350ms cubic-bezier(0.55, 0, 1, 0.45) forwards',
+        'dnd-particle': 'dnd-particle 400ms cubic-bezier(0.2, 0, 0, 1) forwards',
       },
     },
   },

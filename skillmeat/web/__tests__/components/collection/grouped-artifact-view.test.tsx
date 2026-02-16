@@ -49,6 +49,12 @@ jest.mock('@/hooks', () => ({
   useCreateGroup: jest.fn(),
   useArtifactGroups: jest.fn(),
   useTags: jest.fn(),
+  useDndAnimations: () => ({
+    animState: { phase: 'idle', targetGroupId: null, sourceGroupId: null, targetRect: null },
+    triggerDropIntoGroup: jest.fn(),
+    triggerRemovePoof: jest.fn(),
+    reset: jest.fn(),
+  }),
 }));
 
 // Mock sonner toast
