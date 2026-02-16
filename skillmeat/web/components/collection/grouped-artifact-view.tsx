@@ -31,7 +31,7 @@ import {
 import {
   SortableContext,
   sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
+  rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { Package } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -42,7 +42,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import type { Artifact } from '@/types/artifact';
 import type { Group } from '@/types/groups';
@@ -96,11 +95,13 @@ function GroupedViewSkeleton() {
         ))}
       </div>
       {/* Content skeleton */}
-      <div className="flex-1 space-y-2 p-4">
-        <Skeleton className="h-8 w-48 rounded-md" />
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-12 w-full rounded-md" />
-        ))}
+      <div className="flex-1 p-4">
+        <Skeleton className="mb-3 h-8 w-48 rounded-md" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-md" />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -446,8 +447,8 @@ export function GroupedArtifactView({
             </Select>
           </div>
 
-          {/* Pane content */}
-          <div className="flex flex-1 flex-col overflow-hidden p-4">
+          {/* Pane header (fixed) */}
+          <div className="shrink-0 px-4 pt-4">
             <PaneHeader title={paneName} count={paneArtifacts.length} />
 
             {/* Remove-from-group drop zone */}
@@ -456,8 +457,10 @@ export function GroupedArtifactView({
                 <RemoveFromGroupDropZone groupName={selectedGroup.name} />
               </div>
             )}
+          </div>
 
-            {/* Artifact list */}
+          {/* Scrollable artifact grid */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
             {paneArtifacts.length === 0 ? (
               <EmptyState
                 message={
@@ -469,23 +472,21 @@ export function GroupedArtifactView({
                 }
               />
             ) : (
-              <ScrollArea className="flex-1">
-                <SortableContext
-                  items={sortableIds}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="space-y-1 pr-2">
-                    {paneArtifacts.map((artifact) => (
-                      <DraggableMiniArtifactCard
-                        key={artifact.id}
-                        artifact={artifact}
-                        groupId={isSpecificGroup ? selectedPane : 'all'}
-                        onClick={() => onArtifactClick?.(artifact)}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </ScrollArea>
+              <SortableContext
+                items={sortableIds}
+                strategy={rectSortingStrategy}
+              >
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {paneArtifacts.map((artifact) => (
+                    <DraggableMiniArtifactCard
+                      key={artifact.id}
+                      artifact={artifact}
+                      groupId={isSpecificGroup ? selectedPane : 'all'}
+                      onClick={() => onArtifactClick?.(artifact)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
             )}
           </div>
         </div>

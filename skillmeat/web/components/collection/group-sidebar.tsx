@@ -124,7 +124,7 @@ export function GroupSidebar({
       <Separator />
 
       {/* Scrollable group list */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-1 p-3">
           {groups.map((group) => (
             <DroppableGroupItem

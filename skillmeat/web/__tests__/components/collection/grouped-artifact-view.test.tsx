@@ -27,7 +27,7 @@ jest.mock('@dnd-kit/sortable', () => ({
   __esModule: true,
   SortableContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   sortableKeyboardCoordinates: jest.fn(),
-  verticalListSortingStrategy: jest.fn(),
+  rectSortingStrategy: jest.fn(),
   useSortable: jest.fn(),
 }));
 
@@ -48,6 +48,7 @@ jest.mock('@/hooks', () => ({
   useReorderArtifactsInGroup: jest.fn(),
   useCreateGroup: jest.fn(),
   useArtifactGroups: jest.fn(),
+  useTags: jest.fn(),
 }));
 
 // Mock sonner toast
@@ -70,6 +71,7 @@ import {
   useReorderArtifactsInGroup,
   useCreateGroup,
   useArtifactGroups,
+  useTags,
 } from '@/hooks';
 import { useSensor, useSensors } from '@dnd-kit/core';
 
@@ -151,6 +153,7 @@ function setupHookDefaults() {
   (useReorderArtifactsInGroup as jest.Mock).mockReturnValue({ mutateAsync: mockMutateAsync });
   (useCreateGroup as jest.Mock).mockReturnValue({ mutateAsync: mockMutateAsync });
   (useArtifactGroups as jest.Mock).mockReturnValue({ data: [], isLoading: false });
+  (useTags as jest.Mock).mockReturnValue({ data: { items: [] }, isLoading: false });
 }
 
 function setupHooks(opts: {
