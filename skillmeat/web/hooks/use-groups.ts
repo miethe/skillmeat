@@ -129,15 +129,15 @@ interface ApiGroupListResponse {
 /**
  * Fetch groups for a specific collection.
  *
- * Retrieves all groups belonging to a collection, sorted by position for
- * consistent display ordering. Uses the `GET /api/v1/groups?collection_id={id}`
+ * Retrieves all groups belonging to a collection, sorted alphabetically by
+ * name (case-insensitive) for consistent display ordering. Uses the `GET /api/v1/groups?collection_id={id}`
  * endpoint.
  *
  * @param collectionId - The collection ID to fetch groups for. When undefined,
  *   the query is disabled and returns undefined data.
  *
  * @returns TanStack Query result containing:
- *   - `data.groups`: Array of Group objects sorted by position (ascending)
+ *   - `data.groups`: Array of Group objects sorted alphabetically by name
  *   - `data.total`: Total count of groups in the collection
  *   - Standard query states: `isLoading`, `isError`, `error`, `refetch`, etc.
  *
@@ -162,7 +162,7 @@ interface ApiGroupListResponse {
  *   if (isLoading) return <Skeleton />;
  *   if (isError) return <ErrorMessage error={error} />;
  *
- *   // data.groups is already sorted by position
+ *   // data.groups is already sorted alphabetically by name
  *   return (
  *     <div>
  *       {data.groups.map(group => (
@@ -200,8 +200,10 @@ export function useGroups(
         const params = new URLSearchParams({ collection_id: collectionId });
         const response = await apiRequest<ApiGroupListResponse>(`/groups?${params.toString()}`);
 
-        // Sort by position to ensure consistent ordering
-        const sortedGroups = [...response.groups].sort((a, b) => a.position - b.position);
+        // Sort alphabetically by name (case-insensitive) for consistent ordering
+        const sortedGroups = [...response.groups].sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        );
 
         return {
           groups: sortedGroups,

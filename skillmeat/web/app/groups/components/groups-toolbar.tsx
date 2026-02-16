@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-export type GroupSortField = 'position' | 'name' | 'updated_at' | 'artifact_count';
+export type GroupSortField = 'name' | 'updated_at' | 'artifact_count';
 
 interface GroupsToolbarProps {
   search: string;
@@ -75,7 +75,6 @@ export function GroupsToolbar({
               <SelectValue placeholder="Sort groups" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="position">Sort: Position</SelectItem>
               <SelectItem value="name">Sort: Name</SelectItem>
               <SelectItem value="updated_at">Sort: Recently updated</SelectItem>
               <SelectItem value="artifact_count">Sort: Artifact count</SelectItem>

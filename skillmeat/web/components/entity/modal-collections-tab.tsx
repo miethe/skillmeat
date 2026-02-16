@@ -129,7 +129,7 @@ export function ModalCollectionsTab({
         }
       }
     }
-    return groups.sort((a, b) => a.position - b.position);
+    return groups.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   }, [groupQueries]);
 
   // Early return if no artifact provided (after all hooks)

@@ -97,11 +97,13 @@ export function GroupsDisplay({
     return <GroupsDisplayEmpty className={className} />;
   }
 
-  // Map groups to GroupInfo format for GroupBadgeRow
-  const groupInfos: GroupInfo[] = groups.map((group) => ({
-    id: group.id,
-    name: group.name,
-  }));
+  // Map groups to GroupInfo format for GroupBadgeRow, sorted alphabetically
+  const groupInfos: GroupInfo[] = [...groups]
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+    .map((group) => ({
+      id: group.id,
+      name: group.name,
+    }));
 
   // Success state - render badges using GroupBadgeRow
   return <GroupBadgeRow groups={groupInfos} maxBadges={maxBadges} className={className} />;
