@@ -48,13 +48,14 @@ import type { Artifact } from '@/types/artifact';
 import type { Group } from '@/types/groups';
 import {
   useGroups,
-  useGroupArtifacts,
+  useGroupsArtifacts,
   useAddArtifactToGroup,
   useRemoveArtifactFromGroup,
   useReorderArtifactsInGroup,
   useCreateGroup,
   useDndAnimations,
 } from '@/hooks';
+import type { GroupArtifact } from '@/types/groups';
 import { GroupSidebar, type PaneSelection } from './group-sidebar';
 import { MiniArtifactCard, DraggableMiniArtifactCard } from './mini-artifact-card';
 import { RemoveFromGroupDropZone } from './remove-from-group-zone';
@@ -164,12 +165,25 @@ export function GroupedArtifactView({
   const { data: groupsData, isLoading: isLoadingGroups } = useGroups(collectionId);
   const groups = groupsData?.groups ?? [];
 
-  // Fetch artifacts for each group (hooks called in stable order based on groups array)
-  const groupArtifactQueries = groups.map((group) => ({
-    group,
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    query: useGroupArtifacts(group.id),
-  }));
+  // Fetch artifacts for each group using useQueries (stable hook count)
+  const groupIds = useMemo(() => groups.map((g) => g.id), [groups]);
+  const groupArtifactResults = useGroupsArtifacts(groupIds);
+
+  // Create lookup map from results for compatibility with existing code
+  const groupArtifactQueries = useMemo(
+    () =>
+      groups.map((group) => {
+        const result = groupArtifactResults.find((r) => r.groupId === group.id);
+        return {
+          group,
+          query: result?.query ?? ({
+            data: undefined,
+            isLoading: false,
+          } as { data: GroupArtifact[] | undefined; isLoading: boolean }),
+        };
+      }),
+    [groups, groupArtifactResults]
+  );
 
   // ── Mutations ──────────────────────────────────────────────────────────
   const addArtifactToGroup = useAddArtifactToGroup();

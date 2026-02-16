@@ -63,6 +63,7 @@
 
 import {
   useQuery,
+  useQueries,
   useMutation,
   useQueryClient,
   type UseQueryResult,
@@ -874,4 +875,59 @@ export function useCopyGroup(): UseMutationResult<
       queryClient.invalidateQueries({ queryKey: artifactGroupKeys.all });
     },
   });
+}
+
+/**
+ * Fetch artifacts for multiple groups using useQueries (safe for dynamic arrays).
+ *
+ * This hook is designed for cases where you need to fetch artifacts for a variable
+ * number of groups without violating React's rules of hooks. Unlike calling
+ * `useGroupArtifacts` in a loop, this approach maintains a stable hook count
+ * regardless of how many groups exist.
+ *
+ * @param groupIds - Array of group IDs to fetch artifacts for
+ * @returns Array of objects with groupId and corresponding query result
+ *
+ * @example
+ * ```tsx
+ * const groupIds = groups.map(g => g.id);
+ * const results = useGroupsArtifacts(groupIds);
+ *
+ * results.forEach(({ groupId, query }) => {
+ *   if (query.data) {
+ *     console.log(`Group ${groupId} has ${query.data.length} artifacts`);
+ *   }
+ * });
+ * ```
+ */
+export function useGroupsArtifacts(
+  groupIds: string[]
+): { groupId: string; query: UseQueryResult<GroupArtifact[], Error> }[] {
+  const results = useQueries({
+    queries: groupIds.map((groupId) => ({
+      queryKey: groupKeys.artifacts(groupId),
+      queryFn: async (): Promise<GroupArtifact[]> => {
+        try {
+          const group = await apiRequest<GroupWithArtifacts>(`/groups/${groupId}`);
+          const artifacts = group.artifacts ?? [];
+          return [...artifacts].sort((a, b) => a.position - b.position);
+        } catch (error) {
+          if (USE_MOCKS) {
+            console.warn(`[groups] Failed to fetch artifacts for group ${groupId}`, error);
+            return [];
+          }
+          throw error;
+        }
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes (browsing)
+      enabled: !!groupId,
+    })),
+  });
+
+  // Results array is guaranteed to have same length as groupIds since useQueries
+  // returns one result per query in the same order
+  return groupIds.map((groupId, index) => ({
+    groupId,
+    query: results[index] as UseQueryResult<GroupArtifact[], Error>,
+  }));
 }

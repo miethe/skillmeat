@@ -77,6 +77,7 @@ export {
   useGroups,
   useGroup,
   useGroupArtifacts,
+  useGroupsArtifacts,
   useCreateGroup,
   useUpdateGroup,
   useDeleteGroup,

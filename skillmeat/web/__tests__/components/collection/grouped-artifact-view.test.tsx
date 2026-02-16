@@ -43,6 +43,7 @@ jest.mock('@dnd-kit/utilities', () => ({
 jest.mock('@/hooks', () => ({
   useGroups: jest.fn(),
   useGroupArtifacts: jest.fn(),
+  useGroupsArtifacts: jest.fn(),
   useAddArtifactToGroup: jest.fn(),
   useRemoveArtifactFromGroup: jest.fn(),
   useReorderArtifactsInGroup: jest.fn(),
@@ -72,6 +73,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import {
   useGroups,
   useGroupArtifacts,
+  useGroupsArtifacts,
   useAddArtifactToGroup,
   useRemoveArtifactFromGroup,
   useReorderArtifactsInGroup,
@@ -177,12 +179,25 @@ function setupHooks(opts: {
     isLoading: opts.isLoadingGroups ?? false,
   });
 
+  // Legacy single-group artifact hook (still exported but not used by GroupedArtifactView)
   (useGroupArtifacts as jest.Mock).mockImplementation((groupId: string) => {
     const map = opts.groupArtifactMap ?? {};
     return {
       data: map[groupId] ?? [],
       isLoading: false,
     };
+  });
+
+  // New batch hook using useQueries pattern
+  (useGroupsArtifacts as jest.Mock).mockImplementation((groupIds: string[]) => {
+    const map = opts.groupArtifactMap ?? {};
+    return groupIds.map((groupId) => ({
+      groupId,
+      query: {
+        data: map[groupId] ?? [],
+        isLoading: false,
+      },
+    }));
   });
 }
 
