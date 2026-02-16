@@ -24,7 +24,9 @@
 import * as React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import * as LucideIcons from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 import { getArtifactTypeConfig } from '@/types/artifact';
@@ -137,6 +139,13 @@ export const MiniArtifactCard = React.forwardRef<
     }
   };
 
+  // Get the icon component from Lucide
+  const iconName = config?.icon ?? 'FileText';
+  const IconComponent = (
+    LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>
+  )[iconName];
+  const Icon = IconComponent || LucideIcons.FileText;
+
   return (
     <div
       ref={ref}
@@ -155,21 +164,33 @@ export const MiniArtifactCard = React.forwardRef<
       aria-label={`${artifact.name}, ${config?.label ?? artifact.type} artifact`}
       {...htmlProps}
     >
-      {/* Type label */}
-      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-        {config?.label ?? artifact.type}
-      </span>
-
-      {/* Artifact name */}
-      <span
-        className="mt-0.5 truncate text-sm font-medium leading-tight"
-        title={artifact.name}
-      >
-        {artifact.name}
-      </span>
+      {/* Type icon + Artifact name (single line) */}
+      <div className="flex items-center gap-1.5">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex-shrink-0">
+                <Icon
+                  className={cn('h-4 w-4', config?.color ?? 'text-muted-foreground')}
+                  aria-hidden="true"
+                />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{config?.label ?? artifact.type}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <span
+          className="truncate text-sm font-medium leading-tight"
+          title={artifact.name}
+        >
+          {artifact.name}
+        </span>
+      </div>
 
       {/* Description zone - fixed height, 3-line clamp */}
-      <div className="mt-1.5 h-[42px]">
+      <div className="mt-1 h-[42px]">
         {artifact.description ? (
           <p
             className="line-clamp-3 text-xs leading-[14px] text-muted-foreground"
@@ -187,19 +208,18 @@ export const MiniArtifactCard = React.forwardRef<
       {/* Spacer to push badges to bottom */}
       <div className="flex-1" />
 
-      {/* Group badges (compact mode) */}
+      {/* Group badges (with names visible) */}
       <ArtifactGroupBadges
         artifactId={artifact.id}
         collectionId={artifact.collections?.[0]?.id}
         maxVisible={2}
-        compact
-        className="mt-1.5"
+        className="mt-1"
       />
 
       {/* Tag badges */}
       {displayTags.length > 0 && (
         <div
-          className="mt-1.5 flex flex-wrap items-center gap-1"
+          className="mt-1 flex flex-wrap items-center gap-1"
           role="list"
           aria-label="Tags"
         >
