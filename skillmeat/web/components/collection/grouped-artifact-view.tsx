@@ -1,25 +1,24 @@
 /**
  * GroupedArtifactView Component
  *
- * Displays artifacts organized by groups with drag-and-drop support using dnd-kit.
+ * Two-pane layout for browsing artifacts organized by groups.
+ * - Left pane: GroupSidebar (fixed 280px, hidden below md)
+ * - Right pane: Artifact list for the selected group/view
+ *
  * Features:
- * - Collapsible group sections sorted alphabetically
- * - Ungrouped artifacts section
- * - Drag-and-drop artifact reordering within groups
- * - Drag-and-drop artifact movement between groups
- * - Compact list-item rows (not cards)
- * - Keyboard accessible
+ * - Drag-and-drop artifacts onto sidebar groups to add
+ * - Drag-and-drop reordering within a group
+ * - Remove-from-group drop zone when viewing a specific group
+ * - Responsive: collapses to dropdown + full-width list below md
  */
 
 'use client';
 
 import * as React from 'react';
 import { useState, useMemo, useCallback } from 'react';
-import * as LucideIcons from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
-  DragOverEvent,
   closestCenter,
   KeyboardSensor,
   PointerSensor,
@@ -28,33 +27,41 @@ import {
   DragStartEvent,
   DragEndEvent,
   UniqueIdentifier,
-  useDroppable,
 } from '@dnd-kit/core';
 import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  useSortable,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronRight, GripVertical, Package } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Package } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import type { Artifact } from '@/types/artifact';
-import { getArtifactTypeConfig } from '@/types/artifact';
 import type { Group } from '@/types/groups';
 import {
   useGroups,
   useGroupArtifacts,
+  useAddArtifactToGroup,
+  useRemoveArtifactFromGroup,
   useReorderArtifactsInGroup,
-  useMoveArtifactToGroup,
+  useCreateGroup,
 } from '@/hooks';
+import { GroupSidebar, type PaneSelection } from './group-sidebar';
+import { MiniArtifactCard, DraggableMiniArtifactCard } from './mini-artifact-card';
+import { RemoveFromGroupDropZone } from './remove-from-group-zone';
 
-// Props interface
+// ---------------------------------------------------------------------------
+// Props interface (preserved for parent compatibility)
+// ---------------------------------------------------------------------------
+
 export interface GroupedArtifactViewProps {
   /** Collection ID to fetch groups for */
   collectionId: string;
@@ -72,445 +79,259 @@ export interface GroupedArtifactViewProps {
   onDelete?: (artifact: Artifact) => void;
 }
 
-// Drag data attached to sortable items
-interface DragData {
-  type: 'artifact';
-  id: string;
-  groupId: string; // group ID or 'ungrouped'
-}
-
-// Sortable artifact list item (compact row)
-interface SortableArtifactRowProps {
-  artifact: Artifact;
-  groupId: string;
-  onArtifactClick?: (artifact: Artifact) => void;
-}
-
-function SortableArtifactRow({
-  artifact,
-  groupId,
-  onArtifactClick,
-}: SortableArtifactRowProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: artifact.id,
-    data: {
-      type: 'artifact',
-      id: artifact.id,
-      groupId,
-    } satisfies DragData,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.3 : 1,
-  };
-
-  const config = getArtifactTypeConfig(artifact.type);
-  const IconComponent = (LucideIcons as any)[config.icon] as
-    | React.ComponentType<{ className?: string }>
-    | undefined;
-  const Icon = IconComponent || LucideIcons.FileText;
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        'flex items-center gap-3 rounded-md border px-3 py-2 transition-colors hover:bg-accent/50',
-        isDragging && 'border-dashed'
-      )}
-    >
-      {/* Drag handle */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="flex-shrink-0 cursor-grab active:cursor-grabbing"
-        aria-label={`Drag ${artifact.name} to reorder or move between groups`}
-      >
-        <GripVertical className="h-4 w-4 text-muted-foreground" />
-      </div>
-
-      {/* Type icon */}
-      <Icon className={cn('h-4 w-4 flex-shrink-0', config.color)} />
-
-      {/* Name (clickable) */}
-      <button
-        type="button"
-        className="min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline"
-        onClick={() => onArtifactClick?.(artifact)}
-      >
-        {artifact.name}
-      </button>
-
-      {/* Type badge */}
-      <Badge variant="secondary" className="flex-shrink-0 text-xs">
-        {config.label}
-      </Badge>
-
-      {/* Description snippet */}
-      {artifact.description && (
-        <span className="hidden min-w-0 max-w-[200px] truncate text-xs text-muted-foreground lg:inline">
-          {artifact.description}
-        </span>
-      )}
-    </div>
-  );
-}
-
-// Standalone artifact row for the drag overlay (no sortable context)
-function ArtifactRowOverlay({ artifact }: { artifact: Artifact }) {
-  const config = getArtifactTypeConfig(artifact.type);
-  const IconComponent = (LucideIcons as any)[config.icon] as
-    | React.ComponentType<{ className?: string }>
-    | undefined;
-  const Icon = IconComponent || LucideIcons.FileText;
-
-  return (
-    <div className="flex items-center gap-3 rounded-md border bg-card px-3 py-2 shadow-lg">
-      <GripVertical className="h-4 w-4 text-muted-foreground" />
-      <Icon className={cn('h-4 w-4 flex-shrink-0', config.color)} />
-      <span className="truncate text-sm font-medium">{artifact.name}</span>
-      <Badge variant="secondary" className="flex-shrink-0 text-xs">
-        {config.label}
-      </Badge>
-    </div>
-  );
-}
-
-// Droppable group section
-interface DroppableGroupSectionProps {
-  group: Group;
-  artifacts: Artifact[];
-  isOpen: boolean;
-  onToggle: () => void;
-  onArtifactClick?: (artifact: Artifact) => void;
-  isDropTarget: boolean;
-}
-
-function DroppableGroupSection({
-  group,
-  artifacts,
-  isOpen,
-  onToggle,
-  onArtifactClick,
-  isDropTarget,
-}: DroppableGroupSectionProps) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: `droppable-group-${group.id}`,
-    data: {
-      type: 'group',
-      groupId: group.id,
-    },
-  });
-
-  const highlighted = isDropTarget || isOver;
-
-  return (
-    <div ref={setNodeRef} className="space-y-2">
-      <Collapsible open={isOpen} onOpenChange={onToggle}>
-        <div
-          className={cn(
-            'flex items-center gap-2 rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50',
-            highlighted && 'border-primary bg-primary/5 ring-1 ring-primary/30'
-          )}
-        >
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="flex-1 justify-start">
-              {isOpen ? (
-                <ChevronDown className="mr-2 h-4 w-4" />
-              ) : (
-                <ChevronRight className="mr-2 h-4 w-4" />
-              )}
-              <span className="font-semibold">{group.name}</span>
-              <span className="ml-2 text-xs text-muted-foreground">
-                ({artifacts.length} {artifacts.length === 1 ? 'artifact' : 'artifacts'})
-              </span>
-            </Button>
-          </CollapsibleTrigger>
-        </div>
-
-        <CollapsibleContent className="mt-2 space-y-1 pl-4">
-          {artifacts.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              <Package className="mx-auto mb-2 h-8 w-8 opacity-50" />
-              <p>No artifacts in this group</p>
-            </div>
-          ) : (
-            <SortableContext
-              items={artifacts.map((a) => a.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-1">
-                {artifacts.map((artifact) => (
-                  <SortableArtifactRow
-                    key={artifact.id}
-                    artifact={artifact}
-                    groupId={group.id}
-                    onArtifactClick={onArtifactClick}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          )}
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
-  );
-}
-
-// Droppable ungrouped section
-interface DroppableUngroupedSectionProps {
-  artifacts: Artifact[];
-  onArtifactClick?: (artifact: Artifact) => void;
-  isDropTarget: boolean;
-}
-
-function DroppableUngroupedSection({
-  artifacts,
-  onArtifactClick,
-  isDropTarget,
-}: DroppableUngroupedSectionProps) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: 'droppable-group-ungrouped',
-    data: {
-      type: 'group',
-      groupId: 'ungrouped',
-    },
-  });
-
-  const highlighted = isDropTarget || isOver;
-
-  return (
-    <div ref={setNodeRef} className="space-y-2">
-      <Collapsible defaultOpen>
-        <div
-          className={cn(
-            'flex items-center gap-2 rounded-lg border bg-muted/30 p-3',
-            highlighted && 'border-primary bg-primary/5 ring-1 ring-primary/30'
-          )}
-        >
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="flex-1 justify-start">
-              <ChevronDown className="mr-2 h-4 w-4" />
-              <span className="font-semibold text-muted-foreground">Ungrouped</span>
-              <span className="ml-2 text-xs text-muted-foreground">
-                ({artifacts.length}{' '}
-                {artifacts.length === 1 ? 'artifact' : 'artifacts'})
-              </span>
-            </Button>
-          </CollapsibleTrigger>
-        </div>
-
-        <CollapsibleContent className="mt-2 space-y-1 pl-4">
-          <div className="space-y-1">
-            {artifacts.map((artifact) => (
-              <SortableArtifactRow
-                key={artifact.id}
-                artifact={artifact}
-                groupId="ungrouped"
-                onArtifactClick={onArtifactClick}
-              />
-            ))}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
-  );
-}
-
+// ---------------------------------------------------------------------------
 // Loading skeleton
+// ---------------------------------------------------------------------------
+
 function GroupedViewSkeleton() {
   return (
-    <div className="space-y-4" data-testid="grouped-view-skeleton">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="space-y-2">
-          <Skeleton className="h-12 w-full rounded-lg" />
-          <div className="space-y-1 pl-4">
-            <Skeleton className="h-10 w-full rounded-md" />
-            <Skeleton className="h-10 w-full rounded-md" />
-          </div>
-        </div>
-      ))}
+    <div className="flex h-full gap-0" data-testid="grouped-view-skeleton">
+      {/* Sidebar skeleton */}
+      <div className="hidden w-[280px] shrink-0 border-r p-3 md:block">
+        <Skeleton className="mb-2 h-9 w-full rounded-md" />
+        <Skeleton className="mb-2 h-9 w-full rounded-md" />
+        <div className="my-3 h-px bg-border" />
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="mb-2 h-9 w-full rounded-md" />
+        ))}
+      </div>
+      {/* Content skeleton */}
+      <div className="flex-1 space-y-2 p-4">
+        <Skeleton className="h-8 w-48 rounded-md" />
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-12 w-full rounded-md" />
+        ))}
+      </div>
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// PaneHeader
+// ---------------------------------------------------------------------------
+
+interface PaneHeaderProps {
+  title: string;
+  count: number;
+}
+
+function PaneHeader({ title, count }: PaneHeaderProps) {
+  return (
+    <div className="flex items-center gap-2 pb-3">
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <span className="text-sm text-muted-foreground">
+        ({count} {count === 1 ? 'artifact' : 'artifacts'})
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// EmptyState
+// ---------------------------------------------------------------------------
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <Package className="mb-3 h-10 w-10 text-muted-foreground/50" aria-hidden="true" />
+      <p className="text-sm text-muted-foreground">{message}</p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main component
+// ---------------------------------------------------------------------------
+
 export function GroupedArtifactView({
   collectionId,
   artifacts,
   onArtifactClick,
 }: GroupedArtifactViewProps) {
-  // Fetch groups
-  const { data: groupsData, isLoading: isLoadingGroups } = useGroups(collectionId);
-  const groups = groupsData?.groups || [];
-  // Sort groups alphabetically (case-insensitive)
-  const sortedGroups = useMemo(() => {
-    return [...groups].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-  }, [groups]);
-
-  // Track open/closed state for each group
-  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
-
-  // Drag state
+  // ── State ──────────────────────────────────────────────────────────────
+  const [selectedPane, setSelectedPane] = useState<PaneSelection>('all');
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
-  const [overGroupId, setOverGroupId] = useState<string | null>(null);
 
-  // Mutations
-  const reorderArtifactsInGroup = useReorderArtifactsInGroup();
-  const moveArtifactToGroup = useMoveArtifactToGroup();
+  // ── Queries ────────────────────────────────────────────────────────────
+  const { data: groupsData, isLoading: isLoadingGroups } = useGroups(collectionId);
+  const groups = groupsData?.groups ?? [];
 
-  // Sensors for drag and drop
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  // Fetch artifacts for each group
+  // Fetch artifacts for each group (hooks called in stable order based on groups array)
   const groupArtifactQueries = groups.map((group) => ({
     group,
     // eslint-disable-next-line react-hooks/rules-of-hooks
     query: useGroupArtifacts(group.id),
   }));
 
-  // Build artifact-to-group mapping
-  const artifactGroupMap = useMemo(() => {
-    const map = new Map<string, string>();
+  // ── Mutations ──────────────────────────────────────────────────────────
+  const addArtifactToGroup = useAddArtifactToGroup();
+  const removeArtifactFromGroup = useRemoveArtifactFromGroup();
+  const reorderArtifactsInGroup = useReorderArtifactsInGroup();
+  const createGroup = useCreateGroup();
+
+  // ── Derived data ───────────────────────────────────────────────────────
+
+  // Map artifact ID -> set of group IDs it belongs to
+  const artifactGroupMembership = useMemo(() => {
+    const map = new Map<string, Set<string>>();
     groupArtifactQueries.forEach(({ group, query }) => {
       if (query.data) {
-        query.data.forEach((groupArtifact) => {
-          map.set(groupArtifact.artifact_id, group.id);
+        query.data.forEach((ga) => {
+          if (!map.has(ga.artifact_id)) {
+            map.set(ga.artifact_id, new Set());
+          }
+          map.get(ga.artifact_id)!.add(group.id);
         });
       }
     });
     return map;
   }, [groupArtifactQueries]);
 
-  // Organize artifacts by group
+  // Artifacts organized by group (position-sorted)
   const artifactsByGroup = useMemo(() => {
     const byGroup = new Map<string, Artifact[]>();
+    groups.forEach((group) => byGroup.set(group.id, []));
 
-    // Initialize with empty arrays for each group
-    groups.forEach((group) => {
-      byGroup.set(group.id, []);
-    });
-
-    // Populate with artifacts
     artifacts.forEach((artifact) => {
-      const groupId = artifactGroupMap.get(artifact.id);
-      if (groupId) {
-        const groupArtifacts = byGroup.get(groupId) || [];
-        groupArtifacts.push(artifact);
-        byGroup.set(groupId, groupArtifacts);
+      const memberGroups = artifactGroupMembership.get(artifact.id);
+      if (memberGroups) {
+        memberGroups.forEach((groupId) => {
+          const arr = byGroup.get(groupId);
+          if (arr) arr.push(artifact);
+        });
       }
     });
 
-    // Sort each group's artifacts by position
+    // Sort by position within each group
     groupArtifactQueries.forEach(({ group, query }) => {
       if (query.data) {
-        const sortedArtifacts = byGroup.get(group.id) || [];
-        sortedArtifacts.sort((a, b) => {
-          const posA = query.data!.find((ga) => ga.artifact_id === a.id)?.position ?? 0;
-          const posB = query.data!.find((ga) => ga.artifact_id === b.id)?.position ?? 0;
-          return posA - posB;
-        });
-        byGroup.set(group.id, sortedArtifacts);
+        const arr = byGroup.get(group.id);
+        if (arr) {
+          arr.sort((a, b) => {
+            const posA = query.data!.find((ga) => ga.artifact_id === a.id)?.position ?? 0;
+            const posB = query.data!.find((ga) => ga.artifact_id === b.id)?.position ?? 0;
+            return posA - posB;
+          });
+        }
       }
     });
 
     return byGroup;
-  }, [artifacts, artifactGroupMap, groups, groupArtifactQueries]);
+  }, [artifacts, artifactGroupMembership, groups, groupArtifactQueries]);
 
   // Ungrouped artifacts
-  const ungroupedArtifacts = useMemo(() => {
-    return artifacts.filter((artifact) => !artifactGroupMap.has(artifact.id));
-  }, [artifacts, artifactGroupMap]);
+  const ungroupedArtifacts = useMemo(
+    () => artifacts.filter((a) => !artifactGroupMembership.has(a.id)),
+    [artifacts, artifactGroupMembership]
+  );
 
-  // Toggle group open/closed
-  const toggleGroup = useCallback((groupId: string) => {
-    setOpenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupId)) {
-        next.delete(groupId);
-      } else {
-        next.add(groupId);
-      }
-      return next;
-    });
-  }, []);
+  // Resolve what to show in the right pane
+  const selectedGroup: Group | undefined = useMemo(
+    () => groups.find((g) => g.id === selectedPane),
+    [groups, selectedPane]
+  );
 
-  // Find which group a droppable belongs to
-  const resolveDropGroupId = useCallback((overId: UniqueIdentifier | undefined, overData: Record<string, any> | undefined): string | null => {
-    if (!overId) return null;
+  const paneArtifacts: Artifact[] = useMemo(() => {
+    if (selectedPane === 'all') return artifacts;
+    if (selectedPane === 'ungrouped') return ungroupedArtifacts;
+    return artifactsByGroup.get(selectedPane) ?? [];
+  }, [selectedPane, artifacts, ungroupedArtifacts, artifactsByGroup]);
 
-    // If dropped on a droppable group container
-    if (overData?.type === 'group') {
-      return overData.groupId as string;
+  const paneName = useMemo(() => {
+    if (selectedPane === 'all') return 'All Artifacts';
+    if (selectedPane === 'ungrouped') return 'Ungrouped';
+    return selectedGroup?.name ?? 'Group';
+  }, [selectedPane, selectedGroup]);
+
+  // If selected pane points to a deleted group, reset to 'all'
+  React.useEffect(() => {
+    if (
+      selectedPane !== 'all' &&
+      selectedPane !== 'ungrouped' &&
+      !groups.find((g) => g.id === selectedPane)
+    ) {
+      setSelectedPane('all');
     }
+  }, [groups, selectedPane]);
 
-    // If dropped on another artifact, find that artifact's group
-    if (overData?.type === 'artifact') {
-      return overData.groupId as string;
-    }
+  // ── DnD setup ──────────────────────────────────────────────────────────
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-    // Fallback: check the id string for droppable group prefix
-    const idStr = String(overId);
-    if (idStr.startsWith('droppable-group-')) {
-      return idStr.replace('droppable-group-', '');
-    }
-
-    // Check if it's an artifact ID we can map
-    const groupId = artifactGroupMap.get(idStr);
-    if (groupId) return groupId;
-
-    return null;
-  }, [artifactGroupMap]);
-
-  // Drag handlers
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id);
   }, []);
 
-  const handleDragOver = useCallback((event: DragOverEvent) => {
-    const { over } = event;
-    if (!over) {
-      setOverGroupId(null);
-      return;
-    }
-    const targetGroupId = resolveDropGroupId(over.id, over.data.current as Record<string, any> | undefined);
-    setOverGroupId(targetGroupId);
-  }, [resolveDropGroupId]);
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+      setActiveId(null);
 
-  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
-    const { active, over } = event;
+      if (!over) return;
 
-    setActiveId(null);
-    setOverGroupId(null);
+      const activeData = active.data.current as
+        | { type: string; artifactId?: string; groupId?: string }
+        | undefined;
+      const overData = over.data.current as
+        | { type: string; groupId?: string; artifactId?: string }
+        | undefined;
 
-    if (!over) return;
+      if (!activeData || activeData.type !== 'artifact') return;
 
-    const activeData = active.data.current as DragData | undefined;
-    const overData = over.data.current as Record<string, any> | undefined;
+      const draggedArtifactId = (activeData.artifactId ?? active.id) as string;
+      const sourceGroupId = activeData.groupId; // group ID or 'all'/'ungrouped'
 
-    if (!activeData || activeData.type !== 'artifact') return;
+      // ── Dropped on a sidebar group ───────────────────────────────────
+      if (overData?.type === 'group-sidebar' && overData.groupId) {
+        const targetGroupId = overData.groupId;
+        const targetGroup = groups.find((g) => g.id === targetGroupId);
+        const targetName = targetGroup?.name ?? 'group';
 
-    const sourceGroupId = activeData.groupId;
-    const targetGroupId = resolveDropGroupId(over.id, overData);
+        // Check if already in that group
+        const membership = artifactGroupMembership.get(draggedArtifactId);
+        if (membership?.has(targetGroupId)) {
+          toast.info(`Already in ${targetName}`);
+          return;
+        }
 
-    if (!targetGroupId) return;
+        try {
+          await addArtifactToGroup.mutateAsync({
+            groupId: targetGroupId,
+            artifactId: draggedArtifactId,
+          });
+          toast.success(`Added to ${targetName}`);
+        } catch {
+          toast.error('Failed to add to group');
+        }
+        return;
+      }
 
-    // Same group: reorder artifacts within group
-    if (sourceGroupId === targetGroupId && sourceGroupId !== 'ungrouped') {
-      // Dropped on another artifact in the same group
-      if (overData?.type === 'artifact' && active.id !== over.id) {
-        const groupArtifacts = artifactsByGroup.get(sourceGroupId) || [];
+      // ── Dropped on remove zone ───────────────────────────────────────
+      if (overData?.type === 'remove-zone' && selectedGroup) {
+        try {
+          await removeArtifactFromGroup.mutateAsync({
+            groupId: selectedGroup.id,
+            artifactId: draggedArtifactId,
+          });
+          toast.success(`Removed from ${selectedGroup.name}`);
+        } catch {
+          toast.error('Failed to remove from group');
+        }
+        return;
+      }
+
+      // ── Dropped on another artifact (reorder within same group) ──────
+      if (
+        overData?.type === 'artifact' &&
+        sourceGroupId &&
+        sourceGroupId === overData.groupId &&
+        sourceGroupId !== 'all' &&
+        sourceGroupId !== 'ungrouped' &&
+        active.id !== over.id
+      ) {
+        const groupArtifacts = artifactsByGroup.get(sourceGroupId) ?? [];
         const oldIndex = groupArtifacts.findIndex((a) => a.id === active.id);
         const newIndex = groupArtifacts.findIndex((a) => a.id === over.id);
 
@@ -526,91 +347,159 @@ export function GroupedArtifactView({
               artifactIds: reordered.map((a) => a.id),
             });
             toast.success('Artifacts reordered');
-          } catch (error) {
+          } catch {
             toast.error('Failed to reorder artifacts');
-            console.error('Reorder artifacts error:', error);
           }
         }
       }
-      return;
-    }
+    },
+    [
+      groups,
+      selectedGroup,
+      artifactGroupMembership,
+      artifactsByGroup,
+      addArtifactToGroup,
+      removeArtifactFromGroup,
+      reorderArtifactsInGroup,
+    ]
+  );
 
-    // Different group: move artifact between groups
-    if (sourceGroupId !== targetGroupId && sourceGroupId !== 'ungrouped' && targetGroupId !== 'ungrouped') {
-      try {
-        await moveArtifactToGroup.mutateAsync({
-          sourceGroupId,
-          targetGroupId,
-          artifactId: active.id as string,
-        });
-        toast.success('Artifact moved to group');
-      } catch (error) {
-        toast.error('Failed to move artifact');
-        console.error('Move artifact error:', error);
-      }
+  // ── Create group handler ───────────────────────────────────────────────
+  const handleCreateGroup = useCallback(async () => {
+    // Simple inline creation -- prompt-free, creates with default name
+    // A more complete dialog can be added later
+    const name = `New Group ${groups.length + 1}`;
+    try {
+      const created = await createGroup.mutateAsync({
+        collection_id: collectionId,
+        name,
+        position: groups.length,
+      });
+      setSelectedPane(created.id);
+      toast.success(`Created "${name}"`);
+    } catch {
+      toast.error('Failed to create group');
     }
-  }, [resolveDropGroupId, artifactsByGroup, reorderArtifactsInGroup, moveArtifactToGroup]);
+  }, [collectionId, createGroup, groups.length]);
 
-  // Loading state
+  // ── Drag overlay artifact ──────────────────────────────────────────────
+  const draggedArtifact = useMemo(
+    () => (activeId ? artifacts.find((a) => a.id === activeId) : undefined),
+    [activeId, artifacts]
+  );
+
+  // ── Loading state ──────────────────────────────────────────────────────
   if (isLoadingGroups) {
     return <GroupedViewSkeleton />;
   }
 
-  // No groups
-  if (groups.length === 0 && ungroupedArtifacts.length === 0) {
-    return (
-      <div className="py-12 text-center">
-        <Package className="mx-auto h-12 w-12 text-muted-foreground/50" />
-        <h3 className="mt-4 text-lg font-semibold">No groups or artifacts</h3>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Create groups to organize your artifacts.
-        </p>
-      </div>
-    );
-  }
+  // ── Determine sort context ─────────────────────────────────────────────
+  // Only wrap in SortableContext when viewing a specific group (not all / ungrouped)
+  const isSpecificGroup = selectedPane !== 'all' && selectedPane !== 'ungrouped';
+  const sortableIds = isSpecificGroup ? paneArtifacts.map((a) => a.id) : [];
 
+  // ── Render ─────────────────────────────────────────────────────────────
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="space-y-4">
-        {/* Groups (alphabetically sorted) */}
-        {sortedGroups.map((group) => {
-          const groupArtifacts = artifactsByGroup.get(group.id) || [];
-          return (
-            <DroppableGroupSection
-              key={group.id}
-              group={group}
-              artifacts={groupArtifacts}
-              isOpen={openGroups.has(group.id)}
-              onToggle={() => toggleGroup(group.id)}
-              onArtifactClick={onArtifactClick}
-              isDropTarget={overGroupId === group.id}
-            />
-          );
-        })}
-
-        {/* Ungrouped artifacts */}
-        {ungroupedArtifacts.length > 0 && (
-          <DroppableUngroupedSection
-            artifacts={ungroupedArtifacts}
-            onArtifactClick={onArtifactClick}
-            isDropTarget={overGroupId === 'ungrouped'}
+      <div className="flex h-full">
+        {/* ── Left pane: sidebar (hidden below md) ─────────────────────── */}
+        <div className="hidden md:block">
+          <GroupSidebar
+            groups={groups}
+            selectedPane={selectedPane}
+            onSelectPane={setSelectedPane}
+            artifactCount={artifacts.length}
+            ungroupedCount={ungroupedArtifacts.length}
+            onCreateGroup={handleCreateGroup}
           />
-        )}
+        </div>
+
+        {/* ── Right pane ───────────────────────────────────────────────── */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {/* Mobile dropdown (shown below md) */}
+          <div className="block p-4 pb-0 md:hidden">
+            <Select
+              value={selectedPane}
+              onValueChange={(value: string) => setSelectedPane(value as PaneSelection)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select view" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  All Artifacts ({artifacts.length})
+                </SelectItem>
+                <SelectItem value="ungrouped">
+                  Ungrouped ({ungroupedArtifacts.length})
+                </SelectItem>
+                {groups.map((group) => (
+                  <SelectItem key={group.id} value={group.id}>
+                    {group.name} ({group.artifact_count})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Pane content */}
+          <div className="flex flex-1 flex-col overflow-hidden p-4">
+            <PaneHeader title={paneName} count={paneArtifacts.length} />
+
+            {/* Remove-from-group drop zone */}
+            {isSpecificGroup && selectedGroup && (
+              <div className="mb-3">
+                <RemoveFromGroupDropZone groupName={selectedGroup.name} />
+              </div>
+            )}
+
+            {/* Artifact list */}
+            {paneArtifacts.length === 0 ? (
+              <EmptyState
+                message={
+                  selectedPane === 'all'
+                    ? 'No artifacts in this collection'
+                    : selectedPane === 'ungrouped'
+                      ? 'All artifacts are assigned to groups'
+                      : 'No artifacts in this group. Drag artifacts here to add them.'
+                }
+              />
+            ) : (
+              <ScrollArea className="flex-1">
+                <SortableContext
+                  items={sortableIds}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-1 pr-2">
+                    {paneArtifacts.map((artifact) => (
+                      <DraggableMiniArtifactCard
+                        key={artifact.id}
+                        artifact={artifact}
+                        groupId={isSpecificGroup ? selectedPane : 'all'}
+                        onClick={() => onArtifactClick?.(artifact)}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </ScrollArea>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Drag overlay */}
+      {/* Drag overlay (portal) */}
       <DragOverlay>
-        {activeId &&
-          (() => {
-            const artifact = artifacts.find((a) => a.id === activeId);
-            return artifact ? <ArtifactRowOverlay artifact={artifact} /> : null;
-          })()}
+        {draggedArtifact ? (
+          <MiniArtifactCard
+            artifact={draggedArtifact}
+            onClick={() => {}}
+            className="shadow-lg"
+          />
+        ) : null}
       </DragOverlay>
     </DndContext>
   );
