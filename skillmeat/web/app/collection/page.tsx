@@ -121,11 +121,21 @@ function CollectionPageContent() {
   // Read filter state from URL params (single source of truth)
   const urlSearch = searchParams.get('search') || '';
   const urlType = searchParams.get('type') || 'all';
-  const urlStatus = searchParams.get('status') || 'all';
-  const urlScope = searchParams.get('scope') || 'all';
-  const urlPlatform = searchParams.get('platform') || 'all';
   const urlSort = searchParams.get('sort') || 'confidence';
   const urlOrder = (searchParams.get('order') as 'asc' | 'desc') || 'desc';
+
+  // Multi-select filters from URL (comma-separated)
+  const selectedStatuses = useMemo(() => {
+    return searchParams.get('status')?.split(',').filter(Boolean) || [];
+  }, [searchParams]);
+
+  const selectedScopes = useMemo(() => {
+    return searchParams.get('scope')?.split(',').filter(Boolean) || [];
+  }, [searchParams]);
+
+  const selectedPlatforms = useMemo(() => {
+    return searchParams.get('platform')?.split(',').filter(Boolean) || [];
+  }, [searchParams]);
 
   // Tag filtering from URL
   const selectedTags = useMemo(() => {
@@ -137,15 +147,17 @@ function CollectionPageContent() {
     return searchParams.get('tools')?.split(',').filter(Boolean) || [];
   }, [searchParams]);
 
-  // Derive filters object from URL state
+  // Group filtering from URL (multi-select, comma-separated)
+  const selectedGroups = useMemo(() => {
+    return searchParams.get('groups')?.split(',').filter(Boolean) || [];
+  }, [searchParams]);
+
+  // Derive filters object from URL state (for type filter and API queries)
   const filters: ArtifactFilters = useMemo(
     () => ({
       type: urlType !== 'all' ? (urlType as ArtifactFilters['type']) : undefined,
-      status: urlStatus !== 'all' ? (urlStatus as ArtifactFilters['status']) : undefined,
-      scope: urlScope !== 'all' ? (urlScope as ArtifactFilters['scope']) : undefined,
-      platform: urlPlatform !== 'all' ? (urlPlatform as ArtifactFilters['platform']) : undefined,
     }),
-    [urlType, urlStatus, urlScope, urlPlatform]
+    [urlType]
   );
 
   // Use URL values directly for search and sort
@@ -189,7 +201,6 @@ function CollectionPageContent() {
   // Get URL params for deep linking
   const urlArtifactId = searchParams.get('artifact');
   const urlCollectionId = searchParams.get('collection');
-  const urlGroupId = searchParams.get('group');
   const urlTab = searchParams.get('tab') as ArtifactDetailsTab | null;
 
   // Helper to update URL params without full page reload
@@ -218,26 +229,25 @@ function CollectionPageContent() {
     }
   }, [urlCollectionId, selectedCollectionId, setSelectedCollectionId]);
 
+  // Sync first selected group to context for API optimization (single group_id query param)
   useEffect(() => {
-    const normalizedUrlGroupId = urlGroupId || null;
-    if (normalizedUrlGroupId !== selectedGroupId) {
-      setSelectedGroupId(normalizedUrlGroupId);
+    const firstGroup = selectedGroups.length === 1 ? (selectedGroups[0] ?? null) : null;
+    if (firstGroup !== selectedGroupId) {
+      setSelectedGroupId(firstGroup);
     }
-  }, [urlGroupId, selectedGroupId, setSelectedGroupId]);
+  }, [selectedGroups, selectedGroupId, setSelectedGroupId]);
 
-  // Sync URL when collection/group changes (two-way binding)
+  // Sync URL when collection changes (one-way: context -> URL for collection only)
+  // Group URL updates are handled directly by handleGroupClick / toolbar handlers
   useEffect(() => {
-    // Only update URL if the values differ from current URL params
     const currentUrlCollection = searchParams.get('collection');
-    const currentUrlGroup = searchParams.get('group');
 
-    if (selectedCollectionId !== currentUrlCollection || selectedGroupId !== currentUrlGroup) {
+    if (selectedCollectionId !== currentUrlCollection) {
       updateUrlParams({
         collection: selectedCollectionId,
-        group: selectedGroupId,
       });
     }
-  }, [selectedCollectionId, selectedGroupId, searchParams, updateUrlParams]);
+  }, [selectedCollectionId, searchParams, updateUrlParams]);
 
   // ==========================================================================
   // Event Handlers
@@ -319,8 +329,8 @@ function CollectionPageContent() {
   } = useInfiniteCollectionArtifacts(isSpecificCollection ? selectedCollectionId : undefined, {
     limit: 20,
     artifact_type: filters.type && filters.type !== 'all' ? filters.type : undefined,
-    group_id: isSpecificCollection ? (selectedGroupId ?? undefined) : undefined,
-    include_groups: isSpecificCollection && !!selectedGroupId,
+    group_id: isSpecificCollection && selectedGroups.length === 1 ? selectedGroups[0] : undefined,
+    include_groups: isSpecificCollection && selectedGroups.length > 0,
     enabled: isSpecificCollection,
   });
 
@@ -387,14 +397,41 @@ function CollectionPageContent() {
     [updateUrlParams]
   );
 
-  // Handle filter object changes (type, status, scope)
+  // Handle filter object changes (type only - status/scope/platform are now multi-select)
   const handleFiltersChange = useCallback(
     (newFilters: ArtifactFilters) => {
       updateUrlParams({
         type: newFilters.type && newFilters.type !== 'all' ? newFilters.type : null,
-        status: newFilters.status && newFilters.status !== 'all' ? newFilters.status : null,
-        scope: newFilters.scope && newFilters.scope !== 'all' ? newFilters.scope : null,
-        platform: newFilters.platform && newFilters.platform !== 'all' ? newFilters.platform : null,
+      });
+    },
+    [updateUrlParams]
+  );
+
+  // Handle multi-select status filter changes
+  const handleStatusesChange = useCallback(
+    (statuses: string[]) => {
+      updateUrlParams({
+        status: statuses.length > 0 ? statuses.join(',') : null,
+      });
+    },
+    [updateUrlParams]
+  );
+
+  // Handle multi-select scope filter changes
+  const handleScopesChange = useCallback(
+    (scopes: string[]) => {
+      updateUrlParams({
+        scope: scopes.length > 0 ? scopes.join(',') : null,
+      });
+    },
+    [updateUrlParams]
+  );
+
+  // Handle multi-select platform filter changes
+  const handlePlatformsChange = useCallback(
+    (platforms: string[]) => {
+      updateUrlParams({
+        platform: platforms.length > 0 ? platforms.join(',') : null,
       });
     },
     [updateUrlParams]
@@ -451,10 +488,21 @@ function CollectionPageContent() {
     [selectedTags, handleTagsChange]
   );
 
-  // Handle clicking a group badge on a card to set group filter
+  // Handle clicking a group badge on a card to toggle group in multi-select
   const handleGroupClick = useCallback(
     (groupId: string) => {
-      updateUrlParams({ group: groupId });
+      const newGroups = selectedGroups.includes(groupId)
+        ? selectedGroups.filter((g) => g !== groupId)
+        : [...selectedGroups, groupId];
+      updateUrlParams({ groups: newGroups.length > 0 ? newGroups.join(',') : null });
+    },
+    [selectedGroups, updateUrlParams]
+  );
+
+  // Handle group filter changes from toolbar (multi-select)
+  const handleGroupsChange = useCallback(
+    (groupIds: string[]) => {
+      updateUrlParams({ groups: groupIds.length > 0 ? groupIds.join(',') : null });
     },
     [updateUrlParams]
   );
@@ -510,27 +558,40 @@ function CollectionPageContent() {
       artifacts = artifacts.filter((artifact) => artifact.type === filters.type);
     }
 
-    // Status filter (uses syncStatus)
-    if (filters.status && filters.status !== 'all') {
-      artifacts = artifacts.filter((artifact) => artifact.syncStatus === filters.status);
+    // Status filter (multi-select, uses syncStatus)
+    if (selectedStatuses.length > 0) {
+      artifacts = artifacts.filter((artifact) =>
+        selectedStatuses.includes(artifact.syncStatus || '')
+      );
     }
 
-    // Scope filter
-    if (filters.scope && filters.scope !== 'all') {
-      artifacts = artifacts.filter((artifact) => artifact.scope === filters.scope);
+    // Scope filter (multi-select)
+    if (selectedScopes.length > 0) {
+      artifacts = artifacts.filter((artifact) =>
+        selectedScopes.includes(artifact.scope || '')
+      );
     }
 
-    // Target platform filter
-    if (filters.platform && filters.platform !== 'all') {
-      if (filters.platform === 'universal') {
-        artifacts = artifacts.filter(
-          (artifact) => !artifact.targetPlatforms || artifact.targetPlatforms.length === 0
-        );
-      } else {
-        artifacts = artifacts.filter((artifact) =>
-          artifact.targetPlatforms?.some((platform) => platform === filters.platform)
-        );
-      }
+    // Target platform filter (multi-select)
+    if (selectedPlatforms.length > 0) {
+      artifacts = artifacts.filter((artifact) => {
+        if (selectedPlatforms.includes('universal')) {
+          // Include artifacts with no platform (universal) OR matching any selected platform
+          const isUniversal = !artifact.targetPlatforms || artifact.targetPlatforms.length === 0;
+          const matchesPlatform = artifact.targetPlatforms?.some((p) =>
+            selectedPlatforms.includes(p)
+          );
+          return isUniversal || matchesPlatform;
+        }
+        return artifact.targetPlatforms?.some((p) => selectedPlatforms.includes(p));
+      });
+    }
+
+    // Group filter (multi-select, client-side when >1 group selected)
+    if (selectedGroups.length > 1) {
+      artifacts = artifacts.filter((artifact) =>
+        artifact.groups?.some((g) => selectedGroups.includes(g.id)) ?? false
+      );
     }
 
     // Search
@@ -551,6 +612,10 @@ function CollectionPageContent() {
     infiniteAllArtifactsData,
     filters,
     searchQuery,
+    selectedStatuses,
+    selectedScopes,
+    selectedPlatforms,
+    selectedGroups,
   ]);
 
   // Compute available tags from artifacts matching current filters (excluding tag filter)
@@ -620,20 +685,20 @@ function CollectionPageContent() {
           selectedTags.length > 0 ||
           selectedTools.length > 0 ||
           (filters.type && filters.type !== 'all') ||
-          (filters.status && filters.status !== 'all') ||
-          (filters.scope && filters.scope !== 'all') ||
-          (filters.platform && filters.platform !== 'all') ||
-          selectedGroupId
+          selectedStatuses.length > 0 ||
+          selectedScopes.length > 0 ||
+          selectedPlatforms.length > 0 ||
+          selectedGroups.length > 0
       ),
     [
       searchQuery,
       selectedTags.length,
       selectedTools.length,
       filters.type,
-      filters.status,
-      filters.scope,
-      filters.platform,
-      selectedGroupId,
+      selectedStatuses.length,
+      selectedScopes.length,
+      selectedPlatforms.length,
+      selectedGroups.length,
     ]
   );
 
@@ -709,27 +774,29 @@ function CollectionPageContent() {
   const activeFilterItems = useMemo<ActiveFilterItem[]>(() => {
     const items: ActiveFilterItem[] = [];
 
-    if (filters.status && filters.status !== 'all') {
+    selectedStatuses.forEach((status) => {
       items.push({
-        id: `status:${filters.status}`,
-        label: `Status: ${filters.status}`,
-        onRemove: () => updateUrlParams({ status: null }),
+        id: `status:${status}`,
+        label: `Status: ${status}`,
+        onRemove: () => handleStatusesChange(selectedStatuses.filter((s) => s !== status)),
       });
-    }
-    if (filters.scope && filters.scope !== 'all') {
+    });
+
+    selectedScopes.forEach((scope) => {
       items.push({
-        id: `scope:${filters.scope}`,
-        label: `Scope: ${filters.scope}`,
-        onRemove: () => updateUrlParams({ scope: null }),
+        id: `scope:${scope}`,
+        label: `Scope: ${scope}`,
+        onRemove: () => handleScopesChange(selectedScopes.filter((s) => s !== scope)),
       });
-    }
-    if (filters.platform && filters.platform !== 'all') {
+    });
+
+    selectedPlatforms.forEach((platform) => {
       items.push({
-        id: `platform:${filters.platform}`,
-        label: `Platform: ${filters.platform}`,
-        onRemove: () => updateUrlParams({ platform: null }),
+        id: `platform:${platform}`,
+        label: `Platform: ${platform}`,
+        onRemove: () => handlePlatformsChange(selectedPlatforms.filter((p) => p !== platform)),
       });
-    }
+    });
 
     selectedTags.forEach((tag) => {
       items.push({
@@ -747,28 +814,33 @@ function CollectionPageContent() {
       });
     });
 
-    if (isSpecificCollection && selectedGroupId) {
-      const selectedGroup = currentGroups.find((group) => group.id === selectedGroupId);
-      items.push({
-        id: `group:${selectedGroupId}`,
-        label: `Group: ${selectedGroup?.name ?? selectedGroupId}`,
-        onRemove: () => updateUrlParams({ group: null }),
+    if (isSpecificCollection) {
+      selectedGroups.forEach((groupId) => {
+        const group = currentGroups.find((g) => g.id === groupId);
+        items.push({
+          id: `group:${groupId}`,
+          label: `Group: ${group?.name ?? groupId}`,
+          onRemove: () => handleGroupsChange(selectedGroups.filter((g) => g !== groupId)),
+        });
       });
     }
 
     return items;
   }, [
-    filters.status,
-    filters.scope,
-    filters.platform,
+    selectedStatuses,
+    selectedScopes,
+    selectedPlatforms,
     selectedTags,
     selectedTools,
-    selectedGroupId,
+    selectedGroups,
     isSpecificCollection,
     currentGroups,
-    updateUrlParams,
+    handleStatusesChange,
+    handleScopesChange,
+    handlePlatformsChange,
     handleTagsChange,
     handleToolsChange,
+    handleGroupsChange,
   ]);
 
   // ==========================================================================
@@ -911,6 +983,15 @@ function CollectionPageContent() {
         selectedTools={selectedTools}
         onToolsChange={handleToolsChange}
         availableTools={availableTools}
+        selectedGroups={selectedGroups}
+        onGroupsChange={handleGroupsChange}
+        availableGroups={currentGroups}
+        selectedStatuses={selectedStatuses}
+        onStatusesChange={handleStatusesChange}
+        selectedScopes={selectedScopes}
+        onScopesChange={handleScopesChange}
+        selectedPlatforms={selectedPlatforms}
+        onPlatformsChange={handlePlatformsChange}
         showTypeFilter={false}
         allowGroupedView={isSpecificCollection}
       />

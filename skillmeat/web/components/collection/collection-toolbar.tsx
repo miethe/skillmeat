@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Grid3x3, List, Layers, Search, RefreshCw, Filter, X, ArrowUpDown } from 'lucide-react';
+import { Grid3x3, List, Layers, Search, RefreshCw, Filter, X, ArrowUpDown, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -17,13 +17,16 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { TagFilterPopover } from '@/components/ui/tag-filter-popover';
-import { ToolFilterPopover } from '@/components/ui/tool-filter-popover';
 import { cn } from '@/lib/utils';
 import type { ArtifactFilters } from '@/types/artifact';
+import type { Group } from '@/types/groups';
 
 interface AvailableTag {
   name: string;
@@ -56,6 +59,24 @@ interface CollectionToolbarProps {
   onToolsChange?: (tools: string[]) => void;
   /** Optional: If provided, use these tools instead of static list */
   availableTools?: AvailableTool[];
+  /** Currently selected group IDs for filtering (multi-select) */
+  selectedGroups?: string[];
+  /** Handler for group filter changes */
+  onGroupsChange?: (groupIds: string[]) => void;
+  /** Available groups for the group filter dropdown */
+  availableGroups?: Group[];
+  /** Multi-select status filter values */
+  selectedStatuses?: string[];
+  /** Handler for status filter changes */
+  onStatusesChange?: (statuses: string[]) => void;
+  /** Multi-select scope filter values */
+  selectedScopes?: string[];
+  /** Handler for scope filter changes */
+  onScopesChange?: (scopes: string[]) => void;
+  /** Multi-select platform filter values */
+  selectedPlatforms?: string[];
+  /** Handler for platform filter changes */
+  onPlatformsChange?: (platforms: string[]) => void;
   /** Show type filter in dropdown (disable when type tabs are rendered separately) */
   showTypeFilter?: boolean;
   /** Whether grouped view should be selectable */
@@ -114,6 +135,15 @@ export function CollectionToolbar({
   selectedTools = [],
   onToolsChange,
   availableTools,
+  selectedGroups = [],
+  onGroupsChange,
+  availableGroups = [],
+  selectedStatuses = [],
+  onStatusesChange,
+  selectedScopes = [],
+  onScopesChange,
+  selectedPlatforms = [],
+  onPlatformsChange,
   showTypeFilter = true,
   allowGroupedView = true,
 }: CollectionToolbarProps) {
@@ -148,22 +178,23 @@ export function CollectionToolbar({
     setLocalSearch('');
     onTagsChange?.([]);
     onToolsChange?.([]);
-  }, [onFiltersChange, onTagsChange, onToolsChange]);
+    onGroupsChange?.([]);
+    onStatusesChange?.([]);
+    onScopesChange?.([]);
+    onPlatformsChange?.([]);
+  }, [onFiltersChange, onTagsChange, onToolsChange, onGroupsChange, onStatusesChange, onScopesChange, onPlatformsChange]);
 
-  // Calculate active filter count
+  // Calculate active filter count (includes all filters in the dropdown)
   const activeFilterCount =
-    Object.entries(filters).filter(
-      ([key, value]) =>
-        value !== undefined &&
-        value !== 'all' &&
-        value !== '' &&
-        (showTypeFilter || key !== 'type')
-    ).length +
+    selectedStatuses.length +
+    selectedScopes.length +
+    selectedPlatforms.length +
     (selectedTags.length > 0 ? 1 : 0) +
-    (selectedTools.length > 0 ? 1 : 0);
+    (selectedTools.length > 0 ? 1 : 0) +
+    selectedGroups.length;
 
   const hasActiveFilters =
-    activeFilterCount > 0 || localSearch.length > 0 || selectedTools.length > 0;
+    activeFilterCount > 0 || localSearch.length > 0;
 
   return (
     <div className="border-b bg-muted/30 px-6 py-3">
@@ -192,16 +223,7 @@ export function CollectionToolbar({
             />
           )}
 
-          {/* Tool Filter Popover */}
-          {onToolsChange && (
-            <ToolFilterPopover
-              selectedTools={selectedTools}
-              onChange={onToolsChange}
-              availableTools={availableTools}
-            />
-          )}
-
-          {/* Filter Dropdown */}
+          {/* Filter Dropdown (Status, Scope, Platform, Group, Tools) */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
@@ -243,70 +265,331 @@ export function CollectionToolbar({
                 </div>
               )}
 
-              {/* Status Filter */}
-              <div className="p-2">
-                <label htmlFor="status-filter" className="mb-1.5 block text-xs font-medium">
-                  Status
-                </label>
-                <Select
-                  value={filters.status || 'all'}
-                  onValueChange={(value) => handleFilterChange('status', value)}
-                >
-                  <SelectTrigger id="status-filter" className="h-8">
-                    <SelectValue placeholder="All Statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="outdated">Outdated</SelectItem>
-                    <SelectItem value="conflict">Conflict</SelectItem>
-                    <SelectItem value="error">Error</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Status Filter (multi-select checkboxes) */}
+              {onStatusesChange && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <span className="flex items-center gap-2">
+                        Status
+                        {selectedStatuses.length > 0 && (
+                          <Badge variant="secondary" className="ml-auto h-5 min-w-[1.25rem] px-1 text-[10px]">
+                            {selectedStatuses.length}
+                          </Badge>
+                        )}
+                      </span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-48">
+                      {selectedStatuses.length > 0 && (
+                        <>
+                          <DropdownMenuItem
+                            onSelect={(e) => e.preventDefault()}
+                            onClick={() => onStatusesChange([])}
+                          >
+                            <span className="text-xs text-muted-foreground">Clear all</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      {[
+                        { value: 'active', label: 'Active' },
+                        { value: 'synced', label: 'Synced' },
+                        { value: 'modified', label: 'Modified' },
+                        { value: 'outdated', label: 'Outdated' },
+                        { value: 'conflict', label: 'Conflict' },
+                        { value: 'error', label: 'Error' },
+                      ].map((item) => {
+                        const isSelected = selectedStatuses.includes(item.value);
+                        return (
+                          <DropdownMenuItem
+                            key={item.value}
+                            onSelect={(e) => e.preventDefault()}
+                            onClick={() => {
+                              if (isSelected) {
+                                onStatusesChange(selectedStatuses.filter((s) => s !== item.value));
+                              } else {
+                                onStatusesChange([...selectedStatuses, item.value]);
+                              }
+                            }}
+                          >
+                            <span className="flex w-full items-center gap-2">
+                              <div
+                                className={cn(
+                                  'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                                  isSelected ? 'border-primary bg-primary' : 'border-input'
+                                )}
+                              >
+                                {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                              </div>
+                              {item.label}
+                            </span>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                </>
+              )}
 
-              {/* Scope Filter */}
-              <div className="p-2">
-                <label htmlFor="scope-filter" className="mb-1.5 block text-xs font-medium">
-                  Scope
-                </label>
-                <Select
-                  value={filters.scope || 'all'}
-                  onValueChange={(value) => handleFilterChange('scope', value)}
-                >
-                  <SelectTrigger id="scope-filter" className="h-8">
-                    <SelectValue placeholder="All Scopes" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Scopes</SelectItem>
-                    <SelectItem value="user">User (Global)</SelectItem>
-                    <SelectItem value="local">Local (Project)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Scope Filter (multi-select checkboxes) */}
+              {onScopesChange && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <span className="flex items-center gap-2">
+                        Scope
+                        {selectedScopes.length > 0 && (
+                          <Badge variant="secondary" className="ml-auto h-5 min-w-[1.25rem] px-1 text-[10px]">
+                            {selectedScopes.length}
+                          </Badge>
+                        )}
+                      </span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-48">
+                      {selectedScopes.length > 0 && (
+                        <>
+                          <DropdownMenuItem
+                            onSelect={(e) => e.preventDefault()}
+                            onClick={() => onScopesChange([])}
+                          >
+                            <span className="text-xs text-muted-foreground">Clear all</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      {[
+                        { value: 'user', label: 'User (Global)' },
+                        { value: 'local', label: 'Local (Project)' },
+                      ].map((item) => {
+                        const isSelected = selectedScopes.includes(item.value);
+                        return (
+                          <DropdownMenuItem
+                            key={item.value}
+                            onSelect={(e) => e.preventDefault()}
+                            onClick={() => {
+                              if (isSelected) {
+                                onScopesChange(selectedScopes.filter((s) => s !== item.value));
+                              } else {
+                                onScopesChange([...selectedScopes, item.value]);
+                              }
+                            }}
+                          >
+                            <span className="flex w-full items-center gap-2">
+                              <div
+                                className={cn(
+                                  'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                                  isSelected ? 'border-primary bg-primary' : 'border-input'
+                                )}
+                              >
+                                {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                              </div>
+                              {item.label}
+                            </span>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                </>
+              )}
 
-              {/* Platform Filter */}
-              <div className="p-2">
-                <label htmlFor="platform-filter" className="mb-1.5 block text-xs font-medium">
-                  Platform
-                </label>
-                <Select
-                  value={filters.platform || 'all'}
-                  onValueChange={(value) => handleFilterChange('platform', value)}
-                >
-                  <SelectTrigger id="platform-filter" className="h-8">
-                    <SelectValue placeholder="All Platforms" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Platforms</SelectItem>
-                    <SelectItem value="universal">Universal</SelectItem>
-                    <SelectItem value="claude_code">Claude Code</SelectItem>
-                    <SelectItem value="codex">Codex</SelectItem>
-                    <SelectItem value="gemini">Gemini</SelectItem>
-                    <SelectItem value="cursor">Cursor</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Platform Filter (multi-select checkboxes) */}
+              {onPlatformsChange && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <span className="flex items-center gap-2">
+                        Platform
+                        {selectedPlatforms.length > 0 && (
+                          <Badge variant="secondary" className="ml-auto h-5 min-w-[1.25rem] px-1 text-[10px]">
+                            {selectedPlatforms.length}
+                          </Badge>
+                        )}
+                      </span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-48">
+                      {selectedPlatforms.length > 0 && (
+                        <>
+                          <DropdownMenuItem
+                            onSelect={(e) => e.preventDefault()}
+                            onClick={() => onPlatformsChange([])}
+                          >
+                            <span className="text-xs text-muted-foreground">Clear all</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      {[
+                        { value: 'universal', label: 'Universal' },
+                        { value: 'claude_code', label: 'Claude Code' },
+                        { value: 'codex', label: 'Codex' },
+                        { value: 'gemini', label: 'Gemini' },
+                        { value: 'cursor', label: 'Cursor' },
+                      ].map((item) => {
+                        const isSelected = selectedPlatforms.includes(item.value);
+                        return (
+                          <DropdownMenuItem
+                            key={item.value}
+                            onSelect={(e) => e.preventDefault()}
+                            onClick={() => {
+                              if (isSelected) {
+                                onPlatformsChange(selectedPlatforms.filter((p) => p !== item.value));
+                              } else {
+                                onPlatformsChange([...selectedPlatforms, item.value]);
+                              }
+                            }}
+                          >
+                            <span className="flex w-full items-center gap-2">
+                              <div
+                                className={cn(
+                                  'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                                  isSelected ? 'border-primary bg-primary' : 'border-input'
+                                )}
+                              >
+                                {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                              </div>
+                              {item.label}
+                            </span>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                </>
+              )}
+
+              {/* Group Filter (multi-select checkboxes) */}
+              {onGroupsChange && availableGroups.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <span className="flex items-center gap-2">
+                        Group
+                        {selectedGroups.length > 0 && (
+                          <Badge variant="secondary" className="ml-auto h-5 min-w-[1.25rem] px-1 text-[10px]">
+                            {selectedGroups.length}
+                          </Badge>
+                        )}
+                      </span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-48">
+                      {selectedGroups.length > 0 && (
+                        <>
+                          <DropdownMenuItem
+                            onSelect={(e) => e.preventDefault()}
+                            onClick={() => onGroupsChange([])}
+                          >
+                            <span className="text-xs text-muted-foreground">Clear all</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      {availableGroups.map((group) => {
+                        const isSelected = selectedGroups.includes(group.id);
+                        return (
+                          <DropdownMenuItem
+                            key={group.id}
+                            onSelect={(e) => e.preventDefault()}
+                            onClick={() => {
+                              if (isSelected) {
+                                onGroupsChange(selectedGroups.filter((g) => g !== group.id));
+                              } else {
+                                onGroupsChange([...selectedGroups, group.id]);
+                              }
+                            }}
+                          >
+                            <span className="flex w-full items-center gap-2">
+                              <div
+                                className={cn(
+                                  'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                                  isSelected ? 'border-primary bg-primary' : 'border-input'
+                                )}
+                              >
+                                {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                              </div>
+                              <span className="truncate">{group.name}</span>
+                              {group.artifact_count > 0 && (
+                                <span className="ml-auto text-xs text-muted-foreground">
+                                  {group.artifact_count}
+                                </span>
+                              )}
+                            </span>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                </>
+              )}
+
+              {/* Tools Filter (sub-menu with checkboxes) */}
+              {onToolsChange && availableTools && availableTools.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <span className="flex items-center gap-2">
+                        Tools
+                        {selectedTools.length > 0 && (
+                          <Badge variant="secondary" className="ml-auto h-5 min-w-[1.25rem] px-1 text-[10px]">
+                            {selectedTools.length}
+                          </Badge>
+                        )}
+                      </span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-56 max-h-60 overflow-y-auto">
+                      {selectedTools.length > 0 && (
+                        <>
+                          <DropdownMenuItem
+                            onSelect={(e) => e.preventDefault()}
+                            onClick={() => onToolsChange([])}
+                          >
+                            <span className="text-xs text-muted-foreground">Clear all</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      {availableTools.map((tool) => {
+                        const isSelected = selectedTools.includes(tool.name);
+                        return (
+                          <DropdownMenuItem
+                            key={tool.name}
+                            onSelect={(e) => e.preventDefault()}
+                            onClick={() => {
+                              if (isSelected) {
+                                onToolsChange(selectedTools.filter((t) => t !== tool.name));
+                              } else {
+                                onToolsChange([...selectedTools, tool.name]);
+                              }
+                            }}
+                          >
+                            <span className="flex w-full items-center gap-2">
+                              <div
+                                className={cn(
+                                  'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                                  isSelected ? 'border-primary bg-primary' : 'border-input'
+                                )}
+                              >
+                                {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                              </div>
+                              <span className="truncate font-mono text-xs">{tool.name}</span>
+                              {tool.artifact_count > 0 && (
+                                <span className="ml-auto text-xs text-muted-foreground">
+                                  {tool.artifact_count}
+                                </span>
+                              )}
+                            </span>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 

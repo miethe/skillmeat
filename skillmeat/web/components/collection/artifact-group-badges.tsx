@@ -215,7 +215,7 @@ export function ArtifactGroupBadges({
 
   return (
     <div
-      className={cn('flex items-center gap-1 overflow-hidden', className)}
+      className={cn('flex items-center gap-1 overflow-hidden py-0.5', className)}
       role="list"
       aria-label="Group memberships"
     >
