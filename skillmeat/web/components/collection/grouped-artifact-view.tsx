@@ -462,10 +462,10 @@ export function GroupedArtifactView({
               <EmptyState
                 message={
                   selectedPane === 'all'
-                    ? 'No artifacts in this collection'
+                    ? 'No artifacts in your collection yet'
                     : selectedPane === 'ungrouped'
-                      ? 'All artifacts are assigned to groups'
-                      : 'No artifacts in this group. Drag artifacts here to add them.'
+                      ? 'All artifacts are organized into groups'
+                      : 'No artifacts in this group yet. Drag artifacts here to add them.'
                 }
               />
             ) : (
