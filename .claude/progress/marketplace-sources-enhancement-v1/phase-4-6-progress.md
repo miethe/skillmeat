@@ -2,13 +2,12 @@
 type: progress
 prd: marketplace-sources-enhancement-v1
 phase: 4-6
-status: in_progress
+status: completed
 progress: 0
 created: 2026-01-18
 updated: 2026-01-18
 source: docs/project_plans/implementation_plans/enhancements/marketplace-sources-enhancement-v1/phase-4-6-frontend.md
 ---
-
 # Phase 4-6 Progress: Frontend Implementation
 
 **Phases**: 4 (Components), 5 (Pages), 6 (Dialogs)
