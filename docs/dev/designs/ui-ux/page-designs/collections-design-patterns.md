@@ -4,7 +4,7 @@
 
 **Status**: Verified - Collections page implemented, Context Entities page already follows most patterns.
 
-**Last Verified**: 2025-12-20
+**Last Verified**: 2026-02-17
 
 ---
 
@@ -44,6 +44,23 @@
 └──────────────────────────────────────────┘
 ```
 
+### Groups Two-Pane Layout Pattern
+```
++---------------------+----------------------------------------+
+| GroupSidebar        | ArtifactPane                           |
+| (280px, fixed)      | (flex-1, independent scroll)           |
+|                     |                                        |
+| [*] All Artifacts   | [PaneHeader: group name + count]       |
+| [ ] Ungrouped       | [RemoveFromGroupDropZone] (conditional)|
+| ───────────         |                                        |
+| [●] Group A     5   | [MiniArtifactCard] (draggable)         |
+| [●] Group B     3   | [MiniArtifactCard]                     |
+|                     | [MiniArtifactCard]                     |
+| [+ Create Group]    |                                        |
+| [Manage]            |                                        |
++---------------------+----------------------------------------+
+```
+
 ---
 
 ## Key File Locations
@@ -57,6 +74,13 @@
 | EditCollectionDialog | `/skillmeat/web/components/collection/edit-collection-dialog.tsx` | Update modal |
 | UnifiedEntityModal | `/skillmeat/web/components/entity/unified-entity-modal.tsx` | Detail view modal |
 | Context Entities Page | `/skillmeat/web/app/context-entities/page.tsx` | Already follows most patterns |
+| GroupSidebar | `/skillmeat/web/components/collection/group-sidebar.tsx` | Fixed sidebar with group navigation and drop targets |
+| MiniArtifactCard | `/skillmeat/web/components/collection/mini-artifact-card.tsx` | Draggable artifact card for grouped view |
+| RemoveFromGroupDropZone | `/skillmeat/web/components/collection/remove-from-group-zone.tsx` | Drop zone for removing artifacts from groups |
+| DndAnimations | `/skillmeat/web/components/collection/dnd-animations.tsx` | Shared animations for drag and drop operations |
+| GroupedArtifactView | `/skillmeat/web/components/collection/grouped-artifact-view.tsx` | DndContext container with two-pane layout |
+| use-dnd-animations | `/skillmeat/web/hooks/use-dnd-animations.ts` | Hook for DnD animation state management |
+| use-artifact-groups | `/skillmeat/web/hooks/use-artifact-groups.ts` | Hook for group state and operations |
 
 ---
 
@@ -370,9 +394,362 @@ export function CollectionToolbar({
 
 ---
 
-## Pattern 4: State Management
+## Pattern 4: Groups Two-Pane Layout (Grouped View Mode)
 
-### Collections Page State Pattern
+The Groups Two-Pane layout provides a fixed sidebar for group navigation combined with a flexible main pane for viewing and organizing artifacts within groups. Unlike the Context Entities sidebar filter pattern, this layout uses navigation and drag-and-drop interaction as its primary pattern.
+
+### Layout Structure
+```typescript
+// skillmeat/web/components/collection/grouped-artifact-view.tsx
+
+<DndContext>
+  <div className="flex h-full gap-4">
+    {/* LEFT: Fixed Group Sidebar (280px) */}
+    <GroupSidebar
+      groups={groups}
+      selectedGroup={selectedGroup}
+      onGroupSelect={handleGroupSelect}
+      onManage={handleManageGroups}
+      onCreate={handleCreateGroup}
+    />
+
+    {/* RIGHT: Artifact Pane (flex-1, independent scroll) */}
+    <div className="flex-1 overflow-auto">
+      <PaneHeader
+        groupName={selectedGroup?.name}
+        artifactCount={selectedGroup?.artifacts.length}
+      />
+
+      {selectedGroup?.id === 'ungrouped' && (
+        <RemoveFromGroupDropZone />
+      )}
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+        {artifacts.map(artifact => (
+          <MiniArtifactCard
+            key={artifact.id}
+            artifact={artifact}
+            isDragging={activeId === artifact.id}
+            isGhost={overGroups.has(artifact.id)}
+          />
+        ))}
+      </div>
+    </div>
+  </div>
+</DndContext>
+```
+
+### Key File Locations
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| GroupSidebar | `/skillmeat/web/components/collection/group-sidebar.tsx` | Fixed 280px sidebar displaying groups and counts |
+| MiniArtifactCard | `/skillmeat/web/components/collection/mini-artifact-card.tsx` | Draggable card with animation hooks |
+| RemoveFromGroupDropZone | `/skillmeat/web/components/collection/remove-from-group-zone.tsx` | Drop zone for ungrouping artifacts |
+| DndAnimations | `/skillmeat/web/components/collection/dnd-animations.tsx` | Centralized animation system for DnD operations |
+| GroupedArtifactView | `/skillmeat/web/components/collection/grouped-artifact-view.tsx` | DndContext container orchestrating layout |
+| use-dnd-animations | `/skillmeat/web/hooks/use-dnd-animations.ts` | Hook managing pickup, drop, settle, poof animations |
+| use-artifact-groups | `/skillmeat/web/hooks/use-artifact-groups.ts` | Hook managing group state and mutations |
+
+### Sidebar Component Pattern
+
+```typescript
+// skillmeat/web/components/collection/group-sidebar.tsx
+
+export function GroupSidebar({
+  groups,
+  selectedGroup,
+  onGroupSelect,
+  onManage,
+  onCreate,
+}: GroupSidebarProps) {
+  return (
+    <aside className="w-[280px] flex-shrink-0 overflow-auto border-r bg-muted/20 p-4">
+      <div className="space-y-2">
+        {/* All Artifacts option */}
+        <button
+          onClick={() => onGroupSelect(null)}
+          className={cn(
+            'w-full px-3 py-2 rounded-md text-left text-sm',
+            selectedGroup === null
+              ? 'bg-primary text-primary-foreground'
+              : 'hover:bg-muted'
+          )}
+        >
+          <Check className="mr-2 inline h-4 w-4" />
+          All Artifacts
+        </button>
+
+        {/* Ungrouped option */}
+        <button
+          onClick={() => onGroupSelect('ungrouped')}
+          className={cn(
+            'w-full px-3 py-2 rounded-md text-left text-sm',
+            selectedGroup?.id === 'ungrouped'
+              ? 'bg-primary text-primary-foreground'
+              : 'hover:bg-muted'
+          )}
+        >
+          <Square className="mr-2 inline h-4 w-4" />
+          Ungrouped
+        </button>
+
+        <Separator />
+
+        {/* Groups list with counts */}
+        <div className="space-y-1">
+          {groups.map(group => (
+            <button
+              key={group.id}
+              onClick={() => onGroupSelect(group)}
+              className={cn(
+                'w-full flex items-center justify-between px-3 py-2 rounded-md text-sm',
+                selectedGroup?.id === group.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-muted'
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <Circle className="h-3 w-3 fill-current" />
+                <span>{group.name}</span>
+              </div>
+              <Badge variant="secondary" className="text-xs">
+                {group.artifacts.length}
+              </Badge>
+            </button>
+          ))}
+        </div>
+
+        <Separator />
+
+        {/* Group management buttons */}
+        <Button
+          variant="ghost"
+          className="w-full justify-start"
+          onClick={onCreate}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Create Group
+        </Button>
+
+        <Button
+          variant="ghost"
+          className="w-full justify-start"
+          onClick={onManage}
+        >
+          <Settings className="mr-2 h-4 w-4" />
+          Manage
+        </Button>
+      </div>
+    </aside>
+  );
+}
+```
+
+### MiniArtifactCard with DnD Integration
+
+```typescript
+// skillmeat/web/components/collection/mini-artifact-card.tsx
+
+export function MiniArtifactCard({
+  artifact,
+  isDragging,
+  isGhost,
+}: MiniArtifactCardProps) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: artifact.id,
+    data: { type: 'artifact', artifact },
+  });
+
+  const {
+    scaleY,
+    opacity,
+    rotation,
+  } = useAnimationStates(isDragging, isGhost);
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0) scaleY(${scaleY}) rotate(${rotation}deg)`,
+        opacity,
+        transition: isDragging ? 'none' : 'all 200ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+      }
+    : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={cn(
+        'group relative rounded-lg border bg-card p-3 cursor-grab transition-all',
+        isDragging && 'z-50 shadow-lg cursor-grabbing',
+        isGhost && 'opacity-50'
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <h3 className="font-medium text-sm truncate">{artifact.name}</h3>
+          <p className="text-xs text-muted-foreground">{artifact.type}</p>
+        </div>
+        {artifact.icon && (
+          <img src={artifact.icon} alt="" className="h-4 w-4 flex-shrink-0" />
+        )}
+      </div>
+
+      {/* Drag Handle Indicator */}
+      {isDragging && (
+        <div className="absolute inset-0 rounded-lg border-2 border-primary pointer-events-none" />
+      )}
+    </div>
+  );
+}
+```
+
+### Animation System
+
+```typescript
+// skillmeat/web/hooks/use-dnd-animations.ts
+
+export function useDndAnimations(activeId: string | null) {
+  const [animations, setAnimations] = useState<Map<string, AnimationState>>(new Map());
+
+  // Track active drag
+  const addActiveAnimation = (id: string) => {
+    setAnimations(prev => new Map(prev).set(id, {
+      state: 'pickup',
+      scale: 0.95,
+      rotate: 5,
+      zIndex: 50,
+    }));
+  };
+
+  // Settle after drop (brief hold before release)
+  const addSettleAnimation = (id: string) => {
+    setAnimations(prev => new Map(prev).set(id, {
+      state: 'settle',
+      scale: 1,
+      rotate: 0,
+      zIndex: 0,
+    }));
+    setTimeout(() => {
+      setAnimations(prev => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 200);
+  };
+
+  // Poof effect when removed from group
+  const addPoofAnimation = (id: string, x: number, y: number) => {
+    setAnimations(prev => new Map(prev).set(id, {
+      state: 'poof',
+      scale: 0,
+      opacity: 0,
+      x: x + 20,
+      y: y + 20,
+      duration: 300,
+    }));
+  };
+
+  return {
+    animations,
+    addActiveAnimation,
+    addSettleAnimation,
+    addPoofAnimation,
+  };
+}
+```
+
+### Drop Zone Pattern
+
+```typescript
+// skillmeat/web/components/collection/remove-from-group-zone.tsx
+
+export function RemoveFromGroupDropZone() {
+  const { isOver, setNodeRef } = useDroppable({
+    id: 'ungrouped-zone',
+    data: { type: 'ungrouped' },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'rounded-lg border-2 border-dashed p-6 text-center transition-all',
+        isOver
+          ? 'border-destructive bg-destructive/10'
+          : 'border-muted-foreground/30'
+      )}
+    >
+      <Trash2 className={cn(
+        'mx-auto h-5 w-5 transition-all',
+        isOver ? 'text-destructive' : 'text-muted-foreground'
+      )} />
+      <p className={cn(
+        'mt-2 text-sm',
+        isOver ? 'text-destructive font-medium' : 'text-muted-foreground'
+      )}>
+        {isOver ? 'Drop to remove from group' : 'Drag artifact here to remove from group'}
+      </p>
+    </div>
+  );
+}
+```
+
+### Key Design Distinctions
+
+**Navigation vs Filtering**: Unlike the Context Entities sidebar which *filters* results, the Groups sidebar *navigates* between different views. Selecting a group changes which artifacts are displayed, not the availability of filters.
+
+**Independent Scrolling**: The sidebar and main pane scroll independently. The sidebar remains fixed at 280px width while the pane expands with flex-1. Both can scroll when their content overflows.
+
+**Drop Targets**: Sidebar groups are drop targets for DnD operations. When hovering a group while dragging an artifact, the group highlights. When hovering the "Ungrouped" zone in the main pane (conditional, only shown for ungrouped view), it shows a removal state.
+
+**Animation Layers**: DnD animations include:
+- **Pickup Scale**: Card scales to 0.95 and rotates slightly on drag start
+- **Drop Settle**: Card returns to 1.0 scale with brief 200ms transition
+- **Poof Removal**: Card scales to 0 and fades with particle effects when dropped in ungrouped zone
+- **Ghost State**: Card fades to 0.5 opacity when hovering valid drop targets
+- **Target Pulse**: Group badges in sidebar pulse when they're valid drop targets
+- **Zone Pulse**: Drop zones show color transition and icon emphasis on hover
+
+---
+
+## Pattern 5: State Management
+
+### Collections Page State Pattern (with Groups Hook Integration)
+
+When implementing grouped view mode, integrate the artifact groups hook:
+
+```typescript
+// skillmeat/web/app/collection/page.tsx (lines in grouped view mode)
+
+const { groups, selectedGroup, setSelectedGroup } = useArtifactGroups(collectionId);
+const { addActiveAnimation, addSettleAnimation } = useDndAnimations();
+
+// Handle DnD operations
+const handleDragEnd = async (event: DragEndEvent) => {
+  const { active, over } = event;
+
+  if (!over) {
+    addSettleAnimation(active.id as string);
+    return;
+  }
+
+  if (over.data?.type === 'group') {
+    // Move artifact to group
+    await moveArtifactToGroup(active.id as string, over.data.groupId);
+    addSettleAnimation(active.id as string);
+  } else if (over.data?.type === 'ungrouped') {
+    // Remove artifact from group
+    await removeArtifactFromGroup(active.id as string);
+    addPoofAnimation(active.id as string, over.data.x, over.data.y);
+  }
+};
+```
+
+### Collections Page State Pattern (Original)
 ```typescript
 // skillmeat/web/app/collection/page.tsx (lines 86-146)
 
@@ -471,7 +848,7 @@ export default function ContextEntitiesPage() {
 
 ---
 
-## Pattern 5: Modal Handlers
+## Pattern 6: Modal Handlers
 
 ### Open Modal Pattern
 ```typescript
@@ -515,7 +892,7 @@ const handleEditorClose = () => {
 
 ---
 
-## Pattern 6: Modal Components
+## Pattern 7: Modal Components
 
 ### Create/Edit Dialog Pattern
 ```typescript
@@ -581,7 +958,7 @@ const handleEditorClose = () => {
 
 ---
 
-## Pattern 7: States (Error, Loading, Empty, Content)
+## Pattern 8: States (Error, Loading, Empty, Content)
 
 ### Error State
 ```typescript
@@ -665,7 +1042,7 @@ function EmptyState({ hasFilters }: { hasFilters: boolean }) {
 
 ---
 
-## Pattern 8: Filter Handling
+## Pattern 9: Filter Handling
 
 ### Sidebar Filter Pattern (Context Entities)
 ```typescript
@@ -706,7 +1083,7 @@ const hasActiveFilters = Object.keys(filters).some(
 
 ---
 
-## Pattern 9: Accessibility
+## Pattern 10: Accessibility
 
 ### Skip Link
 ```typescript

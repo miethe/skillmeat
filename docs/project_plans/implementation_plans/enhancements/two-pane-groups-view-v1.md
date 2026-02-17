@@ -1,7 +1,7 @@
 # Two-Pane Groups View Redesign
 
-**Status**: draft
-**Branch**: feat/collection-org
+**Status**: completed
+**Branch**: feat/two-pane-groups-view
 **Scope**: Frontend only (web)
 **Estimated effort**: 1-2 sessions
 
