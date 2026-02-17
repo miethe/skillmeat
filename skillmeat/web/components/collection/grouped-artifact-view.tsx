@@ -480,7 +480,7 @@ export function GroupedArtifactView({
           </div>
 
           {/* Scrollable artifact grid */}
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-1">
             {paneArtifacts.length === 0 ? (
               <EmptyState
                 message={

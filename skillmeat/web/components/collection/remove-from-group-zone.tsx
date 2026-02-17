@@ -14,6 +14,9 @@ export interface RemoveFromGroupDropZoneProps {
 /**
  * Drop zone that appears at the top of the artifact pane when viewing a specific group.
  * Dragging an artifact onto it removes the artifact from that group.
+ *
+ * Features a breathing border animation while idle (to draw attention during drag),
+ * and scales up with a stronger destructive highlight when hovered.
  */
 export function RemoveFromGroupDropZone({ groupName, isPoofing }: RemoveFromGroupDropZoneProps) {
   const { isOver, setNodeRef } = useDroppable({
@@ -25,16 +28,20 @@ export function RemoveFromGroupDropZone({ groupName, isPoofing }: RemoveFromGrou
     <div
       ref={setNodeRef}
       className={cn(
-        'flex h-12 w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed transition-all',
+        'flex h-12 w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed',
+        'transition-all duration-200 ease-out',
         isOver
-          ? 'scale-[1.02] border-destructive bg-destructive/10 text-destructive'
+          ? 'scale-[1.02] border-destructive bg-destructive/10 text-destructive shadow-sm'
           : isPoofing
             ? 'border-destructive/50 bg-destructive/5 text-destructive'
-            : 'border-muted-foreground/25 text-muted-foreground'
+            : 'animate-dnd-remove-zone-breathe text-muted-foreground'
       )}
     >
       <Trash2
-        className={cn('h-4 w-4 transition-transform', isOver && 'scale-110')}
+        className={cn(
+          'h-4 w-4 transition-transform duration-200',
+          isOver && 'scale-125',
+        )}
         aria-hidden="true"
       />
       <span className="text-sm font-medium">

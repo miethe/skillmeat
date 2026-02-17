@@ -214,6 +214,33 @@ module.exports = {
             opacity: '0',
           },
         },
+        // -- New DnD polish keyframes --
+        'dnd-drop-target-pulse': {
+          '0%, 100%': {
+            boxShadow: '0 0 0 0 hsl(var(--primary) / 0.2)',
+          },
+          '50%': {
+            boxShadow: '0 0 0 4px hsl(var(--primary) / 0.15)',
+          },
+        },
+        'dnd-remove-zone-breathe': {
+          '0%, 100%': {
+            borderColor: 'hsl(var(--destructive) / 0.3)',
+            backgroundColor: 'hsl(var(--destructive) / 0.03)',
+          },
+          '50%': {
+            borderColor: 'hsl(var(--destructive) / 0.5)',
+            backgroundColor: 'hsl(var(--destructive) / 0.06)',
+          },
+        },
+        'dnd-ghost-pulse': {
+          '0%, 100%': {
+            borderColor: 'hsl(var(--primary) / 0.2)',
+          },
+          '50%': {
+            borderColor: 'hsl(var(--primary) / 0.4)',
+          },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -229,6 +256,10 @@ module.exports = {
         'dnd-badge-shrink': 'dnd-badge-shrink 300ms cubic-bezier(0.34, 1.56, 0.64, 1)',
         'dnd-poof': 'dnd-poof 350ms cubic-bezier(0.55, 0, 1, 0.45) forwards',
         'dnd-particle': 'dnd-particle 400ms cubic-bezier(0.2, 0, 0, 1) forwards',
+        // -- New DnD polish animations --
+        'dnd-drop-target-pulse': 'dnd-drop-target-pulse 1.5s ease-in-out infinite',
+        'dnd-remove-zone-breathe': 'dnd-remove-zone-breathe 2s ease-in-out infinite',
+        'dnd-ghost-pulse': 'dnd-ghost-pulse 1.5s ease-in-out infinite',
       },
     },
   },

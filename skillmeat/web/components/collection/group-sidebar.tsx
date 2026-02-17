@@ -66,14 +66,22 @@ function DroppableGroupItem({ group, isSelected, onSelect, animState }: Droppabl
       data-group-drop-id={group.id}
       onClick={onSelect}
       className={cn(
-        'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors',
+        'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm',
+        'transition-all duration-200 ease-out',
         'hover:bg-accent/50',
         isSelected && 'bg-accent font-medium',
-        isOver && !isSelected && 'bg-accent/50 ring-2 ring-primary/50',
-        isOver && isSelected && 'ring-2 ring-primary/50'
+        // Enhanced drop target: scale up, stronger background, pulsing glow
+        isOver && 'scale-[1.03] bg-primary/10 ring-2 ring-primary/60 animate-dnd-drop-target-pulse',
+        isOver && !isSelected && 'font-medium',
       )}
     >
-      <span className="shrink-0" style={{ color: colorHex }}>
+      <span
+        className={cn(
+          'shrink-0 transition-transform duration-200',
+          isOver && 'scale-110',
+        )}
+        style={{ color: colorHex }}
+      >
         <IconComponent className="h-4 w-4" />
       </span>
       <span className="min-w-0 flex-1 truncate">{group.name}</span>

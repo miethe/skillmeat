@@ -260,6 +260,11 @@ MiniArtifactCard.displayName = 'MiniArtifactCard';
  * Uses @dnd-kit/sortable for drag-and-drop reordering and movement
  * between groups. The entire card is the drag surface (no separate handle).
  *
+ * When dragging, the in-place ghost:
+ * - Scales down slightly (0.97) for a "lifted out" feel
+ * - Shows a dashed border with a subtle pulsing animation
+ * - Reduces opacity to clearly distinguish from the drag overlay
+ *
  * @example
  * ```tsx
  * <SortableContext items={artifactIds} strategy={verticalListSortingStrategy}>
@@ -299,7 +304,13 @@ export function DraggableMiniArtifactCard({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.3 : 1,
+    // When dragging, scale down the ghost slightly for a "lifted out" effect
+    ...(isDragging && {
+      opacity: 0.25,
+      transform: [CSS.Transform.toString(transform), 'scale(0.97)']
+        .filter(Boolean)
+        .join(' '),
+    }),
   };
 
   return (
@@ -310,7 +321,7 @@ export function DraggableMiniArtifactCard({
       onClick={onClick}
       groupId={groupId}
       className={cn(
-        isDragging && 'border-dashed cursor-grabbing',
+        isDragging && 'border-dashed cursor-grabbing animate-dnd-ghost-pulse',
         className
       )}
       {...attributes}
