@@ -258,7 +258,7 @@ module.exports = {
         'dnd-particle': 'dnd-particle 400ms cubic-bezier(0.2, 0, 0, 1) forwards',
         // -- New DnD polish animations --
         'dnd-drop-target-pulse': 'dnd-drop-target-pulse 1.5s ease-in-out infinite',
-        'dnd-remove-zone-breathe': 'dnd-remove-zone-breathe 2s ease-in-out infinite',
+        'dnd-remove-zone-breathe': 'dnd-remove-zone-breathe 5s ease-in-out infinite',
         'dnd-ghost-pulse': 'dnd-ghost-pulse 1.5s ease-in-out infinite',
       },
     },
