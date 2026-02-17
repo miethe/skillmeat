@@ -43,11 +43,11 @@ interface ApiGroupListResponse {
  * Fetch groups that contain a specific artifact within a collection
  *
  * Uses the groups endpoint with artifact_id filter to retrieve only groups
- * where the artifact has been added. Results are sorted by position.
+ * where the artifact has been added. Results are sorted alphabetically by name.
  *
  * @param artifactId - Artifact ID to find groups for (required for fetch)
  * @param collectionId - Collection ID to scope the search (required for fetch)
- * @returns Query result with array of Group objects sorted by position
+ * @returns Query result with array of Group objects sorted alphabetically by name
  *
  * @remarks
  * - Query is disabled when either artifactId or collectionId is undefined
@@ -100,9 +100,10 @@ export function useArtifactGroups(
         });
         const response = await apiRequest<ApiGroupListResponse>(`/groups?${params.toString()}`);
 
-        // Sort by position to ensure consistent ordering
-        // Backend may already sort, but defensive sorting ensures UI consistency
-        const sortedGroups = [...response.groups].sort((a, b) => a.position - b.position);
+        // Sort alphabetically by name (case-insensitive) for consistent ordering
+        const sortedGroups = [...response.groups].sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        );
 
         return sortedGroups;
       } catch (error) {

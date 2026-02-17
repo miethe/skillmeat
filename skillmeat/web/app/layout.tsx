@@ -55,11 +55,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         <Providers>
-          <div className="flex min-h-screen flex-col">
+          <div className="flex h-screen flex-col overflow-hidden">
             <Header />
-            <div className="flex flex-1">
+            <div className="flex flex-1 overflow-hidden">
               <Navigation />
-              <main className="flex-1 p-6">{children}</main>
+              <main className="flex-1 overflow-y-auto p-6">{children}</main>
             </div>
           </div>
         </Providers>

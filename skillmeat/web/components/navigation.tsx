@@ -136,7 +136,7 @@ export function Navigation() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 border-r bg-background">
+    <aside className="w-64 shrink-0 overflow-y-auto border-r bg-background">
       <nav className="space-y-1 p-4">
         {/* Collection Switcher */}
         <div className="mb-4">

@@ -77,6 +77,7 @@ export {
   useGroups,
   useGroup,
   useGroupArtifacts,
+  useGroupsArtifacts,
   useCreateGroup,
   useUpdateGroup,
   useDeleteGroup,
@@ -595,3 +596,13 @@ export {
   useKeyboardShortcuts,
   type KeyboardShortcutActions,
 } from './use-keyboard-shortcuts';
+
+// ============================================================================
+// DND ANIMATIONS (1 hook)
+// ============================================================================
+// State machine for drag-and-drop animation phases in Groups view
+export {
+  useDndAnimations,
+  type DndAnimPhase,
+  type DndAnimState,
+} from './use-dnd-animations';

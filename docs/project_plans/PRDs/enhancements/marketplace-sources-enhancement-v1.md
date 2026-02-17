@@ -1,3 +1,6 @@
+---
+status: completed
+---
 # Marketplace Sources Enhancement v1
 
 ## Feature Brief & Metadata

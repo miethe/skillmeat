@@ -96,4 +96,20 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Opera */
   }
+
+  /* DnD particle burst effect */
+  .dnd-particle {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background-color: hsl(var(--muted-foreground));
+    pointer-events: none;
+    animation: dnd-particle 400ms cubic-bezier(0.2, 0, 0, 1) forwards;
+  }
+  .dnd-particle-1 { --particle-x: -18px; --particle-y: -22px; }
+  .dnd-particle-2 { --particle-x: 20px; --particle-y: -18px; }
+  .dnd-particle-3 { --particle-x: -14px; --particle-y: 20px; }
+  .dnd-particle-4 { --particle-x: 22px; --particle-y: 16px; }
+  .dnd-particle-5 { --particle-x: 0px; --particle-y: -26px; }
 }

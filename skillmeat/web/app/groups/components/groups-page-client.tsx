@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { FolderSearch, Library } from 'lucide-react';
 import { useCollectionContext, useGroups } from '@/hooks';
 import { CollectionSwitcher } from '@/components/collection/collection-switcher';
@@ -69,7 +69,7 @@ export function GroupsPageClient() {
   const groups = groupsData?.groups ?? [];
 
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<GroupSortField>('position');
+  const [sort, setSort] = useState<GroupSortField>('name');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
@@ -119,16 +119,14 @@ export function GroupsPageClient() {
     });
 
     return filtered.sort((a, b) => {
-      if (sort === 'name') {
-        return a.name.localeCompare(b.name);
-      }
       if (sort === 'updated_at') {
         return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
       }
       if (sort === 'artifact_count') {
         return b.artifact_count - a.artifact_count;
       }
-      return a.position - b.position;
+      // Default: alphabetical by name (case-insensitive)
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
     });
   }, [groups, search, selectedTag, sort]);
 
