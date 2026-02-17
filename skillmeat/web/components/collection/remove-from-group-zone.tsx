@@ -34,7 +34,7 @@ export function RemoveFromGroupDropZone({ groupName, isPoofing }: RemoveFromGrou
           ? 'scale-[1.02] border-destructive bg-destructive/10 text-destructive shadow-sm'
           : isPoofing
             ? 'border-destructive/50 bg-destructive/5 text-destructive'
-            : 'animate-dnd-remove-zone-breathe text-muted-foreground'
+            : 'text-muted-foreground'
       )}
     >
       <Trash2

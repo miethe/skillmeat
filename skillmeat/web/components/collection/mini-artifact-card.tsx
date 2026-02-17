@@ -321,7 +321,7 @@ export function DraggableMiniArtifactCard({
       onClick={onClick}
       groupId={groupId}
       className={cn(
-        isDragging && 'border-dashed cursor-grabbing animate-dnd-ghost-pulse',
+        isDragging && 'border-dashed cursor-grabbing',
         className
       )}
       {...attributes}

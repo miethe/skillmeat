@@ -70,8 +70,8 @@ function DroppableGroupItem({ group, isSelected, onSelect, animState }: Droppabl
         'transition-all duration-200 ease-out',
         'hover:bg-accent/50',
         isSelected && 'bg-accent font-medium',
-        // Enhanced drop target: scale up, stronger background, pulsing glow
-        isOver && 'scale-[1.03] bg-primary/10 ring-2 ring-primary/60 animate-dnd-drop-target-pulse',
+        // Enhanced drop target: scale up, stronger background
+        isOver && 'scale-[1.03] bg-primary/10 ring-2 ring-primary/60',
         isOver && !isSelected && 'font-medium',
       )}
     >
