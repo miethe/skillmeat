@@ -185,6 +185,15 @@ class APISettings(BaseSettings):
         description="GitHub personal access token for higher API rate limits (5000/hr vs 60/hr)",
     )
 
+    # Composite artifact feature flags
+    composite_artifacts_enabled: bool = Field(
+        default=True,
+        description="Enable composite artifact detection during discovery. "
+        "When disabled, discover_artifacts() always performs flat discovery "
+        "and skips detect_composites(). "
+        "Configurable via SKILLMEAT_COMPOSITE_ARTIFACTS_ENABLED env var.",
+    )
+
     # Memory & Context Intelligence System feature flags
     memory_context_enabled: bool = Field(
         default=True,

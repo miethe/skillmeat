@@ -774,23 +774,43 @@ class ArtifactDiscoveryService:
         # subdirectories when the repo itself is structured as a composite
         # artifact (e.g., a plugin repo with top-level ``skills/`` + ``commands/``
         # or a ``plugin.json`` at root).
+        #
+        # Gated by the ``composite_artifacts_enabled`` feature flag in
+        # ``APISettings`` (env var: ``SKILLMEAT_COMPOSITE_ARTIFACTS_ENABLED``).
+        # When the flag is disabled this block is skipped and flat discovery
+        # proceeds unconditionally.
         # ------------------------------------------------------------------
+        _composite_enabled = True
         try:
-            composite_graph = detect_composites(str(self.base_path))
-            if composite_graph is not None:
-                logger.info(
-                    "Composite artifact detected; returning DiscoveredGraph instead of flat scan",
-                    extra={
-                        "composite_name": composite_graph.parent.name,
-                        "child_count": len(composite_graph.children),
-                        "source_root": composite_graph.source_root,
-                    },
+            from skillmeat.api.config import get_settings
+
+            _composite_enabled = get_settings().composite_artifacts_enabled
+        except Exception:
+            # If settings are unavailable (e.g., CLI context without API stack),
+            # default to enabled so behaviour is unchanged.
+            pass
+
+        if _composite_enabled:
+            try:
+                composite_graph = detect_composites(str(self.base_path))
+                if composite_graph is not None:
+                    logger.info(
+                        "Composite artifact detected; returning DiscoveredGraph instead of flat scan",
+                        extra={
+                            "composite_name": composite_graph.parent.name,
+                            "child_count": len(composite_graph.children),
+                            "source_root": composite_graph.source_root,
+                        },
+                    )
+                    return composite_graph
+            except Exception as exc:
+                # Composite detection must never break flat discovery
+                logger.warning(
+                    f"Composite detection raised an unexpected error; falling back to flat scan: {exc}"
                 )
-                return composite_graph
-        except Exception as exc:
-            # Composite detection must never break flat discovery
-            logger.warning(
-                f"Composite detection raised an unexpected error; falling back to flat scan: {exc}"
+        else:
+            logger.debug(
+                "Composite artifact detection disabled via feature flag; using flat discovery"
             )
         start_time = time.time()
         discovered_artifacts: List[DiscoveredArtifact] = []

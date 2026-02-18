@@ -3,13 +3,13 @@ type: progress
 prd: composite-artifact-infrastructure
 phase: 2
 title: Enhanced Discovery (Core)
-status: pending
+status: completed
 started: null
 completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 3
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -51,7 +51,7 @@ tasks:
 - id: CAI-P2-04
   description: Unit tests with 40+ fixture repos covering true/false positives (<5%
     FP rate)
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -61,7 +61,7 @@ tasks:
 - id: CAI-P2-05
   description: Implement composite_artifacts_enabled feature flag gating new discovery
     path
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -105,7 +105,7 @@ files_modified:
 - skillmeat/core/discovery/
 - skillmeat/core/artifact_detection.py
 - tests/test_composite_detection.py
-progress: 60
+progress: 100
 updated: '2026-02-18'
 ---
 
