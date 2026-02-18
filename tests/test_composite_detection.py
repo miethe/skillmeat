@@ -98,7 +98,7 @@ class TestDetectCompositesMultipleTypes:
     @pytest.mark.parametrize(
         "repo_name",
         [
-            "dev-toolkit",       # skills/ + commands/
+            "dev-toolkit",  # skills/ + commands/
             "data-processing-suite",  # skills/ + agents/
         ],
     )
@@ -134,9 +134,9 @@ class TestDetectCompositesSingleTypeNotComposite:
     @pytest.mark.parametrize(
         "repo_name",
         [
-            "single-skill-repo",    # only skills/
+            "single-skill-repo",  # only skills/
             "single-command-repo",  # only commands/
-            "one-type-only",        # only skills/
+            "one-type-only",  # only skills/
         ],
     )
     def test_returns_none(self, repo_name: str) -> None:
@@ -150,9 +150,9 @@ class TestDetectCompositesFalsePositives:
     @pytest.mark.parametrize(
         "repo_name",
         [
-            "empty-repo",           # completely empty
+            "empty-repo",  # completely empty
             "unrelated-dirs-repo",  # docs/, src/, tests/ — no artifact dirs
-            "dotfile-repo",         # only .github/, .claude/ (dotfiles skipped)
+            "dotfile-repo",  # only .github/, .claude/ (dotfiles skipped)
         ],
     )
     def test_returns_none(self, repo_name: str) -> None:
@@ -323,9 +323,9 @@ class TestDetectCompositesPerformance:
         for _ in range(10):
             detect_composites(path)
         elapsed_ms = (time.time() - start) * 1000
-        assert elapsed_ms < 2000, (
-            f"10 calls took {elapsed_ms:.1f} ms — expected < 2000 ms"
-        )
+        assert (
+            elapsed_ms < 2000
+        ), f"10 calls took {elapsed_ms:.1f} ms — expected < 2000 ms"
 
 
 # ===========================================================================
@@ -411,9 +411,7 @@ class TestDetectCompositesWithTmpPath:
     def test_plugin_json_triggers_detection(self, tmp_path: Path) -> None:
         repo = tmp_path / "my-plugin"
         repo.mkdir()
-        (repo / "plugin.json").write_text(
-            '{"name": "my-plugin", "version": "1.0.0"}'
-        )
+        (repo / "plugin.json").write_text('{"name": "my-plugin", "version": "1.0.0"}')
         skills_dir = repo / "skills"
         skills_dir.mkdir()
         self._make_skill(skills_dir, "tool-skill")

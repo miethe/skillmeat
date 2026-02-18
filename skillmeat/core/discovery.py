@@ -343,9 +343,7 @@ def _scan_child_artifacts(
                 )
                 discovered.append(child)
             except Exception as exc:
-                logger.debug(
-                    f"Could not detect child artifact at {entry}: {exc}"
-                )
+                logger.debug(f"Could not detect child artifact at {entry}: {exc}")
     except PermissionError as exc:
         logger.debug(f"Permission denied scanning child dir {subdir}: {exc}")
 
@@ -390,9 +388,7 @@ def _build_graph_from_plugin_json(
             artifact_type = _ARTIFACT_TYPE_CONTAINER_NAMES.get(entry.name.lower())
             if artifact_type is None:
                 continue
-            children.extend(
-                _scan_child_artifacts(entry, artifact_type, files_scanned)
-            )
+            children.extend(_scan_child_artifacts(entry, artifact_type, files_scanned))
     except PermissionError as exc:
         logger.debug(f"Permission denied reading composite root {root_path}: {exc}")
 
@@ -451,9 +447,7 @@ def _build_graph_from_subdirs(
     files_scanned = [0]
 
     for artifact_type, subdir in found_type_dirs.items():
-        children.extend(
-            _scan_child_artifacts(subdir, artifact_type, files_scanned)
-        )
+        children.extend(_scan_child_artifacts(subdir, artifact_type, files_scanned))
 
     parent_id = f"{ArtifactType.COMPOSITE.value}:{composite_name}"
     links: List[Dict[str, Any]] = [
@@ -607,7 +601,9 @@ class ArtifactDiscoveryService:
         self.base_path = base_path
         self.scan_mode = scan_mode
         roots = profile_root_dirs or (
-            [profile_root_dir] if profile_root_dir else [".claude", ".codex", ".gemini", ".cursor"]
+            [profile_root_dir]
+            if profile_root_dir
+            else [".claude", ".codex", ".gemini", ".cursor"]
         )
         self.profile_root_dirs = [r for r in roots if r]
         if not self.profile_root_dirs:
@@ -616,7 +612,11 @@ class ArtifactDiscoveryService:
         # Auto-detect mode based on directory structure
         if scan_mode == "auto":
             existing_profile_root = next(
-                (root for root in self.profile_root_dirs if (base_path / root).exists()),
+                (
+                    root
+                    for root in self.profile_root_dirs
+                    if (base_path / root).exists()
+                ),
                 None,
             )
             if existing_profile_root:
@@ -631,7 +631,11 @@ class ArtifactDiscoveryService:
                 self.artifacts_base = base_path / self.profile_root_dirs[0]
         elif scan_mode == "project":
             selected_root = next(
-                (root for root in self.profile_root_dirs if (base_path / root).exists()),
+                (
+                    root
+                    for root in self.profile_root_dirs
+                    if (base_path / root).exists()
+                ),
                 self.profile_root_dirs[0],
             )
             self.artifacts_base = base_path / selected_root
@@ -946,9 +950,13 @@ class ArtifactDiscoveryService:
                 # Check if there's a fuzzy match from earlier scanning
                 # If so, downgrade to name_type match (possible duplicate)
                 # Otherwise, set to none (new artifact)
-                if artifact.collection_match is not None and artifact.collection_match.type in (
-                    "exact",
-                    "hash",
+                if (
+                    artifact.collection_match is not None
+                    and artifact.collection_match.type
+                    in (
+                        "exact",
+                        "hash",
+                    )
                 ):
                     # Fuzzy match found something, but exact check says not in collection
                     # This means it's a similar artifact (e.g., "notebooklm" vs "notebooklm-skill")
