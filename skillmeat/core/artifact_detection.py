@@ -36,6 +36,7 @@ from typing import Any, Dict, FrozenSet, List, Literal, Optional, Set
 __all__ = [
     # Enums
     "ArtifactType",
+    "CompositeType",
     # Data classes
     "DetectionResult",
     "ArtifactSignature",
@@ -78,6 +79,14 @@ class ArtifactType(str, Enum):
         HOOK: Hook configurations (file-based)
         MCP: Model Context Protocol server configurations
 
+    Composite artifact types (deployable multi-artifact bundles):
+        COMPOSITE: A deployable package that groups multiple artifact types.
+                   The specific composite variant is determined by CompositeType
+                   (e.g., PLUGIN). COMPOSITE is deployable — it maps to a
+                   directory structure and can be installed into a project.
+                   Reserved future variants: STACK (multi-tool stack),
+                   SUITE (curated workflow suite) — not yet implemented.
+
     Context entity types (non-deployable, for project management):
         PROJECT_CONFIG: CLAUDE.md project configuration files
         SPEC_FILE: Specification documents in .claude/specs/
@@ -92,6 +101,8 @@ class ArtifactType(str, Enum):
         <ArtifactType.COMMAND: 'command'>
         >>> str(ArtifactType.AGENT)
         'agent'
+        >>> ArtifactType.COMPOSITE in ArtifactType.deployable_types()
+        True
     """
 
     # Primary artifact types
@@ -100,6 +111,9 @@ class ArtifactType(str, Enum):
     AGENT = "agent"
     HOOK = "hook"
     MCP = "mcp"
+
+    # Composite artifact types (composite-artifact-infrastructure-v1)
+    COMPOSITE = "composite"
 
     # Context entity types (agent-context-entities-v1)
     PROJECT_CONFIG = "project_config"
@@ -110,12 +124,32 @@ class ArtifactType(str, Enum):
 
     @classmethod
     def primary_types(cls) -> List["ArtifactType"]:
-        """Return list of primary (deployable) artifact types."""
+        """Return list of primary (deployable, single-artifact) types."""
         return [cls.SKILL, cls.COMMAND, cls.AGENT, cls.HOOK, cls.MCP]
 
     @classmethod
+    def composite_types(cls) -> List["ArtifactType"]:
+        """Return list of composite (multi-artifact bundle) types.
+
+        Composite artifacts are deployable packages that group multiple
+        artifact types together. The variant behaviour within this category
+        is controlled by CompositeType (e.g., CompositeType.PLUGIN).
+        """
+        return [cls.COMPOSITE]
+
+    @classmethod
+    def deployable_types(cls) -> List["ArtifactType"]:
+        """Return all types that can be deployed to a project.
+
+        Includes both primary artifact types and composite types.
+        Context entity types are explicitly excluded because they are
+        non-deployable project-management constructs.
+        """
+        return cls.primary_types() + cls.composite_types()
+
+    @classmethod
     def context_types(cls) -> List["ArtifactType"]:
-        """Return list of context entity types."""
+        """Return list of context entity types (non-deployable)."""
         return [
             cls.PROJECT_CONFIG,
             cls.SPEC_FILE,
@@ -123,6 +157,32 @@ class ArtifactType(str, Enum):
             cls.CONTEXT_FILE,
             cls.PROGRESS_TEMPLATE,
         ]
+
+
+class CompositeType(str, Enum):
+    """Variant classifier for COMPOSITE artifacts.
+
+    When an artifact has ArtifactType.COMPOSITE, this enum specifies
+    which kind of composite it is and therefore how it should be
+    installed, displayed, and resolved.
+
+    Variants:
+        PLUGIN: A curated bundle of skills, commands, agents, and/or
+                hooks that are distributed and deployed as a unit.
+                This is the initial supported composite variant.
+
+    Reserved for future use (not yet implemented):
+        STACK: A multi-tool stack declaration (infrastructure-level).
+        SUITE: A curated workflow suite (end-to-end use-case bundle).
+
+    Example:
+        >>> CompositeType.PLUGIN.value
+        'plugin'
+        >>> CompositeType("plugin")
+        <CompositeType.PLUGIN: 'plugin'>
+    """
+
+    PLUGIN = "plugin"
 
 
 # =============================================================================
@@ -420,6 +480,14 @@ ARTIFACT_SIGNATURES: Dict[ArtifactType, ArtifactSignature] = {
         manifest_names={".mcp.json", "mcp.json"},
         allowed_nesting=False,
     ),
+    ArtifactType.COMPOSITE: ArtifactSignature(
+        artifact_type=ArtifactType.COMPOSITE,
+        container_names={"composites", "composite", "plugins", "plugin", "claude-composites"},
+        is_directory=True,  # Composites are directory-based (contain multiple artifacts)
+        requires_manifest=True,
+        manifest_names={"COMPOSITE.md", "composite.md", "PLUGIN.md", "plugin.md"},
+        allowed_nesting=False,
+    ),
 }
 
 # Container directory name aliases - maps ArtifactType to all valid directory names
@@ -429,6 +497,7 @@ CONTAINER_ALIASES: Dict[ArtifactType, Set[str]] = {
     ArtifactType.AGENT: {"agents", "agent", "subagents", "claude-agents"},
     ArtifactType.HOOK: {"hooks", "hook", "claude-hooks"},
     ArtifactType.MCP: {"mcp", "mcp-servers", "servers", "mcp_servers", "claude-mcp"},
+    ArtifactType.COMPOSITE: {"composites", "composite", "plugins", "plugin", "claude-composites"},
 }
 
 # Reverse lookup: container name -> ArtifactType (lowercase for case-insensitive matching)
@@ -444,6 +513,7 @@ MANIFEST_FILES: Dict[ArtifactType, Set[str]] = {
     ArtifactType.AGENT: {"AGENT.md", "agent.md"},
     ArtifactType.HOOK: {"settings.json"},
     ArtifactType.MCP: {".mcp.json", "mcp.json"},
+    ArtifactType.COMPOSITE: {"COMPOSITE.md", "composite.md", "PLUGIN.md", "plugin.md"},
 }
 
 # Canonical (preferred) container names
@@ -453,6 +523,7 @@ CANONICAL_CONTAINERS: Dict[ArtifactType, str] = {
     ArtifactType.AGENT: "agents",
     ArtifactType.HOOK: "hooks",
     ArtifactType.MCP: "mcp",
+    ArtifactType.COMPOSITE: "composites",
 }
 
 

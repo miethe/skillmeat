@@ -1,15 +1,26 @@
 ---
-title: "Implementation Plan: Composite Artifact Infrastructure"
-description: "Phased implementation plan for relational model enabling many-to-many artifact relationships, graph-aware discovery, smart import with deduplication, and web UI relationship browsing."
-audience: [ai-agents, developers]
-tags: [implementation, planning, phases, composite-artifacts, database, api, frontend]
+title: 'Implementation Plan: Composite Artifact Infrastructure'
+description: Phased implementation plan for relational model enabling many-to-many
+  artifact relationships, graph-aware discovery, smart import with deduplication,
+  and web UI relationship browsing.
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- planning
+- phases
+- composite-artifacts
+- database
+- api
+- frontend
 created: 2026-02-17
-updated: 2026-02-18
-category: "product-planning"
-status: draft
+updated: '2026-02-18'
+category: product-planning
+status: in-progress
 related:
-  - /docs/project_plans/PRDs/features/composite-artifact-infrastructure-v1.md
-  - /docs/project_plans/design-specs/composite-artifact-infrastructure.md
+- /docs/project_plans/PRDs/features/composite-artifact-infrastructure-v1.md
+- /docs/project_plans/design-specs/composite-artifact-infrastructure.md
 ---
 
 # Implementation Plan: Composite Artifact Infrastructure

@@ -20,6 +20,8 @@ Models:
     - CommunityScore: Aggregated scoring from external sources
     - MatchHistory: Artifact matching query history for analytics
     - CacheMetadata: Cache system metadata
+    - CompositeArtifact: Deployable multi-artifact bundle (composite-artifact-infrastructure-v1)
+    - CompositeMembership: Child-artifact membership within a CompositeArtifact
 
 Usage:
     >>> from skillmeat.cache.models import get_session, Project, Artifact
@@ -216,7 +218,8 @@ class Artifact(Base):
     Tracks version information and modification status.
 
     Attributes:
-        id: Unique artifact identifier (primary key)
+        id: Unique artifact identifier (primary key, type:name composite key)
+        uuid: Stable UUID for cross-context identity (32-char hex, globally unique)
         project_id: Foreign key to projects.id
         name: Artifact name
         type: Artifact type (skill, command, agent, mcp_server, hook)
@@ -243,6 +246,11 @@ class Artifact(Base):
 
     # Primary key
     id: Mapped[str] = mapped_column(String, primary_key=True)
+
+    # Stable cross-context identity (ADR-007)
+    uuid: Mapped[str] = mapped_column(
+        String, unique=True, nullable=False, default=lambda: uuid.uuid4().hex, index=True
+    )
 
     # Foreign key
     project_id: Mapped[str] = mapped_column(
@@ -317,11 +325,22 @@ class Artifact(Base):
         lazy="selectin",
         order_by="ArtifactVersion.created_at.desc()",
     )
+    # Composite membership — artifacts may appear as children in one or more
+    # CompositeArtifact bundles.  The explicit foreign_keys= argument is
+    # required because CompositeMembership references artifacts.uuid (not
+    # artifacts.id), which would otherwise trigger AmbiguousForeignKeysError.
+    composite_memberships: Mapped[List["CompositeMembership"]] = relationship(
+        "CompositeMembership",
+        foreign_keys="[CompositeMembership.child_artifact_uuid]",
+        back_populates="child_artifact",
+        lazy="selectin",
+    )
 
     # Constraints
     __table_args__ = (
         CheckConstraint(
             "type IN ('skill', 'command', 'agent', 'mcp', 'mcp_server', 'hook', "
+            "'composite', "
             "'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')",
             name="check_artifact_type",
         ),
@@ -342,6 +361,7 @@ class Artifact(Base):
         """
         result = {
             "id": self.id,
+            "uuid": self.uuid,
             "project_id": self.project_id,
             "name": self.name,
             "type": self.type,
@@ -1884,6 +1904,7 @@ class MarketplaceCatalogEntry(Base):
     __table_args__ = (
         CheckConstraint(
             "artifact_type IN ('skill', 'command', 'agent', 'mcp', 'mcp_server', 'hook', "
+            "'composite', "
             "'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')",
             name="check_catalog_artifact_type",
         ),
@@ -2800,6 +2821,266 @@ class ModuleMemoryItem(Base):
             f"<ModuleMemoryItem(module_id={self.module_id!r}, "
             f"memory_id={self.memory_id!r}, ordering={self.ordering})>"
         )
+
+
+# =============================================================================
+# Composite Artifact Models (composite-artifact-infrastructure-v1)
+# =============================================================================
+
+
+class CompositeArtifact(Base):
+    """Deployable multi-artifact bundle tracked in the cache.
+
+    A CompositeArtifact groups one or more child artifacts (skills, commands,
+    agents, hooks, mcp servers) into a single installable unit.  The specific
+    variant of the bundle is determined by ``composite_type``, which maps to
+    ``CompositeType`` in ``skillmeat.core.artifact_detection`` (currently only
+    ``"plugin"`` is implemented; ``"stack"`` and ``"suite"`` are reserved for
+    future use).
+
+    Primary key format
+    ------------------
+    ``id`` uses the ``type:name`` composite string used throughout the cache
+    layer (e.g., ``"composite:my-plugin"``), matching the convention already
+    established for ``Artifact.id``.
+
+    Relationship to CompositeMembership
+    ------------------------------------
+    Each CompositeArtifact has zero or more CompositeMembership rows that
+    reference individual child ``Artifact`` rows via ``artifacts.uuid``
+    (not ``artifacts.id``).  Referencing the stable UUID column instead of the
+    mutable ``type:name`` primary key satisfies the ADR-007 requirement for
+    cross-context artifact identity.  Deleting a CompositeArtifact cascades to
+    all its membership rows.
+
+    Attributes:
+        id: Primary key in ``type:name`` format (e.g., ``"composite:my-plugin"``)
+        collection_id: Owning collection identifier (non-null; mirrors the
+            ``collection_id`` stored on each CompositeMembership row for
+            denormalised queries)
+        composite_type: Variant classifier — ``"plugin"`` (default),
+            ``"stack"``, or ``"suite"`` — maps to ``CompositeType`` enum
+        display_name: Human-readable label for the composite (nullable)
+        description: Free-text description (nullable)
+        metadata_json: Raw JSON string for future extension (nullable Text,
+            not a typed JSON column so that schema migrations are minimised)
+        created_at: UTC timestamp when first cached
+        updated_at: UTC timestamp on last update (auto-refreshed on writes)
+        memberships: List of CompositeMembership children
+
+    Indexes:
+        - idx_composite_artifacts_collection_id: Filter by owning collection
+        - idx_composite_artifacts_composite_type: Filter by variant
+    """
+
+    __tablename__ = "composite_artifacts"
+
+    # Primary key — type:name string (e.g., "composite:my-plugin")
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+
+    # Owning collection
+    collection_id: Mapped[str] = mapped_column(String, nullable=False)
+
+    # Composite variant — maps to CompositeType enum ("plugin" | "stack" | "suite")
+    composite_type: Mapped[str] = mapped_column(
+        String, nullable=False, default="plugin", server_default="plugin"
+    )
+
+    # Display fields
+    display_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Extensibility — raw JSON string kept as Text to avoid schema churn
+    metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    memberships: Mapped[List["CompositeMembership"]] = relationship(
+        "CompositeMembership",
+        back_populates="composite",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        CheckConstraint(
+            "composite_type IN ('plugin', 'stack', 'suite')",
+            name="check_composite_artifact_type",
+        ),
+        Index("idx_composite_artifacts_collection_id", "collection_id"),
+        Index("idx_composite_artifacts_composite_type", "composite_type"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of CompositeArtifact."""
+        return (
+            f"<CompositeArtifact(id={self.id!r}, "
+            f"composite_type={self.composite_type!r}, "
+            f"collection_id={self.collection_id!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert CompositeArtifact to dictionary for JSON serialisation.
+
+        Returns:
+            Dictionary representation of the composite artifact.
+        """
+        return {
+            "id": self.id,
+            "collection_id": self.collection_id,
+            "composite_type": self.composite_type,
+            "display_name": self.display_name,
+            "description": self.description,
+            "metadata_json": self.metadata_json,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "memberships": [m.to_dict() for m in self.memberships],
+        }
+
+
+class CompositeMembership(Base):
+    """Child-artifact membership within a CompositeArtifact.
+
+    Records that a specific ``Artifact`` (identified by its stable UUID per
+    ADR-007) is a member of a ``CompositeArtifact``.  Multiple composites can
+    include the same child artifact; the composite primary key covers
+    ``(collection_id, composite_id, child_artifact_uuid)`` to enforce
+    uniqueness within a collection context while allowing cross-collection
+    sharing of the same child.
+
+    Foreign-key semantics
+    ---------------------
+    - ``composite_id`` → ``composite_artifacts.id`` (``ON DELETE CASCADE``):
+      removing the parent composite automatically removes all its membership
+      rows, preventing orphaned references.
+    - ``child_artifact_uuid`` → ``artifacts.uuid`` (``ON DELETE CASCADE``):
+      referencing the stable UUID column (not the mutable ``type:name`` id)
+      satisfies the ADR-007 cross-context identity requirement and means
+      renaming an artifact does not break membership records.  Deleting the
+      child artifact from the cache also purges its membership rows.
+
+    Bidirectional relationship note
+    --------------------------------
+    Both ``Artifact.composite_memberships`` and the ``child_artifact``
+    relationship here carry an explicit ``foreign_keys=`` argument.  Without
+    it SQLAlchemy raises ``AmbiguousForeignKeysError`` because
+    ``CompositeMembership`` contains two foreign keys that both ultimately
+    reference tables related to artifacts (``composite_artifacts`` and
+    ``artifacts``).
+
+    Attributes:
+        collection_id: Owning collection (part of composite PK; denormalised
+            from ``CompositeArtifact.collection_id`` for partition-style queries)
+        composite_id: FK to ``composite_artifacts.id``, CASCADE delete
+            (part of composite PK)
+        child_artifact_uuid: FK to ``artifacts.uuid``, CASCADE delete
+            (part of composite PK)
+        relationship_type: Semantic label for the membership edge, default
+            ``"contains"`` (reserved for future graph-style queries)
+        pinned_version_hash: Optional content hash locking the child to a
+            specific snapshot; ``None`` means "always use latest"
+        membership_metadata: Raw JSON string for future per-edge metadata
+        created_at: UTC timestamp when membership was created
+
+    Indexes:
+        - Primary key covers (collection_id, composite_id, child_artifact_uuid)
+        - idx_composite_memberships_composite_id: fast child lookup by parent
+        - idx_composite_memberships_child_uuid: reverse lookup — all composites
+          containing a given child artifact
+    """
+
+    __tablename__ = "composite_memberships"
+
+    # Composite primary key
+    collection_id: Mapped[str] = mapped_column(String, primary_key=True)
+    composite_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("composite_artifacts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    child_artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    # Edge semantics
+    relationship_type: Mapped[str] = mapped_column(
+        String, nullable=False, default="contains", server_default="contains"
+    )
+
+    # Optional version pin — None means "track latest"
+    pinned_version_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Extensibility — raw JSON string for future per-membership metadata
+    membership_metadata: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Relationships — explicit foreign_keys= on both sides avoids
+    # AmbiguousForeignKeysError (see docstring for rationale).
+    composite: Mapped["CompositeArtifact"] = relationship(
+        "CompositeArtifact",
+        back_populates="memberships",
+        lazy="joined",
+    )
+    child_artifact: Mapped["Artifact"] = relationship(
+        "Artifact",
+        foreign_keys=[child_artifact_uuid],
+        back_populates="composite_memberships",
+        lazy="joined",
+    )
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_composite_memberships_composite_id", "composite_id"),
+        Index("idx_composite_memberships_child_uuid", "child_artifact_uuid"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of CompositeMembership."""
+        return (
+            f"<CompositeMembership(composite_id={self.composite_id!r}, "
+            f"child_artifact_uuid={self.child_artifact_uuid!r}, "
+            f"relationship_type={self.relationship_type!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert CompositeMembership to dictionary for JSON serialisation.
+
+        Returns:
+            Dictionary representation of the membership edge, including a
+            summary of the child artifact when it has been loaded.
+        """
+        result: Dict[str, Any] = {
+            "collection_id": self.collection_id,
+            "composite_id": self.composite_id,
+            "child_artifact_uuid": self.child_artifact_uuid,
+            "relationship_type": self.relationship_type,
+            "pinned_version_hash": self.pinned_version_hash,
+            "membership_metadata": self.membership_metadata,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+        # Include a lightweight child summary when the relationship is loaded
+        if self.child_artifact is not None:
+            result["child_artifact"] = {
+                "id": self.child_artifact.id,
+                "uuid": self.child_artifact.uuid,
+                "name": self.child_artifact.name,
+                "type": self.child_artifact.type,
+            }
+        return result
 
 
 # =============================================================================

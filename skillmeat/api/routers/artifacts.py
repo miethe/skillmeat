@@ -3529,6 +3529,8 @@ async def _deploy_merge(
         target_path = dest_base / "mcp" / artifact_name
     elif artifact_type == ArtifactType.HOOK:
         target_path = dest_base / "hooks" / f"{artifact_name}.md"
+    elif artifact_type == ArtifactType.COMPOSITE:
+        target_path = dest_base / "composites" / artifact_name
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

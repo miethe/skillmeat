@@ -1,141 +1,186 @@
 ---
 type: progress
-prd: "composite-artifact-infrastructure"
+prd: composite-artifact-infrastructure
 phase: 1
-title: "Core Relationships (Database & ORM)"
-status: "planning"
-started: "2026-02-17"
+title: Core Relationships (Database & ORM)
+status: completed
+started: '2026-02-17'
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 9
-completed_tasks: 0
+completed_tasks: 9
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["data-layer-expert", "python-backend-engineer"]
-contributors: ["code-reviewer"]
-
+owners:
+- data-layer-expert
+- python-backend-engineer
+contributors:
+- code-reviewer
 tasks:
-  - id: "CAI-P1-01"
-    description: "Add PLUGIN to ArtifactType enum; audit all call sites for exhaustiveness"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "1pt"
-    priority: "critical"
-
-  - id: "CAI-P1-02"
-    description: "Add uuid column to CachedArtifact ORM model (String, unique, non-null, indexed, default=uuid4().hex)"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "1pt"
-    priority: "critical"
-
-  - id: "CAI-P1-03"
-    description: "Alembic migration 1: add uuid column to artifacts table, backfill existing rows, apply NOT NULL + unique index"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["CAI-P1-02"]
-    estimated_effort: "2pt"
-    priority: "critical"
-
-  - id: "CAI-P1-04"
-    description: "Define CompositeArtifact and CompositeMembership ORM models with UUID FK (child_artifact_uuid → artifacts.uuid, ondelete=CASCADE)"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["CAI-P1-01", "CAI-P1-03"]
-    estimated_effort: "2pt"
-    priority: "high"
-
-  - id: "CAI-P1-05"
-    description: "Alembic migration 2: create composite_artifacts and composite_memberships tables (separate from UUID migration)"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["CAI-P1-04"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-  - id: "CAI-P1-06"
-    description: "Implement composite membership repository CRUD and service-layer type:name → UUID resolution (composite_service.py)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CAI-P1-05"]
-    estimated_effort: "2pt"
-    priority: "high"
-
-  - id: "CAI-P1-07"
-    description: "Write CachedArtifact.uuid into filesystem manifests (.skillmeat-deployed.toml and manifest.toml) additively"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CAI-P1-03"]
-    estimated_effort: "1pt"
-    priority: "medium"
-
-  - id: "CAI-P1-08"
-    description: "Unit tests: UUID generation, uniqueness, CompositeMembership CRUD, service-layer resolution (>80% coverage)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CAI-P1-06"]
-    estimated_effort: "2pt"
-    priority: "medium"
-
-  - id: "CAI-P1-09"
-    description: "Integration tests: FK constraints, cascading deletes, type:name → UUID resolution end-to-end, migration round-trip"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CAI-P1-08"]
-    estimated_effort: "2pt"
-    priority: "medium"
-
+- id: CAI-P1-01
+  description: Add PLUGIN to ArtifactType enum; audit all call sites for exhaustiveness
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 1pt
+  priority: critical
+- id: CAI-P1-02
+  description: Add uuid column to CachedArtifact ORM model (String, unique, non-null,
+    indexed, default=uuid4().hex)
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 1pt
+  priority: critical
+- id: CAI-P1-03
+  description: 'Alembic migration 1: add uuid column to artifacts table, backfill
+    existing rows, apply NOT NULL + unique index'
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - CAI-P1-02
+  estimated_effort: 2pt
+  priority: critical
+- id: CAI-P1-04
+  description: Define CompositeArtifact and CompositeMembership ORM models with UUID
+    FK (child_artifact_uuid → artifacts.uuid, ondelete=CASCADE)
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - CAI-P1-01
+  - CAI-P1-03
+  estimated_effort: 2pt
+  priority: high
+- id: CAI-P1-05
+  description: 'Alembic migration 2: create composite_artifacts and composite_memberships
+    tables (separate from UUID migration)'
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - CAI-P1-04
+  estimated_effort: 1pt
+  priority: high
+- id: CAI-P1-06
+  description: Implement composite membership repository CRUD and service-layer type:name
+    → UUID resolution (composite_service.py)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CAI-P1-05
+  estimated_effort: 2pt
+  priority: high
+- id: CAI-P1-07
+  description: Write CachedArtifact.uuid into filesystem manifests (.skillmeat-deployed.toml
+    and manifest.toml) additively
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CAI-P1-03
+  estimated_effort: 1pt
+  priority: medium
+- id: CAI-P1-08
+  description: 'Unit tests: UUID generation, uniqueness, CompositeMembership CRUD,
+    service-layer resolution (>80% coverage)'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CAI-P1-06
+  estimated_effort: 2pt
+  priority: medium
+- id: CAI-P1-09
+  description: 'Integration tests: FK constraints, cascading deletes, type:name →
+    UUID resolution end-to-end, migration round-trip'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CAI-P1-08
+  estimated_effort: 2pt
+  priority: medium
 parallelization:
   batch_1:
-    tasks: ["CAI-P1-01", "CAI-P1-02"]
-    note: "Independent — enum addition and UUID column are separate concerns"
+    tasks:
+    - CAI-P1-01
+    - CAI-P1-02
+    note: Independent — enum addition and UUID column are separate concerns
   batch_2:
-    tasks: ["CAI-P1-03"]
-    note: "UUID migration must apply before composite tables reference artifacts.uuid"
+    tasks:
+    - CAI-P1-03
+    note: UUID migration must apply before composite tables reference artifacts.uuid
   batch_3:
-    tasks: ["CAI-P1-04", "CAI-P1-07"]
-    note: "Composite ORM model + filesystem UUID writes are independent after migration"
+    tasks:
+    - CAI-P1-04
+    - CAI-P1-07
+    note: Composite ORM model + filesystem UUID writes are independent after migration
   batch_4:
-    tasks: ["CAI-P1-05", "CAI-P1-06"]
-    note: "Composite migration runs after model defined; repository runs after migration"
+    tasks:
+    - CAI-P1-05
+    - CAI-P1-06
+    note: Composite migration runs after model defined; repository runs after migration
   batch_5:
-    tasks: ["CAI-P1-08", "CAI-P1-09"]
-    note: "Unit and integration tests run after repository complete"
-  critical_path: ["CAI-P1-02", "CAI-P1-03", "CAI-P1-04", "CAI-P1-05", "CAI-P1-06", "CAI-P1-08"]
-  estimated_total_time: "3-4 days"
-
+    tasks:
+    - CAI-P1-08
+    - CAI-P1-09
+    note: Unit and integration tests run after repository complete
+  critical_path:
+  - CAI-P1-02
+  - CAI-P1-03
+  - CAI-P1-04
+  - CAI-P1-05
+  - CAI-P1-06
+  - CAI-P1-08
+  estimated_total_time: 3-4 days
 blockers: []
-
-success_criteria: [
-  { id: "SC-P1-1", description: "All existing CachedArtifact rows have non-null unique UUID after migration", status: "pending" },
-  { id: "SC-P1-2", description: "CompositeMembership FK constraint enforced by database (insert with bad UUID rejected)", status: "pending" },
-  { id: "SC-P1-3", description: "Cascading delete removes memberships when child artifact deleted", status: "pending" },
-  { id: "SC-P1-4", description: "type:name → UUID resolution works correctly in service layer", status: "pending" },
-  { id: "SC-P1-5", description: "UUID appears in .skillmeat-deployed.toml and manifest.toml (additive, backward-compatible)", status: "pending" },
-  { id: "SC-P1-6", description: "Both Alembic migrations apply and rollback cleanly and independently", status: "pending" },
-  { id: "SC-P1-7", description: "No regression in existing artifact queries/imports (pytest tests/api/test_artifacts.py)", status: "pending" },
-  { id: "SC-P1-8", description: "Repository CRUD >80% test coverage", status: "pending" }
-]
-
-files_modified: [
-  "skillmeat/core/artifact_detection.py",
-  "skillmeat/cache/models.py",
-  "skillmeat/cache/migrations/versions/{ts1}_add_artifact_uuid_column.py",
-  "skillmeat/cache/migrations/versions/{ts2}_add_composite_artifact_tables.py",
-  "skillmeat/cache/repositories.py",
-  "skillmeat/core/services/composite_service.py",
-  "skillmeat/storage/",
-  "tests/test_composite_memberships.py",
-  "tests/integration/test_composite_memberships_integration.py",
-  "tests/conftest.py"
-]
+success_criteria:
+- id: SC-P1-1
+  description: All existing CachedArtifact rows have non-null unique UUID after migration
+  status: pending
+- id: SC-P1-2
+  description: CompositeMembership FK constraint enforced by database (insert with
+    bad UUID rejected)
+  status: pending
+- id: SC-P1-3
+  description: Cascading delete removes memberships when child artifact deleted
+  status: pending
+- id: SC-P1-4
+  description: type:name → UUID resolution works correctly in service layer
+  status: pending
+- id: SC-P1-5
+  description: UUID appears in .skillmeat-deployed.toml and manifest.toml (additive,
+    backward-compatible)
+  status: pending
+- id: SC-P1-6
+  description: Both Alembic migrations apply and rollback cleanly and independently
+  status: pending
+- id: SC-P1-7
+  description: No regression in existing artifact queries/imports (pytest tests/api/test_artifacts.py)
+  status: pending
+- id: SC-P1-8
+  description: Repository CRUD >80% test coverage
+  status: pending
+files_modified:
+- skillmeat/core/artifact_detection.py
+- skillmeat/cache/models.py
+- skillmeat/cache/migrations/versions/{ts1}_add_artifact_uuid_column.py
+- skillmeat/cache/migrations/versions/{ts2}_add_composite_artifact_tables.py
+- skillmeat/cache/repositories.py
+- skillmeat/core/services/composite_service.py
+- skillmeat/storage/
+- tests/test_composite_memberships.py
+- tests/integration/test_composite_memberships_integration.py
+- tests/conftest.py
+progress: 100
+updated: '2026-02-18'
 ---
 
 # composite-artifact-infrastructure - Phase 1: Core Relationships (Database & ORM)
