@@ -194,6 +194,46 @@ class DiscoveryResult(BaseModel):
     scan_duration_ms: float
 
 
+class DiscoveredGraph(BaseModel):
+    """Hierarchical discovery result for a composite artifact and its children.
+
+    Returned by composite-aware discovery paths instead of a flat ``DiscoveryResult``
+    when the scanner encounters a composite artifact (``ArtifactType.COMPOSITE``).
+    A ``DiscoveryResult`` represents a flat collection of independent artifacts;
+    a ``DiscoveredGraph`` represents a rooted hierarchy where one composite artifact
+    owns a set of member artifacts linked by explicit relationship records.
+
+    When to use ``DiscoveredGraph`` vs ``DiscoveryResult``:
+        - ``DiscoveryResult``: returned by ``ArtifactDiscoveryService.discover_artifacts()``
+          for standard (non-composite) scans; contains a flat list of independent
+          ``DiscoveredArtifact`` instances.
+        - ``DiscoveredGraph``: returned when a composite artifact root is detected;
+          contains a single parent, its child members, and the edges between them.
+          For v1, all edges use ``relationship_type = "contains"``.
+
+    Attributes:
+        parent: The composite artifact acting as the root of this graph.
+                Its ``type`` field will be ``"composite"``.
+        children: All member artifacts found beneath the composite root.
+                  Each child is a fully-resolved ``DiscoveredArtifact`` (skill,
+                  command, agent, etc.) that belongs to the composite.
+        links: Parent-child relationship metadata edges.
+               Each entry is a mapping with at minimum the keys:
+               ``{"parent_id": str, "child_id": str, "relationship_type": str}``.
+               ``parent_id`` and ``child_id`` use the ``"type:name"`` format
+               (e.g., ``"composite:my-plugin"``, ``"skill:canvas-design"``).
+               For v1, ``relationship_type`` is always ``"contains"``.
+        source_root: Absolute filesystem path to the directory where the composite
+                     artifact was detected (i.e., the directory that contains the
+                     composite manifest file such as ``COMPOSITE.md``).
+    """
+
+    parent: DiscoveredArtifact
+    children: List[DiscoveredArtifact] = Field(default_factory=list)
+    links: List[Dict[str, Any]] = Field(default_factory=list)
+    source_root: str
+
+
 class ArtifactDiscoveryService:
     """Service for discovering artifacts in project profile roots or collections.
 

@@ -1,14 +1,22 @@
 ---
-title: "Phase 2: Enhanced Discovery (Graph-Aware Detection)"
-description: "Update discovery layer to detect composite roots and return dependency graphs"
-audience: [ai-agents, developers]
-tags: [implementation, phase-2, discovery, detection, graph]
+title: 'Phase 2: Enhanced Discovery (Graph-Aware Detection)'
+description: Update discovery layer to detect composite roots and return dependency
+  graphs
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- phase-2
+- discovery
+- detection
+- graph
 created: 2026-02-17
-updated: 2026-02-18
-category: "product-planning"
-status: draft
+updated: '2026-02-18'
+category: product-planning
+status: in-progress
 related:
-  - /docs/project_plans/implementation_plans/features/composite-artifact-infrastructure-v1.md
+- /docs/project_plans/implementation_plans/features/composite-artifact-infrastructure-v1.md
 ---
 
 # Phase 2: Enhanced Discovery (Graph-Aware Detection)
