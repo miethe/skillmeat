@@ -547,3 +547,143 @@ class TestCopyGroupTransactionRollback:
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
         app.dependency_overrides.clear()
+
+
+class TestGroupMetadataCRUD:
+    """Test groups metadata fields across create/update/list/detail endpoints."""
+
+    def test_create_group_with_metadata_defaults(self, client, source_collection):
+        """Create group without metadata fields should apply defaults."""
+        response = client.post(
+            "/api/v1/groups",
+            json={
+                "collection_id": source_collection.id,
+                "name": "Defaults Group",
+            },
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["tags"] == []
+        assert data["color"] == "slate"
+        assert data["icon"] == "layers"
+
+    def test_create_group_with_metadata_normalization(self, client, source_collection):
+        """Create group should normalize tags and accept valid color/icon values."""
+        response = client.post(
+            "/api/v1/groups",
+            json={
+                "collection_id": source_collection.id,
+                "name": "Normalized Group",
+                "tags": [" Frontend ", "frontend", "Critical_Path"],
+                "color": "#22C55E",
+                "icon": "Folder",
+            },
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["tags"] == ["frontend", "critical_path"]
+        assert data["color"] == "#22c55e"
+        assert data["icon"] == "folder"
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"tags": ["invalid tag!"]},
+            {"color": "purple"},
+            {"color": "#12"},
+            {"icon": "rocket"},
+            {"tags": [f"t{i}" for i in range(21)]},
+        ],
+    )
+    def test_create_group_rejects_invalid_metadata(
+        self, client, source_collection, payload
+    ):
+        """Create group should reject invalid metadata values."""
+        response = client.post(
+            "/api/v1/groups",
+            json={
+                "collection_id": source_collection.id,
+                "name": "Invalid Metadata Group",
+                **payload,
+            },
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_update_group_partial_and_full_metadata(
+        self, client, source_collection, test_db
+    ):
+        """Update group should support partial and full metadata updates."""
+        group = Group(
+            id=uuid.uuid4().hex,
+            collection_id=source_collection.id,
+            name="Editable Group",
+            tags_json='["legacy"]',
+            color="slate",
+            icon="layers",
+            position=0,
+        )
+        test_db.add(group)
+        test_db.commit()
+
+        partial_response = client.put(
+            f"/api/v1/groups/{group.id}",
+            json={"color": "green"},
+        )
+        assert partial_response.status_code == status.HTTP_200_OK
+        partial_data = partial_response.json()
+        assert partial_data["color"] == "green"
+        assert partial_data["icon"] == "layers"
+        assert partial_data["tags"] == ["legacy"]
+
+        full_response = client.put(
+            f"/api/v1/groups/{group.id}",
+            json={
+                "name": "Edited Group",
+                "description": "Updated description",
+                "tags": ["Ops", "on_call"],
+                "color": "#f59e0b",
+                "icon": "wrench",
+            },
+        )
+        assert full_response.status_code == status.HTTP_200_OK
+        full_data = full_response.json()
+        assert full_data["name"] == "Edited Group"
+        assert full_data["description"] == "Updated description"
+        assert full_data["tags"] == ["ops", "on_call"]
+        assert full_data["color"] == "#f59e0b"
+        assert full_data["icon"] == "wrench"
+
+    def test_list_and_detail_include_metadata_fields(
+        self, client, source_collection, test_db
+    ):
+        """List/detail endpoints should include tags, color, and icon."""
+        group = Group(
+            id=uuid.uuid4().hex,
+            collection_id=source_collection.id,
+            name="Metadata Group",
+            description="Group with metadata",
+            tags_json='["frontend","critical"]',
+            color="blue",
+            icon="sparkles",
+            position=0,
+        )
+        test_db.add(group)
+        test_db.commit()
+
+        list_response = client.get(f"/api/v1/groups?collection_id={source_collection.id}")
+        assert list_response.status_code == status.HTTP_200_OK
+        list_data = list_response.json()
+        listed_group = next(g for g in list_data["groups"] if g["id"] == group.id)
+        assert listed_group["tags"] == ["frontend", "critical"]
+        assert listed_group["color"] == "blue"
+        assert listed_group["icon"] == "sparkles"
+
+        detail_response = client.get(f"/api/v1/groups/{group.id}")
+        assert detail_response.status_code == status.HTTP_200_OK
+        detail_data = detail_response.json()
+        assert detail_data["tags"] == ["frontend", "critical"]
+        assert detail_data["color"] == "blue"
+        assert detail_data["icon"] == "sparkles"

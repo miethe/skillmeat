@@ -1,6 +1,6 @@
 # SkillMeat - Complete Feature Index
 
-**Date**: 2026-02-06 | **Status**: Comprehensive Catalog Complete | **Scope**: Full Web UI
+**Date**: 2026-02-17 | **Status**: Comprehensive Catalog Complete | **Scope**: Full Web UI
 
 ## Executive Summary
 
@@ -49,7 +49,7 @@ Root (/)
 │   │   └── [id]/         Semantic tree viewer
 │   ├── [listing_id]/     Listing detail
 │   └── publish/          Publish wizard
-├── Groups                Group-based browsing
+├── Groups                Two-pane: sidebar + artifact grid, group management hub
 ├── Context Entities      Project context config
 ├── Templates             Quick setup templates
 ├── MCP Servers           Protocol server management
@@ -67,10 +67,13 @@ Root (/)
 - Grid/List/Grouped views
 - Infinite scroll (20 items)
 - Search full-text (name, desc, tags)
-- Filters: Type, Status, Scope
+- Unified multi-select filter menu: Type, Status, Scope, Tags, Groups in single dropdown
+- AND/OR filter mode toggle
 - Sort: Confidence, Name, Date, Usage
-- Tag filter with URL sync (?tags=)
 - View toggles: Grid, List, Grouped
+- Artifact card enhancements:
+  - Group badges (multi-badge display with color coding)
+  - Source labels with GitHub links (clickable repo/path navigation)
 - Modals: Detail, Create, Edit, Move, Group, Delete, Params
 - Infinite scroll trigger: 200px threshold
 
@@ -86,10 +89,20 @@ Root (/)
 - Modals: Add, Detail, Form, Delete, File ops, Merge
 
 **Groups (/groups)**
-- Collection selector
-- Group selector
-- Grid display
-- Same artifact interactions as Collection
+- Two-pane layout:
+  - **GroupSidebar** (280px): Groups list, "All Artifacts" & "Ungrouped" virtual selections, search/sort
+  - **Main ArtifactPane**: Artifact grid (3-col), responds to selected group
+- Group management hub: Card-based CRUD
+  - **GroupCard**: Display group, metadata (color, icon, description), action menu
+  - **GroupFormDialog**: Create/edit group with name, description, color palette, icon selection
+  - **GroupDeleteDialog**: Confirm removal with artifact reassignment option
+- Drag-and-drop interactions:
+  - Add artifacts to group via sidebar drag
+  - **RemoveFromGroupDropZone**: Drag from grid to remove
+  - Polished DnD animations: pickup shake, drop flash, poof explosion, particle effects
+- Group metadata editing: Custom color palette, icon picker, editable descriptions
+- Virtual selections: "All Artifacts" tab (shows collection contents), "Ungrouped" tab (artifacts without group)
+- Manage button: Routes to management hub for full CRUD
 
 ---
 
@@ -265,7 +278,7 @@ Root (/)
 
 ## Complete Modal Inventory
 
-### Collection Domain (7 modals)
+### Collection Domain (9 modals)
 
 1. **Create Collection Dialog**: Name, description, default settings
 2. **Edit Collection Dialog**: Modify metadata, delete option
@@ -274,6 +287,8 @@ Root (/)
 5. **Manage Groups Dialog**: Create, edit, delete groups
 6. **Copy Group Dialog**: Clone group configuration
 7. **Deployment Dialog**: Select project, schedule options
+8. **GroupFormDialog**: Create/edit group with name, description, color palette, icon selection
+9. **GroupDeleteDialog**: Confirm group removal with artifact reassignment option
 
 ---
 

@@ -53,9 +53,6 @@ export function EntityFilters({
   const [tagInputValue, setTagInputValue] = useState('');
   const { selectedCollectionId } = useCollectionContext();
 
-  // Only show group filter when in specific collection context
-  const isSpecificCollectionContext = selectedCollectionId && selectedCollectionId !== 'all';
-
   const handleStatusChange = (value: string) => {
     if (value === 'all') {
       onStatusFilterChange(null);
@@ -126,8 +123,8 @@ export function EntityFilters({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Group Filter - Only shown in specific collection context */}
-        {isSpecificCollectionContext && selectedCollectionId && onGroupFilterChange && (
+        {/* Group Filter - Always shown when collection context and handler are available */}
+        {selectedCollectionId && selectedCollectionId !== 'all' && onGroupFilterChange && (
           <GroupFilterSelect
             collectionId={selectedCollectionId}
             value={groupId}

@@ -23,6 +23,18 @@ export type GroupResponse = {
    */
   description?: string | null;
   /**
+   * Group-local tags
+   */
+  tags?: Array<string>;
+  /**
+   * Visual color token or custom HEX color for group card accents
+   */
+  color: string;
+  /**
+   * Icon token for group display
+   */
+  icon: 'layers' | 'folder' | 'tag' | 'sparkles' | 'book' | 'wrench';
+  /**
    * Display order in collection
    */
   position: number;

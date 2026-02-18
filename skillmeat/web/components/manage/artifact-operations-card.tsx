@@ -61,6 +61,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { StatusBadge } from '@/components/shared/status-badge';
 import {
@@ -69,9 +70,12 @@ import {
   type HealthStatus,
 } from '@/components/shared/health-indicator';
 import { DeploymentBadgeStack } from '@/components/shared/deployment-badge-stack';
+import { TagSelectorPopover } from '@/components/collection/tag-selector-popover';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 import { getArtifactTypeConfig } from '@/types/artifact';
 import { Tool } from '@/types/enums';
+import { useTags } from '@/hooks';
+import { getTagColor } from '@/lib/utils/tag-colors';
 
 // ============================================================================
 // Types
@@ -110,6 +114,9 @@ export interface ArtifactOperationsCardProps {
 
   /** Whether selection is enabled */
   selectable?: boolean;
+
+  /** Handler when a tag badge is clicked (for filtering) */
+  onTagClick?: (tagName: string) => void;
 
   /** Additional CSS classes */
   className?: string;
@@ -236,6 +243,7 @@ export function ArtifactOperationsCard({
   selected = false,
   onSelect,
   selectable = false,
+  onTagClick,
   className,
 }: ArtifactOperationsCardProps) {
   const config = getArtifactTypeConfig(artifact.type);
@@ -243,10 +251,30 @@ export function ArtifactOperationsCard({
   const versionInfo = getVersionDisplay(artifact);
   const lastSynced = artifact.upstream?.lastChecked;
 
+  // Fetch all tags to build a name->color map from DB
+  const { data: allTagsResponse } = useTags(100);
+  const dbTagColorMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    if (allTagsResponse?.items) {
+      for (const tag of allTagsResponse.items) {
+        if (tag.color) {
+          map.set(tag.name, tag.color);
+        }
+      }
+    }
+    return map;
+  }, [allTagsResponse?.items]);
+
+  /** Resolve tag color: prefer DB color, fall back to hash-based color */
+  const resolveTagColor = (tagName: string): string => {
+    return dbTagColorMap.get(tagName) || getTagColor(tagName);
+  };
+
   // Tag cloud
   const displayTags = extractDisplayTags(artifact.tags);
-  const visibleTags = displayTags.slice(0, 3);
-  const remainingTagsCount = displayTags.length - visibleTags.length;
+  const sortedDisplayTags = [...displayTags].sort((a, b) => a.localeCompare(b));
+  const visibleTags = sortedDisplayTags.slice(0, 3);
+  const remainingTagsCount = sortedDisplayTags.length - visibleTags.length;
 
   // Deployment indicators
   const hasDeployments = (artifact.deployments?.length ?? 0) > 0;
@@ -359,20 +387,53 @@ export function ArtifactOperationsCard({
       </div>
 
       {/* Tag Cloud Row */}
-      {visibleTags.length > 0 && (
-        <div className="flex min-h-[28px] flex-wrap items-center gap-1 border-t px-4 py-2">
-          {visibleTags.map((tag) => (
-            <Badge key={tag} variant="secondary" className="text-xs">
-              {tag}
-            </Badge>
-          ))}
-          {remainingTagsCount > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              +{remainingTagsCount} more
-            </Badge>
-          )}
-        </div>
-      )}
+      <div className="flex min-h-[28px] flex-wrap items-center gap-1 border-t px-4 py-2">
+        {visibleTags.map((tag) => (
+          <Badge
+            key={tag}
+            colorStyle={resolveTagColor(tag)}
+            className={cn(
+              'text-xs',
+              onTagClick && 'cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all'
+            )}
+            onClick={onTagClick ? (e) => {
+              e.stopPropagation();
+              onTagClick(tag);
+            } : undefined}
+          >
+            {tag}
+          </Badge>
+        ))}
+        {remainingTagsCount > 0 && (
+          <Badge variant="secondary" className="text-xs">
+            +{remainingTagsCount} more
+          </Badge>
+        )}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <TagSelectorPopover
+                  artifactId={artifact.id}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 rounded-full"
+                      aria-label="Add tags"
+                    >
+                      <LucideIcons.Plus className="h-3 w-3" />
+                    </Button>
+                  }
+                />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Add Tags</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
 
       {/* Status Row: Indicators, Deployed Badge, Last Synced */}
       <div className="flex flex-wrap items-center gap-2 border-t px-4 py-2">

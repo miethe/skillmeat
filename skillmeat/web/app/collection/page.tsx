@@ -37,8 +37,28 @@ import type { Artifact, ArtifactFilters } from '@/types/artifact';
 import type { ArtifactParameters } from '@/types/discovery';
 import { mapApiResponseToArtifact, type ArtifactResponse } from '@/lib/api/mappers';
 import { mapArtifactsToEntities } from '@/lib/api/entity-mapper';
+import type { FilterMode } from '@/components/collection/collection-toolbar';
 
 type ViewMode = 'grid' | 'list' | 'grouped';
+
+// ==========================================================================
+// Filter Combination Logic
+// ==========================================================================
+
+/**
+ * The filterMode (AND/OR) controls how values WITHIN each filter category
+ * combine. Across categories, filters always combine with AND.
+ *
+ * - AND mode (within category): artifact must match ALL selected values
+ *   e.g., Groups=["A","B"] with AND -> artifact must be in both A and B
+ * - OR mode (within category): artifact must match ANY selected value
+ *   e.g., Groups=["A","B"] with OR -> artifact in A or B
+ *
+ * For single-value fields (status, scope), AND with multiple selections
+ * will match nothing (an artifact can't be both "active" and "modified"),
+ * which is technically correct. The main value of AND mode is for
+ * multi-value fields like groups, tags, and tools.
+ */
 
 function CollectionPageSkeleton() {
   return (
@@ -81,6 +101,7 @@ function CollectionPageContent() {
   const {
     selectedCollectionId,
     currentCollection,
+    currentGroups,
     isLoadingCollection,
     setSelectedCollectionId,
     selectedGroupId,
@@ -120,11 +141,22 @@ function CollectionPageContent() {
   // Read filter state from URL params (single source of truth)
   const urlSearch = searchParams.get('search') || '';
   const urlType = searchParams.get('type') || 'all';
-  const urlStatus = searchParams.get('status') || 'all';
-  const urlScope = searchParams.get('scope') || 'all';
-  const urlPlatform = searchParams.get('platform') || 'all';
   const urlSort = searchParams.get('sort') || 'confidence';
   const urlOrder = (searchParams.get('order') as 'asc' | 'desc') || 'desc';
+  const filterMode: FilterMode = (searchParams.get('filterMode') as FilterMode) || 'and';
+
+  // Multi-select filters from URL (comma-separated)
+  const selectedStatuses = useMemo(() => {
+    return searchParams.get('status')?.split(',').filter(Boolean) || [];
+  }, [searchParams]);
+
+  const selectedScopes = useMemo(() => {
+    return searchParams.get('scope')?.split(',').filter(Boolean) || [];
+  }, [searchParams]);
+
+  const selectedPlatforms = useMemo(() => {
+    return searchParams.get('platform')?.split(',').filter(Boolean) || [];
+  }, [searchParams]);
 
   // Tag filtering from URL
   const selectedTags = useMemo(() => {
@@ -136,15 +168,17 @@ function CollectionPageContent() {
     return searchParams.get('tools')?.split(',').filter(Boolean) || [];
   }, [searchParams]);
 
-  // Derive filters object from URL state
+  // Group filtering from URL (multi-select, comma-separated)
+  const selectedGroups = useMemo(() => {
+    return searchParams.get('groups')?.split(',').filter(Boolean) || [];
+  }, [searchParams]);
+
+  // Derive filters object from URL state (for type filter and API queries)
   const filters: ArtifactFilters = useMemo(
     () => ({
       type: urlType !== 'all' ? (urlType as ArtifactFilters['type']) : undefined,
-      status: urlStatus !== 'all' ? (urlStatus as ArtifactFilters['status']) : undefined,
-      scope: urlScope !== 'all' ? (urlScope as ArtifactFilters['scope']) : undefined,
-      platform: urlPlatform !== 'all' ? (urlPlatform as ArtifactFilters['platform']) : undefined,
     }),
-    [urlType, urlStatus, urlScope, urlPlatform]
+    [urlType]
   );
 
   // Use URL values directly for search and sort
@@ -188,7 +222,6 @@ function CollectionPageContent() {
   // Get URL params for deep linking
   const urlArtifactId = searchParams.get('artifact');
   const urlCollectionId = searchParams.get('collection');
-  const urlGroupId = searchParams.get('group');
   const urlTab = searchParams.get('tab') as ArtifactDetailsTab | null;
 
   // Helper to update URL params without full page reload
@@ -217,25 +250,25 @@ function CollectionPageContent() {
     }
   }, [urlCollectionId, selectedCollectionId, setSelectedCollectionId]);
 
+  // Sync first selected group to context for API optimization (single group_id query param)
   useEffect(() => {
-    if (urlGroupId && urlGroupId !== selectedGroupId) {
-      setSelectedGroupId(urlGroupId);
+    const firstGroup = selectedGroups.length === 1 ? (selectedGroups[0] ?? null) : null;
+    if (firstGroup !== selectedGroupId) {
+      setSelectedGroupId(firstGroup);
     }
-  }, [urlGroupId, selectedGroupId, setSelectedGroupId]);
+  }, [selectedGroups, selectedGroupId, setSelectedGroupId]);
 
-  // Sync URL when collection/group changes (two-way binding)
+  // Sync URL when collection changes (one-way: context -> URL for collection only)
+  // Group URL updates are handled directly by handleGroupClick / toolbar handlers
   useEffect(() => {
-    // Only update URL if the values differ from current URL params
     const currentUrlCollection = searchParams.get('collection');
-    const currentUrlGroup = searchParams.get('group');
 
-    if (selectedCollectionId !== currentUrlCollection || selectedGroupId !== currentUrlGroup) {
+    if (selectedCollectionId !== currentUrlCollection) {
       updateUrlParams({
         collection: selectedCollectionId,
-        group: selectedGroupId,
       });
     }
-  }, [selectedCollectionId, selectedGroupId, searchParams, updateUrlParams]);
+  }, [selectedCollectionId, searchParams, updateUrlParams]);
 
   // ==========================================================================
   // Event Handlers
@@ -317,6 +350,8 @@ function CollectionPageContent() {
   } = useInfiniteCollectionArtifacts(isSpecificCollection ? selectedCollectionId : undefined, {
     limit: 20,
     artifact_type: filters.type && filters.type !== 'all' ? filters.type : undefined,
+    group_id: isSpecificCollection && selectedGroups.length === 1 ? selectedGroups[0] : undefined,
+    include_groups: isSpecificCollection && selectedGroups.length > 0,
     enabled: isSpecificCollection,
   });
 
@@ -383,14 +418,41 @@ function CollectionPageContent() {
     [updateUrlParams]
   );
 
-  // Handle filter object changes (type, status, scope)
+  // Handle filter object changes (type only - status/scope/platform are now multi-select)
   const handleFiltersChange = useCallback(
     (newFilters: ArtifactFilters) => {
       updateUrlParams({
         type: newFilters.type && newFilters.type !== 'all' ? newFilters.type : null,
-        status: newFilters.status && newFilters.status !== 'all' ? newFilters.status : null,
-        scope: newFilters.scope && newFilters.scope !== 'all' ? newFilters.scope : null,
-        platform: newFilters.platform && newFilters.platform !== 'all' ? newFilters.platform : null,
+      });
+    },
+    [updateUrlParams]
+  );
+
+  // Handle multi-select status filter changes
+  const handleStatusesChange = useCallback(
+    (statuses: string[]) => {
+      updateUrlParams({
+        status: statuses.length > 0 ? statuses.join(',') : null,
+      });
+    },
+    [updateUrlParams]
+  );
+
+  // Handle multi-select scope filter changes
+  const handleScopesChange = useCallback(
+    (scopes: string[]) => {
+      updateUrlParams({
+        scope: scopes.length > 0 ? scopes.join(',') : null,
+      });
+    },
+    [updateUrlParams]
+  );
+
+  // Handle multi-select platform filter changes
+  const handlePlatformsChange = useCallback(
+    (platforms: string[]) => {
+      updateUrlParams({
+        platform: platforms.length > 0 ? platforms.join(',') : null,
       });
     },
     [updateUrlParams]
@@ -436,6 +498,60 @@ function CollectionPageContent() {
     },
     [updateUrlParams]
   );
+
+  // Handle clicking a tag badge on a card to add it to filters
+  const handleTagClick = useCallback(
+    (tagName: string) => {
+      if (!selectedTags.includes(tagName)) {
+        handleTagsChange([...selectedTags, tagName]);
+      }
+    },
+    [selectedTags, handleTagsChange]
+  );
+
+  // Handle clicking a group badge on a card to toggle group in multi-select
+  const handleGroupClick = useCallback(
+    (groupId: string) => {
+      const newGroups = selectedGroups.includes(groupId)
+        ? selectedGroups.filter((g) => g !== groupId)
+        : [...selectedGroups, groupId];
+      updateUrlParams({ groups: newGroups.length > 0 ? newGroups.join(',') : null });
+    },
+    [selectedGroups, updateUrlParams]
+  );
+
+  // Handle group filter changes from toolbar (multi-select)
+  const handleGroupsChange = useCallback(
+    (groupIds: string[]) => {
+      updateUrlParams({ groups: groupIds.length > 0 ? groupIds.join(',') : null });
+    },
+    [updateUrlParams]
+  );
+
+  // Handle filter mode (AND/OR) changes
+  const handleFilterModeChange = useCallback(
+    (mode: FilterMode) => {
+      updateUrlParams({
+        filterMode: mode === 'and' ? null : mode, // 'and' is default, don't write to URL
+      });
+    },
+    [updateUrlParams]
+  );
+
+  // Clear ALL filters in a single URL update to avoid stale searchParams race condition
+  const handleClearAllFilters = useCallback(() => {
+    updateUrlParams({
+      status: null,
+      scope: null,
+      platform: null,
+      groups: null,
+      tags: null,
+      tools: null,
+      search: null,
+      filterMode: null,
+      // Don't clear: type, sort, order, collection, view (navigation, not filters)
+    });
+  }, [updateUrlParams]);
 
   // Helper function to map API artifact response to Artifact type
   // Uses the centralized mapper from @/lib/api/mappers
@@ -483,35 +599,12 @@ function CollectionPageContent() {
       });
     }
 
-    // Type filter
+    // Type filter is always AND (it's a primary category selector, not a cross-category filter)
     if (filters.type && filters.type !== 'all') {
       artifacts = artifacts.filter((artifact) => artifact.type === filters.type);
     }
 
-    // Status filter (uses syncStatus)
-    if (filters.status && filters.status !== 'all') {
-      artifacts = artifacts.filter((artifact) => artifact.syncStatus === filters.status);
-    }
-
-    // Scope filter
-    if (filters.scope && filters.scope !== 'all') {
-      artifacts = artifacts.filter((artifact) => artifact.scope === filters.scope);
-    }
-
-    // Target platform filter
-    if (filters.platform && filters.platform !== 'all') {
-      if (filters.platform === 'universal') {
-        artifacts = artifacts.filter(
-          (artifact) => !artifact.targetPlatforms || artifact.targetPlatforms.length === 0
-        );
-      } else {
-        artifacts = artifacts.filter((artifact) =>
-          artifact.targetPlatforms?.some((platform) => platform === filters.platform)
-        );
-      }
-    }
-
-    // Search
+    // Search is always AND (narrows results regardless of filter mode)
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       artifacts = artifacts.filter((a) => {
@@ -522,14 +615,56 @@ function CollectionPageContent() {
       });
     }
 
+    // Apply filter categories — always AND across categories.
+    // The filterMode controls how values WITHIN each category combine:
+    //   'and' -> .every() (artifact must match ALL selected values)
+    //   'or'  -> .some()  (artifact must match ANY selected value)
+    const withinMode = filterMode === 'and' ? 'every' : 'some';
+
+    if (selectedStatuses.length > 0) {
+      artifacts = artifacts.filter((artifact) =>
+        selectedStatuses[withinMode]((s) => (artifact.syncStatus || '') === s)
+      );
+    }
+
+    if (selectedScopes.length > 0) {
+      artifacts = artifacts.filter((artifact) =>
+        selectedScopes[withinMode]((s) => (artifact.scope || '') === s)
+      );
+    }
+
+    if (selectedPlatforms.length > 0) {
+      artifacts = artifacts.filter((artifact) => {
+        const matchesPlatform = (p: string) => {
+          if (p === 'universal') {
+            return !artifact.targetPlatforms || artifact.targetPlatforms.length === 0;
+          }
+          return artifact.targetPlatforms?.includes(p) ?? false;
+        };
+        return selectedPlatforms[withinMode](matchesPlatform);
+      });
+    }
+
+    if (selectedGroups.length > 1) {
+      artifacts = artifacts.filter((artifact) =>
+        selectedGroups[withinMode]((gId) =>
+          artifact.groups?.some((g) => g.id === gId) ?? false
+        )
+      );
+    }
+
     return artifacts;
   }, [
     isSpecificCollection,
     infiniteCollectionData,
     infiniteAllArtifactsData,
-    currentCollection,
     filters,
     searchQuery,
+    selectedStatuses,
+    selectedScopes,
+    selectedPlatforms,
+    selectedGroups,
+    filterMode,
   ]);
 
   // Compute available tags from artifacts matching current filters (excluding tag filter)
@@ -549,18 +684,20 @@ function CollectionPageContent() {
   const filteredArtifacts = useMemo(() => {
     let artifacts = preTagFilterArtifacts;
 
-    // Tag filter
+    // Tag filter — AND/OR mode applies within this category too
     if (selectedTags.length > 0) {
-      artifacts = artifacts.filter((artifact) => {
-        return artifact.tags?.some((tag: string) => selectedTags.includes(tag)) ?? false;
-      });
+      const tagWithinMode = filterMode === 'and' ? 'every' : 'some';
+      artifacts = artifacts.filter((artifact) =>
+        selectedTags[tagWithinMode]((tag) => artifact.tags?.includes(tag) ?? false)
+      );
     }
 
-    // Tool filter
+    // Tool filter — AND/OR mode applies within this category too
     if (selectedTools.length > 0) {
-      artifacts = artifacts.filter((artifact) => {
-        return artifact.tools?.some((tool: string) => selectedTools.includes(tool)) ?? false;
-      });
+      const toolWithinMode = filterMode === 'and' ? 'every' : 'some';
+      artifacts = artifacts.filter((artifact) =>
+        selectedTools[toolWithinMode]((tool) => artifact.tools?.includes(tool) ?? false)
+      );
     }
 
     // Apply client-side sorting (confidence sorting requires client-side since backend doesn't support it)
@@ -590,7 +727,7 @@ function CollectionPageContent() {
     }
 
     return artifacts;
-  }, [preTagFilterArtifacts, selectedTags, selectedTools, sortField, sortOrder]);
+  }, [preTagFilterArtifacts, selectedTags, selectedTools, filterMode, sortField, sortOrder]);
 
   const hasActiveFilters = useMemo(
     () =>
@@ -599,18 +736,20 @@ function CollectionPageContent() {
           selectedTags.length > 0 ||
           selectedTools.length > 0 ||
           (filters.type && filters.type !== 'all') ||
-          (filters.status && filters.status !== 'all') ||
-          (filters.scope && filters.scope !== 'all') ||
-          (filters.platform && filters.platform !== 'all')
+          selectedStatuses.length > 0 ||
+          selectedScopes.length > 0 ||
+          selectedPlatforms.length > 0 ||
+          selectedGroups.length > 0
       ),
     [
       searchQuery,
       selectedTags.length,
       selectedTools.length,
       filters.type,
-      filters.status,
-      filters.scope,
-      filters.platform,
+      selectedStatuses.length,
+      selectedScopes.length,
+      selectedPlatforms.length,
+      selectedGroups.length,
     ]
   );
 
@@ -686,27 +825,29 @@ function CollectionPageContent() {
   const activeFilterItems = useMemo<ActiveFilterItem[]>(() => {
     const items: ActiveFilterItem[] = [];
 
-    if (filters.status && filters.status !== 'all') {
+    selectedStatuses.forEach((status) => {
       items.push({
-        id: `status:${filters.status}`,
-        label: `Status: ${filters.status}`,
-        onRemove: () => updateUrlParams({ status: null }),
+        id: `status:${status}`,
+        label: `Status: ${status}`,
+        onRemove: () => handleStatusesChange(selectedStatuses.filter((s) => s !== status)),
       });
-    }
-    if (filters.scope && filters.scope !== 'all') {
+    });
+
+    selectedScopes.forEach((scope) => {
       items.push({
-        id: `scope:${filters.scope}`,
-        label: `Scope: ${filters.scope}`,
-        onRemove: () => updateUrlParams({ scope: null }),
+        id: `scope:${scope}`,
+        label: `Scope: ${scope}`,
+        onRemove: () => handleScopesChange(selectedScopes.filter((s) => s !== scope)),
       });
-    }
-    if (filters.platform && filters.platform !== 'all') {
+    });
+
+    selectedPlatforms.forEach((platform) => {
       items.push({
-        id: `platform:${filters.platform}`,
-        label: `Platform: ${filters.platform}`,
-        onRemove: () => updateUrlParams({ platform: null }),
+        id: `platform:${platform}`,
+        label: `Platform: ${platform}`,
+        onRemove: () => handlePlatformsChange(selectedPlatforms.filter((p) => p !== platform)),
       });
-    }
+    });
 
     selectedTags.forEach((tag) => {
       items.push({
@@ -724,16 +865,33 @@ function CollectionPageContent() {
       });
     });
 
+    if (isSpecificCollection) {
+      selectedGroups.forEach((groupId) => {
+        const group = currentGroups.find((g) => g.id === groupId);
+        items.push({
+          id: `group:${groupId}`,
+          label: `Group: ${group?.name ?? groupId}`,
+          onRemove: () => handleGroupsChange(selectedGroups.filter((g) => g !== groupId)),
+        });
+      });
+    }
+
     return items;
   }, [
-    filters.status,
-    filters.scope,
-    filters.platform,
+    selectedStatuses,
+    selectedScopes,
+    selectedPlatforms,
     selectedTags,
     selectedTools,
-    updateUrlParams,
+    selectedGroups,
+    isSpecificCollection,
+    currentGroups,
+    handleStatusesChange,
+    handleScopesChange,
+    handlePlatformsChange,
     handleTagsChange,
     handleToolsChange,
+    handleGroupsChange,
   ]);
 
   // ==========================================================================
@@ -770,7 +928,7 @@ function CollectionPageContent() {
     });
   };
 
-  const handleDetailClose = () => {
+  const handleDetailClose = useCallback(() => {
     // Set closing flag FIRST to prevent race condition with auto-open useEffect
     isClosingRef.current = true;
     setIsDetailOpen(false);
@@ -784,7 +942,7 @@ function CollectionPageContent() {
     setTimeout(() => {
       isClosingRef.current = false;
     }, 0);
-  };
+  }, [updateUrlParams]);
 
   // Handler for Delete action from modal (must be after handleDetailClose)
   const handleDeleteFromModal = useCallback(() => {
@@ -876,8 +1034,20 @@ function CollectionPageContent() {
         selectedTools={selectedTools}
         onToolsChange={handleToolsChange}
         availableTools={availableTools}
+        selectedGroups={selectedGroups}
+        onGroupsChange={handleGroupsChange}
+        availableGroups={currentGroups}
+        selectedStatuses={selectedStatuses}
+        onStatusesChange={handleStatusesChange}
+        selectedScopes={selectedScopes}
+        onScopesChange={handleScopesChange}
+        selectedPlatforms={selectedPlatforms}
+        onPlatformsChange={handlePlatformsChange}
         showTypeFilter={false}
         allowGroupedView={isSpecificCollection}
+        filterMode={filterMode}
+        onFilterModeChange={handleFilterModeChange}
+        onClearAllFilters={handleClearAllFilters}
       />
 
       {/* Active filters row */}
@@ -953,6 +1123,8 @@ function CollectionPageContent() {
                 onManageGroups={handleManageGroups}
                 onEdit={handleEditFromDropdown}
                 onDelete={handleDeleteFromDropdown}
+                onTagClick={handleTagClick}
+                onGroupClick={handleGroupClick}
               />
             ) : viewMode === 'list' ? (
               <ArtifactList
@@ -987,6 +1159,8 @@ function CollectionPageContent() {
                 onManageGroups={handleManageGroups}
                 onEdit={handleEditFromDropdown}
                 onDelete={handleDeleteFromDropdown}
+                onTagClick={handleTagClick}
+                onGroupClick={handleGroupClick}
               />
             )}
           </>

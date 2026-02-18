@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { normalizeTagForStorage } from '@/lib/utils/tag-suggestions';
+import { getTagColor } from '@/lib/utils/tag-colors';
 
 // ============================================================================
 // Types
@@ -42,42 +43,6 @@ export interface TagEditorProps {
   disabled?: boolean;
   /** Additional CSS classes for the container */
   className?: string;
-}
-
-// ============================================================================
-// Color Utilities (from tag-badge.tsx)
-// ============================================================================
-
-const TAG_COLORS = [
-  '#6366f1', // Indigo
-  '#8b5cf6', // Violet
-  '#d946ef', // Fuchsia
-  '#ec4899', // Pink
-  '#f43f5e', // Rose
-  '#ef4444', // Red
-  '#f97316', // Orange
-  '#eab308', // Yellow
-  '#84cc16', // Lime
-  '#22c55e', // Green
-  '#14b8a6', // Teal
-  '#06b6d4', // Cyan
-  '#0ea5e9', // Sky
-  '#3b82f6', // Blue
-] as const;
-
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash);
-}
-
-function getTagColor(tag: string): string {
-  const hash = hashString(tag.toLowerCase());
-  return TAG_COLORS[hash % TAG_COLORS.length] as string;
 }
 
 // ============================================================================
@@ -152,7 +117,7 @@ function AddTagPopover({ availableTags, currentTags, onAddTag, disabled }: AddTa
       // Filter by search
       if (search && !tagLower.includes(search.toLowerCase())) return false;
       return true;
-    });
+    }).sort((a, b) => a.localeCompare(b));
   }, [availableTags, currentTags, search]);
 
   // Check if search text matches an existing available tag (case-insensitive)
@@ -307,7 +272,7 @@ export function TagEditor({
       role="group"
       aria-label="Tag editor"
     >
-      {tags.map((tag) => (
+      {[...tags].sort((a, b) => a.localeCompare(b)).map((tag) => (
         <EditableTagBadge key={tag} tag={tag} onRemove={handleRemoveTag} disabled={disabled} />
       ))}
       <AddTagPopover

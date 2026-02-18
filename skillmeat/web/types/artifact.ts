@@ -213,6 +213,9 @@ export interface Artifact {
   /** Optional platform targeting restrictions (undefined/null means universal) */
   targetPlatforms?: Platform[];
 
+  /** Groups this artifact belongs to (only populated when include_groups=true) */
+  groups?: { id: string; name: string; position?: number }[] | null;
+
   // ============================================================================
   // Source & Origin
   // ============================================================================

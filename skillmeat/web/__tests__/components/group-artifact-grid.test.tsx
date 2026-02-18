@@ -67,6 +67,16 @@ jest.mock('@/hooks', () => ({
     mutate: jest.fn(),
     isPending: false,
   }),
+  useDndAnimations: () => ({
+    animState: { phase: 'idle', targetGroupId: null, sourceGroupId: null, targetRect: null },
+    triggerDropIntoGroup: jest.fn(),
+    triggerRemovePoof: jest.fn(),
+    reset: jest.fn(),
+  }),
+  useCliCopy: () => ({
+    copy: jest.fn(),
+    isCopying: false,
+  }),
 }));
 
 // Use the function references directly for configuration

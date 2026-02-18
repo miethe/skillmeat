@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   FolderOpen,
@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,12 +23,15 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCollectionContext, useRemoveArtifactFromCollection, useToast } from '@/hooks';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQueries } from '@tanstack/react-query';
 import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
 import { AddToGroupDialog } from '@/components/collection/add-to-group-dialog';
-import { GroupsDisplay } from './groups-display';
+import { apiRequest } from '@/lib/api';
+import { artifactGroupKeys } from '@/hooks/use-artifact-groups';
+import { GroupCard } from '@/app/groups/components/group-card';
 import type { Artifact } from '@/types/artifact';
+import type { Group } from '@/types/groups';
 
 interface ModalCollectionsTabProps {
   /**
@@ -60,10 +64,11 @@ interface ModalCollectionsTabProps {
  *
  * Features:
  * - List of collections containing this artifact
- * - Groups within each collection (as badges)
+ * - Aggregated groups section (deduplicated across all collections)
  * - "Add to Collection" button opens MoveCopyDialog
+ * - "Add to Group" button opens AddToGroupDialog
  * - "Remove from Collection" via dropdown menu
- * - Empty state when artifact not in any collection
+ * - Empty state for both collections and groups
  * - Loading skeleton during data fetch
  *
  * @example
@@ -89,16 +94,48 @@ export function ModalCollectionsTab({
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Early return if no artifact provided
+  // Use artifact's collections array directly (already populated in Artifact type)
+  const artifactCollections = resolvedArtifact?.collections || [];
+
+  // Fetch groups for each collection the artifact belongs to
+  // Hooks must be called unconditionally (before any early returns)
+  const groupQueries = useQueries({
+    queries: artifactCollections.map((collection) => ({
+      queryKey: artifactGroupKeys.list(resolvedArtifact?.id, collection.id),
+      queryFn: async () => {
+        const params = new URLSearchParams({
+          collection_id: collection.id,
+          artifact_id: resolvedArtifact!.id,
+        });
+        const response = await apiRequest<{ groups: Group[]; total: number }>(
+          `/groups?${params.toString()}`
+        );
+        return response.groups;
+      },
+      enabled: !!resolvedArtifact?.id && !!collection.id,
+      staleTime: 10 * 60 * 1000,
+    })),
+  });
+
+  const isLoadingGroups = groupQueries.some((q) => q.isLoading);
+  const allGroups = useMemo(() => {
+    const seen = new Set<string>();
+    const groups: Group[] = [];
+    for (const query of groupQueries) {
+      for (const group of query.data ?? []) {
+        if (!seen.has(group.id)) {
+          seen.add(group.id);
+          groups.push(group);
+        }
+      }
+    }
+    return groups.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  }, [groupQueries]);
+
+  // Early return if no artifact provided (after all hooks)
   if (!resolvedArtifact) {
     return null;
   }
-
-  // Artifact type now has flattened metadata - no conversion needed
-  // The artifact is already in the correct format for child dialogs
-
-  // Use artifact's collections array directly (already populated in Artifact type)
-  const artifactCollections = resolvedArtifact.collections || [];
 
   const handleRemoveFromCollection = async (collectionId: string) => {
     try {
@@ -143,15 +180,11 @@ export function ModalCollectionsTab({
     <div className="space-y-4">
       {/* Header with Add button */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium">Collections & Groups</h3>
+        <h3 className="text-sm font-medium">Collections</h3>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={() => setShowCreateDialog(true)}>
             <FolderPlus className="mr-2 h-4 w-4" />
             New
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowGroupDialog(true)}>
-            <Layers className="mr-2 h-4 w-4" />
-            Add to Group
           </Button>
           <Button variant="outline" size="sm" onClick={() => setShowAddDialog(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -160,8 +193,8 @@ export function ModalCollectionsTab({
         </div>
       </div>
 
-      {/* Collections list */}
-      <ScrollArea className="h-[300px]">
+      {/* Scrollable area for both Collections and Groups */}
+      <ScrollArea className="h-[400px]">
         {artifactCollections.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <FolderOpen className="h-12 w-12 text-muted-foreground/50" />
@@ -226,24 +259,71 @@ export function ModalCollectionsTab({
                   </div>
                 </div>
 
-                {/* Groups within this collection */}
-                <div className="mt-3 border-t pt-3">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Layers className="h-3 w-3" />
-                    <span className="font-medium">Groups in {collection.name}</span>
-                  </div>
-                  <div className="mt-2">
-                    <GroupsDisplay
-                      collectionId={collection.id}
-                      artifactId={resolvedArtifact.id}
-                      maxBadges={3}
-                    />
-                  </div>
-                </div>
               </div>
             ))}
           </div>
         )}
+
+        {/* Separator between Collections and Groups */}
+        <Separator className="my-4" />
+
+        {/* Groups section */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium">Groups</h3>
+            <Button variant="outline" size="sm" onClick={() => setShowGroupDialog(true)}>
+              <Layers className="mr-2 h-4 w-4" />
+              Add to Group
+            </Button>
+          </div>
+
+          {isLoadingGroups ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {[1, 2].map((i) => (
+                <div key={i} className="space-y-2 rounded-lg border p-3">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-4" />
+                    <Skeleton className="h-5 w-24" />
+                  </div>
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-2/3" />
+                </div>
+              ))}
+            </div>
+          ) : allGroups.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <Layers className="h-10 w-10 text-muted-foreground/50" />
+              <p className="mt-3 text-sm text-muted-foreground">Not in any groups</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => setShowGroupDialog(true)}
+              >
+                <Layers className="mr-2 h-4 w-4" />
+                Add to Group
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {allGroups.map((group) => (
+                <GroupCard
+                  key={group.id}
+                  group={group}
+                  onOpenDetails={() => {
+                    onNavigate?.();
+                    router.push(
+                      `/collection?collection=${group.collection_id}&group=${group.id}`
+                    );
+                  }}
+                  onEdit={() => {}}
+                  onDelete={() => {}}
+                  onCopy={() => {}}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </ScrollArea>
 
       {/* Add to Collection dialog */}
@@ -291,10 +371,15 @@ export function ModalCollectionsTab({
 function CollectionsTabSkeleton() {
   return (
     <div className="space-y-4">
+      {/* Collections header skeleton */}
       <div className="flex items-center justify-between">
-        <Skeleton className="h-5 w-32" />
-        <Skeleton className="h-9 w-36" />
+        <Skeleton className="h-5 w-24" />
+        <div className="flex gap-2">
+          <Skeleton className="h-9 w-16" />
+          <Skeleton className="h-9 w-36" />
+        </div>
       </div>
+      {/* Collection cards skeleton */}
       <div className="space-y-3">
         {[1, 2].map((i) => (
           <div key={i} className="space-y-2 rounded-lg border p-3">
@@ -306,16 +391,26 @@ function CollectionsTabSkeleton() {
               </div>
               <Skeleton className="h-8 w-8" />
             </div>
-            {/* Groups section skeleton */}
-            <div className="mt-3 border-t pt-3">
-              <div className="flex items-center gap-1.5">
-                <Skeleton className="h-3 w-3" />
-                <Skeleton className="h-3 w-24" />
-              </div>
-              <div className="mt-2">
-                <Skeleton className="h-3 w-40" />
-              </div>
+          </div>
+        ))}
+      </div>
+      {/* Separator */}
+      <Separator />
+      {/* Groups header skeleton */}
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-5 w-16" />
+        <Skeleton className="h-9 w-28" />
+      </div>
+      {/* Group cards skeleton */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {[1, 2].map((i) => (
+          <div key={i} className="space-y-2 rounded-lg border p-3">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-4 w-4" />
+              <Skeleton className="h-5 w-24" />
             </div>
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-2/3" />
           </div>
         ))}
       </div>

@@ -40,7 +40,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Activity,
@@ -60,6 +60,7 @@ import {
   ExternalLink,
   MoreVertical,
   Trash2,
+  Plus,
 } from 'lucide-react';
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -69,7 +70,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -94,7 +94,9 @@ import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments
 import { DeployButton } from '@/components/shared/deploy-button';
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
 import { ProjectSelectorForDiff } from '@/components/entity/project-selector-for-diff';
-import { TagEditor } from '@/components/shared/tag-editor';
+import { TagSelectorPopover } from '@/components/collection/tag-selector-popover';
+import { getTagColor } from '@/lib/utils/tag-colors';
+import { Badge } from '@/components/ui/badge';
 
 // Types
 import type { Artifact, ArtifactType } from '@/types/artifact';
@@ -110,7 +112,6 @@ import {
   useEntityLifecycle,
   useSources,
   useTags,
-  useUpdateArtifactTags,
 } from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments';
@@ -408,7 +409,6 @@ export function ArtifactOperationsModal({
   const [activeTab, setActiveTab] = useState<OperationsModalTab>(initialTab);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [localTags, setLocalTags] = useState<string[] | null>(null);
   const [selectedProjectForDiff, setSelectedProjectForDiff] = useState<string | null>(null);
   const [sourceEntry, setSourceEntry] = useState<{
     sourceId: string;
@@ -428,11 +428,6 @@ export function ArtifactOperationsModal({
   useEffect(() => {
     setSelectedPath(null);
   }, [artifact?.id, open]);
-
-  // Reset localTags when artifact changes
-  useEffect(() => {
-    setLocalTags(null);
-  }, [artifact?.id]);
 
   // Reset selectedProjectForDiff when artifact changes or modal closes
   useEffect(() => {
@@ -554,49 +549,12 @@ export function ArtifactOperationsModal({
   // Fetch marketplace sources for Sources tab
   const { data: sourcesData } = useSources(100);
 
-  // Fetch tags for autocomplete
-  const { data: tagsData, isLoading: isTagsLoading } = useTags(100);
-  const availableTags = useMemo(() => {
-    if (!tagsData?.items) return [];
-    return tagsData.items.map((tag) => tag.name);
-  }, [tagsData]);
-
-  // Tag update mutation
-  const { mutate: updateTags, isPending: isUpdatingTags } = useUpdateArtifactTags();
+  // Fetch tags (for loading state display, TagSelectorPopover handles its own data)
+  const { isLoading: isTagsLoading } = useTags(100);
 
   // ========================================================================
   // Handlers
   // ========================================================================
-
-  const handleTagsChange = useCallback(
-    (newTags: string[]) => {
-      if (!artifact) return;
-
-      setLocalTags(newTags);
-
-      updateTags(
-        { artifactId: artifact.id, tags: newTags },
-        {
-          onSuccess: () => {
-            toast({
-              title: 'Tags updated',
-              description: 'Artifact tags have been updated.',
-            });
-            queryClient.invalidateQueries({ queryKey: ['artifacts'] });
-          },
-          onError: (error) => {
-            setLocalTags(null);
-            toast({
-              title: 'Failed to update tags',
-              description: error instanceof Error ? error.message : 'Unknown error',
-              variant: 'destructive',
-            });
-          },
-        }
-      );
-    },
-    [artifact, updateTags, toast, queryClient]
-  );
 
   // Find source catalog entry when Sources tab is active
   useEffect(() => {
@@ -996,13 +954,28 @@ export function ArtifactOperationsModal({
               <Tag className="h-4 w-4" aria-hidden="true" />
               Tags
             </h3>
-            <TagEditor
-              tags={localTags ?? artifact.tags ?? []}
-              onTagsChange={handleTagsChange}
-              availableTags={availableTags}
-              isLoading={isTagsLoading || isUpdatingTags}
-              disabled={isUpdatingTags}
-            />
+            {isTagsLoading ? (
+              <div className="flex items-center gap-1">
+                <div className="h-5 w-16 animate-pulse rounded-md bg-muted" />
+                <div className="h-5 w-12 animate-pulse rounded-md bg-muted" />
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[...(artifact.tags ?? [])].sort((a, b) => a.localeCompare(b)).map((tag) => (
+                  <Badge key={tag} colorStyle={getTagColor(tag)} className="text-xs">
+                    {tag}
+                  </Badge>
+                ))}
+                <TagSelectorPopover
+                  artifactId={artifact.id}
+                  trigger={
+                    <Button variant="outline" size="sm" className="h-6 w-6 rounded-full p-0">
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  }
+                />
+              </div>
+            )}
           </div>
 
           <div>

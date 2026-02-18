@@ -4,7 +4,7 @@ prd: marketplace-sources-enhancement-v1
 phase: 7-8
 title: Testing and Documentation
 status: completed
-completed_at: "2026-01-18"
+completed_at: '2026-01-18'
 progress: 100
 total_tasks: 19
 completed_tasks: 19
@@ -241,7 +241,6 @@ in_progress_tasks: 0
 blocked_tasks: 0
 updated: '2026-01-18'
 ---
-
 # Phases 7-8: Testing & Documentation
 
 Comprehensive testing and documentation for the marketplace sources enhancement, including quality assurance across all layers and complete documentation for users and developers.

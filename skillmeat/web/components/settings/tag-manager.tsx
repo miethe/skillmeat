@@ -87,13 +87,13 @@ export function TagManager() {
 
   const tags = data?.items ?? [];
 
-  const filteredTags = searchQuery
+  const filteredTags = (searchQuery
     ? tags.filter(
         (tag) =>
           tag.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           tag.slug.toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : tags;
+    : tags).sort((a, b) => a.name.localeCompare(b.name));
 
   // --- Create ---
 

@@ -162,7 +162,7 @@ function OverflowBadge({ count, hiddenDeployments, onClick }: OverflowBadgeProps
           <div className="space-y-1">
             <p className="text-xs font-medium text-muted-foreground">Also deployed to:</p>
             {hiddenDeployments.map((deployment) => (
-              <div key={deployment.project_path} className="flex items-center gap-1 text-xs">
+              <div key={`${deployment.project_path}-${deployment.deployed_at}`} className="flex items-center gap-1 text-xs">
                 <FolderKanban className="h-3 w-3" aria-hidden="true" />
                 <span>
                   {deployment.project_name || extractProjectName(deployment.project_path)}
@@ -217,7 +217,7 @@ export function DeploymentBadgeStack({
       aria-label="Deployment locations"
     >
       {visibleDeployments.map((deployment) => (
-        <div key={deployment.project_path} role="listitem">
+        <div key={`${deployment.project_path}-${deployment.deployed_at}`} role="listitem">
           <DeploymentBadge
             deployment={deployment}
             onClick={onBadgeClick ? () => onBadgeClick(deployment) : undefined}

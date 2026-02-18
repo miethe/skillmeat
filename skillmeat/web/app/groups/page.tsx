@@ -4,17 +4,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export const metadata = {
   title: 'Groups | SkillMeat',
-  description: 'Browse and manage artifact groups across your collections',
+  description: 'Manage and organize groups across your collections',
 };
 
 /**
- * Groups Page - Browse artifacts organized by groups
+ * Groups Page - Group management hub
  *
- * This page provides a dedicated view for browsing artifacts by group,
- * complementing the collection-based view. Users can:
- * - Select a group from any collection
- * - View all artifacts within that group
- * - Navigate between groups quickly
+ * This page provides a dedicated view for managing groups, including:
+ * - Creating and editing group metadata
+ * - Searching and sorting groups as cards
+ * - Navigating to collection view for group artifacts
  *
  * Server component wrapper with client component for interactivity.
  */
@@ -24,7 +23,9 @@ export default function GroupsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Groups</h1>
-          <p className="text-muted-foreground">Browse artifacts by group within your collections</p>
+          <p className="text-muted-foreground">
+            Create, organize, and manage groups within your collections
+          </p>
         </div>
       </div>
       <Suspense fallback={<GroupsPageSkeleton />}>
@@ -41,17 +42,18 @@ export default function GroupsPage() {
 function GroupsPageSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Group selector skeleton */}
-      <div className="flex items-center gap-4">
-        <Skeleton className="h-10 w-48" />
+      {/* Toolbar skeleton */}
+      <div className="flex items-center gap-4 rounded-lg border bg-card p-4">
         <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-10 w-40" />
+        <Skeleton className="h-10 w-32" />
       </div>
 
-      {/* Artifact grid skeleton */}
+      {/* Card grid skeleton */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} className="space-y-3">
-            <Skeleton className="h-48 w-full rounded-lg" />
+            <Skeleton className="h-56 w-full rounded-lg" />
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-4 w-1/2" />
           </div>

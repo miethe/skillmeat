@@ -1,6 +1,6 @@
 # SkillMeat Feature Catalog - Quick Reference
 
-**Last Updated**: 2026-01-29 | **Version**: 0.3.0-beta
+**Last Updated**: 2026-02-17 | **Version**: 0.3.0-beta
 
 Quick lookup guide for screenshots, feature verification, and UI planning.
 
@@ -15,7 +15,7 @@ Quick lookup guide for screenshots, feature verification, and UI planning.
 | **Dashboard** | `/` | Analytics overview | Stats cards, trends, top artifacts |
 | **Collection** | `/collection` | Browse artifacts | Grid/List/Grouped views, search, filter, sort |
 | **Manage** | `/manage` | Entity-focused view | By type tabs, unified modal detail |
-| **Groups** | `/groups` | Group-based browsing | Cross-collection group navigation |
+| **Groups** | `/groups` | Group-based browsing | Two-pane layout (sidebar + artifact grid), DnD group assignment, management hub, color/icon metadata |
 
 ### Project & Deployment
 
@@ -53,10 +53,12 @@ Quick lookup guide for screenshots, feature verification, and UI planning.
 ### Collection Filters
 
 ```
-Type:     All | Skill | Command | Agent | MCP | Hook
-Status:   All | Synced | Modified | Outdated | Conflict | Error
-Scope:    All | User | Local
-Tags:     Multi-select (from available)
+Unified Filter Menu:
+  • Type:     All | Skill | Command | Agent | MCP | Hook
+  • Scope:    All | User | Local
+  • Tags:     Multi-select (from available)
+  • Groups:   Multi-select (from available)
+  • Mode:     AND | OR toggle for combining filters
 Search:   Full-text (name, description, tags)
 ```
 

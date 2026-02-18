@@ -1,6 +1,6 @@
 # SkillMeat - Complete Feature Catalog
 
-**Last Updated**: 2026-01-29
+**Last Updated**: 2026-02-17
 **Version**: 0.3.0-beta
 **Purpose**: Comprehensive inventory of all UI pages, components, modals, and API endpoints for screenshot planning and feature documentation
 
@@ -93,10 +93,12 @@
   - Name (A-Z)
   - Updated date
   - Usage count
-- Filters:
-  - Artifact Type (all/skill/command/agent/mcp/hook)
-  - Status (all/synced/modified/outdated/conflict/error)
-  - Scope (all/user/local)
+- Unified multi-select filter menu:
+  - Artifact Type (skill/command/agent/mcp/hook)
+  - Status (synced/modified/outdated/conflict/error)
+  - Scope (user/local)
+  - Groups (all available groups)
+  - Filter mode toggle: AND (all filters must match) / OR (any filter matches)
 - Tag filter bar
 - Refresh button
 - Last updated timestamp
@@ -110,7 +112,7 @@
 
 **Artifact Display**:
 - **Grid View**: Cards in 3-column responsive layout
-  - Card shows: name, type badge, description, tags, action menu
+  - Card shows: name, type badge, description, group badges (colored), source labels with GitHub links, alphabetically sorted tags, action menu
   - Collection badge (when viewing "All Collections")
   - Click to open detail modal
 
@@ -506,25 +508,78 @@
 
 **Path**: `/app/groups/page.tsx`
 
-**Purpose**: Browse artifacts organized by groups across all collections
+**Purpose**: Browse and manage artifacts organized by groups with drag-and-drop support
 
 **Key UI Elements**:
 
-**Group Selector**:
-- Dropdown to select collection
-- Dropdown to select group within collection
-- Group info display
+**Two-Pane Layout**:
 
-**Artifact Grid**:
-- All artifacts in selected group
-- Same card layout as collection view
-- Click to view detail
-- Action menu per artifact
+**GroupSidebar** (280px fixed left pane):
+- 'All Artifacts' virtual item (displays all ungrouped artifacts)
+- 'Ungrouped' virtual item (displays unassigned artifacts)
+- Separator
+- Group items with:
+  - Custom color indicator dot
+  - Type icon
+  - Group name
+  - Artifact count badge
+- 'Create Group' button (opens GroupFormDialog)
+- 'Manage' button (navigates to /groups/manage)
+
+**ArtifactPane** (flex-1 right pane):
+- **PaneHeader**:
+  - Selected group name
+  - Artifact count in group
+  - Refresh button
+- **RemoveFromGroupDropZone** (conditional, shows when group selected):
+  - Drop zone for removing artifacts from group
+  - Visual feedback on hover
+- **MiniArtifactCard Grid**:
+  - Responsive grid of compact artifact cards
+  - Draggable cards (drag to sidebar to add to group)
+  - Quick view/edit/delete actions
+  - Empty state: "No artifacts in this group"
+
+**Group Management Hub** (/groups/manage):
+- Card-based grid layout of GroupCard components
+- GroupCard displays:
+  - Group color indicator
+  - Group icon
+  - Group name
+  - Artifact count
+  - Edit/Delete buttons
+- 'Create Group' button (top right)
+- GroupFormDialog for create/edit with:
+  - Group name input
+  - Custom color picker (compact palette)
+  - Icon selection
+  - Description text field
+- GroupDeleteDialog for confirmation with artifact count warning
+
+**Group Metadata**:
+- Custom color (compact picker with predefined palette)
+- Icon selection (dropdown or icon picker)
+- Description field (markdown support)
+
+**Drag & Drop Interactions**:
+- **Add to Group**: Drag artifact card from ArtifactPane to group in sidebar
+- **Remove from Group**: Drag artifact card to RemoveFromGroupDropZone (only visible when group selected)
+- **Animations** (DndAnimations component):
+  - Pickup scale animation
+  - Drop settle animation
+  - Poof effect on remove
+  - Particle effects on drop
+  - Ghost pulse during drag
+  - Drop target pulse on hover
+  - Remove zone breathe animation
 
 **Features**:
+- Visual group organization with color coding
 - Quick group navigation
+- One-click group management
+- Drag-and-drop artifact assignment
+- Smooth, polished animations
 - Cross-collection group browsing
-- Same filtering/sorting as collection view
 
 ---
 
@@ -868,6 +923,8 @@
 | Add to Group Dialog | `collection/add-to-group-dialog.tsx` | Assign artifacts to groups |
 | Manage Groups Dialog | `collection/manage-groups-dialog.tsx` | Manage collection groups |
 | Copy Group Dialog | `collection/copy-group-dialog.tsx` | Duplicate group configuration |
+| GroupFormDialog | `groups/group-form-dialog.tsx` | Create/edit group with color, icon, description |
+| GroupDeleteDialog | `groups/group-delete-dialog.tsx` | Confirm group deletion with artifact count warning |
 | Deploy Dialog | `collection/deploy-dialog.tsx` | Deploy artifacts to project |
 
 ### Entity-Related Dialogs
@@ -1119,7 +1176,7 @@
 ### Artifacts Router (`/api/v1/artifacts`)
 
 **Core CRUD**:
-- `GET /` - List artifacts (paginated)
+- `GET /` - List artifacts (paginated, supports collection_id query parameter for filtering)
 - `POST /` - Create artifact
 - `GET /{artifact_id}` - Get artifact details
 - `PUT /{artifact_id}` - Update artifact
@@ -1188,15 +1245,19 @@
 
 **Management**:
 - `GET /` - List groups
-- `POST /` - Create group
+- `POST /` - Create group (with optional color, icon, description)
 - `GET /{group_id}` - Get group details
-- `PUT /{group_id}` - Update group
+- `PUT /{group_id}` - Update group (supports color, icon, description fields)
 - `DELETE /{group_id}` - Delete group
 
 **Group Artifacts**:
 - `GET /{group_id}/artifacts` - List group artifacts
 - `POST /{group_id}/artifacts/{artifact_id}` - Add artifact
 - `DELETE /{group_id}/artifacts/{artifact_id}` - Remove artifact
+
+**Schemas**:
+- `GroupCreateRequest` - Includes optional color, icon, and description fields
+- `GroupUpdateRequest` - Includes optional color, icon, and description fields
 
 ### Projects Router (`/api/v1/projects`)
 

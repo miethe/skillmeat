@@ -1,16 +1,20 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useState, useCallback, useEffect } from 'react';
-import { Layers, FolderOpen, X, FolderSearch, Library, Settings } from 'lucide-react';
-import { useCollectionContext, useGroup } from '@/hooks';
-import { GroupArtifactGrid } from './group-artifact-grid';
-import { GroupSelector } from './group-selector';
+import { useState, useEffect, useMemo } from 'react';
+import { FolderSearch, Library } from 'lucide-react';
+import { useCollectionContext, useGroups } from '@/hooks';
 import { CollectionSwitcher } from '@/components/collection/collection-switcher';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ManageGroupsDialog } from '@/components/collection/manage-groups-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CopyGroupDialog } from '@/components/collection/copy-group-dialog';
+import { GroupCard } from './group-card';
+import { GroupDeleteDialog } from './group-delete-dialog';
+import { GroupDetailsModal } from './group-details-modal';
+import { GroupFormDialog } from './group-form-dialog';
+import { GroupsToolbar, type GroupSortField } from './groups-toolbar';
+import type { Group } from '@/types/groups';
 
 /**
  * Groups Page Client Component
@@ -53,70 +57,87 @@ export function GroupsPageClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Get selected group from URL params
-  const groupId = searchParams.get('group');
   const collectionId = searchParams.get('collection');
-
-  // Fetch group details when a group is selected
-  const { data: selectedGroup } = useGroup(groupId ?? undefined);
 
   // Access collection context for collection-aware operations
   const { selectedCollectionId, collections, isLoadingCollections } = useCollectionContext();
 
-  // Handler to update URL when group selection changes
-  // The collection ID is maintained by the CollectionSwitcher via context
-  const handleGroupSelect = useCallback(
-    (newGroupId: string | null) => {
-      const params = new URLSearchParams(searchParams.toString());
-
-      if (newGroupId) {
-        params.set('group', newGroupId);
-      } else {
-        params.delete('group');
-      }
-
-      // Ensure collection is in URL if we have one selected
-      if (selectedCollectionId) {
-        params.set('collection', selectedCollectionId);
-      }
-
-      router.push(`/groups?${params.toString()}`);
-    },
-    [searchParams, router, selectedCollectionId]
-  );
-
-  // Handler to clear selection
-  const handleClearSelection = useCallback(() => {
-    router.push('/groups');
-  }, [router]);
-
   // Derive collection ID to use (URL param takes precedence, then context)
   const effectiveCollectionId = collectionId || selectedCollectionId;
   const hasCollections = collections.length > 0;
+  const { data: groupsData, isLoading: isLoadingGroups } = useGroups(effectiveCollectionId || undefined);
+  const groups = groupsData?.groups ?? [];
 
-  const [manageGroupsOpen, setManageGroupsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<GroupSortField>('name');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<Group | null>(null);
+  const [copyingGroup, setCopyingGroup] = useState<Group | null>(null);
+  const [detailsGroup, setDetailsGroup] = useState<Group | null>(null);
 
   // Sync URL with collection context changes
-  // When collection changes via CollectionSwitcher, update URL and clear group
   useEffect(() => {
     if (selectedCollectionId && selectedCollectionId !== collectionId) {
       const params = new URLSearchParams(searchParams.toString());
       params.set('collection', selectedCollectionId);
-      // Clear group when collection changes
-      params.delete('group');
       router.push(`/groups?${params.toString()}`);
     }
   }, [selectedCollectionId, collectionId, searchParams, router]);
 
+  const availableTags = useMemo(() => {
+    const tags = new Set<string>();
+    for (const group of groups) {
+      for (const tag of group.tags ?? []) {
+        tags.add(tag);
+      }
+    }
+    return Array.from(tags).sort();
+  }, [groups]);
+
+  const filteredGroups = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    const filtered = groups.filter((group) => {
+      if (selectedTag && !(group.tags ?? []).includes(selectedTag)) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      const haystack = [
+        group.name,
+        group.description ?? '',
+        ...(group.tags ?? []),
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      return haystack.includes(normalizedSearch);
+    });
+
+    return filtered.sort((a, b) => {
+      if (sort === 'updated_at') {
+        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      }
+      if (sort === 'artifact_count') {
+        return b.artifact_count - a.artifact_count;
+      }
+      // Default: alphabetical by name (case-insensitive)
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+  }, [groups, search, selectedTag, sort]);
+
   return (
     <div className="space-y-6">
-      {/* Collection and Group Selector Toolbar */}
+      {/* Collection Selector */}
       <div
         className="flex flex-wrap items-center gap-4 rounded-lg border bg-card p-4"
         role="region"
-        aria-label="Group selector"
+        aria-label="Collection selector"
       >
-        {/* Collection Selector */}
         <div className="flex items-center gap-2">
           <Library className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
           <span className="text-sm font-medium text-muted-foreground">Collection:</span>
@@ -128,30 +149,21 @@ export function GroupsPageClient() {
             <span className="text-sm text-muted-foreground">No collections available</span>
           )}
         </div>
-
-        {/* Group Selector - only show when collection is selected */}
-        {effectiveCollectionId && (
-          <div className="flex items-center gap-2">
-            <Layers className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-            <span className="text-sm font-medium text-muted-foreground">Group:</span>
-            <GroupSelector
-              collectionId={effectiveCollectionId}
-              selectedGroupId={groupId}
-              onGroupSelect={handleGroupSelect}
-            />
-          </div>
-        )}
-
-        {/* Manage Groups Link */}
-        {effectiveCollectionId && (
-          <div className="ml-auto">
-            <Button variant="ghost" size="sm" onClick={() => setManageGroupsOpen(true)}>
-              <Settings className="mr-1 h-4 w-4" aria-hidden="true" />
-              Manage Groups
-            </Button>
-          </div>
-        )}
       </div>
+
+      {effectiveCollectionId && (
+        <GroupsToolbar
+          search={search}
+          onSearchChange={setSearch}
+          sort={sort}
+          onSortChange={setSort}
+          selectedTag={selectedTag}
+          onSelectedTagChange={setSelectedTag}
+          availableTags={availableTags}
+          onCreate={() => setCreateOpen(true)}
+          disabled={isLoadingGroups}
+        />
+      )}
 
       {/* Content Area - conditional rendering based on state */}
       {!hasCollections && !isLoadingCollections ? (
@@ -173,72 +185,85 @@ export function GroupsPageClient() {
           title="Select a collection"
           description="Choose a collection from the dropdown above to browse its groups."
         />
-      ) : groupId && collectionId ? (
-        // Group is selected - show artifacts
-        <div className="space-y-4">
-          {/* Group header with name and clear button */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FolderOpen className="h-5 w-5 text-primary" aria-hidden="true" />
-              <span className="font-medium">
-                {selectedGroup?.name ?? (
-                  <code className="rounded bg-muted px-2 py-1 text-sm">{groupId}</code>
-                )}
-              </span>
-              {selectedGroup?.description && (
-                <span className="hidden text-sm text-muted-foreground md:inline">
-                  - {selectedGroup.description}
-                </span>
-              )}
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClearSelection}
-              className="text-muted-foreground hover:text-foreground"
-              aria-label="Clear group selection"
-            >
-              <X className="mr-1 h-4 w-4" aria-hidden="true" />
-              Clear
-            </Button>
-          </div>
-
-          {/* Artifact grid */}
-          <GroupArtifactGrid groupId={groupId} collectionId={collectionId} />
-        </div>
-      ) : groupId && !collectionId ? (
-        // Group selected but no collection - error state
-        <EmptyState
-          icon={Layers}
-          title="Collection not specified"
-          description="Please select a collection along with the group to view its artifacts."
-          action={
-            <Button variant="outline" onClick={handleClearSelection}>
-              Start over
-            </Button>
-          }
-        />
       ) : (
-        // Collection selected but no group
-        <EmptyState
-          icon={Layers}
-          title="Select a group"
-          description="Use the group dropdown above to browse artifacts organized by group within this collection."
-          action={
-            <Button variant="outline" asChild>
-              <Link href={`/collection?collection=${effectiveCollectionId}`}>Go to Collection</Link>
-            </Button>
-          }
+        <div className="space-y-4">
+          {isLoadingGroups ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Skeleton key={i} className="h-48 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : filteredGroups.length === 0 ? (
+            <EmptyState
+              icon={FolderSearch}
+              title={groups.length === 0 ? 'No groups yet' : 'No matching groups'}
+              description={
+                groups.length === 0
+                  ? 'Create your first group to organize artifacts in this collection.'
+                  : 'Try adjusting search or tag filters.'
+              }
+              action={
+                <Button onClick={() => setCreateOpen(true)} disabled={!effectiveCollectionId}>
+                  New Group
+                </Button>
+              }
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {filteredGroups.map((group) => (
+                <GroupCard
+                  key={group.id}
+                  group={group}
+                  onOpenDetails={setDetailsGroup}
+                  onEdit={setEditingGroup}
+                  onDelete={setDeletingGroup}
+                  onCopy={setCopyingGroup}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {effectiveCollectionId && (
+        <GroupFormDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          collectionId={effectiveCollectionId}
+          defaultPosition={groups.length}
         />
       )}
 
       {effectiveCollectionId && (
-        <ManageGroupsDialog
-          open={manageGroupsOpen}
-          onOpenChange={setManageGroupsOpen}
+        <GroupFormDialog
+          open={!!editingGroup}
+          onOpenChange={(open) => !open && setEditingGroup(null)}
           collectionId={effectiveCollectionId}
+          group={editingGroup}
         />
       )}
+
+      <GroupDeleteDialog
+        open={!!deletingGroup}
+        onOpenChange={(open) => !open && setDeletingGroup(null)}
+        group={deletingGroup}
+      />
+
+      {copyingGroup && (
+        <CopyGroupDialog
+          open={!!copyingGroup}
+          onOpenChange={(open) => !open && setCopyingGroup(null)}
+          group={copyingGroup}
+          sourceCollectionId={copyingGroup.collection_id}
+          onSuccess={() => setCopyingGroup(null)}
+        />
+      )}
+
+      <GroupDetailsModal
+        open={!!detailsGroup}
+        onOpenChange={(open) => !open && setDetailsGroup(null)}
+        group={detailsGroup}
+      />
     </div>
   );
 }

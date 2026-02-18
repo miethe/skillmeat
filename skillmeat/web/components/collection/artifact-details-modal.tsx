@@ -42,6 +42,7 @@ import {
   Trash2,
   Rocket,
   AlertCircle,
+  Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -71,11 +72,11 @@ import {
   useToast,
   useSources,
   useTags,
-  useUpdateArtifactTags,
   useProjects,
   deploymentKeys,
 } from '@/hooks';
-import { TagEditor } from '@/components/shared/tag-editor';
+import { TagSelectorPopover } from '@/components/collection/tag-selector-popover';
+import { getTagColor } from '@/lib/utils/tag-colors';
 import type { FileListResponse, FileContentResponse } from '@/types/files';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
 import { DeployDialog } from '@/components/collection/deploy-dialog';
@@ -492,7 +493,6 @@ export function ArtifactDetailsModal({
   const [activeTab, setActiveTab] = useState<ArtifactDetailsTab>(initialTab);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [showLinkingDialog, setShowLinkingDialog] = useState(false);
-  const [localTags, setLocalTags] = useState<string[] | null>(null);
 
   // Source entry state for Sources tab
   const [sourceEntry, setSourceEntry] = useState<{
@@ -562,46 +562,8 @@ export function ArtifactDetailsModal({
     }
   }, [effectiveReturnTo, router]);
 
-  // Fetch tags for autocomplete
-  const { data: tagsData, isLoading: isTagsLoading } = useTags(100);
-  const availableTags = useMemo(() => {
-    if (!tagsData?.items) return [];
-    return tagsData.items.map((tag) => tag.name);
-  }, [tagsData]);
-
-  // Tag update mutation
-  const { mutate: updateTags, isPending: isUpdatingTags } = useUpdateArtifactTags();
-
-  // Handle tags change
-  const handleTagsChange = useCallback(
-    (newTags: string[]) => {
-      if (!artifact) return;
-
-      setLocalTags(newTags);
-
-      updateTags(
-        { artifactId: artifact.id, tags: newTags },
-        {
-          onSuccess: () => {
-            toast({
-              title: 'Tags updated',
-              description: 'Artifact tags have been updated.',
-            });
-            queryClient.invalidateQueries({ queryKey: ['artifacts'] });
-          },
-          onError: (error) => {
-            setLocalTags(null);
-            toast({
-              title: 'Failed to update tags',
-              description: error instanceof Error ? error.message : 'Unknown error',
-              variant: 'destructive',
-            });
-          },
-        }
-      );
-    },
-    [artifact, updateTags, toast, queryClient]
-  );
+  // Fetch tags (for display purposes, TagSelectorPopover handles its own data)
+  const { isLoading: isTagsLoading } = useTags(100);
 
   // Fetch marketplace sources for Sources tab
   const { data: sourcesData } = useSources(100);
@@ -1095,13 +1057,28 @@ export function ArtifactDetailsModal({
                     <Tag className="h-4 w-4" />
                     Tags
                   </h3>
-                  <TagEditor
-                    tags={localTags ?? artifact.tags ?? []}
-                    onTagsChange={handleTagsChange}
-                    availableTags={availableTags}
-                    isLoading={isTagsLoading || isUpdatingTags}
-                    disabled={isUpdatingTags}
-                  />
+                  {isTagsLoading ? (
+                    <div className="flex items-center gap-1">
+                      <div className="h-5 w-16 animate-pulse rounded-md bg-muted" />
+                      <div className="h-5 w-12 animate-pulse rounded-md bg-muted" />
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {[...(artifact.tags ?? [])].sort((a, b) => a.localeCompare(b)).map((tag) => (
+                        <Badge key={tag} colorStyle={getTagColor(tag)} className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                      <TagSelectorPopover
+                        artifactId={artifact.id}
+                        trigger={
+                          <Button variant="outline" size="sm" className="h-6 w-6 rounded-full p-0">
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Aliases */}

@@ -60,9 +60,6 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
     });
   };
 
-  // Determine if we're in a specific collection context (not "All Collections")
-  const isSpecificCollectionContext = selectedCollectionId && selectedCollectionId !== 'all';
-
   return (
     <div className="space-y-4">
       {/* Search */}
@@ -78,9 +75,7 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
 
       {/* Filter Controls */}
       <div
-        className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${
-          isSpecificCollectionContext ? 'lg:grid-cols-7' : 'lg:grid-cols-6'
-        }`}
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-7"
       >
         {/* Type Filter */}
         <div>
@@ -147,8 +142,8 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
           </Select>
         </div>
 
-        {/* Group Filter - Only show in specific collection context */}
-        {isSpecificCollectionContext && selectedCollectionId && (
+        {/* Group Filter - Always visible; requires a collection context to fetch groups */}
+        {selectedCollectionId && selectedCollectionId !== 'all' && (
           <div>
             <label htmlFor="group-filter" className="mb-1.5 block text-sm font-medium">
               Group

@@ -69,7 +69,7 @@ export function BundlePreview({ preview, className }: BundlePreviewProps) {
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Tags</p>
               <div className="flex flex-wrap gap-1">
-                {preview.bundle.metadata.tags.map((tag) => (
+                {[...preview.bundle.metadata.tags].sort((a, b) => a.localeCompare(b)).map((tag) => (
                   <Badge key={tag} variant="secondary">
                     {tag}
                   </Badge>

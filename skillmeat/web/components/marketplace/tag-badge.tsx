@@ -159,8 +159,9 @@ export function TagBadge({ tags, maxDisplay = 3, onTagClick, className }: TagBad
     return null;
   }
 
-  const visibleTags = tags.slice(0, maxDisplay);
-  const hiddenTags = tags.slice(maxDisplay);
+  const sortedTags = [...tags].sort((a, b) => a.localeCompare(b));
+  const visibleTags = sortedTags.slice(0, maxDisplay);
+  const hiddenTags = sortedTags.slice(maxDisplay);
   const hasOverflow = hiddenTags.length > 0;
 
   return (

@@ -825,6 +825,9 @@ class Group(Base):
         collection_id: Foreign key to collections.id (NOT NULL)
         name: Group name (1-255 characters, unique per collection)
         description: Optional detailed description
+        tags_json: JSON-serialized list of group-local tags
+        color: Visual accent token for group cards
+        icon: Icon token for group cards
         position: Display order within collection (0-based, default 0)
         created_at: Timestamp when group was created
         updated_at: Timestamp when group was last modified
@@ -852,6 +855,27 @@ class Group(Base):
     # Core fields
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tags_json: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default="[]",
+        server_default="[]",
+        comment="JSON-serialized list of group-local tags",
+    )
+    color: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="slate",
+        server_default="slate",
+        comment="Visual accent token for group card rendering",
+    )
+    icon: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="layers",
+        server_default="layers",
+        comment="Icon token for group card rendering",
+    )
     position: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
@@ -904,11 +928,28 @@ class Group(Base):
             "collection_id": self.collection_id,
             "name": self.name,
             "description": self.description,
+            "tags": self.get_tags_list(),
+            "color": self.color,
+            "icon": self.icon,
             "position": self.position,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "artifact_count": 0,  # Will be populated when artifacts relationship exists
         }
+
+    def get_tags_list(self) -> List[str]:
+        """Parse and return group-local tags as a list."""
+        if not self.tags_json:
+            return []
+        try:
+            parsed = json.loads(self.tags_json)
+        except json.JSONDecodeError:
+            return []
+        return parsed if isinstance(parsed, list) else []
+
+    def set_tags_list(self, tags: List[str]) -> None:
+        """Persist group-local tags from a list as JSON text."""
+        self.tags_json = json.dumps(tags or [])
 
 
 class GroupArtifact(Base):

@@ -25,3 +25,5 @@ export { CollectionToolbar } from './collection-toolbar';
 export { GroupedArtifactView } from './grouped-artifact-view';
 export { ArtifactBrowseCard, ArtifactBrowseCardSkeleton } from './artifact-browse-card';
 export type { ArtifactBrowseCardProps } from './artifact-browse-card';
+export { ArtifactGroupBadges } from './artifact-group-badges';
+export type { ArtifactGroupBadgesProps } from './artifact-group-badges';

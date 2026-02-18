@@ -63,6 +63,7 @@
 
 import {
   useQuery,
+  useQueries,
   useMutation,
   useQueryClient,
   type UseQueryResult,
@@ -129,15 +130,15 @@ interface ApiGroupListResponse {
 /**
  * Fetch groups for a specific collection.
  *
- * Retrieves all groups belonging to a collection, sorted by position for
- * consistent display ordering. Uses the `GET /api/v1/groups?collection_id={id}`
+ * Retrieves all groups belonging to a collection, sorted alphabetically by
+ * name (case-insensitive) for consistent display ordering. Uses the `GET /api/v1/groups?collection_id={id}`
  * endpoint.
  *
  * @param collectionId - The collection ID to fetch groups for. When undefined,
  *   the query is disabled and returns undefined data.
  *
  * @returns TanStack Query result containing:
- *   - `data.groups`: Array of Group objects sorted by position (ascending)
+ *   - `data.groups`: Array of Group objects sorted alphabetically by name
  *   - `data.total`: Total count of groups in the collection
  *   - Standard query states: `isLoading`, `isError`, `error`, `refetch`, etc.
  *
@@ -162,7 +163,7 @@ interface ApiGroupListResponse {
  *   if (isLoading) return <Skeleton />;
  *   if (isError) return <ErrorMessage error={error} />;
  *
- *   // data.groups is already sorted by position
+ *   // data.groups is already sorted alphabetically by name
  *   return (
  *     <div>
  *       {data.groups.map(group => (
@@ -200,8 +201,10 @@ export function useGroups(
         const params = new URLSearchParams({ collection_id: collectionId });
         const response = await apiRequest<ApiGroupListResponse>(`/groups?${params.toString()}`);
 
-        // Sort by position to ensure consistent ordering
-        const sortedGroups = [...response.groups].sort((a, b) => a.position - b.position);
+        // Sort alphabetically by name (case-insensitive) for consistent ordering
+        const sortedGroups = [...response.groups].sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        );
 
         return {
           groups: sortedGroups,
@@ -352,6 +355,9 @@ export function useCreateGroup(): UseMutationResult<Group, Error, CreateGroupReq
             collection_id: data.collection_id,
             name: data.name,
             description: data.description,
+            tags: data.tags ?? [],
+            color: data.color ?? 'slate',
+            icon: data.icon ?? 'layers',
             position: data.position ?? 0,
             artifact_count: 0,
             created_at: new Date().toISOString(),
@@ -583,6 +589,8 @@ export function useAddArtifactToGroup(): UseMutationResult<
       // Invalidate group artifacts and detail to update artifact_count
       queryClient.invalidateQueries({ queryKey: groupKeys.artifacts(groupId) });
       queryClient.invalidateQueries({ queryKey: groupKeys.detail(groupId) });
+      // Invalidate all group lists so counts update in filters/dialogs
+      queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
       // Cross-hook invalidation: artifact's group membership has changed
       // This ensures useArtifactGroups queries reflect the new membership
       queryClient.invalidateQueries({ queryKey: artifactGroupKeys.all });
@@ -640,6 +648,8 @@ export function useRemoveArtifactFromGroup(): UseMutationResult<
       // Invalidate group artifacts and detail to update artifact_count
       queryClient.invalidateQueries({ queryKey: groupKeys.artifacts(groupId) });
       queryClient.invalidateQueries({ queryKey: groupKeys.detail(groupId) });
+      // Invalidate all group lists so counts update in filters/dialogs
+      queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
       // Cross-hook invalidation: artifact's group membership has changed
       // This ensures useArtifactGroups queries reflect the removal
       queryClient.invalidateQueries({ queryKey: artifactGroupKeys.all });
@@ -782,6 +792,8 @@ export function useMoveArtifactToGroup(): UseMutationResult<
       queryClient.invalidateQueries({ queryKey: groupKeys.artifacts(targetGroupId) });
       queryClient.invalidateQueries({ queryKey: groupKeys.detail(sourceGroupId) });
       queryClient.invalidateQueries({ queryKey: groupKeys.detail(targetGroupId) });
+      // Invalidate all group lists so counts update in filters/dialogs
+      queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
       // Cross-hook invalidation: artifact's group membership has changed
       // Moving between groups changes which groups the artifact belongs to
       queryClient.invalidateQueries({ queryKey: artifactGroupKeys.all });
@@ -841,6 +853,9 @@ export function useCopyGroup(): UseMutationResult<
             collection_id: targetCollectionId,
             name: 'Copied Group',
             description: undefined,
+            tags: [],
+            color: 'slate',
+            icon: 'layers',
             position: 0,
             artifact_count: 0,
             created_at: new Date().toISOString(),
@@ -860,4 +875,59 @@ export function useCopyGroup(): UseMutationResult<
       queryClient.invalidateQueries({ queryKey: artifactGroupKeys.all });
     },
   });
+}
+
+/**
+ * Fetch artifacts for multiple groups using useQueries (safe for dynamic arrays).
+ *
+ * This hook is designed for cases where you need to fetch artifacts for a variable
+ * number of groups without violating React's rules of hooks. Unlike calling
+ * `useGroupArtifacts` in a loop, this approach maintains a stable hook count
+ * regardless of how many groups exist.
+ *
+ * @param groupIds - Array of group IDs to fetch artifacts for
+ * @returns Array of objects with groupId and corresponding query result
+ *
+ * @example
+ * ```tsx
+ * const groupIds = groups.map(g => g.id);
+ * const results = useGroupsArtifacts(groupIds);
+ *
+ * results.forEach(({ groupId, query }) => {
+ *   if (query.data) {
+ *     console.log(`Group ${groupId} has ${query.data.length} artifacts`);
+ *   }
+ * });
+ * ```
+ */
+export function useGroupsArtifacts(
+  groupIds: string[]
+): { groupId: string; query: UseQueryResult<GroupArtifact[], Error> }[] {
+  const results = useQueries({
+    queries: groupIds.map((groupId) => ({
+      queryKey: groupKeys.artifacts(groupId),
+      queryFn: async (): Promise<GroupArtifact[]> => {
+        try {
+          const group = await apiRequest<GroupWithArtifacts>(`/groups/${groupId}`);
+          const artifacts = group.artifacts ?? [];
+          return [...artifacts].sort((a, b) => a.position - b.position);
+        } catch (error) {
+          if (USE_MOCKS) {
+            console.warn(`[groups] Failed to fetch artifacts for group ${groupId}`, error);
+            return [];
+          }
+          throw error;
+        }
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes (browsing)
+      enabled: !!groupId,
+    })),
+  });
+
+  // Results array is guaranteed to have same length as groupIds since useQueries
+  // returns one result per query in the same order
+  return groupIds.map((groupId, index) => ({
+    groupId,
+    query: results[index] as UseQueryResult<GroupArtifact[], Error>,
+  }));
 }

@@ -21,6 +21,18 @@ export type GroupCreateRequest = {
    */
   description?: string | null;
   /**
+   * Group-local tags used for categorization and filtering
+   */
+  tags?: Array<string>;
+  /**
+   * Visual color token or custom HEX color for group card accents
+   */
+  color?: string;
+  /**
+   * Icon token used for group display
+   */
+  icon?: 'layers' | 'folder' | 'tag' | 'sparkles' | 'book' | 'wrench';
+  /**
    * Display order within collection (0-based)
    */
   position?: number;

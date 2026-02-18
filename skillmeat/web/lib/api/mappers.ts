@@ -94,6 +94,7 @@ export interface ArtifactResponse {
   scope?: string;
   collection?: { id: string; name: string } | string;
   collections?: Array<{ id: string; name: string; artifact_count?: number }>;
+  groups?: Array<{ id: string; name: string; position?: number }> | null;
   project_path?: string;
 
   // Source & Origin
@@ -349,6 +350,7 @@ export function mapApiResponseToArtifact(
     scope,
     ...(collectionName && { collection: collectionName }),
     ...(collections && { collections }),
+    ...(response.groups && response.groups.length > 0 && { groups: response.groups }),
     ...(context === 'project' && response.project_path && { projectPath: response.project_path }),
 
     // Metadata (flattened)

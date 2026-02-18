@@ -26,12 +26,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { getSourceDisplay } from '@/lib/source-utils';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 import { getArtifactTypeConfig } from '@/types/artifact';
 import { Tool } from '@/types/enums';
 import { ScoreBadge } from '@/components/ScoreBadge';
 import { PlatformBadge } from '@/components/platform-badge';
+import { ArtifactGroupBadges } from '@/components/collection/artifact-group-badges';
+import { TagSelectorPopover } from '@/components/collection/tag-selector-popover';
+import { useTags } from '@/hooks';
+import { getTagColor } from '@/lib/utils/tag-colors';
 
 /**
  * Props for ArtifactBrowseCard component
@@ -54,6 +60,12 @@ export interface ArtifactBrowseCardProps {
 
   /** Handler for deleting artifact */
   onDelete?: (artifact: Artifact) => void;
+
+  /** Handler when a tag badge is clicked (for filtering) */
+  onTagClick?: (tagName: string) => void;
+
+  /** Handler when a group badge is clicked (for filtering) */
+  onGroupClick?: (groupId: string) => void;
 
   /** Whether to show collection badge (All Collections view) */
   showCollectionBadge?: boolean;
@@ -133,11 +145,32 @@ export function ArtifactBrowseCard({
   onAddToGroup,
   onViewDetails,
   onDelete,
+  onTagClick,
+  onGroupClick,
   showCollectionBadge = false,
   onCollectionClick,
   className,
 }: ArtifactBrowseCardProps) {
   const config = getArtifactTypeConfig(artifact.type);
+
+  // Fetch all tags to build a name->color map from DB
+  const { data: allTagsResponse } = useTags(100);
+  const dbTagColorMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    if (allTagsResponse?.items) {
+      for (const tag of allTagsResponse.items) {
+        if (tag.color) {
+          map.set(tag.name, tag.color);
+        }
+      }
+    }
+    return map;
+  }, [allTagsResponse?.items]);
+
+  /** Resolve tag color: prefer DB color, fall back to hash-based color */
+  const resolveTagColor = (tagName: string): string => {
+    return dbTagColorMap.get(tagName) || getTagColor(tagName);
+  };
 
   // Get the icon component from Lucide
   const iconName = config?.icon ?? 'FileText';
@@ -149,11 +182,16 @@ export function ArtifactBrowseCard({
   // Extract tools and display tags
   const tools = extractToolsFromTags(artifact.tags);
   const displayTags = extractDisplayTags(artifact.tags);
-  const visibleTags = displayTags.slice(0, 3);
-  const remainingTagsCount = displayTags.length - visibleTags.length;
+  const sortedDisplayTags = [...displayTags].sort((a, b) => a.localeCompare(b));
+  const visibleTags = sortedDisplayTags.slice(0, 3);
+  const remainingTagsCount = sortedDisplayTags.length - visibleTags.length;
 
-  // Determine author/source display
-  const authorDisplay = artifact.author || artifact.source?.split('/')[0] || 'Unknown';
+  // Determine source display info
+  const sourceDisplay = getSourceDisplay(artifact);
+  const authorDisplay =
+    artifact.author ||
+    (sourceDisplay.type === 'github' ? sourceDisplay.displayName : null) ||
+    (sourceDisplay.type === 'local' ? 'Local' : 'Unknown');
 
   // Check deployment count
   const deploymentCount = artifact.deployments?.length ?? 0;
@@ -221,9 +259,23 @@ export function ArtifactBrowseCard({
               <h3 className="truncate font-semibold leading-tight" title={artifact.name}>
                 {artifact.name}
               </h3>
-              <p className="truncate text-sm text-muted-foreground" title={authorDisplay}>
-                {authorDisplay}
-              </p>
+              {sourceDisplay.type === 'github' ? (
+                <a
+                  href={sourceDisplay.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 truncate text-sm text-blue-600 hover:underline dark:text-blue-400"
+                  title={sourceDisplay.displayName}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <LucideIcons.Github className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+                  <span className="truncate">{sourceDisplay.displayName}</span>
+                </a>
+              ) : (
+                <p className="truncate text-sm text-muted-foreground" title={authorDisplay}>
+                  {authorDisplay}
+                </p>
+              )}
             </div>
           </div>
 
@@ -344,7 +396,19 @@ export function ArtifactBrowseCard({
         aria-label="Tags"
       >
         {visibleTags.map((tag) => (
-          <Badge key={tag} variant="secondary" className="text-xs" role="listitem">
+          <Badge
+            key={tag}
+            colorStyle={resolveTagColor(tag)}
+            className={cn(
+              'text-xs',
+              onTagClick && 'cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all'
+            )}
+            role="listitem"
+            onClick={onTagClick ? (e) => {
+              e.stopPropagation();
+              onTagClick(tag);
+            } : undefined}
+          >
             {tag}
           </Badge>
         ))}
@@ -357,6 +421,30 @@ export function ArtifactBrowseCard({
             +{remainingTagsCount} more
           </Badge>
         )}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <TagSelectorPopover
+                  artifactId={artifact.id}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 rounded-full"
+                      aria-label="Add tags"
+                    >
+                      <LucideIcons.Plus className="h-3 w-3" />
+                    </Button>
+                  }
+                />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Add Tags</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {/* Target Platforms */}
@@ -371,6 +459,16 @@ export function ArtifactBrowseCard({
           </Badge>
         )}
       </div>
+
+      {/* Group badges */}
+      <ArtifactGroupBadges
+        artifactId={artifact.id}
+        collectionId={artifact.collections?.[0]?.id}
+        maxVisible={3}
+        onAddToGroup={onAddToGroup}
+        onGroupClick={onGroupClick}
+        className="mt-auto px-3 pb-1"
+      />
 
       {/* Footer: Tools, Deployed Badge, Score */}
       <div className="flex items-center justify-between border-t px-4 py-3">

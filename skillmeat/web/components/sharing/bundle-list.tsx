@@ -116,7 +116,7 @@ export function BundleList({ filter = 'all' }: BundleListProps) {
 
                       {bundle.metadata?.tags && bundle.metadata.tags.length > 0 && (
                         <div className="mb-3 flex flex-wrap gap-1">
-                          {bundle.metadata.tags.slice(0, 3).map((tag) => (
+                          {[...bundle.metadata.tags].sort((a, b) => a.localeCompare(b)).slice(0, 3).map((tag) => (
                             <Badge key={tag} variant="outline" className="text-xs">
                               {tag}
                             </Badge>

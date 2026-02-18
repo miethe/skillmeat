@@ -239,12 +239,16 @@ export async function fetchCollectionArtifactsPaginated(
     limit?: number;
     after?: string;
     artifact_type?: string;
+    group_id?: string;
+    include_groups?: boolean;
   }
 ): Promise<CollectionArtifactsPaginatedResponse> {
   const params = new URLSearchParams();
   if (options?.limit) params.set('limit', options.limit.toString());
   if (options?.after) params.set('after', options.after);
   if (options?.artifact_type) params.set('artifact_type', options.artifact_type);
+  if (options?.group_id) params.set('group_id', options.group_id);
+  if (options?.include_groups) params.set('include_groups', 'true');
 
   const queryString = params.toString();
   const path = queryString
