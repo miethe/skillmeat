@@ -4,7 +4,7 @@ description: "Phased implementation plan for relational model enabling many-to-m
 audience: [ai-agents, developers]
 tags: [implementation, planning, phases, composite-artifacts, database, api, frontend]
 created: 2026-02-17
-updated: 2026-02-17
+updated: 2026-02-18
 category: "product-planning"
 status: draft
 related:
@@ -20,22 +20,23 @@ related:
 **Related Documents**:
 - **PRD**: `/docs/project_plans/PRDs/features/composite-artifact-infrastructure-v1.md`
 - **Design Spec**: `/docs/project_plans/design-specs/composite-artifact-infrastructure.md`
+- **ADR-007**: `/docs/dev/architecture/decisions/ADR-007-artifact-uuid-identity.md`
 
 **Complexity**: Large (L)
-**Total Estimated Effort**: 35 story points across 4 phases
-**Target Timeline**: 12-14 days (3-4 weeks at 1 FTE backend + 1 FTE frontend)
+**Total Estimated Effort**: 47 story points across 4 phases
+**Target Timeline**: 14-18 days (3-4 weeks at 1 FTE backend + 1 FTE frontend)
 
 ---
 
 ## Executive Summary
 
-This implementation plan outlines the phased rollout of the Composite Artifact Infrastructure feature. We will introduce collection-scoped composite entities plus membership metadata that enables Plugins to reference atomic artifacts (Skills, Commands, Agents, etc.) without mutating those artifact records.
+This implementation plan outlines the phased rollout of the Composite Artifact Infrastructure feature. We will introduce a `COMPOSITE` value in the `ArtifactType` enum alongside a `CompositeType` enum (with `PLUGIN` as the first composite type), UUID-backed FK membership via ADR-007, and deployable composite entities that reference atomic artifacts (Skills, Commands, Agents, etc.) without mutating those artifact records.
 
 **Key outcomes**:
-1. **Phase 1** establishes database schema, ORM models, and repository layer for composite membership metadata.
-2. **Phase 2** implements graph-aware discovery that detects composite roots and builds in-memory dependency graphs.
-3. **Phase 3** orchestrates smart transactional import with SHA-256 deduplication and version pinning.
-4. **Phase 4** exposes relationships in the web UI with "Contains" tabs, "Part of" sections, and import preview dialogs.
+1. **Phase 1** establishes the `COMPOSITE` artifact type, `CompositeType` enum, UUID identity column (per ADR-007), database schema, ORM models, and repository layer for composite membership metadata with UUID FK-backed child references.
+2. **Phase 2** implements graph-aware discovery that detects composite roots and builds in-memory dependency graphs using `DiscoveredGraph` Pydantic BaseModel.
+3. **Phase 3** orchestrates smart transactional import with deduplication (reusing existing `content_hash` fields), version pinning, and atomic rollback on failure.
+4. **Phase 4** exposes relationships in the web UI with "Contains" tabs, "Part of" sections, import preview dialogs (3 buckets: New, Existing, Conflict), and CLI composite listing.
 
 **Success is measured by**: Zero duplicate artifacts on re-import, transactional atomicity, <5% false positive rate in composite detection, and complete UI relationship browsing within 2 clicks.
 
@@ -47,9 +48,9 @@ This implementation plan outlines the phased rollout of the Composite Artifact I
 
 Following MeatyPrompts layered architecture:
 
-1. **Database Layer** (Phase 1) — composite entity + membership metadata tables with scoped keys, relationship metadata, version pinning
-2. **Repository Layer** (Phase 1) — CRUD operations on memberships, parent/child lookups, transaction handling
-3. **Service Layer** (Phase 2-3) — Composite detection logic, deduplication, import orchestration
+1. **Database Layer** (Phase 1) — composite entity + membership metadata tables with scoped keys, relationship metadata, version pinning; UUID identity column per ADR-007
+2. **Repository Layer** (Phase 1) — CRUD operations on memberships, parent/child lookups via UUID FK-backed membership, transaction handling
+3. **Service Layer** (Phase 2-3) — Composite detection logic, deduplication, import orchestration; `CompositeType` enum drives type-specific behavior
 4. **API Layer** (Phase 3-4) — `GET /artifacts/{id}/associations` endpoint returning `AssociationsDTO`
 5. **UI Layer** (Phase 4) — Artifact detail tabs, import preview modal, relationship rendering
 6. **Testing Layer** (All phases) — Unit, integration, E2E coverage >80%
@@ -64,8 +65,9 @@ Following MeatyPrompts layered architecture:
 
 ### Critical Path
 
-1. **Enum update** (FR-1) → blocks all downstream work
-2. **ORM model + migration** (FR-2 to FR-4) → required before repository and service layers
+0. **UUID column migration** (ADR-007) → adds UUID identity column to `CachedArtifact`; blocks composite membership FK
+1. **Enum update** (FR-1) → `COMPOSITE` in `ArtifactType` + `CompositeType` enum; blocks all downstream work
+2. **ORM model + migration** (FR-2 to FR-4) → requires UUID column; required before repository and service layers
 3. **Repository methods** (Phase 1) → required before discovery and import
 4. **Composite detection** (Phase 2) → required before import orchestration can be tested
 5. **Import transaction wrapper** (Phase 3) → required before API endpoint is useful
@@ -82,25 +84,27 @@ Following MeatyPrompts layered architecture:
 **Dependencies**: None
 **Assigned Subagent(s)**: data-layer-expert, python-backend-engineer
 
-**Overview**: Establish database schema and ORM layer for composite entities and membership metadata. This is the foundation for all downstream phases.
+**Overview**: Establish database schema and ORM layer for composite entities and membership metadata. This is the foundation for all downstream phases. Includes adding the UUID identity column to `CachedArtifact` per ADR-007.
 
 See detailed phase breakdown: [Phase 1: Core Relationships](./composite-artifact-infrastructure-v1/phase-1-core-relationships.md)
 
 **Key Deliverables**:
-- `PLUGIN` added to `ArtifactType` enum with exhaustive call-site audit
-- `CompositeArtifact` + membership metadata ORM models with scoped keys, `relationship_type`, `pinned_version_hash`
+- `COMPOSITE` added to `ArtifactType` enum (not PLUGIN); `CompositeType` enum with `PLUGIN` value for composite subtyping
+- UUID identity column added to `CachedArtifact` per ADR-007
+- `CompositeArtifact` + membership metadata ORM models with scoped keys, `composite_type` (from `CompositeType` enum), `relationship_type`, `pinned_version_hash`; `CompositeMembership.child_artifact_uuid` FK references `CachedArtifact.uuid`
 - Atomic artifact schema remains unchanged; parent/child linkage represented via metadata rows
 - Alembic migration with reversible down() migration
 - Repository methods: `get_associations()`, `create_membership()`, `delete_membership()`
 - Unit tests for model validation and repository CRUD
 
 **Phase 1 Quality Gates**:
-- [x] Enum change does not break existing type-checking (run type-check full suite)
-- [x] Alembic migration applies cleanly to fresh DB
-- [x] Alembic migration rolls back cleanly
-- [x] FK constraints enforced by database
-- [x] Repository CRUD methods pass unit tests (>80% coverage)
-- [x] No regression in existing artifact queries/imports
+- [ ] Enum change does not break existing type-checking (run type-check full suite)
+- [ ] UUID column migration applies cleanly per ADR-007
+- [ ] Alembic migration applies cleanly to fresh DB
+- [ ] Alembic migration rolls back cleanly
+- [ ] FK constraints enforced by database (including UUID FK on membership)
+- [ ] Repository CRUD methods pass unit tests (>80% coverage)
+- [ ] No regression in existing artifact queries/imports
 
 ---
 
@@ -115,19 +119,19 @@ See detailed phase breakdown: [Phase 1: Core Relationships](./composite-artifact
 See detailed phase breakdown: [Phase 2: Enhanced Discovery](./composite-artifact-infrastructure-v1/phase-2-enhanced-discovery.md)
 
 **Key Deliverables**:
-- `DiscoveredGraph` dataclass (parent artifact + list of children + linkage metadata)
+- `DiscoveredGraph` Pydantic `BaseModel` (parent artifact + list of children + linkage metadata)
 - `detect_composites(root_path)` function with signature detection (plugin.json OR 2+ artifact-type subdirectories)
-- Updated `discover_artifacts()` to return `DiscoveredGraph` for composites, flat `DiscoveryResult` for atomic
+- Updated `discover_artifacts()` class method to return `DiscoveredGraph` for composites, flat `DiscoveryResult` for atomic
 - False positive guard: require at least 2 distinct artifact-type children to qualify as composite
-- Unit tests with fixture repos covering true positives and false positive validation
+- Unit tests with 10-15 fixture repos covering true positives and false positive validation
 - Feature flag: `composite_artifacts_enabled` gates new discovery path
 
 **Phase 2 Quality Gates**:
-- [x] Composite detection returns `DiscoveredGraph` with correct parent/children linkage
-- [x] False positive rate <5% on fixture repo set (40+ repos)
-- [x] Existing flat discovery tests pass (no regression)
-- [x] Feature flag properly gates new behavior
-- [x] Discovery scan time adds <500ms overhead
+- [ ] Composite detection returns `DiscoveredGraph` with correct parent/children linkage
+- [ ] False positive rate <5% on fixture repo set (10-15 repos)
+- [ ] Existing flat discovery tests pass (no regression)
+- [ ] Feature flag properly gates new behavior
+- [ ] Discovery scan time adds <500ms overhead
 
 ---
 
@@ -137,29 +141,33 @@ See detailed phase breakdown: [Phase 2: Enhanced Discovery](./composite-artifact
 **Dependencies**: Phase 1 complete, Phase 2 complete
 **Assigned Subagent(s)**: python-backend-engineer, backend-architect
 
-**Overview**: Implement transactional smart import orchestration with SHA-256 deduplication, version pinning, and atomic rollback on failure.
+**Overview**: Implement transactional smart import orchestration with deduplication (leveraging existing `Artifact.content_hash` and `ArtifactVersion.content_hash` fields), version pinning, and atomic rollback on failure.
 
 See detailed phase breakdown: [Phase 3: Import Orchestration](./composite-artifact-infrastructure-v1/phase-3-import-orchestration.md)
 
 **Key Deliverables**:
-- SHA-256 content hash computation for skills (directory tree hash) and single-file artifacts
+- Deduplication leveraging existing `Artifact.content_hash` and `ArtifactVersion.content_hash` fields (no new hash computation needed for artifacts that already have content hashes)
 - Dedup logic: hash lookup → link existing / new version / create new
 - Transaction wrapper for plugin import: all children + composite entity + memberships in single DB transaction
 - Rollback on any child failure: no partial imports
 - Record `pinned_version_hash` in membership metadata at import time
 - Propagate composite membership metadata to project deployments (Claude Code in v1)
 - Plugin meta-file storage: `~/.skillmeat/collections/{collection}/plugins/<name>/`
+- Import preview with 3 buckets: "New" (create), "Existing" (link), "Conflict" (resolution needed)
+- Enhanced import handling for same-name-different-hash artifacts deferred to future enhancement
 - Integration tests: happy path, dedup scenarios, rollback validation
 - `GET /artifacts/{id}/associations` API endpoint with `AssociationsDTO` response
+- Bundle export: `skillmeat export` updated to export Composites as Bundles
 
 **Phase 3 Quality Gates**:
-- [x] Plugin import happy path: all children + composite entity + memberships created in single transaction
-- [x] Dedup scenario: re-importing same plugin creates 0 new artifact rows for exact matches
-- [x] Rollback scenario: simulated mid-import failure leaves collection in pre-import state
-- [x] Pinned hash recorded correctly and readable via membership repo
-- [x] Project deployment propagation preserves composite membership context for Claude Code
-- [x] Non-Claude platforms return explicit unsupported response for plugin deployment
-- [x] API endpoint returns 200 with `AssociationsDTO` for known artifact, 404 for unknown
+- [ ] Plugin import happy path: all children + composite entity + memberships created in single transaction
+- [ ] Dedup scenario: re-importing same plugin creates 0 new artifact rows for exact matches
+- [ ] Rollback scenario: simulated mid-import failure leaves collection in pre-import state
+- [ ] Pinned hash recorded correctly and readable via membership repo
+- [ ] Project deployment propagation preserves composite membership context for Claude Code
+- [ ] Non-Claude platforms return explicit unsupported response for plugin deployment
+- [ ] API endpoint returns 200 with `AssociationsDTO` for known artifact, 404 for unknown
+- [ ] Import preview correctly categorizes artifacts into New/Existing/Conflict buckets
 
 ---
 
@@ -169,28 +177,31 @@ See detailed phase breakdown: [Phase 3: Import Orchestration](./composite-artifa
 **Dependencies**: Phase 3 complete (API endpoint stable)
 **Assigned Subagent(s)**: ui-engineer-enhanced, frontend-developer, python-backend-engineer (API endpoints)
 
-**Overview**: Surface parent/child relationships in artifact detail page and implement import preview modal showing composite breakdown.
+**Overview**: Surface parent/child relationships in artifact detail page and implement import preview modal showing composite breakdown. Conflict resolution dialog wired to real backend API (no stubs). Plugin deployment for Claude Code deploys child artifacts to standard locations and composite non-artifact files to `.claude/plugins/{plugin_name}/`. CLI listing updated so composites appear alongside artifacts, platform-profile-specific.
 
 See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artifact-infrastructure-v1/phase-4-web-ui.md)
 
 **Key Deliverables**:
 - `AssociationsDTO` TypeScript type (auto-sync from OpenAPI spec)
 - `useArtifactAssociations(artifactId)` React hook calling `GET /artifacts/{id}/associations`
-- Artifact detail page: "Contains" tab listing child artifacts (conditional on composite type)
-- Artifact detail page: "Part of" sidebar section listing parent plugins (conditional on `parents.length > 0`)
-- Import modal: composite detection preview ("1 Plugin + N children: X new, Y existing")
-- Version conflict resolution dialog (warn on pinned hash mismatch during deploy)
-- WCAG 2.1 AA keyboard navigation and screen-reader support
-- Playwright E2E tests: import flow, "Contains" tab rendering, "Part of" section rendering
+- Artifact detail page: "Contains" tab listing child artifacts (conditional on composite type), including a11y
+- Artifact detail page: "Part of" sidebar section listing parent plugins (conditional on `parents.length > 0`), including a11y
+- Import modal: composite detection preview ("1 Plugin + N children: X new, Y existing, Z conflicts"), including a11y
+- Version conflict resolution dialog wired to real backend API, no stubs (warn on pinned hash mismatch during deploy), including a11y
+- WCAG 2.1 AA keyboard navigation and screen-reader support (folded into component tasks)
+- Core import flow E2E test (Playwright); skip non-critical E2E scenarios
+- CLI composite listing: composites appear alongside artifacts, platform-profile-specific
+- Plugin deployment layout for Claude Code: child artifacts to standard locations + composite non-artifact files to `.claude/plugins/{plugin_name}/`
 
 **Phase 4 Quality Gates**:
-- [x] "Contains" tab renders for plugins, lists correct children
-- [x] "Part of" section renders for atomic artifacts with parents
-- [x] Import preview modal shows correct composite breakdown
-- [x] User can navigate parent↔child relationships within 2 clicks
-- [x] Keyboard navigation works (Tab, Enter, Esc)
-- [x] Screen readers announce tab/section content correctly
-- [x] E2E tests pass for all relationship browsing scenarios
+- [ ] "Contains" tab renders for plugins, lists correct children
+- [ ] "Part of" section renders for atomic artifacts with parents
+- [ ] Import preview modal shows correct composite breakdown (3 buckets)
+- [ ] User can navigate parent↔child relationships within 2 clicks
+- [ ] Keyboard navigation works (Tab, Enter, Esc)
+- [ ] Screen readers announce tab/section content correctly
+- [ ] Core import flow E2E test passes
+- [ ] CLI lists composites alongside artifacts
 
 ---
 
@@ -200,15 +211,16 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Subagent(s) | Dependencies |
 |---------|-----------|-------------|-------------------|----------|-------------|--------------|
-| CAI-P1-01 | Add PLUGIN enum | Add `PLUGIN` to `ArtifactType` enum; audit all call sites for exhaustiveness | Enum added; all tests pass; no type-checking errors in IDE/CI | 1 pt | data-layer-expert | None |
-| CAI-P1-02 | Composite data models | Define collection-scoped `CompositeArtifact` + membership metadata ORM with scoped keys, `relationship_type`, `pinned_version_hash` | Models validate; follows existing association patterns; no atomic artifact schema mutation | 2 pts | data-layer-expert | CAI-P1-01 |
+| CAI-P1-01 | Add COMPOSITE enum + CompositeType | Add `COMPOSITE` to `ArtifactType` enum; add `CompositeType` enum with `PLUGIN` value; audit all call sites for exhaustiveness | Enums added; all tests pass; no type-checking errors in IDE/CI | 1 pt | data-layer-expert | None |
+| CAI-P1-01b | Add UUID column to CachedArtifact | Add UUID identity column to `CachedArtifact` per ADR-007; generate and apply Alembic migration for UUID column | UUID column present; auto-populated for new rows; backfilled for existing rows | 2 pts | data-layer-expert | None |
+| CAI-P1-02 | Composite data models | Define collection-scoped `CompositeArtifact` + membership metadata ORM with scoped keys, `composite_type` (from `CompositeType` enum), `relationship_type`, `pinned_version_hash`; `CompositeMembership.child_artifact_uuid` FK references `CachedArtifact.uuid` | Models validate; follows existing association patterns; no atomic artifact schema mutation; UUID FK enforced | 2 pts | data-layer-expert | CAI-P1-01, CAI-P1-01b |
 | CAI-P1-03 | Metadata linkage queries | Implement parent/child metadata query surfaces without adding direct relationships to atomic `Artifact` model | Parent→child and child→parent traversals work via repository DTOs | 1 pt | data-layer-expert | CAI-P1-02 |
 | CAI-P1-04 | Alembic migration | Generate and apply migration for composite entity + membership metadata tables | Migration applies cleanly; rolls back cleanly; no schema errors | 2 pts | data-layer-expert | CAI-P1-03 |
 | CAI-P1-05 | Membership repository | Implement `get_associations()`, `create_membership()`, `delete_membership()` methods | CRUD methods pass unit tests; pagination handled correctly | 2 pts | python-backend-engineer | CAI-P1-04 |
 | CAI-P1-06 | Repository tests | Unit tests for membership repository CRUD and queries | >80% code coverage; all scenarios tested | 1 pt | python-backend-engineer | CAI-P1-05 |
-| CAI-P1-07 | Integration tests (Phase 1) | Integration tests for model + repository layer | Tests create/read/delete memberships; FK constraints enforced | 1 pt | python-backend-engineer | CAI-P1-06 |
+| CAI-P1-07 | Integration tests (Phase 1) | Integration tests for model + repository layer | Tests create/read/delete memberships; FK constraints enforced (including UUID FK) | 1 pt | python-backend-engineer | CAI-P1-06 |
 
-**Phase 1 Total**: 10 story points
+**Phase 1 Total**: 12 story points
 
 ---
 
@@ -216,10 +228,10 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Subagent(s) | Dependencies |
 |---------|-----------|-------------|-------------------|----------|-------------|--------------|
-| CAI-P2-01 | DiscoveredGraph dataclass | Define `DiscoveredGraph` with parent + children + linkage metadata | Dataclass serializable; integrates with existing DiscoveryResult | 1 pt | python-backend-engineer | CAI-P1-07 |
+| CAI-P2-01 | DiscoveredGraph BaseModel | Define `DiscoveredGraph` as Pydantic `BaseModel` with parent + children + linkage metadata | BaseModel serializable; integrates with existing DiscoveryResult | 1 pt | python-backend-engineer | CAI-P1-07 |
 | CAI-P2-02 | detect_composites() | Implement composite root detection (plugin.json OR 2+ artifact-type subdirs) | Returns correct parent/children for test repos; <5% false positive rate | 2 pts | backend-architect | CAI-P2-01 |
-| CAI-P2-03 | Discovery integration | Update `discover_artifacts()` to return `DiscoveredGraph` for composites | Flat discovery unaffected; graph path returns correct structure | 2 pts | python-backend-engineer | CAI-P2-02 |
-| CAI-P2-04 | Discovery tests | Unit tests with 40+ fixture repos covering true positives and false positives | <5% false positive rate; >90% true positive rate on fixtures | 2 pts | backend-architect | CAI-P2-03 |
+| CAI-P2-03 | Discovery integration | Update `discover_artifacts()` class method to return `DiscoveredGraph` for composites | Flat discovery unaffected; graph path returns correct structure | 2 pts | python-backend-engineer | CAI-P2-02 |
+| CAI-P2-04 | Discovery tests | Unit tests with 10-15 fixture repos covering true positives and false positives | <5% false positive rate; >90% true positive rate on fixtures | 2 pts | backend-architect | CAI-P2-03 |
 | CAI-P2-05 | Feature flag integration | Implement `composite_artifacts_enabled` feature flag gating discovery | Flag properly gates new detection path; can be toggled safely | 1 pt | python-backend-engineer | CAI-P2-04 |
 
 **Phase 2 Total**: 8 story points
@@ -230,7 +242,7 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Subagent(s) | Dependencies |
 |---------|-----------|-------------|-------------------|----------|-------------|--------------|
-| CAI-P3-01 | Content hash computation | Implement SHA-256 hashing for skills (tree hash) and single-file artifacts | Hashing consistent; same content → same hash; different content → different hash | 1 pt | python-backend-engineer | CAI-P2-05 |
+| CAI-P3-01 | Content hash deduplication | Leverage existing `Artifact.content_hash` and `ArtifactVersion.content_hash` for dedup; extend hashing for skills (tree hash) where content hash not yet populated | Hashing consistent; same content → same hash; different content → different hash; reuses existing content_hash fields | 1 pt | python-backend-engineer | CAI-P2-05 |
 | CAI-P3-02 | Dedup logic | Implement hash lookup + decision logic (link/new-version/create) | All 3 scenarios handled; unit tests pass | 2 pts | backend-architect | CAI-P3-01 |
 | CAI-P3-03 | Transaction wrapper | Wrap plugin import (children + composite entity + memberships) in single DB transaction | All-or-nothing semantics; rollback on any child failure | 2 pts | python-backend-engineer | CAI-P3-02 |
 | CAI-P3-04 | Version pinning | Record `pinned_version_hash` in membership metadata at import time | Hash stored; retrievable via membership repo | 1 pt | python-backend-engineer | CAI-P3-03 |
@@ -239,8 +251,9 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 | CAI-P3-07 | Associations API endpoint | Implement `GET /artifacts/{id}/associations` returning `AssociationsDTO` | Endpoint returns 200 with DTO for valid ID, 404 for unknown | 2 pts | python-backend-engineer | CAI-P3-06 |
 | CAI-P3-08 | Import integration tests | Integration tests for happy path, dedup scenarios, rollback validation | All scenarios pass; dedup verified; rollback works | 2 pts | python-backend-engineer | CAI-P3-07 |
 | CAI-P3-09 | Observability | Add OpenTelemetry spans + structured logs for composite detection, hash check, import transaction | Spans/logs visible in tracing tools; metrics recorded | 1 pt | backend-architect | CAI-P3-08 |
+| CAI-P3-10 | Bundle export for composites | Update `skillmeat export` to export Composite as Bundle | Export produces valid bundle format; round-trip import/export verified | 1 pt | python-backend-engineer | CAI-P3-07 |
 
-**Phase 3 Total**: 13 story points
+**Phase 3 Total**: 14 story points
 
 ---
 
@@ -250,14 +263,38 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 |---------|-----------|-------------|-------------------|----------|-------------|--------------|
 | CAI-P4-01 | AssociationsDTO TypeScript type | Generate/sync TypeScript type from OpenAPI schema | Type matches backend `AssociationsDTO`; imports correctly | 1 pt | frontend-developer | CAI-P3-07 |
 | CAI-P4-02 | useArtifactAssociations hook | Create React hook calling `GET /artifacts/{id}/associations` | Hook handles loading/error/success states; caches results | 2 pts | frontend-developer | CAI-P4-01 |
-| CAI-P4-03 | Contains tab UI | Add "Contains" tab to artifact detail showing children (conditional on composite type) | Tab visible only for plugins; lists children with types/versions | 2 pts | ui-engineer-enhanced | CAI-P4-02 |
-| CAI-P4-04 | Part of section UI | Add "Part of" section to detail page showing parent plugins | Section visible for artifacts with parents; links to parent detail | 2 pts | ui-engineer-enhanced | CAI-P4-02 |
-| CAI-P4-05 | Import preview modal | Update import modal to show composite breakdown preview | Modal shows "X children: Y new, Z existing" before confirm | 2 pts | ui-engineer-enhanced | CAI-P4-02 |
-| CAI-P4-06 | Conflict resolution dialog | Implement version conflict warning (pinned vs current hash) | Dialog shows side-by-side comparison; offers overwrite/side-by-side options | 2 pts | frontend-developer | CAI-P4-05 |
-| CAI-P4-07 | Accessibility (a11y) | Implement keyboard navigation and screen-reader support | Tab/Enter/Esc work; ARIA labels present; WCAG 2.1 AA compliance | 1 pt | ui-engineer-enhanced | CAI-P4-06 |
-| CAI-P4-08 | E2E tests (Playwright) | Create end-to-end tests for import flow, "Contains" tab, "Part of" section | All critical paths tested; tests pass in CI | 2 pts | ui-engineer-enhanced | CAI-P4-07 |
+| CAI-P4-03 | Contains tab UI | Add "Contains" tab to artifact detail showing children (conditional on composite type), including a11y (keyboard nav, ARIA labels, WCAG 2.1 AA) | Tab visible only for plugins; lists children with types/versions; keyboard/screen-reader accessible | 2 pts | ui-engineer-enhanced | CAI-P4-02 |
+| CAI-P4-04 | Part of section UI | Add "Part of" section to detail page showing parent plugins, including a11y (keyboard nav, ARIA labels, WCAG 2.1 AA) | Section visible for artifacts with parents; links to parent detail; keyboard/screen-reader accessible | 2 pts | ui-engineer-enhanced | CAI-P4-02 |
+| CAI-P4-05 | Import preview modal | Update import modal to show composite breakdown preview with 3 buckets (New, Existing, Conflict), including a11y (keyboard nav, ARIA labels, WCAG 2.1 AA) | Modal shows "X children: Y new, Z existing, W conflicts" before confirm; keyboard/screen-reader accessible | 2 pts | ui-engineer-enhanced | CAI-P4-02 |
+| CAI-P4-06 | Conflict resolution dialog | Implement version conflict warning (pinned vs current hash) wired to real backend API, no stubs, including a11y (keyboard nav, ARIA labels, WCAG 2.1 AA) | Dialog shows side-by-side comparison; offers overwrite/side-by-side options; connected to backend; keyboard/screen-reader accessible | 2 pts | frontend-developer | CAI-P4-05 |
+| CAI-P4-08 | Core import flow E2E test | Core import flow E2E test only (Playwright); skip non-critical E2E scenarios | Core import path tested; test passes in CI | 1 pt | ui-engineer-enhanced | CAI-P4-06 |
+| CAI-P4-09 | CLI composite listing | Update CLI to list composites alongside artifacts, platform-profile-specific | `skillmeat list` shows composites; filtered by platform profile | 1 pt | python-backend-engineer | CAI-P3-07 |
 
-**Phase 4 Total**: 14 story points
+**Phase 4 Total**: 13 story points
+
+---
+
+## Story ID Cross-Reference
+
+Mapping from PRD story IDs to implementation task IDs:
+
+| PRD Story | Implementation Tasks |
+|-----------|---------------------|
+| CAI-001 | CAI-P1-01 |
+| CAI-002 | CAI-P1-02, CAI-P1-03, CAI-P1-04 |
+| CAI-003 | CAI-P1-05 |
+| CAI-004 | CAI-P2-01, CAI-P2-02 |
+| CAI-005 | CAI-P2-03 |
+| CAI-006 | CAI-P3-01, CAI-P3-02 |
+| CAI-007 | CAI-P3-03 |
+| CAI-008 | CAI-P3-04 |
+| CAI-009 | CAI-P3-07 |
+| CAI-010 | CAI-P4-03 |
+| CAI-011 | CAI-P4-04 |
+| CAI-012 | CAI-P4-05 |
+| CAI-013 | CAI-P4-06 |
+| CAI-014 | CAI-P3-09 |
+| CAI-015 | CAI-P2-05 |
 
 ---
 
@@ -265,11 +302,21 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 
 | Phase | Title | Duration | Effort | Key Deliverables |
 |-------|-------|----------|--------|------------------|
-| 1 | Core Relationships (Backend) | 3-4 days | 10 pts | ORM model, migration, repository layer |
-| 2 | Enhanced Discovery (Core) | 2-3 days | 8 pts | Graph-aware detection, DiscoveredGraph structure |
-| 3 | Import Orchestration (Core) | 3-4 days | 13 pts | Transactional smart import, dedup logic, API endpoint |
-| 4 | Web UI Implementation (Frontend) | 3-4 days | 14 pts | Relationship tabs, import preview, E2E tests |
-| **Total** | **Composite Artifact Infrastructure** | **12-14 days** | **35 pts** | **Full relational model + UI relationship browsing** |
+| 1 | Core Relationships (Backend) | 3-4 days | 12 pts | COMPOSITE enum, CompositeType, UUID column (ADR-007), ORM model, migration, repository layer |
+| 2 | Enhanced Discovery (Core) | 2-3 days | 8 pts | Graph-aware detection, DiscoveredGraph BaseModel |
+| 3 | Import Orchestration (Core) | 3-4 days | 14 pts | Transactional smart import, dedup logic, API endpoint, bundle export |
+| 4 | Web UI Implementation (Frontend) | 3-4 days | 13 pts | Relationship tabs, import preview (3 buckets), conflict dialog (real backend), CLI listing, core E2E test |
+| **Total** | **Composite Artifact Infrastructure** | **14-18 days** | **47 pts** | **Full relational model + UI relationship browsing** |
+
+---
+
+## Deferred Items
+
+The following items are explicitly deferred to future enhancements:
+
+- **Enhanced version conflict handling during import**: Same-name-different-hash resolution logic (currently defaults to `CREATE_NEW_VERSION`; enhanced UI for conflict resolution deferred)
+- **Cross-platform plugin deployment**: Deployment support beyond Claude Code (other platforms return explicit unsupported response in v1)
+- **ADR-007 Phase 2 — UUID migration for existing join tables**: Migrate `collection_artifacts`, `group_artifacts`, `artifact_tags` from `type:name` strings to UUID FK references. Phase 1 of ADR-007 (UUID column + CompositeMembership FK) is included in this plan; Phase 2 is optional cleanup deferred to a future milestone.
 
 ---
 
@@ -280,7 +327,7 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 | Risk | Impact | Likelihood | Mitigation Strategy |
 |------|--------|------------|-------------------|
 | Alembic migration breaks existing artifact rows or FK constraints | High | Low | Write reversible migration with down(); test on copy of production schema before deploy; Phase 1 quality gate requires clean rollback validation |
-| Discovery false positives (flat repos mis-detected as composites) | Medium | Medium | Require threshold of 2+ distinct artifact-type subdirectories; use `plugin.json` as authoritative signal; unit test against 40+ fixture repos; Phase 2 acceptance criteria enforce <5% false positive rate |
+| Discovery false positives (flat repos mis-detected as composites) | Medium | Medium | Require threshold of 2+ distinct artifact-type subdirectories; use `plugin.json` as authoritative signal; unit test against 10-15 fixture repos; Phase 2 acceptance criteria enforce <5% false positive rate |
 | Performance regression from graph traversal on large repos | Medium | Low | Limit composite detection to first 3 directory levels; add scan time telemetry; gate behind feature flag; Phase 2 quality gate requires <500ms overhead |
 | Dedup hash collision (two different artifacts with same SHA-256) | Low | Very Low | SHA-256 collision probability negligible (~2^-128); document assumption; add name+hash pair check as secondary guard in Phase 3 |
 | Version conflict resolution UX is confusing | Medium | Medium | Design conflict dialog (Phase 4) with clear side-by-side vs overwrite options; add escape hatch to skip plugin deploy; user testing on conflict scenarios |
@@ -288,6 +335,7 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 | Partial import leaves orphaned child artifacts | High | Low | Wrap plugin import in single DB transaction (Phase 3-03); use existing temp-dir + atomic move pattern; Phase 3 quality gate tests rollback scenario |
 | Import modal doesn't load discovery graph before user confirms | Medium | Low | Ensure discovery completes and returns `DiscoveredGraph` before UI shows import button; Phase 4 E2E test validates this flow |
 | Plugin deployment behavior differs by platform | Medium | Medium | Scope deploy conflict workflow to Claude Code for v1; return explicit unsupported response for other platforms |
+| UUID column migration disrupts existing data | Medium | Low | ADR-007 specifies backfill strategy; migration tested on copy of production schema; Phase 1 quality gate validates UUID column |
 
 ---
 
@@ -295,14 +343,15 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 
 ### Database & ORM
 - `skillmeat/cache/models.py` — Add composite entity + membership metadata models
-- `skillmeat/cache/migrations/versions/` — Alembic migration for composite entity + membership metadata tables
+- `skillmeat/cache/migrations/versions/` — Alembic migration for UUID column (ADR-007) + composite entity + membership metadata tables
 - `skillmeat/cache/repositories.py` — Membership CRUD repository methods
-- `skillmeat/core/artifact_detection.py` — Add `PLUGIN` to `ArtifactType` enum
+- `skillmeat/core/artifact_detection.py` — Add `COMPOSITE` to `ArtifactType` enum; add `CompositeType` enum
+- `docs/dev/architecture/decisions/ADR-007-artifact-uuid-identity.md` — UUID identity column design decision
 
 ### Discovery & Import
 - `skillmeat/core/artifact_detection.py` — Update `ArtifactType`, add composite detection signatures
-- `skillmeat/core/discovery.py` — Implement `DiscoveredGraph`, update `discover_artifacts()`
-- `skillmeat/core/importer.py` — Add hash-based dedup, transaction wrapper, version pinning
+- `skillmeat/core/discovery.py` — Implement `DiscoveredGraph` BaseModel, update `discover_artifacts()` class method
+- `skillmeat/core/importer.py` — Add hash-based dedup (leveraging existing content_hash), transaction wrapper, version pinning
 - `skillmeat/core/sync.py` — Propagate composite membership metadata into project deployment state (Claude Code v1 scope)
 
 ### API & Frontend
@@ -318,41 +367,46 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 - `tests/test_composite_detection.py` — Discovery unit tests with fixture repos
 - `tests/integration/test_plugin_import_integration.py` — Integration tests for smart import
 - `skillmeat/web/__tests__/components/entity/content-pane.test.tsx` — Component tests for relationship tabs
-- `skillmeat/web/tests/e2e/discovery.spec.ts` — E2E tests for import preview and tabs
+- `skillmeat/web/tests/e2e/discovery.spec.ts` — E2E tests for core import flow
 
 ---
 
 ## Success Metrics
 
 ### Functional Success
-- [x] Plugin import end-to-end: source URL → detection → preview → confirm → DB rows + filesystem
-- [x] Deduplication verified: re-importing same plugin creates 0 new artifact rows for exact matches
-- [x] Transactional rollback verified: simulated mid-import failure leaves collection clean
-- [x] UI relationship discovery: users can navigate parent↔child within 2 clicks
+- [ ] Plugin import end-to-end: source URL → detection → preview → confirm → DB rows + filesystem
+- [ ] Deduplication verified: re-importing same plugin creates 0 new artifact rows for exact matches
+- [ ] Transactional rollback verified: simulated mid-import failure leaves collection clean
+- [ ] UI relationship discovery: users can navigate parent↔child within 2 clicks
 
 ### Technical Success
-- [x] Alembic migration applies & rolls back cleanly
-- [x] API returns `AssociationsDTO` with correct parent/child lists
-- [x] Code coverage >80% for all new code
-- [x] False positive rate <5% in composite detection
-- [x] Observability: OTel spans logged for all key operations
+- [ ] Alembic migration applies & rolls back cleanly (including UUID column)
+- [ ] API returns `AssociationsDTO` with correct parent/child lists
+- [ ] Code coverage >80% for all new code
+- [ ] False positive rate <5% in composite detection
+- [ ] Observability: OTel spans logged for all key operations
 
 ### Quality Success
-- [x] Zero P0/P1 regressions in existing artifact import tests
-- [x] WCAG 2.1 AA compliance for UI relationship tabs
-- [x] Feature flag properly gates new behavior
-- [x] All acceptance criteria from PRD met
+- [ ] Zero P0/P1 regressions in existing artifact import tests
+- [ ] WCAG 2.1 AA compliance for UI relationship tabs
+- [ ] Feature flag properly gates new behavior
+- [ ] All acceptance criteria from PRD met
 
 ---
 
 ## Progress Tracking
 
-See detailed progress tracking: `.claude/progress/composite-artifact-infrastructure/all-phases-progress.md`
+See detailed progress tracking (one file per phase):
+- `.claude/progress/composite-artifact-infrastructure/phase-1-progress.md`
+- `.claude/progress/composite-artifact-infrastructure/phase-2-progress.md`
+- `.claude/progress/composite-artifact-infrastructure/phase-3-progress.md`
+- `.claude/progress/composite-artifact-infrastructure/phase-4-progress.md`
+- `.claude/progress/composite-artifact-infrastructure/phase-5-progress.md`
 
-This file will be created and updated as work progresses through each phase using the artifact-tracking CLI scripts.
+These files will be created and updated as work progresses through each phase using the artifact-tracking CLI scripts.
 
 ---
 
-**Implementation Plan Version**: 1.0
-**Last Updated**: 2026-02-17
+**Implementation Plan Version**: 1.1
+**Last Updated**: 2026-02-18
 **Status**: Draft (awaiting approval)

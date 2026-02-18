@@ -4,7 +4,7 @@ description: "Frontend implementation of artifact relationships with contains/pa
 audience: [ai-agents, developers]
 tags: [implementation, phase-4, frontend, react, ui, ux]
 created: 2026-02-17
-updated: 2026-02-17
+updated: 2026-02-18
 category: "product-planning"
 status: draft
 related:
@@ -16,8 +16,8 @@ related:
 **Phase ID**: CAI-P4
 **Duration**: 3-4 days
 **Dependencies**: Phase 3 complete (API endpoint stable)
-**Assigned Subagent(s)**: ui-engineer-enhanced, frontend-developer, python-backend-engineer (API)
-**Estimated Effort**: 14 story points
+**Assigned Subagent(s)**: ui-engineer-enhanced, frontend-developer, python-backend-engineer (API + CLI)
+**Estimated Effort**: 13 story points
 
 ---
 
@@ -28,8 +28,12 @@ Phase 4 brings the Composite Artifact Infrastructure to the web UI, enabling use
 1. Browse "Contains" tab showing which artifacts are in a Plugin
 2. View "Part of" section showing which Plugins contain an artifact
 3. See an import preview modal before confirming plugin import
-4. Navigate parent↔child relationships within 2 clicks
-5. Resolve version conflicts when deploying plugins with pinned versions (Claude Code in v1)
+4. Navigate parent<->child relationships within 2 clicks
+5. Resolve version conflicts when deploying plugins, connected to real backend API
+
+Accessibility requirements are integrated into each component task rather than as a separate pass.
+
+Composites appear alongside atomic artifacts in CLI listings, filtered by platform profile (default: Claude Code).
 
 This phase transforms the system from invisible backend infrastructure into a user-facing feature.
 
@@ -42,7 +46,7 @@ This phase transforms the system from invisible backend infrastructure into a us
 **Description**: Generate the TypeScript type for `AssociationsDTO` from OpenAPI so frontend contracts remain aligned with backend schema.
 
 **Acceptance Criteria**:
-- [x] TypeScript type `AssociationsDTO` defined with:
+- [ ] TypeScript type `AssociationsDTO` defined with:
   ```typescript
   interface AssociationsDTO {
     artifact_id: string;
@@ -59,10 +63,10 @@ This phase transforms the system from invisible backend infrastructure into a us
     created_at: string;  // ISO 8601
   }
   ```
-- [x] Type location: `skillmeat/web/types/associations.ts` (or similar)
-- [x] Type matches backend OpenAPI schema exactly
-- [x] Can be imported and used in React components
-- [x] No type errors in IDE when using type
+- [ ] Type location: `skillmeat/web/types/associations.ts` (or similar)
+- [ ] Type matches backend OpenAPI schema exactly
+- [ ] Can be imported and used in React components
+- [ ] No type errors in IDE when using type
 
 **Implementation Approach**:
 - Use OpenAPI code generation (`skillmeat/web/sdk/` + derived thin types) as canonical source
@@ -80,8 +84,8 @@ This phase transforms the system from invisible backend infrastructure into a us
 **Description**: Create a React hook that fetches artifact associations via the API endpoint. The hook handles loading/error/success states and caches results appropriately.
 
 **Acceptance Criteria**:
-- [x] Hook signature: `useArtifactAssociations(artifactId: string): AssociationsState`
-- [x] Return type:
+- [ ] Hook signature: `useArtifactAssociations(artifactId: string): AssociationsState`
+- [ ] Return type:
   ```typescript
   interface AssociationsState {
     data: AssociationsDTO | null;
@@ -90,21 +94,21 @@ This phase transforms the system from invisible backend infrastructure into a us
     refetch: () => Promise<void>;
   }
   ```
-- [x] Behavior:
+- [ ] Behavior:
   - Fetches `GET /api/v1/artifacts/{artifactId}/associations` on mount and when artifactId changes
   - Caches results (React Query or similar)
   - Handles loading state
   - Handles errors gracefully (doesn't crash, returns error in state)
   - Allows manual refetch
-- [x] Performance:
+- [ ] Performance:
   - Response cached for 5 minutes
   - Deduplicates requests for same artifact
   - Doesn't refetch if artifactId unchanged
-- [x] Error handling:
+- [ ] Error handling:
   - 404 errors handled gracefully (artifact not found)
   - Network errors captured
   - Returns error in state (doesn't throw)
-- [x] Unit tests:
+- [ ] Unit tests:
   - Hook fetches associations on mount
   - Hook updates when artifactId changes
   - Error state works
@@ -130,31 +134,28 @@ This phase transforms the system from invisible backend infrastructure into a us
 **Description**: Add a new tab to the artifact detail page showing child artifacts for composite types (Plugins). The tab is only visible for Plugin-type artifacts.
 
 **Acceptance Criteria**:
-- [x] Tab implementation:
+- [ ] Tab implementation:
   - Added to artifact detail page tabs
   - Label: "Contains"
   - Visible only when `artifact.type === "plugin"` OR when `associations.children.length > 0`
-- [x] Tab content displays:
+- [ ] Tab content displays:
   - List of child artifacts
   - For each child: name, type (icon), description snippet
   - Link to child artifact detail page
   - Sorted by name (or by relationship_type if needed)
-- [x] Empty state:
+- [ ] Empty state:
   - If plugin has no children, show "This plugin contains no artifacts"
   - Still show tab to indicate plugin nature
-- [x] Loading state:
+- [ ] Loading state:
   - While fetching associations, show loading spinner
   - Skeleton loaders for list items (if using shadcn Skeleton)
-- [x] Error state:
+- [ ] Error state:
   - If API error, show error message
   - Offer retry button
-- [x] Mobile responsive:
+- [ ] Mobile responsive:
   - Tab content readable on mobile
   - List items stack correctly
-- [x] Accessibility:
-  - Tab accessible via keyboard (Tab key)
-  - Tab marked as current with `aria-current="page"` when active
-  - List items have semantic meaning (use `<ul>` and `<li>`)
+- [ ] Meets WCAG 2.1 AA: keyboard navigation (Tab/Enter), semantic HTML (ul/li), screen reader announced
 
 **Key Files to Create/Modify**:
 - `skillmeat/web/app/artifacts/[id]/page.tsx` — Update detail page to add "Contains" tab
@@ -175,27 +176,24 @@ This phase transforms the system from invisible backend infrastructure into a us
 **Description**: Add a sidebar section or inline section to artifact detail pages showing which Plugins contain this artifact. Visible for any atomic artifact that has parent associations.
 
 **Acceptance Criteria**:
-- [x] Section placement:
+- [ ] Section placement:
   - Sidebar (right side of detail page) OR below metadata section
   - Visible only when `associations.parents.length > 0`
   - Label: "Part of"
-- [x] Content displays:
+- [ ] Content displays:
   - List of parent Plugins
   - For each parent: name, link to parent detail
   - Indicate relationship type (e.g., "contained in", "required by")
-- [x] Empty state:
+- [ ] Empty state:
   - If no parents, section is hidden (no "Part of" section shown)
-- [x] Loading state:
+- [ ] Loading state:
   - While fetching associations, show loading spinner
-- [x] Error handling:
+- [ ] Error handling:
   - If API error, show error message gracefully
-- [x] Mobile responsive:
+- [ ] Mobile responsive:
   - Works on narrow screens
   - May move to below detail when on mobile
-- [x] Accessibility:
-  - List items semantic
-  - Links have descriptive text
-  - Section is announced by screen readers
+- [ ] Meets WCAG 2.1 AA: semantic list, descriptive link text, screen reader support
 
 **Key Files to Create/Modify**:
 - `skillmeat/web/app/artifacts/[id]/page.tsx` — Update detail page to add "Part of" section
@@ -213,37 +211,30 @@ This phase transforms the system from invisible backend infrastructure into a us
 
 ### CAI-P4-05: Import Preview Modal
 
-**Description**: Update the import modal to show a breakdown of what will be imported when a composite artifact is detected. Preview shows: Plugin name, number of children, count of new vs existing artifacts.
+**Description**: Update the import modal to show a breakdown of what will be imported when a composite artifact is detected. Preview shows three buckets: new artifacts, existing identical matches, and conflicts.
 
 **Acceptance Criteria**:
-- [x] Modal enhancement:
+- [ ] Modal enhancement:
   - When importing a Plugin (detected via `DiscoveredGraph`), show additional preview section
   - Atomic artifacts (non-composite) show existing import modal (no changes)
-- [x] Preview content displays:
-  - Plugin name
-  - Total child count
-  - Breakdown: "X new artifacts, Y already in collection, Z with version conflicts"
-  - Expandable list of children with their import status
-  - Example: "git-workflow-pro (Plugin)\n- 1 Skill (new)\n- 2 Commands (existing)\n- 1 Agent (conflict)"
-- [x] Child status indicators:
-  - "new" — artifact will be created
-  - "existing" — artifact already in collection, will be linked/reused
-  - "conflict" — artifact exists with different version, may need resolution
-- [x] User actions:
-  - User can expand/collapse child list
-  - User can click child to see more details
-  - Primary action: "Import" button (enabled when valid)
+- [ ] Preview displays three buckets:
+  - **"New (Will Import)"**: Artifacts not found in collection — will be created
+  - **"Existing (Identical Hash - Will Link)"**: Artifacts already in collection with matching content hash — will be linked/reused
+  - **"Conflict (Different Hash - Needs Resolution)"**: Artifacts with same name but different content hash — user can fork as new version or merge via Sync Status
+- [ ] Summary line:
+  - Plugin name + total child count
+  - Breakdown: "X new, Y existing (will link), Z conflicts"
+- [ ] Child status indicators per bucket:
+  - Expandable list of children grouped by bucket
+  - Each child shows: name, type, status icon
+- [ ] Conflict handling:
+  - For conflicts: user can choose to fork as new version or defer to merge via Sync Status
+  - Primary action: "Import" button (imports new + links existing; conflicts handled per user choice)
   - Secondary action: "Cancel" button
-- [x] Before/after comparison (optional):
-  - Show current collection artifact count before import
-  - Show projected count after import
-- [x] Mobile responsive:
+- [ ] Mobile responsive:
   - Modal works on narrow screens
   - List items readable
-- [x] Accessibility:
-  - ARIA live region announces summary when modal opens
-  - Keyboard navigation works (Tab, Enter, Esc to close)
-  - Screen readers can access all information
+- [ ] ARIA live region announces summary on open. Keyboard navigation works (Tab, Enter, Esc to close).
 
 **Key Files to Create/Modify**:
 - `skillmeat/web/components/import-modal.tsx` — Update to detect composite and show preview
@@ -254,7 +245,7 @@ This phase transforms the system from invisible backend infrastructure into a us
 - Check if result is `DiscoveredGraph` to determine if composite
 - If composite, show preview UI; if atomic, show existing modal
 - Preview data comes from `DiscoveredGraph` (from discovery phase), not API
-- Mock data for E2E tests: create fake `DiscoveredGraph` with known children
+- Dedup results (which bucket each child falls into) come from backend dedup logic (CAI-P3-02)
 
 **Estimate**: 2 story points
 
@@ -262,45 +253,44 @@ This phase transforms the system from invisible backend infrastructure into a us
 
 ### CAI-P4-06: Version Conflict Resolution Dialog
 
-**Description**: Implement a dialog that appears when deploying a Plugin with pinned child versions that conflict with currently deployed versions. Dialog offers side-by-side or overwrite resolution for Claude Code deployments in v1.
+**Description**: Implement a dialog that appears when deploying a Plugin with pinned child versions that conflict with currently deployed versions. Wired to real backend API for conflict detection and resolution. No stub backends.
 
 **Acceptance Criteria**:
-- [x] Dialog trigger:
+- [ ] Dialog trigger:
   - Appears during Claude Code plugin deployment if version conflict detected
   - Shows which child artifact has conflicting version
   - Displays: artifact name, pinned hash (brief), current hash (brief), date of conflict
-- [x] Dialog content:
+- [ ] Dialog content:
   - Clear explanation of conflict: "Plugin expects version A, but you have version B deployed"
   - Two resolution options:
     - **Side-by-side**: Deploy plugin version separately (renamed, e.g., `git-commit-v1.2.0`)
     - **Overwrite**: Use plugin's pinned version, override currently deployed version
   - Escape hatch: "Skip plugin deployment" to abort without changes
-- [x] User decision:
+- [ ] Backend integration:
+  - Backend deployment propagation (CAI-P3-05) provides conflict data
+  - Dialog consumes real API responses — no stubs
+  - Resolution choice sent back to API for execution
+- [ ] User decision:
   - User selects resolution option
   - Dialog closes
   - Deployment proceeds with chosen resolution
-- [x] Platform scope:
+- [ ] Platform scope:
   - Claude Code: dialog + resolution workflow enabled
   - Other platforms: no dialog; UI shows "plugin deployment not yet supported on this platform"
-- [x] Multiple conflicts:
+- [ ] Multiple conflicts:
   - If multiple children have conflicts, show all in single dialog or wizard
   - Allow user to choose resolution per conflict
-- [x] Mobile responsive:
+- [ ] Mobile responsive:
   - Dialog readable on mobile
   - Options clear
-- [x] Accessibility:
-  - Dialog properly announced via ARIA
-  - Buttons clearly labeled
-  - Keyboard navigation (Tab, Enter)
-  - Focus trap in dialog
+- [ ] Dialog has aria-modal, focus trap, keyboard navigation (Tab, Enter, Esc)
 
 **Key Files to Create/Modify**:
 - `skillmeat/web/components/deployment/conflict-resolution-dialog.tsx` (new) — Define dialog
 - May integrate with existing deployment flow
 
 **Implementation Notes**:
-- Dialog is triggered by deployment logic (not in this phase's scope, but integration point)
-- Conflict detection happens on backend; frontend receives conflict info
+- Conflict detection happens on backend; frontend receives conflict info via API
 - Side-by-side strategy: Backend handles renaming/versioning logic
 - Overwrite strategy: User explicitly chooses to override; log this for audit
 - Consider if user should see hash diff visualization (nice-to-have, not required)
@@ -309,110 +299,35 @@ This phase transforms the system from invisible backend infrastructure into a us
 
 ---
 
-### CAI-P4-07: Accessibility (a11y)
-
-**Description**: Ensure all UI components for relationships meet WCAG 2.1 AA standards. Focus on keyboard navigation, screen reader support, and semantic HTML.
-
-**Acceptance Criteria**:
-- [x] Keyboard navigation:
-  - All tabs accessible via Tab key
-  - All buttons/links accessible via Tab
-  - Enter key activates buttons
-  - Esc key closes dialogs
-  - Tab order logical and visible (focus ring visible)
-- [x] Screen readers:
-  - Tabs announced correctly (role=`tablist`, role=`tab`)
-  - Current tab indicated (aria-current or aria-selected)
-  - Tab content announced when tab becomes active
-  - List items announced with count (e.g., "1 of 3")
-  - Links have descriptive text (not "click here")
-  - Dialogs announced with aria-modal
-- [x] Semantic HTML:
-  - Use `<ul>`/`<li>` for lists
-  - Use proper heading levels (h2, h3)
-  - Use `<button>` for buttons (not `<div>` with click handler)
-  - Use `<a>` for links
-- [x] Color contrast:
-  - Text meets 4.5:1 contrast ratio (AA standard)
-  - Don't rely on color alone to convey status (use icons/text)
-- [x] Labels and instructions:
-  - Form inputs have associated labels
-  - Dialogs have descriptive titles
-  - Error messages associated with inputs (aria-describedby)
-- [x] Testing:
-  - Axe accessibility scanner runs on all new components
-  - NVDA/JAWS screen reader testing (manual or automated)
-  - Keyboard-only navigation tested
-  - No automated a11y errors
-
-**Key Files to Create/Modify**:
-- `skillmeat/web/components/artifact/artifact-contains-tab.tsx` — Add a11y features
-- `skillmeat/web/components/artifact/artifact-part-of-section.tsx` — Add a11y features
-- `skillmeat/web/components/import/composite-preview.tsx` — Add a11y features
-- `skillmeat/web/components/deployment/conflict-resolution-dialog.tsx` — Add a11y features
-
-**Implementation Notes**:
-- Use `aria-*` attributes from shadcn/ui components (they handle a lot automatically)
-- Test with keyboard only (no mouse) — verify all interactions work
-- Use WebAIM contrast checker for color compliance
-- Run axe accessibility scanner in CI
-- Consider user with screen reader testing tools (NVDA on Windows, VoiceOver on Mac)
-
-**Estimate**: 1 story point
+> **Note**: Accessibility requirements have been integrated into each component task (CAI-P4-03 through CAI-P4-06) rather than as a separate pass.
 
 ---
 
-### CAI-P4-08: E2E Tests (Playwright)
+### CAI-P4-08: Core E2E Test (Playwright)
 
-**Description**: Write end-to-end tests using Playwright covering the full user journey: import flow with composite preview, "Contains" tab navigation, "Part of" section visibility, and conflict resolution.
+**Description**: Write end-to-end tests using Playwright covering the core user journeys: import flow with composite preview and "Contains" tab navigation.
 
 **Acceptance Criteria**:
-- [x] Test file: `skillmeat/web/tests/e2e/composite-artifacts.spec.ts`
-- [x] Test scenarios:
+- [ ] Test file: `skillmeat/web/tests/e2e/composite-artifacts.spec.ts`
+- [ ] Test scenarios:
   1. **Import composite flow**:
      - User navigates to import
      - Pastes plugin repo URL
      - Discovery detects composite
-     - Import preview modal shows breakdown
+     - Import preview modal shows three-bucket breakdown
      - User clicks "Import"
      - Plugin appears in collection
-  2. **"Contains" tab**:
+  2. **"Contains" tab navigation**:
      - User opens plugin detail page
      - "Contains" tab visible
      - User clicks "Contains" tab
      - Child artifacts list displays
      - User clicks child artifact link
      - Navigates to child detail page
-  3. **"Part of" section**:
-     - User opens child artifact detail page
-     - "Part of" section visible (if artifact has parents)
-     - Shows parent plugin link
-     - User clicks parent link
-     - Navigates to parent detail page
-  4. **Conflict resolution** (Claude Code deploy workflow):
-     - User deploys plugin
-     - Conflict detected (version mismatch)
-     - Dialog appears
-     - User selects resolution
-     - Dialog closes
-     - Deployment proceeds
-- [x] Test coverage:
-  - Happy path: Import → browse relationships
-  - Error scenarios: Network errors, missing data
-  - Mobile: Tests run on mobile viewport
-  - Accessibility: Tab navigation tested
-- [x] Performance:
-  - Tests complete in <60 seconds per scenario
-  - No flakiness (re-run 5x, all pass)
-- [x] CI integration:
-  - Tests run in GitHub Actions
-  - Headless Chromium browser
-  - Screenshots on failure
-  - Video recording optional
+- [ ] Tests complete in <60 seconds per scenario
 
 **Key Files to Create/Modify**:
 - `skillmeat/web/tests/e2e/composite-artifacts.spec.ts` (new) — E2E test file
-- `skillmeat/web/tests/e2e/fixtures/` — May add fixtures for test data
 
 **Implementation Notes**:
 - Use existing Playwright setup in project (if available)
@@ -420,9 +335,34 @@ This phase transforms the system from invisible backend infrastructure into a us
 - Create test plugins/artifacts via API before running E2E (use `page.request()`)
 - Use page object pattern for maintainability (separate selectors from test logic)
 - Headless mode for CI; headed mode for local development
-- Screenshots on failure help debugging
 
-**Estimate**: 2 story points
+**Estimate**: 1 story point
+
+---
+
+### CAI-P4-09: CLI Composite Listing
+
+**Description**: Ensure composites (Plugins) appear alongside atomic artifacts in `skillmeat list` output. Filter by platform profile (default: Claude Code shows Plugins). CLI displays composite type and child count.
+
+**Acceptance Criteria**:
+- [ ] `skillmeat list` shows composites alongside skills, commands, etc.
+- [ ] Output includes composite_type and child artifact count
+- [ ] Platform profile filter works (default Claude Code)
+
+**Key Files to Modify**:
+- `skillmeat/cli.py` or relevant CLI module
+
+**Implementation Notes**:
+- Query composites from DB alongside atomic artifacts
+- Display composite_type (e.g., "plugin") and child count in list output
+- Platform profile filtering: default to Claude Code, which shows Plugins
+- Use existing Rich table output pattern for consistent formatting
+
+**Dependencies**: Phase 1 complete
+
+**Estimate**: 1 story point
+
+**Subagent**: python-backend-engineer
 
 ---
 
@@ -433,15 +373,16 @@ Before Phase 4 is complete, all the following must pass:
 - [ ] TypeScript types match backend OpenAPI schema
 - [ ] `useArtifactAssociations` hook fetches and caches correctly
 - [ ] "Contains" tab visible for plugins, lists children correctly
+- [ ] "Contains" tab meets WCAG 2.1 AA (keyboard nav, semantic HTML, screen reader)
 - [ ] "Part of" section visible for artifacts with parents
-- [ ] Import preview modal shows composite breakdown before user confirms
-- [ ] Version conflict dialog appears on deploy conflict, offers resolutions
+- [ ] "Part of" section meets WCAG 2.1 AA (semantic list, descriptive links, screen reader)
+- [ ] Import preview modal shows three-bucket breakdown (new, existing, conflict) before user confirms
+- [ ] Import preview modal has ARIA live region and keyboard navigation
+- [ ] Version conflict dialog appears on deploy conflict, offers resolutions via real backend API
+- [ ] Conflict dialog has aria-modal, focus trap, keyboard navigation
 - [ ] Non-Claude platforms show explicit "plugin deployment not yet supported" state
-- [ ] All new components pass accessibility checks (axe scanner <0 violations)
-- [ ] Keyboard navigation works: Tab, Enter, Esc all functional
-- [ ] Screen reader testing: NVDA/VoiceOver can access all content
-- [ ] E2E tests pass: Import → browse relationships → conflicts (if applicable)
-- [ ] E2E tests are not flaky (pass 5/5 consecutive runs)
+- [ ] Core import E2E test passes
+- [ ] CLI `skillmeat list` shows composites alongside atomic artifacts with type and child count
 - [ ] Mobile responsive: All components work on 375px width
 - [ ] No P0/P1 bugs found in QA testing
 
@@ -485,14 +426,12 @@ Reference existing E2E tests in `skillmeat/web/tests/e2e/`:
 
 - [ ] TypeScript types for `AssociationsDTO` defined and exported
 - [ ] `useArtifactAssociations` hook implemented with caching and error handling
-- [ ] "Contains" tab added to artifact detail page (conditional on composite type)
-- [ ] "Part of" section added to artifact detail page (conditional on parents)
-- [ ] Import preview modal updated to show composite breakdown
-- [ ] Version conflict resolution dialog implemented
-- [ ] All components pass accessibility checks (axe <0 violations)
-- [ ] Keyboard navigation tested and working
-- [ ] E2E tests cover import flow, tab navigation, section visibility
-- [ ] E2E tests pass consistently (5/5 runs)
+- [ ] "Contains" tab added to artifact detail page (conditional on composite type) with a11y
+- [ ] "Part of" section added to artifact detail page (conditional on parents) with a11y
+- [ ] Import preview modal updated to show three-bucket composite breakdown with a11y
+- [ ] Version conflict resolution dialog implemented with real backend API and a11y
+- [ ] Core E2E test covers import flow and Contains tab navigation
+- [ ] CLI `skillmeat list` shows composites alongside atomic artifacts
 - [ ] Components responsive on mobile (375px+)
 - [ ] All Phase 4 quality gates passing
 - [ ] Code reviewed and merged to main branch
@@ -524,5 +463,5 @@ After all phases complete, before shipping to production:
 ---
 
 **Implementation Plan Complete**
-Version: 1.0
-Last Updated: 2026-02-17
+Version: 1.1
+Last Updated: 2026-02-18
