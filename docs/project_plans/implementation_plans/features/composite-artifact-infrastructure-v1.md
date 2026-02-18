@@ -23,8 +23,8 @@ related:
 - **ADR-007**: `/docs/dev/architecture/decisions/ADR-007-artifact-uuid-identity.md`
 
 **Complexity**: Large (L)
-**Total Estimated Effort**: 47 story points across 4 phases
-**Target Timeline**: 14-18 days (3-4 weeks at 1 FTE backend + 1 FTE frontend)
+**Total Estimated Effort**: 64 story points across 5 phases
+**Target Timeline**: 18-23 days (4-5 weeks at 1 FTE backend + 1 FTE frontend)
 
 ---
 
@@ -205,22 +205,52 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 
 ---
 
+### Phase 5: UUID Migration for Existing Join Tables (Backend)
+
+**Duration**: 4-5 days
+**Dependencies**: Phase 4 complete
+**Assigned Subagent(s)**: data-layer-expert, python-backend-engineer
+
+**Overview**: Migrate existing join tables (`collection_artifacts`, `group_artifacts`, `artifact_tags`) from `type:name` string references to UUID FK references per ADR-007 Phase 2. This is cleanup that improves referential integrity across the entire data layer, enabled by the UUID column added in Phase 1.
+
+See detailed phase breakdown: [Phase 5: UUID Migration](./composite-artifact-infrastructure-v1/phase-5-uuid-migration.md)
+
+**Key Deliverables**:
+- `collection_artifacts` migrated to `artifact_uuid` FK with cascading deletes
+- `group_artifacts` migrated to `artifact_uuid` FK with cascading deletes
+- `artifact_tags` migrated to `artifact_uuid` FK with cascading deletes
+- All repository methods updated for UUID-based joins
+- Assessment of `type:name` PK to unique index feasibility
+- Comprehensive regression tests across all migrated tables
+- Phase 1 compatibility layer retired
+
+**Phase 5 Quality Gates**:
+- [ ] All join tables use UUID FK with referential integrity enforced
+- [ ] Cascading deletes work across all join tables
+- [ ] All Alembic migrations apply and rollback cleanly
+- [ ] No API surface changes — external consumers see same type:name identifiers
+- [ ] No regression in collection management, tagging, or grouping features
+- [ ] >80% test coverage on migrated repository methods
+
+---
+
 ## Task Breakdown (Consolidated View)
 
 ### Phase 1: Core Relationships
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Subagent(s) | Dependencies |
 |---------|-----------|-------------|-------------------|----------|-------------|--------------|
-| CAI-P1-01 | Add COMPOSITE enum + CompositeType | Add `COMPOSITE` to `ArtifactType` enum; add `CompositeType` enum with `PLUGIN` value; audit all call sites for exhaustiveness | Enums added; all tests pass; no type-checking errors in IDE/CI | 1 pt | data-layer-expert | None |
-| CAI-P1-01b | Add UUID column to CachedArtifact | Add UUID identity column to `CachedArtifact` per ADR-007; generate and apply Alembic migration for UUID column | UUID column present; auto-populated for new rows; backfilled for existing rows | 2 pts | data-layer-expert | None |
-| CAI-P1-02 | Composite data models | Define collection-scoped `CompositeArtifact` + membership metadata ORM with scoped keys, `composite_type` (from `CompositeType` enum), `relationship_type`, `pinned_version_hash`; `CompositeMembership.child_artifact_uuid` FK references `CachedArtifact.uuid` | Models validate; follows existing association patterns; no atomic artifact schema mutation; UUID FK enforced | 2 pts | data-layer-expert | CAI-P1-01, CAI-P1-01b |
-| CAI-P1-03 | Metadata linkage queries | Implement parent/child metadata query surfaces without adding direct relationships to atomic `Artifact` model | Parent→child and child→parent traversals work via repository DTOs | 1 pt | data-layer-expert | CAI-P1-02 |
-| CAI-P1-04 | Alembic migration | Generate and apply migration for composite entity + membership metadata tables | Migration applies cleanly; rolls back cleanly; no schema errors | 2 pts | data-layer-expert | CAI-P1-03 |
-| CAI-P1-05 | Membership repository | Implement `get_associations()`, `create_membership()`, `delete_membership()` methods | CRUD methods pass unit tests; pagination handled correctly | 2 pts | python-backend-engineer | CAI-P1-04 |
-| CAI-P1-06 | Repository tests | Unit tests for membership repository CRUD and queries | >80% code coverage; all scenarios tested | 1 pt | python-backend-engineer | CAI-P1-05 |
-| CAI-P1-07 | Integration tests (Phase 1) | Integration tests for model + repository layer | Tests create/read/delete memberships; FK constraints enforced (including UUID FK) | 1 pt | python-backend-engineer | CAI-P1-06 |
+| CAI-P1-01 | Add COMPOSITE enum + CompositeType | Add `COMPOSITE` to `ArtifactType` enum; add `CompositeType` enum with `PLUGIN` value; audit all call sites | Enums added; all tests pass; no type-checking errors | 1 pt | data-layer-expert | None |
+| CAI-P1-02 | Add UUID column to CachedArtifact | Add `uuid` column (String, unique, non-null, indexed, default=uuid4().hex) per ADR-007 | UUID column present; auto-populated for new rows | 1 pt | data-layer-expert | None |
+| CAI-P1-03 | UUID Alembic migration | Add nullable uuid, backfill existing rows, apply NOT NULL + unique index | Migration applies and rolls back cleanly; all rows have UUID | 2 pts | data-layer-expert | CAI-P1-02 |
+| CAI-P1-04 | Composite ORM models | Define `CompositeArtifact` + `CompositeMembership` with UUID FK (`child_artifact_uuid` → `artifacts.uuid`, ondelete=CASCADE) | Models validate; UUID FK enforced; no atomic artifact schema mutation | 2 pts | data-layer-expert | CAI-P1-01, CAI-P1-03 |
+| CAI-P1-05 | Composite tables Alembic migration | Create `composite_artifacts` and `composite_memberships` tables (separate from UUID migration) | Migration applies/rolls back cleanly; FK targets `artifacts.uuid` | 1 pt | data-layer-expert | CAI-P1-04 |
+| CAI-P1-06 | Membership repository + service | Implement CRUD + service-layer `type:name` → UUID resolution (`composite_service.py`) | CRUD methods work; resolution handles not-found; pagination | 2 pts | python-backend-engineer | CAI-P1-05 |
+| CAI-P1-07 | Filesystem manifest UUID writes | Write `CachedArtifact.uuid` into `.skillmeat-deployed.toml` and `manifest.toml` additively | UUID appears in manifests; backward-compatible (old readers unaffected) | 1 pt | python-backend-engineer | CAI-P1-03 |
+| CAI-P1-08 | Unit tests | UUID generation, uniqueness, CompositeMembership CRUD, service-layer resolution (>80% coverage) | All tests pass; >80% coverage on new code | 2 pts | python-backend-engineer | CAI-P1-06 |
+| CAI-P1-09 | Integration tests | FK constraints, cascading deletes, type:name → UUID resolution end-to-end, migration round-trip | All integration scenarios pass; FK constraints enforced | 2 pts | python-backend-engineer | CAI-P1-08 |
 
-**Phase 1 Total**: 12 story points
+**Phase 1 Total**: 14 story points
 
 ---
 
@@ -274,6 +304,23 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 
 ---
 
+### Phase 5: UUID Migration for Existing Join Tables
+
+| Task ID | Task Name | Description | Acceptance Criteria | Estimate | Subagent(s) | Dependencies |
+|---------|-----------|-------------|-------------------|----------|-------------|--------------|
+| CAI-P5-01 | Migrate collection_artifacts | Add `artifact_uuid` FK column, migrate data, drop old `artifact_id` string column | FK enforced; cascading deletes work; migration reversible | 2 pts | data-layer-expert | CAI-P4-08 |
+| CAI-P5-02 | Migrate group_artifacts | Same pattern as P5-01 for group_artifacts table | FK enforced; cascading deletes work; migration reversible | 2 pts | data-layer-expert | CAI-P5-01 |
+| CAI-P5-03 | Migrate artifact_tags | Same pattern for artifact_tags table (PK change: artifact_id → artifact_uuid) | FK enforced; cascading deletes work; migration reversible | 2 pts | data-layer-expert | CAI-P5-02 |
+| CAI-P5-04 | Update repository queries | Update all repository methods to use UUID-based joins | All queries work with UUID FKs; no API surface changes | 3 pts | python-backend-engineer | CAI-P5-03 |
+| CAI-P5-05 | Update service/API layer | Verify all endpoints handle UUID-based join table queries | All endpoints return correct data; external API unchanged | 2 pts | python-backend-engineer | CAI-P5-04 |
+| CAI-P5-06 | Assess PK change feasibility | Evaluate making `type:name` a unique index instead of PK; document decision | Decision documented; implemented if feasible, deferred if risky | 3 pts | data-layer-expert | CAI-P5-05 |
+| CAI-P5-07 | Regression tests | Comprehensive tests across all migrated tables | >80% coverage; no regressions in collection/tag/group features | 2 pts | python-backend-engineer | CAI-P5-05 |
+| CAI-P5-08 | Retire compatibility layer | Remove any dual-path code from Phase 1 | Clean codebase; no stale compatibility shims | 1 pt | python-backend-engineer | CAI-P5-06, CAI-P5-07 |
+
+**Phase 5 Total**: 15 story points
+
+---
+
 ## Story ID Cross-Reference
 
 Mapping from PRD story IDs to implementation task IDs:
@@ -302,11 +349,12 @@ Mapping from PRD story IDs to implementation task IDs:
 
 | Phase | Title | Duration | Effort | Key Deliverables |
 |-------|-------|----------|--------|------------------|
-| 1 | Core Relationships (Backend) | 3-4 days | 12 pts | COMPOSITE enum, CompositeType, UUID column (ADR-007), ORM model, migration, repository layer |
+| 1 | Core Relationships (Backend) | 3-4 days | 14 pts | COMPOSITE enum, CompositeType, UUID column (ADR-007), ORM models, migrations, repository layer |
 | 2 | Enhanced Discovery (Core) | 2-3 days | 8 pts | Graph-aware detection, DiscoveredGraph BaseModel |
 | 3 | Import Orchestration (Core) | 3-4 days | 14 pts | Transactional smart import, dedup logic, API endpoint, bundle export |
 | 4 | Web UI Implementation (Frontend) | 3-4 days | 13 pts | Relationship tabs, import preview (3 buckets), conflict dialog (real backend), CLI listing, core E2E test |
-| **Total** | **Composite Artifact Infrastructure** | **14-18 days** | **47 pts** | **Full relational model + UI relationship browsing** |
+| 5 | UUID Migration (Backend) | 4-5 days | 15 pts | Migrate existing join tables to UUID FK, retire compatibility layer (ADR-007 Phase 2) |
+| **Total** | **Composite Artifact Infrastructure** | **18-23 days** | **64 pts** (Phases 1-4: **49 pts**) | **Full relational model + UI + UUID migration** |
 
 ---
 
@@ -316,7 +364,7 @@ The following items are explicitly deferred to future enhancements:
 
 - **Enhanced version conflict handling during import**: Same-name-different-hash resolution logic (currently defaults to `CREATE_NEW_VERSION`; enhanced UI for conflict resolution deferred)
 - **Cross-platform plugin deployment**: Deployment support beyond Claude Code (other platforms return explicit unsupported response in v1)
-- **ADR-007 Phase 2 — UUID migration for existing join tables**: Migrate `collection_artifacts`, `group_artifacts`, `artifact_tags` from `type:name` strings to UUID FK references. Phase 1 of ADR-007 (UUID column + CompositeMembership FK) is included in this plan; Phase 2 is optional cleanup deferred to a future milestone.
+- **ADR-007 Phase 2 — UUID migration for existing join tables**: Planned as Phase 5. Migrate `collection_artifacts`, `group_artifacts`, `artifact_tags` from `type:name` strings to UUID FK references. Phase 1 of ADR-007 (UUID column + CompositeMembership FK) is in Phase 1; Phase 2 is in Phase 5 (post-UI completion).
 
 ---
 
