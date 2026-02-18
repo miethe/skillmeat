@@ -233,3 +233,53 @@ Working artifacts didn't have these data-level issues, explaining why the proble
 **Status**: RESOLVED
 
 ---
+
+## Marketplace Import Linking - import_id Filter and Sources Tab Navigation
+
+**Date Fixed**: 2026-02-18
+**Severity**: medium
+**Component**: artifacts-api, artifact-details-modal
+
+**Issue**: Two related issues with Marketplace ↔ Collection bidirectional linking:
+
+1. **Collections Tab blank in Marketplace modal**: When viewing an imported artifact in the Marketplace modal (CatalogEntryModal), the "Collections" tab showed "No collections" even though the artifact was imported and belonged to collections.
+
+2. **Sources Tab links don't navigate in Collection**: In the Collection artifact modal (ArtifactDetailsModal), the "Sources" tab showed the source with clickable styling (cursor-pointer, hover effect, ExternalLink icon) but clicking did nothing.
+
+**Root Causes**:
+
+1. **import_id filter queried wrong table**: The `GET /artifacts?import_id=XYZ` endpoint tried to filter filesystem artifacts using `getattr(a, "import_id", None)`, but `import_id` is only stored on `MarketplaceCatalogEntry` in the DB — not on filesystem artifact objects. Every artifact returned `None`, so the filter returned empty results.
+
+2. **Missing onClick handler**: The source card `<div>` at line 1199 in `artifact-details-modal.tsx` had visual affordances but no `onClick` handler to navigate.
+
+**Fix**:
+
+1. **Backend** (`skillmeat/api/routers/artifacts.py`):
+   - Added `MarketplaceCatalogEntry` to imports
+   - Query `MarketplaceCatalogEntry` table for entries with matching `import_id`
+   - Build artifact IDs as `{artifact_type}:{name}` from query results
+   - Filter filesystem artifacts using the matching IDs set
+   - Graceful degradation: if DB query fails, return empty set with warning log
+
+2. **Frontend** (`skillmeat/web/components/collection/artifact-details-modal.tsx`):
+   - Added `onClick` handler to the source card
+   - Navigates to `/marketplace/sources/${sourceEntry.sourceId}?entry=${encodeURIComponent(sourceEntry.entryPath)}`
+   - Uses existing `router` from Next.js
+
+**Files Modified**:
+- `skillmeat/api/routers/artifacts.py`: +35, -3 lines
+  - Added `MarketplaceCatalogEntry` import (line 125)
+  - Replaced broken `getattr()` filter with DB query (lines 2153-2178)
+- `skillmeat/web/components/collection/artifact-details-modal.tsx`: +8, -1 lines
+  - Added onClick handler to source card (lines 1201-1205)
+
+**Testing**:
+- Python imports validated cleanly
+- TypeScript type check passes (pre-existing test file errors unrelated)
+- Verified correct table queried (`MarketplaceCatalogEntry.import_id`)
+
+**Commits**: 62ebef0e
+
+**Status**: RESOLVED
+
+---
