@@ -122,7 +122,12 @@ from skillmeat.api.services.artifact_cache_service import (
     parse_deployments,
 )
 from skillmeat.api.schemas.deployments import DeploymentSummary
-from skillmeat.cache.models import Collection, CollectionArtifact, get_session
+from skillmeat.cache.models import (
+    Collection,
+    CollectionArtifact,
+    MarketplaceCatalogEntry,
+    get_session,
+)
 from skillmeat.cache.repositories import MarketplaceCatalogRepository
 
 logger = logging.getLogger(__name__)
@@ -2148,9 +2153,32 @@ async def list_artifacts(
             artifacts = filtered_artifacts
 
         # Filter by import_id if specified
+        # import_id is stored on MarketplaceCatalogEntry (not filesystem artifacts),
+        # so we query the DB to get artifact names/types from that import batch.
         if import_id:
+            try:
+                db_session = get_session()
+                # Query catalog entries that were imported in this batch
+                entries = (
+                    db_session.query(
+                        MarketplaceCatalogEntry.artifact_type,
+                        MarketplaceCatalogEntry.name,
+                    )
+                    .filter(MarketplaceCatalogEntry.import_id == import_id)
+                    .all()
+                )
+                # Build artifact IDs in "type:name" format
+                matching_ids: set[str] = {
+                    f"{entry.artifact_type}:{entry.name}" for entry in entries
+                }
+                db_session.close()
+            except Exception as e:
+                logger.warning(f"Failed to query import_id from DB: {e}")
+                matching_ids = set()
             artifacts = [
-                a for a in artifacts if getattr(a, "import_id", None) == import_id
+                a
+                for a in artifacts
+                if f"{a.type.value}:{a.name}" in matching_ids
             ]
 
         # Sort artifacts for consistent pagination

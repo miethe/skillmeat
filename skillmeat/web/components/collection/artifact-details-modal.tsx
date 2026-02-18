@@ -1196,7 +1196,14 @@ export function ArtifactDetailsModal({
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
                 ) : sourceEntry ? (
-                  <div className="cursor-pointer rounded-lg border p-4 transition-colors hover:bg-muted/50">
+                  <div
+                    className="cursor-pointer rounded-lg border p-4 transition-colors hover:bg-muted/50"
+                    onClick={() =>
+                      router.push(
+                        `/marketplace/sources/${sourceEntry.sourceId}?entry=${encodeURIComponent(sourceEntry.entryPath)}`
+                      )
+                    }
+                  >
                     <div className="flex items-center gap-3">
                       <Github className="h-5 w-5 text-muted-foreground" />
                       <div className="flex-1">
