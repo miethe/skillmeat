@@ -1158,7 +1158,14 @@ export function ArtifactOperationsModal({
               <span className="sr-only">Loading source information</span>
             </div>
           ) : sourceEntry ? (
-            <div className="rounded-lg border p-4 transition-colors hover:bg-muted/50">
+            <div
+              className="cursor-pointer rounded-lg border p-4 transition-colors hover:bg-muted/50"
+              onClick={() =>
+                router.push(
+                  `/marketplace/sources/${sourceEntry.sourceId}?artifact=${encodeURIComponent(sourceEntry.entryPath)}`
+                )
+              }
+            >
               <div className="flex items-center gap-3">
                 <Github className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
                 <div className="flex-1">

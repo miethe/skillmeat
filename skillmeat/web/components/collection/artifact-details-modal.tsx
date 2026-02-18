@@ -1200,7 +1200,7 @@ export function ArtifactDetailsModal({
                     className="cursor-pointer rounded-lg border p-4 transition-colors hover:bg-muted/50"
                     onClick={() =>
                       router.push(
-                        `/marketplace/sources/${sourceEntry.sourceId}?entry=${encodeURIComponent(sourceEntry.entryPath)}`
+                        `/marketplace/sources/${sourceEntry.sourceId}?artifact=${encodeURIComponent(sourceEntry.entryPath)}`
                       )
                     }
                   >
