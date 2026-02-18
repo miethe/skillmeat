@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 1
+completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -31,7 +31,7 @@ tasks:
 - id: CAI-P2-02
   description: Implement detect_composites() - composite root detection (plugin.json
     OR 2+ artifact-type subdirs)
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -41,7 +41,7 @@ tasks:
 - id: CAI-P2-03
   description: Update discover_artifacts() to return DiscoveredGraph for composites,
     flat DiscoveryResult for atomic
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -105,7 +105,7 @@ files_modified:
 - skillmeat/core/discovery/
 - skillmeat/core/artifact_detection.py
 - tests/test_composite_detection.py
-progress: 20
+progress: 60
 updated: '2026-02-18'
 ---
 
