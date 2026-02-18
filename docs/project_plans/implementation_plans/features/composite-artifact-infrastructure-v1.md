@@ -29,10 +29,10 @@ related:
 
 ## Executive Summary
 
-This implementation plan outlines the phased rollout of the Composite Artifact Infrastructure feature. We will introduce a relational model (`ArtifactAssociation` table) that enables Plugins to own many-to-many relationships with atomic artifacts (Skills, Commands, Agents, etc.), each of which can be independently versioned and reused across multiple Plugins.
+This implementation plan outlines the phased rollout of the Composite Artifact Infrastructure feature. We will introduce collection-scoped composite entities plus membership metadata that enables Plugins to reference atomic artifacts (Skills, Commands, Agents, etc.) without mutating those artifact records.
 
 **Key outcomes**:
-1. **Phase 1** establishes database schema, ORM models, and repository layer for artifact associations.
+1. **Phase 1** establishes database schema, ORM models, and repository layer for composite membership metadata.
 2. **Phase 2** implements graph-aware discovery that detects composite roots and builds in-memory dependency graphs.
 3. **Phase 3** orchestrates smart transactional import with SHA-256 deduplication and version pinning.
 4. **Phase 4** exposes relationships in the web UI with "Contains" tabs, "Part of" sections, and import preview dialogs.
@@ -47,8 +47,8 @@ This implementation plan outlines the phased rollout of the Composite Artifact I
 
 Following MeatyPrompts layered architecture:
 
-1. **Database Layer** (Phase 1) — `artifact_associations` table with composite PK, FKs, relationship metadata, version pinning
-2. **Repository Layer** (Phase 1) — CRUD operations on associations, parent/child lookups, transaction handling
+1. **Database Layer** (Phase 1) — composite entity + membership metadata tables with scoped keys, relationship metadata, version pinning
+2. **Repository Layer** (Phase 1) — CRUD operations on memberships, parent/child lookups, transaction handling
 3. **Service Layer** (Phase 2-3) — Composite detection logic, deduplication, import orchestration
 4. **API Layer** (Phase 3-4) — `GET /artifacts/{id}/associations` endpoint returning `AssociationsDTO`
 5. **UI Layer** (Phase 4) — Artifact detail tabs, import preview modal, relationship rendering
@@ -82,16 +82,16 @@ Following MeatyPrompts layered architecture:
 **Dependencies**: None
 **Assigned Subagent(s)**: data-layer-expert, python-backend-engineer
 
-**Overview**: Establish database schema and ORM layer for artifact associations. This is the foundation for all downstream phases.
+**Overview**: Establish database schema and ORM layer for composite entities and membership metadata. This is the foundation for all downstream phases.
 
 See detailed phase breakdown: [Phase 1: Core Relationships](./composite-artifact-infrastructure-v1/phase-1-core-relationships.md)
 
 **Key Deliverables**:
 - `PLUGIN` added to `ArtifactType` enum with exhaustive call-site audit
-- `ArtifactAssociation` ORM model with composite PK, FKs, `relationship_type`, `pinned_version_hash`
-- Bidirectional `parent_associations` / `child_associations` relationships on `Artifact`
+- `CompositeArtifact` + membership metadata ORM models with scoped keys, `relationship_type`, `pinned_version_hash`
+- Atomic artifact schema remains unchanged; parent/child linkage represented via metadata rows
 - Alembic migration with reversible down() migration
-- Repository methods: `get_associations()`, `create_association()`, `delete_association()`
+- Repository methods: `get_associations()`, `create_membership()`, `delete_membership()`
 - Unit tests for model validation and repository CRUD
 
 **Phase 1 Quality Gates**:
@@ -144,20 +144,21 @@ See detailed phase breakdown: [Phase 3: Import Orchestration](./composite-artifa
 **Key Deliverables**:
 - SHA-256 content hash computation for skills (directory tree hash) and single-file artifacts
 - Dedup logic: hash lookup → link existing / new version / create new
-- Transaction wrapper for plugin import: all children + parent + associations in single DB transaction
+- Transaction wrapper for plugin import: all children + composite entity + memberships in single DB transaction
 - Rollback on any child failure: no partial imports
-- Record `pinned_version_hash` in `ArtifactAssociation` at import time
-- Sync engine update: `_get_artifact_type_plural()` extension for `PLUGIN` type
-- Plugin meta-file storage: `~/.skillmeat/collection/plugins/<name>/`
+- Record `pinned_version_hash` in membership metadata at import time
+- Propagate composite membership metadata to project deployments (Claude Code in v1)
+- Plugin meta-file storage: `~/.skillmeat/collections/{collection}/plugins/<name>/`
 - Integration tests: happy path, dedup scenarios, rollback validation
 - `GET /artifacts/{id}/associations` API endpoint with `AssociationsDTO` response
 
 **Phase 3 Quality Gates**:
-- [x] Plugin import happy path: all children + parent + associations created in single transaction
+- [x] Plugin import happy path: all children + composite entity + memberships created in single transaction
 - [x] Dedup scenario: re-importing same plugin creates 0 new artifact rows for exact matches
 - [x] Rollback scenario: simulated mid-import failure leaves collection in pre-import state
-- [x] Pinned hash recorded correctly and readable via association repo
-- [x] Sync engine handles `PLUGIN` type correctly
+- [x] Pinned hash recorded correctly and readable via membership repo
+- [x] Project deployment propagation preserves composite membership context for Claude Code
+- [x] Non-Claude platforms return explicit unsupported response for plugin deployment
 - [x] API endpoint returns 200 with `AssociationsDTO` for known artifact, 404 for unknown
 
 ---
@@ -200,12 +201,12 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Subagent(s) | Dependencies |
 |---------|-----------|-------------|-------------------|----------|-------------|--------------|
 | CAI-P1-01 | Add PLUGIN enum | Add `PLUGIN` to `ArtifactType` enum; audit all call sites for exhaustiveness | Enum added; all tests pass; no type-checking errors in IDE/CI | 1 pt | data-layer-expert | None |
-| CAI-P1-02 | ArtifactAssociation model | Define `ArtifactAssociation` ORM with composite PK, FKs, `relationship_type`, `pinned_version_hash` | Model validates; relationships defined; follows `GroupArtifact` pattern | 2 pts | data-layer-expert | CAI-P1-01 |
-| CAI-P1-03 | Artifact relationships | Add `parent_associations` and `child_associations` to `Artifact` ORM | Backrefs work; can traverse parent→child and child→parent | 1 pt | data-layer-expert | CAI-P1-02 |
-| CAI-P1-04 | Alembic migration | Generate and apply migration for `artifact_associations` table | Migration applies cleanly; rolls back cleanly; no schema errors | 2 pts | data-layer-expert | CAI-P1-03 |
-| CAI-P1-05 | Association repository | Implement `get_associations()`, `create_association()`, delete methods | CRUD methods pass unit tests; pagination handled correctly | 2 pts | python-backend-engineer | CAI-P1-04 |
-| CAI-P1-06 | Repository tests | Unit tests for association repository CRUD and queries | >80% code coverage; all scenarios tested | 1 pt | python-backend-engineer | CAI-P1-05 |
-| CAI-P1-07 | Integration tests (Phase 1) | Integration tests for model + repository layer | Tests create/read/delete associations; FK constraints enforced | 1 pt | python-backend-engineer | CAI-P1-06 |
+| CAI-P1-02 | Composite data models | Define collection-scoped `CompositeArtifact` + membership metadata ORM with scoped keys, `relationship_type`, `pinned_version_hash` | Models validate; follows existing association patterns; no atomic artifact schema mutation | 2 pts | data-layer-expert | CAI-P1-01 |
+| CAI-P1-03 | Metadata linkage queries | Implement parent/child metadata query surfaces without adding direct relationships to atomic `Artifact` model | Parent→child and child→parent traversals work via repository DTOs | 1 pt | data-layer-expert | CAI-P1-02 |
+| CAI-P1-04 | Alembic migration | Generate and apply migration for composite entity + membership metadata tables | Migration applies cleanly; rolls back cleanly; no schema errors | 2 pts | data-layer-expert | CAI-P1-03 |
+| CAI-P1-05 | Membership repository | Implement `get_associations()`, `create_membership()`, `delete_membership()` methods | CRUD methods pass unit tests; pagination handled correctly | 2 pts | python-backend-engineer | CAI-P1-04 |
+| CAI-P1-06 | Repository tests | Unit tests for membership repository CRUD and queries | >80% code coverage; all scenarios tested | 1 pt | python-backend-engineer | CAI-P1-05 |
+| CAI-P1-07 | Integration tests (Phase 1) | Integration tests for model + repository layer | Tests create/read/delete memberships; FK constraints enforced | 1 pt | python-backend-engineer | CAI-P1-06 |
 
 **Phase 1 Total**: 10 story points
 
@@ -231,10 +232,10 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 |---------|-----------|-------------|-------------------|----------|-------------|--------------|
 | CAI-P3-01 | Content hash computation | Implement SHA-256 hashing for skills (tree hash) and single-file artifacts | Hashing consistent; same content → same hash; different content → different hash | 1 pt | python-backend-engineer | CAI-P2-05 |
 | CAI-P3-02 | Dedup logic | Implement hash lookup + decision logic (link/new-version/create) | All 3 scenarios handled; unit tests pass | 2 pts | backend-architect | CAI-P3-01 |
-| CAI-P3-03 | Transaction wrapper | Wrap plugin import (children + parent + associations) in single DB transaction | All-or-nothing semantics; rollback on any child failure | 2 pts | python-backend-engineer | CAI-P3-02 |
-| CAI-P3-04 | Version pinning | Record `pinned_version_hash` in `ArtifactAssociation` at import time | Hash stored; retrievable via association repo | 1 pt | python-backend-engineer | CAI-P3-03 |
-| CAI-P3-05 | Sync engine update | Extend `_get_artifact_type_plural()` in sync.py for `PLUGIN` type | Sync handles plugins correctly | 1 pt | backend-architect | CAI-P3-04 |
-| CAI-P3-06 | Plugin storage | Implement `plugins/` directory structure in collection | Meta-files stored at `~/.skillmeat/collection/plugins/<name>/` | 1 pt | python-backend-engineer | CAI-P3-05 |
+| CAI-P3-03 | Transaction wrapper | Wrap plugin import (children + composite entity + memberships) in single DB transaction | All-or-nothing semantics; rollback on any child failure | 2 pts | python-backend-engineer | CAI-P3-02 |
+| CAI-P3-04 | Version pinning | Record `pinned_version_hash` in membership metadata at import time | Hash stored; retrievable via membership repo | 1 pt | python-backend-engineer | CAI-P3-03 |
+| CAI-P3-05 | Project propagation | Carry composite membership metadata into project deployment records (Claude Code in v1) | Deployed children retain parent composite context; unsupported platforms return clear message | 1 pt | backend-architect | CAI-P3-04 |
+| CAI-P3-06 | Plugin storage | Implement `plugins/` directory structure in collection | Meta-files stored at `~/.skillmeat/collections/{collection}/plugins/<name>/` | 1 pt | python-backend-engineer | CAI-P3-05 |
 | CAI-P3-07 | Associations API endpoint | Implement `GET /artifacts/{id}/associations` returning `AssociationsDTO` | Endpoint returns 200 with DTO for valid ID, 404 for unknown | 2 pts | python-backend-engineer | CAI-P3-06 |
 | CAI-P3-08 | Import integration tests | Integration tests for happy path, dedup scenarios, rollback validation | All scenarios pass; dedup verified; rollback works | 2 pts | python-backend-engineer | CAI-P3-07 |
 | CAI-P3-09 | Observability | Add OpenTelemetry spans + structured logs for composite detection, hash check, import transaction | Spans/logs visible in tracing tools; metrics recorded | 1 pt | backend-architect | CAI-P3-08 |
@@ -286,22 +287,23 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 | `ArtifactType` enum change breaks existing callers | High | Medium | Audit all call sites in Phase 1-01; ensure all `match`/`if-elif` chains are exhaustive; PR review enforces this; type-checking catches missed cases |
 | Partial import leaves orphaned child artifacts | High | Low | Wrap plugin import in single DB transaction (Phase 3-03); use existing temp-dir + atomic move pattern; Phase 3 quality gate tests rollback scenario |
 | Import modal doesn't load discovery graph before user confirms | Medium | Low | Ensure discovery completes and returns `DiscoveredGraph` before UI shows import button; Phase 4 E2E test validates this flow |
+| Plugin deployment behavior differs by platform | Medium | Medium | Scope deploy conflict workflow to Claude Code for v1; return explicit unsupported response for other platforms |
 
 ---
 
 ## Key Files & Implementation References
 
 ### Database & ORM
-- `skillmeat/cache/models.py` — Add `ArtifactAssociation` model, update `Artifact` relationships
-- `skillmeat/cache/migrations/versions/` — Alembic migration for `artifact_associations` table
-- `skillmeat/cache/repositories/` — Association CRUD repository methods
-- `skillmeat/core/enums.py` — Add `PLUGIN` to `ArtifactType` enum
+- `skillmeat/cache/models.py` — Add composite entity + membership metadata models
+- `skillmeat/cache/migrations/versions/` — Alembic migration for composite entity + membership metadata tables
+- `skillmeat/cache/repositories.py` — Membership CRUD repository methods
+- `skillmeat/core/artifact_detection.py` — Add `PLUGIN` to `ArtifactType` enum
 
 ### Discovery & Import
 - `skillmeat/core/artifact_detection.py` — Update `ArtifactType`, add composite detection signatures
 - `skillmeat/core/discovery.py` — Implement `DiscoveredGraph`, update `discover_artifacts()`
 - `skillmeat/core/importer.py` — Add hash-based dedup, transaction wrapper, version pinning
-- `skillmeat/core/sync.py` — Extend `_get_artifact_type_plural()` for `PLUGIN` type
+- `skillmeat/core/sync.py` — Propagate composite membership metadata into project deployment state (Claude Code v1 scope)
 
 ### API & Frontend
 - `skillmeat/api/routers/artifacts.py` — Add `GET /artifacts/{id}/associations` endpoint
@@ -312,11 +314,11 @@ See detailed phase breakdown: [Phase 4: Web UI Implementation](./composite-artif
 - `skillmeat/web/components/import-modal.tsx` — Update import preview UI
 
 ### Testing
-- `tests/test_artifact_associations.py` — Unit tests for ORM model and repository
+- `tests/test_composite_memberships.py` — Unit tests for composite entity/membership ORM model and repository
 - `tests/test_composite_detection.py` — Discovery unit tests with fixture repos
-- `tests/test_import_orchestration.py` — Integration tests for smart import
-- `skillmeat/web/__tests__/artifact-detail.test.tsx` — Component tests for relationship tabs
-- `skillmeat/web/__tests__/e2e/import-flow.spec.ts` — E2E tests for import preview and tabs
+- `tests/integration/test_plugin_import_integration.py` — Integration tests for smart import
+- `skillmeat/web/__tests__/components/entity/content-pane.test.tsx` — Component tests for relationship tabs
+- `skillmeat/web/tests/e2e/discovery.spec.ts` — E2E tests for import preview and tabs
 
 ---
 

@@ -29,7 +29,7 @@ Phase 4 brings the Composite Artifact Infrastructure to the web UI, enabling use
 2. View "Part of" section showing which Plugins contain an artifact
 3. See an import preview modal before confirming plugin import
 4. Navigate parent↔child relationships within 2 clicks
-5. Resolve version conflicts when deploying plugins with pinned versions
+5. Resolve version conflicts when deploying plugins with pinned versions (Claude Code in v1)
 
 This phase transforms the system from invisible backend infrastructure into a user-facing feature.
 
@@ -39,7 +39,7 @@ This phase transforms the system from invisible backend infrastructure into a us
 
 ### CAI-P4-01: AssociationsDTO TypeScript Type
 
-**Description**: Generate or manually create the TypeScript type for `AssociationsDTO` that matches the backend API response schema. This enables type-safe frontend code.
+**Description**: Generate the TypeScript type for `AssociationsDTO` from OpenAPI so frontend contracts remain aligned with backend schema.
 
 **Acceptance Criteria**:
 - [x] TypeScript type `AssociationsDTO` defined with:
@@ -65,9 +65,8 @@ This phase transforms the system from invisible backend infrastructure into a us
 - [x] No type errors in IDE when using type
 
 **Implementation Approach**:
-- Option A: Use OpenAPI code-gen tool (if available in project): `openapi-generator` or `openapi-typescript`
-- Option B: Manually create type based on backend schema from `skillmeat/api/schemas/associations.py`
-- Option C: Hand-write type in TypeScript file
+- Use OpenAPI code generation (`skillmeat/web/sdk/` + derived thin types) as canonical source
+- Avoid manual type drift from hand-authored DTO copies
 
 **Key Files to Create/Modify**:
 - `skillmeat/web/types/associations.ts` (new) — Define AssociationsDTO and AssociationItemDTO
@@ -114,7 +113,7 @@ This phase transforms the system from invisible backend infrastructure into a us
 
 **Key Files to Create/Modify**:
 - `skillmeat/web/hooks/useArtifactAssociations.ts` (new) — Define hook
-- `tests/hooks/useArtifactAssociations.test.ts` (new) — Hook tests
+- `skillmeat/web/__tests__/hooks/useArtifactAssociations.test.ts` (new) — Hook tests
 
 **Implementation Notes**:
 - Use existing data-fetching pattern in project (likely React Query, SWR, or Fetch API)
@@ -263,11 +262,11 @@ This phase transforms the system from invisible backend infrastructure into a us
 
 ### CAI-P4-06: Version Conflict Resolution Dialog
 
-**Description**: Implement a dialog that appears when deploying a Plugin with pinned child versions that conflict with currently deployed versions. Dialog offers side-by-side or overwrite resolution.
+**Description**: Implement a dialog that appears when deploying a Plugin with pinned child versions that conflict with currently deployed versions. Dialog offers side-by-side or overwrite resolution for Claude Code deployments in v1.
 
 **Acceptance Criteria**:
 - [x] Dialog trigger:
-  - Appears during plugin deployment if version conflict detected
+  - Appears during Claude Code plugin deployment if version conflict detected
   - Shows which child artifact has conflicting version
   - Displays: artifact name, pinned hash (brief), current hash (brief), date of conflict
 - [x] Dialog content:
@@ -280,6 +279,9 @@ This phase transforms the system from invisible backend infrastructure into a us
   - User selects resolution option
   - Dialog closes
   - Deployment proceeds with chosen resolution
+- [x] Platform scope:
+  - Claude Code: dialog + resolution workflow enabled
+  - Other platforms: no dialog; UI shows "plugin deployment not yet supported on this platform"
 - [x] Multiple conflicts:
   - If multiple children have conflicts, show all in single dialog or wizard
   - Allow user to choose resolution per conflict
@@ -365,7 +367,7 @@ This phase transforms the system from invisible backend infrastructure into a us
 **Description**: Write end-to-end tests using Playwright covering the full user journey: import flow with composite preview, "Contains" tab navigation, "Part of" section visibility, and conflict resolution.
 
 **Acceptance Criteria**:
-- [x] Test file: `skillmeat/web/__tests__/e2e/composite-artifacts.spec.ts`
+- [x] Test file: `skillmeat/web/tests/e2e/composite-artifacts.spec.ts`
 - [x] Test scenarios:
   1. **Import composite flow**:
      - User navigates to import
@@ -387,7 +389,7 @@ This phase transforms the system from invisible backend infrastructure into a us
      - Shows parent plugin link
      - User clicks parent link
      - Navigates to parent detail page
-  4. **Conflict resolution** (if deploy workflow in scope):
+  4. **Conflict resolution** (Claude Code deploy workflow):
      - User deploys plugin
      - Conflict detected (version mismatch)
      - Dialog appears
@@ -409,8 +411,8 @@ This phase transforms the system from invisible backend infrastructure into a us
   - Video recording optional
 
 **Key Files to Create/Modify**:
-- `skillmeat/web/__tests__/e2e/composite-artifacts.spec.ts` (new) — E2E test file
-- `skillmeat/web/__tests__/e2e/fixtures/` — May add fixtures for test data
+- `skillmeat/web/tests/e2e/composite-artifacts.spec.ts` (new) — E2E test file
+- `skillmeat/web/tests/e2e/fixtures/` — May add fixtures for test data
 
 **Implementation Notes**:
 - Use existing Playwright setup in project (if available)
@@ -434,6 +436,7 @@ Before Phase 4 is complete, all the following must pass:
 - [ ] "Part of" section visible for artifacts with parents
 - [ ] Import preview modal shows composite breakdown before user confirms
 - [ ] Version conflict dialog appears on deploy conflict, offers resolutions
+- [ ] Non-Claude platforms show explicit "plugin deployment not yet supported" state
 - [ ] All new components pass accessibility checks (axe scanner <0 violations)
 - [ ] Keyboard navigation works: Tab, Enter, Esc all functional
 - [ ] Screen reader testing: NVDA/VoiceOver can access all content
@@ -470,7 +473,7 @@ Reference existing modal implementations in codebase:
 
 ### Testing Patterns
 
-Reference existing E2E tests in `skillmeat/web/__tests__/e2e/`:
+Reference existing E2E tests in `skillmeat/web/tests/e2e/`:
 - Use page objects for selectors
 - Use fixtures for test data
 - Use `waitFor()` for async operations

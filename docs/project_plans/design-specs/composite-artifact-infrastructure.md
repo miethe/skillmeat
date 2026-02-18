@@ -18,47 +18,44 @@ This decoupling allows child artifacts to be first-class citizens—importable, 
 
 ## 2. Data Model Architecture
 
-We need to move from a parent-child foreign key (1:N) to an association table (N:M) to support shared dependencies.
+We need a collection-scoped composite model to support shared dependencies while keeping atomic artifacts unchanged.
 
 ### A. Database Schema (`skillmeat/cache/models.py`)
 
-We introduce `ArtifactAssociation` to link artifacts. This table handles the "Plugin contains Skill" relationship.
+We introduce a composite entity + membership metadata model. Membership handles the "Plugin contains Skill" relationship without mutating child artifact schema.
 
 ```python
-class ArtifactAssociation(Base):
-    __tablename__ = "artifact_associations"
+class CompositeArtifact(Base):
+    __tablename__ = "composite_artifacts"
 
-    parent_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"), primary_key=True)
-    child_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"), primary_key=True)
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    collection_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    type: Mapped[str] = mapped_column(String, default="plugin")
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    manifest_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+class CompositeMembership(Base):
+    __tablename__ = "composite_memberships"
+
+    collection_id: Mapped[str] = mapped_column(String, primary_key=True)
+    composite_id: Mapped[str] = mapped_column(
+        ForeignKey("composite_artifacts.id", ondelete="CASCADE"), primary_key=True
+    )
+    child_artifact_id: Mapped[str] = mapped_column(String, primary_key=True)  # type:name
     
     # Metadata about the link (e.g., is it a required core component or optional extra?)
     relationship_type: Mapped[str] = mapped_column(String, default="contains") 
     
     # Critical for versioning: Did this plugin assume a specific version of the child?
     pinned_version_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-
-class Artifact(Base):
-    # ... existing fields ...
-
-    # Parent relationships (e.g., Plugins that contain this Skill)
-    parent_associations: Mapped[List["ArtifactAssociation"]] = relationship(
-        "ArtifactAssociation",
-        foreign_keys=[ArtifactAssociation.child_id],
-        backref="child"
-    )
-
-    # Child relationships (e.g., Skills contained in this Plugin)
-    child_associations: Mapped[List["ArtifactAssociation"]] = relationship(
-        "ArtifactAssociation",
-        foreign_keys=[ArtifactAssociation.parent_id],
-        backref="parent"
-    )
+    # Optional JSON metadata for UI "Part of"/"Contains" context without child mutation
+    membership_metadata: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 ```
 
 ### B. Artifact Types
 
-Update `skillmeat/core/enums.py`. We add `PLUGIN` now, but the architecture supports future types.
+Update `skillmeat/core/artifact_detection.py`. We add `PLUGIN` now, but the architecture supports future types.
 
 ```python
 class ArtifactType(str, Enum):
@@ -106,17 +103,17 @@ When the user clicks "Import" on a Plugin:
 
 
 2. **Parent Import:** Import the Plugin artifact itself (storing its specific docs/configs).
-3. **Linkage Creation:** Write rows to `artifact_associations` linking the Plugin ID to the resolved Child IDs.
+3. **Linkage Creation:** Write membership rows linking the Composite ID to resolved Child IDs.
 
 ## 4. Versioning Strategy
 
 Since a Plugin is a specific set of artifacts, versioning is critical to prevent "Plugin Rot" where a shared skill is updated for one plugin but breaks another.
 
-1. **Pinning:** The `ArtifactAssociation` table includes `pinned_version_hash`.
+1. **Pinning:** The membership table includes `pinned_version_hash`.
 2. **Deployment Logic:**
 * When deploying `Plugin X`:
-* Look up all children via `child_associations`.
-* Check the `pinned_version_hash`.
+* Look up children via `CompositeMembership` rows for that composite.
+* Check each row's `pinned_version_hash`.
 * **Conflict Check:** If `Skill Y` is already deployed in the project with a hash *different* from the Plugin's pinned hash, warn the user.
 * **Resolution:** Offer to side-by-side install (rename) or overwrite.
 
@@ -145,7 +142,7 @@ We must strictly separate the Plugin's "Meta Files" from the Children's "Functio
 
 ### Deployment Structure (.claude/)
 
-When deploying the Plugin, we re-assemble the structure virtually or physically based on the target platform's needs.
+When deploying the Plugin, we re-assemble the structure virtually or physically based on the target platform's needs. In v1, this deploy path is supported for Claude Code; other platforms are deferred.
 
 ```text
 .claude/
@@ -162,13 +159,13 @@ When deploying the Plugin, we re-assemble the structure virtually or physically 
 
 ### Phase 1: Core Relationships (Backend)
 
-1. **Schema Migration:** Create `artifact_associations` table.
-2. **Model Updates:** Update `Artifact` ORM to support the relationship.
+1. **Schema Migration:** Create `composite_artifacts` + `composite_memberships` tables.
+2. **Model Updates:** Add composite entity + membership metadata models (atomic artifact schema remains unchanged).
 3. **Versioning:** Ensure `ArtifactVersion` (from the existing codebase) is integrated so different versions of the same skill can coexist in the DB.
 
 ### Phase 2: Enhanced Discovery (Core)
 
-1. **Recursive Scanner:** Update `heuristic_detector.py` to return a hierarchical result set, not just a flat list.
+1. **Recursive Scanner:** Update `discovery.py` to return a hierarchical result set, not just a flat list.
 2. **Composite Logic:** Implement `detect_composites` which looks for grouping patterns (folders containing multiple valid artifact types).
 
 ### Phase 3: Import Orchestration (Core)

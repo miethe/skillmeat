@@ -1,6 +1,6 @@
 ---
 title: "Phase 1: Core Relationships (Database & ORM)"
-description: "Database foundation for artifact associations: schema, ORM models, repository layer"
+description: "Database foundation for composite memberships: schema, ORM models, repository layer"
 audience: [ai-agents, developers]
 tags: [implementation, phase-1, database, orm, repository]
 created: 2026-02-17
@@ -26,10 +26,10 @@ related:
 Phase 1 establishes the database foundation for the entire Composite Artifact Infrastructure. This phase:
 
 1. Adds `PLUGIN` to the `ArtifactType` enum and audits all call sites for exhaustiveness
-2. Defines the `ArtifactAssociation` ORM model with composite primary key and foreign keys
-3. Adds bidirectional relationships to the `Artifact` ORM model
-4. Generates and applies Alembic migration for the `artifact_associations` table
-5. Implements repository CRUD methods for managing associations
+2. Defines collection-scoped composite entity + membership metadata ORM models
+3. Exposes parent/child linkage via repository DTOs (without mutating atomic artifact schema)
+4. Generates and applies Alembic migration for composite entity + membership tables
+5. Implements repository CRUD methods for managing memberships
 6. Provides comprehensive unit and integration tests
 
 This is a critical phase because all downstream work (discovery, import orchestration, API endpoints, UI) depends on these database structures being stable and well-tested.
@@ -52,7 +52,6 @@ This is a critical phase because all downstream work (discovery, import orchestr
 
 **Key Files to Modify**:
 - `skillmeat/core/artifact_detection.py` — Add `PLUGIN` to enum
-- `skillmeat/core/enums.py` (if separate) — Sync if enums split
 - All callers (search for `ArtifactType.` in codebase):
   - `skillmeat/core/importer.py`
   - `skillmeat/core/sync.py`
@@ -71,24 +70,27 @@ This is a critical phase because all downstream work (discovery, import orchestr
 
 ---
 
-### CAI-P1-02: Define ArtifactAssociation ORM Model
+### CAI-P1-02: Define Composite Entity + Membership ORM Models
 
-**Description**: Create the `ArtifactAssociation` ORM model in `skillmeat/cache/models.py` following the `GroupArtifact` pattern. This model represents the many-to-many relationship between a parent artifact (usually a Plugin) and child artifacts (Skills, Commands, etc.).
+**Description**: Create collection-scoped composite entity + membership metadata models in `skillmeat/cache/models.py` following the `GroupArtifact` pattern. These models represent "Plugin contains Artifact" as metadata without changing child artifact schema.
 
 **Acceptance Criteria**:
-- [x] `ArtifactAssociation` class defined with:
-  - Composite primary key: `(parent_id, child_id)`
-  - Foreign keys to `Artifact` table for both `parent_id` and `child_id` with cascade delete rules
+- [x] `CompositeArtifact` class defined with:
+  - Scoped identity including `collection_id`
+  - Composite type (`plugin`) and manifest/meta fields
+- [x] `CompositeMembership` class defined with:
+  - Scoped key including `collection_id`, `composite_id`, `child_artifact_id`
+  - Child artifact references by collection artifact identifier (`type:name`)
   - `relationship_type: String` column (default `"contains"`, allow `"requires"`, `"extends"` for future)
   - `pinned_version_hash: Optional[String]` column for version pinning at association time
   - Timestamps: `created_at`, `updated_at` (inherited from base model)
 - [x] Model follows existing ORM patterns (inherits from `Base`, uses `Mapped` types)
-- [x] Docstring explains parent/child semantics and version pinning
+- [x] Docstring explains parent/child semantics, collection scope, and version pinning
 - [x] No validation errors when running `python -m sqlalchemy.engine.inspectionEngine`
 - [x] Model can be imported without errors
 
 **Key Files to Modify**:
-- `skillmeat/cache/models.py` — Add `ArtifactAssociation` class after `Artifact` definition
+- `skillmeat/cache/models.py` — Add composite entity + membership models
 
 **Reference Patterns**:
 - Study existing association table: `GroupArtifact` in `models.py` for relationship patterns
@@ -96,42 +98,32 @@ This is a critical phase because all downstream work (discovery, import orchestr
 - Use `Mapped[List[...]]` syntax for relationships (SQLAlchemy 2.0+)
 
 **Implementation Notes**:
-- Composite PK of `(parent_id, child_id)` ensures one relationship per parent-child pair
+- Scoped key ensures one relationship per parent-child pair per collection
 - `pinned_version_hash` is nullable because some relationships might not require version pinning
 - `relationship_type` defaults to `"contains"` (the primary v1 use case); architecture supports `"requires"`, `"extends"`, `"depends_on"` for future phases
-- Both foreign keys should have `ondelete="CASCADE"` to clean up associations when parent or child is deleted
+- Use scoped constraints to clean up memberships when composite entity is deleted
 
 **Estimate**: 2 story points
 
 ---
 
-### CAI-P1-03: Add Bidirectional Relationships to Artifact
+### CAI-P1-03: Add Metadata Linkage Query Surface
 
-**Description**: Add `parent_associations` and `child_associations` SQLAlchemy relationships to the `Artifact` ORM model to enable bidirectional traversal of associations.
+**Description**: Expose parent/child membership lookups via repository DTOs and query helpers while keeping atomic `Artifact` schema unchanged.
 
 **Acceptance Criteria**:
-- [x] `Artifact.parent_associations` relationship defined:
-  - Type: `Mapped[List["ArtifactAssociation"]]`
-  - Foreign key: `ArtifactAssociation.child_id`
-  - Allows querying which Plugins contain this artifact
-- [x] `Artifact.child_associations` relationship defined:
-  - Type: `Mapped[List["ArtifactAssociation"]]`
-  - Foreign key: `ArtifactAssociation.parent_id`
-  - Allows querying which children this Plugin contains
-- [x] Both relationships work with backrefs or back_populates
-- [x] Lazy loading strategy appropriate (select for now; may optimize later)
-- [x] Can traverse: `artifact.parent_associations[0].parent` → parent artifact
-- [x] Can traverse: `artifact.child_associations[0].child` → child artifact
+- [x] Query surfaces support child -> parents (Part of) and composite -> children (Contains)
+- [x] Atomic `Artifact` schema remains unchanged (no direct parent/child relationship fields required)
+- [x] Repository returns DTO-oriented structures for API/UI use
 - [x] No circular import issues
 
 **Key Files to Modify**:
-- `skillmeat/cache/models.py` — Update `Artifact` class with relationship definitions
+- `skillmeat/cache/repositories.py` — Add/extend query helpers for parent/child membership traversal
 
 **Implementation Notes**:
-- Use `back_populates` to maintain consistency (avoid backref magic)
-- Define relationships after `ArtifactAssociation` class to avoid forward reference issues
-- Consider cascade behavior: when an `Artifact` is deleted, should its associations also be deleted? (yes, use CASCADE)
-- Lazy loading: `select` is safe; consider `selectinload` optimization in repository queries if needed later
+- Keep atomic artifact schema stable; represent linkage in metadata tables only
+- Consider cascade behavior for composite deletion and collection deletion
+- Use `selectinload`/joined queries in repository methods as needed to avoid N+1
 
 **Estimate**: 1 story point
 
@@ -139,15 +131,14 @@ This is a critical phase because all downstream work (discovery, import orchestr
 
 ### CAI-P1-04: Generate & Apply Alembic Migration
 
-**Description**: Generate an Alembic migration that creates the `artifact_associations` table and apply it to the development database. The migration must be reversible and must not break existing artifact rows.
+**Description**: Generate an Alembic migration that creates composite entity + membership tables and apply it to the development database. The migration must be reversible and must not break existing artifact rows.
 
 **Acceptance Criteria**:
 - [x] Alembic migration file generated in `skillmeat/cache/migrations/versions/`
-- [x] Migration creates `artifact_associations` table with correct schema:
-  - Columns: `parent_id`, `child_id`, `relationship_type`, `pinned_version_hash`, `created_at`, `updated_at`
-  - Composite primary key: `(parent_id, child_id)`
-  - Foreign keys with cascade delete on both parent and child
-  - Indexes on foreign key columns for query performance
+- [x] Migration creates composite entity + membership tables with correct schema:
+  - Membership columns include `collection_id`, `composite_id`, `child_artifact_id`, `relationship_type`, `pinned_version_hash`, timestamps
+  - Composite key prevents duplicate membership rows within the same collection
+  - Indexes support parent and child lookup performance
 - [x] Migration applies cleanly to fresh database: `alembic upgrade head`
 - [x] Migration rolls back cleanly: `alembic downgrade -1` leaves DB in pre-migration state
 - [x] No existing artifact rows are affected or deleted
@@ -155,11 +146,11 @@ This is a critical phase because all downstream work (discovery, import orchestr
 - [x] Migration file includes descriptive docstring and down() migration
 
 **Key Files to Modify**:
-- `skillmeat/cache/migrations/versions/{timestamp}_add_artifact_associations.py` — New migration
+- `skillmeat/cache/migrations/versions/{timestamp}_add_composite_membership_tables.py` — New migration
 
 **Implementation Steps**:
-1. Update `models.py` with `ArtifactAssociation` class definition
-2. Run `alembic revision --autogenerate -m "Add artifact_associations table"` from skillmeat root
+1. Update `models.py` with composite entity + membership model definitions
+2. Run `alembic revision --autogenerate -m "Add composite entity and membership tables"` from skillmeat root
 3. Review generated migration for correctness
 4. Manually add down() migration if not auto-generated
 5. Test on fresh DB: `alembic upgrade head`
@@ -170,32 +161,31 @@ This is a critical phase because all downstream work (discovery, import orchestr
 
 ---
 
-### CAI-P1-05: Implement Association Repository Methods
+### CAI-P1-05: Implement Membership Repository Methods
 
-**Description**: Implement CRUD methods in the association repository (or primary repository module) to handle association creation, querying, and deletion.
+**Description**: Implement CRUD methods in the membership repository (or primary repository module) to handle membership creation, querying, and deletion.
 
 **Acceptance Criteria**:
 - [x] `get_associations(artifact_id: str) -> AssociationQueryResult`:
   - Returns both parent associations (where artifact is child) and child associations (where artifact is parent)
   - Returns structure: `{"parents": [...], "children": [...]}`
-- [x] `create_association(parent_id: str, child_id: str, relationship_type: str, pinned_version_hash: Optional[str]) -> ArtifactAssociation`:
-  - Creates and returns association record
-  - Validates that both parent and child artifacts exist
-  - Raises `IntegrityError` if association already exists
-- [x] `delete_association(parent_id: str, child_id: str) -> bool`:
-  - Deletes association
+- [x] `create_membership(composite_id: str, child_artifact_id: str, relationship_type: str, pinned_version_hash: Optional[str]) -> MembershipRecord`:
+  - Creates and returns membership record
+  - Validates that composite and child artifact identifiers exist in collection scope
+  - Raises `IntegrityError` if membership already exists
+- [x] `delete_membership(composite_id: str, child_artifact_id: str) -> bool`:
+  - Deletes membership
   - Returns True if deleted, False if not found
-- [x] `get_children_of(parent_id: str) -> List[ArtifactAssociation]`:
+- [x] `get_children_of(composite_id: str) -> List[MembershipRecord]`:
   - Query helper for plugins listing their children
   - Optional: support filtering by relationship_type
-- [x] `get_parents_of(child_id: str) -> List[ArtifactAssociation]`:
+- [x] `get_parents_of(child_id: str) -> List[MembershipRecord]`:
   - Query helper for artifacts listing which plugins contain them
 - [x] Methods use cursor pagination if returning large result sets (not expected for v1, but pattern should be present)
 - [x] All methods properly handle database errors and raise domain exceptions
 
 **Key Files to Modify**:
-- `skillmeat/cache/repositories/` (or main repository module) — Add association methods
-- May create new file: `skillmeat/cache/repositories/associations.py` or extend existing repo
+- `skillmeat/cache/repositories.py` (or primary repository module) — Add membership methods
 
 **Implementation Notes**:
 - Follow existing repository patterns in the codebase (use SQLAlchemy Session, transaction handling)
@@ -207,35 +197,35 @@ This is a critical phase because all downstream work (discovery, import orchestr
 
 ---
 
-### CAI-P1-06: Unit Tests for Association Model & Repository
+### CAI-P1-06: Unit Tests for Membership Model & Repository
 
-**Description**: Write comprehensive unit tests for the `ArtifactAssociation` ORM model and repository methods to ensure correct behavior, error handling, and database constraints.
+**Description**: Write comprehensive unit tests for the `CompositeMembership` ORM model and repository methods to ensure correct behavior, error handling, and database constraints.
 
 **Acceptance Criteria**:
-- [x] Test file: `tests/test_artifact_associations.py` (or similar)
+- [x] Test file: `tests/test_composite_memberships.py` (or similar)
 - [x] Model validation tests:
-  - Valid association creates correctly
+  - Valid membership creates correctly
   - Composite PK prevents duplicate parent-child pairs
   - Foreign key constraints prevent orphaned references
   - `relationship_type` defaults to `"contains"`
   - Timestamps auto-set on creation
 - [x] Repository method tests:
-  - `create_association()` creates and returns correct record
-  - `create_association()` raises error on duplicate
+  - `create_membership()` creates and returns correct record
+  - `create_membership()` raises error on duplicate
   - `get_associations()` returns both parents and children
-  - `delete_association()` removes records
+  - `delete_membership()` removes records
   - `get_children_of()` returns correct children
   - `get_parents_of()` returns correct parents
   - Methods handle non-existent artifacts gracefully
 - [x] Integration tests:
-  - Create association → query → delete workflow
-  - Cascade delete: deleting parent removes associations
-  - Cascade delete: deleting child removes associations
-- [x] Code coverage >80% for all association code
+  - Create membership → query → delete workflow
+  - Cascade delete: deleting parent removes memberships
+  - Cascade delete: deleting child removes memberships
+- [x] Code coverage >80% for all membership code
 - [x] Tests use fixtures or factories for creating test artifacts
 
 **Key Files to Create/Modify**:
-- `tests/test_artifact_associations.py` — New test file
+- `tests/test_composite_memberships.py` — New test file
 - Fixtures in `tests/conftest.py` for test artifacts
 
 **Implementation Notes**:
@@ -253,27 +243,27 @@ This is a critical phase because all downstream work (discovery, import orchestr
 **Description**: Write integration tests verifying model, migration, and repository layer work together correctly in a real database scenario.
 
 **Acceptance Criteria**:
-- [x] Test file: `tests/integration/test_artifact_associations_integration.py`
+- [x] Test file: `tests/integration/test_composite_memberships_integration.py`
 - [x] End-to-end workflow tests:
   - Create test artifacts in DB
-  - Create associations between them
-  - Query associations via repository
+  - Create memberships between them
+  - Query memberships via repository
   - Verify no orphaned records
-  - Delete associations
+  - Delete memberships
   - Verify cleanup
 - [x] Migration tests:
   - Verify migration creates table with correct schema
   - Verify rollback leaves DB clean
   - No existing artifact data is lost
 - [x] Error scenarios:
-  - Attempt to create association with non-existent parent (should fail)
-  - Attempt to create association with non-existent child (should fail)
-  - Attempt duplicate association (should fail)
-- [x] Performance baseline test (create/query 100 associations, verify <100ms)
+  - Attempt to create membership with non-existent parent (should fail)
+  - Attempt to create membership with non-existent child (should fail)
+  - Attempt duplicate membership (should fail)
+- [x] Performance baseline test (create/query 100 memberships, verify <100ms)
 - [x] Tests run against real PostgreSQL (or SQLite for CI)
 
 **Key Files to Create/Modify**:
-- `tests/integration/test_artifact_associations_integration.py` — New test file
+- `tests/integration/test_composite_memberships_integration.py` — New test file
 
 **Estimate**: 1 story point
 
@@ -286,10 +276,10 @@ Before Phase 2 can begin, all the following must pass:
 - [ ] Enum change does not break existing type-checking: `mypy skillmeat --ignore-missing-imports` passes
 - [ ] Alembic migration applies cleanly to fresh DB: `alembic upgrade head` succeeds
 - [ ] Alembic migration rolls back cleanly: `alembic downgrade -1` leaves DB in pre-migration state
-- [ ] Foreign key constraints enforced: attempting to create association with non-existent artifact raises error
-- [ ] Repository CRUD methods pass unit tests: `pytest tests/test_artifact_associations.py -v` passes
-- [ ] Integration tests pass: `pytest tests/integration/test_artifact_associations_integration.py -v` passes
-- [ ] No regression in existing artifact tests: `pytest tests/test_artifacts.py -v` passes (or similar existing tests)
+- [ ] Foreign key constraints enforced: attempting to create membership with non-existent artifact raises error
+- [ ] Repository CRUD methods pass unit tests: `pytest tests/test_composite_memberships.py -v` passes
+- [ ] Integration tests pass: `pytest tests/integration/test_composite_memberships_integration.py -v` passes
+- [ ] No regression in existing artifact tests: `pytest tests/api/test_artifacts.py -v` passes
 - [ ] Code coverage >80% for all new code: `pytest --cov=skillmeat --cov-report=term-missing` shows >80%
 
 ---
@@ -314,7 +304,7 @@ Before Phase 2 can begin, all the following must pass:
 - Query pagination: Use cursor pagination pattern (even if not immediately needed, establish pattern)
 - Error handling: Raise domain-specific exceptions (not raw DB errors)
 - DTOs: Always return DTOs from public methods, not ORM objects
-- Reference existing repository code in `skillmeat/cache/repositories/`
+- Reference existing repository code in `skillmeat/cache/repositories.py`
 
 ### Testing Patterns
 
@@ -328,8 +318,8 @@ Before Phase 2 can begin, all the following must pass:
 ## Deliverables Checklist
 
 - [ ] `ArtifactType.PLUGIN` enum value added and all call sites audited
-- [ ] `ArtifactAssociation` ORM model defined in `models.py`
-- [ ] Bidirectional relationships added to `Artifact` model
+- [ ] Composite entity + membership metadata ORM models defined in `models.py`
+- [ ] Metadata linkage query surface implemented without mutating atomic `Artifact` schema
 - [ ] Alembic migration created and tested (apply & rollback)
 - [ ] Repository methods implemented: `create`, `read`, `delete`, `query_helpers`
 - [ ] Unit test file created with >80% coverage

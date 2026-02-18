@@ -28,8 +28,8 @@ Phase 3 implements the core smart import logic that makes the Composite Artifact
 1. Implements SHA-256 content hash computation for deduplication
 2. Creates deduplication logic (hash lookup → link existing / new version / create new)
 3. Wraps plugin import in a single database transaction for atomicity
-4. Records `pinned_version_hash` in associations at import time
-5. Extends sync engine for `PLUGIN` artifact type
+4. Records `pinned_version_hash` in membership metadata at import time
+5. Propagates composite membership metadata to project deployments (Claude Code in v1)
 6. Implements plugin meta-file storage in collection filesystem
 7. Creates API endpoint for querying associations
 8. Provides comprehensive integration tests
@@ -123,7 +123,7 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 
 ### CAI-P3-03: Transaction Wrapper for Plugin Import
 
-**Description**: Wrap entire plugin import (all children + parent + associations) in a single database transaction. If any child import fails, roll back completely (no partial imports).
+**Description**: Wrap entire plugin import (all children + composite entity + membership metadata rows) in a single database transaction. If any child import fails, roll back completely (no partial imports).
 
 **Acceptance Criteria**:
 - [x] Function: `import_plugin_transactional(discovered_graph: DiscoveredGraph, source_url: str) -> ImportResult`
@@ -135,8 +135,8 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
      c. Execute decision: link existing OR create new version OR create new artifact
      d. If any step fails → raise exception (triggers rollback)
   3. After all children resolved:
-     a. Create plugin artifact row
-     b. Write association rows linking plugin to all children
+     a. Create composite entity row
+     b. Write membership rows linking composite to all children
   4. Commit transaction
 - [x] Rollback on failure:
   - Any exception during import → automatic transaction rollback
@@ -159,9 +159,9 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
   - Validation errors → rollback + return error
   - Don't swallow exceptions; let caller handle
 - [x] Integration tests:
-  - Happy path: all children + parent created, associations written
+  - Happy path: all children + composite entity created, memberships written
   - Rollback scenario: mid-import failure leaves DB clean
-  - Dedup scenario: re-import creates associations only, no new artifacts
+  - Dedup scenario: re-import updates memberships only, no duplicate child artifacts
 
 **Key Files to Modify**:
 - `skillmeat/core/importer.py` — Add `import_plugin_transactional()` function
@@ -179,18 +179,19 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 
 ### CAI-P3-04: Version Pinning (pinned_version_hash)
 
-**Description**: Record the `pinned_version_hash` in `ArtifactAssociation` at the time the association is created (plugin import). This hash enables future conflict detection when deploying.
+**Description**: Record the `pinned_version_hash` in membership metadata at the time the association is created (plugin import). This hash enables future conflict detection when deploying.
 
 **Acceptance Criteria**:
 - [x] At import time (Phase 3-03):
-  - When creating association, compute content hash of child artifact as it exists at import time
-  - Store hash in `ArtifactAssociation.pinned_version_hash`
+  - When creating membership row, compute content hash of child artifact as it exists at import time
+  - Store hash in membership `pinned_version_hash`
 - [x] Query/retrieval:
-  - Repository method: `get_association(parent_id, child_id) -> Association`
-  - Returns association with `pinned_version_hash` populated
+  - Repository method: `get_membership(composite_id, child_artifact_id) -> MembershipRecord`
+  - Returns membership with `pinned_version_hash` populated
 - [x] Schema validation:
   - `pinned_version_hash` is 64-char hex string (or NULL for unversioned associations)
   - Index on `pinned_version_hash` for conflict detection queries
+  - If `ArtifactVersion.content_hash` exists for the same child/version, mismatch is logged as validation warning
 - [x] Unit tests:
   - Association created with correct pinned hash
   - Hash retrieved correctly
@@ -201,10 +202,11 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 
 **Key Files to Modify**:
 - `skillmeat/core/importer.py` — Compute and store hash at association creation
-- `skillmeat/cache/repositories/associations.py` — Ensure hash is returned in queries
+- `skillmeat/cache/repositories.py` — Ensure hash is returned in queries
 
 **Implementation Notes**:
 - Pinned hash represents the version of the child artifact that the plugin author intended
+- Association-time hash is source of truth for membership pinning; compare against `ArtifactVersion.content_hash` when available
 - Future: Support hash migration strategies (side-by-side, overwrite, abort) in Phase 4
 - Logging: Log pinned hash for each association created
 
@@ -212,19 +214,19 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 
 ---
 
-### CAI-P3-05: Sync Engine Update (_get_artifact_type_plural)
+### CAI-P3-05: Project Deployment Propagation (Claude Code v1)
 
-**Description**: Extend the sync engine to handle `PLUGIN` artifact type in filesystem path construction and sync operations.
+**Description**: Propagate composite membership metadata to project deployment state so children retain parent composite context. In v1, plugin deployment behavior is supported for Claude Code only.
 
 **Acceptance Criteria**:
-- [x] Function `_get_artifact_type_plural(artifact_type: ArtifactType) -> str`:
-  - Existing behavior: `SKILL` → `skills`, `COMMAND` → `commands`, etc.
-  - New: `PLUGIN` → `plugins`
-- [x] All references updated:
-  - `skillmeat/core/sync.py` — Update `_get_artifact_type_plural()`
-  - Any code computing filesystem paths based on artifact type
+- [x] Deployment metadata propagation:
+  - Composite deployment creates/updates project-scoped linkage metadata
+  - Child artifacts retain parent composite context in project views/modals
+- [x] Claude Code scope:
+  - Plugin deployment structure and conflict handling enabled for Claude Code
+  - Non-Claude platforms return explicit unsupported response for plugin deploy in v1
 - [x] Plugin sync behavior:
-  - Plugins stored at: `~/.skillmeat/collection/plugins/<plugin-name>/`
+  - Plugins stored at: `~/.skillmeat/collections/{collection}/plugins/<plugin-name>/`
   - Plugin meta-files (plugin.json, README) stored there
   - Children stored under their respective type directories (not nested under plugin)
 - [x] Tests:
@@ -233,13 +235,13 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
   - No recursion/nesting of plugin directories
 
 **Key Files to Modify**:
-- `skillmeat/core/sync.py` — Update `_get_artifact_type_plural()` to handle `PLUGIN`
+- `skillmeat/core/sync.py` — Add deployment metadata propagation + platform gating
 
 **Implementation Notes**:
-- Plugins are "meta" artifacts that don't contain the actual skill/command code
-- Children are fully independent; their paths don't change
-- Consider if `refresh_single_artifact_cache()` needs plugin-specific handling (likely not)
-- Verify sync doesn't attempt to recurse into plugin directories
+- Plugins are "meta" entities that don't duplicate child artifact content
+- Children are fully independent; linkage is metadata only
+- Ensure project deployment APIs expose composite linkage metadata for the "Part of" modal/tab UX
+- Enforce explicit platform gating for non-Claude plugin deployment
 
 **Estimate**: 1 story point
 
@@ -252,7 +254,7 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 **Acceptance Criteria**:
 - [x] Directory structure:
   ```
-  ~/.skillmeat/collection/plugins/
+  ~/.skillmeat/collections/{collection}/plugins/
   └── git-workflow-pro/
       ├── plugin.json
       ├── README.md
@@ -450,11 +452,12 @@ Before Phase 4 can begin, all the following must pass:
 
 - [ ] Hash computation consistent: Same artifact → same hash every time
 - [ ] Dedup logic correct: All three scenarios (link, new version, create) tested
-- [ ] Transaction wrapper works: Happy path imports all children + parent atomically
+- [ ] Transaction wrapper works: Happy path imports all children + composite entity atomically
 - [ ] Rollback scenario passes: Mid-import failure leaves DB clean
-- [ ] Pinned hash stored correctly: Associations include hash, retrievable via API
-- [ ] Sync engine handles plugins: `_get_artifact_type_plural("plugin")` returns `"plugins"`
-- [ ] Plugin files stored correctly: `~/.skillmeat/collection/plugins/<name>/` directory created
+- [ ] Pinned hash stored correctly: Memberships include hash, retrievable via API
+- [ ] Project deployment propagation works for Claude Code
+- [ ] Plugin files stored correctly: `~/.skillmeat/collections/{collection}/plugins/<name>/` directory created
+- [ ] Non-Claude plugin deployment returns explicit unsupported response
 - [ ] API endpoint works: `GET /api/v1/artifacts/{id}/associations` returns 200 with `AssociationsDTO`
 - [ ] Integration tests pass: Happy path, dedup, rollback, hash pinning, sync, API all green
 - [ ] Observability complete: OTel spans logged, metrics recorded, structured logs include required fields
@@ -506,7 +509,7 @@ def import_plugin_transactional(discovered_graph, source_url):
             # Step 3: Create associations
             for child_id in child_ids:
                 hash = compute_artifact_hash(...)
-                create_association(plugin_id, child_id, "contains", hash, session)
+                create_membership(plugin_id, child_id, "contains", hash, session)
 
             # Transaction commits here on success
     except Exception as e:
@@ -548,8 +551,8 @@ def import_plugin_transactional(discovered_graph, source_url):
 - [ ] Deduplication logic implemented with all three scenarios
 - [ ] Transaction wrapper for plugin import implemented with rollback
 - [ ] Version pinning (`pinned_version_hash`) stored and retrievable
-- [ ] Sync engine updated to handle `PLUGIN` type
-- [ ] Plugin meta-file storage implemented at `~/.skillmeat/collection/plugins/`
+- [ ] Project deployment propagation implemented (Claude Code v1 scope)
+- [ ] Plugin meta-file storage implemented at `~/.skillmeat/collections/{collection}/plugins/`
 - [ ] `GET /artifacts/{id}/associations` API endpoint implemented
 - [ ] Integration tests covering happy path, dedup, rollback, pinning, sync
 - [ ] OpenTelemetry spans, metrics, and structured logging added

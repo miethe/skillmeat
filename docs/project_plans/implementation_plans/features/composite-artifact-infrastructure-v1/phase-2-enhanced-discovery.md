@@ -74,7 +74,7 @@ The output of this phase feeds directly into Phase 3 (import orchestration) and 
   - Returns `DiscoveredGraph` if composite detected
   - Returns `None` if root is not a composite (caller should fall back to flat discovery)
 - [x] Detection logic:
-  - **Signal 1**: Presence of `plugin.json` in root directory (authoritative; if present, assume composite)
+  - **Signal 1**: Presence of `plugin.json` in root directory (authoritative; parse permissive v1 schema with `name`, `version`, optional metadata)
   - **Signal 2**: Multiple distinct artifact-type subdirectories (e.g., `skills/` + `commands/` + `agents/`)
   - **False positive guard**: Require at least 2 distinct artifact-type subdirectories to qualify as composite (prevents single-skill repo being mis-classified)
 - [x] Child discovery:
@@ -99,6 +99,7 @@ The output of this phase feeds directly into Phase 3 (import orchestration) and 
 
 **Implementation Notes**:
 - Plugin root detection: Check for `plugin.json` using existing file-reading patterns
+- `plugin.json` parsing should be schema-tolerant: unknown keys ignored, invalid schema falls back to heuristic path
 - Artifact-type subdirectories: Use `ARTIFACT_SIGNATURES` from `artifact_detection.py` to identify valid types
 - Recursive child detection: Leverage existing `detect_artifact()` function for each child
 - Synthesis of plugin metadata: If no `plugin.json`, create reasonable defaults (e.g., name from repo name)
@@ -130,7 +131,7 @@ The output of this phase feeds directly into Phase 3 (import orchestration) and 
 
 **Key Files to Modify**:
 - `skillmeat/core/discovery.py` — Update `discover_artifacts()` function
-- `skillmeat/core/feature_flags.py` (or config) — Define `composite_artifacts_enabled` flag
+- `skillmeat/api/config.py` — Define `composite_artifacts_enabled` flag in API settings
 
 **Implementation Notes**:
 - Feature flag should default to `True` in dev/staging, can be toggled for gradual rollout
@@ -199,10 +200,10 @@ The output of this phase feeds directly into Phase 3 (import orchestration) and 
 
 **Acceptance Criteria**:
 - [x] Feature flag defined: `composite_artifacts_enabled: bool` (default `True`)
-- [x] Flag location: `skillmeat/core/config.py` or `skillmeat/core/feature_flags.py`
+- [x] Flag location: `skillmeat/api/config.py` (API runtime), with optional mirroring in `skillmeat/config.py` for CLI workflows
 - [x] Can be toggled via:
-  - Environment variable: `COMPOSITE_ARTIFACTS_ENABLED=false`
-  - Config file: `skillmeat.toml` or `.env`
+  - Environment variable: `SKILLMEAT_COMPOSITE_ARTIFACTS_ENABLED=false`
+  - Config file: `.env` (API) and optional `~/.skillmeat/config.toml` mirror for CLI flows
   - Runtime API (optional): Admin endpoint to toggle flags
 - [x] When flag disabled:
   - `discover_artifacts()` uses flat discovery even if composite detected
@@ -217,7 +218,8 @@ The output of this phase feeds directly into Phase 3 (import orchestration) and 
   - Test toggle at runtime
 
 **Key Files to Modify**:
-- `skillmeat/core/config.py` (or feature_flags.py) — Define flag with default value
+- `skillmeat/api/config.py` — Define flag with default value
+- `skillmeat/config.py` (optional) — Mirror flag for CLI-consumed config when needed
 - `skillmeat/core/discovery.py` — Check flag before calling `detect_composites()`
 - Tests — Verify flag behavior
 
