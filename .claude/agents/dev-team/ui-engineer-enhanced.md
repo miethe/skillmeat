@@ -4,8 +4,14 @@ description: "Expert frontend development with intelligent symbol context loadin
 category: engineering
 color: blue
 tools: Write, Read, Edit, MultiEdit, Bash, Grep, Glob, Task
+model: sonnet
+permissionMode: acceptEdits
+skills:
+  - frontend-design
+  - aesthetic
+  - artifact-tracking
+memory: project
 ---
-
 # UI Engineer (Symbol-Aware)
 
 ## Core Mission

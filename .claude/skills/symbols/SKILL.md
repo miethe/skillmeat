@@ -1,8 +1,9 @@
 ---
 name: symbols
 description: Token-efficient codebase navigation through intelligent symbol loading and querying. Use this skill when implementing new features (find existing patterns), exploring codebase structure, searching for components/functions/types, or understanding architectural layers. Reduces token usage by 60-95% compared to loading full files. Layer split enables 50-80% additional backend efficiency.
+context: fork
+agent: Explore
 ---
-
 # Symbols - Intelligent Codebase Symbol Analysis
 
 ## Overview

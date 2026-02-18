@@ -4,8 +4,10 @@ description: "Lead Architecture orchestrator that makes architectural decisions 
 category: engineering
 tools: Task, Read, Write, Edit, Bash, Grep, Glob, WebSearch
 color: purple
+model: opus
+skills:
+  - planning
 ---
-
 # Lead Architect Orchestrator
 
 **Role:** Architectural decision-maker and engineering orchestrator for MeatyPrompts.

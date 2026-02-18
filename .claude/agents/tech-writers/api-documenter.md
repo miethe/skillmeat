@@ -3,8 +3,8 @@ name: api-documenter
 description: Create OpenAPI/Swagger specs, generate SDKs, and write developer documentation. Handles versioning, examples, and interactive docs. Use PROACTIVELY for API documentation or client library generation.
 tools: Read, Write, Edit, Bash
 model: haiku
+permissionMode: acceptEdits
 ---
-
 You are an API documentation specialist focused on developer experience.
 
 ## Focus Areas

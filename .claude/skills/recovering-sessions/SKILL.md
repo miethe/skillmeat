@@ -1,6 +1,8 @@
 ---
 name: recovering-sessions
 description: "Recover from crashed, failed, or interrupted Claude Code sessions. Use this skill when: session crashed during multi-agent parallel execution, need to determine what work was completed vs incomplete, want to generate resumption commands for interrupted tasks, recovering from context window exhaustion, or handling session handoffs. Analyzes agent logs, verifies on-disk state, and creates resumption plans with ready-to-execute Task() commands."
+context: fork
+agent: Explore
 ---
 
 # Session Recovery Skill

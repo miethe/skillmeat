@@ -106,59 +106,95 @@ Commands are prompt templates. Skills are knowledge repositories. Without explic
 
 **Mandatory**: All implementation work MUST be delegated. Opus orchestrates only.
 
-### Model Selection Philosophy
+### Model Selection (Post-Refactor)
 
-**Default: Opus** — Use Opus for subagents unless criteria below indicate otherwise.
+| Model | Budget | Use When |
+|-------|--------|----------|
+| **Opus 4.6** | $15/$75/M | Orchestration, deep reasoning, architectural decisions |
+| **Sonnet 4.6** | $3/$15/M | Implementation, review, moderate reasoning (DEFAULT for subagents) |
+| **Haiku 4.5** | $0.80/$4/M | Mechanical search, extraction, simple queries |
 
-| Model | Use When | Examples |
-|-------|----------|----------|
-| **Opus** (default) | Complex reasoning, architecture decisions, multi-file changes, nuanced judgment | Feature implementation, refactoring, debugging, cross-cutting concerns |
-| **Sonnet** | Moderate complexity, well-scoped tasks, cost-sensitive batches | Single-file fixes, straightforward CRUD, bulk operations |
-| **Haiku** | Simple/mechanical tasks, high-volume ops, quick discovery | File search, status queries, simple doc updates, progress tracking |
+**Default: Sonnet 4.6** — Sonnet is now near-Opus for coding (79.6% SWE-bench). Use Opus only for deep reasoning.
+
+### Implementation Agents
+
+| Agent | Model | Skills | Permission | Memory |
+|-------|-------|--------|------------|--------|
+| python-backend-engineer | sonnet | skillmeat-cli, artifact-tracking | acceptEdits | project |
+| ui-engineer-enhanced | sonnet | frontend-design, aesthetic, artifact-tracking | acceptEdits | project |
+| ui-engineer | sonnet | frontend-design, aesthetic | acceptEdits | - |
+| frontend-developer | sonnet | frontend-design | acceptEdits | - |
+| frontend-architect | sonnet | - | acceptEdits | - |
+| backend-architect | sonnet | - | acceptEdits | - |
+| backend-typescript-architect | sonnet | - | acceptEdits | - |
+| nextjs-architecture-expert | sonnet | - | acceptEdits | - |
+| data-layer-expert | sonnet | - | acceptEdits | - |
+| refactoring-expert | sonnet | - | acceptEdits | - |
+| openapi-expert | sonnet | artifact-tracking | acceptEdits | - |
+| ai-engineer | sonnet | - | acceptEdits | - |
+| documentation-complex | sonnet | - | acceptEdits | - |
 
 ### Exploration & Analysis
 
-| Task | Agent | Model | Rationale |
-|------|-------|-------|-----------|
-| Find files/patterns | codebase-explorer | Haiku | Mechanical search, high volume |
-| Deep analysis | explore | Opus | Complex reasoning needed |
-| Debug investigation | ultrathink-debugger | Opus | Root cause analysis requires depth |
-| Progress tracking | artifact-tracker | Haiku | Structured updates, low complexity |
-| Query status | artifact-query | Haiku | Simple data retrieval |
+| Agent | Model | Skills | Permission | Memory |
+|-------|-------|--------|------------|--------|
+| codebase-explorer | haiku | symbols | plan | project |
+| search-specialist | haiku | - | plan | - |
+| symbols-engineer | haiku | - | plan | - |
+| task-decomposition-expert | haiku | - | plan | - |
+| implementation-planner | haiku | planning | plan | - |
 
-### Implementation
+### Review & Validation
 
-| Task | Agent | Model | Rationale |
-|------|-------|-------|-----------|
-| Backend Python | python-backend-engineer | Opus | Architecture awareness, multi-layer changes |
-| Frontend React | ui-engineer | Opus | Component design, state management |
-| Full-stack TS | backend-typescript-architect | Opus | System-wide considerations |
-| UI components | ui-engineer-enhanced | Opus | Design system coherence |
-| Simple bug fixes | python-backend-engineer | Sonnet | Well-scoped, single-file changes |
-| Bulk/batch ops | (any) | Sonnet | Cost efficiency for repetitive tasks |
+| Agent | Model | Permission | disallowedTools | Memory |
+|-------|-------|------------|-----------------|--------|
+| senior-code-reviewer | sonnet | plan | Write, Edit, MultiEdit, Bash | project |
+| task-completion-validator | sonnet | plan | Write, Edit, MultiEdit | project |
+| karen | opus | plan | Write, Edit, MultiEdit | - |
+| api-librarian | sonnet | plan | Write, Edit, MultiEdit | - |
+| telemetry-auditor | sonnet | plan | Write, Edit, MultiEdit | - |
+| code-reviewer | - | plan | Write, Edit, MultiEdit, Bash | - |
+| a11y-sheriff | - | plan | - | - |
+
+### Orchestration (Opus Only)
+
+| Agent | Model | Skills | Permission | Memory |
+|-------|-------|--------|------------|--------|
+| lead-architect | opus | planning | default | - |
+| lead-pm | opus | planning, artifact-tracking, meatycapture-capture | default | project |
+| spike-writer | opus | planning | default | - |
+| ultrathink-debugger | opus | - | acceptEdits | project |
+| documentation-planner | opus | - | plan | - |
 
 ### Documentation
 
-| Task | Agent | Model | Rationale |
-|------|-------|-------|-----------|
-| Simple docs | documentation-writer | Haiku | Structured, template-based |
-| Feature docs | documentation-writer | Sonnet | Moderate analysis needed |
-| Complex docs | documentation-complex | Opus | Multi-system synthesis |
-| AI artifacts | ai-artifacts-engineer | Opus | Prompt engineering requires nuance |
+| Agent | Model | Permission |
+|-------|-------|------------|
+| documentation-writer | haiku | acceptEdits |
+| documentation-expert | haiku | acceptEdits |
+| api-documenter | haiku | acceptEdits |
+| changelog-generator | haiku | acceptEdits |
+| technical-writer | haiku | - |
 
-### Model Override Guidelines
+### PM & Planning
 
-**Downgrade to Sonnet** when:
-- Task is well-defined with clear boundaries
-- Single file or limited scope
-- Following established patterns (no design decisions)
-- Running 3+ similar tasks in parallel (cost optimization)
+| Agent | Model | Skills |
+|-------|-------|--------|
+| prd-writer | sonnet | planning |
+| feature-planner | sonnet | planning, artifact-tracking |
 
-**Downgrade to Haiku** when:
-- Task is purely mechanical (search, copy, format)
-- High-volume operations (10+ items)
-- Simple status updates or queries
-- Template-based output
+### Agent Teams (Experimental)
+
+For multi-component features, use Agent Teams instead of sequential subagents:
+
+| Team Template | Lead | Teammates | Use When |
+|---------------|------|-----------|----------|
+| feature-team | Opus orchestrator | python-backend-engineer, ui-engineer-enhanced, task-completion-validator | Full feature (API + frontend + tests) |
+| debug-team | ultrathink-debugger | codebase-explorer, python-backend-engineer | Complex debugging with parallel investigation |
+| refactor-team | Opus orchestrator | python-backend-engineer, ui-engineer-enhanced, code-reviewer | Cross-layer refactoring |
+
+**Use Subagents for**: Single-file fixes, batch ops, exploration, docs, review, quick features (< 3 files).
+**Use Agent Teams for**: Full features (5+ files), cross-cutting refactors, multi-system integration, phase execution with 3+ batches.
 
 ### Background Execution
 
@@ -197,22 +233,19 @@ Subagents can run in the background, allowing parallel work:
 ```text
 # Bug: API returns 422 error
 
-1. DELEGATE exploration (Haiku - mechanical search):
-   Task("codebase-explorer", "Find ListItemCreate schema and where it's used", model="haiku")
+1. DELEGATE exploration:
+   Task("codebase-explorer", "Find ListItemCreate schema and where it's used")
+   # codebase-explorer is pre-configured as haiku with plan permissionMode
 
-2. DELEGATE fix (Opus default - requires understanding context):
+2. DELEGATE fix:
    Task("python-backend-engineer", "Fix ListItemCreate schema - make list_id optional.
         File: services/api/app/schemas/list_item.py
         Change: list_id from required to optional (int | None = None)
         Reason: list_id comes from URL path, not request body")
+   # python-backend-engineer is pre-configured as sonnet with acceptEdits
 
 3. COMMIT (Opus does this directly):
    git add ... && git commit
-
-# Feature: Add 5 similar CRUD endpoints (use Sonnet for batch efficiency)
-Task("python-backend-engineer", "Add GET /widgets endpoint", model="sonnet")
-Task("python-backend-engineer", "Add POST /widgets endpoint", model="sonnet")
-# ... parallel batch
 ```
 
 ---
@@ -585,6 +618,7 @@ Never use PyGithub directly; always go through the wrapper.
 - `.claude/context/key-context/component-patterns.md` - React/shadcn patterns
 - `.claude/context/key-context/nextjs-patterns.md` - App Router patterns
 - `.claude/context/key-context/testing-patterns.md` - Jest/Playwright templates
+- `.claude/context/key-context/agent-teams-patterns.md` - Agent Teams vs subagents decision framework
 
 **Reference Context** (load as needed):
 - `.claude/context/api-endpoint-mapping.md` - Full API reference

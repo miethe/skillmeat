@@ -1,8 +1,9 @@
 ---
 name: Confidence Check
 description: Pre-implementation confidence assessment (≥90% required). Use before starting any implementation to verify readiness with duplicate check, architecture compliance, official docs verification, OSS references, and root cause identification.
+context: fork
+agent: general-purpose
 ---
-
 # Confidence Check Skill
 
 ## Purpose
