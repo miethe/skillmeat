@@ -3,14 +3,14 @@ type: progress
 prd: composite-artifact-infrastructure
 phase: 5
 title: UUID Migration for Existing Join Tables (Backend)
-status: in_progress
+status: completed
 started: null
 completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 3
-in_progress_tasks: 2
+completed_tasks: 8
+in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
 owners:
@@ -54,7 +54,7 @@ tasks:
 - id: CAI-P5-04
   description: 'Update repository layer to query via artifact_uuid: all CollectionArtifact/GroupArtifact/ArtifactTag
     queries use UUID join; external DTOs still return type:name'
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -64,7 +64,7 @@ tasks:
 - id: CAI-P5-05
   description: 'Verify service and API layer correctness post-migration: smoke test
     all collection, group, and tag endpoints; no API surface changes permitted'
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -75,7 +75,7 @@ tasks:
   description: 'Assess and implement (or defer) PK change: artifacts.id type:name
     → unique index, artifacts.uuid → PK; document outcome in ADR-007 regardless of
     decision'
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies:
@@ -87,7 +87,7 @@ tasks:
   description: 'Comprehensive regression tests: tests/test_uuid_migration_regression.py
     covering all three join tables, cascade deletes, API endpoints, and alembic downgrade
     -3'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -98,7 +98,7 @@ tasks:
 - id: CAI-P5-08
   description: 'Retire Phase 1 compatibility layer: remove _migrate_artifact_tags_fk()
     if superseded, remove dual-path shims, update ADR-007 Phase 2 checklist'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -165,7 +165,7 @@ files_modified:
 - tests/test_uuid_migration_regression.py
 - tests/conftest.py
 - docs/dev/architecture/decisions/ADR-007-artifact-uuid-identity.md
-progress: 37
+progress: 100
 updated: '2026-02-19'
 ---
 
