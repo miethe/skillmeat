@@ -16,19 +16,92 @@ Usage:
 
     >>> from skillmeat.cache.migrations import run_migrations
     >>> run_migrations()
+
+Migration Safety Pattern - FK Migrations Requiring Populated artifacts Table:
+    Some migrations JOIN against the artifacts table to resolve type:name IDs
+    to stable UUIDs (per ADR-007).  If the cache has never been populated (or
+    was wiped), those JOINs silently produce zero rows and no data is migrated,
+    causing permanent data loss for association rows.
+
+    Any migration that reads from or JOINs against artifacts MUST call
+    ``ensure_artifacts_populated()`` at the top of its ``upgrade()`` function:
+
+    .. code-block:: python
+
+        from skillmeat.cache.migrations.env import ensure_artifacts_populated
+
+        def upgrade() -> None:
+            ensure_artifacts_populated()   # Raises RuntimeError if table empty
+            # ... rest of migration
+
+    This guard is deliberately loud: it raises an unrecoverable error rather
+    than silently migrating zero rows, which would be much harder to diagnose
+    after the fact.
 """
 
 from __future__ import annotations
 
+import logging
 import sys
 from logging.config import fileConfig
-
-from alembic import context
-from sqlalchemy import engine_from_config, pool, text
-
-# Add skillmeat to Python path for imports
 from pathlib import Path
 
+from alembic import context, op
+from sqlalchemy import engine_from_config, pool, text
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Migration safety helpers
+# ---------------------------------------------------------------------------
+
+_ARTIFACTS_LOW_WATERMARK = 10  # Warn when row count is suspiciously low
+
+
+def ensure_artifacts_populated() -> None:
+    """Assert that the artifacts table has been populated before proceeding.
+
+    Call this at the top of any ``upgrade()`` function that JOINs against the
+    artifacts table to resolve ``type:name`` identifiers to UUIDs.  If the
+    cache has not been refreshed, the JOIN produces zero rows and the migration
+    silently migrates nothing, leaving association tables empty.
+
+    Raises:
+        RuntimeError: If the artifacts table contains zero rows.
+
+    Side-effects:
+        Logs a WARNING when the row count is above zero but below
+        ``_ARTIFACTS_LOW_WATERMARK`` (currently {watermark}), which may
+        indicate a partially-populated cache.
+
+    Example::
+
+        from skillmeat.cache.migrations.env import ensure_artifacts_populated
+
+        def upgrade() -> None:
+            ensure_artifacts_populated()
+            # ... rest of migration
+    """.format(watermark=_ARTIFACTS_LOW_WATERMARK)
+    conn = op.get_bind()
+    result = conn.execute(text("SELECT COUNT(*) FROM artifacts"))
+    count: int = result.scalar() or 0
+
+    if count == 0:
+        raise RuntimeError(
+            "Cannot run migration: artifacts table is empty. "
+            "Run 'skillmeat cache refresh' (or 'skillmeat web dev' which "
+            "triggers a refresh on startup) and then re-run migrations."
+        )
+
+    if count < _ARTIFACTS_LOW_WATERMARK:
+        logger.warning(
+            "ensure_artifacts_populated: artifacts table has only %d row(s). "
+            "This is unexpectedly low and may indicate a partially-populated "
+            "cache. Migration will proceed, but verify results afterwards.",
+            count,
+        )
+
+# Add skillmeat to Python path for imports
 skillmeat_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(skillmeat_root))
 
