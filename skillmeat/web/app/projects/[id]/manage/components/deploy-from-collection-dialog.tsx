@@ -92,7 +92,12 @@ export function DeployFromCollectionDialog({
     if (!selectedGroupId || !groupArtifacts) return null;
     const set = new Set<string>();
     for (const ga of groupArtifacts) {
-      set.add(ga.artifact_id);
+      // Use artifact_id (type:name) when available for entity.id comparison;
+      // also add artifact_uuid as fallback for orphaned entries.
+      if (ga.artifact_id) {
+        set.add(ga.artifact_id);
+      }
+      set.add(ga.artifact_uuid);
     }
     return set;
   }, [selectedGroupId, groupArtifacts]);

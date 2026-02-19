@@ -257,9 +257,9 @@ class AddGroupArtifactsRequest(BaseModel):
 class ArtifactPositionUpdate(BaseModel):
     """Schema for updating artifact position in bulk reorder operations."""
 
-    artifact_id: str = Field(
-        description="Artifact ID",
-        examples=["artifact1"],
+    artifact_uuid: str = Field(
+        description="Artifact UUID (ADR-007 stable identity)",
+        examples=["a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"],
     )
     position: int = Field(
         ge=0,
@@ -280,9 +280,18 @@ class ReorderArtifactsRequest(BaseModel):
 class GroupArtifactResponse(BaseModel):
     """Response schema for an artifact in a group."""
 
-    artifact_id: str = Field(
-        description="Artifact ID",
-        examples=["artifact1"],
+    artifact_uuid: str = Field(
+        description="Artifact UUID (ADR-007 stable identity)",
+        examples=["a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"],
+    )
+    artifact_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Resolved artifact ID (type:name format) for API lookups. "
+            "Populated when the artifact exists in the local cache; "
+            "None for orphaned UUIDs."
+        ),
+        examples=["skill:canvas-design"],
     )
     position: int = Field(
         description="Position in group",
@@ -297,7 +306,8 @@ class GroupArtifactResponse(BaseModel):
 
         json_schema_extra = {
             "example": {
-                "artifact_id": "artifact1",
+                "artifact_uuid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+                "artifact_id": "skill:canvas-design",
                 "position": 0,
                 "added_at": "2024-11-16T12:00:00Z",
             }
@@ -398,12 +408,12 @@ class GroupWithArtifactsResponse(GroupResponse):
                 "artifact_count": 2,
                 "artifacts": [
                     {
-                        "artifact_id": "artifact1",
+                        "artifact_uuid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
                         "position": 0,
                         "added_at": "2024-11-16T12:00:00Z",
                     },
                     {
-                        "artifact_id": "artifact2",
+                        "artifact_uuid": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
                         "position": 1,
                         "added_at": "2024-11-16T13:00:00Z",
                     },

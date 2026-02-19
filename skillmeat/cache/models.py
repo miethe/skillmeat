@@ -335,6 +335,14 @@ class Artifact(Base):
         back_populates="child_artifact",
         lazy="selectin",
     )
+    # Group membership — artifacts may appear in one or more Groups.
+    # The explicit foreign_keys= argument is required because GroupArtifact
+    # references artifacts.uuid (not artifacts.id).
+    group_memberships: Mapped[List["GroupArtifact"]] = relationship(
+        "GroupArtifact",
+        foreign_keys="[GroupArtifact.artifact_uuid]",
+        lazy="select",
+    )
 
     # Constraints
     __table_args__ = (
@@ -977,20 +985,24 @@ class GroupArtifact(Base):
 
     Represents the many-to-many relationship between groups and artifacts,
     allowing artifacts to be organized within groups with custom ordering.
-    Note that artifact_id has no foreign key constraint as artifacts may
-    reference external sources not yet in the local cache.
 
     Attributes:
         group_id: Foreign key to groups.id (part of composite primary key)
-        artifact_id: Artifact identifier (part of composite primary key, no FK)
+        artifact_uuid: FK to artifacts.uuid (part of composite PK, CASCADE DELETE)
         position: Display order within group (0-based, default 0)
         added_at: Timestamp when artifact was added to group
 
     Indexes:
         - idx_group_artifacts_group_id: Fast lookup by group
-        - idx_group_artifacts_artifact_id: Fast lookup by artifact
+        - idx_group_artifacts_artifact_uuid: Fast lookup by artifact UUID
         - idx_group_artifacts_group_position: Ordered queries within group
         - idx_group_artifacts_added_at: Sort by membership date
+
+    Note:
+        artifact_uuid references artifacts.uuid (the stable ADR-007 identity
+        column) rather than artifacts.id (the mutable type:name string).  This
+        allows cascade deletes when an artifact is removed from the cache and
+        keeps the join table referentially sound.
     """
 
     __tablename__ = "group_artifacts"
@@ -999,7 +1011,12 @@ class GroupArtifact(Base):
     group_id: Mapped[str] = mapped_column(
         String, ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
     )
-    artifact_id: Mapped[str] = mapped_column(String, primary_key=True)
+    artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+        comment="FK to artifacts.uuid (ADR-007 stable identity) — CASCADE DELETE",
+    )
 
     # Ordering and metadata
     position: Mapped[int] = mapped_column(
@@ -1013,7 +1030,7 @@ class GroupArtifact(Base):
     __table_args__ = (
         CheckConstraint("position >= 0", name="check_group_artifact_position"),
         Index("idx_group_artifacts_group_id", "group_id"),
-        Index("idx_group_artifacts_artifact_id", "artifact_id"),
+        Index("idx_group_artifacts_artifact_uuid", "artifact_uuid"),
         Index("idx_group_artifacts_group_position", "group_id", "position"),
         Index("idx_group_artifacts_added_at", "added_at"),
     )
@@ -1022,7 +1039,7 @@ class GroupArtifact(Base):
         """Return string representation of GroupArtifact."""
         return (
             f"<GroupArtifact(group_id={self.group_id!r}, "
-            f"artifact_id={self.artifact_id!r}, position={self.position})>"
+            f"artifact_uuid={self.artifact_uuid!r}, position={self.position})>"
         )
 
 

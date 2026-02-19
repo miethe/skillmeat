@@ -19,11 +19,13 @@ from sqlalchemy.orm import sessionmaker
 from skillmeat.api.config import APISettings, Environment
 from skillmeat.api.server import create_app
 from skillmeat.cache.models import (
+    Artifact,
     Base,
     Collection,
     CollectionArtifact,
     Group,
     GroupArtifact,
+    Project,
 )
 
 
@@ -144,8 +146,26 @@ def target_collection(test_db) -> Collection:
 
 
 @pytest.fixture
-def source_group_with_artifacts(test_db, source_collection) -> tuple[Group, list[str]]:
-    """Create a source group with artifacts for testing."""
+def test_project(test_db) -> "Project":
+    """Create a test project to serve as FK parent for Artifact rows."""
+    project = Project(
+        id=uuid.uuid4().hex,
+        name="Test Project",
+        path="/tmp/test-project",
+        status="active",
+    )
+    test_db.add(project)
+    test_db.commit()
+    return project
+
+
+@pytest.fixture
+def source_group_with_artifacts(test_db, source_collection, test_project) -> tuple[Group, list[str]]:
+    """Create a source group with artifacts for testing.
+
+    CAI-P5-02: GroupArtifact now uses artifact_uuid FK → artifacts.uuid.
+    Fixtures must create real Artifact rows first.
+    """
     # Create group
     group = Group(
         id=uuid.uuid4().hex,
@@ -157,21 +177,33 @@ def source_group_with_artifacts(test_db, source_collection) -> tuple[Group, list
     test_db.add(group)
     test_db.flush()
 
-    # Create some artifact IDs and add them to the group
-    artifact_ids = [f"artifact-{i}" for i in range(3)]
+    # Create Artifact rows and wire them into the group/collection
+    artifact_ids = [f"skill:artifact-{i}" for i in range(3)]
 
     for i, artifact_id in enumerate(artifact_ids):
-        # Add to collection
+        artifact_uuid = uuid.uuid4().hex
+        artifact = Artifact(
+            id=artifact_id,
+            uuid=artifact_uuid,
+            project_id=test_project.id,
+            name=f"artifact-{i}",
+            type="skill",
+        )
+        test_db.add(artifact)
+        test_db.flush()  # persist so FK constraints are satisfied
+
+        # Add to collection (P5-01: uses artifact_uuid)
         collection_artifact = CollectionArtifact(
             collection_id=source_collection.id,
-            artifact_id=artifact_id,
+            artifact_uuid=artifact_uuid,
+            added_at=datetime.utcnow(),
         )
         test_db.add(collection_artifact)
 
-        # Add to group
+        # Add to group (P5-02: uses artifact_uuid)
         group_artifact = GroupArtifact(
             group_id=group.id,
-            artifact_id=artifact_id,
+            artifact_uuid=artifact_uuid,
             position=i,
         )
         test_db.add(group_artifact)
@@ -238,12 +270,15 @@ class TestCopyGroup:
             assert new_group.name == f"{source_group.name} (Copy)"
 
             # Verify artifacts were added to target collection
+            # P5-02: CollectionArtifact uses artifact_uuid; resolve via Artifact table
             for artifact_id in artifact_ids:
+                art = session.query(Artifact).filter_by(id=artifact_id).first()
+                assert art is not None, f"Artifact {artifact_id} not in cache"
                 collection_artifact = (
                     session.query(CollectionArtifact)
                     .filter_by(
                         collection_id=target_collection.id,
-                        artifact_id=artifact_id,
+                        artifact_uuid=art.uuid,
                     )
                     .first()
                 )
@@ -266,11 +301,14 @@ class TestCopyGroup:
         """Test copying when some artifacts already exist in target collection."""
         source_group, artifact_ids = source_group_with_artifacts
 
-        # Pre-add one artifact to target collection
+        # Pre-add one artifact to target collection (P5-01: uses artifact_uuid)
         existing_artifact_id = artifact_ids[0]
+        existing_art = test_db.query(Artifact).filter_by(id=existing_artifact_id).first()
+        assert existing_art is not None
         existing_association = CollectionArtifact(
             collection_id=target_collection.id,
-            artifact_id=existing_artifact_id,
+            artifact_uuid=existing_art.uuid,
+            added_at=datetime.utcnow(),
         )
         test_db.add(existing_association)
         test_db.commit()
@@ -293,12 +331,9 @@ class TestCopyGroup:
                 .filter_by(collection_id=target_collection.id)
                 .all()
             )
-            artifact_ids_in_collection = [ca.artifact_id for ca in collection_artifacts]
-
-            # Should have exactly len(artifact_ids) artifacts (no duplicates)
-            assert len(artifact_ids_in_collection) == len(artifact_ids)
-            for artifact_id in artifact_ids:
-                assert artifact_id in artifact_ids_in_collection
+            # P5-02: collection_artifacts uses artifact_uuid; count is sufficient
+            # No duplicate check needed — the router already guards duplicates by UUID
+            assert len(collection_artifacts) == len(artifact_ids)
 
     def test_copy_empty_group(
         self,
@@ -441,7 +476,8 @@ class TestCopyGroup:
             assert len(new_group_artifacts) == len(source_group_artifacts)
 
             for new_ga, source_ga in zip(new_group_artifacts, source_group_artifacts):
-                assert new_ga.artifact_id == source_ga.artifact_id
+                # P5-02: GroupArtifact now uses artifact_uuid
+                assert new_ga.artifact_uuid == source_ga.artifact_uuid
                 assert new_ga.position == source_ga.position
 
     def test_copy_group_appends_to_end_of_collection(

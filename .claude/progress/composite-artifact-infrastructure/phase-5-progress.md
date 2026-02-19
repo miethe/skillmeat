@@ -1,120 +1,172 @@
 ---
 type: progress
-prd: "composite-artifact-infrastructure"
+prd: composite-artifact-infrastructure
 phase: 5
-title: "UUID Migration for Existing Join Tables (Backend)"
-status: "planning"
+title: UUID Migration for Existing Join Tables (Backend)
+status: pending
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 0
+completed_tasks: 2
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["data-layer-expert", "python-backend-engineer"]
-contributors: ["code-reviewer"]
-
+owners:
+- data-layer-expert
+- python-backend-engineer
+contributors:
+- code-reviewer
 tasks:
-  - id: "CAI-P5-01"
-    description: "Migrate collection_artifacts to artifact_uuid FK: add column, backfill from artifacts.uuid, drop artifact_id, update CollectionArtifact ORM and Collection.artifacts relationship"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["CAI-P4-08"]
-    estimated_effort: "2pt"
-    priority: "critical"
-
-  - id: "CAI-P5-02"
-    description: "Migrate group_artifacts to artifact_uuid FK: same shadow-column pattern as P5-01; preserve position/CheckConstraint; composite PK becomes (group_id, artifact_uuid)"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["CAI-P5-01"]
-    estimated_effort: "2pt"
-    priority: "high"
-
-  - id: "CAI-P5-03"
-    description: "Migrate artifact_tags to artifact_uuid FK: PK becomes (artifact_uuid, tag_id); update Artifact.tags and Tag.artifacts relationships at models.py:299-308, 1132-1134"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["CAI-P5-02"]
-    estimated_effort: "2pt"
-    priority: "high"
-
-  - id: "CAI-P5-04"
-    description: "Update repository layer to query via artifact_uuid: all CollectionArtifact/GroupArtifact/ArtifactTag queries use UUID join; external DTOs still return type:name"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CAI-P5-03"]
-    estimated_effort: "3pt"
-    priority: "high"
-
-  - id: "CAI-P5-05"
-    description: "Verify service and API layer correctness post-migration: smoke test all collection, group, and tag endpoints; no API surface changes permitted"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CAI-P5-03"]
-    estimated_effort: "2pt"
-    priority: "high"
-
-  - id: "CAI-P5-06"
-    description: "Assess and implement (or defer) PK change: artifacts.id type:name → unique index, artifacts.uuid → PK; document outcome in ADR-007 regardless of decision"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["CAI-P5-04", "CAI-P5-05"]
-    estimated_effort: "3pt"
-    priority: "medium"
-
-  - id: "CAI-P5-07"
-    description: "Comprehensive regression tests: tests/test_uuid_migration_regression.py covering all three join tables, cascade deletes, API endpoints, and alembic downgrade -3"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CAI-P5-04", "CAI-P5-05"]
-    estimated_effort: "2pt"
-    priority: "high"
-
-  - id: "CAI-P5-08"
-    description: "Retire Phase 1 compatibility layer: remove _migrate_artifact_tags_fk() if superseded, remove dual-path shims, update ADR-007 Phase 2 checklist"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CAI-P5-06", "CAI-P5-07"]
-    estimated_effort: "1pt"
-    priority: "low"
-
+- id: CAI-P5-01
+  description: 'Migrate collection_artifacts to artifact_uuid FK: add column, backfill
+    from artifacts.uuid, drop artifact_id, update CollectionArtifact ORM and Collection.artifacts
+    relationship'
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - CAI-P4-08
+  estimated_effort: 2pt
+  priority: critical
+- id: CAI-P5-02
+  description: 'Migrate group_artifacts to artifact_uuid FK: same shadow-column pattern
+    as P5-01; preserve position/CheckConstraint; composite PK becomes (group_id, artifact_uuid)'
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - CAI-P5-01
+  estimated_effort: 2pt
+  priority: high
+- id: CAI-P5-03
+  description: 'Migrate artifact_tags to artifact_uuid FK: PK becomes (artifact_uuid,
+    tag_id); update Artifact.tags and Tag.artifacts relationships at models.py:299-308,
+    1132-1134'
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - CAI-P5-02
+  estimated_effort: 2pt
+  priority: high
+- id: CAI-P5-04
+  description: 'Update repository layer to query via artifact_uuid: all CollectionArtifact/GroupArtifact/ArtifactTag
+    queries use UUID join; external DTOs still return type:name'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CAI-P5-03
+  estimated_effort: 3pt
+  priority: high
+- id: CAI-P5-05
+  description: 'Verify service and API layer correctness post-migration: smoke test
+    all collection, group, and tag endpoints; no API surface changes permitted'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CAI-P5-03
+  estimated_effort: 2pt
+  priority: high
+- id: CAI-P5-06
+  description: 'Assess and implement (or defer) PK change: artifacts.id type:name
+    → unique index, artifacts.uuid → PK; document outcome in ADR-007 regardless of
+    decision'
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - CAI-P5-04
+  - CAI-P5-05
+  estimated_effort: 3pt
+  priority: medium
+- id: CAI-P5-07
+  description: 'Comprehensive regression tests: tests/test_uuid_migration_regression.py
+    covering all three join tables, cascade deletes, API endpoints, and alembic downgrade
+    -3'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CAI-P5-04
+  - CAI-P5-05
+  estimated_effort: 2pt
+  priority: high
+- id: CAI-P5-08
+  description: 'Retire Phase 1 compatibility layer: remove _migrate_artifact_tags_fk()
+    if superseded, remove dual-path shims, update ADR-007 Phase 2 checklist'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CAI-P5-06
+  - CAI-P5-07
+  estimated_effort: 1pt
+  priority: low
 parallelization:
-  batch_1: ["CAI-P5-01"]
-  batch_2: ["CAI-P5-02"]
-  batch_3: ["CAI-P5-03"]
-  batch_4: ["CAI-P5-04", "CAI-P5-05"]
-  batch_5: ["CAI-P5-06", "CAI-P5-07"]
-  batch_6: ["CAI-P5-08"]
-  critical_path: ["CAI-P5-01", "CAI-P5-02", "CAI-P5-03", "CAI-P5-04", "CAI-P5-07"]
-  estimated_total_time: "4-6 days"
-
+  batch_1:
+  - CAI-P5-01
+  batch_2:
+  - CAI-P5-02
+  batch_3:
+  - CAI-P5-03
+  batch_4:
+  - CAI-P5-04
+  - CAI-P5-05
+  batch_5:
+  - CAI-P5-06
+  - CAI-P5-07
+  batch_6:
+  - CAI-P5-08
+  critical_path:
+  - CAI-P5-01
+  - CAI-P5-02
+  - CAI-P5-03
+  - CAI-P5-04
+  - CAI-P5-07
+  estimated_total_time: 4-6 days
 blockers: []
-
-success_criteria: [
-  { id: "SC-P5-1", description: "All three join tables (collection_artifacts, group_artifacts, artifact_tags) use artifact_uuid FK with ondelete=CASCADE", status: "pending" },
-  { id: "SC-P5-2", description: "Cascading deletes verified: deleting a CachedArtifact removes all join table rows across all three tables", status: "pending" },
-  { id: "SC-P5-3", description: "All Alembic migrations apply cleanly (alembic upgrade head) and roll back cleanly (alembic downgrade -3)", status: "pending" },
-  { id: "SC-P5-4", description: "No API surface changes — external consumers continue to receive type:name identifiers", status: "pending" },
-  { id: "SC-P5-5", description: "No regression in collection management, tagging, or grouping features (all endpoint tests pass)", status: "pending" },
-  { id: "SC-P5-6", description: "Decision on artifacts.id PK demotion documented in ADR-007 with rationale (Outcome A or B)", status: "pending" },
-  { id: "SC-P5-7", description: ">80% test coverage on all repository methods that touch migrated tables", status: "pending" }
-]
-
-files_modified: [
-  "skillmeat/cache/models.py",
-  "skillmeat/cache/migrations/versions/",
-  "skillmeat/cache/repositories.py",
-  "skillmeat/core/services/",
-  "tests/test_uuid_migration_regression.py",
-  "tests/conftest.py",
-  "docs/dev/architecture/decisions/ADR-007-artifact-uuid-identity.md"
-]
+success_criteria:
+- id: SC-P5-1
+  description: All three join tables (collection_artifacts, group_artifacts, artifact_tags)
+    use artifact_uuid FK with ondelete=CASCADE
+  status: pending
+- id: SC-P5-2
+  description: 'Cascading deletes verified: deleting a CachedArtifact removes all
+    join table rows across all three tables'
+  status: pending
+- id: SC-P5-3
+  description: All Alembic migrations apply cleanly (alembic upgrade head) and roll
+    back cleanly (alembic downgrade -3)
+  status: pending
+- id: SC-P5-4
+  description: No API surface changes — external consumers continue to receive type:name
+    identifiers
+  status: pending
+- id: SC-P5-5
+  description: No regression in collection management, tagging, or grouping features
+    (all endpoint tests pass)
+  status: pending
+- id: SC-P5-6
+  description: Decision on artifacts.id PK demotion documented in ADR-007 with rationale
+    (Outcome A or B)
+  status: pending
+- id: SC-P5-7
+  description: '>80% test coverage on all repository methods that touch migrated tables'
+  status: pending
+files_modified:
+- skillmeat/cache/models.py
+- skillmeat/cache/migrations/versions/
+- skillmeat/cache/repositories.py
+- skillmeat/core/services/
+- tests/test_uuid_migration_regression.py
+- tests/conftest.py
+- docs/dev/architecture/decisions/ADR-007-artifact-uuid-identity.md
+progress: 25
+updated: '2026-02-19'
 ---
 
 # composite-artifact-infrastructure - Phase 5: UUID Migration for Existing Join Tables (Backend)

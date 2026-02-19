@@ -41,6 +41,7 @@ from skillmeat.api.schemas.groups import (
     ReorderArtifactsRequest,
 )
 from skillmeat.cache.models import (
+    Artifact,
     Collection,
     CollectionArtifact,
     Group,
@@ -54,6 +55,35 @@ router = APIRouter(
     prefix="/groups",
     tags=["groups"],
 )
+
+
+def _resolve_artifact_ids(
+    session,
+    group_artifacts: list,
+) -> dict[str, str]:
+    """Return a mapping of artifact_uuid → artifact.id for the given GroupArtifacts.
+
+    Performs a single batch query against the Artifact table so callers can
+    build GroupArtifactResponse objects with the optional ``artifact_id`` field
+    populated (ADR-007 resolved ID for backward-compat frontend lookups).
+
+    Args:
+        session: SQLAlchemy session
+        group_artifacts: list of GroupArtifact ORM objects
+
+    Returns:
+        Dict mapping artifact_uuid → artifact.id (type:name string).
+        UUIDs with no matching Artifact row are omitted.
+    """
+    uuids = [ga.artifact_uuid for ga in group_artifacts]
+    if not uuids:
+        return {}
+    rows = (
+        session.query(Artifact.uuid, Artifact.id)
+        .filter(Artifact.uuid.in_(uuids))
+        .all()
+    )
+    return {row.uuid: row.id for row in rows}
 
 
 def _parse_group_tags(tags_json: Optional[str]) -> list[str]:
@@ -245,10 +275,16 @@ async def list_groups(
         if search:
             query = query.filter(Group.name.ilike(f"%{search}%"))
 
-        # Apply artifact_id filter if provided
+        # Apply artifact_id filter if provided — join through Artifact to
+        # resolve the UUID, since GroupArtifact now stores artifact_uuid.
         if artifact_id:
-            query = query.join(GroupArtifact).filter(
-                GroupArtifact.artifact_id == artifact_id
+            query = (
+                query.join(GroupArtifact)
+                .join(
+                    Artifact,
+                    Artifact.uuid == GroupArtifact.artifact_uuid,
+                )
+                .filter(Artifact.id == artifact_id)
             )
 
         # Order by position
@@ -333,9 +369,13 @@ async def get_group(group_id: str) -> GroupWithArtifactsResponse:
             .all()
         )
 
+        # Resolve artifact_uuid → artifact.id in one batch query
+        uuid_to_id = _resolve_artifact_ids(session, group_artifacts)
+
         artifacts = [
             GroupArtifactResponse(
-                artifact_id=ga.artifact_id,
+                artifact_uuid=ga.artifact_uuid,
+                artifact_id=uuid_to_id.get(ga.artifact_uuid),
                 position=ga.position,
                 added_at=ga.added_at,
             )
@@ -612,9 +652,9 @@ async def copy_group(
             .all()
         )
 
-        # Get existing artifacts in target collection
+        # Get existing artifact UUIDs in target collection (P5-01: artifact_uuid FK)
         existing_collection_artifacts = {
-            ca.artifact_id
+            ca.artifact_uuid
             for ca in session.query(CollectionArtifact)
             .filter_by(collection_id=request.target_collection_id)
             .all()
@@ -623,18 +663,19 @@ async def copy_group(
         # Copy artifacts to new group and add to collection if needed
         for source_ga in source_artifacts:
             # Add artifact to target collection if not already there
-            if source_ga.artifact_id not in existing_collection_artifacts:
+            if source_ga.artifact_uuid not in existing_collection_artifacts:
                 collection_artifact = CollectionArtifact(
                     collection_id=request.target_collection_id,
-                    artifact_id=source_ga.artifact_id,
+                    artifact_uuid=source_ga.artifact_uuid,
+                    added_at=source_ga.added_at,
                 )
                 session.add(collection_artifact)
-                existing_collection_artifacts.add(source_ga.artifact_id)
+                existing_collection_artifacts.add(source_ga.artifact_uuid)
 
             # Add artifact to new group with same position
             new_group_artifact = GroupArtifact(
                 group_id=new_group.id,
-                artifact_id=source_ga.artifact_id,
+                artifact_uuid=source_ga.artifact_uuid,
                 position=source_ga.position,
             )
             session.add(new_group_artifact)
@@ -805,19 +846,30 @@ async def add_artifacts_to_group(
                 detail=f"Group '{group_id}' not found",
             )
 
-        # Get existing artifacts
-        existing_artifact_ids = {
-            ga.artifact_id
+        # Resolve artifact IDs → UUIDs via the Artifact table
+        requested_artifacts = (
+            session.query(Artifact)
+            .filter(Artifact.id.in_(request.artifact_ids))
+            .all()
+        )
+        artifact_uuid_map = {a.id: a.uuid for a in requested_artifacts}
+
+        # Get existing artifact UUIDs already in this group
+        existing_artifact_uuids = {
+            ga.artifact_uuid
             for ga in session.query(GroupArtifact).filter_by(group_id=group_id).all()
         }
 
-        # Filter out duplicates
+        # Filter to artifact IDs whose resolved UUIDs are not already present
         new_artifact_ids = [
-            aid for aid in request.artifact_ids if aid not in existing_artifact_ids
+            aid
+            for aid in request.artifact_ids
+            if aid in artifact_uuid_map
+            and artifact_uuid_map[aid] not in existing_artifact_uuids
         ]
 
         if not new_artifact_ids:
-            logger.info(f"No new artifacts to add to group {group_id} (all duplicates)")
+            logger.info(f"No new artifacts to add to group {group_id} (all duplicates or not found)")
         else:
             # Determine position
             if request.position is not None:
@@ -846,7 +898,7 @@ async def add_artifacts_to_group(
             for i, artifact_id in enumerate(new_artifact_ids):
                 group_artifact = GroupArtifact(
                     group_id=group_id,
-                    artifact_id=artifact_id,
+                    artifact_uuid=artifact_uuid_map[artifact_id],
                     position=start_position + i,
                 )
                 session.add(group_artifact)
@@ -862,9 +914,13 @@ async def add_artifacts_to_group(
             .all()
         )
 
+        # Resolve artifact_uuid → artifact.id in one batch query
+        uuid_to_id = _resolve_artifact_ids(session, group_artifacts)
+
         artifacts = [
             GroupArtifactResponse(
-                artifact_id=ga.artifact_id,
+                artifact_uuid=ga.artifact_uuid,
+                artifact_id=uuid_to_id.get(ga.artifact_uuid),
                 position=ga.position,
                 added_at=ga.added_at,
             )
@@ -924,10 +980,18 @@ async def remove_artifact_from_group(group_id: str, artifact_id: str) -> None:
     """
     session = get_session()
     try:
-        # Find association
+        # Resolve artifact_id (type:name string) → artifact_uuid via Artifact table
+        artifact = session.query(Artifact).filter_by(id=artifact_id).first()
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Find association by group_id + artifact_uuid
         group_artifact = (
             session.query(GroupArtifact)
-            .filter_by(group_id=group_id, artifact_id=artifact_id)
+            .filter_by(group_id=group_id, artifact_uuid=artifact.uuid)
             .first()
         )
 
@@ -1000,10 +1064,18 @@ async def update_artifact_position(
     """
     session = get_session()
     try:
-        # Find association
+        # Resolve artifact_id (type:name string) → artifact_uuid via Artifact table
+        artifact = session.query(Artifact).filter_by(id=artifact_id).first()
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Find association by group_id + artifact_uuid
         group_artifact = (
             session.query(GroupArtifact)
-            .filter_by(group_id=group_id, artifact_id=artifact_id)
+            .filter_by(group_id=group_id, artifact_uuid=artifact.uuid)
             .first()
         )
 
@@ -1044,7 +1116,8 @@ async def update_artifact_position(
             )
 
         return GroupArtifactResponse(
-            artifact_id=group_artifact.artifact_id,
+            artifact_uuid=group_artifact.artifact_uuid,
+            artifact_id=artifact_id,
             position=group_artifact.position,
             added_at=group_artifact.added_at,
         )
@@ -1104,32 +1177,34 @@ async def reorder_artifacts_in_group(
                 detail=f"Group '{group_id}' not found",
             )
 
-        # Load all group artifacts
-        artifact_ids = [a.artifact_id for a in request.artifacts]
+        # The request already uses artifact_uuid values directly
+        artifact_ids = [a.artifact_uuid for a in request.artifacts]
+
+        # Load all group artifacts matching the provided UUIDs
         group_artifacts = (
             session.query(GroupArtifact)
             .filter(
                 GroupArtifact.group_id == group_id,
-                GroupArtifact.artifact_id.in_(artifact_ids),
+                GroupArtifact.artifact_uuid.in_(artifact_ids),
             )
             .all()
         )
 
         # Verify all artifacts exist in group
-        found_ids = {ga.artifact_id for ga in group_artifacts}
-        missing_ids = set(artifact_ids) - found_ids
-        if missing_ids:
+        found_uuids = {ga.artifact_uuid for ga in group_artifacts}
+        missing_uuids = set(artifact_ids) - found_uuids
+        if missing_uuids:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifacts not found in group: {', '.join(missing_ids)}",
+                detail=f"Artifacts not found in group: {', '.join(missing_uuids)}",
             )
 
-        # Build position map
-        position_map = {a.artifact_id: a.position for a in request.artifacts}
+        # Build position map keyed by artifact_uuid
+        position_map = {a.artifact_uuid: a.position for a in request.artifacts}
 
         # Update positions
         for ga in group_artifacts:
-            new_position = position_map.get(ga.artifact_id)
+            new_position = position_map.get(ga.artifact_uuid)
             if new_position is not None:
                 ga.position = new_position
 
@@ -1145,9 +1220,13 @@ async def reorder_artifacts_in_group(
             .all()
         )
 
+        # Resolve artifact_uuid → artifact.id in one batch query
+        uuid_to_id = _resolve_artifact_ids(session, all_group_artifacts)
+
         artifacts = [
             GroupArtifactResponse(
-                artifact_id=ga.artifact_id,
+                artifact_uuid=ga.artifact_uuid,
+                artifact_id=uuid_to_id.get(ga.artifact_uuid),
                 position=ga.position,
                 added_at=ga.added_at,
             )

@@ -181,10 +181,12 @@ export function GroupedArtifactView({
     groupArtifactQueries.forEach(({ group, query }) => {
       if (query.data) {
         query.data.forEach((ga) => {
-          if (!map.has(ga.artifact_id)) {
-            map.set(ga.artifact_id, new Set());
+          // Use artifact_id (type:name) if available, fall back to artifact_uuid
+          const key = ga.artifact_id ?? ga.artifact_uuid;
+          if (!map.has(key)) {
+            map.set(key, new Set());
           }
-          map.get(ga.artifact_id)!.add(group.id);
+          map.get(key)!.add(group.id);
         });
       }
     });
@@ -212,8 +214,9 @@ export function GroupedArtifactView({
         const arr = byGroup.get(group.id);
         if (arr) {
           arr.sort((a, b) => {
-            const posA = query.data!.find((ga) => ga.artifact_id === a.id)?.position ?? 0;
-            const posB = query.data!.find((ga) => ga.artifact_id === b.id)?.position ?? 0;
+            // Match by artifact_id (type:name) if present, otherwise fall back to uuid
+            const posA = query.data!.find((ga) => (ga.artifact_id ?? ga.artifact_uuid) === a.id)?.position ?? 0;
+            const posB = query.data!.find((ga) => (ga.artifact_id ?? ga.artifact_uuid) === b.id)?.position ?? 0;
             return posA - posB;
           });
         }
