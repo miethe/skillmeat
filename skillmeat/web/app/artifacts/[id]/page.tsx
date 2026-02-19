@@ -277,17 +277,22 @@ export default function ArtifactDetailPage({ params }: ArtifactDetailPageProps) 
           </header>
 
           {/* Tab navigation */}
-          <Tabs defaultValue="overview">
+          <Tabs defaultValue="overview" aria-label="Artifact detail sections">
             <TabsList
               className={showContainsTab ? 'grid w-full grid-cols-2' : 'grid w-full grid-cols-1'}
               aria-label="Artifact sections"
             >
-              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
               {showContainsTab && (
-                <TabsTrigger value="contains">
+                <TabsTrigger
+                  value="contains"
+                  data-testid="tab-contains"
+                  aria-describedby={hasChildren ? 'contains-count' : undefined}
+                >
                   Contains
                   {hasChildren && (
                     <span
+                      id="contains-count"
                       className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-primary"
                       aria-label={`${associations!.children.length} children`}
                     >

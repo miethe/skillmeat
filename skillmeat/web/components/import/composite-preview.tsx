@@ -83,6 +83,8 @@ const INTENT_STYLES = {
 
 function BucketHeader({ label, count, isOpen, onToggle, intent }: BucketHeaderProps) {
   const { icon: Icon, iconCls, countCls } = INTENT_STYLES[intent];
+  // Only set aria-controls when the panel is actually rendered in the DOM
+  const controlsId = isOpen ? `bucket-${intent}` : undefined;
 
   return (
     <button
@@ -90,7 +92,9 @@ function BucketHeader({ label, count, isOpen, onToggle, intent }: BucketHeaderPr
       onClick={onToggle}
       className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-sm font-medium transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       aria-expanded={isOpen}
-      aria-controls={`bucket-${intent}`}
+      aria-controls={controlsId}
+      aria-label={`${label}: ${count} ${count !== 1 ? 'artifacts' : 'artifact'}. ${isOpen ? 'Collapse' : 'Expand'} section`}
+      data-testid={`bucket-toggle-${intent}`}
     >
       {isOpen ? (
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -169,7 +173,7 @@ function BucketSection({ intent, label, entries, defaultOpen = false }: BucketSe
   if (entries.length === 0) return null;
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1" data-testid={`bucket-section-${intent}`}>
       <BucketHeader
         label={label}
         count={entries.length}
@@ -221,7 +225,7 @@ export function CompositePreview({ preview, className }: CompositePreviewProps) 
   } — ${summaryParts.join(', ') || 'none'}.`;
 
   return (
-    <div className={cn('space-y-4', className)}>
+    <div className={cn('space-y-4', className)} data-testid="composite-preview">
       {/* ARIA live region — announces summary when opened */}
       <div
         role="status"

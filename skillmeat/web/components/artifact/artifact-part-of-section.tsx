@@ -112,7 +112,7 @@ export function ArtifactPartOfSection({
   }
 
   return (
-    <section aria-label="Parent plugins that contain this artifact" className="space-y-2">
+    <section aria-label="Parent plugins that contain this artifact" className="space-y-2" data-testid="part-of-section">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Part of
       </h3>

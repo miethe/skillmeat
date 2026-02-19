@@ -200,7 +200,7 @@ export function ArtifactContainsTab({
   }
 
   return (
-    <section aria-label="Child artifacts contained in this plugin">
+    <section aria-label="Child artifacts contained in this plugin" data-testid="contains-tab-content">
       <p className="mb-3 text-xs text-muted-foreground">
         {children.length} {children.length === 1 ? 'artifact' : 'artifacts'} in
         this plugin

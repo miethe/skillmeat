@@ -130,6 +130,8 @@ interface ResolutionOptionProps {
   selected: boolean;
   onSelect: () => void;
   radioId: string;
+  /** Unique name scoped to the parent ConflictCard's radio group. */
+  radioGroupName: string;
   title: string;
   description: string;
   icon: React.ReactNode;
@@ -141,6 +143,7 @@ function ResolutionOption({
   selected,
   onSelect,
   radioId,
+  radioGroupName,
   title,
   description,
   icon,
@@ -161,7 +164,7 @@ function ResolutionOption({
       <input
         type="radio"
         id={radioId}
-        name={`resolution-${value}`}
+        name={radioGroupName}
         value={value}
         checked={selected}
         onChange={onSelect}
@@ -212,6 +215,9 @@ function ConflictCard({ conflict, resolution, onResolutionChange, index, total }
   const uid = useId();
   const sideBySideId = `${uid}-side-by-side`;
   const overwriteId = `${uid}-overwrite`;
+  // Unique radio group name scoped to this card — prevents radios across different
+  // conflict cards from being mutually exclusive with each other (WCAG 4.1.3).
+  const radioGroupName = `${uid}-resolution`;
 
   return (
     <article
@@ -273,6 +279,7 @@ function ConflictCard({ conflict, resolution, onResolutionChange, index, total }
           selected={resolution === 'side-by-side'}
           onSelect={() => onResolutionChange('side-by-side')}
           radioId={sideBySideId}
+          radioGroupName={radioGroupName}
           title="Deploy side-by-side"
           description={`Install the plugin's pinned version under a renamed alias, keeping the current deployment intact.`}
           icon={<ArrowRightLeft className="h-4 w-4" aria-hidden="true" />}
@@ -284,6 +291,7 @@ function ConflictCard({ conflict, resolution, onResolutionChange, index, total }
           selected={resolution === 'overwrite'}
           onSelect={() => onResolutionChange('overwrite')}
           radioId={overwriteId}
+          radioGroupName={radioGroupName}
           title="Overwrite with plugin version"
           description={`Replace the current deployment with the plugin's pinned hash. Existing users of this artifact will see the plugin's version.`}
           icon={<Layers className="h-4 w-4" aria-hidden="true" />}
