@@ -410,56 +410,13 @@ class TagService:
     # Artifact Associations
     # =========================================================================
 
-    def _resolve_artifact_uuid(self, artifact_id_or_uuid: str) -> Optional[str]:
-        """Resolve an artifact identifier to its stable UUID.
-
-        Accepts either:
-        - A bare ``artifacts.uuid`` value (32-char hex) — returned as-is.
-        - A ``type:name`` composite id (e.g. ``skill:canvas-design``) —
-          looked up in ``artifacts.id`` and the matching ``uuid`` returned.
-
-        Returns None if no matching artifact is found in the cache.
-        """
-        try:
-            from skillmeat.cache.models import Artifact, get_session
-
-            session = get_session()
-            try:
-                # Try direct UUID lookup first (cheap, avoids the JOIN)
-                art = session.query(Artifact).filter_by(uuid=artifact_id_or_uuid).first()
-                if art:
-                    return art.uuid
-                # Fall back to type:name id lookup
-                art = session.query(Artifact).filter_by(id=artifact_id_or_uuid).first()
-                return art.uuid if art else None
-            finally:
-                session.close()
-        except Exception as exc:
-            self.logger.debug(
-                "Could not resolve artifact uuid for %r: %s", artifact_id_or_uuid, exc
-            )
-            return None
-
     def sync_artifact_tags(self, artifact_uuid: str, tags: List[str]) -> List[str]:
         """Ensure tags exist and sync associations for an artifact.
 
         Args:
             artifact_uuid: Artifact UUID (artifacts.uuid, ADR-007 stable identity).
-                For backward compatibility, a ``type:name`` composite id is also
-                accepted and resolved to the UUID automatically.
             tags: List of tag names to set on the artifact
         """
-        # Back-compat: accept legacy type:name artifact_id strings and resolve them
-        if ":" in artifact_uuid:
-            resolved = self._resolve_artifact_uuid(artifact_uuid)
-            if not resolved:
-                self.logger.warning(
-                    "sync_artifact_tags: artifact '%s' not found in cache; "
-                    "skipping tag sync",
-                    artifact_uuid,
-                )
-                return self._normalize_tag_names(tags)
-            artifact_uuid = resolved
         normalized_tags = self._normalize_tag_names(tags)
         desired_tag_ids: List[str] = []
 
@@ -512,8 +469,6 @@ class TagService:
 
         Args:
             artifact_uuid: Artifact UUID (artifacts.uuid, ADR-007 stable identity).
-                For backward compatibility, a ``type:name`` composite id is also
-                accepted and resolved to the UUID automatically.
             tag_id: Tag identifier
 
         Returns:
@@ -528,15 +483,6 @@ class TagService:
             >>> if success:
             ...     print("Tag added to artifact")
         """
-        # Back-compat: accept legacy type:name artifact_id strings and resolve them
-        if ":" in artifact_uuid:
-            resolved = self._resolve_artifact_uuid(artifact_uuid)
-            if not resolved:
-                raise ValueError(
-                    f"Artifact '{artifact_uuid}' not found in cache"
-                )
-            artifact_uuid = resolved
-
         self.logger.info(f"Adding tag {tag_id} to artifact uuid={artifact_uuid}")
 
         try:
@@ -567,8 +513,6 @@ class TagService:
 
         Args:
             artifact_uuid: Artifact UUID (artifacts.uuid, ADR-007 stable identity).
-                For backward compatibility, a ``type:name`` composite id is also
-                accepted and resolved to the UUID automatically.
             tag_id: Tag identifier
 
         Returns:
@@ -579,18 +523,6 @@ class TagService:
             >>> if removed:
             ...     print("Tag removed from artifact")
         """
-        # Back-compat: accept legacy type:name artifact_id strings and resolve them
-        if ":" in artifact_uuid:
-            resolved = self._resolve_artifact_uuid(artifact_uuid)
-            if not resolved:
-                self.logger.warning(
-                    "remove_tag_from_artifact: artifact '%s' not found in cache; "
-                    "returning False",
-                    artifact_uuid,
-                )
-                return False
-            artifact_uuid = resolved
-
         self.logger.info(f"Removing tag {tag_id} from artifact uuid={artifact_uuid}")
 
         try:
@@ -618,8 +550,6 @@ class TagService:
 
         Args:
             artifact_uuid: Artifact UUID (artifacts.uuid, ADR-007 stable identity).
-                For backward compatibility, a ``type:name`` composite id is also
-                accepted and resolved to the UUID automatically.
 
         Returns:
             List of TagResponse instances for the artifact
@@ -629,18 +559,6 @@ class TagService:
             >>> for tag in tags:
             ...     print(f"- {tag.name}")
         """
-        # Back-compat: accept legacy type:name artifact_id strings and resolve them
-        if ":" in artifact_uuid:
-            resolved = self._resolve_artifact_uuid(artifact_uuid)
-            if not resolved:
-                self.logger.debug(
-                    "get_artifact_tags: artifact '%s' not found in cache; "
-                    "returning empty list",
-                    artifact_uuid,
-                )
-                return []
-            artifact_uuid = resolved
-
         self.logger.debug(f"Getting tags for artifact uuid={artifact_uuid}")
 
         # Get tags via repository

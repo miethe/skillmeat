@@ -386,7 +386,7 @@ Don't add UUIDs. `CompositeMembership.child_artifact_id` stores `type:name` like
 - [x] Migrate `group_artifacts` to UUID FK (CAI-P5-02)
 - [x] Migrate `artifact_tags` to UUID FK (CAI-P5-03)
 - [x] Assessed feasibility of dropping `type:name` as PK — **Outcome B: deferred permanently** (CAI-P5-06; see "Phase 2 Assessment" section above)
-- [ ] Retire Phase 1 compatibility layer (CAI-P5-08)
+- [x] Retire Phase 1 compatibility layer (CAI-P5-08)
 
 ---
 

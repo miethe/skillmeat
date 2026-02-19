@@ -3283,98 +3283,15 @@ def get_session(db_path: Optional[str | Path] = None):
 # =============================================================================
 
 
-def _migrate_artifact_tags_fk(engine: Engine) -> None:
-    """Remove FK constraint from artifact_tags.artifact_id if present.
-
-    SQLite doesn't support ALTER TABLE DROP CONSTRAINT, so we recreate
-    the table without the FK. This is a one-time migration for databases
-    created before the FK was removed from the model.
-
-    The artifact_tags.artifact_id column stores "type:name" format IDs from
-    collection_artifacts, not project-scoped artifacts.id UUIDs. The old FK
-    constraint caused all tag-artifact associations to fail silently.
-    """
-    import logging
-
-    from sqlalchemy import inspect as sa_inspect, text
-
-    log = logging.getLogger(__name__)
-
-    inspector = sa_inspect(engine)
-
-    # Check if table exists
-    if "artifact_tags" not in inspector.get_table_names():
-        return
-
-    # Check for FK constraints referencing the artifacts table
-    fks = inspector.get_foreign_keys("artifact_tags")
-    artifact_fks = [fk for fk in fks if fk.get("referred_table") == "artifacts"]
-
-    if not artifact_fks:
-        return  # Already migrated or never had FK
-
-    log.info("Migrating artifact_tags: removing FK constraint to artifacts table")
-
-    with engine.begin() as conn:
-        # Rename old table
-        conn.execute(text("ALTER TABLE artifact_tags RENAME TO _artifact_tags_old"))
-
-        # Create new table without FK on artifact_id
-        conn.execute(
-            text(
-                """
-            CREATE TABLE artifact_tags (
-                artifact_id VARCHAR NOT NULL,
-                tag_id VARCHAR NOT NULL,
-                created_at DATETIME NOT NULL,
-                PRIMARY KEY (artifact_id, tag_id),
-                FOREIGN KEY(tag_id) REFERENCES tags (id) ON DELETE CASCADE
-            )
-        """
-            )
-        )
-
-        # Recreate indexes
-        conn.execute(
-            text(
-                "CREATE INDEX idx_artifact_tags_artifact_id "
-                "ON artifact_tags (artifact_id)"
-            )
-        )
-        conn.execute(
-            text("CREATE INDEX idx_artifact_tags_tag_id " "ON artifact_tags (tag_id)")
-        )
-        conn.execute(
-            text(
-                "CREATE INDEX idx_artifact_tags_created_at "
-                "ON artifact_tags (created_at)"
-            )
-        )
-
-        # Copy data from old table
-        conn.execute(
-            text(
-                """
-            INSERT INTO artifact_tags (artifact_id, tag_id, created_at)
-            SELECT artifact_id, tag_id, created_at FROM _artifact_tags_old
-        """
-            )
-        )
-
-        # Drop old table
-        conn.execute(text("DROP TABLE _artifact_tags_old"))
-
-    log.info("Successfully migrated artifact_tags table")
-
-
 def create_tables(db_path: Optional[str | Path] = None) -> None:
     """Create all tables in the database.
 
     This creates the tables defined by the ORM models. It's safe to call
     multiple times - existing tables will not be modified.
 
-    After creating tables, runs migrations to fix schema issues in existing
-    databases (e.g., removing the artifact_tags FK constraint).
+    Schema migrations are managed by Alembic (see ``skillmeat/cache/migrations/``).
+    The Phase 1 compatibility migration for ``artifact_tags`` FK has been
+    superseded by the proper Alembic migration ``20260219_1300`` (CAI-P5-08).
 
     Args:
         db_path: Path to database file. If None, uses default location
@@ -3385,7 +3302,6 @@ def create_tables(db_path: Optional[str | Path] = None) -> None:
     """
     engine = create_db_engine(db_path)
     Base.metadata.create_all(engine)
-    _migrate_artifact_tags_fk(engine)
 
 
 def drop_tables(db_path: Optional[str | Path] = None) -> None:

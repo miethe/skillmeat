@@ -205,16 +205,16 @@ def refresh_single_artifact_cache(
         }
 
         # Delegate to shared upsert
-        create_or_update_collection_artifact(
+        assoc = create_or_update_collection_artifact(
             session, collection_id, artifact_id, metadata
         )
 
-        # Sync tags to Tag ORM tables
+        # Sync tags to Tag ORM tables — pass artifact_uuid (ADR-007), not type:name
         if file_artifact.tags:
             try:
                 from skillmeat.core.services import TagService
 
-                TagService().sync_artifact_tags(artifact_id, file_artifact.tags)
+                TagService().sync_artifact_tags(assoc.artifact_uuid, file_artifact.tags)
             except Exception as e:
                 logger.warning(f"Tag ORM sync failed for {artifact_id}: {e}")
 
@@ -312,13 +312,13 @@ def populate_collection_artifact_from_import(
         session, collection_id, artifact_id, metadata
     )
 
-    # Sync tags to Tag ORM tables
+    # Sync tags to Tag ORM tables — pass artifact_uuid (ADR-007), not type:name
     tags = entry.tags or (file_artifact.tags if file_artifact else None)
     if tags:
         try:
             from skillmeat.core.services import TagService
 
-            TagService().sync_artifact_tags(artifact_id, tags)
+            TagService().sync_artifact_tags(result.artifact_uuid, tags)
         except Exception as e:
             logger.warning(f"Tag ORM sync failed for {artifact_id}: {e}")
 
