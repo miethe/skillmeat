@@ -1,93 +1,109 @@
 ---
 type: progress
-prd: "request-log-viewer-v1"
+prd: request-log-viewer-v1
 phase: 1
-title: "Backend API Foundation"
+title: Backend API Foundation
 status: pending
 progress: 0
 total_tasks: 6
 completed_tasks: 0
 blocked_tasks: 0
-created: "2025-01-30"
-updated: "2025-01-30"
-
+created: '2025-01-30'
+updated: '2025-01-30'
 tasks:
-  - id: "TASK-1.1"
-    title: "Create RequestLogManager class"
-    status: "pending"
-    priority: "high"
-    estimate: "2d"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    file_targets:
-      - "skillmeat/api/app/managers/request_log_manager.py"
-    notes: "Subprocess wrapper for meatycapture CLI commands (list, view, search)"
-
-  - id: "TASK-1.2"
-    title: "Create Pydantic DTOs/schemas"
-    status: "pending"
-    priority: "high"
-    estimate: "1d"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    file_targets:
-      - "skillmeat/api/app/schemas/request_log.py"
-    notes: "RequestLogListItem, RequestLogDetail, RequestLogSearchQuery schemas"
-
-  - id: "TASK-1.3"
-    title: "Create list endpoint"
-    status: "pending"
-    priority: "high"
-    estimate: "1d"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.1", "TASK-1.2"]
-    file_targets:
-      - "skillmeat/api/app/routers/request_logs.py"
-    notes: "GET /api/v1/request-logs - list all logs with pagination, type/status filtering"
-
-  - id: "TASK-1.4"
-    title: "Create detail endpoint"
-    status: "pending"
-    priority: "high"
-    estimate: "1d"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.1", "TASK-1.2"]
-    file_targets:
-      - "skillmeat/api/app/routers/request_logs.py"
-    notes: "GET /api/v1/request-logs/{log_id} - return full log details"
-
-  - id: "TASK-1.5"
-    title: "Create search endpoint"
-    status: "pending"
-    priority: "high"
-    estimate: "1.5d"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.1", "TASK-1.2"]
-    file_targets:
-      - "skillmeat/api/app/routers/request_logs.py"
-    notes: "POST /api/v1/request-logs/search - advanced search with filters, date ranges, text query"
-
-  - id: "TASK-1.6"
-    title: "Write API integration tests"
-    status: "pending"
-    priority: "medium"
-    estimate: "1d"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.3", "TASK-1.4", "TASK-1.5"]
-    file_targets:
-      - "skillmeat/api/tests/routers/test_request_logs.py"
-    notes: "Test all endpoints, error cases, filtering, pagination. Target >80% coverage"
-
+- id: TASK-1.1
+  title: Create RequestLogManager class
+  status: pending
+  priority: high
+  estimate: 2d
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  file_targets:
+  - skillmeat/api/app/managers/request_log_manager.py
+  notes: Subprocess wrapper for meatycapture CLI commands (list, view, search)
+- id: TASK-1.2
+  title: Create Pydantic DTOs/schemas
+  status: pending
+  priority: high
+  estimate: 1d
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  file_targets:
+  - skillmeat/api/app/schemas/request_log.py
+  notes: RequestLogListItem, RequestLogDetail, RequestLogSearchQuery schemas
+- id: TASK-1.3
+  title: Create list endpoint
+  status: pending
+  priority: high
+  estimate: 1d
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.1
+  - TASK-1.2
+  file_targets:
+  - skillmeat/api/app/routers/request_logs.py
+  notes: GET /api/v1/request-logs - list all logs with pagination, type/status filtering
+- id: TASK-1.4
+  title: Create detail endpoint
+  status: pending
+  priority: high
+  estimate: 1d
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.1
+  - TASK-1.2
+  file_targets:
+  - skillmeat/api/app/routers/request_logs.py
+  notes: GET /api/v1/request-logs/{log_id} - return full log details
+- id: TASK-1.5
+  title: Create search endpoint
+  status: pending
+  priority: high
+  estimate: 1.5d
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.1
+  - TASK-1.2
+  file_targets:
+  - skillmeat/api/app/routers/request_logs.py
+  notes: POST /api/v1/request-logs/search - advanced search with filters, date ranges,
+    text query
+- id: TASK-1.6
+  title: Write API integration tests
+  status: pending
+  priority: medium
+  estimate: 1d
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.3
+  - TASK-1.4
+  - TASK-1.5
+  file_targets:
+  - skillmeat/api/tests/routers/test_request_logs.py
+  notes: Test all endpoints, error cases, filtering, pagination. Target >80% coverage
 parallelization:
-  batch_1: ["TASK-1.1", "TASK-1.2"]
-  batch_2: ["TASK-1.3", "TASK-1.4", "TASK-1.5"]
-  batch_3: ["TASK-1.6"]
-
+  batch_1:
+  - TASK-1.1
+  - TASK-1.2
+  batch_2:
+  - TASK-1.3
+  - TASK-1.4
+  - TASK-1.5
+  batch_3:
+  - TASK-1.6
 blockers: []
-
 references:
-  prd: ".claude/prds/request-log-viewer-v1.md"
-  meatycapture_spec: ".claude/skills/meatycapture-capture/SKILL.md"
+  prd: .claude/prds/request-log-viewer-v1.md
+  meatycapture_spec: .claude/skills/meatycapture-capture/SKILL.md
+schema_version: 2
+doc_type: progress
+feature_slug: request-log-viewer-v1
 ---
 
 # Phase 1: Backend API Foundation

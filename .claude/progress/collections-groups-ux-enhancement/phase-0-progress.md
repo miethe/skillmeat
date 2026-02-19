@@ -4,8 +4,8 @@ prd: collections-groups-ux-enhancement
 phase: 0
 title: API Contract Alignment & Backend Enhancements
 status: completed
-started: "2026-01-20"
-completed: "2026-01-20"
+started: '2026-01-20'
+completed: '2026-01-20'
 overall_progress: 100
 completion_estimate: on-track
 total_tasks: 5
@@ -116,6 +116,9 @@ files_modified:
 - skillmeat/web/hooks/useGroupArtifacts.ts
 progress: 100
 updated: '2026-01-20'
+schema_version: 2
+doc_type: progress
+feature_slug: collections-groups-ux-enhancement
 ---
 
 # collections-groups-ux-enhancement - Phase 0: API Contract Alignment & Backend Enhancements

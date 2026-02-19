@@ -1,17 +1,32 @@
 ---
-title: "Implementation Plan: Multi-Platform Project Deployments (v1)"
-description: "Add deployment profiles for Claude Code, Codex, Gemini, and future agent platforms without duplicating artifacts."
-audience: [ai-agents, developers, architects, product]
-tags: [implementation, deployments, platform, codex, claude, gemini, artifacts]
+title: 'Implementation Plan: Multi-Platform Project Deployments (v1)'
+description: Add deployment profiles for Claude Code, Codex, Gemini, and future agent
+  platforms without duplicating artifacts.
+audience:
+- ai-agents
+- developers
+- architects
+- product
+tags:
+- implementation
+- deployments
+- platform
+- codex
+- claude
+- gemini
+- artifacts
 created: 2026-02-07
 updated: 2026-02-09
-category: "product-planning"
-status: in-progress
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/PRDs/features/agent-context-entities-v1.md
-  - /docs/project_plans/PRDs/features/enhanced-frontmatter-utilization-v1.md
+- /docs/project_plans/PRDs/features/agent-context-entities-v1.md
+- /docs/project_plans/PRDs/features/enhanced-frontmatter-utilization-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: multi-platform-project-deployments
+prd_ref: null
 ---
-
 # Implementation Plan: Multi-Platform Project Deployments (v1)
 
 **Plan ID**: `IMPL-2026-02-07-multi-platform-project-deployments-v1`

@@ -1,116 +1,129 @@
 ---
 type: progress
-prd: "collections-navigation"
+prd: collections-navigation
 phase: 4
-title: "Collection Features - Pages, Dialogs, UI Components"
-status: "pending"
+title: Collection Features - Pages, Dialogs, UI Components
+status: pending
 overall_progress: 0
 total_tasks: 7
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["ui-engineer-enhanced"]
-contributors: ["frontend-developer"]
-
+owners:
+- ui-engineer-enhanced
+contributors:
+- frontend-developer
 tasks:
-  - id: "TASK-4.1"
-    name: "Collection Page Redesign"
-    description: "Redesign collection page with view modes, filtering, search, and sorting"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "TASK-4.2"
-    name: "Collection Switcher Component"
-    description: "Dropdown component to select active collection"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TASK-4.3"
-    name: "All Collections View"
-    description: "Aggregated view showing artifacts across all collections"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TASK-4.4"
-    name: "Create/Edit Collection Dialogs"
-    description: "CRUD dialogs for collection management with form validation"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TASK-4.5"
-    name: "Move/Copy to Collections Dialog"
-    description: "Bulk operations dialog for moving/copying artifacts"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["TASK-4.4"]
-    estimated_effort: "1.5h"
-    priority: "medium"
-
-  - id: "TASK-4.6"
-    name: "Artifact Card Enhancement"
-    description: "Add ellipsis menu to artifact cards with collection actions"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TASK-4.7"
-    name: "Unified Modal Collections/Groups Tab"
-    description: "Add Collections & Groups tab to artifact modal showing membership"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-4.4"]
-    estimated_effort: "2h"
-    priority: "high"
-
+- id: TASK-4.1
+  name: Collection Page Redesign
+  description: Redesign collection page with view modes, filtering, search, and sorting
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 3h
+  priority: high
+- id: TASK-4.2
+  name: Collection Switcher Component
+  description: Dropdown component to select active collection
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+- id: TASK-4.3
+  name: All Collections View
+  description: Aggregated view showing artifacts across all collections
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+- id: TASK-4.4
+  name: Create/Edit Collection Dialogs
+  description: CRUD dialogs for collection management with form validation
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+- id: TASK-4.5
+  name: Move/Copy to Collections Dialog
+  description: Bulk operations dialog for moving/copying artifacts
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - TASK-4.4
+  estimated_effort: 1.5h
+  priority: medium
+- id: TASK-4.6
+  name: Artifact Card Enhancement
+  description: Add ellipsis menu to artifact cards with collection actions
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+- id: TASK-4.7
+  name: Unified Modal Collections/Groups Tab
+  description: Add Collections & Groups tab to artifact modal showing membership
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-4.4
+  estimated_effort: 2h
+  priority: high
 parallelization:
-  batch_1: ["TASK-4.1", "TASK-4.2", "TASK-4.3", "TASK-4.4", "TASK-4.6"]
-  batch_2: ["TASK-4.5", "TASK-4.7"]
-  critical_path: ["TASK-4.1", "TASK-4.4", "TASK-4.7"]
-  estimated_total_time: "1.5w"
-
+  batch_1:
+  - TASK-4.1
+  - TASK-4.2
+  - TASK-4.3
+  - TASK-4.4
+  - TASK-4.6
+  batch_2:
+  - TASK-4.5
+  - TASK-4.7
+  critical_path:
+  - TASK-4.1
+  - TASK-4.4
+  - TASK-4.7
+  estimated_total_time: 1.5w
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "Collection page supports grid/list/grouped view modes"
-    status: "pending"
-  - id: "SC-2"
-    description: "Collection switcher dropdown works with keyboard navigation"
-    status: "pending"
-  - id: "SC-3"
-    description: "All Collections view aggregates artifacts correctly"
-    status: "pending"
-  - id: "SC-4"
-    description: "Create/Edit dialogs validate input and handle errors"
-    status: "pending"
-  - id: "SC-5"
-    description: "Move/Copy dialog supports multi-select and batch operations"
-    status: "pending"
-  - id: "SC-6"
-    description: "Artifact card menu shows context-aware actions"
-    status: "pending"
-  - id: "SC-7"
-    description: "Modal tab displays current memberships with add/remove"
-    status: "pending"
-  - id: "SC-8"
-    description: "All components follow Radix UI + shadcn patterns"
-    status: "pending"
-
+- id: SC-1
+  description: Collection page supports grid/list/grouped view modes
+  status: pending
+- id: SC-2
+  description: Collection switcher dropdown works with keyboard navigation
+  status: pending
+- id: SC-3
+  description: All Collections view aggregates artifacts correctly
+  status: pending
+- id: SC-4
+  description: Create/Edit dialogs validate input and handle errors
+  status: pending
+- id: SC-5
+  description: Move/Copy dialog supports multi-select and batch operations
+  status: pending
+- id: SC-6
+  description: Artifact card menu shows context-aware actions
+  status: pending
+- id: SC-7
+  description: Modal tab displays current memberships with add/remove
+  status: pending
+- id: SC-8
+  description: All components follow Radix UI + shadcn patterns
+  status: pending
 files_modified: []
+schema_version: 2
+doc_type: progress
+feature_slug: collections-navigation
 ---
 
 # collections-navigation - Phase 4: Collection Features

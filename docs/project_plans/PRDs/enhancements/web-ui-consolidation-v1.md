@@ -1,17 +1,28 @@
 ---
-title: "PRD: Web UI Consolidation & Enhancements"
-description: "Unified entity display, content viewing/editing, sync functionality, and performance improvements"
-audience: [ai-agents, developers]
-tags: [prd, web-ui, enhancement, consolidation, content-viewer, sync]
+title: 'PRD: Web UI Consolidation & Enhancements'
+description: Unified entity display, content viewing/editing, sync functionality,
+  and performance improvements
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- web-ui
+- enhancement
+- consolidation
+- content-viewer
+- sync
 created: 2025-11-25
 updated: 2025-11-25
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
-  - /docs/project_plans/artifact-version-tracking-sync-prd.md
+- /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
+- /docs/project_plans/artifact-version-tracking-sync-prd.md
+schema_version: 2
+doc_type: prd
+feature_slug: web-ui-consolidation
 ---
-
 # PRD: Web UI Consolidation & Enhancements
 
 **Feature Name:** Web UI Consolidation & Enhancements

@@ -88,8 +88,8 @@ export interface AddGroupArtifactsRequest {
 
 /** Position update for artifact reorder operations */
 export interface ArtifactPositionUpdate {
-  /** Artifact ID */
-  artifact_id: string;
+  /** Artifact UUID (ADR-007 stable identity) */
+  artifact_uuid: string;
   /** New position */
   position: number;
 }
@@ -102,8 +102,13 @@ export interface ReorderArtifactsRequest {
 
 /** Artifact in a group with position information */
 export interface GroupArtifact {
-  /** Artifact ID */
-  artifact_id: string;
+  /** Artifact UUID (ADR-007 stable identity) */
+  artifact_uuid: string;
+  /**
+   * Resolved artifact ID (type:name format) for API lookups.
+   * Present when the artifact exists in the local cache; null for orphaned UUIDs.
+   */
+  artifact_id?: string | null;
   /** Position in group (0-based) */
   position: number;
   /** When artifact was added to group (ISO 8601) */

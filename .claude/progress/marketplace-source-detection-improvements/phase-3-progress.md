@@ -1,167 +1,206 @@
 ---
 type: progress
-prd: "marketplace-source-detection-improvements"
+prd: marketplace-source-detection-improvements
 phase: 3
-phase_name: "API Layer"
+phase_name: API Layer
 status: completed
 progress: 100
 total_tasks: 13
 completed_tasks: 13
-effort: "12-18 pts"
+effort: 12-18 pts
 created: 2026-01-05
 updated: 2026-01-06
 completed_at: 2026-01-06
-
-assigned_to: ["python-backend-engineer"]
-dependencies: [2]
-
+assigned_to:
+- python-backend-engineer
+dependencies:
+- 2
 tasks:
-  # PATCH Endpoint (5 tasks)
-  - id: "P3.1a"
-    name: "Add manual_map to request schema"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.4d"]
-    effort: "2 pts"
-    completed_by: "aab5845"
-    completed_at: 2026-01-06
-    note: "Added manual_map field to UpdateSourceRequest schema with Optional[Dict[str, str]] type"
-
-  - id: "P3.1b"
-    name: "Validate directory paths"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3.1a"]
-    effort: "3 pts"
-    completed_by: "a11c94f"
-    completed_at: 2026-01-06
-    note: "Added path validation in router layer using GitHubScanner tree data, raises 422 for invalid paths"
-
-  - id: "P3.1c"
-    name: "Validate artifact types"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3.1a"]
-    effort: "1 pt"
-    completed_by: "a95cc94"
-    completed_at: 2026-01-06
-    note: "Added artifact type validation with ALLOWED_ARTIFACT_TYPES constant, raises 422 for invalid types"
-
-  - id: "P3.1d"
-    name: "Persist mappings"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3.1b", "P3.1c"]
-    effort: "2 pts"
-    completed_by: "a24e6bb"
-    completed_at: 2026-01-06
-    note: "Persisting manual_map to database using set_manual_map_dict() method, handles None/empty to clear mapping"
-
-  - id: "P3.1e"
-    name: "Update PATCH route handler"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3.1d"]
-    effort: "2 pts"
-    completed_by: "a6ac07c"
-    completed_at: 2026-01-06
-    note: "Completed PATCH endpoint integration with OpenAPI docs, docstring examples, and verified all validation/persistence flows"
-
-  # GET Endpoint (2 tasks)
-  - id: "P3.2a"
-    name: "Include manual_map in response"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3.1e"]
-    effort: "1 pt"
-    completed_by: "a34ed31"
-    completed_at: 2026-01-06
-    note: "Added manual_map to SourceResponse schema and GET endpoint, returns Dict or None from database"
-
-  - id: "P3.2b"
-    name: "Test GET response"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3.2a"]
-    effort: "1 pt"
-    completed_by: "a11e023"
-    completed_at: 2026-01-06
-    note: "Added 12 comprehensive tests for GET endpoint manual_map response, all passing with edge cases covered"
-
-  # Rescan Endpoint (4 tasks)
-  - id: "P3.3a"
-    name: "Pass manual_map to detector"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3.2b"]
-    effort: "2 pts"
-    completed_by: "a0b2d72"
-    completed_at: 2026-01-06
-    note: "Rescan endpoint now retrieves manual_map from database and passes to scanner as manual_mappings parameter"
-
-  - id: "P3.3b"
-    name: "Return dedup counts"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3.3a"]
-    effort: "2 pts"
-    completed_by: "a5fbe50"
-    completed_at: 2026-01-06
-    note: "Added database session to scan_repository call to enable cross-source deduplication, dedup counts auto-included in ScanResultDTO response"
-
-  - id: "P3.3c"
-    name: "Update response schema"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3.3b"]
-    effort: "2 pts"
-    completed_by: "a5ef7b9"
-    completed_at: 2026-01-06
-    note: "Enhanced ScanResultDTO schema descriptions for dedup fields, updated rescan endpoint docs with deduplication process explanation"
-
-  - id: "P3.3d"
-    name: "Integration test"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3.3c"]
-    effort: "2 pts"
-    completed_by: "a049cb6"
-    completed_at: 2026-01-06
-    note: "Created 8 comprehensive integration tests for rescan endpoint covering manual_map usage, dedup counts, end-to-end flow, and error cases"
-
-  # Error Handling & Docs (2 tasks)
-  - id: "P3.4a"
-    name: "Add error responses"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3.3d"]
-    effort: "2 pts"
-    completed_by: "a890d52"
-    completed_at: 2026-01-06
-    note: "Created 13 comprehensive error tests, verified 422 responses for invalid paths/types, documented all error codes"
-
-  - id: "P3.4b"
-    name: "Update OpenAPI docs"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3.4a"]
-    effort: "2 pts"
-    completed_by: "a926f74"
-    completed_at: 2026-01-06
-    note: "Enhanced OpenAPI docs for all endpoints with manual_map examples, validation rules, and complete error documentation"
-
+- id: P3.1a
+  name: Add manual_map to request schema
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.4d
+  effort: 2 pts
+  completed_by: aab5845
+  completed_at: 2026-01-06
+  note: Added manual_map field to UpdateSourceRequest schema with Optional[Dict[str,
+    str]] type
+- id: P3.1b
+  name: Validate directory paths
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3.1a
+  effort: 3 pts
+  completed_by: a11c94f
+  completed_at: 2026-01-06
+  note: Added path validation in router layer using GitHubScanner tree data, raises
+    422 for invalid paths
+- id: P3.1c
+  name: Validate artifact types
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3.1a
+  effort: 1 pt
+  completed_by: a95cc94
+  completed_at: 2026-01-06
+  note: Added artifact type validation with ALLOWED_ARTIFACT_TYPES constant, raises
+    422 for invalid types
+- id: P3.1d
+  name: Persist mappings
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3.1b
+  - P3.1c
+  effort: 2 pts
+  completed_by: a24e6bb
+  completed_at: 2026-01-06
+  note: Persisting manual_map to database using set_manual_map_dict() method, handles
+    None/empty to clear mapping
+- id: P3.1e
+  name: Update PATCH route handler
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3.1d
+  effort: 2 pts
+  completed_by: a6ac07c
+  completed_at: 2026-01-06
+  note: Completed PATCH endpoint integration with OpenAPI docs, docstring examples,
+    and verified all validation/persistence flows
+- id: P3.2a
+  name: Include manual_map in response
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3.1e
+  effort: 1 pt
+  completed_by: a34ed31
+  completed_at: 2026-01-06
+  note: Added manual_map to SourceResponse schema and GET endpoint, returns Dict or
+    None from database
+- id: P3.2b
+  name: Test GET response
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3.2a
+  effort: 1 pt
+  completed_by: a11e023
+  completed_at: 2026-01-06
+  note: Added 12 comprehensive tests for GET endpoint manual_map response, all passing
+    with edge cases covered
+- id: P3.3a
+  name: Pass manual_map to detector
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3.2b
+  effort: 2 pts
+  completed_by: a0b2d72
+  completed_at: 2026-01-06
+  note: Rescan endpoint now retrieves manual_map from database and passes to scanner
+    as manual_mappings parameter
+- id: P3.3b
+  name: Return dedup counts
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3.3a
+  effort: 2 pts
+  completed_by: a5fbe50
+  completed_at: 2026-01-06
+  note: Added database session to scan_repository call to enable cross-source deduplication,
+    dedup counts auto-included in ScanResultDTO response
+- id: P3.3c
+  name: Update response schema
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3.3b
+  effort: 2 pts
+  completed_by: a5ef7b9
+  completed_at: 2026-01-06
+  note: Enhanced ScanResultDTO schema descriptions for dedup fields, updated rescan
+    endpoint docs with deduplication process explanation
+- id: P3.3d
+  name: Integration test
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3.3c
+  effort: 2 pts
+  completed_by: a049cb6
+  completed_at: 2026-01-06
+  note: Created 8 comprehensive integration tests for rescan endpoint covering manual_map
+    usage, dedup counts, end-to-end flow, and error cases
+- id: P3.4a
+  name: Add error responses
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3.3d
+  effort: 2 pts
+  completed_by: a890d52
+  completed_at: 2026-01-06
+  note: Created 13 comprehensive error tests, verified 422 responses for invalid paths/types,
+    documented all error codes
+- id: P3.4b
+  name: Update OpenAPI docs
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3.4a
+  effort: 2 pts
+  completed_by: a926f74
+  completed_at: 2026-01-06
+  note: Enhanced OpenAPI docs for all endpoints with manual_map examples, validation
+    rules, and complete error documentation
 parallelization:
-  batch_1: ["P3.1a"]
-  batch_2: ["P3.1b", "P3.1c"]
-  batch_3: ["P3.1d"]
-  batch_4: ["P3.1e"]
-  batch_5: ["P3.2a"]
-  batch_6: ["P3.2b"]
-  batch_7: ["P3.3a"]
-  batch_8: ["P3.3b"]
-  batch_9: ["P3.3c"]
-  batch_10: ["P3.3d"]
-  batch_11: ["P3.4a", "P3.4b"]
+  batch_1:
+  - P3.1a
+  batch_2:
+  - P3.1b
+  - P3.1c
+  batch_3:
+  - P3.1d
+  batch_4:
+  - P3.1e
+  batch_5:
+  - P3.2a
+  batch_6:
+  - P3.2b
+  batch_7:
+  - P3.3a
+  batch_8:
+  - P3.3b
+  batch_9:
+  - P3.3c
+  batch_10:
+  - P3.3d
+  batch_11:
+  - P3.4a
+  - P3.4b
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-source-detection-improvements
 ---
 
 # Phase 3: API Layer

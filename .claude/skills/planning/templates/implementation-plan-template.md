@@ -1,14 +1,28 @@
 ---
-title: "Implementation Plan: Feature Name"
-description: "Detailed phased implementation with task breakdown and subagent assignments"
-audience: [ai-agents, developers]
-tags: [implementation, planning, phases, tasks]
-created: YYYY-MM-DD
-updated: YYYY-MM-DD
-category: "product-planning"
-status: draft
-related:
-  - /docs/project_plans/PRDs/category/feature-name-v1.md
+title: "Implementation Plan: Feature Name" # Human-readable implementation plan title
+schema_version: 2 # CCDash frontmatter schema version
+doc_type: implementation_plan # Must remain `implementation_plan`
+status: draft # draft|planning|in-progress|review|completed|superseded
+created: YYYY-MM-DD # Initial creation date (YYYY-MM-DD)
+updated: YYYY-MM-DD # Last edit date (YYYY-MM-DD)
+feature_slug: "feature-name" # Kebab-case feature identifier
+feature_version: "v1" # Version label for this feature document set
+prd_ref: /docs/project_plans/PRDs/category/feature-name-v1.md # Parent PRD path (required)
+plan_ref: null # Root implementation plan should be null
+scope: "Describe implementation boundary in one sentence" # Scope summary used in dashboards
+effort_estimate: "TBD" # Total effort estimate (points/days)
+architecture_summary: null # Optional high-level architecture summary
+related_documents: [] # Related docs (PRD, ADRs, diagrams, specs)
+owner: null # Single accountable owner (name or agent)
+contributors: [] # Supporting contributors
+priority: medium # low|medium|high|critical
+risk_level: medium # low|medium|high|critical
+category: "product-planning" # Planning taxonomy label
+tags: [implementation, planning, phases, tasks] # Search/filter tags
+milestone: null # Optional release/milestone marker
+commit_refs: [] # Commit SHAs added during implementation
+pr_refs: [] # Pull request refs (e.g., #123)
+files_affected: [] # Key files expected to change
 ---
 
 # Implementation Plan: [Feature Name]

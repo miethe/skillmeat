@@ -1,95 +1,111 @@
 ---
 prd: discovery-cache-fixes
 phase: 1
-title: "Discovery Cache & Invalidation Fixes"
+title: Discovery Cache & Invalidation Fixes
 status: completed
 completion: 100%
-updated_at: 2025-12-03T12:00:00Z
-completed_at: 2025-12-03T12:00:00Z
-
+updated_at: 2025-12-03 12:00:00+00:00
+completed_at: 2025-12-03 12:00:00+00:00
 tasks:
-  - id: "BUG1-001"
-    title: "Backend discovery filtering"
-    description: "Modify discover_artifacts() to filter already-imported artifacts"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_time: "2h"
-    commit: "e09951c"
-    files:
-      - "skillmeat/core/discovery.py"
-
-  - id: "BUG1-002"
-    title: "API endpoint update"
-    description: "Update /discover endpoint to pass manifest and return importable_count"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BUG1-001"]
-    estimated_time: "1h"
-    commit: "e09951c"
-    files:
-      - "skillmeat/api/routers/artifacts.py"
-
-  - id: "BUG2-001"
-    title: "Frontend cache invalidation fixes"
-    description: "Fix async/await race conditions and implement granular cache invalidation"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    dependencies: []
-    estimated_time: "2h"
-    commit: "e09951c"
-    files:
-      - "skillmeat/web/hooks/useProjectDiscovery.ts"
-      - "skillmeat/web/hooks/useCacheRefresh.ts"
-      - "skillmeat/web/hooks/useDeploy.ts"
-      - "skillmeat/web/hooks/useDiscovery.ts"
-
-  - id: "BUG1-003"
-    title: "Frontend UI update - show remaining count"
-    description: "Update DiscoveryBanner to display importable_count instead of discovered_count"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["BUG1-002", "BUG2-001"]
-    estimated_time: "1h"
-    commit: "e09951c"
-    files:
-      - "skillmeat/web/components/discovery/DiscoveryBanner.tsx"
-      - "skillmeat/web/hooks/useProjectDiscovery.ts"
-      - "skillmeat/web/types/discovery.ts"
-
-  - id: "BUG2-002"
-    title: "Backend integration tests"
-    description: "Add integration tests for discovery filtering and cache invalidation"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BUG1-002"]
-    estimated_time: "2h"
-    commit: "e09951c"
-    files:
-      - "skillmeat/api/tests/test_discovery_cache_fixes.py"
-
-  - id: "BUG1-004"
-    title: "Frontend component tests"
-    description: "Add unit tests for DiscoveryBanner count display and hiding behavior"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["BUG1-003"]
-    estimated_time: "1h"
-    commit: "e09951c"
-    files:
-      - "skillmeat/web/__tests__/discovery-banner.test.tsx"
-
+- id: BUG1-001
+  title: Backend discovery filtering
+  description: Modify discover_artifacts() to filter already-imported artifacts
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_time: 2h
+  commit: e09951c
+  files:
+  - skillmeat/core/discovery.py
+- id: BUG1-002
+  title: API endpoint update
+  description: Update /discover endpoint to pass manifest and return importable_count
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BUG1-001
+  estimated_time: 1h
+  commit: e09951c
+  files:
+  - skillmeat/api/routers/artifacts.py
+- id: BUG2-001
+  title: Frontend cache invalidation fixes
+  description: Fix async/await race conditions and implement granular cache invalidation
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies: []
+  estimated_time: 2h
+  commit: e09951c
+  files:
+  - skillmeat/web/hooks/useProjectDiscovery.ts
+  - skillmeat/web/hooks/useCacheRefresh.ts
+  - skillmeat/web/hooks/useDeploy.ts
+  - skillmeat/web/hooks/useDiscovery.ts
+- id: BUG1-003
+  title: Frontend UI update - show remaining count
+  description: Update DiscoveryBanner to display importable_count instead of discovered_count
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - BUG1-002
+  - BUG2-001
+  estimated_time: 1h
+  commit: e09951c
+  files:
+  - skillmeat/web/components/discovery/DiscoveryBanner.tsx
+  - skillmeat/web/hooks/useProjectDiscovery.ts
+  - skillmeat/web/types/discovery.ts
+- id: BUG2-002
+  title: Backend integration tests
+  description: Add integration tests for discovery filtering and cache invalidation
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BUG1-002
+  estimated_time: 2h
+  commit: e09951c
+  files:
+  - skillmeat/api/tests/test_discovery_cache_fixes.py
+- id: BUG1-004
+  title: Frontend component tests
+  description: Add unit tests for DiscoveryBanner count display and hiding behavior
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - BUG1-003
+  estimated_time: 1h
+  commit: e09951c
+  files:
+  - skillmeat/web/__tests__/discovery-banner.test.tsx
 parallelization:
-  batch_1: ["BUG1-001", "BUG2-001"]
-  batch_2: ["BUG1-002"]
-  batch_3: ["BUG1-003", "BUG2-002"]
-  batch_4: ["BUG1-004"]
-  critical_path: ["BUG1-001", "BUG1-002", "BUG1-003", "BUG1-004"]
-  estimated_total_time: "9h"
-
+  batch_1:
+  - BUG1-001
+  - BUG2-001
+  batch_2:
+  - BUG1-002
+  batch_3:
+  - BUG1-003
+  - BUG2-002
+  batch_4:
+  - BUG1-004
+  critical_path:
+  - BUG1-001
+  - BUG1-002
+  - BUG1-003
+  - BUG1-004
+  estimated_total_time: 9h
 blockers: []
-
 work_log: []
+schema_version: 2
+doc_type: progress
+feature_slug: discovery-cache-fixes
+type: progress
 ---
 
 # Phase 1: Discovery Cache & Invalidation Fixes

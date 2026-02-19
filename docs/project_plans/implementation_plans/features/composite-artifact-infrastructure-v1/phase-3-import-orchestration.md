@@ -1,14 +1,28 @@
 ---
-title: "Phase 3: Import Orchestration & Deduplication"
-description: "Transactional smart import with SHA-256 dedup, version pinning, and API endpoint"
-audience: [ai-agents, developers]
-tags: [implementation, phase-3, import, deduplication, transactions, api]
+title: 'Phase 3: Import Orchestration & Deduplication'
+description: Transactional smart import with SHA-256 dedup, version pinning, and API
+  endpoint
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- phase-3
+- import
+- deduplication
+- transactions
+- api
 created: 2026-02-17
-updated: 2026-02-17
-category: "product-planning"
-status: draft
+updated: '2026-02-18'
+category: product-planning
+status: completed
 related:
-  - /docs/project_plans/implementation_plans/features/composite-artifact-infrastructure-v1.md
+- /docs/project_plans/implementation_plans/features/composite-artifact-infrastructure-v1.md
+schema_version: 2
+doc_type: phase_plan
+feature_slug: composite-artifact-infrastructure
+prd_ref: null
+plan_ref: null
 ---
 
 # Phase 3: Import Orchestration & Deduplication
@@ -17,7 +31,7 @@ related:
 **Duration**: 3-4 days
 **Dependencies**: Phase 1 complete, Phase 2 complete
 **Assigned Subagent(s)**: python-backend-engineer, backend-architect
-**Estimated Effort**: 13 story points
+**Estimated Effort**: 14 story points
 
 ---
 
@@ -25,14 +39,18 @@ related:
 
 Phase 3 implements the core smart import logic that makes the Composite Artifact Infrastructure useful. This phase:
 
-1. Implements SHA-256 content hash computation for deduplication
-2. Creates deduplication logic (hash lookup → link existing / new version / create new)
-3. Wraps plugin import in a single database transaction for atomicity
-4. Records `pinned_version_hash` in membership metadata at import time
-5. Propagates composite membership metadata to project deployments (Claude Code in v1)
-6. Implements plugin meta-file storage in collection filesystem
-7. Creates API endpoint for querying associations
-8. Provides comprehensive integration tests
+1. Leverages existing `Artifact.content_hash` and `ArtifactVersion.content_hash` (UNIQUE index) infrastructure for deduplication — no parallel hashing system
+2. Implements SHA-256 content hash computation compatible with existing content_hash fields
+3. Creates deduplication logic (hash lookup → link existing / new version / create new)
+4. Wraps plugin import in a single database transaction for atomicity
+5. Records `pinned_version_hash` in membership metadata at import time
+6. Propagates composite membership metadata to project deployments (Claude Code in v1)
+7. Implements plugin meta-file storage in collection filesystem
+8. Creates API endpoint for querying associations
+9. Provides integration tests for core import flows
+10. Unifies bundle export with the Composite model via `skillmeat export`
+
+> **Note**: Enhanced version conflict handling for same-name-different-hash scenarios is deferred to a future enhancement. For v1, this case defaults to `CREATE_NEW_VERSION`.
 
 The output of this phase feeds directly into Phase 4 (UI implementation) and enables the full end-to-end import workflow.
 
@@ -44,29 +62,33 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 
 **Description**: Implement SHA-256 hash computation for all artifact types. For directory-based artifacts (skills), compute tree hash; for file artifacts (commands), compute file hash.
 
+> **Important**: Leverage existing `Artifact.content_hash` and `ArtifactVersion.content_hash` (which has a UNIQUE index). The `compute_artifact_hash()` function should produce hashes compatible with the existing content_hash fields. If the existing hashing algorithm is already SHA-256, reuse it directly.
+
 **Acceptance Criteria**:
-- [x] Function: `compute_artifact_hash(artifact_path: str) -> str`
+- [ ] Function: `compute_artifact_hash(artifact_path: str) -> str`
   - Returns 64-character hex SHA-256 hash
   - For directories: merkle-tree hash of all files (sorted by path)
   - For files: direct file hash
   - Consistent: same artifact always produces same hash
-- [x] Hash computation strategy:
+- [ ] Hash computation strategy:
   - **Skills (directories)**: Tree hash of all files in skill directory, excluding cache/metadata
   - **Commands/Agents/Hooks (files)**: Direct SHA-256 of file content
   - **MCP (spec files)**: SHA-256 of spec content
-- [x] Exclusions: Don't hash `.git/`, `node_modules/`, `.DS_Store`, temp files
-- [x] Deterministic: Same artifact hashed multiple times = same hash
-- [x] Unit tests:
+- [ ] Hash output compatible with existing `ArtifactVersion.content_hash` format
+- [ ] Exclusions: Don't hash `.git/`, `node_modules/`, `.DS_Store`, temp files
+- [ ] Deterministic: Same artifact hashed multiple times = same hash
+- [ ] Unit tests:
   - Same artifact → same hash
   - Different content → different hash
   - Tree hash stable across directory reordering
   - Very large directories handled efficiently
-- [x] Performance: Hashing <1GB artifact completes in <5s
+- [ ] Performance: Hashing <1GB artifact completes in <5s
 
 **Key Files to Modify**:
 - `skillmeat/core/importer.py` or new `skillmeat/core/deduplication.py` — Add `compute_artifact_hash()`
 
 **Implementation Notes**:
+- Check existing code in `skillmeat/cache/models.py` — `ArtifactVersion` already has `content_hash` with UNIQUE index. Reuse existing algorithm if SHA-256.
 - For skill tree hash, consider using `hashlib.sha256()` with sorted directory traversal
 - For commands/agents/hooks, use `hashlib.file_digest()` or read+hash
 - Document hash strategy in docstring for reproducibility
@@ -80,24 +102,26 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 
 **Description**: Implement the three-scenario deduplication decision tree: exact match (link existing), name match with different hash (new version or fork), new artifact (create).
 
+> **Note**: For v1, Scenario B (name match, different hash) defaults to `CREATE_NEW_VERSION`. Enhanced conflict resolution UI for this scenario is deferred to a future enhancement.
+
 **Acceptance Criteria**:
-- [x] Function: `resolve_artifact_for_import(discovered: DiscoveredArtifact, content_hash: str) -> DeduplicationResult`
+- [ ] Function: `resolve_artifact_for_import(discovered: DiscoveredArtifact, content_hash: str) -> DeduplicationResult`
   - Returns enum: `LINK_EXISTING`, `CREATE_NEW_VERSION`, `CREATE_NEW_ARTIFACT`, `CONFLICT_NEEDS_USER_DECISION`
-- [x] Logic:
+- [ ] Logic:
   - **Scenario A (Exact match)**: Query DB for artifact with same content hash
     - If found: Return `LINK_EXISTING` + existing artifact ID
     - Decision: Use existing artifact, don't create new row
   - **Scenario B (Name match, different hash)**: Query DB for artifact with same name but different hash
-    - If found: Return `CREATE_NEW_VERSION` or `CONFLICT_NEEDS_USER_DECISION`
-    - Decision: Create new `ArtifactVersion` linked to existing artifact, OR create new artifact (user choice for v1, default to new version)
+    - If found: Return `CREATE_NEW_VERSION` (v1 default; enhanced conflict resolution deferred)
+    - Decision: Create new `ArtifactVersion` linked to existing artifact
   - **Scenario C (New)**: No name or hash match found
     - Return `CREATE_NEW_ARTIFACT`
     - Decision: Create new artifact row
-- [x] Database query:
-  - Hash lookup: `SELECT * FROM artifacts WHERE content_hash = ?`
+- [ ] Database queries check against existing `Artifact.content_hash` and `ArtifactVersion.content_hash` fields — not a separate hash store:
+  - Hash lookup: `SELECT * FROM artifact_versions WHERE content_hash = ?` (leverages UNIQUE index)
   - Name lookup: `SELECT * FROM artifacts WHERE name = ? AND type = ?`
   - Efficient queries with appropriate indexes
-- [x] Return type `DeduplicationResult`:
+- [ ] Return type `DeduplicationResult`:
   ```python
   @dataclass
   class DeduplicationResult:
@@ -105,7 +129,7 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
       artifact_id: Optional[str]  # ID to link/version if decision is LINK_EXISTING
       reason: str  # Explanation for decision
   ```
-- [x] Unit tests covering all three scenarios
+- [ ] Unit tests covering all three scenarios
 
 **Key Files to Modify**:
 - `skillmeat/core/deduplication.py` (new) or `skillmeat/core/importer.py` — Add dedup logic
@@ -126,8 +150,8 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 **Description**: Wrap entire plugin import (all children + composite entity + membership metadata rows) in a single database transaction. If any child import fails, roll back completely (no partial imports).
 
 **Acceptance Criteria**:
-- [x] Function: `import_plugin_transactional(discovered_graph: DiscoveredGraph, source_url: str) -> ImportResult`
-- [x] Flow:
+- [ ] Function: `import_plugin_transactional(discovered_graph: DiscoveredGraph, source_url: str) -> ImportResult`
+- [ ] Flow:
   1. Begin database transaction
   2. For each child in graph:
      a. Compute content hash
@@ -138,11 +162,11 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
      a. Create composite entity row
      b. Write membership rows linking composite to all children
   4. Commit transaction
-- [x] Rollback on failure:
+- [ ] Rollback on failure:
   - Any exception during import → automatic transaction rollback
   - No orphaned rows left in DB
   - Collection filesystem state reverted (temp dir pattern already established)
-- [x] Return type `ImportResult`:
+- [ ] Return type `ImportResult`:
   ```python
   @dataclass
   class ImportResult:
@@ -153,12 +177,12 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
       errors: List[str]
       transaction_id: str  # For observability
   ```
-- [x] Error handling:
+- [ ] Error handling:
   - Database errors → rollback + return error
   - File I/O errors → rollback + return error
   - Validation errors → rollback + return error
   - Don't swallow exceptions; let caller handle
-- [x] Integration tests:
+- [ ] Integration tests:
   - Happy path: all children + composite entity created, memberships written
   - Rollback scenario: mid-import failure leaves DB clean
   - Dedup scenario: re-import updates memberships only, no duplicate child artifacts
@@ -182,21 +206,21 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 **Description**: Record the `pinned_version_hash` in membership metadata at the time the association is created (plugin import). This hash enables future conflict detection when deploying.
 
 **Acceptance Criteria**:
-- [x] At import time (Phase 3-03):
+- [ ] At import time (Phase 3-03):
   - When creating membership row, compute content hash of child artifact as it exists at import time
   - Store hash in membership `pinned_version_hash`
-- [x] Query/retrieval:
+- [ ] Query/retrieval:
   - Repository method: `get_membership(composite_id, child_artifact_id) -> MembershipRecord`
   - Returns membership with `pinned_version_hash` populated
-- [x] Schema validation:
+- [ ] Schema validation:
   - `pinned_version_hash` is 64-char hex string (or NULL for unversioned associations)
   - Index on `pinned_version_hash` for conflict detection queries
   - If `ArtifactVersion.content_hash` exists for the same child/version, mismatch is logged as validation warning
-- [x] Unit tests:
+- [ ] Unit tests:
   - Association created with correct pinned hash
   - Hash retrieved correctly
   - Can query associations by pinned hash
-- [x] Future use (Phase 4):
+- [ ] Future use (Phase 4):
   - On deploy, check if current child hash differs from pinned hash
   - Warn user if conflict detected
 
@@ -219,19 +243,21 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 **Description**: Propagate composite membership metadata to project deployment state so children retain parent composite context. In v1, plugin deployment behavior is supported for Claude Code only.
 
 **Acceptance Criteria**:
-- [x] Deployment metadata propagation:
+- [ ] Deployment metadata propagation:
   - Composite deployment creates/updates project-scoped linkage metadata
   - Child artifacts retain parent composite context in project views/modals
-- [x] Claude Code scope:
-  - Plugin deployment structure and conflict handling enabled for Claude Code
+- [ ] Claude Code deployment structure:
+  - Child artifacts deploy to standard artifact locations (e.g., `.claude/skills/`, `.claude/commands/`)
+  - Composite non-artifact files (plugin.json, README, etc.) deploy to `.claude/plugins/{plugin_name}/`
   - Non-Claude platforms return explicit unsupported response for plugin deploy in v1
-- [x] Plugin sync behavior:
+- [ ] Plugin sync behavior:
   - Plugins stored at: `~/.skillmeat/collections/{collection}/plugins/<plugin-name>/`
   - Plugin meta-files (plugin.json, README) stored there
   - Children stored under their respective type directories (not nested under plugin)
-- [x] Tests:
+- [ ] Tests:
   - Syncing plugins puts them in correct directory
-  - Children are synced independently
+  - Children are synced independently to standard locations
+  - Composite non-artifact files land in `.claude/plugins/{plugin_name}/`
   - No recursion/nesting of plugin directories
 
 **Key Files to Modify**:
@@ -252,7 +278,7 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 **Description**: Implement the `plugins/` directory structure in the collection filesystem for storing plugin-specific meta-files (plugin.json, README, docs, etc.).
 
 **Acceptance Criteria**:
-- [x] Directory structure:
+- [ ] Directory structure:
   ```
   ~/.skillmeat/collections/{collection}/plugins/
   └── git-workflow-pro/
@@ -260,17 +286,17 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
       ├── README.md
       └── manifest.toml
   ```
-- [x] Plugin meta-files stored separately from children:
+- [ ] Plugin meta-files stored separately from children:
   - Plugin's own files in `plugins/<name>/`
   - Children stored in `skills/`, `commands/`, etc. (independent of plugin)
-- [x] At import time:
+- [ ] At import time:
   - Extract plugin meta-files from source
   - Write to `plugins/<plugin-name>/` directory
   - Use atomic move (temp dir + rename) pattern
-- [x] Manifest registration:
+- [ ] Manifest registration:
   - Update collection manifest to register plugin artifact
   - Lock file updated with plugin version/SHA
-- [x] Tests:
+- [ ] Tests:
   - Plugin files written to correct directory
   - Children written to their type directories
   - Manifest updated correctly
@@ -293,8 +319,8 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 **Description**: Create a new API endpoint that returns associations for a given artifact (both parents and children with relationship metadata).
 
 **Acceptance Criteria**:
-- [x] Endpoint: `GET /api/v1/artifacts/{artifact_id}/associations`
-- [x] Response schema `AssociationsDTO`:
+- [ ] Endpoint: `GET /api/v1/artifacts/{artifact_id}/associations`
+- [ ] Response schema `AssociationsDTO`:
   ```python
   @dataclass
   class AssociationsDTO:
@@ -311,19 +337,19 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
       pinned_version_hash: Optional[str]
       created_at: datetime
   ```
-- [x] HTTP behavior:
+- [ ] HTTP behavior:
   - 200 OK + DTO for valid artifact_id
   - 404 Not Found for unknown artifact_id
   - 401 Unauthorized if not authenticated (use existing auth middleware)
-- [x] Query parameters (optional):
+- [ ] Query parameters (optional):
   - `include_parents: bool` (default true)
   - `include_children: bool` (default true)
   - `relationship_type: str` (filter by type, default all)
-- [x] OpenAPI documentation:
+- [ ] OpenAPI documentation:
   - Endpoint documented in OpenAPI spec
   - Request/response schemas defined
   - Examples provided
-- [x] Performance:
+- [ ] Performance:
   - Responds in <200ms for plugins with up to 50 children
   - Query optimized with `joinedload()` or similar
 
@@ -345,40 +371,31 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 
 ### CAI-P3-08: Integration Tests (Import Orchestration)
 
-**Description**: Write comprehensive integration tests validating plugin import happy path, deduplication scenarios, and rollback behavior.
+**Description**: Write integration tests validating plugin import happy path, deduplication scenarios, rollback behavior, and API endpoint.
 
 **Acceptance Criteria**:
-- [x] Test file: `tests/integration/test_plugin_import_integration.py`
-- [x] Happy path test:
+- [ ] Test file: `tests/integration/test_plugin_import_integration.py`
+- [ ] Happy path test:
   - Create test plugin with 3 children (skills + commands)
   - Call `import_plugin_transactional()` with discovered graph
   - Verify: plugin created, 3 children created, 3 associations created
   - Verify: all DB transactions committed
   - Verify: files written to collection filesystem
-- [x] Deduplication test:
+  - Verify: `pinned_version_hash` stored correctly for each child
+- [ ] Deduplication test:
   - First import: 1 plugin + 3 children (all new)
   - Re-import same plugin second time
   - Verify: 0 new artifacts created (children reused)
   - Verify: associations still created/updated
   - Verify: `children_reused` counter = 3
-- [x] Rollback test:
+- [ ] Rollback test:
   - Create test plugin import that will fail mid-way (mock failure in child 2 of 3)
   - Call `import_plugin_transactional()`
   - Verify: transaction rolled back
   - Verify: no plugin row created
   - Verify: child 1 artifact not created (or rolled back)
   - Verify: collection filesystem in pre-import state
-- [x] Hash pinning test:
-  - Import plugin with specific child versions
-  - Verify: `pinned_version_hash` stored correctly
-  - Re-import same plugin
-  - Verify: pinned hash matches original import
-- [x] Sync engine test:
-  - Import plugin
-  - Run sync operation
-  - Verify: plugin appears in `plugins/` directory
-  - Verify: children appear in `skills/`, `commands/` directories
-- [x] API endpoint test:
+- [ ] API endpoint test:
   - Create plugin + children
   - Call `GET /api/v1/artifacts/{plugin_id}/associations`
   - Verify: returns 200 with correct parent/child lists
@@ -404,31 +421,31 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 **Description**: Add OpenTelemetry instrumentation for all key operations: composite detection, hash computation, deduplication decision, import transaction, association write. Also add structured logging and metrics.
 
 **Acceptance Criteria**:
-- [x] OpenTelemetry spans:
+- [ ] OpenTelemetry spans:
   - Span: `composite.detect` — Time spent in composite detection
   - Span: `artifact.hash_compute` — Hash computation per artifact
   - Span: `artifact.dedup_resolve` — Dedup decision per artifact
   - Span: `plugin.import_transactional` — Entire import transaction
   - Span: `association.write` — Writing association rows
   - All spans include relevant tags: `plugin_name`, `child_count`, `artifact_name`, `content_hash`
-- [x] Metrics:
+- [ ] Metrics:
   - Counter: `plugin_import_total` — Total plugins imported
   - Counter: `dedup_hit_total` — Artifacts linked to existing (reused)
   - Counter: `dedup_miss_total` — New artifacts created
   - Histogram: `plugin_import_duration_seconds` — Distribution of import times
   - Histogram: `artifact_hash_compute_duration_seconds` — Hash computation time
-- [x] Structured logging:
+- [ ] Structured logging:
   - Log fields: `plugin_name`, `child_count`, `new_count`, `existing_count`, `transaction_id`, `duration_ms`
   - Examples:
     - "plugin_imported" → plugin_name, child_count, new_count, existing_count, duration_ms
     - "dedup_decision" → artifact_name, decision, content_hash
     - "import_failure" → error_msg, partial_imports_rolled_back
-- [x] Log levels:
+- [ ] Log levels:
   - INFO: Import started/completed
   - DEBUG: Per-child dedup decisions
   - WARN: Conflicts or dedup ambiguities
   - ERROR: Import failures
-- [x] No breaking changes to existing logging
+- [ ] No breaking changes to existing logging
 
 **Key Files to Modify**:
 - `skillmeat/core/importer.py` — Add OTel spans + metrics
@@ -446,11 +463,40 @@ The output of this phase feeds directly into Phase 4 (UI implementation) and ena
 
 ---
 
+### CAI-P3-10: Bundle Export for Composites
+
+**Description**: Update `skillmeat export` command to accept a Composite Artifact ID and automatically generate a Bundle zip containing the composite's metadata plus all child artifacts. Unifies the legacy Bundle concept with the new Composite model.
+
+**Acceptance Criteria**:
+- [ ] `skillmeat export <composite_id>` generates a valid Bundle zip
+- [ ] Bundle includes composite metadata + all child artifacts
+- [ ] Existing manual bundle creation still works
+- [ ] Unit test for export path
+
+**Key Files to Modify**:
+- `skillmeat/core/sharing/bundle.py` — Add composite-aware export logic
+- CLI export command (e.g., `skillmeat/cli.py` or relevant CLI module)
+
+**Implementation Notes**:
+- Resolve composite membership to enumerate child artifacts
+- Bundle zip should contain composite metadata (plugin.json, manifest) at root level
+- Child artifacts placed in type-appropriate subdirectories within the bundle
+- Reuse existing bundle creation infrastructure where possible
+
+**Dependencies**: CAI-P3-03
+
+**Estimate**: 1 story point
+
+**Subagent**: python-backend-engineer
+
+---
+
 ## Phase 3 Quality Gates
 
 Before Phase 4 can begin, all the following must pass:
 
 - [ ] Hash computation consistent: Same artifact → same hash every time
+- [ ] Hash output compatible with existing `ArtifactVersion.content_hash` format
 - [ ] Dedup logic correct: All three scenarios (link, new version, create) tested
 - [ ] Transaction wrapper works: Happy path imports all children + composite entity atomically
 - [ ] Rollback scenario passes: Mid-import failure leaves DB clean
@@ -459,7 +505,8 @@ Before Phase 4 can begin, all the following must pass:
 - [ ] Plugin files stored correctly: `~/.skillmeat/collections/{collection}/plugins/<name>/` directory created
 - [ ] Non-Claude plugin deployment returns explicit unsupported response
 - [ ] API endpoint works: `GET /api/v1/artifacts/{id}/associations` returns 200 with `AssociationsDTO`
-- [ ] Integration tests pass: Happy path, dedup, rollback, hash pinning, sync, API all green
+- [ ] Bundle export works: `skillmeat export <composite_id>` produces valid zip
+- [ ] Integration tests pass: Happy path, dedup, rollback, API all green
 - [ ] Observability complete: OTel spans logged, metrics recorded, structured logs include required fields
 - [ ] No regression in existing import: `pytest tests/test_importer.py -v` passes (flat artifact imports unaffected)
 
@@ -547,18 +594,21 @@ def import_plugin_transactional(discovered_graph, source_url):
 
 ## Deliverables Checklist
 
-- [ ] Content hash computation implemented and tested
+- [ ] Content hash computation implemented and tested (compatible with existing `ArtifactVersion.content_hash`)
 - [ ] Deduplication logic implemented with all three scenarios
 - [ ] Transaction wrapper for plugin import implemented with rollback
 - [ ] Version pinning (`pinned_version_hash`) stored and retrievable
 - [ ] Project deployment propagation implemented (Claude Code v1 scope)
 - [ ] Plugin meta-file storage implemented at `~/.skillmeat/collections/{collection}/plugins/`
 - [ ] `GET /artifacts/{id}/associations` API endpoint implemented
-- [ ] Integration tests covering happy path, dedup, rollback, pinning, sync
+- [ ] Bundle export for composites via `skillmeat export <composite_id>`
+- [ ] Integration tests covering happy path, dedup, rollback, API
 - [ ] OpenTelemetry spans, metrics, and structured logging added
 - [ ] API endpoint documented in OpenAPI spec
 - [ ] All Phase 3 quality gates passing
 - [ ] Code reviewed and merged to main branch
+
+> **Deferred**: Enhanced version conflict handling (same-name-different-hash with user choice UI) is planned for a future enhancement.
 
 ---
 

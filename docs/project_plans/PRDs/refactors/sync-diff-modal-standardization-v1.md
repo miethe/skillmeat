@@ -1,19 +1,33 @@
 ---
-title: "PRD: Sync/Diff Modal Standardization Refactor"
-description: "Fix sync/diff inconsistencies between /manage and /projects pages, establish shared modal foundation, and enable complete sync workflows"
-audience: [ai-agents, developers, architects]
-tags: [prd, planning, refactor, sync, diff, modal, standardization, collection]
+title: 'PRD: Sync/Diff Modal Standardization Refactor'
+description: Fix sync/diff inconsistencies between /manage and /projects pages, establish
+  shared modal foundation, and enable complete sync workflows
+audience:
+- ai-agents
+- developers
+- architects
+tags:
+- prd
+- planning
+- refactor
+- sync
+- diff
+- modal
+- standardization
+- collection
 created: 2026-02-04
 updated: 2026-02-04
-category: "product-planning"
-status: planned
+category: product-planning
+status: inferred_complete
 priority: HIGH
 related:
-  - /docs/project_plans/reports/sync-diff-modal-inconsistency-analysis-2026-02-04.md
-  - /docs/project_plans/PRDs/enhancements/artifact-flow-modal-redesign.md
-  - /docs/project_plans/implementation_plans/refactors/modal-architecture-improvements-r2r3.md
+- /docs/project_plans/reports/sync-diff-modal-inconsistency-analysis-2026-02-04.md
+- /docs/project_plans/PRDs/enhancements/artifact-flow-modal-redesign.md
+- /docs/project_plans/implementation_plans/refactors/modal-architecture-improvements-r2r3.md
+schema_version: 2
+doc_type: prd
+feature_slug: sync-diff-modal-standardization
 ---
-
 # PRD: Sync/Diff Modal Standardization Refactor
 
 **Feature Name:** Sync/Diff Modal Standardization

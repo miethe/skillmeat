@@ -1,72 +1,77 @@
 ---
 type: progress
-prd: "marketplace-github-ingestion-remediation"
+prd: marketplace-github-ingestion-remediation
 phase: 3
-title: "Import Downloads"
-status: "completed"
-started: "2025-12-26T18:00:00Z"
-completed: "2025-12-26T20:30:00Z"
-
+title: Import Downloads
+status: completed
+started: '2025-12-26T18:00:00Z'
+completed: '2025-12-26T20:30:00Z'
 overall_progress: 100
-completion_estimate: "complete"
-
+completion_estimate: complete
 total_tasks: 3
 completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer"]
+owners:
+- python-backend-engineer
 contributors: []
-
 tasks:
-  - id: "REM-3.1"
-    description: "Implement _download_artifact - fetch files from GitHub API"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "60min"
-    priority: "high"
-    file: "skillmeat/core/marketplace/import_coordinator.py"
-    commit: "pending"
-
-  - id: "REM-3.2"
-    description: "Implement _update_manifest - update collection manifest.toml"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "30min"
-    priority: "high"
-    file: "skillmeat/core/marketplace/import_coordinator.py"
-    commit: "pending"
-
-  - id: "REM-3.3"
-    description: "Wire Downloads - replace stub in import_coordinator.py"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REM-3.1", "REM-3.2"]
-    estimated_effort: "30min"
-    priority: "high"
-    file: "skillmeat/core/marketplace/import_coordinator.py"
-    commit: "pending"
-
+- id: REM-3.1
+  description: Implement _download_artifact - fetch files from GitHub API
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 60min
+  priority: high
+  file: skillmeat/core/marketplace/import_coordinator.py
+  commit: pending
+- id: REM-3.2
+  description: Implement _update_manifest - update collection manifest.toml
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 30min
+  priority: high
+  file: skillmeat/core/marketplace/import_coordinator.py
+  commit: pending
+- id: REM-3.3
+  description: Wire Downloads - replace stub in import_coordinator.py
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REM-3.1
+  - REM-3.2
+  estimated_effort: 30min
+  priority: high
+  file: skillmeat/core/marketplace/import_coordinator.py
+  commit: pending
 parallelization:
-  batch_1: ["REM-3.1", "REM-3.2"]
-  batch_2: ["REM-3.3"]
-  critical_path: ["REM-3.1", "REM-3.3"]
-  estimated_total_time: "2h"
-
+  batch_1:
+  - REM-3.1
+  - REM-3.2
+  batch_2:
+  - REM-3.3
+  critical_path:
+  - REM-3.1
+  - REM-3.3
+  estimated_total_time: 2h
 blockers: []
-
 success_criteria:
-  - _download_artifact fetches files from GitHub API successfully ✅
-  - _update_manifest updates manifest.toml with new artifact entry ✅
-  - Import flow completes end-to-end (catalog entry → downloaded files → manifest updated) ✅
-  - pytest tests/core/marketplace/test_import_coordinator.py passes ✅ (36/36)
-
+- "_download_artifact fetches files from GitHub API successfully \u2705"
+- "_update_manifest updates manifest.toml with new artifact entry \u2705"
+- "Import flow completes end-to-end (catalog entry \u2192 downloaded files \u2192\
+  \ manifest updated) \u2705"
+- "pytest tests/core/marketplace/test_import_coordinator.py passes \u2705 (36/36)"
 files_modified:
-  - "skillmeat/core/marketplace/import_coordinator.py"
-  - "tests/core/marketplace/test_import_coordinator.py"
+- skillmeat/core/marketplace/import_coordinator.py
+- tests/core/marketplace/test_import_coordinator.py
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-github-ingestion-remediation
 ---
 
 # Phase 3: Import Downloads

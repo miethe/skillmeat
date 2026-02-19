@@ -1,16 +1,27 @@
 ---
-title: "PRD: Composite Artifact Infrastructure"
-description: "Introduce a many-to-many relational model for composite artifacts (Plugins, Stacks, Suites) with deduplication, version pinning, and relationship browsing in the web UI."
-audience: [ai-agents, developers]
-tags: [composite-artifacts, plugins, relational-model, discovery, import]
+title: 'PRD: Composite Artifact Infrastructure'
+description: Introduce a many-to-many relational model for composite artifacts (Plugins,
+  Stacks, Suites) with deduplication, version pinning, and relationship browsing in
+  the web UI.
+audience:
+- ai-agents
+- developers
+tags:
+- composite-artifacts
+- plugins
+- relational-model
+- discovery
+- import
 created: 2026-02-17
-updated: 2026-02-17
-category: "product-planning"
-status: draft
+updated: 2026-02-18
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/design-specs/composite-artifact-infrastructure.md
+- /docs/project_plans/design-specs/composite-artifact-infrastructure.md
+schema_version: 2
+doc_type: prd
+feature_slug: composite-artifact-infrastructure
 ---
-
 # Feature Brief & Metadata
 
 **Feature Name:**
@@ -60,7 +71,7 @@ SkillMeat currently stores all artifacts (skills, commands, agents, MCP servers,
 
 ### Current state
 
-The `ArtifactType` enum in `skillmeat/core/artifact_detection.py` defines five atomic types: `SKILL`, `COMMAND`, `AGENT`, `HOOK`, `MCP`. The `Artifact` ORM model in `skillmeat/cache/models.py` treats every artifact as an independent row with no relationship columns. The `discovery.py` scanner returns a flat `DiscoveryResult` containing a list of individual `DiscoveredArtifact` objects; it has no graph traversal or parent-detection step. An informal "bundle" concept exists in `skillmeat/core/sharing/bundle.py` for export/import zip files, but there is no DB representation of bundle membership and no import-time deduplication.
+The `ArtifactType` enum in `skillmeat/core/artifact_detection.py` defines five atomic types: `SKILL`, `COMMAND`, `AGENT`, `HOOK`, `MCP`. A separate `CONTEXT_FILE` value exists as a context entity type (not an artifact type proper). The `Artifact` ORM model in `skillmeat/cache/models.py` treats every artifact as an independent row with no relationship columns. The `discovery.py` scanner returns a flat `DiscoveryResult` containing a list of individual `DiscoveredArtifact` objects; it has no graph traversal or parent-detection step. An informal "bundle" concept exists in `skillmeat/core/sharing/bundle.py` for export/import zip files, but there is no DB representation of bundle membership and no import-time deduplication. `COMPOSITE` will be added as a new deployable artifact type to enable formal composite entity representation.
 
 ### Problem space
 
@@ -148,21 +159,21 @@ Surface parent/child relationships in the artifact detail view and show an impor
 graph TD
     A[User enters source URL] --> B[Discovery: scan repo]
     B --> C{Composite root detected?}
-    C -- Yes --> D[Build DiscoveredGraph<br/>plugin + children]
+    C -- Yes --> D[Build DiscoveredGraph<br/>composite + children]
     C -- No --> E[Existing flat discovery path]
-    D --> F[UI shows import preview<br/>X new, Y existing]
+    D --> F[UI shows import preview<br/>X new, Y existing, Z conflicts]
     F --> G[User confirms import]
     G --> H[Import orchestrator starts transaction]
     H --> I[Hash-check each child]
     I --> J{Match found?}
     J -- Exact match --> K[Link to existing artifact]
-    J -- Name match, diff hash --> L[Offer: fork or update]
+    J -- Name match, diff hash --> L[Offer: fork or update via merge]
     J -- New --> M[Create new artifact row]
-    K & L & M --> N[Import plugin artifact itself]
+    K & L & M --> N[Import composite artifact itself]
     N --> O[Write CompositeMembership rows]
     O --> P[Commit transaction]
     P --> Q[Refresh DB cache]
-    Q --> R[UI shows plugin with relationship tabs]
+    Q --> R[UI shows composite with relationship tabs]
 ```
 
 ---
@@ -173,24 +184,26 @@ graph TD
 
 | ID | Requirement | Priority | Notes |
 |:--:|-------------|:--------:|-------|
-| FR-1 | Introduce `PLUGIN` value to `ArtifactType` enum in `skillmeat/core/artifact_detection.py` | Must | Architecture leaves room for `STACK`, `SUITE` later |
-| FR-2 | Create `CompositeArtifact` ORM model in `skillmeat/cache/models.py` for collection-scoped composite entities (`plugin`) with manifest/meta fields | Must | Composite entity is distinct from contained atomic artifacts |
-| FR-3 | Create `CompositeMembership` table linking `collection_id + composite_id` to child `artifact_id` with `relationship_type` and `pinned_version_hash` | Must | Relationship is metadata; atomic artifact records are not structurally changed |
-| FR-4 | Generate and apply Alembic migration for composite entity + membership tables | Must | Must not break existing artifact rows |
+| FR-1 | Introduce `COMPOSITE` value to `ArtifactType` enum in `skillmeat/core/artifact_detection.py`. Introduce `CompositeType` enum with initial value `PLUGIN`. Add `composite_types()` class method to `ArtifactType`. | Must | Architecture leaves room for `STACK`, `SUITE` as future `CompositeType` values (not `ArtifactType` values). `COMPOSITE` is a deployable type included in `deployable_types()`. |
+| FR-2 | Create `CompositeArtifact` ORM model in `skillmeat/cache/models.py` for collection-scoped composite entities with a `composite_type` field (from `CompositeType` enum, default `PLUGIN`), manifest/meta fields | Must | Composite entity is distinct from contained atomic artifacts; `composite_type` determines variant-specific behavior (deployment paths, detection heuristics) |
+| FR-3 | Create `CompositeMembership` table linking `collection_id + composite_id` to child `artifact_uuid` (FK to `CachedArtifact.uuid` per ADR-007) with `relationship_type` and `pinned_version_hash` | Must | Relationship is metadata; atomic artifact records are not structurally changed |
+| FR-4 | Generate and apply Alembic migration for composite entity + membership tables, including UUID column on `CachedArtifact` per ADR-007 | Must | Must not break existing artifact rows |
 | FR-5 | Update `discovery.py` to detect composite roots (presence of `plugin.json`, or multiple artifact-type subdirectories in one folder) and return a `DiscoveredGraph` | Must | `DiscoveredGraph` holds one parent + list of children with in-memory linkage |
 | FR-6 | Implement `detect_composites()` in the detection layer (recursive child scan inside composite root) | Must | False positive guard: require at least 2 distinct artifact-type children |
-| FR-7 | Implement hash-based dedup in `importer.py`: SHA-256 content hash check against existing DB entries before creating new artifact row | Must | Three scenarios: exact match → link; name match + diff hash → user decision; new → create |
+| FR-7 | Implement hash-based dedup in `importer.py`: SHA-256 content hash check against existing DB entries before creating new artifact row. Leverage existing `Artifact.content_hash` and `ArtifactVersion.content_hash` fields. | Must | Three scenarios: exact match → link; name match + diff hash → user decision; new → create. Reuse existing content hash infrastructure rather than building parallel hashing. |
 | FR-8 | Wrap plugin import (all children + composite entity + membership rows) in a single DB transaction; roll back entirely on any child import failure | Must | Prevents partial imports |
 | FR-9 | Record `pinned_version_hash` in composite membership metadata at import time (SHA-256 of child content at association time) | Must | Enables future conflict detection on deploy |
 | FR-10 | API endpoint: `GET /artifacts/{id}/associations` — returns parent and child associations with relationship type and pinned hash | Must | Returns DTO, not ORM model |
 | FR-11 | Artifact detail page: add "Contains" tab listing child artifacts (visible when artifact type is composite) | Must | Sorted by relationship_type then name |
-| FR-12 | Artifact detail page: add "Part of" section listing parent plugins (visible for any atomic artifact that has parents) | Must | Shown in sidebar or below metadata |
-| FR-13 | Import modal/flow: when a composite is detected, show preview: "Importing 1 Plugin + N children (X new, Y already in collection)" before user confirms | Must | Requires discovery to return graph before import starts |
+| FR-12 | Artifact detail page: add "Part of" section listing parent composites (visible for any atomic artifact that has parents) | Must | Shown in sidebar or below metadata |
+| FR-13 | Import modal/flow: when a composite is detected, show preview with 3 buckets: "New (Will Import)", "Existing (Identical Hash - Will Link)", "Conflict (Different Hash - Needs Resolution)". For conflicts, user can fork as new version or update via merge functionality. | Must | Requires discovery to return graph before import starts. Version conflict import resolution deferred to future enhancement — v1 surfaces conflicts but does not implement inline resolution UI. |
 | FR-14 | Collection storage: store plugin meta-files under `~/.skillmeat/collections/{collection}/plugins/<name>/` (separate from child artifact directories) | Should | Matches design spec file structure |
-| FR-15 | Deployment: when deploying a plugin to Claude Code, detect hash conflicts between pinned child version and currently deployed version; warn user with side-by-side or overwrite options | Should | v1 platform scope: Claude Code; other platforms deferred |
-| FR-16 | Composite listing: support listing composite entities (e.g., `GET /artifacts?artifact_type=plugin` or equivalent) for browsing/filtering | Should | Listing composites must not duplicate or mutate child artifacts |
-| FR-17 | Support `plugin.json` manifest format for publisher-defined plugin declarations | Could | Enables explicit composition; detection falls back to heuristic if absent |
-| FR-18 | Export a composite artifact as a bundle zip that includes all children (unifying bundle and plugin concepts) | Could | Future; architecture enables this |
+| FR-15 | Deployment layout: when deploying a Composite of type Plugin to Claude Code, deploy child artifacts to their standard locations AND deploy composite's own non-artifact files (configs, manifests, docs, scripts) to `{PROJECT_ROOT}/.claude/plugins/{plugin_name}/` | Must | Deployment structure is platform-profile-specific. Children go to standard artifact locations; composite meta-files go to plugin directory. |
+| FR-16 | Deployment: when deploying a plugin to Claude Code, detect hash conflicts between pinned child version and currently deployed version; warn user with side-by-side or overwrite options | Should | v1 platform scope: Claude Code; other platforms deferred |
+| FR-17 | Composite listing: support listing composite entities (e.g., `GET /artifacts?artifact_type=composite` or equivalent) for browsing/filtering | Should | Listing composites must not duplicate or mutate child artifacts |
+| FR-18 | CLI listing: Composites appear alongside atomic artifacts in `skillmeat list` output, filtered by platform profile (default: Claude Code → Plugin) | Should | Platform profile determines which `CompositeType` values are shown by default |
+| FR-19 | Support exporting a Composite Artifact as a Bundle zip (including all children) via `skillmeat export` | Should | Unifies legacy bundle concept with composite artifacts |
+| FR-20 | Support `plugin.json` manifest format for publisher-defined plugin declarations | Could | Enables explicit composition; detection falls back to heuristic if absent |
 
 ### 6.2 Non-functional requirements
 
@@ -223,24 +236,27 @@ graph TD
 ### In scope
 
 - `CompositeArtifact` and membership metadata tables, ORM models, Alembic migration
-- `PLUGIN` enum value in `ArtifactType`
+- `COMPOSITE` enum value in `ArtifactType`, `CompositeType` enum with `PLUGIN`
+- UUID column on `CachedArtifact` per ADR-007 for FK-based membership references
 - Metadata linkage from child artifacts to one-or-more composites without mutating child artifact schema
 - `detect_composites()` function and updated `DiscoveredGraph` return type in discovery layer
-- Hash-based deduplication logic in importer
+- Hash-based deduplication logic in importer (leveraging existing `content_hash` fields)
 - Transactional import orchestration for plugins
 - `pinned_version_hash` recording at import time
 - `GET /artifacts/{id}/associations` API endpoint
 - "Contains" tab and "Part of" section in artifact detail UI
-- Import preview UI for composite artifacts
+- Import preview UI for composite artifacts with 3-bucket display
 - Collection filesystem structure for `plugins/` directory
-- Project deployment propagation of composite membership metadata (Claude Code in v1)
+- Plugin deployment to Claude Code: children to standard locations, composite meta-files to `.claude/plugins/{name}/`
+- CLI listing with platform profile filtering
+- Bundle export unification via `skillmeat export`
 
 ### Out of scope
 
-- `STACK` and `SUITE` composite types (architecture supports them; implementation deferred)
-- Bundle zip export unification (deferred to future milestone; FR-18)
+- `STACK` and `SUITE` composite types (architecture supports them as `CompositeType` values; implementation deferred)
+- Version conflict inline resolution UI (v1 surfaces conflicts; resolution deferred to future enhancement)
 - Registry/marketplace publishing of composite artifacts
-- `plugin.json` manifest authoring tooling (FR-17 is "Could"; CLI publish command deferred)
+- `plugin.json` manifest authoring tooling (FR-20 is "Could"; CLI publish command deferred)
 - Circular dependency detection (no plugin-of-plugins scenarios in scope)
 - UI for manually creating associations (import-driven only for v1)
 - Cross-platform plugin deployment semantics beyond Claude Code
@@ -258,9 +274,10 @@ graph TD
 ### Internal dependencies
 
 - **`skillmeat/cache/models.py`**: Must be updated before any repository or service changes
+- **`ADR-007-artifact-uuid-identity`**: UUID column on `CachedArtifact` enables FK-based `CompositeMembership`. Phase 1 of ADR-007 is implemented alongside composite infrastructure Phase 1.
 - **`collection_artifacts` integration**: Membership rows must link to collection artifact IDs (`type:name`) and collection scope
 - **`skillmeat/core/artifact_detection.py`**: `ArtifactType` enum change must propagate to all callers before discovery updates
-- **`skillmeat/core/importer.py`**: Deduplication logic builds on existing import flow; must not break single-artifact imports
+- **`skillmeat/core/importer.py`**: Deduplication logic builds on existing import flow and existing `content_hash` fields; must not break single-artifact imports
 - **`skillmeat/api/openapi.json`**: Must be regenerated after new endpoint added; frontend code-gen depends on it
 - **Existing `GroupArtifact` and `TemplateEntity` patterns**: The new `CompositeMembership` should follow these established association table patterns in `models.py`
 
@@ -289,7 +306,7 @@ graph TD
 | Performance regression from graph traversal on large repos | Med | Low | Limit composite detection to first 3 directory levels; add scan time telemetry; gate behind feature flag |
 | Dedup hash collision (two different artifacts with same SHA-256) | Low | Very Low | SHA-256 collision probability negligible; document assumption; add name+hash pair check as secondary guard |
 | Version conflict resolution UX is confusing | Med | Med | Design Phase 4 conflict dialog with clear "side-by-side" vs "overwrite" options; add escape hatch to skip plugin deploy without resolving |
-| `ArtifactType` enum change breaks existing callers (sync.py, sharing/bundle.py, etc.) | High | Med | Audit all `ArtifactType` references before merging; `PLUGIN` is additive; existing `match`/`if-elif` chains are exhaustive-checked in PR review |
+| `ArtifactType` enum change breaks existing callers (sync.py, sharing/bundle.py, etc.) | High | Med | Audit all `ArtifactType` references before merging; `COMPOSITE` is additive; existing `match`/`if-elif` chains are exhaustive-checked in PR review |
 | Partial import leaves orphaned child artifacts in collection | High | Low | Wrap entire plugin import in a single DB transaction; filesystem writes use temp-dir + atomic move pattern already established in codebase |
 | Cross-platform deployment behavior is inconsistent for plugins | Med | Med | Scope v1 deployment path + conflict UX to Claude Code; return explicit "not yet supported" for other platforms |
 
@@ -303,7 +320,7 @@ graph TD
 - In the detail view for the `git-commit` skill, a "Part of" section shows "git-workflow-pro (Plugin)".
 
 **Technical architecture:**
-- Composite entity + membership metadata tables link collection-scoped composite records to child artifact IDs with typed, optionally version-pinned edges.
+- Composite entity + membership metadata tables link collection-scoped composite records to child artifact UUIDs (per ADR-007) with typed, optionally version-pinned edges.
 - Discovery produces `DiscoveredGraph` objects when composites are detected; falls back to flat `DiscoveryResult` for atomic artifacts.
 - Import orchestration is graph-aware: children are resolved first (dedup), composite entity is created, membership metadata is written, all in one transaction.
 - `GET /artifacts/{id}/associations` returns a `AssociationsDTO` with `parents: []` and `children: []` lists.
@@ -319,18 +336,19 @@ graph TD
 
 ### Functional acceptance
 
-- [ ] FR-1 through FR-13 implemented and verified by integration tests
+- [ ] FR-1 through FR-15 (Must-priority) implemented and verified by integration tests
 - [ ] Plugin import end-to-end: source URL → detection → preview → confirm → DB rows + filesystem files created correctly
 - [ ] Deduplication: re-importing same plugin a second time creates zero new artifact rows for exact matches
 - [ ] Transactional rollback: simulated mid-import failure leaves collection in pre-import state
-- [ ] UI relationship tabs render correctly for both parent (plugin) and child (atomic) artifact detail views
+- [ ] UI relationship tabs render correctly for both parent (composite) and child (atomic) artifact detail views
 
 ### Technical acceptance
 
 - [ ] Alembic migration applies and rolls back cleanly against production-schema DB
 - [ ] All new API endpoints return DTOs (no ORM models exposed)
 - [ ] `GET /artifacts/{id}/associations` returns `{"parents": [], "children": []}` structure
-- [ ] Composite membership table has composite PK and scope constraints defined (`collection_id + composite_id + child_artifact_id`)
+- [ ] Composite membership table has composite PK and scope constraints defined (`collection_id + composite_id + child_artifact_uuid`)
+- [ ] UUID column on `CachedArtifact` per ADR-007 with unique index and FK constraint on `CompositeMembership`
 - [ ] OpenTelemetry spans added for composite detection, hash check, import transaction, association write
 - [ ] Structured logs include `plugin_name`, `child_count`, `new_count`, `existing_count`
 - [ ] `composite_artifacts_enabled` feature flag gates new discovery/import paths
@@ -340,16 +358,16 @@ graph TD
 
 - [ ] Unit test coverage >80% for: hash dedup logic, `detect_composites()`, `CompositeMembership` model, import orchestrator
 - [ ] Integration tests cover: plugin import happy path, dedup scenario, partial-failure rollback, association endpoint
-- [ ] E2E (Playwright) test covers: import preview modal, "Contains" tab rendering, "Part of" section rendering
-- [ ] Discovery unit tests validate <5% false positive rate against fixture repo set
+- [ ] E2E (Playwright) test covers core import flow (reduced scope: skip most E2E except core import)
+- [ ] Discovery unit tests validate <5% false positive rate against fixture repo set (reduced to 10-15 fixture repos)
 - [ ] No regression in existing single-artifact import tests
 
 ### Documentation acceptance
 
 - [ ] `skillmeat/cache/models.py` docstring updated with `CompositeArtifact` + `CompositeMembership` descriptions
-- [ ] `skillmeat/core/artifact_detection.py` docstring updated with `PLUGIN` type and composite detection notes
+- [ ] `skillmeat/core/artifact_detection.py` docstring updated with `COMPOSITE` type, `CompositeType` enum, and composite detection notes
 - [ ] API endpoint documented in `openapi.json` with request/response schemas
-- [ ] `plugin.json` manifest format documented (even if FR-17 is deferred)
+- [ ] `plugin.json` manifest format documented (even if FR-20 is deferred)
 
 ---
 
@@ -371,6 +389,8 @@ graph TD
   - **A**: Keep child artifacts non-duplicated by default (link existing when exact hash matches). For hash mismatch, preserve association metadata and surface immediate/deferred conflict handling policy (import-time + drift-time).
 - [x] **Q4**: Does plugin deployment support all platforms in v1?
   - **A**: No. Claude Code is in scope; other platforms are explicitly deferred and should return a clear unsupported response.
+- [x] **Q5**: Should `PLUGIN` be an `ArtifactType` or a separate concept?
+  - **A**: `COMPOSITE` is the `ArtifactType`. A separate `CompositeType` enum (with initial value `PLUGIN`, future `STACK`/`SUITE`) determines variant-specific behavior (deployment paths, storage layout, detection heuristics). This separates the "is composite" identity from the "what kind of composite" behavior.
 
 ---
 
@@ -379,12 +399,13 @@ graph TD
 ### Related documentation
 
 - **Design Specification**: [Composite Artifact Infrastructure Design Doc](/docs/project_plans/design-specs/composite-artifact-infrastructure.md)
+- **ADR-007**: [Artifact UUID Identity](/docs/dev/architecture/decisions/ADR-007-artifact-uuid-identity.md) — UUID column on CachedArtifact enables FK-based CompositeMembership
 - **ORM Models**: `skillmeat/cache/models.py` — `GroupArtifact` and `TemplateEntity` as reference patterns for the new membership table
 - **Artifact Detection**: `skillmeat/core/artifact_detection.py` — `ArtifactType` enum, `ARTIFACT_SIGNATURES` dict, `detect_artifact()` function
 - **Discovery Service**: `skillmeat/core/discovery.py` — `DiscoveryResult`, `DiscoveredArtifact`, `discover_artifacts()`
 - **Import Manager**: `skillmeat/core/importer.py`
 - **Sync Engine**: `skillmeat/core/sync.py` — propagate composite membership metadata into project deployment state (Claude Code v1)
-- **Bundle (legacy)**: `skillmeat/core/sharing/bundle.py` — concept being formalized by this feature
+- **Bundle (legacy)**: `skillmeat/core/sharing/bundle.py` — concept being formalized and unified by this feature via FR-19
 
 ### Symbol references
 
@@ -402,11 +423,12 @@ graph TD
 - Duration: ~4 days
 - Assigned agents: `data-layer-expert`, `python-backend-engineer`
 - Tasks:
-  - [ ] Add `PLUGIN` to `ArtifactType` enum; audit all call sites for exhaustiveness
-  - [ ] Define composite entity + membership metadata ORM models in `models.py` following association-table patterns
+  - [ ] Add `COMPOSITE` to `ArtifactType` enum with `composite_types()` class method; add `CompositeType` enum with `PLUGIN`; audit all call sites for exhaustiveness
+  - [ ] Add UUID column to `CachedArtifact` per ADR-007 with unique index and backfill migration
+  - [ ] Define composite entity + membership metadata ORM models in `models.py` following association-table patterns; `CompositeMembership.child_artifact_uuid` uses FK to `CachedArtifact.uuid`
   - [ ] Keep atomic artifact schema unchanged; model membership as separate metadata rows
-  - [ ] Generate Alembic migration for composite entity + membership tables with scoped keys and `pinned_version_hash`
-  - [ ] Add repository methods: `get_associations(artifact_id)`, `create_membership(composite_id, child_artifact_id, ...)`
+  - [ ] Generate Alembic migration for UUID column + composite entity + membership tables with scoped keys and `pinned_version_hash`
+  - [ ] Add repository methods: `get_associations(artifact_id)`, `create_membership(composite_id, child_artifact_uuid, ...)`
   - [ ] Unit tests for new model and repository methods
 
 **Phase 2: Enhanced discovery** (3 days)
@@ -422,11 +444,12 @@ graph TD
 - Duration: ~4 days
 - Assigned agents: `python-backend-engineer`
 - Tasks:
-  - [ ] Implement SHA-256 content hash computation for skills (directory tree hash) and single-file artifacts
+  - [ ] Implement SHA-256 content hash computation for skills (directory tree hash) and single-file artifacts, leveraging existing `content_hash` fields
   - [ ] Implement dedup logic: hash lookup → link / new version / create new
   - [ ] Wrap plugin import in DB transaction; add rollback on any child failure
   - [ ] Record `pinned_version_hash` in membership metadata at write time
   - [ ] Propagate composite membership metadata to project deployments (Claude Code in v1)
+  - [ ] Deploy composite non-artifact files to `.claude/plugins/{plugin_name}/` for Claude Code
   - [ ] Add `plugin.json` storage to `~/.skillmeat/collections/{collection}/plugins/<name>/`
   - [ ] Integration tests: happy path, dedup scenario, rollback scenario
   - [ ] Add API endpoint: `GET /artifacts/{id}/associations` with `AssociationsDTO`
@@ -437,31 +460,32 @@ graph TD
 - Tasks:
   - [ ] Add `AssociationsDTO` TypeScript type (sync from `openapi.json`)
   - [ ] Add `useArtifactAssociations(artifactId)` hook calling `GET /artifacts/{id}/associations`
-  - [ ] Artifact detail page: "Contains" tab (conditional on composite type) with child artifact list
+  - [ ] Artifact detail page: "Contains" tab (conditional on composite type) with child artifact list; a11y folded into component implementation
   - [ ] Artifact detail page: "Part of" sidebar section (conditional on `parents.length > 0`)
-  - [ ] Import modal: composite detection preview ("1 Plugin + N children: X new, Y existing")
+  - [ ] Import modal: composite detection preview with 3 buckets ("New", "Existing (Identical Hash)", "Conflict (Different Hash)")
   - [ ] Version conflict resolution dialog (warn on pinned hash mismatch during deploy)
-  - [ ] Playwright E2E tests: import flow, "Contains" tab, "Part of" section
+  - [ ] Bundle export unification: integrate `skillmeat export` for composites
+  - [ ] E2E tests: reduced scope — core import flow only (skip most other E2E)
 
 ### Epics & User Stories Backlog
 
-| Story ID | Short Name | Description | Acceptance Criteria | Estimate |
-|----------|-----------|-------------|-------------------|----------|
-| CAI-001 | PLUGIN enum | Add `PLUGIN` to `ArtifactType`; audit call sites | All existing tests pass; `PLUGIN` serializes to `"plugin"` | 1 pt |
-| CAI-002 | Composite + membership models | Composite entity + membership metadata models and migration | Migration applies/rolls back; scoped constraints enforced | 3 pt |
-| CAI-003 | Membership repository | `get_associations`, `create_membership` repo methods | Unit tests green; returns correct parent/child lists | 2 pt |
-| CAI-004 | Composite detection | `detect_composites()` + `DiscoveredGraph` | <5% false positive rate on fixture set | 3 pt |
-| CAI-005 | Discovery integration | Update `discover_artifacts()` to return `DiscoveredGraph` | Existing flat discovery tests unaffected | 2 pt |
-| CAI-006 | Content hash dedup | SHA-256 dedup logic in importer | Zero duplicate rows for exact re-imports | 3 pt |
-| CAI-007 | Transactional import | Atomic plugin import + rollback | Rollback test passes; partial states impossible | 3 pt |
-| CAI-008 | Version pinning | Record `pinned_version_hash` in association | Hash stored correctly; readable via repo method | 2 pt |
-| CAI-009 | Associations API | `GET /artifacts/{id}/associations` endpoint | Returns `AssociationsDTO`; 200 for known id, 404 for unknown | 2 pt |
-| CAI-010 | Contains tab UI | "Contains" tab on plugin detail page | Tab visible only for composite types; lists children | 3 pt |
-| CAI-011 | Part of UI | "Part of" section on child artifact detail | Section visible when parents exist; links to parent | 2 pt |
-| CAI-012 | Import preview UI | Composite import preview in modal | Shows plugin name + child count breakdown before confirm | 3 pt |
-| CAI-013 | Conflict resolution UI | Version conflict warning on deploy | Dialog shows pinned vs current hash; offers side-by-side or overwrite | 3 pt |
-| CAI-014 | Observability | OTel spans + structured logs + metrics | Spans visible in trace; metrics in prometheus endpoint | 2 pt |
-| CAI-015 | Feature flag | `composite_artifacts_enabled` flag gates new paths | Disabling flag reverts to flat discovery/import behavior | 1 pt |
+| Story ID | Short Name | Description | Acceptance Criteria | Estimate | Impl Task IDs |
+|----------|-----------|-------------|-------------------|----------|---------------|
+| CAI-001 | COMPOSITE enum | Add `COMPOSITE` to `ArtifactType`, `CompositeType` enum with `PLUGIN`; audit call sites | All existing tests pass; `COMPOSITE` serializes to `"composite"`; `CompositeType.PLUGIN` serializes to `"plugin"` | 1 pt | CAI-P1-01 |
+| CAI-002 | Composite + membership models | Composite entity + membership metadata models and migration (including UUID column per ADR-007) | Migration applies/rolls back; scoped constraints enforced; UUID FK on membership | 3 pt | CAI-P1-02, CAI-P1-03, CAI-P1-04 |
+| CAI-003 | Membership repository | `get_associations`, `create_membership` repo methods | Unit tests green; returns correct parent/child lists | 2 pt | CAI-P1-05 |
+| CAI-004 | Composite detection | `detect_composites()` + `DiscoveredGraph` | <5% false positive rate on fixture set | 3 pt | CAI-P2-01, CAI-P2-02 |
+| CAI-005 | Discovery integration | Update `discover_artifacts()` to return `DiscoveredGraph` | Existing flat discovery tests unaffected | 2 pt | CAI-P2-03 |
+| CAI-006 | Content hash dedup | SHA-256 dedup logic in importer (reusing existing content_hash) | Zero duplicate rows for exact re-imports | 3 pt | CAI-P3-01, CAI-P3-02 |
+| CAI-007 | Transactional import | Atomic plugin import + rollback | Rollback test passes; partial states impossible | 3 pt | CAI-P3-03 |
+| CAI-008 | Version pinning | Record `pinned_version_hash` in association | Hash stored correctly; readable via repo method | 2 pt | CAI-P3-04 |
+| CAI-009 | Associations API | `GET /artifacts/{id}/associations` endpoint | Returns `AssociationsDTO`; 200 for known id, 404 for unknown | 2 pt | CAI-P3-07 |
+| CAI-010 | Contains tab UI | "Contains" tab on composite detail page | Tab visible only for composite types; lists children | 3 pt | CAI-P4-03 |
+| CAI-011 | Part of UI | "Part of" section on child artifact detail | Section visible when parents exist; links to parent | 2 pt | CAI-P4-04 |
+| CAI-012 | Import preview UI | Composite import preview in modal with 3 buckets | Shows composite name + child count with New/Existing/Conflict breakdown | 3 pt | CAI-P4-05 |
+| CAI-013 | Conflict resolution UI | Version conflict warning on deploy | Dialog shows pinned vs current hash; offers side-by-side or overwrite | 3 pt | CAI-P4-06 |
+| CAI-014 | Observability | OTel spans + structured logs + metrics | Spans visible in trace; metrics in prometheus endpoint | 2 pt | CAI-P3-09 |
+| CAI-015 | Feature flag | `composite_artifacts_enabled` flag gates new paths | Disabling flag reverts to flat discovery/import behavior | 1 pt | CAI-P2-05 |
 
 **Total estimate:** ~35 story points across 4 phases
 

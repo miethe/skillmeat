@@ -72,7 +72,7 @@ parallelization:
   - P2-T3
   - P2-T4
 quality_gates:
-- Hash matching accuracy ≥95% across artifact types
+- "Hash matching accuracy \u226595% across artifact types"
 - Exact matches hidden from 'Ready to Import' list
 - Review modal usable <2 min average per artifact
 - Duplicate link relationships persisted in collection metadata
@@ -82,6 +82,9 @@ total_tasks: 4
 completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
+schema_version: 2
+doc_type: progress
+feature_slug: discovery-import-fixes-v1
 ---
 
 # Phase 2: Duplicate Detection & Review Workflow

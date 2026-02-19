@@ -1,142 +1,164 @@
 ---
 type: progress
-prd: "PRD-003-claudectl-alias"
-phase: "2-3"
-phase_title: "Management Commands & Polish"
+prd: PRD-003-claudectl-alias
+phase: 2-3
+phase_title: Management Commands & Polish
 status: completed
 progress: 100
 total_tasks: 14
 completed_tasks: 14
-estimated_effort: "2 weeks"
+estimated_effort: 2 weeks
 story_points: 28
 dependencies:
-  - phase: 1
-    status: "must_complete"
-
+- phase: 1
+  status: must_complete
 tasks:
-  # Phase 2 tasks
-  - id: "P2-T1"
-    title: "Search Command Enhancement"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    story_points: 3
-    phase: 2
-
-  - id: "P2-T2"
-    title: "Sync & Update Commands"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    story_points: 3
-    phase: 2
-
-  - id: "P2-T3"
-    title: "Diff Command"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    story_points: 2
-    phase: 2
-
-  - id: "P2-T4"
-    title: "Bundle Commands"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    story_points: 3
-    phase: 2
-
-  - id: "P2-T5"
-    title: "Config Management"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    story_points: 2
-    phase: 2
-
-  - id: "P2-T6"
-    title: "Zsh Completion"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T1", "P2-T2", "P2-T3"]
-    story_points: 3
-    phase: 2
-
-  - id: "P2-T7"
-    title: "Fish Completion"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T1", "P2-T2", "P2-T3"]
-    story_points: 2
-    phase: 2
-
-  - id: "P2-T8"
-    title: "Quick Start Guide"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    story_points: 2
-    phase: 2
-
-  # Phase 3 tasks
-  - id: "P3-T1"
-    title: "Full User Guide"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    story_points: 3
-    phase: 3
-
-  - id: "P3-T2"
-    title: "Scripting Examples"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["P2-T4"]
-    story_points: 2
-    phase: 3
-
-  - id: "P3-T3"
-    title: "Man Page"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    story_points: 2
-    phase: 3
-
-  - id: "P3-T4"
-    title: "Confidence Score Integration"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T1"]
-    story_points: 2
-    phase: 3
-    note: "Depends on PRD-001 completion"
-
-  - id: "P3-T5"
-    title: "Shell Compatibility Tests"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T6", "P2-T7"]
-    story_points: 2
-    phase: 3
-
-  - id: "P3-T6"
-    title: "Final Integration Tests"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    story_points: 1
-    phase: 3
-
+- id: P2-T1
+  title: Search Command Enhancement
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  story_points: 3
+  phase: 2
+- id: P2-T2
+  title: Sync & Update Commands
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  story_points: 3
+  phase: 2
+- id: P2-T3
+  title: Diff Command
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  story_points: 2
+  phase: 2
+- id: P2-T4
+  title: Bundle Commands
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  story_points: 3
+  phase: 2
+- id: P2-T5
+  title: Config Management
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  story_points: 2
+  phase: 2
+- id: P2-T6
+  title: Zsh Completion
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T1
+  - P2-T2
+  - P2-T3
+  story_points: 3
+  phase: 2
+- id: P2-T7
+  title: Fish Completion
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T1
+  - P2-T2
+  - P2-T3
+  story_points: 2
+  phase: 2
+- id: P2-T8
+  title: Quick Start Guide
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  story_points: 2
+  phase: 2
+- id: P3-T1
+  title: Full User Guide
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  story_points: 3
+  phase: 3
+- id: P3-T2
+  title: Scripting Examples
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - P2-T4
+  story_points: 2
+  phase: 3
+- id: P3-T3
+  title: Man Page
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  story_points: 2
+  phase: 3
+- id: P3-T4
+  title: Confidence Score Integration
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T1
+  story_points: 2
+  phase: 3
+  note: Depends on PRD-001 completion
+- id: P3-T5
+  title: Shell Compatibility Tests
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T6
+  - P2-T7
+  story_points: 2
+  phase: 3
+- id: P3-T6
+  title: Final Integration Tests
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  story_points: 1
+  phase: 3
 parallelization:
-  # Phase 2
-  batch_1: ["P2-T1", "P2-T2", "P2-T3", "P2-T4", "P2-T5"]
-  batch_2: ["P2-T6", "P2-T7", "P2-T8"]
-  # Phase 3
-  batch_3: ["P3-T1", "P3-T3"]
-  batch_4: ["P3-T2", "P3-T4", "P3-T5"]
-  batch_5: ["P3-T6"]
+  batch_1:
+  - P2-T1
+  - P2-T2
+  - P2-T3
+  - P2-T4
+  - P2-T5
+  batch_2:
+  - P2-T6
+  - P2-T7
+  - P2-T8
+  batch_3:
+  - P3-T1
+  - P3-T3
+  batch_4:
+  - P3-T2
+  - P3-T4
+  - P3-T5
+  batch_5:
+  - P3-T6
+schema_version: 2
+doc_type: progress
+feature_slug: prd-003-claudectl-alias
 ---
 
 # Phases 2-3: Management Commands & Polish

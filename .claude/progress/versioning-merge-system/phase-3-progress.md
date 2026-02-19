@@ -1,99 +1,117 @@
 ---
 type: progress
-prd: "versioning-merge-system"
+prd: versioning-merge-system
 phase: 3
-title: "Repository Layer - Version Comparisons & Metadata"
-status: "planning"
-started: "2025-12-03"
+title: Repository Layer - Version Comparisons & Metadata
+status: planning
+started: '2025-12-03'
 completed: null
 overall_progress: 0
-completion_estimate: "on-track"
+completion_estimate: on-track
 total_tasks: 6
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["python-backend-engineer"]
+owners:
+- python-backend-engineer
 contributors: []
-
 tasks:
-  - id: "REPO-012"
-    description: "Implement get_version_diff(v1_id, v2_id) for two-way diffs"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-006"]
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "REPO-013"
-    description: "Implement get_files_changed(v1_id, v2_id)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-012"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "REPO-014"
-    description: "Implement version summary calculation ('{N} added, {M} modified, {K} removed')"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-012"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "REPO-015"
-    description: "Implement retention policy support (keep last N or N days)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-005"]
-    estimated_effort: "3h"
-    priority: "medium"
-
-  - id: "REPO-016"
-    description: "Implement get_version_for_restore helper"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-006"]
-    estimated_effort: "2h"
-    priority: "medium"
-
-  - id: "REPO-017"
-    description: "Extend .version.toml with audit metadata (performed_by, merge_parent_versions)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-002"]
-    estimated_effort: "2h"
-    priority: "medium"
-
+- id: REPO-012
+  description: Implement get_version_diff(v1_id, v2_id) for two-way diffs
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-006
+  estimated_effort: 3h
+  priority: high
+- id: REPO-013
+  description: Implement get_files_changed(v1_id, v2_id)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-012
+  estimated_effort: 2h
+  priority: high
+- id: REPO-014
+  description: Implement version summary calculation ('{N} added, {M} modified, {K}
+    removed')
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-012
+  estimated_effort: 2h
+  priority: high
+- id: REPO-015
+  description: Implement retention policy support (keep last N or N days)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-005
+  estimated_effort: 3h
+  priority: medium
+- id: REPO-016
+  description: Implement get_version_for_restore helper
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-006
+  estimated_effort: 2h
+  priority: medium
+- id: REPO-017
+  description: Extend .version.toml with audit metadata (performed_by, merge_parent_versions)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-002
+  estimated_effort: 2h
+  priority: medium
 parallelization:
-  batch_1: ["REPO-012", "REPO-015", "REPO-017"]
-  batch_2: ["REPO-013", "REPO-014", "REPO-016"]
-  critical_path: ["REPO-012", "REPO-013", "REPO-014"]
-  estimated_total_time: "2.5d"
-
+  batch_1:
+  - REPO-012
+  - REPO-015
+  - REPO-017
+  batch_2:
+  - REPO-013
+  - REPO-014
+  - REPO-016
+  critical_path:
+  - REPO-012
+  - REPO-013
+  - REPO-014
+  estimated_total_time: 2.5d
 blockers: []
-
 success_criteria:
-  - id: "SC-3.1"
-    description: "Two-way diffs compute correctly for artifact versions with file-level granularity"
-    status: "pending"
-  - id: "SC-3.2"
-    description: "Files changed lists are accurate and distinguish added/modified/removed"
-    status: "pending"
-  - id: "SC-3.3"
-    description: "Summaries are human-readable and accurately reflect changes"
-    status: "pending"
-  - id: "SC-3.4"
-    description: "Retention policies execute correctly (last N or N days)"
-    status: "pending"
-  - id: "SC-3.5"
-    description: "Rollback preparation includes all needed files and metadata"
-    status: "pending"
-  - id: "SC-3.6"
-    description: "Audit metadata stores correctly and persists in .version.toml"
-    status: "pending"
-  - id: "SC-3.7"
-    description: "Unit tests achieve >85% coverage for all repository methods"
-    status: "pending"
+- id: SC-3.1
+  description: Two-way diffs compute correctly for artifact versions with file-level
+    granularity
+  status: pending
+- id: SC-3.2
+  description: Files changed lists are accurate and distinguish added/modified/removed
+  status: pending
+- id: SC-3.3
+  description: Summaries are human-readable and accurately reflect changes
+  status: pending
+- id: SC-3.4
+  description: Retention policies execute correctly (last N or N days)
+  status: pending
+- id: SC-3.5
+  description: Rollback preparation includes all needed files and metadata
+  status: pending
+- id: SC-3.6
+  description: Audit metadata stores correctly and persists in .version.toml
+  status: pending
+- id: SC-3.7
+  description: Unit tests achieve >85% coverage for all repository methods
+  status: pending
+schema_version: 2
+doc_type: progress
+feature_slug: versioning-merge-system
 ---
 
 # versioning-merge-system - Phase 3: Repository Layer - Version Comparisons & Metadata

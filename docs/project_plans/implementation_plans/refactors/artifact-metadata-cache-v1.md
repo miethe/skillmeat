@@ -1,18 +1,32 @@
 ---
-title: "Implementation Plan: Artifact Metadata Caching Enhancement"
-description: "Phase 6 follow-on to collection-data-consistency-v1 that populates artifact metadata cache from file-based artifacts, enabling true database-backed web performance"
-audience: [ai-agents, developers, architects]
-tags: [implementation, refactor, performance, caching, collections, web]
+title: 'Implementation Plan: Artifact Metadata Caching Enhancement'
+description: Phase 6 follow-on to collection-data-consistency-v1 that populates artifact
+  metadata cache from file-based artifacts, enabling true database-backed web performance
+audience:
+- ai-agents
+- developers
+- architects
+tags:
+- implementation
+- refactor
+- performance
+- caching
+- collections
+- web
 created: 2026-02-01
 updated: 2026-02-02
-category: "refactors"
+category: refactors
 status: completed
 complexity: Medium
-total_effort: "12-16 hours (Phases 1-4) + 6-8 hours (Phase 5 future)"
+total_effort: 12-16 hours (Phases 1-4) + 6-8 hours (Phase 5 future)
 related:
-  - /docs/project_plans/implementation_plans/refactors/collection-data-consistency-v1.md
-  - /docs/project_plans/reports/dual-collection-system-architecture-analysis.md
-  - /docs/project_plans/reports/manage-collection-page-architecture-analysis.md
+- /docs/project_plans/implementation_plans/refactors/collection-data-consistency-v1.md
+- /docs/project_plans/reports/dual-collection-system-architecture-analysis.md
+- /docs/project_plans/reports/manage-collection-page-architecture-analysis.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: artifact-metadata-cache
+prd_ref: null
 ---
 
 # Implementation Plan: Artifact Metadata Caching Enhancement (Phase 6)

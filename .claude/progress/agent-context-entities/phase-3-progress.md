@@ -1,94 +1,122 @@
 ---
 type: progress
-prd: "agent-context-entities"
+prd: agent-context-entities
 phase: 3
-phase_title: "Web UI"
+phase_title: Web UI
 status: completed
 progress: 100
 total_tasks: 9
 completed_tasks: 9
-created: "2025-12-14"
-updated: "2025-12-15"
-completed_at: "2025-12-15"
-
+created: '2025-12-14'
+updated: '2025-12-15'
+completed_at: '2025-12-15'
 tasks:
-  - id: "TASK-3.1"
-    name: "Create Context Entities List Page"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.2", "TASK-3.5", "TASK-3.7", "TASK-3.8", "TASK-3.9"]
-    estimate: 3
-    completed_commit: "ef232b0"
-
-  - id: "TASK-3.2"
-    name: "Create ContextEntityCard Component"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.7"]
-    estimate: 2
-    completed_commit: "3be1104"
-
-  - id: "TASK-3.3"
-    name: "Create ContextEntityDetail Modal"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.7", "TASK-3.8"]
-    estimate: 3
-    completed_commit: "3be1104"
-
-  - id: "TASK-3.4"
-    name: "Create ContextEntityEditor Component"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.7", "TASK-3.9"]
-    estimate: 3
-    completed_commit: "3be1104"
-
-  - id: "TASK-3.5"
-    name: "Create Context Entity Filters Sidebar"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-3.7"]
-    estimate: 2
-    completed_commit: "3be1104"
-
-  - id: "TASK-3.6"
-    name: "Create DeployToProjectDialog Component"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.7", "TASK-3.8", "TASK-3.9"]
-    estimate: 2
-    completed_commit: "3be1104"
-
-  - id: "TASK-3.7"
-    name: "Create TypeScript Types for Context Entities"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    dependencies: []
-    estimate: 1
-    completed_commit: "a83d9af"
-
-  - id: "TASK-3.8"
-    name: "Create API Client Functions"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-3.7"]
-    estimate: 2
-    completed_commit: "a83d9af"
-
-  - id: "TASK-3.9"
-    name: "Create React Hooks for Context Entities"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-3.7", "TASK-3.8"]
-    estimate: 2
-    completed_commit: "2e1b06d"
-
+- id: TASK-3.1
+  name: Create Context Entities List Page
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.2
+  - TASK-3.5
+  - TASK-3.7
+  - TASK-3.8
+  - TASK-3.9
+  estimate: 3
+  completed_commit: ef232b0
+- id: TASK-3.2
+  name: Create ContextEntityCard Component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.7
+  estimate: 2
+  completed_commit: 3be1104
+- id: TASK-3.3
+  name: Create ContextEntityDetail Modal
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.7
+  - TASK-3.8
+  estimate: 3
+  completed_commit: 3be1104
+- id: TASK-3.4
+  name: Create ContextEntityEditor Component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.7
+  - TASK-3.9
+  estimate: 3
+  completed_commit: 3be1104
+- id: TASK-3.5
+  name: Create Context Entity Filters Sidebar
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-3.7
+  estimate: 2
+  completed_commit: 3be1104
+- id: TASK-3.6
+  name: Create DeployToProjectDialog Component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.7
+  - TASK-3.8
+  - TASK-3.9
+  estimate: 2
+  completed_commit: 3be1104
+- id: TASK-3.7
+  name: Create TypeScript Types for Context Entities
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies: []
+  estimate: 1
+  completed_commit: a83d9af
+- id: TASK-3.8
+  name: Create API Client Functions
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-3.7
+  estimate: 2
+  completed_commit: a83d9af
+- id: TASK-3.9
+  name: Create React Hooks for Context Entities
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-3.7
+  - TASK-3.8
+  estimate: 2
+  completed_commit: 2e1b06d
 parallelization:
-  batch_1: ["TASK-3.7", "TASK-3.8"]
-  batch_2: ["TASK-3.9"]
-  batch_3: ["TASK-3.2", "TASK-3.3", "TASK-3.4", "TASK-3.5", "TASK-3.6"]
-  batch_4: ["TASK-3.1"]
+  batch_1:
+  - TASK-3.7
+  - TASK-3.8
+  batch_2:
+  - TASK-3.9
+  batch_3:
+  - TASK-3.2
+  - TASK-3.3
+  - TASK-3.4
+  - TASK-3.5
+  - TASK-3.6
+  batch_4:
+  - TASK-3.1
+schema_version: 2
+doc_type: progress
+feature_slug: agent-context-entities
 ---
 
 # Phase 3: Web UI

@@ -1,13 +1,24 @@
 ---
-title: "PRD: Global Fields Management"
-description: "Centralized settings page for managing enumerable field options across SkillMeat"
-audience: [ai-agents, developers]
-tags: [prd, planning, feature, settings, ui]
+title: 'PRD: Global Fields Management'
+description: Centralized settings page for managing enumerable field options across
+  SkillMeat
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- planning
+- feature
+- settings
+- ui
 created: 2026-01-22
 updated: 2026-01-22
-category: "product-planning"
+category: product-planning
 status: ready
 related: []
+schema_version: 2
+doc_type: prd
+feature_slug: global-fields-management
 ---
 
 # Feature Brief & Metadata

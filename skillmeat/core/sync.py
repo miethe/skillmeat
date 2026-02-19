@@ -130,7 +130,9 @@ class SyncManager:
 
         # Use collection from first deployment if not specified
         if not collection_name:
-            collection_name = deployments[0].from_collection if deployments else "default"
+            collection_name = (
+                deployments[0].from_collection if deployments else "default"
+            )
 
         # Get artifacts from collection
         collection_artifacts = self._get_collection_artifacts(collection_name)
@@ -309,9 +311,7 @@ class SyncManager:
 
         return hasher.hexdigest()
 
-    def _load_deployment_metadata(
-        self, project_path: Path
-    ) -> List[Deployment]:
+    def _load_deployment_metadata(self, project_path: Path) -> List[Deployment]:
         """Load deployment metadata using unified tracker.
 
         Args:
@@ -381,6 +381,10 @@ class SyncManager:
             relative_artifact_path = Path(f"hooks/{artifact_name}.md")
         elif artifact_type == "mcp":
             relative_artifact_path = Path(f"mcp/{artifact_name}")
+        elif artifact_type in ("plugin", "composite"):
+            # Plugins (and their composite parent type) are deployed as directories
+            # under .claude/plugins/<name>/ — consistent with the collection layout.
+            relative_artifact_path = Path(f"plugins/{artifact_name}")
         else:
             raise ValueError(f"Unknown artifact type: {artifact_type}")
 
@@ -531,6 +535,12 @@ class SyncManager:
             "agent": "agents",
             "hook": "hooks",
             "mcp": "mcps",
+            # Composite / plugin type — stored under "plugins/" in the collection
+            # and under ".claude/plugins/" when deployed to a project.
+            "plugin": "plugins",
+            # Generic composite key (ArtifactType.COMPOSITE) also maps to plugins/
+            # for v1, since PLUGIN is the only supported composite variant.
+            "composite": "plugins",
         }
         return plural_map.get(artifact_type, artifact_type + "s")
 
@@ -1018,7 +1028,9 @@ class SyncManager:
         if synced_artifacts and self.collection_mgr:
             try:
                 deployments = self._load_deployment_metadata(project_path)
-                collection_name = deployments[0].from_collection if deployments else "default"
+                collection_name = (
+                    deployments[0].from_collection if deployments else "default"
+                )
 
                 # Create descriptive message for the snapshot
                 artifact_list = ", ".join(synced_artifacts[:3])
@@ -1163,7 +1175,9 @@ class SyncManager:
         try:
             # Get collection from drift metadata
             deployments = self._load_deployment_metadata(project_path)
-            collection_name = deployments[0].from_collection if deployments else "default"
+            collection_name = (
+                deployments[0].from_collection if deployments else "default"
+            )
 
             collection = self.collection_mgr.load_collection(collection_name)
             collection_path = self.collection_mgr.config.get_collection_path(
@@ -1402,7 +1416,9 @@ class SyncManager:
 
                 if merge_base_snapshot and self.snapshot_mgr:
                     # Use merge base from snapshot
-                    collection_name = deployments[0].from_collection if deployments else None
+                    collection_name = (
+                        deployments[0].from_collection if deployments else None
+                    )
                     base_path = self._extract_base_from_snapshot(
                         merge_base_snapshot,
                         artifact_name,
@@ -1477,7 +1493,9 @@ class SyncManager:
             # Infer collection name if not provided
             if not collection_name:
                 deployments = self._load_deployment_metadata(Path.cwd())
-                collection_name = deployments[0].from_collection if deployments else None
+                collection_name = (
+                    deployments[0].from_collection if deployments else None
+                )
 
             if not collection_name:
                 logger.warning("No collection name available for baseline search")
@@ -1724,7 +1742,9 @@ class SyncManager:
             try:
                 # Get collection path
                 deployments = self._load_deployment_metadata(Path("."))
-                collection_name = deployments[0].from_collection if deployments else "default"
+                collection_name = (
+                    deployments[0].from_collection if deployments else "default"
+                )
                 collection = self.collection_mgr.load_collection(collection_name)
                 collection_path = self.collection_mgr.config.get_collection_path(
                     collection_name
@@ -1803,6 +1823,38 @@ class SyncManager:
         except Exception as e:
             # Never fail sync due to analytics
             logger.debug(f"Failed to record sync analytics: {e}")
+
+    def validate_plugin_deployment_platform(self, platform: str) -> None:
+        """Raise an error when a plugin deployment is requested on an unsupported platform.
+
+        For v1, plugins (composite artifacts) are only supported for Claude Code
+        deployments.  Any other platform (e.g. "cursor", "windsurf", "vscode")
+        must receive an explicit, actionable error rather than a silent no-op.
+
+        Args:
+            platform: Target deployment platform identifier (case-insensitive).
+                      The string "claude_code" (and its common aliases
+                      "claudecode", "claude-code", "claude") is the only
+                      value that is accepted without raising.
+
+        Raises:
+            NotImplementedError: When ``platform`` is not a recognised
+                Claude Code identifier.
+
+        Example::
+
+            sync_mgr.validate_plugin_deployment_platform("claude_code")  # OK
+            sync_mgr.validate_plugin_deployment_platform("cursor")
+            # NotImplementedError: Plugin deployment is not supported on
+            # platform 'cursor'. Only Claude Code is supported in v1. ...
+        """
+        _claude_code_aliases = {"claude_code", "claudecode", "claude-code", "claude"}
+        if platform.lower() not in _claude_code_aliases:
+            raise NotImplementedError(
+                f"Plugin deployment is not supported on platform '{platform}'. "
+                "Only Claude Code is supported in v1. "
+                "Non-Claude Code platform support is planned for a future release."
+            )
 
     def _record_sync_event(self, sync_type: str, artifact_names: List[str]) -> None:
         """Record sync event for analytics (legacy method for batch tracking).

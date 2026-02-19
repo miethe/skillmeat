@@ -1,3 +1,11 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: entity-artifact-consolidation
+prd_ref: null
+plan_ref: null
+---
 # Phase 4-5: Component Unification & Deprecation
 
 **Phases**: 4 & 5

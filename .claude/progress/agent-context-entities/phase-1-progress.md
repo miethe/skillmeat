@@ -1,94 +1,116 @@
 ---
 type: progress
-prd: "agent-context-entities"
+prd: agent-context-entities
 phase: 1
-phase_title: "Core Infrastructure"
+phase_title: Core Infrastructure
 status: completed
 progress: 100
 total_tasks: 9
 completed_tasks: 9
-created: "2025-12-14"
-updated: "2025-12-14"
-
+created: '2025-12-14'
+updated: '2025-12-14'
 tasks:
-  - id: "TASK-1.1"
-    name: "Extend ArtifactType Enum"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimate: 1
-    completed_commit: "a42f676"
-
-  - id: "TASK-1.2"
-    name: "Database Schema Migration"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["TASK-1.1"]
-    estimate: 3
-    completed_commit: "a42f676"
-
-  - id: "TASK-1.3"
-    name: "Context Entity Validation Module"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.1"]
-    estimate: 5
-    completed_commit: "a42f676"
-
-  - id: "TASK-1.4"
-    name: "Markdown Parser with Frontmatter"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: 3
-    completed_commit: "a42f676"
-
-  - id: "TASK-1.5"
-    name: "API Schemas for Context Entities"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.1"]
-    estimate: 3
-    completed_commit: "a42f676"
-
-  - id: "TASK-1.6"
-    name: "Context Entities Router"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.2", "TASK-1.3", "TASK-1.4", "TASK-1.5"]
-    estimate: 5
-    completed_commit: "a42f676"
-
-  - id: "TASK-1.7"
-    name: "Unit Tests for Validation"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.3", "TASK-1.4"]
-    estimate: 3
-    completed_commit: "a42f676"
-
-  - id: "TASK-1.8"
-    name: "Integration Tests for API"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.6"]
-    estimate: 2
-    completed_commit: "a42f676"
-
-  - id: "TASK-1.9"
-    name: "Register Router in Server"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.6"]
-    estimate: 1
-    completed_commit: "a42f676"
-
+- id: TASK-1.1
+  name: Extend ArtifactType Enum
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimate: 1
+  completed_commit: a42f676
+- id: TASK-1.2
+  name: Database Schema Migration
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - TASK-1.1
+  estimate: 3
+  completed_commit: a42f676
+- id: TASK-1.3
+  name: Context Entity Validation Module
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.1
+  estimate: 5
+  completed_commit: a42f676
+- id: TASK-1.4
+  name: Markdown Parser with Frontmatter
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 3
+  completed_commit: a42f676
+- id: TASK-1.5
+  name: API Schemas for Context Entities
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.1
+  estimate: 3
+  completed_commit: a42f676
+- id: TASK-1.6
+  name: Context Entities Router
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.2
+  - TASK-1.3
+  - TASK-1.4
+  - TASK-1.5
+  estimate: 5
+  completed_commit: a42f676
+- id: TASK-1.7
+  name: Unit Tests for Validation
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.3
+  - TASK-1.4
+  estimate: 3
+  completed_commit: a42f676
+- id: TASK-1.8
+  name: Integration Tests for API
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.6
+  estimate: 2
+  completed_commit: a42f676
+- id: TASK-1.9
+  name: Register Router in Server
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.6
+  estimate: 1
+  completed_commit: a42f676
 parallelization:
-  batch_1: ["TASK-1.1", "TASK-1.3", "TASK-1.4"]
-  batch_2: ["TASK-1.2"]
-  batch_3: ["TASK-1.5", "TASK-1.7"]
-  batch_4: ["TASK-1.6"]
-  batch_5: ["TASK-1.8", "TASK-1.9"]
+  batch_1:
+  - TASK-1.1
+  - TASK-1.3
+  - TASK-1.4
+  batch_2:
+  - TASK-1.2
+  batch_3:
+  - TASK-1.5
+  - TASK-1.7
+  batch_4:
+  - TASK-1.6
+  batch_5:
+  - TASK-1.8
+  - TASK-1.9
+schema_version: 2
+doc_type: progress
+feature_slug: agent-context-entities
 ---
 
 # Phase 1: Core Infrastructure

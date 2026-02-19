@@ -17,12 +17,60 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from skillmeat.api.schemas.deployments import DeploymentSummary
-from skillmeat.cache.models import CollectionArtifact
+from skillmeat.cache.models import Artifact, CollectionArtifact
 
 logger = logging.getLogger(__name__)
 
 # Default TTL for artifact metadata cache: 30 minutes
 DEFAULT_METADATA_TTL_SECONDS = 30 * 60
+
+
+# =============================================================================
+# Internal helpers — resolve type:name identifiers to artifact_uuid (CAI-P5-05)
+# =============================================================================
+
+
+def _resolve_artifact_uuid(session: Session, artifact_id: str) -> Optional[str]:
+    """Resolve a type:name artifact_id string to its artifacts.uuid value.
+
+    Args:
+        session: Database session
+        artifact_id: Artifact identifier in 'type:name' format
+
+    Returns:
+        UUID hex string if found, None otherwise
+    """
+    row = session.query(Artifact.uuid).filter(Artifact.id == artifact_id).first()
+    return row[0] if row else None
+
+
+def _get_collection_artifact(
+    session: Session,
+    collection_id: str,
+    artifact_id: str,
+) -> Optional[CollectionArtifact]:
+    """Fetch a CollectionArtifact row by collection_id and type:name artifact_id.
+
+    Joins through the Artifact table to resolve artifact_id → artifact_uuid
+    since the collection_artifacts PK uses uuid (not the type:name string).
+
+    Args:
+        session: Database session
+        collection_id: Collection identifier
+        artifact_id: Artifact identifier in 'type:name' format
+
+    Returns:
+        CollectionArtifact ORM instance if found, None otherwise
+    """
+    return (
+        session.query(CollectionArtifact)
+        .join(Artifact, Artifact.uuid == CollectionArtifact.artifact_uuid)
+        .filter(
+            CollectionArtifact.collection_id == collection_id,
+            Artifact.id == artifact_id,
+        )
+        .first()
+    )
 
 
 def create_or_update_collection_artifact(
@@ -46,10 +94,21 @@ def create_or_update_collection_artifact(
 
     Returns:
         CollectionArtifact ORM instance (committed)
+
+    Raises:
+        ValueError: If artifact_id cannot be resolved to an artifact UUID.
     """
+    # Resolve type:name → uuid via the Artifact table (CAI-P5-05)
+    artifact_uuid = _resolve_artifact_uuid(session, artifact_id)
+    if not artifact_uuid:
+        raise ValueError(
+            f"Cannot upsert CollectionArtifact: artifact '{artifact_id}' not found "
+            "in the artifacts cache. Ensure the artifact is imported before caching."
+        )
+
     assoc = (
         session.query(CollectionArtifact)
-        .filter_by(collection_id=collection_id, artifact_id=artifact_id)
+        .filter_by(collection_id=collection_id, artifact_uuid=artifact_uuid)
         .first()
     )
 
@@ -65,7 +124,7 @@ def create_or_update_collection_artifact(
     else:
         assoc = CollectionArtifact(
             collection_id=collection_id,
-            artifact_id=artifact_id,
+            artifact_uuid=artifact_uuid,
             added_at=datetime.utcnow(),
             **metadata_with_timestamp,
         )
@@ -146,16 +205,16 @@ def refresh_single_artifact_cache(
         }
 
         # Delegate to shared upsert
-        create_or_update_collection_artifact(
+        assoc = create_or_update_collection_artifact(
             session, collection_id, artifact_id, metadata
         )
 
-        # Sync tags to Tag ORM tables
+        # Sync tags to Tag ORM tables — pass artifact_uuid (ADR-007), not type:name
         if file_artifact.tags:
             try:
                 from skillmeat.core.services import TagService
 
-                TagService().sync_artifact_tags(artifact_id, file_artifact.tags)
+                TagService().sync_artifact_tags(assoc.artifact_uuid, file_artifact.tags)
             except Exception as e:
                 logger.warning(f"Tag ORM sync failed for {artifact_id}: {e}")
 
@@ -253,13 +312,13 @@ def populate_collection_artifact_from_import(
         session, collection_id, artifact_id, metadata
     )
 
-    # Sync tags to Tag ORM tables
+    # Sync tags to Tag ORM tables — pass artifact_uuid (ADR-007), not type:name
     tags = entry.tags or (file_artifact.tags if file_artifact else None)
     if tags:
         try:
             from skillmeat.core.services import TagService
 
-            TagService().sync_artifact_tags(artifact_id, tags)
+            TagService().sync_artifact_tags(result.artifact_uuid, tags)
         except Exception as e:
             logger.warning(f"Tag ORM sync failed for {artifact_id}: {e}")
 
@@ -286,11 +345,7 @@ def invalidate_artifact_cache(
         True if invalidation succeeded (or row didn't exist), False on error
     """
     try:
-        assoc = (
-            session.query(CollectionArtifact)
-            .filter_by(collection_id=collection_id, artifact_id=artifact_id)
-            .first()
-        )
+        assoc = _get_collection_artifact(session, collection_id, artifact_id)
         if assoc:
             assoc.synced_at = None
             session.commit()
@@ -328,11 +383,7 @@ def delete_artifact_cache(
         True if deletion succeeded (or row didn't exist), False on error
     """
     try:
-        assoc = (
-            session.query(CollectionArtifact)
-            .filter_by(collection_id=collection_id, artifact_id=artifact_id)
-            .first()
-        )
+        assoc = _get_collection_artifact(session, collection_id, artifact_id)
         if assoc:
             session.delete(assoc)
             session.commit()
@@ -612,11 +663,7 @@ def add_deployment_to_cache(
         True if update succeeded, False otherwise
     """
     try:
-        assoc = (
-            session.query(CollectionArtifact)
-            .filter_by(collection_id=collection_id, artifact_id=artifact_id)
-            .first()
-        )
+        assoc = _get_collection_artifact(session, collection_id, artifact_id)
         if not assoc:
             logger.warning(
                 "Cannot add deployment cache — artifact not found: %s (collection=%s)",
@@ -718,11 +765,7 @@ def remove_deployment_from_cache(
         True if update succeeded, False otherwise
     """
     try:
-        assoc = (
-            session.query(CollectionArtifact)
-            .filter_by(collection_id=collection_id, artifact_id=artifact_id)
-            .first()
-        )
+        assoc = _get_collection_artifact(session, collection_id, artifact_id)
         if not assoc:
             logger.warning(
                 "Cannot remove deployment cache — artifact not found: %s (collection=%s)",

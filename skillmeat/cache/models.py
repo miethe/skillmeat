@@ -20,6 +20,8 @@ Models:
     - CommunityScore: Aggregated scoring from external sources
     - MatchHistory: Artifact matching query history for analytics
     - CacheMetadata: Cache system metadata
+    - CompositeArtifact: Deployable multi-artifact bundle (composite-artifact-infrastructure-v1)
+    - CompositeMembership: Child-artifact membership within a CompositeArtifact
 
 Usage:
     >>> from skillmeat.cache.models import get_session, Project, Artifact
@@ -216,7 +218,8 @@ class Artifact(Base):
     Tracks version information and modification status.
 
     Attributes:
-        id: Unique artifact identifier (primary key)
+        id: Unique artifact identifier (primary key, type:name composite key)
+        uuid: Stable UUID for cross-context identity (32-char hex, globally unique)
         project_id: Foreign key to projects.id
         name: Artifact name
         type: Artifact type (skill, command, agent, mcp_server, hook)
@@ -243,6 +246,11 @@ class Artifact(Base):
 
     # Primary key
     id: Mapped[str] = mapped_column(String, primary_key=True)
+
+    # Stable cross-context identity (ADR-007)
+    uuid: Mapped[str] = mapped_column(
+        String, unique=True, nullable=False, default=lambda: uuid.uuid4().hex, index=True
+    )
 
     # Foreign key
     project_id: Mapped[str] = mapped_column(
@@ -297,7 +305,7 @@ class Artifact(Base):
     collections: Mapped[List["Collection"]] = relationship(
         "Collection",
         secondary="collection_artifacts",
-        primaryjoin="foreign(CollectionArtifact.artifact_id) == Artifact.id",
+        primaryjoin="Artifact.uuid == foreign(CollectionArtifact.artifact_uuid)",
         secondaryjoin="foreign(CollectionArtifact.collection_id) == Collection.id",
         viewonly=True,
         lazy="select",
@@ -305,7 +313,7 @@ class Artifact(Base):
     tags: Mapped[List["Tag"]] = relationship(
         "Tag",
         secondary="artifact_tags",
-        primaryjoin="Artifact.id == foreign(ArtifactTag.artifact_id)",
+        primaryjoin="Artifact.uuid == foreign(ArtifactTag.artifact_uuid)",
         secondaryjoin="foreign(ArtifactTag.tag_id) == Tag.id",
         lazy="selectin",
         back_populates="artifacts",
@@ -317,11 +325,30 @@ class Artifact(Base):
         lazy="selectin",
         order_by="ArtifactVersion.created_at.desc()",
     )
+    # Composite membership — artifacts may appear as children in one or more
+    # CompositeArtifact bundles.  The explicit foreign_keys= argument is
+    # required because CompositeMembership references artifacts.uuid (not
+    # artifacts.id), which would otherwise trigger AmbiguousForeignKeysError.
+    composite_memberships: Mapped[List["CompositeMembership"]] = relationship(
+        "CompositeMembership",
+        foreign_keys="[CompositeMembership.child_artifact_uuid]",
+        back_populates="child_artifact",
+        lazy="selectin",
+    )
+    # Group membership — artifacts may appear in one or more Groups.
+    # The explicit foreign_keys= argument is required because GroupArtifact
+    # references artifacts.uuid (not artifacts.id).
+    group_memberships: Mapped[List["GroupArtifact"]] = relationship(
+        "GroupArtifact",
+        foreign_keys="[GroupArtifact.artifact_uuid]",
+        lazy="select",
+    )
 
     # Constraints
     __table_args__ = (
         CheckConstraint(
             "type IN ('skill', 'command', 'agent', 'mcp', 'mcp_server', 'hook', "
+            "'composite', "
             "'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')",
             name="check_artifact_type",
         ),
@@ -342,6 +369,7 @@ class Artifact(Base):
         """
         result = {
             "id": self.id,
+            "uuid": self.uuid,
             "project_id": self.project_id,
             "name": self.name,
             "type": self.type,
@@ -957,20 +985,24 @@ class GroupArtifact(Base):
 
     Represents the many-to-many relationship between groups and artifacts,
     allowing artifacts to be organized within groups with custom ordering.
-    Note that artifact_id has no foreign key constraint as artifacts may
-    reference external sources not yet in the local cache.
 
     Attributes:
         group_id: Foreign key to groups.id (part of composite primary key)
-        artifact_id: Artifact identifier (part of composite primary key, no FK)
+        artifact_uuid: FK to artifacts.uuid (part of composite PK, CASCADE DELETE)
         position: Display order within group (0-based, default 0)
         added_at: Timestamp when artifact was added to group
 
     Indexes:
         - idx_group_artifacts_group_id: Fast lookup by group
-        - idx_group_artifacts_artifact_id: Fast lookup by artifact
+        - idx_group_artifacts_artifact_uuid: Fast lookup by artifact UUID
         - idx_group_artifacts_group_position: Ordered queries within group
         - idx_group_artifacts_added_at: Sort by membership date
+
+    Note:
+        artifact_uuid references artifacts.uuid (the stable ADR-007 identity
+        column) rather than artifacts.id (the mutable type:name string).  This
+        allows cascade deletes when an artifact is removed from the cache and
+        keeps the join table referentially sound.
     """
 
     __tablename__ = "group_artifacts"
@@ -979,7 +1011,12 @@ class GroupArtifact(Base):
     group_id: Mapped[str] = mapped_column(
         String, ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
     )
-    artifact_id: Mapped[str] = mapped_column(String, primary_key=True)
+    artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+        comment="FK to artifacts.uuid (ADR-007 stable identity) — CASCADE DELETE",
+    )
 
     # Ordering and metadata
     position: Mapped[int] = mapped_column(
@@ -993,16 +1030,38 @@ class GroupArtifact(Base):
     __table_args__ = (
         CheckConstraint("position >= 0", name="check_group_artifact_position"),
         Index("idx_group_artifacts_group_id", "group_id"),
-        Index("idx_group_artifacts_artifact_id", "artifact_id"),
+        Index("idx_group_artifacts_artifact_uuid", "artifact_uuid"),
         Index("idx_group_artifacts_group_position", "group_id", "position"),
         Index("idx_group_artifacts_added_at", "added_at"),
     )
+
+    # Relationship to Artifact (lazy to avoid N+1 in list queries)
+    artifact: Mapped[Optional["Artifact"]] = relationship(
+        "Artifact",
+        primaryjoin="GroupArtifact.artifact_uuid == foreign(Artifact.uuid)",
+        foreign_keys="[GroupArtifact.artifact_uuid]",
+        lazy="select",
+        viewonly=True,
+    )
+
+    @property
+    def artifact_id(self) -> Optional[str]:
+        """Return the artifact's type:name identifier (e.g. 'skill:canvas').
+
+        This is a compatibility shim — the DB FK column is artifact_uuid but
+        many service-layer callers expect the old type:name string.  The value
+        is resolved via the artifact relationship (one extra query per access
+        unless the relationship is already loaded).
+        """
+        if self.artifact is not None:
+            return self.artifact.id
+        return None
 
     def __repr__(self) -> str:
         """Return string representation of GroupArtifact."""
         return (
             f"<GroupArtifact(group_id={self.group_id!r}, "
-            f"artifact_id={self.artifact_id!r}, position={self.position})>"
+            f"artifact_uuid={self.artifact_uuid!r}, position={self.position})>"
         )
 
 
@@ -1010,21 +1069,24 @@ class CollectionArtifact(Base):
     """Association between Collection and Artifact (many-to-many).
 
     Links artifacts to collections with tracking of when they were added.
-    This is a pure association table with composite primary key.
+    This is a rich association table (has cached metadata columns in addition
+    to the join keys) with a composite primary key.
 
     Attributes:
         collection_id: Foreign key to collections.id (part of composite PK)
-        artifact_id: Reference to artifacts.id (part of composite PK, NO FK constraint)
+        artifact_uuid: FK to artifacts.uuid with CASCADE delete (part of composite PK)
         added_at: Timestamp when artifact was added to collection
 
     Indexes:
         - idx_collection_artifacts_collection_id: Fast lookup by collection
-        - idx_collection_artifacts_artifact_id: Fast lookup by artifact
+        - idx_collection_artifacts_artifact_uuid: Fast lookup by artifact UUID
         - idx_collection_artifacts_added_at: Sort by addition date
 
     Note:
-        artifact_id intentionally has NO foreign key constraint because artifacts
-        may come from external sources (marketplace, GitHub) that aren't in cache.
+        artifact_uuid references artifacts.uuid (the stable ADR-007 identity
+        column) rather than artifacts.id (the mutable type:name string).  This
+        allows cascade deletes when an artifact is removed from the cache and
+        keeps the join table referentially sound.
     """
 
     __tablename__ = "collection_artifacts"
@@ -1035,7 +1097,12 @@ class CollectionArtifact(Base):
         ForeignKey("collections.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    artifact_id: Mapped[str] = mapped_column(String, primary_key=True)
+    artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+        comment="FK to artifacts.uuid (ADR-007 stable identity) — CASCADE DELETE",
+    )
 
     # Timestamp
     added_at: Mapped[datetime] = mapped_column(
@@ -1064,9 +1131,31 @@ class CollectionArtifact(Base):
     # Indexes
     __table_args__ = (
         Index("idx_collection_artifacts_collection_id", "collection_id"),
-        Index("idx_collection_artifacts_artifact_id", "artifact_id"),
+        Index("idx_collection_artifacts_artifact_uuid", "artifact_uuid"),
         Index("idx_collection_artifacts_added_at", "added_at"),
     )
+
+    # Relationship to Artifact (lazy to avoid N+1 in list queries)
+    artifact: Mapped[Optional["Artifact"]] = relationship(
+        "Artifact",
+        primaryjoin="CollectionArtifact.artifact_uuid == foreign(Artifact.uuid)",
+        foreign_keys="[CollectionArtifact.artifact_uuid]",
+        lazy="select",
+        viewonly=True,
+    )
+
+    @property
+    def artifact_id(self) -> Optional[str]:
+        """Return the artifact's type:name identifier (e.g. 'skill:canvas').
+
+        This is a compatibility shim — the DB FK column is artifact_uuid but
+        many service-layer callers expect the old type:name string.  The value
+        is resolved via the artifact relationship (one extra query per access
+        unless the relationship is already loaded).
+        """
+        if self.artifact is not None:
+            return self.artifact.id
+        return None
 
     @property
     def tools(self) -> list[str]:
@@ -1080,7 +1169,7 @@ class CollectionArtifact(Base):
         return (
             f"<CollectionArtifact("
             f"collection_id={self.collection_id!r}, "
-            f"artifact_id={self.artifact_id!r}, "
+            f"artifact_uuid={self.artifact_uuid!r}, "
             f"added_at={self.added_at!r})>"
         )
 
@@ -1131,7 +1220,7 @@ class Tag(Base):
         "Artifact",
         secondary="artifact_tags",
         primaryjoin="Tag.id == ArtifactTag.tag_id",
-        secondaryjoin="foreign(ArtifactTag.artifact_id) == Artifact.id",
+        secondaryjoin="foreign(ArtifactTag.artifact_uuid) == Artifact.uuid",
         lazy="selectin",
         back_populates="tags",
         viewonly=True,
@@ -1182,12 +1271,13 @@ class ArtifactTag(Base):
     can have multiple tags, and each tag can be applied to multiple artifacts.
 
     Attributes:
-        artifact_id: Foreign key to artifacts.id (part of composite PK)
+        artifact_uuid: FK to artifacts.uuid (part of composite PK; CASCADE
+            delete so removing an artifact purges its tag associations)
         tag_id: Foreign key to tags.id (part of composite PK)
         created_at: Timestamp when tag was added to artifact
 
     Indexes:
-        - idx_artifact_tags_artifact_id: Fast lookup by artifact
+        - idx_artifact_tags_artifact_uuid: Fast lookup by artifact UUID
         - idx_artifact_tags_tag_id: Fast lookup by tag
         - idx_artifact_tags_created_at: Sort by tag application date
     """
@@ -1195,9 +1285,13 @@ class ArtifactTag(Base):
     __tablename__ = "artifact_tags"
 
     # Composite primary key
-    # No FK constraint — artifact_id uses "type:name" format from
-    # collection_artifacts, not project-scoped artifacts.id
-    artifact_id: Mapped[str] = mapped_column(String, primary_key=True)
+    # artifact_uuid references artifacts.uuid (ADR-007 stable identity) with
+    # CASCADE delete so that removing an artifact purges all its tag rows.
+    artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+    )
     tag_id: Mapped[str] = mapped_column(
         String, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
     )
@@ -1209,7 +1303,7 @@ class ArtifactTag(Base):
 
     # Indexes
     __table_args__ = (
-        Index("idx_artifact_tags_artifact_id", "artifact_id"),
+        Index("idx_artifact_tags_artifact_uuid", "artifact_uuid"),
         Index("idx_artifact_tags_tag_id", "tag_id"),
         Index("idx_artifact_tags_created_at", "created_at"),
     )
@@ -1217,7 +1311,7 @@ class ArtifactTag(Base):
     def __repr__(self) -> str:
         """Return string representation of ArtifactTag."""
         return (
-            f"<ArtifactTag(artifact_id={self.artifact_id!r}, "
+            f"<ArtifactTag(artifact_uuid={self.artifact_uuid!r}, "
             f"tag_id={self.tag_id!r}, created_at={self.created_at!r})>"
         )
 
@@ -1884,6 +1978,7 @@ class MarketplaceCatalogEntry(Base):
     __table_args__ = (
         CheckConstraint(
             "artifact_type IN ('skill', 'command', 'agent', 'mcp', 'mcp_server', 'hook', "
+            "'composite', "
             "'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')",
             name="check_catalog_artifact_type",
         ),
@@ -2803,6 +2898,266 @@ class ModuleMemoryItem(Base):
 
 
 # =============================================================================
+# Composite Artifact Models (composite-artifact-infrastructure-v1)
+# =============================================================================
+
+
+class CompositeArtifact(Base):
+    """Deployable multi-artifact bundle tracked in the cache.
+
+    A CompositeArtifact groups one or more child artifacts (skills, commands,
+    agents, hooks, mcp servers) into a single installable unit.  The specific
+    variant of the bundle is determined by ``composite_type``, which maps to
+    ``CompositeType`` in ``skillmeat.core.artifact_detection`` (currently only
+    ``"plugin"`` is implemented; ``"stack"`` and ``"suite"`` are reserved for
+    future use).
+
+    Primary key format
+    ------------------
+    ``id`` uses the ``type:name`` composite string used throughout the cache
+    layer (e.g., ``"composite:my-plugin"``), matching the convention already
+    established for ``Artifact.id``.
+
+    Relationship to CompositeMembership
+    ------------------------------------
+    Each CompositeArtifact has zero or more CompositeMembership rows that
+    reference individual child ``Artifact`` rows via ``artifacts.uuid``
+    (not ``artifacts.id``).  Referencing the stable UUID column instead of the
+    mutable ``type:name`` primary key satisfies the ADR-007 requirement for
+    cross-context artifact identity.  Deleting a CompositeArtifact cascades to
+    all its membership rows.
+
+    Attributes:
+        id: Primary key in ``type:name`` format (e.g., ``"composite:my-plugin"``)
+        collection_id: Owning collection identifier (non-null; mirrors the
+            ``collection_id`` stored on each CompositeMembership row for
+            denormalised queries)
+        composite_type: Variant classifier — ``"plugin"`` (default),
+            ``"stack"``, or ``"suite"`` — maps to ``CompositeType`` enum
+        display_name: Human-readable label for the composite (nullable)
+        description: Free-text description (nullable)
+        metadata_json: Raw JSON string for future extension (nullable Text,
+            not a typed JSON column so that schema migrations are minimised)
+        created_at: UTC timestamp when first cached
+        updated_at: UTC timestamp on last update (auto-refreshed on writes)
+        memberships: List of CompositeMembership children
+
+    Indexes:
+        - idx_composite_artifacts_collection_id: Filter by owning collection
+        - idx_composite_artifacts_composite_type: Filter by variant
+    """
+
+    __tablename__ = "composite_artifacts"
+
+    # Primary key — type:name string (e.g., "composite:my-plugin")
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+
+    # Owning collection
+    collection_id: Mapped[str] = mapped_column(String, nullable=False)
+
+    # Composite variant — maps to CompositeType enum ("plugin" | "stack" | "suite")
+    composite_type: Mapped[str] = mapped_column(
+        String, nullable=False, default="plugin", server_default="plugin"
+    )
+
+    # Display fields
+    display_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Extensibility — raw JSON string kept as Text to avoid schema churn
+    metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    memberships: Mapped[List["CompositeMembership"]] = relationship(
+        "CompositeMembership",
+        back_populates="composite",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        CheckConstraint(
+            "composite_type IN ('plugin', 'stack', 'suite')",
+            name="check_composite_artifact_type",
+        ),
+        Index("idx_composite_artifacts_collection_id", "collection_id"),
+        Index("idx_composite_artifacts_composite_type", "composite_type"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of CompositeArtifact."""
+        return (
+            f"<CompositeArtifact(id={self.id!r}, "
+            f"composite_type={self.composite_type!r}, "
+            f"collection_id={self.collection_id!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert CompositeArtifact to dictionary for JSON serialisation.
+
+        Returns:
+            Dictionary representation of the composite artifact.
+        """
+        return {
+            "id": self.id,
+            "collection_id": self.collection_id,
+            "composite_type": self.composite_type,
+            "display_name": self.display_name,
+            "description": self.description,
+            "metadata_json": self.metadata_json,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "memberships": [m.to_dict() for m in self.memberships],
+        }
+
+
+class CompositeMembership(Base):
+    """Child-artifact membership within a CompositeArtifact.
+
+    Records that a specific ``Artifact`` (identified by its stable UUID per
+    ADR-007) is a member of a ``CompositeArtifact``.  Multiple composites can
+    include the same child artifact; the composite primary key covers
+    ``(collection_id, composite_id, child_artifact_uuid)`` to enforce
+    uniqueness within a collection context while allowing cross-collection
+    sharing of the same child.
+
+    Foreign-key semantics
+    ---------------------
+    - ``composite_id`` → ``composite_artifacts.id`` (``ON DELETE CASCADE``):
+      removing the parent composite automatically removes all its membership
+      rows, preventing orphaned references.
+    - ``child_artifact_uuid`` → ``artifacts.uuid`` (``ON DELETE CASCADE``):
+      referencing the stable UUID column (not the mutable ``type:name`` id)
+      satisfies the ADR-007 cross-context identity requirement and means
+      renaming an artifact does not break membership records.  Deleting the
+      child artifact from the cache also purges its membership rows.
+
+    Bidirectional relationship note
+    --------------------------------
+    Both ``Artifact.composite_memberships`` and the ``child_artifact``
+    relationship here carry an explicit ``foreign_keys=`` argument.  Without
+    it SQLAlchemy raises ``AmbiguousForeignKeysError`` because
+    ``CompositeMembership`` contains two foreign keys that both ultimately
+    reference tables related to artifacts (``composite_artifacts`` and
+    ``artifacts``).
+
+    Attributes:
+        collection_id: Owning collection (part of composite PK; denormalised
+            from ``CompositeArtifact.collection_id`` for partition-style queries)
+        composite_id: FK to ``composite_artifacts.id``, CASCADE delete
+            (part of composite PK)
+        child_artifact_uuid: FK to ``artifacts.uuid``, CASCADE delete
+            (part of composite PK)
+        relationship_type: Semantic label for the membership edge, default
+            ``"contains"`` (reserved for future graph-style queries)
+        pinned_version_hash: Optional content hash locking the child to a
+            specific snapshot; ``None`` means "always use latest"
+        membership_metadata: Raw JSON string for future per-edge metadata
+        created_at: UTC timestamp when membership was created
+
+    Indexes:
+        - Primary key covers (collection_id, composite_id, child_artifact_uuid)
+        - idx_composite_memberships_composite_id: fast child lookup by parent
+        - idx_composite_memberships_child_uuid: reverse lookup — all composites
+          containing a given child artifact
+    """
+
+    __tablename__ = "composite_memberships"
+
+    # Composite primary key
+    collection_id: Mapped[str] = mapped_column(String, primary_key=True)
+    composite_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("composite_artifacts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    child_artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    # Edge semantics
+    relationship_type: Mapped[str] = mapped_column(
+        String, nullable=False, default="contains", server_default="contains"
+    )
+
+    # Optional version pin — None means "track latest"
+    pinned_version_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Extensibility — raw JSON string for future per-membership metadata
+    membership_metadata: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Relationships — explicit foreign_keys= on both sides avoids
+    # AmbiguousForeignKeysError (see docstring for rationale).
+    composite: Mapped["CompositeArtifact"] = relationship(
+        "CompositeArtifact",
+        back_populates="memberships",
+        lazy="joined",
+    )
+    child_artifact: Mapped["Artifact"] = relationship(
+        "Artifact",
+        foreign_keys=[child_artifact_uuid],
+        back_populates="composite_memberships",
+        lazy="joined",
+    )
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_composite_memberships_composite_id", "composite_id"),
+        Index("idx_composite_memberships_child_uuid", "child_artifact_uuid"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of CompositeMembership."""
+        return (
+            f"<CompositeMembership(composite_id={self.composite_id!r}, "
+            f"child_artifact_uuid={self.child_artifact_uuid!r}, "
+            f"relationship_type={self.relationship_type!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert CompositeMembership to dictionary for JSON serialisation.
+
+        Returns:
+            Dictionary representation of the membership edge, including a
+            summary of the child artifact when it has been loaded.
+        """
+        result: Dict[str, Any] = {
+            "collection_id": self.collection_id,
+            "composite_id": self.composite_id,
+            "child_artifact_uuid": self.child_artifact_uuid,
+            "relationship_type": self.relationship_type,
+            "pinned_version_hash": self.pinned_version_hash,
+            "membership_metadata": self.membership_metadata,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+        # Include a lightweight child summary when the relationship is loaded
+        if self.child_artifact is not None:
+            result["child_artifact"] = {
+                "id": self.child_artifact.id,
+                "uuid": self.child_artifact.uuid,
+                "name": self.child_artifact.name,
+                "type": self.child_artifact.type,
+            }
+        return result
+
+
+# =============================================================================
 # Database Engine and Session Setup
 # =============================================================================
 
@@ -2928,98 +3283,15 @@ def get_session(db_path: Optional[str | Path] = None):
 # =============================================================================
 
 
-def _migrate_artifact_tags_fk(engine: Engine) -> None:
-    """Remove FK constraint from artifact_tags.artifact_id if present.
-
-    SQLite doesn't support ALTER TABLE DROP CONSTRAINT, so we recreate
-    the table without the FK. This is a one-time migration for databases
-    created before the FK was removed from the model.
-
-    The artifact_tags.artifact_id column stores "type:name" format IDs from
-    collection_artifacts, not project-scoped artifacts.id UUIDs. The old FK
-    constraint caused all tag-artifact associations to fail silently.
-    """
-    import logging
-
-    from sqlalchemy import inspect as sa_inspect, text
-
-    log = logging.getLogger(__name__)
-
-    inspector = sa_inspect(engine)
-
-    # Check if table exists
-    if "artifact_tags" not in inspector.get_table_names():
-        return
-
-    # Check for FK constraints referencing the artifacts table
-    fks = inspector.get_foreign_keys("artifact_tags")
-    artifact_fks = [fk for fk in fks if fk.get("referred_table") == "artifacts"]
-
-    if not artifact_fks:
-        return  # Already migrated or never had FK
-
-    log.info("Migrating artifact_tags: removing FK constraint to artifacts table")
-
-    with engine.begin() as conn:
-        # Rename old table
-        conn.execute(text("ALTER TABLE artifact_tags RENAME TO _artifact_tags_old"))
-
-        # Create new table without FK on artifact_id
-        conn.execute(
-            text(
-                """
-            CREATE TABLE artifact_tags (
-                artifact_id VARCHAR NOT NULL,
-                tag_id VARCHAR NOT NULL,
-                created_at DATETIME NOT NULL,
-                PRIMARY KEY (artifact_id, tag_id),
-                FOREIGN KEY(tag_id) REFERENCES tags (id) ON DELETE CASCADE
-            )
-        """
-            )
-        )
-
-        # Recreate indexes
-        conn.execute(
-            text(
-                "CREATE INDEX idx_artifact_tags_artifact_id "
-                "ON artifact_tags (artifact_id)"
-            )
-        )
-        conn.execute(
-            text("CREATE INDEX idx_artifact_tags_tag_id " "ON artifact_tags (tag_id)")
-        )
-        conn.execute(
-            text(
-                "CREATE INDEX idx_artifact_tags_created_at "
-                "ON artifact_tags (created_at)"
-            )
-        )
-
-        # Copy data from old table
-        conn.execute(
-            text(
-                """
-            INSERT INTO artifact_tags (artifact_id, tag_id, created_at)
-            SELECT artifact_id, tag_id, created_at FROM _artifact_tags_old
-        """
-            )
-        )
-
-        # Drop old table
-        conn.execute(text("DROP TABLE _artifact_tags_old"))
-
-    log.info("Successfully migrated artifact_tags table")
-
-
 def create_tables(db_path: Optional[str | Path] = None) -> None:
     """Create all tables in the database.
 
     This creates the tables defined by the ORM models. It's safe to call
     multiple times - existing tables will not be modified.
 
-    After creating tables, runs migrations to fix schema issues in existing
-    databases (e.g., removing the artifact_tags FK constraint).
+    Schema migrations are managed by Alembic (see ``skillmeat/cache/migrations/``).
+    The Phase 1 compatibility migration for ``artifact_tags`` FK has been
+    superseded by the proper Alembic migration ``20260219_1300`` (CAI-P5-08).
 
     Args:
         db_path: Path to database file. If None, uses default location
@@ -3030,7 +3302,6 @@ def create_tables(db_path: Optional[str | Path] = None) -> None:
     """
     engine = create_db_engine(db_path)
     Base.metadata.create_all(engine)
-    _migrate_artifact_tags_fk(engine)
 
 
 def drop_tables(db_path: Optional[str | Path] = None) -> None:

@@ -5,11 +5,14 @@ created: 2026-02-15
 branch: feat/collection-org
 estimated_effort: 1-2 hours
 files_affected:
-  - skillmeat/web/components/collection/artifact-browse-card.tsx
-  - skillmeat/web/components/manage/artifact-operations-card.tsx
-  - skillmeat/web/components/collection/artifact-group-badges.tsx
-  - skillmeat/web/components/collection/filters.tsx
-  - skillmeat/web/app/manage/components/entity-filters.tsx
+- skillmeat/web/components/collection/artifact-browse-card.tsx
+- skillmeat/web/components/manage/artifact-operations-card.tsx
+- skillmeat/web/components/collection/artifact-group-badges.tsx
+- skillmeat/web/components/collection/filters.tsx
+- skillmeat/web/app/manage/components/entity-filters.tsx
+schema_version: 2
+doc_type: quick_feature
+feature_slug: collection-card-ux-enhancements
 ---
 
 # Collection Card UX Enhancements

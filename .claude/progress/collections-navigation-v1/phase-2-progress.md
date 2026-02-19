@@ -9,93 +9,87 @@ total_tasks: 6
 completed_tasks: 6
 total_story_points: 12
 completed_story_points: 12
-completed_at: "2025-12-12"
-
+completed_at: '2025-12-12'
 tasks:
-  - id: TASK-2.1
-    title: Collections Router
-    description: FastAPI CRUD endpoints for collections
-    status: completed
-    story_points: 3
-    assigned_to:
-      - python-backend-engineer
-    dependencies: []
-    created_at: "2025-12-12"
-
-  - id: TASK-2.2
-    title: Groups Router
-    description: FastAPI CRUD endpoints for groups
-    status: completed
-    story_points: 3
-    assigned_to:
-      - python-backend-engineer
-    dependencies: []
-    created_at: "2025-12-12"
-
-  - id: TASK-2.3
-    title: Collection-Artifact Endpoints
-    description: Link/unlink, move, copy artifacts
-    status: completed
-    story_points: 2
-    assigned_to:
-      - python-backend-engineer
-    dependencies:
-      - TASK-2.1
-    created_at: "2025-12-12"
-
-  - id: TASK-2.4
-    title: Group-Artifact Endpoints
-    description: Link/unlink, position, reorder artifacts
-    status: completed
-    story_points: 2
-    assigned_to:
-      - python-backend-engineer
-    dependencies:
-      - TASK-2.2
-    created_at: "2025-12-12"
-
-  - id: TASK-2.5
-    title: Deployment Summary Endpoints
-    description: Aggregated deployment data
-    status: completed
-    story_points: 2
-    assigned_to:
-      - python-backend-engineer
-    dependencies:
-      - TASK-2.1
-      - TASK-2.2
-    created_at: "2025-12-12"
-    note: "Skipped - Phase 5 scope"
-
-  - id: TASK-2.6
-    title: Pydantic Schemas
-    description: Request/response models
-    status: completed
-    story_points: 1
-    assigned_to:
-      - python-backend-engineer
-    dependencies: []
-    created_at: "2025-12-12"
-
+- id: TASK-2.1
+  title: Collections Router
+  description: FastAPI CRUD endpoints for collections
+  status: completed
+  story_points: 3
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  created_at: '2025-12-12'
+- id: TASK-2.2
+  title: Groups Router
+  description: FastAPI CRUD endpoints for groups
+  status: completed
+  story_points: 3
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  created_at: '2025-12-12'
+- id: TASK-2.3
+  title: Collection-Artifact Endpoints
+  description: Link/unlink, move, copy artifacts
+  status: completed
+  story_points: 2
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  created_at: '2025-12-12'
+- id: TASK-2.4
+  title: Group-Artifact Endpoints
+  description: Link/unlink, position, reorder artifacts
+  status: completed
+  story_points: 2
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.2
+  created_at: '2025-12-12'
+- id: TASK-2.5
+  title: Deployment Summary Endpoints
+  description: Aggregated deployment data
+  status: completed
+  story_points: 2
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  - TASK-2.2
+  created_at: '2025-12-12'
+  note: Skipped - Phase 5 scope
+- id: TASK-2.6
+  title: Pydantic Schemas
+  description: Request/response models
+  status: completed
+  story_points: 1
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  created_at: '2025-12-12'
 parallelization:
   batch_1:
-    - TASK-2.1
-    - TASK-2.2
+  - TASK-2.1
+  - TASK-2.2
   batch_2:
-    - TASK-2.3
-    - TASK-2.4
+  - TASK-2.3
+  - TASK-2.4
   batch_3:
-    - TASK-2.5
-    - TASK-2.6
-
+  - TASK-2.5
+  - TASK-2.6
 context_files:
-  - skillmeat/api/
-  - skillmeat/api/routers/
-  - skillmeat/cache/models.py
-
+- skillmeat/api/
+- skillmeat/api/routers/
+- skillmeat/cache/models.py
 blockers: []
-notes: "Depends on Phase 1 completion. Pydantic schemas can be created in parallel with TASK-2.1/2.2"
-
+notes: Depends on Phase 1 completion. Pydantic schemas can be created in parallel
+  with TASK-2.1/2.2
+schema_version: 2
+doc_type: progress
+feature_slug: collections-navigation-v1
 ---
 
 # Phase 2: Backend API

@@ -1,3 +1,10 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: discovery-import-fixes
+prd_ref: null
+---
 # Discovery & Import Bug Fixes Implementation Plan
 
 **Created**: 2026-01-12

@@ -1,10 +1,18 @@
 ---
-title: "Phases 4-6: Frontend Implementation"
-description: "Components, pages, and dialogs for marketplace sources enhancement"
+title: 'Phases 4-6: Frontend Implementation'
+description: Components, pages, and dialogs for marketplace sources enhancement
 parent: ../marketplace-sources-enhancement-v1.md
-phases: [4, 5, 6]
+phases:
+- 4
+- 5
+- 6
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: marketplace-sources-enhancement
+prd_ref: null
+plan_ref: null
 ---
-
 # Phases 4-6: Frontend Implementation
 
 **Parent Plan**: [Marketplace Sources Enhancement v1](../marketplace-sources-enhancement-v1.md)

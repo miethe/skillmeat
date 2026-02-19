@@ -1,120 +1,139 @@
 ---
 type: progress
-prd: "artifact-detection-standardization"
+prd: artifact-detection-standardization
 phase: 5
-phase_title: "Comprehensive Testing, Documentation, and Migration Safeguards"
+phase_title: Comprehensive Testing, Documentation, and Migration Safeguards
 status: pending
 progress: 0
 total_tasks: 10
 completed_tasks: 0
 story_points: 17
-duration: "2 weeks"
-
+duration: 2 weeks
 tasks:
-  - id: "TASK-5.1"
-    title: "Create Comprehensive Unit Test Suite"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: []
-    story_points: 4
-    description: "45+ test cases covering all detection contexts"
-
-  - id: "TASK-5.2"
-    title: "Create Integration Tests for Cross-Module Consistency"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: []
-    story_points: 3
-    description: "30+ tests for layer consistency"
-
-  - id: "TASK-5.3"
-    title: "Run Full Test Suite and Verify Coverage"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-5.1", "TASK-5.2"]
-    story_points: 2
-    description: "Verify >90% coverage, all tests pass"
-
-  - id: "TASK-5.4"
-    title: "Create Deprecation Warning Documentation"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    model: "sonnet"
-    dependencies: []
-    story_points: 2
-    description: "Document all deprecations with migration paths"
-
-  - id: "TASK-5.5"
-    title: "Create Migration Guide for Developers"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    model: "sonnet"
-    dependencies: ["TASK-5.4"]
-    story_points: 2
-    description: "Before/after code examples, FAQ"
-
-  - id: "TASK-5.6"
-    title: "Create Developer Reference Documentation"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    model: "sonnet"
-    dependencies: []
-    story_points: 2
-    description: "Detection system reference guide"
-
-  - id: "TASK-5.7"
-    title: "Create Architecture Documentation"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    model: "sonnet"
-    dependencies: ["TASK-5.6"]
-    story_points: 1
-    description: "High-level system design doc"
-
-  - id: "TASK-5.8"
-    title: "Create Backwards Compatibility Report"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: []
-    story_points: 2
-    description: "Document all changes and non-changes"
-
-  - id: "TASK-5.9"
-    title: "Final Quality Assurance and Bug Fixes"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-5.3"]
-    story_points: 2
-    description: "Final QA pass, fix any issues"
-
-  - id: "TASK-5.10"
-    title: "Create Summary Report and Metrics"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-5.3", "TASK-5.9"]
-    story_points: 1
-    description: "Final metrics, lessons learned"
-
+- id: TASK-5.1
+  title: Create Comprehensive Unit Test Suite
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies: []
+  story_points: 4
+  description: 45+ test cases covering all detection contexts
+- id: TASK-5.2
+  title: Create Integration Tests for Cross-Module Consistency
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies: []
+  story_points: 3
+  description: 30+ tests for layer consistency
+- id: TASK-5.3
+  title: Run Full Test Suite and Verify Coverage
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-5.1
+  - TASK-5.2
+  story_points: 2
+  description: Verify >90% coverage, all tests pass
+- id: TASK-5.4
+  title: Create Deprecation Warning Documentation
+  status: pending
+  assigned_to:
+  - documentation-writer
+  model: sonnet
+  dependencies: []
+  story_points: 2
+  description: Document all deprecations with migration paths
+- id: TASK-5.5
+  title: Create Migration Guide for Developers
+  status: pending
+  assigned_to:
+  - documentation-writer
+  model: sonnet
+  dependencies:
+  - TASK-5.4
+  story_points: 2
+  description: Before/after code examples, FAQ
+- id: TASK-5.6
+  title: Create Developer Reference Documentation
+  status: pending
+  assigned_to:
+  - documentation-writer
+  model: sonnet
+  dependencies: []
+  story_points: 2
+  description: Detection system reference guide
+- id: TASK-5.7
+  title: Create Architecture Documentation
+  status: pending
+  assigned_to:
+  - documentation-writer
+  model: sonnet
+  dependencies:
+  - TASK-5.6
+  story_points: 1
+  description: High-level system design doc
+- id: TASK-5.8
+  title: Create Backwards Compatibility Report
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies: []
+  story_points: 2
+  description: Document all changes and non-changes
+- id: TASK-5.9
+  title: Final Quality Assurance and Bug Fixes
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-5.3
+  story_points: 2
+  description: Final QA pass, fix any issues
+- id: TASK-5.10
+  title: Create Summary Report and Metrics
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-5.3
+  - TASK-5.9
+  story_points: 1
+  description: Final metrics, lessons learned
 parallelization:
-  batch_1: ["TASK-5.1", "TASK-5.2", "TASK-5.4", "TASK-5.6", "TASK-5.8"]
-  batch_2: ["TASK-5.3", "TASK-5.5", "TASK-5.7"]
-  batch_3: ["TASK-5.9"]
-  batch_4: ["TASK-5.10"]
-
+  batch_1:
+  - TASK-5.1
+  - TASK-5.2
+  - TASK-5.4
+  - TASK-5.6
+  - TASK-5.8
+  batch_2:
+  - TASK-5.3
+  - TASK-5.5
+  - TASK-5.7
+  batch_3:
+  - TASK-5.9
+  batch_4:
+  - TASK-5.10
 blockers:
-  - description: "Phases 2, 3, 4 must be complete"
-    blocking_tasks: ["TASK-5.1", "TASK-5.2"]
-    status: "active"
-
+- description: Phases 2, 3, 4 must be complete
+  blocking_tasks:
+  - TASK-5.1
+  - TASK-5.2
+  status: active
 notes:
-  - "Testing and documentation tasks can run in parallel"
-  - "TASK-5.4, 5.5, 5.6, 5.7 use documentation-writer (Sonnet)"
+- Testing and documentation tasks can run in parallel
+- TASK-5.4, 5.5, 5.6, 5.7 use documentation-writer (Sonnet)
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-detection-standardization
 ---
 
 # Phase 5: Comprehensive Testing, Documentation, and Migration Safeguards

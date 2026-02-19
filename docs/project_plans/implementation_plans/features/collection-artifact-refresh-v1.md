@@ -1,17 +1,34 @@
 ---
-title: "Implementation Plan: Collection Artifact Refresh"
-description: "Phased implementation for refreshing metadata of existing collection artifacts from upstream GitHub sources, resolving stale data issues with automatic field updates and drift detection"
-audience: [ai-agents, developers]
-tags: [implementation, planning, phases, tasks, backend, api, cli, metadata-refresh, drift-detection]
+title: 'Implementation Plan: Collection Artifact Refresh'
+description: Phased implementation for refreshing metadata of existing collection
+  artifacts from upstream GitHub sources, resolving stale data issues with automatic
+  field updates and drift detection
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- planning
+- phases
+- tasks
+- backend
+- api
+- cli
+- metadata-refresh
+- drift-detection
 created: 2025-01-21
 updated: 2025-01-21
-category: "product-planning"
+category: product-planning
 status: completed
 related:
-  - /docs/project_plans/PRDs/features/collection-artifact-refresh-v1.md
-  - /skillmeat/core/sync.py
-  - /skillmeat/core/github_metadata.py
-  - /skillmeat/api/routers/collections.py
+- /docs/project_plans/PRDs/features/collection-artifact-refresh-v1.md
+- /skillmeat/core/sync.py
+- /skillmeat/core/github_metadata.py
+- /skillmeat/api/routers/collections.py
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: collection-artifact-refresh
+prd_ref: null
 ---
 
 # Implementation Plan: Collection Artifact Refresh

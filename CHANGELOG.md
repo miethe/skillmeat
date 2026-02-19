@@ -351,6 +351,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tags display with overflow handling and color consistency
 - Rescan button and last sync time visibility improved
 
+#### Composite Artifact Infrastructure (Phases 1-5, 2026-02-18 to 2026-02-19)
+
+**Phase 1: Data Models & UUID Identity (ADR-007)**
+- New database tables: `composite_artifacts`, `composite_memberships` for storing artifact group relationships
+- UUID identity system for artifacts (`artifacts.uuid` column) enabling cross-project references
+- Alembic migrations for new composite artifact schema
+- Phase 1 compatibility layer for graceful dual-path transition
+
+**Phase 2: Enhanced Discovery & Composite Detection**
+- `DiscoveredGraph` BaseModel for representing composite artifact hierarchies
+- Composite root detection algorithm identifying artifact groups with bundle manifests
+- Plugin manifest support (plugin.json, plugin.toml) for discovering composite artifacts
+- Feature flag (`SKILLMEAT_ENABLE_COMPOSITE_DETECTION`) for composite detection control
+- Comprehensive test coverage for composite artifact discovery patterns
+
+**Phase 3: Import Orchestration & Sync**
+- Content hashing and deduplication to detect duplicate artifacts
+- Transactional plugin import with version pinning and atomic operations
+- Sync engine PLUGIN support for discovering and syncing composite bundles
+- Plugin meta-file storage preserving manifest and dependency information
+- `GET /artifacts/{id}/associations` API endpoint for querying relationships
+- Composite bundle export via `skillmeat export` command
+- Integration tests and OpenTelemetry observability spans for monitoring
+- Performance optimizations with background processing and async patterns
+
+**Phase 4: Web UI & Relationship Browsing**
+- `AssociationsDTO` types and schema definitions for artifact relationships
+- `useArtifactAssociations` React hook for querying and managing relationships
+- "Contains" tab on artifact detail page showing child artifacts and dependencies
+- "Part of" section displaying parent artifacts and composition hierarchy
+- Import composite preview dialog with relationship visualization
+- Version conflict resolution dialog for plugin deployment scenarios
+- WCAG a11y compliance improvements across relationship UI
+- Playwright E2E tests for relationship browsing and deployment workflows
+
+**Phase 5: UUID Migration & Compatibility Layer Retirement**
+- Migration of all association tables to artifact_uuid foreign keys:
+  - `collection_artifacts.artifact_uuid` FK with ondelete=CASCADE
+  - `group_artifacts.artifact_uuid` FK with position constraint preservation
+  - `artifact_tags.artifact_uuid` FK with composite primary key
+- Repository layer updates for UUID-based querying with backward-compatible DTOs
+- Service and API layer verification ensuring no external surface changes
+- Primary key assessment with deferred secondary index approach
+- Comprehensive UUID migration regression tests covering all join tables
+- Retirement of Phase 1 compatibility layer and dual-path shims
+
+**Technical Achievements**
+- All association tables successfully migrated to UUID foreign keys
+- Cascading deletes verified across composite artifact relationships
+- Alembic migrations apply and rollback cleanly
+- API surface unchanged for backward compatibility
+- Zero regression in collection, tagging, and grouping features
+
 ### Fixed
 
 #### Memory Extraction Pipeline v2 (2026-02-08)
@@ -365,7 +418,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `isDiffLoading` variable used before declaration in sync tab
 - Marketplace source import: symlink resolution and artifact naming
 
+#### Composite Artifact Infrastructure (2026-02-19)
+
+- Artifact table population race conditions in collection artifacts endpoint
+- Association table backup column cleanup (_artifact_id_backup columns now dropped)
+- UUID migration regression preventing cascading deletes
+- Alembic migration consistency issues during Phase 5 UUID rollout
+
 ### Changed
+
+#### Composite Artifact Infrastructure (2026-02-19)
+
+- Repository layer now queries all association tables via artifact_uuid FK instead of artifact_id
+- Service layer updated to handle UUID-based relationship lookups
+- API responses maintain backward-compatible type:name format despite internal UUID schema
+- Sync engine PLUGIN support extended to handle composite artifact manifests
+- ORM model relationships updated to use UUID foreign keys with proper cascade delete behavior
 
 #### Entity-Artifact Type System Consolidation (2026-01-28)
 

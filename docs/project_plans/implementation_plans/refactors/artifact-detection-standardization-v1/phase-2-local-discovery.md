@@ -1,3 +1,11 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: artifact-detection-standardization
+prd_ref: null
+plan_ref: null
+---
 # Phase 2: Rebuild Local Discovery with Shared Detector
 
 **Duration:** 1 week

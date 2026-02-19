@@ -1,120 +1,134 @@
 ---
 type: progress
-prd: "versioning-merge-system"
+prd: versioning-merge-system
 phase: 1
-title: "Storage Infrastructure"
-status: "partial"
-started: "2025-11-30"
+title: Storage Infrastructure
+status: partial
+started: '2025-11-30'
 completed: null
 overall_progress: 60
-completion_estimate: "architecture-deviation"
+completion_estimate: architecture-deviation
 total_tasks: 6
 completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["data-layer-expert"]
-contributors: ["python-backend-engineer"]
-
-# ARCHITECTURE NOTE: Implementation uses COLLECTION-LEVEL TARBALL SNAPSHOTS
-# instead of PRD's per-artifact versioned directories.
-# Files: skillmeat/storage/snapshot.py, skillmeat/core/version.py
-# This is functionally similar but architecturally different.
-
+owners:
+- data-layer-expert
+contributors:
+- python-backend-engineer
 tasks:
-  - id: "TASK-1.1"
-    description: "Design and document versions/ and latest/ directory layout for artifacts"
-    status: "deviated"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "3h"
-    priority: "high"
-    implementation: "Uses ~/.skillmeat/snapshots/{collection}/*.tar.gz instead of per-artifact versions/"
-    note: "Different architecture: tarball-based collection snapshots vs directory-based artifact versions"
-
-  - id: "TASK-1.2"
-    description: "Define .version.toml schema with id, timestamp, hash, source, files_changed, change_summary, parent_versions"
-    status: "partial"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["TASK-1.1"]
-    estimated_effort: "3h"
-    priority: "high"
-    implementation: "snapshots.toml in SnapshotManager with id, timestamp, message, artifact_count"
-    note: "Missing: files_changed, change_summary, parent_versions fields"
-
-  - id: "TASK-1.3"
-    description: "Implement deterministic version ID generation (v{n}-{hash})"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["TASK-1.2"]
-    estimated_effort: "2h"
-    priority: "high"
-    implementation: "Snapshot ID = timestamp format YYYYMMDD-HHMMSS-microseconds (deterministic, sortable)"
-
-  - id: "TASK-1.4"
-    description: "Implement deterministic file hashing strategy for artifact files (SHA256)"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "medium"
-    implementation: "compute_content_hash() in utils/filesystem.py uses SHA256"
-
-  - id: "TASK-1.5"
-    description: "Build utility to create version snapshot directories from source artifacts"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["TASK-1.1"]
-    estimated_effort: "2h"
-    priority: "high"
-    implementation: "SnapshotManager.create_snapshot() creates tar.gz of collection"
-
-  - id: "TASK-1.6"
-    description: "Design gzip/bzip2 compression option for version storage (optional, feature-flagged)"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["TASK-1.5"]
-    estimated_effort: "2h"
-    priority: "low"
-    implementation: "Snapshots are always gzip compressed (tar.gz)"
-
+- id: TASK-1.1
+  description: Design and document versions/ and latest/ directory layout for artifacts
+  status: deviated
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 3h
+  priority: high
+  implementation: Uses ~/.skillmeat/snapshots/{collection}/*.tar.gz instead of per-artifact
+    versions/
+  note: 'Different architecture: tarball-based collection snapshots vs directory-based
+    artifact versions'
+- id: TASK-1.2
+  description: Define .version.toml schema with id, timestamp, hash, source, files_changed,
+    change_summary, parent_versions
+  status: partial
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - TASK-1.1
+  estimated_effort: 3h
+  priority: high
+  implementation: snapshots.toml in SnapshotManager with id, timestamp, message, artifact_count
+  note: 'Missing: files_changed, change_summary, parent_versions fields'
+- id: TASK-1.3
+  description: Implement deterministic version ID generation (v{n}-{hash})
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - TASK-1.2
+  estimated_effort: 2h
+  priority: high
+  implementation: Snapshot ID = timestamp format YYYYMMDD-HHMMSS-microseconds (deterministic,
+    sortable)
+- id: TASK-1.4
+  description: Implement deterministic file hashing strategy for artifact files (SHA256)
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 2h
+  priority: medium
+  implementation: compute_content_hash() in utils/filesystem.py uses SHA256
+- id: TASK-1.5
+  description: Build utility to create version snapshot directories from source artifacts
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - TASK-1.1
+  estimated_effort: 2h
+  priority: high
+  implementation: SnapshotManager.create_snapshot() creates tar.gz of collection
+- id: TASK-1.6
+  description: Design gzip/bzip2 compression option for version storage (optional,
+    feature-flagged)
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - TASK-1.5
+  estimated_effort: 2h
+  priority: low
+  implementation: Snapshots are always gzip compressed (tar.gz)
 parallelization:
-  batch_1: ["TASK-1.1", "TASK-1.4"]
-  batch_2: ["TASK-1.2", "TASK-1.5"]
-  batch_3: ["TASK-1.3", "TASK-1.6"]
-  critical_path: ["TASK-1.1", "TASK-1.2", "TASK-1.3"]
-  estimated_total_time: "3d"
-
+  batch_1:
+  - TASK-1.1
+  - TASK-1.4
+  batch_2:
+  - TASK-1.2
+  - TASK-1.5
+  batch_3:
+  - TASK-1.3
+  - TASK-1.6
+  critical_path:
+  - TASK-1.1
+  - TASK-1.2
+  - TASK-1.3
+  estimated_total_time: 3d
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "Version directory structure designed and documented with clear examples"
-    status: "deviated"
-    note: "Using tarball snapshots instead of version directories"
-  - id: "SC-2"
-    description: "TOML schema complete with all required fields and validation rules"
-    status: "partial"
-  - id: "SC-3"
-    description: "Version ID generation produces sortable, unique IDs with content hash"
-    status: "completed"
-  - id: "SC-4"
-    description: "Hash computation deterministic - same artifact produces same hash"
-    status: "completed"
-  - id: "SC-5"
-    description: "Directory creation utility handles edge cases (missing files, symlinks)"
-    status: "completed"
-  - id: "SC-6"
-    description: "Unit tests for all utilities achieve >90% coverage"
-    status: "partial"
-
+- id: SC-1
+  description: Version directory structure designed and documented with clear examples
+  status: deviated
+  note: Using tarball snapshots instead of version directories
+- id: SC-2
+  description: TOML schema complete with all required fields and validation rules
+  status: partial
+- id: SC-3
+  description: Version ID generation produces sortable, unique IDs with content hash
+  status: completed
+- id: SC-4
+  description: Hash computation deterministic - same artifact produces same hash
+  status: completed
+- id: SC-5
+  description: Directory creation utility handles edge cases (missing files, symlinks)
+  status: completed
+- id: SC-6
+  description: Unit tests for all utilities achieve >90% coverage
+  status: partial
 files_modified:
-  - path: "skillmeat/storage/snapshot.py"
-    status: "created"
-    lines: 271
-    note: "SnapshotManager with tarball-based snapshots"
-  - path: "skillmeat/utils/filesystem.py"
-    status: "modified"
-    note: "compute_content_hash() for SHA256 hashing"
+- path: skillmeat/storage/snapshot.py
+  status: created
+  lines: 271
+  note: SnapshotManager with tarball-based snapshots
+- path: skillmeat/utils/filesystem.py
+  status: modified
+  note: compute_content_hash() for SHA256 hashing
+schema_version: 2
+doc_type: progress
+feature_slug: versioning-merge-system
 ---
 
 # versioning-merge-system - Phase 1: Storage Infrastructure

@@ -33,18 +33,20 @@ Timestamp Tracking:
     - New/modified artifacts get current timestamp; unchanged preserve original
 """
 
+import json
 import logging
 import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
 from skillmeat.core.artifact_detection import (
     ARTIFACT_SIGNATURES,
     ArtifactType,
+    CompositeType,
     DetectionError,
     DetectionResult,
     MANIFEST_FILES,
@@ -194,6 +196,359 @@ class DiscoveryResult(BaseModel):
     scan_duration_ms: float
 
 
+class DiscoveredGraph(BaseModel):
+    """Hierarchical discovery result for a composite artifact and its children.
+
+    Returned by composite-aware discovery paths instead of a flat ``DiscoveryResult``
+    when the scanner encounters a composite artifact (``ArtifactType.COMPOSITE``).
+    A ``DiscoveryResult`` represents a flat collection of independent artifacts;
+    a ``DiscoveredGraph`` represents a rooted hierarchy where one composite artifact
+    owns a set of member artifacts linked by explicit relationship records.
+
+    When to use ``DiscoveredGraph`` vs ``DiscoveryResult``:
+        - ``DiscoveryResult``: returned by ``ArtifactDiscoveryService.discover_artifacts()``
+          for standard (non-composite) scans; contains a flat list of independent
+          ``DiscoveredArtifact`` instances.
+        - ``DiscoveredGraph``: returned when a composite artifact root is detected;
+          contains a single parent, its child members, and the edges between them.
+          For v1, all edges use ``relationship_type = "contains"``.
+
+    Attributes:
+        parent: The composite artifact acting as the root of this graph.
+                Its ``type`` field will be ``"composite"``.
+        children: All member artifacts found beneath the composite root.
+                  Each child is a fully-resolved ``DiscoveredArtifact`` (skill,
+                  command, agent, etc.) that belongs to the composite.
+        links: Parent-child relationship metadata edges.
+               Each entry is a mapping with at minimum the keys:
+               ``{"parent_id": str, "child_id": str, "relationship_type": str}``.
+               ``parent_id`` and ``child_id`` use the ``"type:name"`` format
+               (e.g., ``"composite:my-plugin"``, ``"skill:canvas-design"``).
+               For v1, ``relationship_type`` is always ``"contains"``.
+        source_root: Absolute filesystem path to the directory where the composite
+                     artifact was detected (i.e., the directory that contains the
+                     composite manifest file such as ``COMPOSITE.md``).
+    """
+
+    parent: DiscoveredArtifact
+    children: List[DiscoveredArtifact] = Field(default_factory=list)
+    links: List[Dict[str, Any]] = Field(default_factory=list)
+    source_root: str
+
+
+# Maximum number of files scanned per composite detection pass
+_COMPOSITE_MAX_FILES = 1000
+
+# Maximum directory depth for composite detection
+_COMPOSITE_MAX_DEPTH = 3
+
+# Artifact-type subdirectory names that count as distinct types for the
+# "2+ distinct artifact-type subdirectory" signal. We derive the set from
+# ARTIFACT_SIGNATURES so it stays in sync automatically.
+_ARTIFACT_TYPE_CONTAINER_NAMES: Dict[str, ArtifactType] = {
+    alias.lower(): artifact_type
+    for artifact_type, sig in ARTIFACT_SIGNATURES.items()
+    if artifact_type in ArtifactType.primary_types()
+    for alias in sig.container_names
+}
+
+
+def _parse_plugin_json(plugin_json_path: Path) -> Dict[str, Any]:
+    """Parse plugin.json permissively, extracting known fields.
+
+    Treats all fields as optional; returns an empty dict on any parse failure.
+
+    Args:
+        plugin_json_path: Path to ``plugin.json`` file.
+
+    Returns:
+        Dictionary with extracted fields (name, version, description, tags).
+    """
+    result: Dict[str, Any] = {}
+    try:
+        with open(plugin_json_path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        if isinstance(data, dict):
+            for key in ("name", "version", "description"):
+                value = data.get(key)
+                if value is not None:
+                    result[key] = str(value)
+            tags = data.get("tags")
+            if isinstance(tags, list):
+                result["tags"] = [str(t) for t in tags]
+    except Exception as exc:
+        logger.debug(f"Could not parse plugin.json at {plugin_json_path}: {exc}")
+    return result
+
+
+def _scan_child_artifacts(
+    subdir: Path,
+    artifact_type: ArtifactType,
+    files_scanned: List[int],
+) -> List[DiscoveredArtifact]:
+    """Scan a single artifact-type subdirectory for child artifacts.
+
+    Uses ``detect_artifact()`` in heuristic mode (50 % confidence threshold)
+    consistent with ``ArtifactDiscoveryService._detect_artifact_type()``.
+
+    Args:
+        subdir: The artifact-type container directory (e.g., ``skills/``).
+        artifact_type: The type expected inside this directory.
+        files_scanned: Single-element list used as a shared counter. The
+                       function increments ``files_scanned[0]`` for each
+                       path examined and returns early when the limit is
+                       reached.
+
+    Returns:
+        List of ``DiscoveredArtifact`` instances found inside ``subdir``.
+    """
+    discovered: List[DiscoveredArtifact] = []
+
+    if not subdir.exists() or not subdir.is_dir():
+        return discovered
+
+    try:
+        for entry in subdir.iterdir():
+            if files_scanned[0] >= _COMPOSITE_MAX_FILES:
+                logger.debug(
+                    "Composite child scan halted: reached %d file limit",
+                    _COMPOSITE_MAX_FILES,
+                )
+                break
+
+            if entry.name.startswith("."):
+                continue
+
+            files_scanned[0] += 1
+
+            try:
+                result = detect_artifact(
+                    entry,
+                    container_type=subdir.name,
+                    mode="heuristic",
+                )
+                if result.confidence < 50:
+                    continue
+
+                child = DiscoveredArtifact(
+                    type=result.artifact_type.value,
+                    name=result.name,
+                    source=result.metadata.get("source"),
+                    version=result.metadata.get("version"),
+                    scope=result.metadata.get("scope"),
+                    tags=result.metadata.get("tags", []),
+                    description=result.metadata.get("description"),
+                    path=str(entry),
+                    discovered_at=datetime.now(timezone.utc),
+                )
+                discovered.append(child)
+            except Exception as exc:
+                logger.debug(f"Could not detect child artifact at {entry}: {exc}")
+    except PermissionError as exc:
+        logger.debug(f"Permission denied scanning child dir {subdir}: {exc}")
+
+    return discovered
+
+
+def _build_graph_from_plugin_json(
+    root_path: Path,
+    plugin_json_path: Path,
+) -> DiscoveredGraph:
+    """Build a ``DiscoveredGraph`` rooted on a ``plugin.json`` composite.
+
+    Args:
+        root_path: Directory containing ``plugin.json``.
+        plugin_json_path: Absolute path to the ``plugin.json`` file.
+
+    Returns:
+        ``DiscoveredGraph`` with parent, children, and links populated.
+    """
+    meta = _parse_plugin_json(plugin_json_path)
+    composite_name = meta.get("name", root_path.name)
+
+    parent = DiscoveredArtifact(
+        type=ArtifactType.COMPOSITE.value,
+        name=composite_name,
+        source=meta.get("source"),
+        version=meta.get("version"),
+        description=meta.get("description"),
+        tags=meta.get("tags", []),
+        path=str(root_path),
+        discovered_at=datetime.now(timezone.utc),
+    )
+
+    children: List[DiscoveredArtifact] = []
+    files_scanned = [0]
+
+    # Scan each artifact-type subdirectory for children
+    try:
+        for entry in root_path.iterdir():
+            if not entry.is_dir() or entry.name.startswith("."):
+                continue
+            artifact_type = _ARTIFACT_TYPE_CONTAINER_NAMES.get(entry.name.lower())
+            if artifact_type is None:
+                continue
+            children.extend(_scan_child_artifacts(entry, artifact_type, files_scanned))
+    except PermissionError as exc:
+        logger.debug(f"Permission denied reading composite root {root_path}: {exc}")
+
+    parent_id = f"{ArtifactType.COMPOSITE.value}:{composite_name}"
+    links: List[Dict[str, Any]] = [
+        {
+            "parent_id": parent_id,
+            "child_id": f"{child.type}:{child.name}",
+            "relationship_type": "contains",
+        }
+        for child in children
+    ]
+
+    logger.info(
+        "Composite detected via plugin.json",
+        extra={
+            "event": "composite_detected",
+            "composite_name": composite_name,
+            "child_count": len(children),
+            "source_root": str(root_path),
+            "signal": "plugin_json",
+        },
+    )
+
+    return DiscoveredGraph(
+        parent=parent,
+        children=children,
+        links=links,
+        source_root=str(root_path),
+    )
+
+
+def _build_graph_from_subdirs(
+    root_path: Path,
+    found_type_dirs: Dict[ArtifactType, Path],
+) -> DiscoveredGraph:
+    """Build a ``DiscoveredGraph`` from a directory with multiple artifact-type subdirs.
+
+    Args:
+        root_path: Root directory containing the artifact-type subdirectories.
+        found_type_dirs: Mapping of detected ``ArtifactType`` to its subdirectory path.
+
+    Returns:
+        ``DiscoveredGraph`` with parent, children, and links populated.
+    """
+    composite_name = root_path.name
+
+    parent = DiscoveredArtifact(
+        type=ArtifactType.COMPOSITE.value,
+        name=composite_name,
+        path=str(root_path),
+        discovered_at=datetime.now(timezone.utc),
+    )
+
+    children: List[DiscoveredArtifact] = []
+    files_scanned = [0]
+
+    for artifact_type, subdir in found_type_dirs.items():
+        children.extend(_scan_child_artifacts(subdir, artifact_type, files_scanned))
+
+    parent_id = f"{ArtifactType.COMPOSITE.value}:{composite_name}"
+    links: List[Dict[str, Any]] = [
+        {
+            "parent_id": parent_id,
+            "child_id": f"{child.type}:{child.name}",
+            "relationship_type": "contains",
+        }
+        for child in children
+    ]
+
+    logger.info(
+        "Composite detected via multiple artifact-type subdirectories",
+        extra={
+            "event": "composite_detected",
+            "composite_name": composite_name,
+            "child_count": len(children),
+            "source_root": str(root_path),
+            "signal": "multi_subdir",
+            "detected_types": [t.value for t in found_type_dirs],
+        },
+    )
+
+    return DiscoveredGraph(
+        parent=parent,
+        children=children,
+        links=links,
+        source_root=str(root_path),
+    )
+
+
+def detect_composites(root_path: str) -> Optional[DiscoveredGraph]:
+    """Detect whether a directory root contains a composite artifact.
+
+    Detection uses two independent signals, checked in priority order:
+
+    1. **plugin.json signal** — presence of ``plugin.json`` at the root is
+       an authoritative composite indicator. Returns immediately if found.
+    2. **Multi-subdir signal** — if the root contains 2+ distinct
+       artifact-type subdirectories (e.g., ``skills/`` and ``commands/``),
+       the root is treated as an implicit composite.
+
+    False-positive guard: the multi-subdir path requires at least 2 distinct
+    primary artifact-type containers; a single ``skills/`` directory alone is
+    not considered composite.
+
+    Depth: only the first 3 directory levels are examined for the subdir
+    signal; ``plugin.json`` is only checked at the immediate root.
+
+    Args:
+        root_path: Filesystem path to the candidate directory root.
+
+    Returns:
+        A populated ``DiscoveredGraph`` if a composite is detected, or
+        ``None`` if the directory is not a composite (or the path is invalid,
+        inaccessible, or empty).
+    """
+    try:
+        root = Path(root_path)
+        if not root.exists() or not root.is_dir():
+            return None
+    except Exception as exc:
+        logger.debug(f"Invalid composite root path '{root_path}': {exc}")
+        return None
+
+    # -------------------------------------------------------------------------
+    # Signal 1: plugin.json at root (authoritative composite signal)
+    # -------------------------------------------------------------------------
+    plugin_json = root / "plugin.json"
+    try:
+        if plugin_json.exists() and plugin_json.is_file():
+            return _build_graph_from_plugin_json(root, plugin_json)
+    except PermissionError as exc:
+        logger.debug(f"Permission denied reading plugin.json at {plugin_json}: {exc}")
+
+    # -------------------------------------------------------------------------
+    # Signal 2: 2+ distinct artifact-type subdirectories at the root level.
+    #
+    # We intentionally check only immediate children of ``root`` (depth 1).
+    # Recursing deeper would cause false positives for any project with a
+    # profile root (e.g., ``.claude/``) whose subdirectories happen to contain
+    # artifact-type container names (``skills/``, ``commands/``, etc.).
+    # -------------------------------------------------------------------------
+    found_type_dirs: Dict[ArtifactType, Path] = {}
+
+    try:
+        for entry in root.iterdir():
+            if not entry.is_dir() or entry.name.startswith("."):
+                continue
+            artifact_type = _ARTIFACT_TYPE_CONTAINER_NAMES.get(entry.name.lower())
+            if artifact_type is not None:
+                found_type_dirs[artifact_type] = entry
+    except PermissionError as exc:
+        logger.debug(f"Permission denied scanning root {root}: {exc}")
+
+    if len(found_type_dirs) >= 2:
+        return _build_graph_from_subdirs(root, found_type_dirs)
+
+    return None
+
+
 class ArtifactDiscoveryService:
     """Service for discovering artifacts in project profile roots or collections.
 
@@ -246,7 +601,9 @@ class ArtifactDiscoveryService:
         self.base_path = base_path
         self.scan_mode = scan_mode
         roots = profile_root_dirs or (
-            [profile_root_dir] if profile_root_dir else [".claude", ".codex", ".gemini", ".cursor"]
+            [profile_root_dir]
+            if profile_root_dir
+            else [".claude", ".codex", ".gemini", ".cursor"]
         )
         self.profile_root_dirs = [r for r in roots if r]
         if not self.profile_root_dirs:
@@ -255,7 +612,11 @@ class ArtifactDiscoveryService:
         # Auto-detect mode based on directory structure
         if scan_mode == "auto":
             existing_profile_root = next(
-                (root for root in self.profile_root_dirs if (base_path / root).exists()),
+                (
+                    root
+                    for root in self.profile_root_dirs
+                    if (base_path / root).exists()
+                ),
                 None,
             )
             if existing_profile_root:
@@ -270,7 +631,11 @@ class ArtifactDiscoveryService:
                 self.artifacts_base = base_path / self.profile_root_dirs[0]
         elif scan_mode == "project":
             selected_root = next(
-                (root for root in self.profile_root_dirs if (base_path / root).exists()),
+                (
+                    root
+                    for root in self.profile_root_dirs
+                    if (base_path / root).exists()
+                ),
                 self.profile_root_dirs[0],
             )
             self.artifacts_base = base_path / selected_root
@@ -360,8 +725,16 @@ class ArtifactDiscoveryService:
         include_skipped: bool = False,
         collection_name: Optional[str] = None,
         include_collection_status: bool = True,
-    ) -> DiscoveryResult:
+    ) -> Union[DiscoveryResult, DiscoveredGraph]:
         """Scan artifacts directory and discover all artifacts.
+
+        Composite-aware: before performing a flat scan this method calls
+        ``detect_composites()`` on the artifacts base directory. If a
+        composite structure is detected a ``DiscoveredGraph`` is returned
+        immediately and no further flat scanning is performed.
+
+        For non-composite roots the method falls back to the original flat
+        discovery behaviour, returning a ``DiscoveryResult`` as before.
 
         This method recursively scans the artifacts directory, detects
         artifact types, extracts metadata, validates structure, and optionally
@@ -385,14 +758,64 @@ class ArtifactDiscoveryService:
                             when collection membership is not needed.
 
         Returns:
-            DiscoveryResult with discovered artifacts, error list, and metrics.
-            The `discovered_count` field shows total artifacts found.
-            The `importable_count` field shows artifacts not yet imported (filtered).
+            ``DiscoveredGraph`` if the artifacts base is a composite artifact root,
+            otherwise ``DiscoveryResult`` with discovered artifacts, error list, and metrics.
+            The `discovered_count` field shows total artifacts found (DiscoveryResult only).
+            The `importable_count` field shows artifacts not yet imported (DiscoveryResult only).
             The `artifacts` list contains only importable artifacts if manifest provided.
             The `skipped_artifacts` list contains skipped artifacts if include_skipped=True.
             Each artifact's `collection_status` field will be populated if
             include_collection_status=True.
         """
+        # ------------------------------------------------------------------
+        # Composite detection: check the repository root before flat scan.
+        #
+        # We pass ``self.base_path`` (the repo/project root) rather than
+        # ``self.artifacts_base`` (the profile subdirectory such as ``.claude/``).
+        # A profile root like ``.claude/`` contains artifact-type subdirectories
+        # by design and would always produce false-positive composite hits.
+        # The repository root, by contrast, only contains artifact-type
+        # subdirectories when the repo itself is structured as a composite
+        # artifact (e.g., a plugin repo with top-level ``skills/`` + ``commands/``
+        # or a ``plugin.json`` at root).
+        #
+        # Gated by the ``composite_artifacts_enabled`` feature flag in
+        # ``APISettings`` (env var: ``SKILLMEAT_COMPOSITE_ARTIFACTS_ENABLED``).
+        # When the flag is disabled this block is skipped and flat discovery
+        # proceeds unconditionally.
+        # ------------------------------------------------------------------
+        _composite_enabled = True
+        try:
+            from skillmeat.api.config import get_settings
+
+            _composite_enabled = get_settings().composite_artifacts_enabled
+        except Exception:
+            # If settings are unavailable (e.g., CLI context without API stack),
+            # default to enabled so behaviour is unchanged.
+            pass
+
+        if _composite_enabled:
+            try:
+                composite_graph = detect_composites(str(self.base_path))
+                if composite_graph is not None:
+                    logger.info(
+                        "Composite artifact detected; returning DiscoveredGraph instead of flat scan",
+                        extra={
+                            "composite_name": composite_graph.parent.name,
+                            "child_count": len(composite_graph.children),
+                            "source_root": composite_graph.source_root,
+                        },
+                    )
+                    return composite_graph
+            except Exception as exc:
+                # Composite detection must never break flat discovery
+                logger.warning(
+                    f"Composite detection raised an unexpected error; falling back to flat scan: {exc}"
+                )
+        else:
+            logger.debug(
+                "Composite artifact detection disabled via feature flag; using flat discovery"
+            )
         start_time = time.time()
         discovered_artifacts: List[DiscoveredArtifact] = []
         errors: List[str] = []
@@ -527,9 +950,13 @@ class ArtifactDiscoveryService:
                 # Check if there's a fuzzy match from earlier scanning
                 # If so, downgrade to name_type match (possible duplicate)
                 # Otherwise, set to none (new artifact)
-                if artifact.collection_match is not None and artifact.collection_match.type in (
-                    "exact",
-                    "hash",
+                if (
+                    artifact.collection_match is not None
+                    and artifact.collection_match.type
+                    in (
+                        "exact",
+                        "hash",
+                    )
                 ):
                     # Fuzzy match found something, but exact check says not in collection
                     # This means it's a similar artifact (e.g., "notebooklm" vs "notebooklm-skill")

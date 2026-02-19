@@ -18,7 +18,7 @@ tasks:
   estimate: 3 pts
   model: opus
 - id: SYNC-U02
-  name: Integrate for Deploy (Collection→Project)
+  name: "Integrate for Deploy (Collection\u2192Project)"
   status: completed
   assigned_to:
   - ui-engineer-enhanced
@@ -27,7 +27,7 @@ tasks:
   estimate: 1 pt
   model: opus
 - id: SYNC-U03
-  name: Integrate for Push (Project→Collection)
+  name: "Integrate for Push (Project\u2192Collection)"
   status: completed
   assigned_to:
   - ui-engineer-enhanced
@@ -36,7 +36,7 @@ tasks:
   estimate: 1 pt
   model: opus
 - id: SYNC-U04
-  name: Integrate for Pull (Source→Collection)
+  name: "Integrate for Pull (Source\u2192Collection)"
   status: completed
   assigned_to:
   - ui-engineer-enhanced
@@ -86,6 +86,9 @@ total_tasks: 6
 completed_tasks: 6
 in_progress_tasks: 0
 blocked_tasks: 0
+schema_version: 2
+doc_type: progress
+feature_slug: unified-sync-workflow
 ---
 
 # Phase 2: Unified DiffViewer Confirmation Dialog

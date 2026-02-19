@@ -1,3 +1,9 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: prd
+feature_slug: entity-artifact-consolidation
+---
 # Entity and Artifact Type System Consolidation
 
 **Status**: Approved for development

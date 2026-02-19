@@ -1,89 +1,111 @@
 ---
 type: progress
-prd: "unified-sync-workflow"
+prd: unified-sync-workflow
 phase: 4
-phase_name: "Tests, Accessibility & Polish"
+phase_name: Tests, Accessibility & Polish
 status: pending
 progress: 0
 created: 2026-02-04
 updated: 2026-02-05
-
 tasks:
-  - id: "SYNC-P01"
-    name: "Persistent drift dismissal"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimate: "1 pt"
-    model: "sonnet"
-
-  - id: "SYNC-P02"
-    name: "E2E: Deploy with conflicts"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-U02"]
-    estimate: "0.75 pts"
-    model: "sonnet"
-
-  - id: "SYNC-P03"
-    name: "E2E: Push with conflicts"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-U03"]
-    estimate: "0.75 pts"
-    model: "sonnet"
-
-  - id: "SYNC-P04"
-    name: "E2E: Pull with conflicts"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-U04"]
-    estimate: "0.75 pts"
-    model: "sonnet"
-
-  - id: "SYNC-P05"
-    name: "E2E: Full sync cycle"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SYNC-P02", "SYNC-P03", "SYNC-P04"]
-    estimate: "1 pt"
-    model: "sonnet"
-
-  - id: "SYNC-P06"
-    name: "Accessibility audit"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimate: "0.5 pts"
-    model: "sonnet"
-
-  - id: "SYNC-P07"
-    name: "Performance: large diffs"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimate: "0.5 pts"
-    model: "sonnet"
-
-  - id: "SYNC-P08"
-    name: "Code review and merge"
-    status: "pending"
-    assigned_to: ["code-reviewer"]
-    dependencies: ["SYNC-P01", "SYNC-P02", "SYNC-P03", "SYNC-P04", "SYNC-P05", "SYNC-P06", "SYNC-P07"]
-    estimate: "0.75 pts"
-    model: "opus"
-
+- id: SYNC-P01
+  name: Persistent drift dismissal
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimate: 1 pt
+  model: sonnet
+- id: SYNC-P02
+  name: 'E2E: Deploy with conflicts'
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SYNC-U02
+  estimate: 0.75 pts
+  model: sonnet
+- id: SYNC-P03
+  name: 'E2E: Push with conflicts'
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SYNC-U03
+  estimate: 0.75 pts
+  model: sonnet
+- id: SYNC-P04
+  name: 'E2E: Pull with conflicts'
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SYNC-U04
+  estimate: 0.75 pts
+  model: sonnet
+- id: SYNC-P05
+  name: 'E2E: Full sync cycle'
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SYNC-P02
+  - SYNC-P03
+  - SYNC-P04
+  estimate: 1 pt
+  model: sonnet
+- id: SYNC-P06
+  name: Accessibility audit
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimate: 0.5 pts
+  model: sonnet
+- id: SYNC-P07
+  name: 'Performance: large diffs'
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimate: 0.5 pts
+  model: sonnet
+- id: SYNC-P08
+  name: Code review and merge
+  status: pending
+  assigned_to:
+  - code-reviewer
+  dependencies:
+  - SYNC-P01
+  - SYNC-P02
+  - SYNC-P03
+  - SYNC-P04
+  - SYNC-P05
+  - SYNC-P06
+  - SYNC-P07
+  estimate: 0.75 pts
+  model: opus
 parallelization:
-  batch_1: ["SYNC-P01", "SYNC-P02", "SYNC-P03", "SYNC-P04", "SYNC-P06", "SYNC-P07"]
-  batch_2: ["SYNC-P05"]
-  batch_3: ["SYNC-P08"]
-
+  batch_1:
+  - SYNC-P01
+  - SYNC-P02
+  - SYNC-P03
+  - SYNC-P04
+  - SYNC-P06
+  - SYNC-P07
+  batch_2:
+  - SYNC-P05
+  batch_3:
+  - SYNC-P08
 quality_gates:
-  - "Drift dismissal persists across sessions, expires after 24h"
-  - "All E2E tests pass"
-  - "Zero axe-core accessibility violations"
-  - "Dialog renders in <200ms for typical diffs"
-  - "Code review complete with no blockers"
+- Drift dismissal persists across sessions, expires after 24h
+- All E2E tests pass
+- Zero axe-core accessibility violations
+- Dialog renders in <200ms for typical diffs
+- Code review complete with no blockers
+schema_version: 2
+doc_type: progress
+feature_slug: unified-sync-workflow
 ---
 
 # Phase 4: Tests, Accessibility & Polish

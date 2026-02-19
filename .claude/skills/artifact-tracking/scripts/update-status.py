@@ -102,6 +102,7 @@ def recalculate_metrics(frontmatter: Dict[str, Any]) -> Dict[str, Any]:
     """
     tasks = frontmatter.get('tasks', [])
     if not tasks:
+        frontmatter['updated'] = datetime.now().strftime('%Y-%m-%d')
         return frontmatter
 
     # Count tasks by status

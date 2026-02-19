@@ -53,6 +53,9 @@ completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
 updated: '2026-01-23'
+schema_version: 2
+doc_type: progress
+feature_slug: enhanced-frontmatter-utilization
 ---
 
 # Phase 4: Polish, Validation & Deployment - Progress

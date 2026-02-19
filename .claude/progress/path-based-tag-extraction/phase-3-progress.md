@@ -1,121 +1,146 @@
 ---
 prd: path-based-tag-extraction-v1
 phase: 3
-name: "Import Integration & Polish"
+name: Import Integration & Polish
 status: completed
 created: 2026-01-04
 updated: 2026-01-05
 completed_at: 2026-01-05
 completion: 100
-
 tasks:
-  - id: "TASK-3.1"
-    name: "Update Import Request Schema"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: []
-    estimated_effort: "0.5h"
-    commit: "6e6c384"
-
-  - id: "TASK-3.2"
-    name: "Backend Import Logic"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.1"]
-    estimated_effort: "2h"
-    commit: "6e6c384"
-
-  - id: "TASK-3.3"
-    name: "Import UI Checkbox"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    model: "sonnet"
-    dependencies: []
-    estimated_effort: "0.5h"
-    commit: "6e6c384"
-
-  - id: "TASK-3.4"
-    name: "Frontend State Management"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    model: "sonnet"
-    dependencies: ["TASK-3.3"]
-    estimated_effort: "1h"
-    commit: "6e6c384"
-
-  - id: "TASK-3.5"
-    name: "Integration Tests"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-3.2"]
-    estimated_effort: "1.5h"
-    commit: "95148b3"
-
-  - id: "TASK-3.6"
-    name: "E2E Tests"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-3.4", "TASK-3.5"]
-    estimated_effort: "2h"
-    commit: "ec0e2a5"
-
-  - id: "TASK-3.7"
-    name: "QA Workflow Testing"
-    status: "completed"
-    assigned_to: ["karen"]
-    model: "sonnet"
-    dependencies: ["TASK-3.6"]
-    estimated_effort: "1.5h"
-    notes: "Automated validation: 42 tests pass, frontend builds"
-
-  - id: "TASK-3.8"
-    name: "Documentation Update"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    model: "haiku"
-    dependencies: ["TASK-3.7"]
-    estimated_effort: "1h"
-    commit: "f11e32d"
-
+- id: TASK-3.1
+  name: Update Import Request Schema
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies: []
+  estimated_effort: 0.5h
+  commit: 6e6c384
+- id: TASK-3.2
+  name: Backend Import Logic
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.1
+  estimated_effort: 2h
+  commit: 6e6c384
+- id: TASK-3.3
+  name: Import UI Checkbox
+  status: completed
+  assigned_to:
+  - ui-engineer
+  model: sonnet
+  dependencies: []
+  estimated_effort: 0.5h
+  commit: 6e6c384
+- id: TASK-3.4
+  name: Frontend State Management
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: sonnet
+  dependencies:
+  - TASK-3.3
+  estimated_effort: 1h
+  commit: 6e6c384
+- id: TASK-3.5
+  name: Integration Tests
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-3.2
+  estimated_effort: 1.5h
+  commit: 95148b3
+- id: TASK-3.6
+  name: E2E Tests
+  status: completed
+  assigned_to:
+  - ui-engineer
+  model: sonnet
+  dependencies:
+  - TASK-3.4
+  - TASK-3.5
+  estimated_effort: 2h
+  commit: ec0e2a5
+- id: TASK-3.7
+  name: QA Workflow Testing
+  status: completed
+  assigned_to:
+  - karen
+  model: sonnet
+  dependencies:
+  - TASK-3.6
+  estimated_effort: 1.5h
+  notes: 'Automated validation: 42 tests pass, frontend builds'
+- id: TASK-3.8
+  name: Documentation Update
+  status: completed
+  assigned_to:
+  - documentation-writer
+  model: haiku
+  dependencies:
+  - TASK-3.7
+  estimated_effort: 1h
+  commit: f11e32d
 parallelization:
-  batch_1: ["TASK-3.1", "TASK-3.3"]
-  batch_2: ["TASK-3.2", "TASK-3.4"]
-  batch_3: ["TASK-3.5"]
-  batch_4: ["TASK-3.6"]
-  batch_5: ["TASK-3.7"]
-  batch_6: ["TASK-3.8"]
-
+  batch_1:
+  - TASK-3.1
+  - TASK-3.3
+  batch_2:
+  - TASK-3.2
+  - TASK-3.4
+  batch_3:
+  - TASK-3.5
+  batch_4:
+  - TASK-3.6
+  batch_5:
+  - TASK-3.7
+  batch_6:
+  - TASK-3.8
 execution_log:
-  - batch: 1
-    status: "completed"
-    tasks: ["TASK-3.1", "TASK-3.3"]
-    commit: "6e6c384"
-  - batch: 2
-    status: "completed"
-    tasks: ["TASK-3.2", "TASK-3.4"]
-    commit: "6e6c384"
-  - batch: 3
-    status: "completed"
-    tasks: ["TASK-3.5"]
-    commit: "95148b3"
-    notes: "26 path tag integration tests"
-  - batch: 4
-    status: "completed"
-    tasks: ["TASK-3.6"]
-    commit: "ec0e2a5"
-    notes: "10 E2E tests for checkbox"
-  - batch: 5
-    status: "completed"
-    tasks: ["TASK-3.7"]
-    notes: "42 passing tests, frontend builds successfully"
-  - batch: 6
-    status: "completed"
-    tasks: ["TASK-3.8"]
-    commit: "f11e32d"
+- batch: 1
+  status: completed
+  tasks:
+  - TASK-3.1
+  - TASK-3.3
+  commit: 6e6c384
+- batch: 2
+  status: completed
+  tasks:
+  - TASK-3.2
+  - TASK-3.4
+  commit: 6e6c384
+- batch: 3
+  status: completed
+  tasks:
+  - TASK-3.5
+  commit: 95148b3
+  notes: 26 path tag integration tests
+- batch: 4
+  status: completed
+  tasks:
+  - TASK-3.6
+  commit: ec0e2a5
+  notes: 10 E2E tests for checkbox
+- batch: 5
+  status: completed
+  tasks:
+  - TASK-3.7
+  notes: 42 passing tests, frontend builds successfully
+- batch: 6
+  status: completed
+  tasks:
+  - TASK-3.8
+  commit: f11e32d
+schema_version: 2
+doc_type: progress
+feature_slug: path-based-tag-extraction-v1
+type: progress
 ---
 
 # Phase 3: Import Integration & Polish

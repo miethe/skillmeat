@@ -1,16 +1,19 @@
 ---
 type: context
-prd: "request-log-viewer-v1"
-title: "Request-Log Viewer - Development Context"
-status: "active"
-created: "2026-01-30"
-updated: "2026-01-30"
+prd: request-log-viewer-v1
+title: Request-Log Viewer - Development Context
+status: active
+created: '2026-01-30'
+updated: '2026-01-30'
 counts:
   decisions: 0
   gotchas: 0
   integration_notes: 0
   performance_notes: 0
   handoff_notes: 0
+schema_version: 2
+doc_type: context
+feature_slug: request-log-viewer-v1
 ---
 
 # Request-Log Viewer Feature - Development Context

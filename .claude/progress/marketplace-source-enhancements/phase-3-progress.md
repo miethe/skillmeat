@@ -1,104 +1,123 @@
 ---
 type: progress
-prd: "marketplace-source-enhancements"
+prd: marketplace-source-enhancements
 phase: 3
-title: "Frontend Exclusions"
+title: Frontend Exclusions
 status: completed
 progress: 100
 total_tasks: 8
 completed_tasks: 8
-created_at: "2025-12-31"
-updated_at: "2025-12-31"
-
+created_at: '2025-12-31'
+updated_at: '2025-12-31'
 tasks:
-  - id: "TASK-3.1"
-    title: "Add exclusion hooks"
-    description: "Create useExcludeCatalogEntry, useRestoreCatalogEntry mutations"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    dependencies: []
-    estimated_time: "2h"
-    files:
-      - "skillmeat/web/hooks/useMarketplaceSources.ts"
-
-  - id: "TASK-3.2"
-    title: "Create ExcludeArtifactDialog component"
-    description: "Confirmation dialog with Radix Dialog for marking artifacts as excluded"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_time: "2h"
-    files:
-      - "skillmeat/web/components/marketplace/exclude-artifact-dialog.tsx"
-
-  - id: "TASK-3.3"
-    title: "Add 'Not an Artifact' link to CatalogCard"
-    description: "Integrate exclusion trigger into catalog card UI"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.1", "TASK-3.2"]
-    estimated_time: "1h"
-    files:
-      - "skillmeat/web/app/marketplace/sources/[id]/components/"
-
-  - id: "TASK-3.4"
-    title: "Create ExcludedArtifactsList component"
-    description: "Collapsible table showing excluded entries with restore action"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.1"]
-    estimated_time: "2h"
-    files:
-      - "skillmeat/web/app/marketplace/sources/[id]/components/excluded-list.tsx"
-
-  - id: "TASK-3.5"
-    title: "Integrate excluded list into source page"
-    description: "Add collapsible section below catalog grid"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.4"]
-    estimated_time: "1h"
-    files:
-      - "skillmeat/web/app/marketplace/sources/[id]/page.tsx"
-
-  - id: "TASK-3.6"
-    title: "Update Select All to skip excluded"
-    description: "Filter excluded entries from bulk selection"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.1"]
-    estimated_time: "1h"
-    files:
-      - "skillmeat/web/app/marketplace/sources/[id]/page.tsx"
-
-  - id: "TASK-3.7"
-    title: "Add excluded status badge"
-    description: "Visual indicator for excluded entries in cards and lists"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_time: "0.5h"
-    files:
-      - "skillmeat/web/components/marketplace/"
-
-  - id: "TASK-3.8"
-    title: "E2E test for exclusion workflow"
-    description: "Test mark -> disappear -> restore -> reappear flow"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-3.3", "TASK-3.5"]
-    estimated_time: "1.5h"
-    files:
-      - "skillmeat/web/tests/e2e/marketplace-exclusion.spec.ts"
-
+- id: TASK-3.1
+  title: Add exclusion hooks
+  description: Create useExcludeCatalogEntry, useRestoreCatalogEntry mutations
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies: []
+  estimated_time: 2h
+  files:
+  - skillmeat/web/hooks/useMarketplaceSources.ts
+- id: TASK-3.2
+  title: Create ExcludeArtifactDialog component
+  description: Confirmation dialog with Radix Dialog for marking artifacts as excluded
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_time: 2h
+  files:
+  - skillmeat/web/components/marketplace/exclude-artifact-dialog.tsx
+- id: TASK-3.3
+  title: Add 'Not an Artifact' link to CatalogCard
+  description: Integrate exclusion trigger into catalog card UI
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.1
+  - TASK-3.2
+  estimated_time: 1h
+  files:
+  - skillmeat/web/app/marketplace/sources/[id]/components/
+- id: TASK-3.4
+  title: Create ExcludedArtifactsList component
+  description: Collapsible table showing excluded entries with restore action
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.1
+  estimated_time: 2h
+  files:
+  - skillmeat/web/app/marketplace/sources/[id]/components/excluded-list.tsx
+- id: TASK-3.5
+  title: Integrate excluded list into source page
+  description: Add collapsible section below catalog grid
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.4
+  estimated_time: 1h
+  files:
+  - skillmeat/web/app/marketplace/sources/[id]/page.tsx
+- id: TASK-3.6
+  title: Update Select All to skip excluded
+  description: Filter excluded entries from bulk selection
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.1
+  estimated_time: 1h
+  files:
+  - skillmeat/web/app/marketplace/sources/[id]/page.tsx
+- id: TASK-3.7
+  title: Add excluded status badge
+  description: Visual indicator for excluded entries in cards and lists
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_time: 0.5h
+  files:
+  - skillmeat/web/components/marketplace/
+- id: TASK-3.8
+  title: E2E test for exclusion workflow
+  description: Test mark -> disappear -> restore -> reappear flow
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-3.3
+  - TASK-3.5
+  estimated_time: 1.5h
+  files:
+  - skillmeat/web/tests/e2e/marketplace-exclusion.spec.ts
 parallelization:
-  batch_1: ["TASK-3.1", "TASK-3.2", "TASK-3.7"]
-  batch_2: ["TASK-3.3", "TASK-3.4"]
-  batch_3: ["TASK-3.5", "TASK-3.6", "TASK-3.8"]
-  critical_path: ["TASK-3.1", "TASK-3.4", "TASK-3.5"]
-  estimated_total_time: "11h"
-
+  batch_1:
+  - TASK-3.1
+  - TASK-3.2
+  - TASK-3.7
+  batch_2:
+  - TASK-3.3
+  - TASK-3.4
+  batch_3:
+  - TASK-3.5
+  - TASK-3.6
+  - TASK-3.8
+  critical_path:
+  - TASK-3.1
+  - TASK-3.4
+  - TASK-3.5
+  estimated_total_time: 11h
 blockers: []
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-source-enhancements
 ---
 
 # Phase 3: Frontend Exclusions

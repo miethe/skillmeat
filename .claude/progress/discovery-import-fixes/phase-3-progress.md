@@ -61,6 +61,9 @@ total_tasks: 3
 completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
+schema_version: 2
+doc_type: progress
+feature_slug: discovery-import-fixes-v1
 ---
 
 # Phase 3: Deployment UX Improvements

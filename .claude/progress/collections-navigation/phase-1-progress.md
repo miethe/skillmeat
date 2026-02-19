@@ -1,90 +1,105 @@
 ---
 type: progress
-prd: "collections-navigation"
+prd: collections-navigation
 phase: 1
-title: "Database Layer - Collections & Navigation"
-status: "pending"
+title: Database Layer - Collections & Navigation
+status: pending
 overall_progress: 0
 total_tasks: 5
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["data-layer-expert"]
-contributors: ["python-backend-engineer"]
-
+owners:
+- data-layer-expert
+contributors:
+- python-backend-engineer
 tasks:
-  - id: "TASK-1.1"
-    name: "Collection Model"
-    description: "SQLAlchemy ORM model for user collections"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TASK-1.2"
-    name: "Group Model"
-    description: "SQLAlchemy ORM model for custom groups within collections"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TASK-1.3"
-    name: "CollectionArtifact Association Model"
-    description: "Many-to-many association table for Collection ↔ Artifact relationships"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["TASK-1.1"]
-    estimated_effort: "1.5h"
-    priority: "high"
-
-  - id: "TASK-1.4"
-    name: "GroupArtifact Association Model"
-    description: "Many-to-many association table for Group ↔ Artifact relationships"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["TASK-1.2"]
-    estimated_effort: "1.5h"
-    priority: "high"
-
-  - id: "TASK-1.5"
-    name: "Alembic Migration: Create Collections Tables"
-    description: "Alembic migration to create collections, groups, and association tables"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.1", "TASK-1.2", "TASK-1.3", "TASK-1.4"]
-    estimated_effort: "1.5h"
-    priority: "high"
-
+- id: TASK-1.1
+  name: Collection Model
+  description: SQLAlchemy ORM model for user collections
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+- id: TASK-1.2
+  name: Group Model
+  description: SQLAlchemy ORM model for custom groups within collections
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+- id: TASK-1.3
+  name: CollectionArtifact Association Model
+  description: "Many-to-many association table for Collection \u2194 Artifact relationships"
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - TASK-1.1
+  estimated_effort: 1.5h
+  priority: high
+- id: TASK-1.4
+  name: GroupArtifact Association Model
+  description: "Many-to-many association table for Group \u2194 Artifact relationships"
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - TASK-1.2
+  estimated_effort: 1.5h
+  priority: high
+- id: TASK-1.5
+  name: 'Alembic Migration: Create Collections Tables'
+  description: Alembic migration to create collections, groups, and association tables
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.1
+  - TASK-1.2
+  - TASK-1.3
+  - TASK-1.4
+  estimated_effort: 1.5h
+  priority: high
 parallelization:
-  batch_1: ["TASK-1.1", "TASK-1.2"]
-  batch_2: ["TASK-1.3", "TASK-1.4"]
-  batch_3: ["TASK-1.5"]
-  critical_path: ["TASK-1.1", "TASK-1.3", "TASK-1.5"]
-  estimated_total_time: "1w"
-
+  batch_1:
+  - TASK-1.1
+  - TASK-1.2
+  batch_2:
+  - TASK-1.3
+  - TASK-1.4
+  batch_3:
+  - TASK-1.5
+  critical_path:
+  - TASK-1.1
+  - TASK-1.3
+  - TASK-1.5
+  estimated_total_time: 1w
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "SQLite schema created with proper indexes for performance"
-    status: "pending"
-  - id: "SC-2"
-    description: "Alembic migrations support upgrade/downgrade"
-    status: "pending"
-  - id: "SC-3"
-    description: "SQLAlchemy models include all relationships and validation"
-    status: "pending"
-  - id: "SC-4"
-    description: "All models include to_dict() methods for serialization"
-    status: "pending"
-  - id: "SC-5"
-    description: "Test coverage >90% for models"
-    status: "pending"
-
+- id: SC-1
+  description: SQLite schema created with proper indexes for performance
+  status: pending
+- id: SC-2
+  description: Alembic migrations support upgrade/downgrade
+  status: pending
+- id: SC-3
+  description: SQLAlchemy models include all relationships and validation
+  status: pending
+- id: SC-4
+  description: All models include to_dict() methods for serialization
+  status: pending
+- id: SC-5
+  description: Test coverage >90% for models
+  status: pending
 files_modified: []
+schema_version: 2
+doc_type: progress
+feature_slug: collections-navigation
 ---
 
 # collections-navigation - Phase 1: Database Layer

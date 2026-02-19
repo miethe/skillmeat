@@ -1,3 +1,10 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: entity-artifact-consolidation
+prd_ref: null
+---
 # Implementation Plan: Entity and Artifact Type System Consolidation
 
 **Epic ID**: REFACTOR-TYPE-CONSOLIDATION

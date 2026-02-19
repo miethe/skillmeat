@@ -1,3 +1,10 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: catalog-entry-modal-enhancement
+prd_ref: null
+---
  ---
 title: "Implementation Plan: Catalog Entry Modal Enhancement with File Contents Preview"
 description: "Detailed implementation plan for adding file tree and content preview to marketplace catalog modals"

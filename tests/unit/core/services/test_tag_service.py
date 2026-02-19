@@ -387,9 +387,9 @@ def test_add_tag_to_artifact_success(tag_service, mock_repository):
     """Test adding tag to artifact successfully."""
     result = tag_service.add_tag_to_artifact("artifact-123", "tag-456")
 
-    # Verify repository was called
+    # Verify repository was called with new artifact_uuid kwarg
     mock_repository.add_tag_to_artifact.assert_called_once_with(
-        artifact_id="artifact-123", tag_id="tag-456"
+        artifact_uuid="artifact-123", tag_id="tag-456"
     )
 
     # Verify result
@@ -424,9 +424,9 @@ def test_remove_tag_from_artifact_success(tag_service, mock_repository):
     """Test removing tag from artifact successfully."""
     result = tag_service.remove_tag_from_artifact("artifact-123", "tag-456")
 
-    # Verify repository was called
+    # Verify repository was called with new artifact_uuid kwarg
     mock_repository.remove_tag_from_artifact.assert_called_once_with(
-        artifact_id="artifact-123", tag_id="tag-456"
+        artifact_uuid="artifact-123", tag_id="tag-456"
     )
 
     # Verify result
@@ -446,9 +446,9 @@ def test_get_artifact_tags_success(tag_service, mock_repository, mock_tag):
     """Test getting artifact tags successfully."""
     result = tag_service.get_artifact_tags("artifact-123")
 
-    # Verify repository was called
+    # Verify repository was called with new artifact_uuid kwarg
     mock_repository.get_artifact_tags.assert_called_once_with(
-        artifact_id="artifact-123"
+        artifact_uuid="artifact-123"
     )
 
     # Verify response

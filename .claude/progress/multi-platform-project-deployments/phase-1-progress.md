@@ -4,8 +4,8 @@ prd: multi-platform-project-deployments-v1
 phase: 1
 title: Data Model Foundations
 status: completed
-started: "2026-02-07T00:00:00Z"
-completed: "2026-02-07T00:00:00Z"
+started: '2026-02-07T00:00:00Z'
+completed: '2026-02-07T00:00:00Z'
 overall_progress: 100
 completion_estimate: completed
 total_tasks: 12
@@ -210,6 +210,9 @@ files_modified:
 - alembic/versions/
 progress: 100
 updated: '2026-02-07'
+schema_version: 2
+doc_type: progress
+feature_slug: multi-platform-project-deployments-v1
 ---
 
 # Phase 1: Data Model Foundations

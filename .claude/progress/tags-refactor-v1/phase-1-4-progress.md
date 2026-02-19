@@ -10,238 +10,222 @@ total_tasks: 17
 completed_tasks: 0
 total_story_points: 19
 completed_story_points: 0
-
 tasks:
-  - id: DB-001
-    title: Tags Table
-    description: Create tags table with id, name, slug, color, created_at
-    status: pending
-    story_points: 2
-    assigned_to:
-      - data-layer-expert
-    dependencies: []
-    created_at: "2025-12-18"
-
-  - id: DB-002
-    title: Artifact-Tags Junction
-    description: Create artifact_tags junction table with FKs and unique constraint
-    status: pending
-    story_points: 1
-    assigned_to:
-      - data-layer-expert
-    dependencies:
-      - DB-001
-    created_at: "2025-12-18"
-
-  - id: DB-003
-    title: Alembic Migration
-    description: Create migration for tags schema
-    status: pending
-    story_points: 1
-    assigned_to:
-      - data-layer-expert
-    dependencies:
-      - DB-002
-    created_at: "2025-12-18"
-
-  - id: REPO-001
-    title: Tag CRUD Methods
-    description: Implement create, read, update, delete for tags
-    status: pending
-    story_points: 2
-    assigned_to:
-      - python-backend-engineer
-    dependencies:
-      - DB-003
-    created_at: "2025-12-18"
-
-  - id: REPO-002
-    title: Tag Search & List
-    description: Implement tag listing with cursor pagination and search by name
-    status: pending
-    story_points: 2
-    assigned_to:
-      - python-backend-engineer
-    dependencies:
-      - REPO-001
-    created_at: "2025-12-18"
-
-  - id: REPO-003
-    title: Artifact-Tag Association
-    description: Implement add/remove tags from artifacts, get tags for artifact
-    status: pending
-    story_points: 2
-    assigned_to:
-      - data-layer-expert
-    dependencies:
-      - REPO-001
-    created_at: "2025-12-18"
-
-  - id: REPO-004
-    title: Tag Statistics
-    description: Implement tag count query (artifacts per tag)
-    status: pending
-    story_points: 1
-    assigned_to:
-      - python-backend-engineer
-    dependencies:
-      - REPO-003
-    created_at: "2025-12-18"
-
-  - id: SVC-001
-    title: Tag DTOs
-    description: Create Pydantic schemas for tag request/response
-    status: pending
-    story_points: 1
-    assigned_to:
-      - python-backend-engineer
-    dependencies:
-      - REPO-004
-    created_at: "2025-12-18"
-
-  - id: SVC-002
-    title: Tag Service
-    description: Implement tag service with business logic
-    status: pending
-    story_points: 3
-    assigned_to:
-      - backend-architect
-    dependencies:
-      - SVC-001
-    created_at: "2025-12-18"
-
-  - id: SVC-003
-    title: Artifact-Tag Service
-    description: Implement artifact tag association service
-    status: pending
-    story_points: 2
-    assigned_to:
-      - backend-architect
-    dependencies:
-      - SVC-002
-    created_at: "2025-12-18"
-
-  - id: SVC-004
-    title: Error Handling
-    description: Implement error patterns for tag operations
-    status: pending
-    story_points: 1
-    assigned_to:
-      - python-backend-engineer
-    dependencies:
-      - SVC-003
-    created_at: "2025-12-18"
-
-  - id: SVC-005
-    title: Observability
-    description: Add OpenTelemetry spans for tag operations
-    status: pending
-    story_points: 1
-    assigned_to:
-      - backend-architect
-    dependencies:
-      - SVC-004
-    created_at: "2025-12-18"
-
-  - id: API-001
-    title: Tag Router Setup
-    description: Create FastAPI router for tag endpoints
-    status: pending
-    story_points: 1
-    assigned_to:
-      - python-backend-engineer
-    dependencies:
-      - SVC-005
-    created_at: "2025-12-18"
-
-  - id: API-002
-    title: Tag CRUD Endpoints
-    description: Implement GET /tags, POST /tags, PUT /tags/{id}, DELETE /tags/{id}
-    status: pending
-    story_points: 2
-    assigned_to:
-      - python-backend-engineer
-    dependencies:
-      - API-001
-    created_at: "2025-12-18"
-
-  - id: API-003
-    title: Artifact-Tag Endpoints
-    description: Implement GET /artifacts/{id}/tags, POST /artifacts/{id}/tags/{tag_id}, DELETE /artifacts/{id}/tags/{tag_id}
-    status: pending
-    story_points: 2
-    assigned_to:
-      - python-backend-engineer
-    dependencies:
-      - API-002
-    created_at: "2025-12-18"
-
-  - id: API-004
-    title: Response Formatting
-    description: Standardize tag response formats with pagination
-    status: pending
-    story_points: 1
-    assigned_to:
-      - python-backend-engineer
-    dependencies:
-      - API-003
-    created_at: "2025-12-18"
-
-  - id: API-005
-    title: OpenAPI Documentation
-    description: Document all tag endpoints in Swagger
-    status: pending
-    story_points: 1
-    assigned_to:
-      - python-backend-engineer
-    dependencies:
-      - API-004
-    created_at: "2025-12-18"
-
+- id: DB-001
+  title: Tags Table
+  description: Create tags table with id, name, slug, color, created_at
+  status: pending
+  story_points: 2
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  created_at: '2025-12-18'
+- id: DB-002
+  title: Artifact-Tags Junction
+  description: Create artifact_tags junction table with FKs and unique constraint
+  status: pending
+  story_points: 1
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DB-001
+  created_at: '2025-12-18'
+- id: DB-003
+  title: Alembic Migration
+  description: Create migration for tags schema
+  status: pending
+  story_points: 1
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DB-002
+  created_at: '2025-12-18'
+- id: REPO-001
+  title: Tag CRUD Methods
+  description: Implement create, read, update, delete for tags
+  status: pending
+  story_points: 2
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DB-003
+  created_at: '2025-12-18'
+- id: REPO-002
+  title: Tag Search & List
+  description: Implement tag listing with cursor pagination and search by name
+  status: pending
+  story_points: 2
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-001
+  created_at: '2025-12-18'
+- id: REPO-003
+  title: Artifact-Tag Association
+  description: Implement add/remove tags from artifacts, get tags for artifact
+  status: pending
+  story_points: 2
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - REPO-001
+  created_at: '2025-12-18'
+- id: REPO-004
+  title: Tag Statistics
+  description: Implement tag count query (artifacts per tag)
+  status: pending
+  story_points: 1
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-003
+  created_at: '2025-12-18'
+- id: SVC-001
+  title: Tag DTOs
+  description: Create Pydantic schemas for tag request/response
+  status: pending
+  story_points: 1
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-004
+  created_at: '2025-12-18'
+- id: SVC-002
+  title: Tag Service
+  description: Implement tag service with business logic
+  status: pending
+  story_points: 3
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - SVC-001
+  created_at: '2025-12-18'
+- id: SVC-003
+  title: Artifact-Tag Service
+  description: Implement artifact tag association service
+  status: pending
+  story_points: 2
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - SVC-002
+  created_at: '2025-12-18'
+- id: SVC-004
+  title: Error Handling
+  description: Implement error patterns for tag operations
+  status: pending
+  story_points: 1
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SVC-003
+  created_at: '2025-12-18'
+- id: SVC-005
+  title: Observability
+  description: Add OpenTelemetry spans for tag operations
+  status: pending
+  story_points: 1
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - SVC-004
+  created_at: '2025-12-18'
+- id: API-001
+  title: Tag Router Setup
+  description: Create FastAPI router for tag endpoints
+  status: pending
+  story_points: 1
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SVC-005
+  created_at: '2025-12-18'
+- id: API-002
+  title: Tag CRUD Endpoints
+  description: Implement GET /tags, POST /tags, PUT /tags/{id}, DELETE /tags/{id}
+  status: pending
+  story_points: 2
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - API-001
+  created_at: '2025-12-18'
+- id: API-003
+  title: Artifact-Tag Endpoints
+  description: Implement GET /artifacts/{id}/tags, POST /artifacts/{id}/tags/{tag_id},
+    DELETE /artifacts/{id}/tags/{tag_id}
+  status: pending
+  story_points: 2
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - API-002
+  created_at: '2025-12-18'
+- id: API-004
+  title: Response Formatting
+  description: Standardize tag response formats with pagination
+  status: pending
+  story_points: 1
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - API-003
+  created_at: '2025-12-18'
+- id: API-005
+  title: OpenAPI Documentation
+  description: Document all tag endpoints in Swagger
+  status: pending
+  story_points: 1
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - API-004
+  created_at: '2025-12-18'
 parallelization:
   batch_1:
-    - DB-001
+  - DB-001
   batch_2:
-    - DB-002
+  - DB-002
   batch_3:
-    - DB-003
+  - DB-003
   batch_4:
-    - REPO-001
+  - REPO-001
   batch_5:
-    - REPO-002
-    - REPO-003
+  - REPO-002
+  - REPO-003
   batch_6:
-    - REPO-004
+  - REPO-004
   batch_7:
-    - SVC-001
+  - SVC-001
   batch_8:
-    - SVC-002
+  - SVC-002
   batch_9:
-    - SVC-003
+  - SVC-003
   batch_10:
-    - SVC-004
+  - SVC-004
   batch_11:
-    - SVC-005
+  - SVC-005
   batch_12:
-    - API-001
+  - API-001
   batch_13:
-    - API-002
+  - API-002
   batch_14:
-    - API-003
+  - API-003
   batch_15:
-    - API-004
+  - API-004
   batch_16:
-    - API-005
-
+  - API-005
 context_files:
-  - skillmeat/cache/models.py
-  - skillmeat/core/
-  - skillmeat/api/
-  - skillmeat/storage/
-
+- skillmeat/cache/models.py
+- skillmeat/core/
+- skillmeat/api/
+- skillmeat/storage/
 blockers: []
-notes: "Backend implementation for tags system. Phases 1-4 establish database, data access, business logic, and API layers. Phase 0 (bug fix) must complete first."
-
+notes: Backend implementation for tags system. Phases 1-4 establish database, data
+  access, business logic, and API layers. Phase 0 (bug fix) must complete first.
+schema_version: 2
+doc_type: progress
+feature_slug: tags-refactor-v1
 ---
 
 # Phases 1-4: Backend Implementation

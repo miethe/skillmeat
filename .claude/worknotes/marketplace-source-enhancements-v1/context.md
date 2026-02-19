@@ -1,8 +1,11 @@
 ---
 type: context
-prd: "marketplace-source-enhancements-v1"
-created: "2025-12-31"
-updated: "2025-12-31"
+prd: marketplace-source-enhancements-v1
+created: '2025-12-31'
+updated: '2025-12-31'
+schema_version: 2
+doc_type: context
+feature_slug: marketplace-source-enhancements-v1
 ---
 
 # Marketplace Source Enhancements - Context

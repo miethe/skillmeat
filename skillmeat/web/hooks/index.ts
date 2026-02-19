@@ -122,7 +122,7 @@ export {
 export { useDeploy, useUndeploy } from './useDeploy';
 
 // ============================================================================
-// ARTIFACTS (6 hooks)
+// ARTIFACTS (7 hooks)
 // ============================================================================
 // Core artifact operations, bulk import, and infinite scroll
 export {
@@ -134,6 +134,12 @@ export {
   useInfiniteArtifacts,
   type InfiniteAllArtifactsOptions,
 } from './useArtifacts';
+
+// Composite artifact parent/child association graph
+export {
+  associationKeys,
+  useArtifactAssociations,
+} from './useArtifactAssociations';
 
 // ============================================================================
 // PROJECTS (7 hooks)

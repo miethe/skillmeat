@@ -1,9 +1,14 @@
 ---
-title: "Phase 2 & 4 Progress: Match Engine & Web UI Components"
-prd_reference: "PRD-001-confidence-scoring.md"
-phase: "2-4"
-status: "in_progress"
+title: 'Phase 2 & 4 Progress: Match Engine & Web UI Components'
+prd_reference: PRD-001-confidence-scoring.md
+phase: 2-4
+status: in_progress
 last_updated: 2025-12-23
+schema_version: 2
+doc_type: progress
+feature_slug: phase-2-4
+type: progress
+prd: phase-2-4
 ---
 
 # Phase 2 & Phase 4 Implementation Progress

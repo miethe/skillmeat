@@ -1,11 +1,19 @@
 ---
-title: "SPIKE: Native Claude Plugin Support"
-spike_id: "SPIKE-2025-11-30-claude-plugins"
+title: 'SPIKE: Native Claude Plugin Support'
+spike_id: SPIKE-2025-11-30-claude-plugins
 date: 2025-11-30
 status: research
 complexity: large
-related_request: "docs/project_plans/ideas/README.md (I-20251125-03)"
-tags: [spike, plugins, integration, marketplace, architecture]
+related_request: docs/project_plans/ideas/README.md (I-20251125-03)
+tags:
+- spike
+- plugins
+- integration
+- marketplace
+- architecture
+schema_version: 2
+doc_type: spike
+feature_slug: claude-plugin-integration-spike
 ---
 
 # SPIKE: Native Claude Plugin Support

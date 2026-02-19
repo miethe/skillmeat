@@ -118,11 +118,15 @@ def _get_artifact_collections(
     Returns:
         List of ArtifactCollectionInfo objects for each collection
     """
-    # Query collection associations with collection details
+    # Query collection associations with collection details.
+    # Since CAI-P5-01, CollectionArtifact stores artifact_uuid (FK to
+    # artifacts.uuid) rather than the type:name artifact_id string.  Join
+    # through Artifact to resolve the type:name lookup.
     associations = (
         session.query(CollectionArtifact, Collection)
         .join(Collection, CollectionArtifact.collection_id == Collection.id)
-        .filter(CollectionArtifact.artifact_id == artifact_id)
+        .join(Artifact, Artifact.uuid == CollectionArtifact.artifact_uuid)
+        .filter(Artifact.id == artifact_id)
         .all()
     )
 

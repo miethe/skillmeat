@@ -1,57 +1,74 @@
 ---
 type: progress
-prd: "global-fields-management"
+prd: global-fields-management
 phase: 4
 status: pending
 progress: 0
-
 tasks:
-  - id: "GFM-IMPL-4.1"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    model: "sonnet"
-
-  - id: "GFM-IMPL-4.2"
-    status: "pending"
-    assigned_to: ["python-backend-engineer", "ui-engineer-enhanced"]
-    dependencies: []
-    model: "opus"
-
-  - id: "GFM-IMPL-4.3"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["GFM-IMPL-4.1"]
-    model: "sonnet"
-
-  - id: "GFM-IMPL-4.4"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["GFM-IMPL-4.1"]
-    model: "sonnet"
-
-  - id: "GFM-IMPL-4.5"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["GFM-IMPL-4.1"]
-    model: "sonnet"
-
-  - id: "GFM-IMPL-4.6"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["GFM-IMPL-4.3", "GFM-IMPL-4.4", "GFM-IMPL-4.5"]
-    model: "sonnet"
-
-  - id: "GFM-IMPL-4.7"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["GFM-IMPL-4.2"]
-    model: "sonnet"
-
+- id: GFM-IMPL-4.1
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  model: sonnet
+- id: GFM-IMPL-4.2
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  - ui-engineer-enhanced
+  dependencies: []
+  model: opus
+- id: GFM-IMPL-4.3
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - GFM-IMPL-4.1
+  model: sonnet
+- id: GFM-IMPL-4.4
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - GFM-IMPL-4.1
+  model: sonnet
+- id: GFM-IMPL-4.5
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - GFM-IMPL-4.1
+  model: sonnet
+- id: GFM-IMPL-4.6
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - GFM-IMPL-4.3
+  - GFM-IMPL-4.4
+  - GFM-IMPL-4.5
+  model: sonnet
+- id: GFM-IMPL-4.7
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - GFM-IMPL-4.2
+  model: sonnet
 parallelization:
-  batch_1: ["GFM-IMPL-4.1", "GFM-IMPL-4.2"]
-  batch_2: ["GFM-IMPL-4.3", "GFM-IMPL-4.4", "GFM-IMPL-4.5", "GFM-IMPL-4.7"]
-  batch_3: ["GFM-IMPL-4.6"]
+  batch_1:
+  - GFM-IMPL-4.1
+  - GFM-IMPL-4.2
+  batch_2:
+  - GFM-IMPL-4.3
+  - GFM-IMPL-4.4
+  - GFM-IMPL-4.5
+  - GFM-IMPL-4.7
+  batch_3:
+  - GFM-IMPL-4.6
+schema_version: 2
+doc_type: progress
+feature_slug: global-fields-management
 ---
 
 # Phase 4: Marketplace Source Fields

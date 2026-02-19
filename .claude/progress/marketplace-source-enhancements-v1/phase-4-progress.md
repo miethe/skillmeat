@@ -1,77 +1,101 @@
 ---
 type: progress
-prd: "marketplace-source-enhancements-v1"
+prd: marketplace-source-enhancements-v1
 phase: 4
-title: "Polish & Testing"
+title: Polish & Testing
 status: completed
 progress: 100
 total_tasks: 7
 completed_tasks: 7
 story_points: 5
-completed_at: "2025-12-31"
-
+completed_at: '2025-12-31'
 tasks:
-  - id: "TASK-4.1"
-    title: "Performance audit"
-    status: "completed"
-    assigned_to: ["react-performance-optimizer"]
-    dependencies: []
-    estimate: "2h"
-    notes: "Identified lucide-react bundle issue, URL sync cascade, mutation per card pattern"
-  - id: "TASK-4.2"
-    title: "Accessibility audit"
-    status: "completed"
-    assigned_to: ["a11y-sheriff"]
-    dependencies: []
-    estimate: "2h"
-    notes: "Found 3 critical, 5 major issues - CatalogCard keyboard nav, missing aria-labels"
-  - id: "TASK-4.3"
-    title: "Cross-browser testing"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    dependencies: []
-    estimate: "1h"
-    notes: "Compatible with all target browsers, added scrollbar-hide utility"
-  - id: "TASK-4.4"
-    title: "Update API documentation"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimate: "1h"
-    notes: "Added operation_ids, curl examples, enhanced schema docs"
-  - id: "TASK-4.5"
-    title: "Update user documentation"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimate: "1h"
-    notes: "Created docs/user/guides/marketplace-exclusions.md"
-  - id: "TASK-4.6"
-    title: "Fix issues from audits"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-4.1", "TASK-4.2"]
-    estimate: "2h"
-    notes: "Fixed 8 critical/high issues: keyboard nav, aria-hidden, aria-labels, lucide imports, scrollbar-hide"
-  - id: "TASK-4.7"
-    title: "Final QA and release prep"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-4.3", "TASK-4.4", "TASK-4.5", "TASK-4.6"]
-    estimate: "1h"
-    notes: "Build passes, marketplace tests pass (8/8), commit a232fde"
-
+- id: TASK-4.1
+  title: Performance audit
+  status: completed
+  assigned_to:
+  - react-performance-optimizer
+  dependencies: []
+  estimate: 2h
+  notes: Identified lucide-react bundle issue, URL sync cascade, mutation per card
+    pattern
+- id: TASK-4.2
+  title: Accessibility audit
+  status: completed
+  assigned_to:
+  - a11y-sheriff
+  dependencies: []
+  estimate: 2h
+  notes: Found 3 critical, 5 major issues - CatalogCard keyboard nav, missing aria-labels
+- id: TASK-4.3
+  title: Cross-browser testing
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies: []
+  estimate: 1h
+  notes: Compatible with all target browsers, added scrollbar-hide utility
+- id: TASK-4.4
+  title: Update API documentation
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimate: 1h
+  notes: Added operation_ids, curl examples, enhanced schema docs
+- id: TASK-4.5
+  title: Update user documentation
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimate: 1h
+  notes: Created docs/user/guides/marketplace-exclusions.md
+- id: TASK-4.6
+  title: Fix issues from audits
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-4.1
+  - TASK-4.2
+  estimate: 2h
+  notes: 'Fixed 8 critical/high issues: keyboard nav, aria-hidden, aria-labels, lucide
+    imports, scrollbar-hide'
+- id: TASK-4.7
+  title: Final QA and release prep
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-4.3
+  - TASK-4.4
+  - TASK-4.5
+  - TASK-4.6
+  estimate: 1h
+  notes: Build passes, marketplace tests pass (8/8), commit a232fde
 parallelization:
-  batch_1: ["TASK-4.1", "TASK-4.2", "TASK-4.3", "TASK-4.4", "TASK-4.5"]
-  batch_2: ["TASK-4.6"]
-  batch_3: ["TASK-4.7"]
-
+  batch_1:
+  - TASK-4.1
+  - TASK-4.2
+  - TASK-4.3
+  - TASK-4.4
+  - TASK-4.5
+  batch_2:
+  - TASK-4.6
+  batch_3:
+  - TASK-4.7
 blockers: []
-
 commits:
-  - sha: "a232fde"
-    message: "feat(web): implement Phase 4 polish and testing fixes"
-    tasks: ["TASK-4.4", "TASK-4.5", "TASK-4.6"]
+- sha: a232fde
+  message: 'feat(web): implement Phase 4 polish and testing fixes'
+  tasks:
+  - TASK-4.4
+  - TASK-4.5
+  - TASK-4.6
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-source-enhancements-v1
 ---
 
 # Phase 4: Polish & Testing

@@ -1,16 +1,29 @@
 ---
-title: "Implementation Plan: Notification System"
-description: "Phase-based execution plan for persistent notification center with expandable import result details"
-audience: [ai-agents, developers, engineering-leads]
-tags: [implementation, planning, notifications, frontend, ux]
+title: 'Implementation Plan: Notification System'
+description: Phase-based execution plan for persistent notification center with expandable
+  import result details
+audience:
+- ai-agents
+- developers
+- engineering-leads
+tags:
+- implementation
+- planning
+- notifications
+- frontend
+- ux
 created: 2025-12-03
 updated: 2025-12-03
-category: "implementation-plan"
-prd: "/docs/project_plans/PRDs/features/notification-system-v1.md"
-complexity: "Medium"
-track: "Standard"
+category: implementation-plan
+prd: /docs/project_plans/PRDs/features/notification-system-v1.md
+complexity: Medium
+track: Standard
+status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: docs-project-plans-prds-features-notification-system-v1-md
+prd_ref: null
 ---
-
 # Implementation Plan: Notification System
 
 **Project:** SkillMeat Web UI - Notification System

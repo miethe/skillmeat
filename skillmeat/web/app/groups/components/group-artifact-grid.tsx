@@ -64,7 +64,7 @@ function ArtifactWithData({
   onClick: (artifact: Artifact) => void;
   onCopyCliCommand: (artifactName: string) => void;
 }) {
-  const { data: artifact, isLoading, error } = useFullArtifact(groupArtifact.artifact_id);
+  const { data: artifact, isLoading, error } = useFullArtifact(groupArtifact.artifact_id ?? groupArtifact.artifact_uuid);
 
   if (isLoading) {
     return <UnifiedCardSkeleton />;
@@ -175,16 +175,16 @@ export function GroupArtifactGrid({ groupId, collectionId, className }: GroupArt
           break;
         case 'name':
           // For name sorting, we'd need the full artifact data
-          // Fall back to artifact_id for now
-          comparison = a.artifact_id.localeCompare(b.artifact_id);
+          // Fall back to artifact_uuid for stable ordering
+          comparison = a.artifact_uuid.localeCompare(b.artifact_uuid);
           break;
         case 'updatedAt':
           // Use added_at as proxy for ordering
           comparison = new Date(a.added_at).getTime() - new Date(b.added_at).getTime();
           break;
         case 'type':
-          // Type sorting requires full artifact data
-          comparison = a.artifact_id.localeCompare(b.artifact_id);
+          // Type sorting requires full artifact data; fall back to uuid
+          comparison = a.artifact_uuid.localeCompare(b.artifact_uuid);
           break;
         default:
           comparison = a.position - b.position;
@@ -378,7 +378,7 @@ export function GroupArtifactGrid({ groupId, collectionId, className }: GroupArt
       >
         {displayedArtifacts.map((groupArtifact) => (
           <ArtifactWithData
-            key={groupArtifact.artifact_id}
+            key={groupArtifact.artifact_uuid}
             groupArtifact={groupArtifact}
             viewMode={viewMode}
             onClick={handleArtifactClick}

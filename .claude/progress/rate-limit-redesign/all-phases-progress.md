@@ -127,6 +127,9 @@ total_tasks: 8
 completed_tasks: 8
 in_progress_tasks: 0
 blocked_tasks: 0
+schema_version: 2
+doc_type: progress
+feature_slug: rate-limit-redesign
 ---
 
 # Rate Limit Redesign - Progress Tracking

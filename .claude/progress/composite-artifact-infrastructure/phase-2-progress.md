@@ -1,87 +1,115 @@
 ---
 type: progress
-prd: "composite-artifact-infrastructure"
+prd: composite-artifact-infrastructure
 phase: 2
-title: "Enhanced Discovery (Core)"
-status: "planning"
+title: Enhanced Discovery (Core)
+status: completed
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 0
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer", "backend-architect"]
-contributors: ["code-reviewer"]
-
+owners:
+- python-backend-engineer
+- backend-architect
+contributors:
+- code-reviewer
 tasks:
-  - id: "CAI-P2-01"
-    description: "Define DiscoveredGraph dataclass with parent + children + linkage metadata"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CAI-P1-07"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-  - id: "CAI-P2-02"
-    description: "Implement detect_composites() - composite root detection (plugin.json OR 2+ artifact-type subdirs)"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["CAI-P2-01"]
-    estimated_effort: "2pt"
-    priority: "high"
-
-  - id: "CAI-P2-03"
-    description: "Update discover_artifacts() to return DiscoveredGraph for composites, flat DiscoveryResult for atomic"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CAI-P2-02"]
-    estimated_effort: "2pt"
-    priority: "high"
-
-  - id: "CAI-P2-04"
-    description: "Unit tests with 40+ fixture repos covering true/false positives (<5% FP rate)"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["CAI-P2-03"]
-    estimated_effort: "2pt"
-    priority: "medium"
-
-  - id: "CAI-P2-05"
-    description: "Implement composite_artifacts_enabled feature flag gating new discovery path"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CAI-P2-04"]
-    estimated_effort: "1pt"
-    priority: "medium"
-
+- id: CAI-P2-01
+  description: Define DiscoveredGraph dataclass with parent + children + linkage metadata
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CAI-P1-07
+  estimated_effort: 1pt
+  priority: high
+- id: CAI-P2-02
+  description: Implement detect_composites() - composite root detection (plugin.json
+    OR 2+ artifact-type subdirs)
+  status: completed
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - CAI-P2-01
+  estimated_effort: 2pt
+  priority: high
+- id: CAI-P2-03
+  description: Update discover_artifacts() to return DiscoveredGraph for composites,
+    flat DiscoveryResult for atomic
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CAI-P2-02
+  estimated_effort: 2pt
+  priority: high
+- id: CAI-P2-04
+  description: Unit tests with 40+ fixture repos covering true/false positives (<5%
+    FP rate)
+  status: completed
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - CAI-P2-03
+  estimated_effort: 2pt
+  priority: medium
+- id: CAI-P2-05
+  description: Implement composite_artifacts_enabled feature flag gating new discovery
+    path
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CAI-P2-04
+  estimated_effort: 1pt
+  priority: medium
 parallelization:
-  batch_1: ["CAI-P2-01"]
-  batch_2: ["CAI-P2-02", "CAI-P2-03"]
-  batch_3: ["CAI-P2-04", "CAI-P2-05"]
-  critical_path: ["CAI-P2-01", "CAI-P2-02", "CAI-P2-03", "CAI-P2-04"]
-  estimated_total_time: "2-3 days"
-
+  batch_1:
+  - CAI-P2-01
+  batch_2:
+  - CAI-P2-02
+  - CAI-P2-03
+  batch_3:
+  - CAI-P2-04
+  - CAI-P2-05
+  critical_path:
+  - CAI-P2-01
+  - CAI-P2-02
+  - CAI-P2-03
+  - CAI-P2-04
+  estimated_total_time: 2-3 days
 blockers: []
-
-success_criteria: [
-  { id: "SC-P2-1", description: "Composite detection returns DiscoveredGraph with correct parent/children linkage", status: "pending" },
-  { id: "SC-P2-2", description: "False positive rate <5% on fixture repo set (40+ repos)", status: "pending" },
-  { id: "SC-P2-3", description: "Existing flat discovery tests pass (no regression)", status: "pending" },
-  { id: "SC-P2-4", description: "Feature flag properly gates new behavior", status: "pending" },
-  { id: "SC-P2-5", description: "Discovery scan time adds <500ms overhead", status: "pending" }
-]
-
-files_modified: [
-  "skillmeat/core/discovery/",
-  "skillmeat/core/artifact_detection.py",
-  "tests/test_composite_detection.py"
-]
+success_criteria:
+- id: SC-P2-1
+  description: Composite detection returns DiscoveredGraph with correct parent/children
+    linkage
+  status: pending
+- id: SC-P2-2
+  description: False positive rate <5% on fixture repo set (40+ repos)
+  status: pending
+- id: SC-P2-3
+  description: Existing flat discovery tests pass (no regression)
+  status: pending
+- id: SC-P2-4
+  description: Feature flag properly gates new behavior
+  status: pending
+- id: SC-P2-5
+  description: Discovery scan time adds <500ms overhead
+  status: pending
+files_modified:
+- skillmeat/core/discovery/
+- skillmeat/core/artifact_detection.py
+- tests/test_composite_detection.py
+progress: 100
+updated: '2026-02-18'
+schema_version: 2
+doc_type: progress
+feature_slug: composite-artifact-infrastructure
 ---
 
 # composite-artifact-infrastructure - Phase 2: Enhanced Discovery (Core)

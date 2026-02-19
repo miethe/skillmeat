@@ -1,63 +1,79 @@
 ---
 type: progress
-prd: "global-fields-management"
+prd: global-fields-management
 phase: 2
 status: pending
 progress: 0
-
 tasks:
-  - id: "GFM-IMPL-2.1"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    model: "sonnet"
-
-  - id: "GFM-IMPL-2.2"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["GFM-IMPL-2.1"]
-    model: "opus"
-
-  - id: "GFM-IMPL-2.3"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["GFM-IMPL-2.2"]
-    model: "opus"
-
-  - id: "GFM-IMPL-2.4"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["GFM-IMPL-2.2"]
-    model: "opus"
-
-  - id: "GFM-IMPL-2.5"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["GFM-IMPL-2.2"]
-    model: "sonnet"
-
-  - id: "GFM-IMPL-2.6"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["GFM-IMPL-2.2"]
-    model: "sonnet"
-
-  - id: "GFM-IMPL-2.7"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    model: "opus"
-
-  - id: "GFM-IMPL-2.8"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["GFM-IMPL-2.7"]
-    model: "sonnet"
-
+- id: GFM-IMPL-2.1
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  model: sonnet
+- id: GFM-IMPL-2.2
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - GFM-IMPL-2.1
+  model: opus
+- id: GFM-IMPL-2.3
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - GFM-IMPL-2.2
+  model: opus
+- id: GFM-IMPL-2.4
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - GFM-IMPL-2.2
+  model: opus
+- id: GFM-IMPL-2.5
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - GFM-IMPL-2.2
+  model: sonnet
+- id: GFM-IMPL-2.6
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - GFM-IMPL-2.2
+  model: sonnet
+- id: GFM-IMPL-2.7
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  model: opus
+- id: GFM-IMPL-2.8
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - GFM-IMPL-2.7
+  model: sonnet
 parallelization:
-  batch_1: ["GFM-IMPL-2.1", "GFM-IMPL-2.7"]
-  batch_2: ["GFM-IMPL-2.2"]
-  batch_3: ["GFM-IMPL-2.3", "GFM-IMPL-2.4", "GFM-IMPL-2.5", "GFM-IMPL-2.6", "GFM-IMPL-2.8"]
+  batch_1:
+  - GFM-IMPL-2.1
+  - GFM-IMPL-2.7
+  batch_2:
+  - GFM-IMPL-2.2
+  batch_3:
+  - GFM-IMPL-2.3
+  - GFM-IMPL-2.4
+  - GFM-IMPL-2.5
+  - GFM-IMPL-2.6
+  - GFM-IMPL-2.8
+schema_version: 2
+doc_type: progress
+feature_slug: global-fields-management
 ---
 
 # Phase 2: Frontend Core & Settings Page

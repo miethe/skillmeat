@@ -1,142 +1,169 @@
 ---
-# === PROGRESS TRACKING: Phases 7-8 Validation ===
-# Testing and documentation for marketplace sources enhancement
-
-# Metadata: Identification and Classification
 type: progress
-prd: "marketplace-sources-enhancement"
+prd: marketplace-sources-enhancement
 phase: 7
-title: "Phases 7-8: Testing & Documentation"
-status: "planning"
-started: "2025-01-18"
+title: 'Phases 7-8: Testing & Documentation'
+status: planning
+started: '2025-01-18'
 completed: null
-
-# Overall Progress
 overall_progress: 0
-completion_estimate: "on-track"
-
-# Task Counts
+completion_estimate: on-track
 total_tasks: 9
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-# Ownership
-owners: ["python-backend-engineer", "frontend-developer", "testing specialist"]
-contributors: ["ui-engineer-enhanced", "documentation-writer", "api-documenter"]
-
-# === TASKS (SOURCE OF TRUTH) ===
+owners:
+- python-backend-engineer
+- frontend-developer
+- testing specialist
+contributors:
+- ui-engineer-enhanced
+- documentation-writer
+- api-documenter
 tasks:
-  # Phase 7: Testing
-  - id: "TEST-001"
-    description: "Unit tests for new schema fields and filtering logic"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["API-004"]
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "TEST-002"
-    description: "Integration tests for source filtering endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TEST-001"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TEST-003"
-    description: "Unit tests for new frontend components"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["UI-010"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TEST-004"
-    description: "E2E tests for full filtering workflow"
-    status: "pending"
-    assigned_to: ["testing specialist"]
-    dependencies: ["TEST-002", "TEST-003"]
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "TEST-005"
-    description: "Accessibility tests for new components (WCAG 2.1 AA)"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TEST-003"]
-    estimated_effort: "2h"
-    priority: "medium"
-
-  - id: "TEST-006"
-    description: "Performance tests for filtering with 500+ sources"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TEST-002"]
-    estimated_effort: "1h"
-    priority: "medium"
-
-  # Phase 8: Documentation
-  - id: "DOC-001"
-    description: "Update API documentation for new endpoints and parameters"
-    status: "pending"
-    assigned_to: ["api-documenter"]
-    dependencies: ["TEST-006"]
-    estimated_effort: "1h"
-    priority: "high"
-
-  - id: "DOC-002"
-    description: "Update component documentation (Storybook or equivalent)"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["TEST-005"]
-    estimated_effort: "1h"
-    priority: "medium"
-
-  - id: "DOC-003"
-    description: "Create/update user guides for source import and filtering"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["DOC-001", "DOC-002"]
-    estimated_effort: "2h"
-    priority: "medium"
-
-# Parallelization Strategy
+- id: TEST-001
+  description: Unit tests for new schema fields and filtering logic
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - API-004
+  estimated_effort: 3h
+  priority: high
+- id: TEST-002
+  description: Integration tests for source filtering endpoint
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TEST-001
+  estimated_effort: 2h
+  priority: high
+- id: TEST-003
+  description: Unit tests for new frontend components
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - UI-010
+  estimated_effort: 2h
+  priority: high
+- id: TEST-004
+  description: E2E tests for full filtering workflow
+  status: pending
+  assigned_to:
+  - testing specialist
+  dependencies:
+  - TEST-002
+  - TEST-003
+  estimated_effort: 3h
+  priority: high
+- id: TEST-005
+  description: Accessibility tests for new components (WCAG 2.1 AA)
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TEST-003
+  estimated_effort: 2h
+  priority: medium
+- id: TEST-006
+  description: Performance tests for filtering with 500+ sources
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TEST-002
+  estimated_effort: 1h
+  priority: medium
+- id: DOC-001
+  description: Update API documentation for new endpoints and parameters
+  status: pending
+  assigned_to:
+  - api-documenter
+  dependencies:
+  - TEST-006
+  estimated_effort: 1h
+  priority: high
+- id: DOC-002
+  description: Update component documentation (Storybook or equivalent)
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - TEST-005
+  estimated_effort: 1h
+  priority: medium
+- id: DOC-003
+  description: Create/update user guides for source import and filtering
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - DOC-001
+  - DOC-002
+  estimated_effort: 2h
+  priority: medium
 parallelization:
-  batch_1: ["TEST-001", "TEST-003"]
-  batch_2: ["TEST-002", "TEST-005"]
-  batch_3: ["TEST-004", "TEST-006"]
-  batch_4: ["DOC-001", "DOC-002"]
-  batch_5: ["DOC-003"]
-  critical_path: ["TEST-001", "TEST-002", "TEST-004", "DOC-001", "DOC-003"]
-  estimated_total_time: "10h"
-
-# Blockers
+  batch_1:
+  - TEST-001
+  - TEST-003
+  batch_2:
+  - TEST-002
+  - TEST-005
+  batch_3:
+  - TEST-004
+  - TEST-006
+  batch_4:
+  - DOC-001
+  - DOC-002
+  batch_5:
+  - DOC-003
+  critical_path:
+  - TEST-001
+  - TEST-002
+  - TEST-004
+  - DOC-001
+  - DOC-003
+  estimated_total_time: 10h
 blockers: []
-
-# Success Criteria
 success_criteria:
-  - { id: "SC-1", description: "All unit tests passing (backend + frontend)", status: "pending" }
-  - { id: "SC-2", description: "All integration tests passing", status: "pending" }
-  - { id: "SC-3", description: "E2E test suite covers critical user journeys", status: "pending" }
-  - { id: "SC-4", description: "Accessibility audit passed (WCAG 2.1 AA)", status: "pending" }
-  - { id: "SC-5", description: "Performance benchmarks met (<200ms for source list)", status: "pending" }
-  - { id: "SC-6", description: "Code coverage >80% across all layers", status: "pending" }
-  - { id: "SC-7", description: "All API endpoints documented with examples", status: "pending" }
-
-# Files Modified
+- id: SC-1
+  description: All unit tests passing (backend + frontend)
+  status: pending
+- id: SC-2
+  description: All integration tests passing
+  status: pending
+- id: SC-3
+  description: E2E test suite covers critical user journeys
+  status: pending
+- id: SC-4
+  description: Accessibility audit passed (WCAG 2.1 AA)
+  status: pending
+- id: SC-5
+  description: Performance benchmarks met (<200ms for source list)
+  status: pending
+- id: SC-6
+  description: Code coverage >80% across all layers
+  status: pending
+- id: SC-7
+  description: All API endpoints documented with examples
+  status: pending
 files_modified:
-  - "tests/unit/backend/test_tags_validation.py"
-  - "tests/unit/backend/test_filtering.py"
-  - "tests/integration/api/test_sources_filtering.py"
-  - "tests/unit/frontend/source-filter-bar.test.tsx"
-  - "tests/e2e/marketplace/source-import.spec.ts"
-  - "tests/e2e/marketplace/source-filtering.spec.ts"
-  - "tests/a11y/marketplace-components.test.ts"
-  - "docs/api/endpoints/marketplace-sources.md"
-  - "docs/guides/user/source-import.md"
-  - "docs/guides/user/source-filtering.md"
+- tests/unit/backend/test_tags_validation.py
+- tests/unit/backend/test_filtering.py
+- tests/integration/api/test_sources_filtering.py
+- tests/unit/frontend/source-filter-bar.test.tsx
+- tests/e2e/marketplace/source-import.spec.ts
+- tests/e2e/marketplace/source-filtering.spec.ts
+- tests/a11y/marketplace-components.test.ts
+- docs/api/endpoints/marketplace-sources.md
+- docs/guides/user/source-import.md
+- docs/guides/user/source-filtering.md
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-sources-enhancement
 ---
 
 # marketplace-sources-enhancement - Phases 7-8: Testing & Documentation

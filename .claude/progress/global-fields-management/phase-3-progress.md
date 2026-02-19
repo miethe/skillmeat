@@ -1,57 +1,72 @@
 ---
 type: progress
-prd: "global-fields-management"
+prd: global-fields-management
 phase: 3
 status: pending
 progress: 0
-
 tasks:
-  - id: "GFM-IMPL-3.1"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    model: "sonnet"
-
-  - id: "GFM-IMPL-3.2"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    model: "sonnet"
-
-  - id: "GFM-IMPL-3.3"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    model: "sonnet"
-
-  - id: "GFM-IMPL-3.4"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "opus"
-
-  - id: "GFM-IMPL-3.5"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["GFM-IMPL-3.4"]
-    model: "sonnet"
-
-  - id: "GFM-IMPL-3.6"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["GFM-IMPL-3.4", "GFM-IMPL-3.5"]
-    model: "sonnet"
-
-  - id: "GFM-IMPL-3.7"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["GFM-IMPL-3.1", "GFM-IMPL-3.2", "GFM-IMPL-3.3"]
-    model: "opus"
-
+- id: GFM-IMPL-3.1
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  model: sonnet
+- id: GFM-IMPL-3.2
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  model: sonnet
+- id: GFM-IMPL-3.3
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  model: sonnet
+- id: GFM-IMPL-3.4
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: opus
+- id: GFM-IMPL-3.5
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - GFM-IMPL-3.4
+  model: sonnet
+- id: GFM-IMPL-3.6
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - GFM-IMPL-3.4
+  - GFM-IMPL-3.5
+  model: sonnet
+- id: GFM-IMPL-3.7
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - GFM-IMPL-3.1
+  - GFM-IMPL-3.2
+  - GFM-IMPL-3.3
+  model: opus
 parallelization:
-  batch_1: ["GFM-IMPL-3.1", "GFM-IMPL-3.2", "GFM-IMPL-3.3", "GFM-IMPL-3.4"]
-  batch_2: ["GFM-IMPL-3.5"]
-  batch_3: ["GFM-IMPL-3.6", "GFM-IMPL-3.7"]
+  batch_1:
+  - GFM-IMPL-3.1
+  - GFM-IMPL-3.2
+  - GFM-IMPL-3.3
+  - GFM-IMPL-3.4
+  batch_2:
+  - GFM-IMPL-3.5
+  batch_3:
+  - GFM-IMPL-3.6
+  - GFM-IMPL-3.7
+schema_version: 2
+doc_type: progress
+feature_slug: global-fields-management
 ---
 
 # Phase 3: Tags CRUD Implementation

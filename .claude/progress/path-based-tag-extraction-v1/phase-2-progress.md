@@ -1,128 +1,159 @@
 ---
 prd_name: path-based-tag-extraction-v1
 phase: 2
-title: "Frontend Review UI"
+title: Frontend Review UI
 status: completed
 completion: 100%
-started_at: "2025-01-05T00:00:00Z"
-completed_at: "2025-01-05T11:50:00Z"
-
+started_at: '2025-01-05T00:00:00Z'
+completed_at: '2025-01-05T11:50:00Z'
 tasks:
-  - id: "TASK-2.1"
-    title: "API Client Functions"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    model: "sonnet"
-    dependencies: []
-    estimated_time: "3h"
-    commit: "3eff240"
-    files:
-      - "skillmeat/web/lib/api/marketplace.ts"
-
-  - id: "TASK-2.2"
-    title: "Type Definitions"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    model: "haiku"
-    dependencies: []
-    estimated_time: "2h"
-    commit: "3eff240"
-    files:
-      - "skillmeat/web/types/path-tags.ts"
-
-  - id: "TASK-2.3"
-    title: "React Query Hooks"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    model: "opus"
-    dependencies: ["TASK-2.1", "TASK-2.2"]
-    estimated_time: "6h"
-    commit: "631b395"
-    files:
-      - "skillmeat/web/hooks/use-path-tags.ts"
-
-  - id: "TASK-2.4"
-    title: "PathTagReview Component"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    model: "opus"
-    dependencies: ["TASK-2.3"]
-    estimated_time: "10h"
-    commit: "f61cea5"
-    files:
-      - "skillmeat/web/components/marketplace/path-tag-review.tsx"
-
-  - id: "TASK-2.5"
-    title: "CatalogEntryModal Integration"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    model: "opus"
-    dependencies: ["TASK-2.4"]
-    estimated_time: "5h"
-    commit: "6b194be"
-    files:
-      - "skillmeat/web/components/CatalogEntryModal.tsx"
-
-  - id: "TASK-2.6"
-    title: "Accessibility Audit"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    model: "sonnet"
-    dependencies: ["TASK-2.4", "TASK-2.5"]
-    estimated_time: "5h"
-    commit: "986512c"
-    files:
-      - "skillmeat/web/components/marketplace/path-tag-review.tsx"
-
-  - id: "TASK-2.7"
-    title: "E2E Tests"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    model: "sonnet"
-    dependencies: ["TASK-2.4", "TASK-2.5"]
-    estimated_time: "5h"
-    commit: "986512c"
-    files:
-      - "skillmeat/web/tests/e2e/path-tag-review.spec.ts"
-
-  - id: "TASK-2.8"
-    title: "Component Testing"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-2.4"]
-    estimated_time: "4h"
-    commit: "6b194be"
-    files:
-      - "skillmeat/web/__tests__/components/marketplace/path-tag-review.test.tsx"
-
+- id: TASK-2.1
+  title: API Client Functions
+  status: completed
+  assigned_to:
+  - ui-engineer
+  model: sonnet
+  dependencies: []
+  estimated_time: 3h
+  commit: 3eff240
+  files:
+  - skillmeat/web/lib/api/marketplace.ts
+- id: TASK-2.2
+  title: Type Definitions
+  status: completed
+  assigned_to:
+  - ui-engineer
+  model: haiku
+  dependencies: []
+  estimated_time: 2h
+  commit: 3eff240
+  files:
+  - skillmeat/web/types/path-tags.ts
+- id: TASK-2.3
+  title: React Query Hooks
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: opus
+  dependencies:
+  - TASK-2.1
+  - TASK-2.2
+  estimated_time: 6h
+  commit: 631b395
+  files:
+  - skillmeat/web/hooks/use-path-tags.ts
+- id: TASK-2.4
+  title: PathTagReview Component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: opus
+  dependencies:
+  - TASK-2.3
+  estimated_time: 10h
+  commit: f61cea5
+  files:
+  - skillmeat/web/components/marketplace/path-tag-review.tsx
+- id: TASK-2.5
+  title: CatalogEntryModal Integration
+  status: completed
+  assigned_to:
+  - ui-engineer
+  model: opus
+  dependencies:
+  - TASK-2.4
+  estimated_time: 5h
+  commit: 6b194be
+  files:
+  - skillmeat/web/components/CatalogEntryModal.tsx
+- id: TASK-2.6
+  title: Accessibility Audit
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: sonnet
+  dependencies:
+  - TASK-2.4
+  - TASK-2.5
+  estimated_time: 5h
+  commit: 986512c
+  files:
+  - skillmeat/web/components/marketplace/path-tag-review.tsx
+- id: TASK-2.7
+  title: E2E Tests
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: sonnet
+  dependencies:
+  - TASK-2.4
+  - TASK-2.5
+  estimated_time: 5h
+  commit: 986512c
+  files:
+  - skillmeat/web/tests/e2e/path-tag-review.spec.ts
+- id: TASK-2.8
+  title: Component Testing
+  status: completed
+  assigned_to:
+  - ui-engineer
+  model: sonnet
+  dependencies:
+  - TASK-2.4
+  estimated_time: 4h
+  commit: 6b194be
+  files:
+  - skillmeat/web/__tests__/components/marketplace/path-tag-review.test.tsx
 parallelization:
-  batch_1: ["TASK-2.1", "TASK-2.2"]
-  batch_2: ["TASK-2.3"]
-  batch_3: ["TASK-2.4"]
-  batch_4: ["TASK-2.5", "TASK-2.8"]
-  batch_5: ["TASK-2.6", "TASK-2.7"]
-  critical_path: ["TASK-2.1", "TASK-2.3", "TASK-2.4", "TASK-2.5"]
-  estimated_total_time: "40h"
-
+  batch_1:
+  - TASK-2.1
+  - TASK-2.2
+  batch_2:
+  - TASK-2.3
+  batch_3:
+  - TASK-2.4
+  batch_4:
+  - TASK-2.5
+  - TASK-2.8
+  batch_5:
+  - TASK-2.6
+  - TASK-2.7
+  critical_path:
+  - TASK-2.1
+  - TASK-2.3
+  - TASK-2.4
+  - TASK-2.5
+  estimated_total_time: 40h
 blockers: []
-
 execution_log:
-  - batch: 1
-    completed_at: "2025-01-05T11:30:00Z"
-    tasks: ["TASK-2.1", "TASK-2.2"]
-  - batch: 2
-    completed_at: "2025-01-05T11:35:00Z"
-    tasks: ["TASK-2.3"]
-  - batch: 3
-    completed_at: "2025-01-05T11:40:00Z"
-    tasks: ["TASK-2.4"]
-  - batch: 4
-    completed_at: "2025-01-05T11:45:00Z"
-    tasks: ["TASK-2.5", "TASK-2.8"]
-  - batch: 5
-    completed_at: "2025-01-05T11:50:00Z"
-    tasks: ["TASK-2.6", "TASK-2.7"]
+- batch: 1
+  completed_at: '2025-01-05T11:30:00Z'
+  tasks:
+  - TASK-2.1
+  - TASK-2.2
+- batch: 2
+  completed_at: '2025-01-05T11:35:00Z'
+  tasks:
+  - TASK-2.3
+- batch: 3
+  completed_at: '2025-01-05T11:40:00Z'
+  tasks:
+  - TASK-2.4
+- batch: 4
+  completed_at: '2025-01-05T11:45:00Z'
+  tasks:
+  - TASK-2.5
+  - TASK-2.8
+- batch: 5
+  completed_at: '2025-01-05T11:50:00Z'
+  tasks:
+  - TASK-2.6
+  - TASK-2.7
+schema_version: 2
+doc_type: progress
+feature_slug: path-based-tag-extraction
+type: progress
+prd: path-based-tag-extraction
 ---
 
 # Phase 2: Frontend Review UI - Progress Tracking

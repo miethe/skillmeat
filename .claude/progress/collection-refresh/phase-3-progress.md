@@ -1,154 +1,187 @@
 ---
 type: progress
-prd: "collection-refresh"
+prd: collection-refresh
 phase: 3
-title: "API Endpoint Implementation"
+title: API Endpoint Implementation
 status: pending
 progress: 0
 created: 2025-01-21
 updated: 2025-01-21
-
 tasks:
-  # 3.1: API Schemas & Models
-  - id: "BE-301"
-    name: "Create RefreshRequest schema"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["Phase 1"]
-    estimate: "0.5 pts"
-
-  - id: "BE-302"
-    name: "Create RefreshResponse schema"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["Phase 1"]
-    estimate: "0.75 pts"
-
-  - id: "BE-303"
-    name: "Create RefreshError schema"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["Phase 1"]
-    estimate: "0.25 pts"
-
-  # 3.2: API Endpoint Implementation
-  - id: "BE-304"
-    name: "Add refresh endpoint signature"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-301", "BE-302"]
-    estimate: "0.75 pts"
-
-  - id: "BE-305"
-    name: "Implement collection validation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-304"]
-    estimate: "0.5 pts"
-
-  - id: "BE-306"
-    name: "Implement query parameter support"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-304"]
-    estimate: "0.5 pts"
-
-  - id: "BE-307"
-    name: "Wire CollectionRefresher to endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-304"]
-    estimate: "0.75 pts"
-
-  - id: "BE-308"
-    name: "Implement result serialization"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-304"]
-    estimate: "0.5 pts"
-
-  - id: "BE-309"
-    name: "Add error handling"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-304"]
-    estimate: "0.75 pts"
-
-  - id: "BE-310"
-    name: "Add logging"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-304"]
-    estimate: "0.5 pts"
-
-  # 3.3: API Tests
-  - id: "BE-311"
-    name: "Unit test: endpoint signature"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-304"]
-    estimate: "0.75 pts"
-
-  - id: "BE-312"
-    name: "Unit test: collection validation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-305"]
-    estimate: "0.5 pts"
-
-  - id: "BE-313"
-    name: "Unit test: request body handling"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-301"]
-    estimate: "0.75 pts"
-
-  - id: "BE-314"
-    name: "Unit test: query parameter handling"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-306"]
-    estimate: "0.75 pts"
-
-  - id: "BE-315"
-    name: "Integration test: full endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-304"]
-    estimate: "1.5 pts"
-
-  - id: "BE-316"
-    name: "Integration test: error handling"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-309"]
-    estimate: "1 pt"
-
-  - id: "BE-317"
-    name: "Performance test: scalability"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-304"]
-    estimate: "1 pt"
-
+- id: BE-301
+  name: Create RefreshRequest schema
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - Phase 1
+  estimate: 0.5 pts
+- id: BE-302
+  name: Create RefreshResponse schema
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - Phase 1
+  estimate: 0.75 pts
+- id: BE-303
+  name: Create RefreshError schema
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - Phase 1
+  estimate: 0.25 pts
+- id: BE-304
+  name: Add refresh endpoint signature
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-301
+  - BE-302
+  estimate: 0.75 pts
+- id: BE-305
+  name: Implement collection validation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-304
+  estimate: 0.5 pts
+- id: BE-306
+  name: Implement query parameter support
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-304
+  estimate: 0.5 pts
+- id: BE-307
+  name: Wire CollectionRefresher to endpoint
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-304
+  estimate: 0.75 pts
+- id: BE-308
+  name: Implement result serialization
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-304
+  estimate: 0.5 pts
+- id: BE-309
+  name: Add error handling
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-304
+  estimate: 0.75 pts
+- id: BE-310
+  name: Add logging
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-304
+  estimate: 0.5 pts
+- id: BE-311
+  name: 'Unit test: endpoint signature'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-304
+  estimate: 0.75 pts
+- id: BE-312
+  name: 'Unit test: collection validation'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-305
+  estimate: 0.5 pts
+- id: BE-313
+  name: 'Unit test: request body handling'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-301
+  estimate: 0.75 pts
+- id: BE-314
+  name: 'Unit test: query parameter handling'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-306
+  estimate: 0.75 pts
+- id: BE-315
+  name: 'Integration test: full endpoint'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-304
+  estimate: 1.5 pts
+- id: BE-316
+  name: 'Integration test: error handling'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-309
+  estimate: 1 pt
+- id: BE-317
+  name: 'Performance test: scalability'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-304
+  estimate: 1 pt
 parallelization:
-  batch_1: ["BE-301", "BE-302", "BE-303"]
-  batch_2: ["BE-304"]
-  batch_3: ["BE-305", "BE-306", "BE-307", "BE-308", "BE-309", "BE-310"]
-  batch_4: ["BE-311", "BE-312", "BE-313", "BE-314", "BE-315", "BE-316", "BE-317"]
-
+  batch_1:
+  - BE-301
+  - BE-302
+  - BE-303
+  batch_2:
+  - BE-304
+  batch_3:
+  - BE-305
+  - BE-306
+  - BE-307
+  - BE-308
+  - BE-309
+  - BE-310
+  batch_4:
+  - BE-311
+  - BE-312
+  - BE-313
+  - BE-314
+  - BE-315
+  - BE-316
+  - BE-317
 quality_gates:
-  - "RefreshRequest and RefreshResponse schemas valid and documented"
-  - "POST /api/v1/collections/{collection_id}/refresh endpoint registered"
-  - "Collection validation returns 404 for invalid IDs"
-  - "Query parameter mode override works correctly"
-  - "CollectionRefresher integrated and called correctly"
-  - "Results serialized to JSON with all fields present"
-  - "Error handling returns appropriate status codes (400, 422, 404, 500)"
-  - "Refresh operations logged with collection_id and duration"
-  - "Unit tests pass with >85% endpoint coverage"
-  - "Performance acceptable for large collections (<30s)"
-  - "OpenAPI spec updated with new endpoint"
+- RefreshRequest and RefreshResponse schemas valid and documented
+- POST /api/v1/collections/{collection_id}/refresh endpoint registered
+- Collection validation returns 404 for invalid IDs
+- Query parameter mode override works correctly
+- CollectionRefresher integrated and called correctly
+- Results serialized to JSON with all fields present
+- Error handling returns appropriate status codes (400, 422, 404, 500)
+- Refresh operations logged with collection_id and duration
+- Unit tests pass with >85% endpoint coverage
+- Performance acceptable for large collections (<30s)
+- OpenAPI spec updated with new endpoint
+schema_version: 2
+doc_type: progress
+feature_slug: collection-refresh
 ---
 
 # Phase 3: API Endpoint Implementation

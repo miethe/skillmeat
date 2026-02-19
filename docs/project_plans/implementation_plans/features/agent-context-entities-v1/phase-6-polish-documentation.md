@@ -1,3 +1,11 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: agent-context-entities
+prd_ref: null
+plan_ref: null
+---
 # Phase 6: Polish & Documentation
 
 **Parent Plan**: [agent-context-entities-v1.md](../agent-context-entities-v1.md)

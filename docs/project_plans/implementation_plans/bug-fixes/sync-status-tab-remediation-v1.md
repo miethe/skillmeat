@@ -1,15 +1,25 @@
 ---
-title: "Remediation Plan: Sync Status Tab Bugs"
-description: "Fix 404 errors and local-only message blocking in sync-status-tab"
-audience: [ai-agents, developers]
-tags: [bug-fix, sync-status, collection-page, web]
+title: 'Remediation Plan: Sync Status Tab Bugs'
+description: Fix 404 errors and local-only message blocking in sync-status-tab
+audience:
+- ai-agents
+- developers
+tags:
+- bug-fix
+- sync-status
+- collection-page
+- web
 created: 2025-01-07
 updated: 2025-01-07
-category: "bug-remediation"
+category: bug-remediation
 status: draft
 related:
-  - REQ-20260107-skillmeat-01
-  - REQ-20260107-skillmeat-02
+- REQ-20260107-skillmeat-01
+- REQ-20260107-skillmeat-02
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: sync-status-tab-remediation
+prd_ref: null
 ---
 
 # Remediation Plan: Sync Status Tab Bugs

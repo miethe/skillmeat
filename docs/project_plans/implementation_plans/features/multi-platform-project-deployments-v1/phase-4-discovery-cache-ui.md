@@ -1,8 +1,13 @@
 ---
-title: "Phase 4: Discovery, Cache, and UI/UX"
+title: 'Phase 4: Discovery, Cache, and UI/UX'
 parent: ../multi-platform-project-deployments-v1.md
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: multi-platform-project-deployments
+prd_ref: null
+plan_ref: null
 ---
-
 # Phase 4: Discovery, Cache, and UI/UX
 
 **Duration**: 1.5 weeks

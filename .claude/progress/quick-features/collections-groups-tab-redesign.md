@@ -1,11 +1,14 @@
 ---
 id: collections-groups-tab-redesign
-title: "Redesign Collections Tab - Separate Collections & Groups Sections"
+title: Redesign Collections Tab - Separate Collections & Groups Sections
 status: completed
 created: 2026-02-13
 scope: frontend-only
 files_affected:
-  - skillmeat/web/components/entity/modal-collections-tab.tsx
+- skillmeat/web/components/entity/modal-collections-tab.tsx
+schema_version: 2
+doc_type: quick_feature
+feature_slug: collections-groups-tab-redesign
 ---
 
 ## Feature

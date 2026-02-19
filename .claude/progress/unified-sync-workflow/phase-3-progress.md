@@ -62,6 +62,9 @@ total_tasks: 4
 completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
+schema_version: 2
+doc_type: progress
+feature_slug: unified-sync-workflow
 ---
 
 # Phase 3: Source vs Project + Merge Integration + Banner

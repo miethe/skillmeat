@@ -73,11 +73,14 @@ quality_gates:
 - All artifacts show correct 'Already in Collection' vs 'Ready to Import' status
 - No '-1 days ago' timestamps anywhere in UI
 - 20+ artifacts bulk import completes <2 seconds
-- ≥85% code coverage for new backend code
+- "\u226585% code coverage for new backend code"
 total_tasks: 4
 completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
+schema_version: 2
+doc_type: progress
+feature_slug: discovery-import-fixes-v1
 ---
 
 # Phase 1: Bug Fixes & Stabilization

@@ -1,80 +1,89 @@
 ---
 type: progress
-prd: "persistent-project-cache"
+prd: persistent-project-cache
 phase: 5
-title: "Advanced Features"
-status: "completed"
+title: Advanced Features
+status: completed
 started: null
-completed: "2025-12-01"
-
+completed: '2025-12-01'
 overall_progress: 100
-completion_estimate: "completed"
-
+completion_estimate: completed
 total_tasks: 4
 completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["backend-architect"]
-contributors: ["python-backend-engineer", "ui-engineer-enhanced"]
-
+owners:
+- backend-architect
+contributors:
+- python-backend-engineer
+- ui-engineer-enhanced
 tasks:
-  - id: "CACHE-5.1"
-    name: "Implement Marketplace Metadata Caching"
-    description: "Add caching for marketplace metadata. Methods: get_marketplace_entries(), update_marketplace_cache(). Endpoint: GET /api/v1/cache/marketplace"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_time: "2d"
-    files: []
-    notes: ""
-
-  - id: "CACHE-5.2"
-    name: "Track Upstream Versions for Update Detection"
-    description: "Track upstream artifact versions, compare deployed vs upstream, flag is_outdated. Endpoint: GET /api/v1/cache/stale-artifacts"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_time: "2d"
-    files: []
-    notes: ""
-
-  - id: "CACHE-5.3"
-    name: "Add UI Indicators for Outdated Artifacts"
-    description: "Create OutdatedBadge.tsx, UpdateAvailableModal.tsx components"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["CACHE-5.2"]
-    estimated_time: "2d"
-    files: []
-    notes: "Depends on CACHE-5.2 completion"
-
-  - id: "CACHE-5.4"
-    name: "Optimize Search with Cache Queries"
-    description: "Add search_artifacts(query, filters) method with pagination, sorting, FTS"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_time: "1d"
-    files: []
-    notes: ""
-
+- id: CACHE-5.1
+  name: Implement Marketplace Metadata Caching
+  description: 'Add caching for marketplace metadata. Methods: get_marketplace_entries(),
+    update_marketplace_cache(). Endpoint: GET /api/v1/cache/marketplace'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_time: 2d
+  files: []
+  notes: ''
+- id: CACHE-5.2
+  name: Track Upstream Versions for Update Detection
+  description: 'Track upstream artifact versions, compare deployed vs upstream, flag
+    is_outdated. Endpoint: GET /api/v1/cache/stale-artifacts'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_time: 2d
+  files: []
+  notes: ''
+- id: CACHE-5.3
+  name: Add UI Indicators for Outdated Artifacts
+  description: Create OutdatedBadge.tsx, UpdateAvailableModal.tsx components
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - CACHE-5.2
+  estimated_time: 2d
+  files: []
+  notes: Depends on CACHE-5.2 completion
+- id: CACHE-5.4
+  name: Optimize Search with Cache Queries
+  description: Add search_artifacts(query, filters) method with pagination, sorting,
+    FTS
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_time: 1d
+  files: []
+  notes: ''
 parallelization:
-  batch_1: ["CACHE-5.1", "CACHE-5.2", "CACHE-5.4"]  # Parallel - no dependencies
-  batch_2: ["CACHE-5.3"]  # Depends on CACHE-5.2
-  critical_path: ["CACHE-5.2", "CACHE-5.3"]
-  estimated_total_time: "4d"  # 2d (batch_1) + 2d (batch_2)
-
+  batch_1:
+  - CACHE-5.1
+  - CACHE-5.2
+  - CACHE-5.4
+  batch_2:
+  - CACHE-5.3
+  critical_path:
+  - CACHE-5.2
+  - CACHE-5.3
+  estimated_total_time: 4d
 blockers: []
-
 success_criteria:
-  - "Marketplace metadata caching functional"
-  - "Update detection system operational"
-  - "UI shows outdated artifact indicators"
-  - "Search performance optimized with cache queries"
-
+- Marketplace metadata caching functional
+- Update detection system operational
+- UI shows outdated artifact indicators
+- Search performance optimized with cache queries
 files_modified: []
+schema_version: 2
+doc_type: progress
+feature_slug: persistent-project-cache
 ---
 
 # persistent-project-cache - Phase 5: Advanced Features

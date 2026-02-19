@@ -399,6 +399,7 @@ Projects (.claude/ directories)
 **Artifact Types Supported**:
 - Skills (full support)
 - Commands, Agents, MCP servers, Hooks (partial support)
+- Composites/Plugins (multi-artifact packages with relational model, smart import, deduplication)
 
 ---
 

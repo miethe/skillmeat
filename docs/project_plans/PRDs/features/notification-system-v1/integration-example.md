@@ -1,3 +1,9 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: prd
+feature_slug: integration-example
+---
 # Notification System Integration Guide
 
 **Feature**: Notification Center for SkillMeat

@@ -1,135 +1,138 @@
 ---
-# === REQUEST LOG VIEWER - PHASE 2: FRONTEND PAGES & COMPONENTS ===
-# Frontend implementation tracking for request log viewer feature
-# REQUIRED FIELDS: assigned_to, dependencies for EVERY task
-
-# Metadata: Identification and Classification
 type: progress
-prd: "request-log-viewer-v1"
+prd: request-log-viewer-v1
 phase: 2
-title: "Frontend Pages & Components"
-status: "pending"
+title: Frontend Pages & Components
+status: pending
 started: null
 completed: null
-
-# Overall Progress: Status and Estimates
 overall_progress: 0
-completion_estimate: "5.5 days"
-
-# Task Counts: Machine-readable task state
+completion_estimate: 5.5 days
 total_tasks: 7
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-# Ownership: Primary and secondary agents
-owners: ["ui-engineer-enhanced"]
+owners:
+- ui-engineer-enhanced
 contributors: []
-
-# === ORCHESTRATION QUICK REFERENCE ===
-# All tasks with assignments and dependencies
 tasks:
-  - id: "TASK-2.1"
-    description: "Create page structure - Setup route, layout, providers"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "0.5 days"
-    priority: "high"
-
-  - id: "TASK-2.2"
-    description: "Build document list table component - TanStack Table with sorting, pagination"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.1"]
-    estimated_effort: "1 day"
-    priority: "high"
-
-  - id: "TASK-2.3"
-    description: "Build multi-select filter UI - Type, domain, subdomain, status filters"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.1"]
-    estimated_effort: "1 day"
-    priority: "high"
-
-  - id: "TASK-2.4"
-    description: "Build keyword search component - Real-time search with debouncing"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.1"]
-    estimated_effort: "0.5 days"
-    priority: "medium"
-
-  - id: "TASK-2.5"
-    description: "Build document detail modal - Full document display with metadata"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.1"]
-    estimated_effort: "1 day"
-    priority: "high"
-
-  - id: "TASK-2.6"
-    description: "Create TanStack Query hooks - useRequestLogs, useRequestLog, useFilterOptions"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "0.5 days"
-    priority: "high"
-
-  - id: "TASK-2.7"
-    description: "Write frontend unit tests - Component and integration tests"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.2", "TASK-2.3", "TASK-2.4", "TASK-2.5", "TASK-2.6"]
-    estimated_effort: "1 day"
-    priority: "high"
-
-# Parallelization Strategy (computed from dependencies)
+- id: TASK-2.1
+  description: Create page structure - Setup route, layout, providers
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 0.5 days
+  priority: high
+- id: TASK-2.2
+  description: Build document list table component - TanStack Table with sorting,
+    pagination
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.1
+  estimated_effort: 1 day
+  priority: high
+- id: TASK-2.3
+  description: Build multi-select filter UI - Type, domain, subdomain, status filters
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.1
+  estimated_effort: 1 day
+  priority: high
+- id: TASK-2.4
+  description: Build keyword search component - Real-time search with debouncing
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.1
+  estimated_effort: 0.5 days
+  priority: medium
+- id: TASK-2.5
+  description: Build document detail modal - Full document display with metadata
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.1
+  estimated_effort: 1 day
+  priority: high
+- id: TASK-2.6
+  description: Create TanStack Query hooks - useRequestLogs, useRequestLog, useFilterOptions
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 0.5 days
+  priority: high
+- id: TASK-2.7
+  description: Write frontend unit tests - Component and integration tests
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.2
+  - TASK-2.3
+  - TASK-2.4
+  - TASK-2.5
+  - TASK-2.6
+  estimated_effort: 1 day
+  priority: high
 parallelization:
-  batch_1: ["TASK-2.1"]
-  batch_2: ["TASK-2.2", "TASK-2.3", "TASK-2.4", "TASK-2.5", "TASK-2.6"]
-  batch_3: ["TASK-2.7"]
-  critical_path: ["TASK-2.1", "TASK-2.2", "TASK-2.7"]
-  estimated_total_time: "5.5 days"
-
-# Critical Blockers: None currently
+  batch_1:
+  - TASK-2.1
+  batch_2:
+  - TASK-2.2
+  - TASK-2.3
+  - TASK-2.4
+  - TASK-2.5
+  - TASK-2.6
+  batch_3:
+  - TASK-2.7
+  critical_path:
+  - TASK-2.1
+  - TASK-2.2
+  - TASK-2.7
+  estimated_total_time: 5.5 days
 blockers: []
-
-# Success Criteria: Acceptance conditions for phase completion
 success_criteria:
-  - id: "SC-1"
-    description: "All components render without errors"
-    status: "pending"
-    result: null
-  - id: "SC-2"
-    description: "Filters update table reactively"
-    status: "pending"
-    result: null
-  - id: "SC-3"
-    description: "Modal displays all item fields correctly"
-    status: "pending"
-    result: null
-  - id: "SC-4"
-    description: "Tests achieve >80% coverage"
-    status: "pending"
-    result: null
-
-# Files Modified: What's being changed in this phase
+- id: SC-1
+  description: All components render without errors
+  status: pending
+  result: null
+- id: SC-2
+  description: Filters update table reactively
+  status: pending
+  result: null
+- id: SC-3
+  description: Modal displays all item fields correctly
+  status: pending
+  result: null
+- id: SC-4
+  description: Tests achieve >80% coverage
+  status: pending
+  result: null
 files_modified:
-  - "skillmeat/web/app/requests/page.tsx"
-  - "skillmeat/web/components/requests/request-log-table.tsx"
-  - "skillmeat/web/components/requests/request-log-filters.tsx"
-  - "skillmeat/web/components/requests/request-log-search.tsx"
-  - "skillmeat/web/components/requests/request-log-modal.tsx"
-  - "skillmeat/web/hooks/use-request-logs.ts"
-  - "skillmeat/web/hooks/use-request-log.ts"
-  - "skillmeat/web/hooks/use-filter-options.ts"
-  - "skillmeat/web/__tests__/components/requests/request-log-table.test.tsx"
-  - "skillmeat/web/__tests__/components/requests/request-log-filters.test.tsx"
-  - "skillmeat/web/__tests__/components/requests/request-log-search.test.tsx"
-  - "skillmeat/web/__tests__/components/requests/request-log-modal.test.tsx"
+- skillmeat/web/app/requests/page.tsx
+- skillmeat/web/components/requests/request-log-table.tsx
+- skillmeat/web/components/requests/request-log-filters.tsx
+- skillmeat/web/components/requests/request-log-search.tsx
+- skillmeat/web/components/requests/request-log-modal.tsx
+- skillmeat/web/hooks/use-request-logs.ts
+- skillmeat/web/hooks/use-request-log.ts
+- skillmeat/web/hooks/use-filter-options.ts
+- skillmeat/web/__tests__/components/requests/request-log-table.test.tsx
+- skillmeat/web/__tests__/components/requests/request-log-filters.test.tsx
+- skillmeat/web/__tests__/components/requests/request-log-search.test.tsx
+- skillmeat/web/__tests__/components/requests/request-log-modal.test.tsx
+schema_version: 2
+doc_type: progress
+feature_slug: request-log-viewer-v1
 ---
 
 # request-log-viewer-v1 - Phase 2: Frontend Pages & Components

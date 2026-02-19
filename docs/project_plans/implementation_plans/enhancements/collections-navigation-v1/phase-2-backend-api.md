@@ -1,16 +1,20 @@
 ---
-title: "Phase 2: Backend API - Collections & Navigation Enhancement"
+title: 'Phase 2: Backend API - Collections & Navigation Enhancement'
 phase: 2
-status: pending
+status: inferred_complete
 assigned_to:
-  - python-backend-engineer
-  - backend-architect
+- python-backend-engineer
+- backend-architect
 dependencies:
-  - Phase 1 (Database Layer)
+- Phase 1 (Database Layer)
 story_points: 12
 duration: 1.5 weeks
+schema_version: 2
+doc_type: phase_plan
+feature_slug: collections-navigation
+prd_ref: null
+plan_ref: null
 ---
-
 # Phase 2: Backend API
 
 **Complexity**: FastAPI router implementation with SQLAlchemy integration

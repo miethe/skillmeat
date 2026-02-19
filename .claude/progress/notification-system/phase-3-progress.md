@@ -7,66 +7,77 @@ progress: 100
 total_tasks: 5
 completed_tasks: 5
 tasks:
-  - id: NS-P3-01
-    title: ImportResultDetail Component
-    description: Create specialized detail view for import_result notifications showing artifacts added, errors encountered, file counts, and actionable links to imported items
-    status: completed
-    assigned_to:
-      - ui-engineer-enhanced
-    dependencies:
-      - NS-P2-06
-    estimate: 5
-    completion_notes: Enhanced ImportResultDetail with sanitization, dark mode, hover states
-  - id: NS-P3-02
-    title: ErrorDetail Component
-    description: Implement error detail view with error message, stack trace (collapsible), error code, and retry/dismiss actions where applicable
-    status: completed
-    assigned_to:
-      - ui-engineer-enhanced
-    dependencies:
-      - NS-P2-06
-    estimate: 3
-    completion_notes: ErrorDetail component with error code, message, collapsible stack trace
-  - id: NS-P3-03
-    title: GenericDetail Component
-    description: Create fallback detail component for success/info/warning types with formatted metadata display and consistent styling
-    status: completed
-    assigned_to:
-      - ui-engineer-enhanced
-    dependencies:
-      - NS-P2-06
-    estimate: 2
-    completion_notes: GenericDetail component with key-value metadata display
-  - id: NS-P3-04
-    title: Detail View Unit Tests
-    description: Write unit tests for all detail view components including rendering different data structures, interactions, and edge cases
-    status: completed
-    assigned_to:
-      - testing-agent
-    dependencies:
-      - NS-P3-01
-      - NS-P3-02
-      - NS-P3-03
-    estimate: 3
-    completion_notes: 23 new tests added, 68 total tests passing
-  - id: NS-P3-05
-    title: Lazy Render Details
-    description: Implement lazy rendering for detail views to improve performance - only render detail content when notification is expanded
-    status: completed
-    assigned_to:
-      - ui-engineer-enhanced
-    dependencies:
-      - NS-P2-06
-    estimate: 2
-    completion_notes: Lazy rendering verified - details only render when expanded
+- id: NS-P3-01
+  title: ImportResultDetail Component
+  description: Create specialized detail view for import_result notifications showing
+    artifacts added, errors encountered, file counts, and actionable links to imported
+    items
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - NS-P2-06
+  estimate: 5
+  completion_notes: Enhanced ImportResultDetail with sanitization, dark mode, hover
+    states
+- id: NS-P3-02
+  title: ErrorDetail Component
+  description: Implement error detail view with error message, stack trace (collapsible),
+    error code, and retry/dismiss actions where applicable
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - NS-P2-06
+  estimate: 3
+  completion_notes: ErrorDetail component with error code, message, collapsible stack
+    trace
+- id: NS-P3-03
+  title: GenericDetail Component
+  description: Create fallback detail component for success/info/warning types with
+    formatted metadata display and consistent styling
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - NS-P2-06
+  estimate: 2
+  completion_notes: GenericDetail component with key-value metadata display
+- id: NS-P3-04
+  title: Detail View Unit Tests
+  description: Write unit tests for all detail view components including rendering
+    different data structures, interactions, and edge cases
+  status: completed
+  assigned_to:
+  - testing-agent
+  dependencies:
+  - NS-P3-01
+  - NS-P3-02
+  - NS-P3-03
+  estimate: 3
+  completion_notes: 23 new tests added, 68 total tests passing
+- id: NS-P3-05
+  title: Lazy Render Details
+  description: Implement lazy rendering for detail views to improve performance -
+    only render detail content when notification is expanded
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - NS-P2-06
+  estimate: 2
+  completion_notes: Lazy rendering verified - details only render when expanded
 parallelization:
   batch_1:
-    - NS-P3-01
-    - NS-P3-02
-    - NS-P3-03
-    - NS-P3-05
+  - NS-P3-01
+  - NS-P3-02
+  - NS-P3-03
+  - NS-P3-05
   batch_2:
-    - NS-P3-04
+  - NS-P3-04
+schema_version: 2
+doc_type: progress
+feature_slug: notification-system
 ---
 
 # Phase 3: Detail Views & Expansion

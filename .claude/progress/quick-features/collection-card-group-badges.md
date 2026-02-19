@@ -4,17 +4,20 @@ status: completed
 created: 2026-02-13
 scope: frontend-only
 files_affected:
-  - skillmeat/web/components/collection/artifact-group-badges.tsx (NEW)
-  - skillmeat/web/components/collection/artifact-browse-card.tsx (EDIT)
+- skillmeat/web/components/collection/artifact-group-badges.tsx (NEW)
+- skillmeat/web/components/collection/artifact-browse-card.tsx (EDIT)
 tasks:
-  - id: TASK-1
-    name: Create ArtifactGroupBadges component
-    status: pending
-    assigned_to: ui-engineer-enhanced
-  - id: TASK-2
-    name: Integrate badges into artifact-browse-card
-    status: pending
-    assigned_to: ui-engineer-enhanced
+- id: TASK-1
+  name: Create ArtifactGroupBadges component
+  status: pending
+  assigned_to: ui-engineer-enhanced
+- id: TASK-2
+  name: Integrate badges into artifact-browse-card
+  status: pending
+  assigned_to: ui-engineer-enhanced
+schema_version: 2
+doc_type: quick_feature
+feature_slug: collection-card-group-badges
 ---
 
 # Collection Card Group Badges

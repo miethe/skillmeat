@@ -1,74 +1,98 @@
 ---
 type: progress
-prd: "notification-system"
+prd: notification-system
 phase: 4
 status: completed
 progress: 100
 total_tasks: 5
 completed_tasks: 5
-
 tasks:
-  - id: "NS-P4-01"
-    title: "Integrate NotificationProvider"
-    description: "Wrap app with NotificationProvider and ensure context is available throughout the component tree"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["NS-P3-04"]
-    estimate: "2pt"
-    progress: 100
-    notes: ["NotificationProvider already integrated in providers.tsx from Phase 2"]
-
-  - id: "NS-P4-02"
-    title: "Integrate NotificationBell in Header"
-    description: "Add NotificationBell component to the main app header, ensuring proper positioning and responsive behavior"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["NS-P3-04"]
-    estimate: "2pt"
-    progress: 100
-    notes: ["NotificationBell already integrated in header.tsx from Phase 2"]
-
-  - id: "NS-P4-03"
-    title: "Update showImportResultToast()"
-    description: "Refactor showImportResultToast() to use the new notification system instead of direct toast calls"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["NS-P3-04"]
-    estimate: "4pt"
-    progress: 100
-    notes: ["Updated showImportResultToast() to create notifications with artifact details"]
-
-  - id: "NS-P4-04"
-    title: "Update showErrorToast()"
-    description: "Refactor showErrorToast() to use the new notification system with proper error categorization"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["NS-P3-04"]
-    estimate: "2pt"
-    progress: 100
-    notes: ["Updated showErrorToast() to create error notifications with proper categorization"]
-
-  - id: "NS-P4-05"
-    title: "Integration Tests"
-    description: "Create integration tests to verify all notification system components work together correctly"
-    status: "completed"
-    assigned_to: ["testing-agent"]
-    dependencies: ["NS-P4-01", "NS-P4-02", "NS-P4-03", "NS-P4-04"]
-    estimate: "4pt"
-    progress: 100
-    notes: ["Created 17 integration tests covering full notification flow"]
-
+- id: NS-P4-01
+  title: Integrate NotificationProvider
+  description: Wrap app with NotificationProvider and ensure context is available
+    throughout the component tree
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - NS-P3-04
+  estimate: 2pt
+  progress: 100
+  notes:
+  - NotificationProvider already integrated in providers.tsx from Phase 2
+- id: NS-P4-02
+  title: Integrate NotificationBell in Header
+  description: Add NotificationBell component to the main app header, ensuring proper
+    positioning and responsive behavior
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - NS-P3-04
+  estimate: 2pt
+  progress: 100
+  notes:
+  - NotificationBell already integrated in header.tsx from Phase 2
+- id: NS-P4-03
+  title: Update showImportResultToast()
+  description: Refactor showImportResultToast() to use the new notification system
+    instead of direct toast calls
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - NS-P3-04
+  estimate: 4pt
+  progress: 100
+  notes:
+  - Updated showImportResultToast() to create notifications with artifact details
+- id: NS-P4-04
+  title: Update showErrorToast()
+  description: Refactor showErrorToast() to use the new notification system with proper
+    error categorization
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - NS-P3-04
+  estimate: 2pt
+  progress: 100
+  notes:
+  - Updated showErrorToast() to create error notifications with proper categorization
+- id: NS-P4-05
+  title: Integration Tests
+  description: Create integration tests to verify all notification system components
+    work together correctly
+  status: completed
+  assigned_to:
+  - testing-agent
+  dependencies:
+  - NS-P4-01
+  - NS-P4-02
+  - NS-P4-03
+  - NS-P4-04
+  estimate: 4pt
+  progress: 100
+  notes:
+  - Created 17 integration tests covering full notification flow
 parallelization:
-  batch_1: ["NS-P4-01", "NS-P4-02", "NS-P4-03", "NS-P4-04"]
-  batch_2: ["NS-P4-05"]
-
+  batch_1:
+  - NS-P4-01
+  - NS-P4-02
+  - NS-P4-03
+  - NS-P4-04
+  batch_2:
+  - NS-P4-05
 blockers: []
-
 metadata:
-  created_at: "2025-12-03"
-  last_updated: "2025-12-03"
-  phase_title: "Integration & Toast Utils"
-  phase_description: "Integrate notification system into the application and migrate existing toast utilities"
+  created_at: '2025-12-03'
+  last_updated: '2025-12-03'
+  phase_title: Integration & Toast Utils
+  phase_description: Integrate notification system into the application and migrate
+    existing toast utilities
+schema_version: 2
+doc_type: progress
+feature_slug: notification-system
 ---
 
 # Phase 4: Integration & Toast Utils

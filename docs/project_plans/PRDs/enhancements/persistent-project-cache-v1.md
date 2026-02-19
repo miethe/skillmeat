@@ -1,17 +1,29 @@
 ---
-title: "PRD: Persistent Project Cache"
-description: "Maintain a stable, lightweight cache of project metadata for web app and CLI to eliminate slow reload times and enable efficient background updates"
-audience: [ai-agents, developers]
-tags: [prd, planning, enhancement, caching, performance, cli, web-ui]
+title: 'PRD: Persistent Project Cache'
+description: Maintain a stable, lightweight cache of project metadata for web app
+  and CLI to eliminate slow reload times and enable efficient background updates
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- planning
+- enhancement
+- caching
+- performance
+- cli
+- web-ui
 created: 2025-11-30
 updated: 2025-11-30
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
-  - /docs/project_plans/PRDs/enhancements/web-ui-consolidation-v1.md
+- /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
+- /docs/project_plans/PRDs/enhancements/web-ui-consolidation-v1.md
+schema_version: 2
+doc_type: prd
+feature_slug: persistent-project-cache
 ---
-
 # PRD: Persistent Project Cache
 
 **Feature Name:** Persistent Project Cache

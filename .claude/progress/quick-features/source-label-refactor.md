@@ -4,18 +4,22 @@ status: completed
 created: 2026-02-16
 branch: feat/collection-org
 files_affected:
-  - skillmeat/web/lib/source-utils.ts (NEW - GitHub URL parser)
-  - skillmeat/web/components/collection/artifact-browse-card.tsx
-  - skillmeat/web/components/collection/artifact-details-modal.tsx (optional - use shared util)
+- skillmeat/web/lib/source-utils.ts (NEW - GitHub URL parser)
+- skillmeat/web/components/collection/artifact-browse-card.tsx
+- skillmeat/web/components/collection/artifact-details-modal.tsx (optional - use shared
+  util)
 tasks:
-  - id: SLR-1
-    title: Create shared GitHub URL parsing utility
-    status: pending
-    assigned_to: ui-engineer
-  - id: SLR-2
-    title: Refactor source label in artifact-browse-card.tsx
-    status: pending
-    assigned_to: ui-engineer
+- id: SLR-1
+  title: Create shared GitHub URL parsing utility
+  status: pending
+  assigned_to: ui-engineer
+- id: SLR-2
+  title: Refactor source label in artifact-browse-card.tsx
+  status: pending
+  assigned_to: ui-engineer
+schema_version: 2
+doc_type: quick_feature
+feature_slug: source-label-refactor
 ---
 
 ## Requirements

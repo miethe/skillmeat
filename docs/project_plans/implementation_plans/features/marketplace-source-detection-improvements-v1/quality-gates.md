@@ -1,8 +1,12 @@
 ---
-parent: "../marketplace-source-detection-improvements-v1.md"
-section: "Quality Assurance Gates"
+parent: ../marketplace-source-detection-improvements-v1.md
+section: Quality Assurance Gates
+status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: quality-gates
+prd_ref: null
 ---
-
 # Quality Assurance Gates
 
 ## Phase 1 Gate

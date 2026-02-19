@@ -1,8 +1,13 @@
 ---
-title: "Phase 1: Data Model Foundations"
+title: 'Phase 1: Data Model Foundations'
 parent: ../multi-platform-project-deployments-v1.md
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: multi-platform-project-deployments
+prd_ref: null
+plan_ref: null
 ---
-
 # Phase 1: Data Model Foundations
 
 **Duration**: 1 week

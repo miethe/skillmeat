@@ -2,58 +2,70 @@
 type: progress
 prd: marketplace-github-ingestion
 phase: 8
-title: "Deployment Layer"
+title: Deployment Layer
 status: pending
-effort: "7 pts"
+effort: 7 pts
 owner: backend-architect
 contributors:
-  - devops-engineer
-  - lead-pm
+- devops-engineer
+- lead-pm
 timeline: phase-8-timeline
-
 tasks:
-  - id: "DEPLOY-001"
-    status: "pending"
-    title: "Feature Flags"
-    assigned_to: ["backend-architect"]
-    dependencies: ["DOC-005"]
-    estimate: 1
-    priority: "high"
-
-  - id: "DEPLOY-002"
-    status: "pending"
-    title: "Monitoring & Alerts"
-    assigned_to: ["backend-architect"]
-    dependencies: ["DEPLOY-001"]
-    estimate: 2
-    priority: "high"
-
-  - id: "DEPLOY-003"
-    status: "pending"
-    title: "Staging Deployment"
-    assigned_to: ["devops-engineer"]
-    dependencies: ["DEPLOY-002"]
-    estimate: 1
-    priority: "high"
-
-  - id: "DEPLOY-004"
-    status: "pending"
-    title: "Production Rollout"
-    assigned_to: ["lead-pm"]
-    dependencies: ["DEPLOY-003"]
-    estimate: 2
-    priority: "high"
-
-  - id: "DEPLOY-005"
-    status: "pending"
-    title: "Post-Launch Support"
-    assigned_to: ["backend-architect"]
-    dependencies: ["DEPLOY-004"]
-    estimate: 1
-    priority: "medium"
-
+- id: DEPLOY-001
+  status: pending
+  title: Feature Flags
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - DOC-005
+  estimate: 1
+  priority: high
+- id: DEPLOY-002
+  status: pending
+  title: Monitoring & Alerts
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - DEPLOY-001
+  estimate: 2
+  priority: high
+- id: DEPLOY-003
+  status: pending
+  title: Staging Deployment
+  assigned_to:
+  - devops-engineer
+  dependencies:
+  - DEPLOY-002
+  estimate: 1
+  priority: high
+- id: DEPLOY-004
+  status: pending
+  title: Production Rollout
+  assigned_to:
+  - lead-pm
+  dependencies:
+  - DEPLOY-003
+  estimate: 2
+  priority: high
+- id: DEPLOY-005
+  status: pending
+  title: Post-Launch Support
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - DEPLOY-004
+  estimate: 1
+  priority: medium
 parallelization:
-  chain: ["DEPLOY-001", "DEPLOY-002", "DEPLOY-003", "DEPLOY-004", "DEPLOY-005"]
+  chain:
+  - DEPLOY-001
+  - DEPLOY-002
+  - DEPLOY-003
+  - DEPLOY-004
+  - DEPLOY-005
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-github-ingestion
 ---
 
 # Phase 8: Deployment Layer

@@ -3,9 +3,11 @@ type: quick-feature-plan
 feature_slug: fix-confidence-scoring-nested-detection
 request_log_id: null
 status: completed
-completed_at: 2026-01-01T00:30:00Z
-created: 2026-01-01T00:00:00Z
+completed_at: 2026-01-01 00:30:00+00:00
+created: 2026-01-01 00:00:00+00:00
 estimated_scope: medium
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # Fix Confidence Scoring and Nested Artifact Detection

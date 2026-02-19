@@ -3,9 +3,11 @@ type: quick-feature-plan
 feature_slug: discovery-import-bugs-1-2
 request_log_id: null
 status: completed
-created: 2026-01-12T12:00:00Z
-completed_at: 2026-01-12T18:30:00Z
+created: 2026-01-12 12:00:00+00:00
+completed_at: 2026-01-12 18:30:00+00:00
 estimated_scope: medium
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # Discovery & Import Bug Fixes (Bugs 1 & 2)

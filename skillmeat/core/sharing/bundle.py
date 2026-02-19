@@ -2,14 +2,24 @@
 
 This module defines the core data structures for .skillmeat-pack bundles,
 which are used to package and distribute artifacts across teams.
+
+It also provides the :func:`export_composite_bundle` function for generating
+composite-aware bundle zips from the DB cache.
 """
 
-from dataclasses import dataclass, field
+import json
+import logging
+import shutil
+import tempfile
+import zipfile
 from datetime import datetime
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from skillmeat.core.artifact import ArtifactType
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -270,3 +280,367 @@ class Bundle:
             dependencies=data.get("dependencies", []),
             bundle_hash=data.get("bundle_hash"),
         )
+
+
+# ---------------------------------------------------------------------------
+# Type-to-subdirectory mapping for artifact filesystem layout
+# ---------------------------------------------------------------------------
+
+#: Maps artifact type strings to their collection subdirectory names.
+_TYPE_TO_SUBDIR: Dict[str, str] = {
+    "skill": "skills",
+    "command": "commands",
+    "agent": "agents",
+    "hook": "hooks",
+    "mcp": "mcp",
+    "mcp_server": "mcp",
+    "composite": "composites",
+}
+
+#: Single-file artifact types (stored as ``<name>.md`` rather than a directory).
+_SINGLE_FILE_TYPES = {"command", "agent"}
+
+
+def _resolve_child_path(collection_path: Path, artifact_type: str, name: str) -> Path:
+    """Return the filesystem path for a child artifact within a collection.
+
+    Args:
+        collection_path: Root directory of the collection (e.g., ``~/.skillmeat/collection``).
+        artifact_type: Artifact type string (e.g., ``"skill"``, ``"command"``).
+        name: Artifact name (without extension for single-file types).
+
+    Returns:
+        Absolute ``Path`` to the artifact on disk.
+
+    Raises:
+        ValueError: If ``artifact_type`` is not recognised.
+    """
+    subdir = _TYPE_TO_SUBDIR.get(artifact_type)
+    if subdir is None:
+        raise ValueError(
+            f"Unknown artifact type '{artifact_type}'. "
+            f"Expected one of: {sorted(_TYPE_TO_SUBDIR)}"
+        )
+
+    if artifact_type in _SINGLE_FILE_TYPES:
+        return collection_path / subdir / f"{name}.md"
+
+    return collection_path / subdir / name
+
+
+def _collect_files(artifact_path: Path) -> List[str]:
+    """Collect file paths relative to *artifact_path*, excluding cache/VCS noise.
+
+    Args:
+        artifact_path: Root of the artifact (directory or single file).
+
+    Returns:
+        Sorted list of relative file path strings (forward slashes).
+    """
+    exclude_patterns = [
+        "__pycache__",
+        "*.pyc",
+        ".git",
+        ".DS_Store",
+        "node_modules",
+        ".env",
+        "*.lock",
+    ]
+
+    if artifact_path.is_file():
+        return [artifact_path.name]
+
+    files: List[str] = []
+    for fp in artifact_path.rglob("*"):
+        if not fp.is_file():
+            continue
+        if any(fp.match(pat) for pat in exclude_patterns):
+            continue
+        rel = fp.relative_to(artifact_path)
+        files.append(str(rel).replace("\\", "/"))
+
+    return sorted(files)
+
+
+class CompositeBundleError(Exception):
+    """Raised when composite bundle export fails."""
+
+
+def export_composite_bundle(
+    composite_id: str,
+    output_path: str,
+    session,  # sqlalchemy.orm.Session — not typed to avoid import cycle
+    collection_name: Optional[str] = None,
+) -> str:
+    """Export a composite artifact and all its children as a Bundle zip.
+
+    The generated archive follows the same ``.skillmeat-pack`` layout used by
+    :class:`~skillmeat.core.sharing.builder.BundleBuilder`:
+
+    .. code-block:: text
+
+        manifest.json
+        composite.json           # composite metadata (id, type, description)
+        artifacts/
+            skills/<name>/       # skill child artifacts
+            commands/<name>.md   # single-file command artifacts
+            agents/<name>.md     # single-file agent artifacts
+            ...
+
+    Args:
+        composite_id: ``type:name`` identifier of the composite artifact
+            (e.g. ``"composite:my-plugin"``).  Must exist in the DB session.
+        output_path: Filesystem path where the ``.skillmeat-pack`` zip will
+            be written.  The parent directory must exist.
+        session: Active SQLAlchemy ``Session`` with access to the
+            ``composite_artifacts`` and ``artifacts`` tables.
+        collection_name: Optional collection name override.  When ``None`` the
+            function resolves the collection via the
+            :class:`~skillmeat.core.collection.CollectionManager` using the
+            active collection name.
+
+    Returns:
+        Absolute path string to the created zip file.
+
+    Raises:
+        CompositeBundleError: If the composite is not found, has no children,
+            or a child artifact cannot be located on the filesystem.
+        ValueError: If ``output_path`` parent directory does not exist.
+    """
+    # Deferred imports to avoid circular dependency chains at module load time.
+    from skillmeat.cache.models import CompositeArtifact, Collection
+    from skillmeat.core.collection import CollectionManager
+    from skillmeat.core.sharing.hasher import BundleHasher
+
+    # ------------------------------------------------------------------
+    # Step 1: Load composite from DB
+    # ------------------------------------------------------------------
+    composite = (
+        session.query(CompositeArtifact)
+        .filter(CompositeArtifact.id == composite_id)
+        .first()
+    )
+    if composite is None:
+        raise CompositeBundleError(
+            f"Composite artifact '{composite_id}' not found in the database. "
+            "Ensure the artifact has been imported before exporting."
+        )
+
+    memberships = composite.memberships  # eager-loaded via selectin
+    if not memberships:
+        raise CompositeBundleError(
+            f"Composite artifact '{composite_id}' has no child members. "
+            "Nothing to export."
+        )
+
+    # ------------------------------------------------------------------
+    # Step 2: Resolve collection filesystem path
+    # ------------------------------------------------------------------
+    col_mgr = CollectionManager()
+
+    if collection_name is not None:
+        resolved_collection_name = collection_name
+    else:
+        # Try to look up the Collection row to get its name
+        coll_row = (
+            session.query(Collection)
+            .filter(Collection.id == composite.collection_id)
+            .first()
+        )
+        if coll_row is not None:
+            resolved_collection_name = coll_row.name
+        else:
+            # collection_id may itself be a name (for test fixtures)
+            resolved_collection_name = composite.collection_id
+
+        # Fall back to active collection when resolution fails
+        try:
+            col_mgr.load_collection(resolved_collection_name)
+        except (ValueError, FileNotFoundError):
+            logger.warning(
+                "export_composite_bundle: collection '%s' not found; "
+                "falling back to active collection.",
+                resolved_collection_name,
+            )
+            resolved_collection_name = col_mgr.get_active_collection_name()
+
+    collection_path = col_mgr.config.get_collection_path(resolved_collection_name)
+
+    logger.info(
+        "export_composite_bundle: exporting composite=%s collection_path=%s",
+        composite_id,
+        collection_path,
+    )
+
+    # ------------------------------------------------------------------
+    # Step 3: Collect child artifact files
+    # ------------------------------------------------------------------
+    # composite_name is the part after "composite:" prefix
+    composite_name = (
+        composite_id.split(":", 1)[-1] if ":" in composite_id else composite_id
+    )
+
+    bundle_artifacts: List[Dict] = []
+    artifact_hashes: List[str] = []
+
+    for membership in memberships:
+        child = membership.child_artifact
+        if child is None:
+            logger.warning(
+                "export_composite_bundle: membership with uuid=%s has no resolved "
+                "child_artifact ORM object; skipping.",
+                membership.child_artifact_uuid,
+            )
+            continue
+
+        child_type = child.type
+        child_name = child.name
+
+        try:
+            artifact_path = _resolve_child_path(collection_path, child_type, child_name)
+        except ValueError as exc:
+            raise CompositeBundleError(
+                f"Cannot resolve filesystem path for child '{child_type}:{child_name}': {exc}"
+            ) from exc
+
+        if not artifact_path.exists():
+            raise CompositeBundleError(
+                f"Child artifact '{child_type}:{child_name}' not found on disk at "
+                f"'{artifact_path}'.  Re-sync the collection before exporting."
+            )
+
+        files = _collect_files(artifact_path)
+        if not files:
+            logger.warning(
+                "export_composite_bundle: child '%s:%s' has no files; skipping.",
+                child_type,
+                child_name,
+            )
+            continue
+
+        subdir = _TYPE_TO_SUBDIR.get(child_type, f"{child_type}s")
+        bundle_relative_path = f"artifacts/{subdir}/{child_name}/"
+
+        # Compute per-artifact hash
+        if artifact_path.is_dir():
+            artifact_hash = BundleHasher.hash_artifact_files(artifact_path, files)
+        else:
+            from skillmeat.core.sharing.hasher import FileHasher
+
+            artifact_hash = FileHasher.hash_file(artifact_path)
+
+        deployed_version = child.deployed_version or "unknown"
+        bundle_artifacts.append(
+            {
+                "type": child_type,
+                "name": child_name,
+                "version": deployed_version,
+                "scope": "user",
+                "path": bundle_relative_path,
+                "files": files,
+                "hash": artifact_hash,
+                "metadata": {"description": child.description or ""},
+            }
+        )
+        artifact_hashes.append(artifact_hash)
+
+    if not bundle_artifacts:
+        raise CompositeBundleError(
+            f"No exportable child artifacts found for composite '{composite_id}'."
+        )
+
+    # ------------------------------------------------------------------
+    # Step 4: Build manifest and composite metadata
+    # ------------------------------------------------------------------
+    now_iso = datetime.utcnow().isoformat()
+
+    manifest: Dict = {
+        "version": "1.0",
+        "name": composite_name,
+        "description": composite.description or f"Composite artifact: {composite_name}",
+        "author": "SkillMeat",
+        "created_at": now_iso,
+        "license": "MIT",
+        "tags": [composite.composite_type, "composite"],
+        "artifacts": bundle_artifacts,
+        "dependencies": [],
+        "bundle_hash": "",  # filled in below
+    }
+
+    bundle_hash = BundleHasher.compute_bundle_hash(manifest, artifact_hashes)
+    manifest["bundle_hash"] = bundle_hash
+
+    composite_metadata: Dict = {
+        "id": composite_id,
+        "composite_type": composite.composite_type,
+        "display_name": composite.display_name or composite_name,
+        "description": composite.description,
+        "collection_id": composite.collection_id,
+        "created_at": (
+            composite.created_at.isoformat() if composite.created_at else None
+        ),
+        "updated_at": (
+            composite.updated_at.isoformat() if composite.updated_at else None
+        ),
+        "member_count": len(bundle_artifacts),
+        "exported_at": now_iso,
+    }
+
+    # ------------------------------------------------------------------
+    # Step 5: Write zip archive
+    # ------------------------------------------------------------------
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    fixed_date_time = (2020, 1, 1, 0, 0, 0)
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp = Path(tmp_dir)
+
+        # Write manifest.json
+        manifest_file = tmp / "manifest.json"
+        manifest_file.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+        )
+
+        # Write composite.json
+        composite_file = tmp / "composite.json"
+        composite_file.write_text(
+            json.dumps(composite_metadata, indent=2, sort_keys=True), encoding="utf-8"
+        )
+
+        # Copy child artifact files
+        for bundle_artifact in bundle_artifacts:
+            child_type = bundle_artifact["type"]
+            child_name = bundle_artifact["name"]
+            artifact_path = _resolve_child_path(collection_path, child_type, child_name)
+            dest_dir = tmp / bundle_artifact["path"].lstrip("/")
+
+            if artifact_path.is_dir():
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(artifact_path, dest_dir, dirs_exist_ok=True)
+            else:
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(artifact_path, dest_dir / artifact_path.name)
+
+        # Create deterministic ZIP
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for fp in sorted(tmp.rglob("*")):
+                if not fp.is_file():
+                    continue
+                arcname = fp.relative_to(tmp)
+                zi = zipfile.ZipInfo(
+                    filename=str(arcname).replace("\\", "/"),
+                    date_time=fixed_date_time,
+                )
+                zi.compress_type = zipfile.ZIP_DEFLATED
+                with open(fp, "rb") as fh:
+                    zf.writestr(zi, fh.read())
+
+    logger.info(
+        "export_composite_bundle: created archive at %s (%d child artifacts)",
+        output,
+        len(bundle_artifacts),
+    )
+
+    return str(output.resolve())

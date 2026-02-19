@@ -14,6 +14,10 @@ created: 2025-12-13
 updated: '2026-02-07'
 category: product-planning
 status: completed
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: add-collection-creation-buttons
+prd_ref: null
 ---
 
 # Implementation Plan: Add Collection Creation Buttons

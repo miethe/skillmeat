@@ -161,6 +161,9 @@ parallelization:
   batch_4:
   - MFV-3.8
 updated: '2026-01-29'
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-folder-view
 ---
 
 # Phase 3: Accessibility & Performance Optimization

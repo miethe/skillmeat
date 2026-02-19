@@ -19,6 +19,10 @@ status: completed
 related:
 - /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
 - /docs/project_plans/SPIKEs/marketplace-github-ingestion-spike.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: marketplace-github-ingestion
+prd_ref: null
 ---
 
 # Implementation Plan: GitHub Marketplace Ingestion

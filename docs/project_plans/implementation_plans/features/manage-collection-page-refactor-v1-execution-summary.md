@@ -1,9 +1,14 @@
 ---
-title: "Execution Summary: /manage vs /collection Page Refactor"
-description: "Quick reference guide for executing the page refactor implementation plan"
+title: 'Execution Summary: /manage vs /collection Page Refactor'
+description: Quick reference guide for executing the page refactor implementation
+  plan
 status: active
 type: execution-guide
 created: 2026-02-01
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: manage-collection-page-refactor-v1-execution-summary
+prd_ref: null
 ---
 
 # Execution Summary: Page Refactor

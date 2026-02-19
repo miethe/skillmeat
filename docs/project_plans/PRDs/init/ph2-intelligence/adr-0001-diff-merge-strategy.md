@@ -1,11 +1,20 @@
 ---
-title: "ADR-0001: Diff & Merge Strategy for Phase 2"
+title: 'ADR-0001: Diff & Merge Strategy for Phase 2'
 status: accepted
 date: 2025-11-10
-deciders: ["lead-architect", "Agent 1"]
-tags: [adr, diff, merge, phase2]
+deciders:
+- lead-architect
+- Agent 1
+tags:
+- adr
+- diff
+- merge
+- phase2
 related:
-  - /docs/project_plans/ph2-intelligence/AI_AGENT_PRD_PHASE2.md
+- /docs/project_plans/ph2-intelligence/AI_AGENT_PRD_PHASE2.md
+schema_version: 2
+doc_type: prd
+feature_slug: adr-0001-diff-merge-strategy
 ---
 
 # ADR-0001 — Diff & Merge Strategy

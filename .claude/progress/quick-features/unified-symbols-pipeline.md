@@ -3,9 +3,11 @@ type: quick-feature-plan
 feature_slug: unified-symbols-pipeline
 request_log_id: null
 status: completed
-created: 2026-01-14T00:00:00Z
-completed_at: 2026-01-14T00:00:00Z
+created: 2026-01-14 00:00:00+00:00
+completed_at: 2026-01-14 00:00:00+00:00
 estimated_scope: medium
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # Unified Symbols Pipeline and Hooks

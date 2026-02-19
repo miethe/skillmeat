@@ -1,16 +1,26 @@
 ---
-title: "Bug Fix: Single-File Artifact Detection"
-description: "Enable detection of single-file commands and agents inside container directories"
-audience: [ai-agents, developers]
-tags: [bugfix, marketplace, detection, heuristic]
+title: 'Bug Fix: Single-File Artifact Detection'
+description: Enable detection of single-file commands and agents inside container
+  directories
+audience:
+- ai-agents
+- developers
+tags:
+- bugfix
+- marketplace
+- detection
+- heuristic
 created: 2026-01-01
 updated: 2026-01-01
-category: "bugs"
-status: active
+category: bugs
+status: inferred_complete
 related:
-  - /docs/project_plans/implementation_plans/bugs/marketplace-sources-non_skills-v1.md
+- /docs/project_plans/implementation_plans/bugs/marketplace-sources-non_skills-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: marketplace-single-file-artifacts
+prd_ref: null
 ---
-
 # Bug Fix: Single-File Artifact Detection
 
 **Plan ID**: `BUGFIX-2026-01-01-SINGLE-FILE-ARTIFACTS`

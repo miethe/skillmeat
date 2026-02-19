@@ -240,6 +240,9 @@ notes: 'Phases 7-8 provide comprehensive testing and documentation for marketpla
 in_progress_tasks: 0
 blocked_tasks: 0
 updated: '2026-01-18'
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-sources-enhancement-v1
 ---
 # Phases 7-8: Testing & Documentation
 

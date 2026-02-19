@@ -1,9 +1,15 @@
 """Artifact importer for bulk import operations."""
 
 import logging
+import os
+import re
+import shutil
+import tempfile
 import time
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from skillmeat.core.artifact import ArtifactManager, ArtifactType
@@ -36,6 +42,63 @@ from skillmeat.core.discovery_metrics import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Optional OpenTelemetry integration (graceful no-op fallback)
+# ---------------------------------------------------------------------------
+
+try:
+    from opentelemetry import metrics as _otel_metrics
+    from opentelemetry import trace as _otel_trace
+
+    _tracer = _otel_trace.get_tracer(__name__)
+    _meter = _otel_metrics.get_meter(__name__)
+
+    # Counters
+    _plugin_import_total = _meter.create_counter(
+        name="plugin_import_total",
+        description="Total plugin (composite artifact) import operations",
+        unit="1",
+    )
+    _dedup_hit_total = _meter.create_counter(
+        name="dedup_hit_total",
+        description="Total artifacts reused via deduplication (LINK_EXISTING)",
+        unit="1",
+    )
+    _dedup_miss_total = _meter.create_counter(
+        name="dedup_miss_total",
+        description="Total new artifacts created (CREATE_NEW_ARTIFACT or CREATE_NEW_VERSION)",
+        unit="1",
+    )
+
+    # Histograms
+    _plugin_import_duration = _meter.create_histogram(
+        name="plugin_import_duration_seconds",
+        description="Duration of transactional plugin import operations in seconds",
+        unit="s",
+    )
+    _artifact_hash_compute_duration = _meter.create_histogram(
+        name="artifact_hash_compute_duration_seconds",
+        description="Duration of per-artifact hash computation in seconds",
+        unit="s",
+    )
+
+    _OTEL_AVAILABLE = True
+
+except ImportError:  # pragma: no cover
+    _tracer = None  # type: ignore[assignment]
+    _meter = None  # type: ignore[assignment]
+    _plugin_import_total = None  # type: ignore[assignment]
+    _dedup_hit_total = None  # type: ignore[assignment]
+    _dedup_miss_total = None  # type: ignore[assignment]
+    _plugin_import_duration = None  # type: ignore[assignment]
+    _artifact_hash_compute_duration = None  # type: ignore[assignment]
+    _OTEL_AVAILABLE = False
+
+
+def _get_tracer():
+    """Return the OTel tracer if available, else None."""
+    return _tracer if _OTEL_AVAILABLE else None
 
 
 @dataclass
@@ -553,7 +616,9 @@ class ArtifactImporter:
         if artifact.target_platforms:
             resolved: List[Platform] = []
             for value in artifact.target_platforms:
-                platform = value if isinstance(value, Platform) else Platform(str(value))
+                platform = (
+                    value if isinstance(value, Platform) else Platform(str(value))
+                )
                 if platform not in resolved:
                     resolved.append(platform)
             return resolved or None
@@ -678,7 +743,9 @@ class ArtifactImporter:
 
         # Check path exists
         if not artifact_path.exists():
-            artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+            artifact_id = (
+                f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+            )
             return ImportResultData(
                 artifact_id=artifact_id,
                 success=False,
@@ -702,7 +769,9 @@ class ArtifactImporter:
         if requires_directory:
             # Directory-based artifacts (skills): must be a directory
             if not artifact_path.is_dir():
-                artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                artifact_id = (
+                    f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                )
                 return ImportResultData(
                     artifact_id=artifact_id,
                     success=False,
@@ -715,7 +784,9 @@ class ArtifactImporter:
         else:
             # File-based artifacts (commands, agents, hooks, mcp): must be a file
             if not artifact_path.is_file():
-                artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                artifact_id = (
+                    f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                )
                 return ImportResultData(
                     artifact_id=artifact_id,
                     success=False,
@@ -796,7 +867,9 @@ class ArtifactImporter:
         if expected_file:
             metadata_path = artifact_path / expected_file
             if not metadata_path.exists():
-                artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                artifact_id = (
+                    f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                )
                 return ImportResultData(
                     artifact_id=artifact_id,
                     success=False,
@@ -930,3 +1003,618 @@ class ArtifactImporter:
                 details=details,
                 path=artifact.path,
             )
+
+
+# =============================================================================
+# Plugin meta-file storage (CAI-P3-06)
+# =============================================================================
+
+
+def slugify_plugin_name(name: str) -> str:
+    """Convert a plugin name to a safe directory slug.
+
+    Transforms the name to lowercase, replaces spaces and consecutive
+    non-alphanumeric characters with a single hyphen, and strips leading/
+    trailing hyphens.
+
+    Args:
+        name: Raw plugin name (e.g. ``"Git Workflow Pro"``).
+
+    Returns:
+        URL-safe slug (e.g. ``"git-workflow-pro"``).
+
+    Examples::
+
+        >>> slugify_plugin_name("Git Workflow Pro")
+        'git-workflow-pro'
+        >>> slugify_plugin_name("MY_PLUGIN  v2")
+        'my-plugin-v2'
+        >>> slugify_plugin_name("  leading/trailing  ")
+        'leading-trailing'
+    """
+    lowered = name.lower()
+    # Replace any run of non-alphanumeric characters with a single hyphen
+    slugged = re.sub(r"[^a-z0-9]+", "-", lowered)
+    # Strip leading/trailing hyphens
+    return slugged.strip("-")
+
+
+def write_plugin_meta_files(
+    plugin_name: str,
+    meta_files: Dict[str, bytes],
+    collection_path: str,
+) -> str:
+    """Write plugin meta-files to the collection filesystem atomically.
+
+    Creates ``<collection_path>/plugins/<slug>/`` and writes every entry in
+    *meta_files* into that directory.  The write is performed via a temporary
+    directory that is atomically moved into place, so a partial failure never
+    leaves a corrupt plugin directory.
+
+    Children are **not** stored here — they go to their type-specific
+    directories (``skills/``, ``commands/``, etc.).  This function only
+    handles the plugin-level meta-files such as ``plugin.json``,
+    ``README.md``, and ``manifest.toml``.
+
+    Args:
+        plugin_name: Human-readable or machine plugin name.  Will be
+            slugified (lowercase, hyphens for spaces/punctuation) before
+            use as a directory name.
+        meta_files: Mapping of filename → raw bytes.  Keys are plain
+            filenames (no path components).  Values are the file contents.
+            An empty dict is valid and results in an empty plugin directory.
+        collection_path: Absolute path to the root of the collection
+            directory (i.e. the directory that contains ``skills/``,
+            ``commands/``, etc.).
+
+    Returns:
+        Absolute path to the newly created plugin directory as a string.
+
+    Raises:
+        OSError: If the filesystem operation fails (permissions, disk full,
+            etc.).
+        ValueError: If *plugin_name* slugifies to an empty string.
+
+    Example::
+
+        plugin_dir = write_plugin_meta_files(
+            plugin_name="Git Workflow Pro",
+            meta_files={
+                "plugin.json": b'{"name": "git-workflow-pro"}',
+                "README.md": b"# Git Workflow Pro\\n",
+            },
+            collection_path="/home/user/.skillmeat/collections/default",
+        )
+        # plugin_dir == "/home/user/.skillmeat/collections/default/plugins/git-workflow-pro"
+    """
+    slug = slugify_plugin_name(plugin_name)
+    if not slug:
+        raise ValueError(
+            f"Plugin name {plugin_name!r} produced an empty slug after slugification."
+        )
+
+    collection_root = Path(collection_path)
+    plugins_dir = collection_root / "plugins"
+    final_plugin_dir = plugins_dir / slug
+
+    # Write via temp directory inside the same filesystem (plugins_dir) so
+    # that the atomic rename is guaranteed to be on the same device.
+    plugins_dir.mkdir(parents=True, exist_ok=True)
+
+    temp_dir_path = tempfile.mkdtemp(dir=plugins_dir, prefix=f".{slug}.")
+    try:
+        temp_plugin_dir = Path(temp_dir_path)
+
+        for filename, content in meta_files.items():
+            dest_file = temp_plugin_dir / filename
+            # Write file content
+            with open(dest_file, "wb") as fh:
+                fh.write(content)
+                fh.flush()
+                os.fsync(fh.fileno())
+
+        # If a previous plugin directory exists, remove it before the rename
+        # so the atomic replace always succeeds regardless of OS rename
+        # semantics (on Windows, rename fails if target exists).
+        if final_plugin_dir.exists():
+            shutil.rmtree(final_plugin_dir)
+
+        # Atomic rename: temp_dir → final destination
+        Path(temp_dir_path).rename(final_plugin_dir)
+
+    except Exception:
+        # Best-effort cleanup of the temp directory on failure
+        try:
+            shutil.rmtree(temp_dir_path, ignore_errors=True)
+        except Exception:
+            pass
+        raise
+
+    logger.info(
+        "write_plugin_meta_files: wrote %d meta-file(s) for plugin %r to %s",
+        len(meta_files),
+        slug,
+        final_plugin_dir,
+    )
+    return str(final_plugin_dir)
+
+
+# =============================================================================
+# Transactional plugin import (CAI-P3-03 + CAI-P3-04)
+# =============================================================================
+
+
+@dataclass
+class ImportResult:
+    """Result of a transactional plugin import via :func:`import_plugin_transactional`.
+
+    Attributes:
+        success: ``True`` when the full transaction committed without error.
+        plugin_id: The ``CompositeArtifact.id`` for the imported plugin
+            (format: ``"composite:<name>"``).
+        children_imported: Number of child ``Artifact`` / ``ArtifactVersion``
+            rows that were newly created during this import.
+        children_reused: Number of child artifacts that already existed in the
+            cache and were linked via deduplication rather than re-created.
+        errors: Human-readable error messages.  Empty on success; populated on
+            partial or total failure.
+        transaction_id: UUID string generated per call for distributed tracing
+            and log correlation.
+    """
+
+    success: bool
+    plugin_id: str
+    children_imported: int
+    children_reused: int
+    errors: List[str]
+    transaction_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+
+def import_plugin_transactional(
+    discovered_graph: "DiscoveredGraph",
+    source_url: str,
+    session: "Session",
+    project_id: str,
+    collection_id: str,
+) -> ImportResult:
+    """Import a composite plugin and all its children in a single DB transaction.
+
+    Executes the full import pipeline within the supplied SQLAlchemy ``session``:
+
+    1. For each child in ``discovered_graph.children``:
+
+       a. Compute a SHA-256 content hash via :func:`~skillmeat.core.hashing.compute_artifact_hash`.
+       b. Run deduplication via :func:`~skillmeat.core.deduplication.resolve_artifact_for_import`.
+       c. Execute the decision:
+
+          * ``LINK_EXISTING`` — the content hash already lives in
+            ``ArtifactVersion``; reuse the existing artifact and version IDs.
+          * ``CREATE_NEW_VERSION`` — same name+type exists but with different
+            content; append a new ``ArtifactVersion`` row to the existing
+            ``Artifact``.
+          * ``CREATE_NEW_ARTIFACT`` — no match; create a new ``Artifact`` row
+            and its initial ``ArtifactVersion``.
+
+    2. Create a ``CompositeArtifact`` row for the plugin (idempotent: skips if
+       a row with the same id already exists).
+
+    3. Create one ``CompositeMembership`` row per child, storing
+       ``pinned_version_hash`` equal to the content hash at import time
+       (CAI-P3-04 version pinning).
+
+    4. Commit the transaction.  Any exception triggers an automatic rollback and
+       the function returns a failure ``ImportResult`` — no orphaned rows are
+       left in the database.
+
+    Args:
+        discovered_graph: Composite artifact hierarchy produced by the Phase 2
+            discovery pipeline (a :class:`~skillmeat.core.discovery.DiscoveredGraph`
+            instance).
+        source_url: URL or filesystem path identifying the upstream source of
+            the composite artifact.  Stored on ``CompositeArtifact`` metadata for
+            provenance tracking.
+        session: An *active* SQLAlchemy ``Session``.  The caller owns session
+            lifecycle; this function issues DML within the supplied session and
+            calls ``session.commit()`` on success or ``session.rollback()`` on
+            failure — it does **not** close the session.
+        project_id: The ``Project.id`` that owns the newly created ``Artifact``
+            rows.  Required because ``artifacts.project_id`` is a non-null
+            foreign key.
+        collection_id: The collection identifier used as the owning scope for
+            ``CompositeArtifact`` and ``CompositeMembership`` rows.
+
+    Returns:
+        :class:`ImportResult` describing the outcome.  On success,
+        ``success=True`` and ``plugin_id`` contains the composite's
+        ``type:name`` key.  On failure, ``success=False`` and ``errors``
+        contains one or more diagnostic messages.
+
+    Raises:
+        This function never propagates exceptions — all errors are caught,
+        the transaction is rolled back, and a failure ``ImportResult`` is
+        returned.
+
+    Example::
+
+        from sqlalchemy.orm import Session
+        from skillmeat.core.importer import import_plugin_transactional
+
+        result = import_plugin_transactional(
+            discovered_graph=graph,
+            source_url="github:owner/repo",
+            session=session,
+            project_id="proj-abc",
+            collection_id="col-xyz",
+        )
+        if result.success:
+            print(f"Imported plugin {result.plugin_id}")
+        else:
+            print(f"Import failed: {result.errors}")
+    """
+    # Deferred imports — these modules sit below `importer` in the dependency
+    # graph, but `importer` is imported early by api/routers/artifacts.py which
+    # is loaded during the API server's import chain.  Deferring here prevents
+    # the circular import: cache.models → cache → cache.marketplace →
+    # api.schemas → api → api.routers → core.importer → cache.models.
+    from skillmeat.cache.models import (
+        Artifact,
+        ArtifactVersion,
+        CompositeArtifact,
+        CompositeMembership,
+    )
+    from skillmeat.core.deduplication import (
+        DeduplicationDecision,
+        resolve_artifact_for_import,
+    )
+    from skillmeat.core.hashing import compute_artifact_hash
+
+    transaction_id = str(uuid.uuid4())
+    plugin_name = discovered_graph.parent.name
+    composite_id = f"composite:{plugin_name}"
+    child_count = len(discovered_graph.children)
+
+    _log = logging.getLogger(__name__)
+    _log.info(
+        "import_plugin_transactional started",
+        extra={
+            "transaction_id": transaction_id,
+            "composite_id": composite_id,
+            "plugin_name": plugin_name,
+            "child_count": child_count,
+        },
+    )
+
+    children_imported = 0
+    children_reused = 0
+    errors: List[str] = []
+
+    # Map child name → (artifact_uuid, content_hash) for membership creation
+    child_records: List[Dict[str, Any]] = []
+
+    tracer = _get_tracer()
+    import_start = time.perf_counter()
+
+    def _run_import() -> ImportResult:
+        nonlocal children_imported, children_reused
+
+        try:
+            # ------------------------------------------------------------------
+            # Step 1: Process each child artifact
+            # ------------------------------------------------------------------
+            for child in discovered_graph.children:
+                child_id = f"{child.type}:{child.name}"
+
+                # (a) Compute content hash
+                hash_start = time.perf_counter()
+                try:
+                    content_hash = compute_artifact_hash(child.path)
+                except (FileNotFoundError, ValueError) as exc:
+                    _log.warning(
+                        "import_plugin_transactional: hash failed for child %s path=%s: %s",
+                        child_id,
+                        child.path,
+                        exc,
+                    )
+                    errors.append(
+                        f"Hash computation failed for '{child_id}' (path={child.path}): {exc}"
+                    )
+                    raise  # abort entire transaction
+                finally:
+                    hash_duration = time.perf_counter() - hash_start
+                    if _OTEL_AVAILABLE and _artifact_hash_compute_duration is not None:
+                        _artifact_hash_compute_duration.record(
+                            hash_duration,
+                            {"artifact_name": child.name},
+                        )
+
+                # (b) Run deduplication
+                dedup_result = resolve_artifact_for_import(
+                    name=child.name,
+                    artifact_type=child.type,
+                    content_hash=content_hash,
+                    session=session,
+                )
+
+                # Log dedup decision at DEBUG level with structured fields
+                _log.debug(
+                    "Deduplication decision for child artifact",
+                    extra={
+                        "artifact_name": child.name,
+                        "decision": dedup_result.decision.value,
+                        "content_hash": content_hash[:16],
+                        "transaction_id": transaction_id,
+                    },
+                )
+
+                # Update OTel dedup counters
+                if _OTEL_AVAILABLE:
+                    if dedup_result.decision == DeduplicationDecision.LINK_EXISTING:
+                        if _dedup_hit_total is not None:
+                            _dedup_hit_total.add(
+                                1,
+                                {
+                                    "plugin_name": plugin_name,
+                                    "artifact_name": child.name,
+                                },
+                            )
+                    else:
+                        if _dedup_miss_total is not None:
+                            _dedup_miss_total.add(
+                                1,
+                                {
+                                    "plugin_name": plugin_name,
+                                    "artifact_name": child.name,
+                                    "decision": dedup_result.decision.value,
+                                },
+                            )
+
+                # (c) Execute decision
+                if dedup_result.decision == DeduplicationDecision.LINK_EXISTING:
+                    # Reuse existing artifact + version — no new rows needed
+                    artifact_uuid_row = (
+                        session.query(Artifact)
+                        .filter(Artifact.id == dedup_result.artifact_id)
+                        .first()
+                    )
+                    if artifact_uuid_row is None:
+                        # Defensive: artifact disappeared between queries
+                        raise RuntimeError(
+                            f"Deduplication returned LINK_EXISTING for '{child_id}' "
+                            f"but artifact id={dedup_result.artifact_id!r} was not found."
+                        )
+                    child_artifact_uuid = artifact_uuid_row.uuid
+                    children_reused += 1
+                    _log.debug(
+                        "LINK_EXISTING: child=%s artifact_id=%s version_id=%s",
+                        child_id,
+                        dedup_result.artifact_id,
+                        dedup_result.artifact_version_id,
+                    )
+
+                elif dedup_result.decision == DeduplicationDecision.CREATE_NEW_VERSION:
+                    # Append a new ArtifactVersion to the existing Artifact row
+                    existing_artifact = (
+                        session.query(Artifact)
+                        .filter(Artifact.id == dedup_result.artifact_id)
+                        .first()
+                    )
+                    if existing_artifact is None:
+                        raise RuntimeError(
+                            f"Deduplication returned CREATE_NEW_VERSION for '{child_id}' "
+                            f"but artifact id={dedup_result.artifact_id!r} was not found."
+                        )
+                    new_version = ArtifactVersion(
+                        artifact_id=existing_artifact.id,
+                        content_hash=content_hash,
+                        change_origin="sync",
+                        parent_hash=None,
+                    )
+                    session.add(new_version)
+                    session.flush()  # populate new_version.id
+                    child_artifact_uuid = existing_artifact.uuid
+                    children_imported += 1
+                    _log.debug(
+                        "CREATE_NEW_VERSION: child=%s artifact_id=%s new_version_id=%s",
+                        child_id,
+                        existing_artifact.id,
+                        new_version.id,
+                    )
+
+                else:
+                    # CREATE_NEW_ARTIFACT — new Artifact + initial ArtifactVersion
+                    artifact_type_name_id = f"{child.type}:{child.name}"
+                    new_artifact = Artifact(
+                        id=artifact_type_name_id,
+                        project_id=project_id,
+                        name=child.name,
+                        type=child.type,
+                        source=source_url,
+                        description=child.description,
+                    )
+                    session.add(new_artifact)
+                    session.flush()  # populate new_artifact.uuid
+
+                    new_version = ArtifactVersion(
+                        artifact_id=new_artifact.id,
+                        content_hash=content_hash,
+                        change_origin="sync",
+                        parent_hash=None,
+                    )
+                    session.add(new_version)
+                    session.flush()
+                    child_artifact_uuid = new_artifact.uuid
+                    children_imported += 1
+                    _log.debug(
+                        "CREATE_NEW_ARTIFACT: child=%s artifact_uuid=%s version_id=%s",
+                        child_id,
+                        child_artifact_uuid,
+                        new_version.id,
+                    )
+
+                # Accumulate (uuid, content_hash) for membership creation in step 3
+                child_records.append(
+                    {
+                        "child_artifact_uuid": child_artifact_uuid,
+                        "pinned_version_hash": content_hash,
+                    }
+                )
+
+            # ------------------------------------------------------------------
+            # Step 2: Upsert CompositeArtifact row
+            # ------------------------------------------------------------------
+            existing_composite = (
+                session.query(CompositeArtifact)
+                .filter(CompositeArtifact.id == composite_id)
+                .first()
+            )
+            if existing_composite is None:
+                composite_row = CompositeArtifact(
+                    id=composite_id,
+                    collection_id=collection_id,
+                    composite_type="plugin",
+                    display_name=discovered_graph.parent.name,
+                    description=discovered_graph.parent.description,
+                    metadata_json=None,
+                )
+                session.add(composite_row)
+                session.flush()
+                _log.debug("Created CompositeArtifact: id=%s", composite_id)
+            else:
+                _log.debug("CompositeArtifact already exists: id=%s", composite_id)
+
+            # ------------------------------------------------------------------
+            # Step 3: Create CompositeMembership rows with pinned_version_hash
+            # ------------------------------------------------------------------
+            for record in child_records:
+                existing_membership = (
+                    session.query(CompositeMembership)
+                    .filter(
+                        CompositeMembership.collection_id == collection_id,
+                        CompositeMembership.composite_id == composite_id,
+                        CompositeMembership.child_artifact_uuid
+                        == record["child_artifact_uuid"],
+                    )
+                    .first()
+                )
+                if existing_membership is not None:
+                    # Already linked — update the pin
+                    existing_membership.pinned_version_hash = record[
+                        "pinned_version_hash"
+                    ]
+                    _log.debug(
+                        "Updated pinned_version_hash on existing membership: "
+                        "composite=%s child_uuid=%s",
+                        composite_id,
+                        record["child_artifact_uuid"],
+                    )
+                else:
+                    membership = CompositeMembership(
+                        collection_id=collection_id,
+                        composite_id=composite_id,
+                        child_artifact_uuid=record["child_artifact_uuid"],
+                        relationship_type="contains",
+                        pinned_version_hash=record["pinned_version_hash"],
+                    )
+                    session.add(membership)
+                    _log.debug(
+                        "Created CompositeMembership: composite=%s child_uuid=%s hash=%s",
+                        composite_id,
+                        record["child_artifact_uuid"],
+                        record["pinned_version_hash"][:8],
+                    )
+
+            # ------------------------------------------------------------------
+            # Step 4: Commit the transaction
+            # ------------------------------------------------------------------
+            session.commit()
+            duration_ms = (time.perf_counter() - import_start) * 1000
+            _log.info(
+                "import_plugin_transactional committed",
+                extra={
+                    "transaction_id": transaction_id,
+                    "composite_id": composite_id,
+                    "plugin_name": plugin_name,
+                    "child_count": child_count,
+                    "children_imported": children_imported,
+                    "children_reused": children_reused,
+                    "duration_ms": round(duration_ms, 2),
+                },
+            )
+
+            # Record OTel metrics on success
+            if _OTEL_AVAILABLE:
+                if _plugin_import_total is not None:
+                    _plugin_import_total.add(
+                        1, {"status": "success", "plugin_name": plugin_name}
+                    )
+                if _plugin_import_duration is not None:
+                    _plugin_import_duration.record(
+                        (time.perf_counter() - import_start),
+                        {"status": "success", "plugin_name": plugin_name},
+                    )
+
+            return ImportResult(
+                success=True,
+                plugin_id=composite_id,
+                children_imported=children_imported,
+                children_reused=children_reused,
+                errors=[],
+                transaction_id=transaction_id,
+            )
+
+        except Exception as exc:
+            session.rollback()
+            error_msg = str(exc)
+            duration_ms = (time.perf_counter() - import_start) * 1000
+            _log.error(
+                "import_plugin_transactional rolled back",
+                extra={
+                    "transaction_id": transaction_id,
+                    "composite_id": composite_id,
+                    "plugin_name": plugin_name,
+                    "child_count": child_count,
+                    "duration_ms": round(duration_ms, 2),
+                    "error": error_msg,
+                },
+                exc_info=True,
+            )
+            errors.append(error_msg)
+
+            # Record OTel metrics on failure
+            if _OTEL_AVAILABLE:
+                if _plugin_import_total is not None:
+                    _plugin_import_total.add(
+                        1, {"status": "failure", "plugin_name": plugin_name}
+                    )
+                if _plugin_import_duration is not None:
+                    _plugin_import_duration.record(
+                        (time.perf_counter() - import_start),
+                        {"status": "failure", "plugin_name": plugin_name},
+                    )
+
+            return ImportResult(
+                success=False,
+                plugin_id=composite_id,
+                children_imported=0,
+                children_reused=0,
+                errors=errors,
+                transaction_id=transaction_id,
+            )
+
+    # ------------------------------------------------------------------
+    # Wrap execution in an OTel parent span when available
+    # ------------------------------------------------------------------
+    if tracer is not None:
+        with tracer.start_as_current_span("plugin.import_transactional") as span:
+            span.set_attribute("plugin_name", plugin_name)
+            span.set_attribute("child_count", child_count)
+            span.set_attribute("transaction_id", transaction_id)
+            result = _run_import()
+            # Write association span after child processing
+            if result.success:
+                with tracer.start_as_current_span("association.write") as assoc_span:
+                    assoc_span.set_attribute("composite_id", composite_id)
+                    assoc_span.set_attribute("child_count", len(child_records))
+            return result
+    else:
+        return _run_import()

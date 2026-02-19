@@ -1,10 +1,13 @@
 ---
 type: context
-prd: "PRD-003-claudectl-alias"
-title: "claudectl Alias Context"
+prd: PRD-003-claudectl-alias
+title: claudectl Alias Context
 created: 2025-12-22
 last_updated: 2025-12-22
 status: active
+schema_version: 2
+doc_type: context
+feature_slug: prd-003-claudectl-alias
 ---
 
 # PRD-003: claudectl Alias - Context

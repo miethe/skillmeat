@@ -1,8 +1,12 @@
 ---
-parent: "../marketplace-source-detection-improvements-v1.md"
-section: "Environment Configuration & Deployment"
+parent: ../marketplace-source-detection-improvements-v1.md
+section: Environment Configuration & Deployment
+status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: deployment
+prd_ref: null
 ---
-
 # Environment Configuration & Deployment
 
 ## Environment Configuration

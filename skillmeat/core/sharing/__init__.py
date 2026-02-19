@@ -5,7 +5,13 @@ functionality for sharing SkillMeat artifacts across teams.
 """
 
 # Bundle creation and inspection
-from skillmeat.core.sharing.bundle import Bundle, BundleArtifact, BundleMetadata
+from skillmeat.core.sharing.bundle import (
+    Bundle,
+    BundleArtifact,
+    BundleMetadata,
+    CompositeBundleError,
+    export_composite_bundle,
+)
 from skillmeat.core.sharing.builder import (
     BundleBuilder,
     BundleValidationError,
@@ -24,6 +30,9 @@ __all__ = [
     "Bundle",
     "BundleArtifact",
     "BundleMetadata",
+    # Composite bundle export
+    "CompositeBundleError",
+    "export_composite_bundle",
     # Bundle builder
     "BundleBuilder",
     "BundleValidationError",

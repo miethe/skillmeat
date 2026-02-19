@@ -1,15 +1,27 @@
 ---
-title: "PRD: Smart Import & Discovery"
-description: "Auto-scanning for existing artifacts in projects and auto-populating details when adding artifacts from sources like GitHub"
-audience: [ai-agents, developers]
-tags: [prd, planning, enhancement, discovery, import, automation]
+title: 'PRD: Smart Import & Discovery'
+description: Auto-scanning for existing artifacts in projects and auto-populating
+  details when adding artifacts from sources like GitHub
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- planning
+- enhancement
+- discovery
+- import
+- automation
 created: 2025-11-30
 updated: 2025-12-15
-category: "product-planning"
+category: product-planning
 status: completed
 related:
-  - /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
-  - /docs/project_plans/PRDs/enhancements/web-ui-consolidation-v1.md
+- /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
+- /docs/project_plans/PRDs/enhancements/web-ui-consolidation-v1.md
+schema_version: 2
+doc_type: prd
+feature_slug: smart-import-discovery
 ---
 
 # PRD: Smart Import & Discovery

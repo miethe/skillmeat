@@ -111,6 +111,37 @@ Status values: `draft` → `approved` → `in-progress` → `completed`
 
 **Reference**: See `.claude/skills/artifact-tracking/plan-status-management.md` for full status management guide.
 
+## CCDash Frontmatter Requirements
+
+Use CCDash-aligned frontmatter for all planning artifacts.
+
+- Reference: `.claude/skills/artifact-tracking/schemas/field-reference.md`
+- Baseline fields for all planning docs: `schema_version`, `doc_type`, `title`, `status`, `created`, `updated`, `feature_slug`
+- Linkage fields: `prd_ref`, `plan_ref`, `related_documents`
+- Lifecycle fields to update after implementation: `commit_refs`, `pr_refs`, `files_affected`
+
+### Field Checklist by Doc Type
+
+- `prd`
+  - Required now: `schema_version`, `doc_type: prd`, `title`, `status`, `created`
+  - Populate early: `feature_slug`, `priority`, `risk_level`, `owner`, `contributors`
+  - Keep `prd_ref: null`; set `plan_ref` after implementation plan exists
+
+- `implementation_plan`
+  - Required now: `schema_version`, `doc_type: implementation_plan`, `title`, `status`, `created`, `prd_ref`
+  - Populate early: `scope`, `effort_estimate`, `feature_slug`, `priority`, `risk_level`
+  - Set `plan_ref: null` for root implementation plan
+
+- `phase_plan`
+  - Required now: `schema_version`, `doc_type: phase_plan`, `title`, `status`, `created`, `phase`, `phase_title`
+  - Populate early: `prd_ref`, `plan_ref`, `entry_criteria`, `exit_criteria`
+  - Keep `feature_slug` aligned with parent PRD/plan
+
+- `spike`
+  - Required now: `schema_version`, `doc_type: spike`, `title`, `status`, `created`
+  - Populate early: `feature_slug`, `research_questions`, `complexity`, `estimated_research_time`
+  - Set `prd_ref`/`plan_ref` when spike is linked to planned work
+
 ## Core Workflows
 
 ### Workflow 1: Create PRD from Feature Request

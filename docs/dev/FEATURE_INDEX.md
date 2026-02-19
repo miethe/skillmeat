@@ -11,7 +11,7 @@ SkillMeat is a personal collection manager for Claude Code artifacts (Skills, Co
 - **40+ Modals**: CRUD operations and workflows
 - **100+ Components**: UI building blocks
 - **150+ API Endpoints**: Full backend coverage
-- **5 Artifact Types**: Skill, Command, Agent, MCP, Hook
+- **6 Artifact Types**: Skill, Command, Agent, MCP, Hook, Composite
 - **8+ Filter Dimensions**: Type, Status, Scope, Tags, Search, etc.
 
 ---
@@ -82,11 +82,17 @@ Root (/)
 ### Entity Management (2 pages)
 
 **Manage (/manage)**
-- Type tabs: Skill/Command/Agent/MCP/Hook
+- Type tabs: Skill/Command/Agent/MCP/Hook/Composite
 - View modes: Grid, List
 - Search and filter
 - Detail panel with tabs
 - Modals: Add, Detail, Form, Delete, File ops, Merge
+- Composite tab includes:
+  - CompositeArtifactCard display with member count badge
+  - CompositeMembersList with version pinning info
+  - CompositeDetailModal with tabs: Overview, Members, History, Relationships
+  - CompositeMembershipEditor for managing child artifacts
+  - "Part of Composites" section showing parent relationships
 
 **Groups (/groups)**
 - Two-pane layout:
@@ -438,7 +444,7 @@ Root (/)
 
 ## API Endpoint Organization
 
-### By Router (15 routers)
+### By Router (16 routers)
 
 1. **Artifacts** (50+ endpoints)
    - CRUD, metadata, tags, versions, files, deployment, sync, linking, discovery
@@ -452,37 +458,41 @@ Root (/)
 4. **Groups** (15+ endpoints)
    - Management, artifact assignment
 
-5. **Projects** (15+ endpoints)
+5. **Composites** (20+ endpoints)
+   - Multi-artifact packages with relational model
+   - CRUD, membership management, sync, version pinning
+
+6. **Projects** (15+ endpoints)
    - CRUD, deployments, config, status
 
-6. **Deployments** (20+ endpoints)
+7. **Deployments** (20+ endpoints)
    - CRUD, sync, rollback, diff, refresh
 
-7. **Marketplace** (25+ endpoints)
+8. **Marketplace** (25+ endpoints)
    - Listings, installation, publishing, brokers
 
-8. **Marketplace Catalog** (10+ endpoints)
+9. **Marketplace Catalog** (10+ endpoints)
    - Catalog CRUD, search, source-based queries
 
-9. **Marketplace Sources** (20+ endpoints)
-   - Source CRUD, scan, tree, catalog, exclusions, tagging
+10. **Marketplace Sources** (20+ endpoints)
+    - Source CRUD, scan, tree, catalog, exclusions, tagging
 
-10. **MCP** (10+ endpoints)
+11. **MCP** (10+ endpoints)
     - Server CRUD, deployment, testing
 
-11. **Context Entities** (12+ endpoints)
+12. **Context Entities** (12+ endpoints)
     - CRUD, deployment
 
-12. **Project Templates** (8+ endpoints)
+13. **Project Templates** (8+ endpoints)
     - Listing, detail, deployment
 
-13. **Tags** (5+ endpoints)
+14. **Tags** (5+ endpoints)
     - Listing, stats, bulk operations
 
-14. **Bundles** (8+ endpoints)
+15. **Bundles** (8+ endpoints)
     - CRUD, export, share
 
-15. **Analytics** (10+ endpoints)
+16. **Analytics** (10+ endpoints)
     - Usage, deployments, trending, tags, collections
 
 ### By Operation Type
@@ -499,7 +509,7 @@ Root (/)
 ### Collection Page
 
 **Filters**:
-- Type (6 options: All, Skill, Command, Agent, MCP, Hook)
+- Type (7 options: All, Skill, Command, Agent, MCP, Hook, Composite)
 - Status (6 options: All, Synced, Modified, Outdated, Conflict, Error)
 - Scope (3 options: All, User, Local)
 - Tags (Multi-select, dynamic)
@@ -622,14 +632,14 @@ env_vars, status
 | **Pages** | 22 (main + sub-routes) |
 | **Modals** | 40+ |
 | **Components** | 100+ |
-| **API Endpoints** | 150+ |
-| **Artifact Types** | 5 |
+| **API Endpoints** | 160+ |
+| **Artifact Types** | 6 (including Composite) |
 | **Sync States** | 6 |
 | **Filter Dimensions** | 8+ |
 | **View Modes** | 3+ |
-| **Routers** | 15 |
+| **Routers** | 16 (including Composites) |
 | **UI Primitives** | 24+ |
-| **Artifact Type Filters** | 6 |
+| **Artifact Type Filters** | 7 |
 | **Status Filters** | 6 |
 | **Scope Options** | 2-3 |
 

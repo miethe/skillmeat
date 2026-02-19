@@ -1,126 +1,150 @@
 ---
 type: progress
-prd: "artifact-detection-standardization"
+prd: artifact-detection-standardization
 phase: 3
-phase_title: "Refactor Marketplace Heuristics Detection"
+phase_title: Refactor Marketplace Heuristics Detection
 status: pending
 progress: 0
 total_tasks: 10
 completed_tasks: 0
 story_points: 18
-duration: "2 weeks"
-
+duration: 2 weeks
 tasks:
-  - id: "TASK-3.1"
-    title: "Analyze Current heuristic_detector.py"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: []
-    story_points: 2
-    description: "Deep analysis of 7-signal scoring system"
-
-  - id: "TASK-3.2"
-    title: "Remove Duplicate ArtifactType Enum"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.1"]
-    story_points: 1
-    description: "Import from shared module instead"
-
-  - id: "TASK-3.3"
-    title: "Import Shared Detection Components"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.2"]
-    story_points: 2
-    description: "Wire up shared signatures, aliases, functions"
-
-  - id: "TASK-3.4"
-    title: "Refactor Confidence Scoring Architecture"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.1", "TASK-3.3"]
-    story_points: 4
-    description: "Separate baseline detection from marketplace signals"
-
-  - id: "TASK-3.5"
-    title: "Implement Baseline Detection"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.4"]
-    story_points: 2
-    description: "Call shared detect_artifact() for baseline"
-
-  - id: "TASK-3.6"
-    title: "Implement Marketplace Confidence Scoring"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.4", "TASK-3.5"]
-    story_points: 3
-    description: "GitHub heuristics, depth penalties, scoring"
-
-  - id: "TASK-3.7"
-    title: "Maintain Manual Directory Mapping"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.6"]
-    story_points: 2
-    description: "Ensure manual overrides still work"
-
-  - id: "TASK-3.8"
-    title: "Update Marketplace Tests"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.5", "TASK-3.6", "TASK-3.7"]
-    story_points: 2
-    description: "Update all tests for refactored scoring"
-
-  - id: "TASK-3.9"
-    title: "Integration Testing"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.8"]
-    story_points: 1
-    description: "Cross-module tests with Phase 1 & 2"
-
-  - id: "TASK-3.10"
-    title: "Documentation and Comments"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.9"]
-    story_points: 1
-    description: "Explain baseline + marketplace architecture"
-
+- id: TASK-3.1
+  title: Analyze Current heuristic_detector.py
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies: []
+  story_points: 2
+  description: Deep analysis of 7-signal scoring system
+- id: TASK-3.2
+  title: Remove Duplicate ArtifactType Enum
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.1
+  story_points: 1
+  description: Import from shared module instead
+- id: TASK-3.3
+  title: Import Shared Detection Components
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.2
+  story_points: 2
+  description: Wire up shared signatures, aliases, functions
+- id: TASK-3.4
+  title: Refactor Confidence Scoring Architecture
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.1
+  - TASK-3.3
+  story_points: 4
+  description: Separate baseline detection from marketplace signals
+- id: TASK-3.5
+  title: Implement Baseline Detection
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.4
+  story_points: 2
+  description: Call shared detect_artifact() for baseline
+- id: TASK-3.6
+  title: Implement Marketplace Confidence Scoring
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.4
+  - TASK-3.5
+  story_points: 3
+  description: GitHub heuristics, depth penalties, scoring
+- id: TASK-3.7
+  title: Maintain Manual Directory Mapping
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.6
+  story_points: 2
+  description: Ensure manual overrides still work
+- id: TASK-3.8
+  title: Update Marketplace Tests
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.5
+  - TASK-3.6
+  - TASK-3.7
+  story_points: 2
+  description: Update all tests for refactored scoring
+- id: TASK-3.9
+  title: Integration Testing
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.8
+  story_points: 1
+  description: Cross-module tests with Phase 1 & 2
+- id: TASK-3.10
+  title: Documentation and Comments
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.9
+  story_points: 1
+  description: Explain baseline + marketplace architecture
 parallelization:
-  batch_1: ["TASK-3.1"]
-  batch_2: ["TASK-3.2"]
-  batch_3: ["TASK-3.3"]
-  batch_4: ["TASK-3.4"]
-  batch_5: ["TASK-3.5"]
-  batch_6: ["TASK-3.6"]
-  batch_7: ["TASK-3.7"]
-  batch_8: ["TASK-3.8"]
-  batch_9: ["TASK-3.9"]
-  batch_10: ["TASK-3.10"]
-
+  batch_1:
+  - TASK-3.1
+  batch_2:
+  - TASK-3.2
+  batch_3:
+  - TASK-3.3
+  batch_4:
+  - TASK-3.4
+  batch_5:
+  - TASK-3.5
+  batch_6:
+  - TASK-3.6
+  batch_7:
+  - TASK-3.7
+  batch_8:
+  - TASK-3.8
+  batch_9:
+  - TASK-3.9
+  batch_10:
+  - TASK-3.10
 blockers:
-  - description: "Phase 1 must be complete"
-    blocking_tasks: ["TASK-3.1"]
-    status: "active"
-
+- description: Phase 1 must be complete
+  blocking_tasks:
+  - TASK-3.1
+  status: active
 notes:
-  - "Can run in parallel with Phase 2 after Phase 1 completes"
-  - "Confidence scores must match pre-refactor behavior"
+- Can run in parallel with Phase 2 after Phase 1 completes
+- Confidence scores must match pre-refactor behavior
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-detection-standardization
 ---
 
 # Phase 3: Refactor Marketplace Heuristics Detection

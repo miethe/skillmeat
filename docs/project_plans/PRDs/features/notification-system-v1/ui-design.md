@@ -1,3 +1,9 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: prd
+feature_slug: ui-design
+---
 # Notification System UI Design
 
 **Feature**: Notification Center for SkillMeat

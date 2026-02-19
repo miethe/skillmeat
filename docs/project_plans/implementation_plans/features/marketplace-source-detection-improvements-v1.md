@@ -1,14 +1,18 @@
 ---
-title: "Implementation Plan: Marketplace Source Detection Improvements"
-description: "Detailed implementation plan for manual source mapping and auto-detection deduplication features"
-author: "Claude Code (Implementation Planning Orchestrator)"
+title: 'Implementation Plan: Marketplace Source Detection Improvements'
+description: Detailed implementation plan for manual source mapping and auto-detection
+  deduplication features
+author: Claude Code (Implementation Planning Orchestrator)
 date: 2026-01-05
-status: "active"
-complexity: "Medium (M)"
-estimated_effort: "55-70 story points"
-estimated_timeline: "4-5 weeks"
+status: inferred_complete
+complexity: Medium (M)
+estimated_effort: 55-70 story points
+estimated_timeline: 4-5 weeks
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: marketplace-source-detection-improvements
+prd_ref: null
 ---
-
 # Implementation Plan: Marketplace Source Detection Improvements
 
 **Feature:** Marketplace Source Detection Improvements (Manual Mapping + Auto-Deduplication)

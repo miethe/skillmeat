@@ -62,6 +62,9 @@ class Deployment:
     platform: Optional[Platform] = None
     profile_root_dir: Optional[str] = None
 
+    # Stable cross-context identity (ADR-007); optional — absent when artifact not yet in cache
+    artifact_uuid: Optional[str] = None
+
     # Deprecated field for backward compatibility
     collection_sha: Optional[str] = None  # Deprecated: use content_hash instead
 
@@ -104,6 +107,8 @@ class Deployment:
             )
         if self.profile_root_dir:
             result["profile_root_dir"] = self.profile_root_dir
+        if self.artifact_uuid is not None:
+            result["artifact_uuid"] = self.artifact_uuid
 
         # Keep collection_sha for backward compatibility (same as content_hash)
         result["collection_sha"] = self.content_hash
@@ -157,6 +162,7 @@ class Deployment:
                 else None
             ),
             profile_root_dir=data.get("profile_root_dir"),
+            artifact_uuid=data.get("artifact_uuid"),  # ADR-007; absent in old files
             collection_sha=data.get("collection_sha"),  # Keep for backward compat
         )
 
@@ -351,7 +357,7 @@ class DeploymentManager:
                 dest_base = resolve_profile_root(project_path, profile=profile)
 
                 if dest_path:
-                    if artifact.type in (ArtifactType.SKILL, ArtifactType.MCP):
+                    if artifact.type in (ArtifactType.SKILL, ArtifactType.MCP, ArtifactType.COMPOSITE):
                         final_dest_path = project_path / dest_path / artifact.name
                     else:
                         final_dest_path = (
@@ -408,6 +414,11 @@ class DeploymentManager:
                         project_path.resolve()
                     )
 
+                artifact_uuid = self._lookup_artifact_uuid(
+                    artifact_name=artifact.name,
+                    artifact_type=artifact.type.value,
+                    project_path=project_path,
+                )
                 DeploymentTracker.record_deployment(
                     project_path=project_path,
                     artifact=artifact,
@@ -418,6 +429,7 @@ class DeploymentManager:
                     profile_root_dir=profile.root_dir,
                     artifact_path=artifact_path,
                     artifact_path_map=dict(profile.artifact_path_map),
+                    artifact_uuid=artifact_uuid,
                 )
 
                 self._record_deployment_version(
@@ -781,3 +793,53 @@ class DeploymentManager:
         except Exception as e:
             # Never fail deploy due to analytics
             console.print(f"[dim]Debug: Failed to record deploy analytics: {e}[/dim]")
+
+    def _lookup_artifact_uuid(
+        self,
+        artifact_name: str,
+        artifact_type: str,
+        project_path: Path,
+    ) -> Optional[str]:
+        """Look up the stable UUID for an artifact from the DB cache.
+
+        Queries the cache Artifact model using the project path + name + type composite
+        key.  Returns None (never raises) when the artifact is not yet cached so callers
+        can always omit the field gracefully.
+
+        Args:
+            artifact_name: Artifact name
+            artifact_type: Artifact type string (e.g. "skill")
+            project_path: Resolved project root directory
+
+        Returns:
+            32-char hex UUID string from CachedArtifact.uuid, or None if not found
+        """
+        try:
+            from skillmeat.cache.models import Artifact as CacheArtifact
+            from skillmeat.cache.models import get_session
+
+            session = get_session()
+            try:
+                cache_artifact = (
+                    session.query(CacheArtifact)
+                    .filter_by(
+                        name=artifact_name,
+                        type=artifact_type,
+                    )
+                    .join(CacheArtifact.project)
+                    .filter_by(path=str(project_path))
+                    .first()
+                )
+                if cache_artifact is not None:
+                    return cache_artifact.uuid
+            finally:
+                session.close()
+        except Exception as e:
+            logger.debug(
+                "UUID lookup failed for %s/%s in %s: %s",
+                artifact_type,
+                artifact_name,
+                project_path,
+                e,
+            )
+        return None

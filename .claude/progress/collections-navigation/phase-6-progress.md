@@ -1,104 +1,117 @@
 ---
 type: progress
-prd: "collections-navigation"
+prd: collections-navigation
 phase: 6
-title: "Caching & Polish - Performance & Documentation"
-status: "pending"
+title: Caching & Polish - Performance & Documentation
+status: pending
 overall_progress: 0
 total_tasks: 6
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["python-backend-engineer"]
-contributors: ["ui-engineer-enhanced", "testing-specialist", "documentation-writer"]
-
+owners:
+- python-backend-engineer
+contributors:
+- ui-engineer-enhanced
+- testing-specialist
+- documentation-writer
 tasks:
-  - id: "TASK-6.1"
-    name: "Local Artifact Cache Implementation"
-    description: "SQLite cache for frequently accessed artifact data"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2.5h"
-    priority: "high"
-
-  - id: "TASK-6.2"
-    name: "Background Refresh Mechanism"
-    description: "Periodic background updates for cache freshness"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-6.1"]
-    estimated_effort: "2h"
-    priority: "medium"
-
-  - id: "TASK-6.3"
-    name: "Cache Persistence Across Restarts"
-    description: "Ensure cache survives server restarts and is consistent"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-6.1"]
-    estimated_effort: "1h"
-    priority: "medium"
-
-  - id: "TASK-6.4"
-    name: "Manual Refresh Button"
-    description: "UI control to force cache refresh on demand"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "1h"
-    priority: "low"
-
-  - id: "TASK-6.5"
-    name: "Comprehensive Testing Suite"
-    description: "End-to-end and integration tests for all features (85%+ coverage)"
-    status: "pending"
-    assigned_to: ["testing-specialist"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TASK-6.6"
-    name: "Documentation"
-    description: "User guides and developer documentation for Collections & Groups"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "1.5h"
-    priority: "medium"
-
+- id: TASK-6.1
+  name: Local Artifact Cache Implementation
+  description: SQLite cache for frequently accessed artifact data
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2.5h
+  priority: high
+- id: TASK-6.2
+  name: Background Refresh Mechanism
+  description: Periodic background updates for cache freshness
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-6.1
+  estimated_effort: 2h
+  priority: medium
+- id: TASK-6.3
+  name: Cache Persistence Across Restarts
+  description: Ensure cache survives server restarts and is consistent
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-6.1
+  estimated_effort: 1h
+  priority: medium
+- id: TASK-6.4
+  name: Manual Refresh Button
+  description: UI control to force cache refresh on demand
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 1h
+  priority: low
+- id: TASK-6.5
+  name: Comprehensive Testing Suite
+  description: End-to-end and integration tests for all features (85%+ coverage)
+  status: pending
+  assigned_to:
+  - testing-specialist
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+- id: TASK-6.6
+  name: Documentation
+  description: User guides and developer documentation for Collections & Groups
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 1.5h
+  priority: medium
 parallelization:
-  batch_1: ["TASK-6.1", "TASK-6.4", "TASK-6.5", "TASK-6.6"]
-  batch_2: ["TASK-6.2", "TASK-6.3"]
-  critical_path: ["TASK-6.1", "TASK-6.2"]
-  estimated_total_time: "1w"
-
+  batch_1:
+  - TASK-6.1
+  - TASK-6.4
+  - TASK-6.5
+  - TASK-6.6
+  batch_2:
+  - TASK-6.2
+  - TASK-6.3
+  critical_path:
+  - TASK-6.1
+  - TASK-6.2
+  estimated_total_time: 1w
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "SQLite cache reduces API response time by 50%+"
-    status: "pending"
-  - id: "SC-2"
-    description: "Background refresh runs every 5 minutes without blocking"
-    status: "pending"
-  - id: "SC-3"
-    description: "Cache persists across server restarts"
-    status: "pending"
-  - id: "SC-4"
-    description: "Manual refresh button updates cache immediately"
-    status: "pending"
-  - id: "SC-5"
-    description: "Test coverage >85% for all new code"
-    status: "pending"
-  - id: "SC-6"
-    description: "Documentation includes user guides and API reference"
-    status: "pending"
-  - id: "SC-7"
-    description: "No performance regressions in existing features"
-    status: "pending"
-
+- id: SC-1
+  description: SQLite cache reduces API response time by 50%+
+  status: pending
+- id: SC-2
+  description: Background refresh runs every 5 minutes without blocking
+  status: pending
+- id: SC-3
+  description: Cache persists across server restarts
+  status: pending
+- id: SC-4
+  description: Manual refresh button updates cache immediately
+  status: pending
+- id: SC-5
+  description: Test coverage >85% for all new code
+  status: pending
+- id: SC-6
+  description: Documentation includes user guides and API reference
+  status: pending
+- id: SC-7
+  description: No performance regressions in existing features
+  status: pending
 files_modified: []
+schema_version: 2
+doc_type: progress
+feature_slug: collections-navigation
 ---
 
 # collections-navigation - Phase 6: Caching & Polish

@@ -3,6 +3,9 @@ type: testing-guide
 prd: confidence-score-enhancements
 task: TASK-5.7
 created: 2025-12-27
+schema_version: 2
+doc_type: context
+feature_slug: confidence-score-enhancements
 ---
 
 # URL Filter Synchronization - Manual Testing Guide

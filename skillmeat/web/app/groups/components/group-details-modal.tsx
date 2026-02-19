@@ -338,9 +338,9 @@ export function GroupDetailsModal({ open, onOpenChange, group }: GroupDetailsMod
                 <div className="space-y-2">
                   {artifacts.map((artifact) => (
                     <GroupArtifactRow
-                      key={artifact.artifact_id}
+                      key={artifact.artifact_uuid}
                       group={group}
-                      artifactId={artifact.artifact_id}
+                      artifactId={artifact.artifact_id ?? artifact.artifact_uuid}
                       addedAt={artifact.added_at}
                     />
                   ))}
@@ -361,11 +361,11 @@ export function GroupDetailsModal({ open, onOpenChange, group }: GroupDetailsMod
                 <div className="space-y-2">
                   {sortedHistory.map((entry) => (
                     <div
-                      key={`${entry.artifact_id}-${entry.added_at}`}
+                      key={`${entry.artifact_uuid}-${entry.added_at}`}
                       className="flex items-center justify-between rounded border px-3 py-2"
                     >
                       <div className="text-sm">
-                        <ArtifactHistoryRow artifactId={entry.artifact_id} /> added to group
+                        <ArtifactHistoryRow artifactId={entry.artifact_id ?? entry.artifact_uuid} /> added to group
                       </div>
                       <span className="text-xs text-muted-foreground">
                         {new Date(entry.added_at).toLocaleString()}

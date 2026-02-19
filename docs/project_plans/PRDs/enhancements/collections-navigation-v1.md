@@ -1,16 +1,29 @@
 ---
-title: "PRD: Collections & Site Navigation Enhancement"
-description: "Restructure navigation and artifact management with Collections-centric UX, custom grouping, and deployment dashboard"
-audience: [ai-agents, developers]
-tags: [prd, planning, enhancement, navigation, collections, groups, deployment, ux]
+title: 'PRD: Collections & Site Navigation Enhancement'
+description: Restructure navigation and artifact management with Collections-centric
+  UX, custom grouping, and deployment dashboard
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- planning
+- enhancement
+- navigation
+- collections
+- groups
+- deployment
+- ux
 created: 2025-12-12
 updated: 2025-12-12
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/implementation_plans/enhancements/collections-navigation-v1.md
+- /docs/project_plans/implementation_plans/enhancements/collections-navigation-v1.md
+schema_version: 2
+doc_type: prd
+feature_slug: collections-navigation
 ---
-
 # PRD: Collections & Site Navigation Enhancement
 
 **Feature Name:** Collections & Site Navigation Enhancement

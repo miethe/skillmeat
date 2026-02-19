@@ -1,8 +1,11 @@
 ---
 type: context
-prd: "catalog-entry-modal-enhancement"
+prd: catalog-entry-modal-enhancement
 created: 2025-12-28
 updated: 2025-12-28
+schema_version: 2
+doc_type: context
+feature_slug: catalog-entry-modal-enhancement
 ---
 
 # Context: Catalog Entry Modal Enhancement

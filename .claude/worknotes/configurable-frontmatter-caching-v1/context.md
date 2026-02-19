@@ -1,23 +1,22 @@
 ---
-# === CONTEXT WORKNOTES: Configurable Frontmatter Caching ===
-# PRD-level sticky pad for agent notes and observations during development
-
 type: context
-prd: "configurable-frontmatter-caching-v1"
-title: "Configurable Frontmatter Caching - Development Context"
-status: "active"
-created: "2026-01-20"
-updated: "2026-01-20"
-
-# Quick Reference (for fast agent queries)
+prd: configurable-frontmatter-caching-v1
+title: Configurable Frontmatter Caching - Development Context
+status: active
+created: '2026-01-20'
+updated: '2026-01-20'
 critical_notes_count: 0
 implementation_decisions_count: 2
 active_gotchas_count: 1
-agent_contributors: ["orchestrator"]
-
-# Agent Communication Index
+agent_contributors:
+- orchestrator
 agents:
-  - { agent: "orchestrator", note_count: 3, last_contribution: "2026-01-20" }
+- agent: orchestrator
+  note_count: 3
+  last_contribution: '2026-01-20'
+schema_version: 2
+doc_type: context
+feature_slug: configurable-frontmatter-caching-v1
 ---
 
 # Configurable Frontmatter Caching - Development Context

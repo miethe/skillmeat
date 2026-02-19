@@ -1,3 +1,10 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: discovery-import-enhancement
+prd_ref: null
+---
 # Implementation Plan: Discovery & Import Enhancement
 
 **Complexity**: L (Large) | **Track**: Full | **Created**: 2025-12-04

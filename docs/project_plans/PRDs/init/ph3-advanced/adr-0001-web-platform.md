@@ -1,11 +1,19 @@
 ---
-title: "ADR-0001: Web Platform Stack for SkillMeat Phase 3"
-status: accepted
+title: 'ADR-0001: Web Platform Stack for SkillMeat Phase 3'
+status: inferred_complete
 date: 2025-11-10
-deciders: ["lead-architect", "product-team"]
-tags: [adr, web, architecture, phase3]
+deciders:
+- lead-architect
+- product-team
+tags:
+- adr
+- web
+- architecture
+- phase3
+schema_version: 2
+doc_type: prd
+feature_slug: adr-0001-web-platform
 ---
-
 # ADR-0001 — Web Platform Stack for SkillMeat Phase 3
 
 ## Context

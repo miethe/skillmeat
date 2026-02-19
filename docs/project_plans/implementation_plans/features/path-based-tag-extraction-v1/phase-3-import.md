@@ -1,3 +1,11 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: path-based-tag-extraction
+prd_ref: null
+plan_ref: null
+---
 # Phase 3: Import Integration
 
 **Phase**: 3 (Import Integration)

@@ -364,14 +364,18 @@ async def list_collection_artifacts(
                 )
 
         # Sort artifacts by name for consistent pagination
-        artifacts = sorted(artifacts, key=lambda a: a.composite_key())
+        # composite_key() returns (name, type_value) tuple — join for cursor use
+        def _cursor_key(a):
+            return f"{a.type.value}:{a.name}"
+
+        artifacts = sorted(artifacts, key=_cursor_key)
 
         # Decode cursor if provided
         start_idx = 0
         if after:
             cursor_value = decode_cursor(after)
-            # Find artifact index by composite key
-            artifact_keys = [a.composite_key() for a in artifacts]
+            # Find artifact index by cursor key
+            artifact_keys = [_cursor_key(a) for a in artifacts]
             try:
                 start_idx = artifact_keys.index(cursor_value) + 1
             except ValueError:
@@ -399,10 +403,11 @@ async def list_collection_artifacts(
         # Convert to summary format (legacy file-based, no collection membership)
         items: List[ArtifactSummary] = [
             ArtifactSummary(
+                id=f"{artifact.type.value}:{artifact.name}",
                 name=artifact.name,
                 type=artifact.type.value,
-                version=artifact.version,
-                source=artifact.source,
+                version=artifact.metadata.version if artifact.metadata else None,
+                source=artifact.upstream or f"{artifact.type.value}:{artifact.name}",
                 tools=(
                     [
                         tool.value if hasattr(tool, "value") else str(tool)
@@ -420,10 +425,10 @@ async def list_collection_artifacts(
         has_previous = start_idx > 0
 
         start_cursor = (
-            encode_cursor(page_artifacts[0].composite_key()) if page_artifacts else None
+            encode_cursor(_cursor_key(page_artifacts[0])) if page_artifacts else None
         )
         end_cursor = (
-            encode_cursor(page_artifacts[-1].composite_key())
+            encode_cursor(_cursor_key(page_artifacts[-1]))
             if page_artifacts
             else None
         )

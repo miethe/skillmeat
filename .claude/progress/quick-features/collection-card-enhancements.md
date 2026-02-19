@@ -4,14 +4,17 @@ status: completed
 feature: Collection Card Enhancements (Group Dialog + Tag/Group Add Buttons)
 created: 2026-02-13
 tasks:
-  - id: QF-1
-    title: "Enhance AddToGroupDialog: taller + group badges"
-    status: in-progress
-    assigned_to: ui-engineer-enhanced
-  - id: QF-2
-    title: "Add '+' buttons and tag selector popover to artifact cards"
-    status: in-progress
-    assigned_to: ui-engineer-enhanced
+- id: QF-1
+  title: 'Enhance AddToGroupDialog: taller + group badges'
+  status: in-progress
+  assigned_to: ui-engineer-enhanced
+- id: QF-2
+  title: Add '+' buttons and tag selector popover to artifact cards
+  status: in-progress
+  assigned_to: ui-engineer-enhanced
+schema_version: 2
+doc_type: quick_feature
+feature_slug: collection-card-enhancements
 ---
 
 # Collection Card Enhancements

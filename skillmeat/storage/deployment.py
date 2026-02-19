@@ -175,6 +175,7 @@ class DeploymentTracker:
         profile_root_dir: str = DEFAULT_PROFILE_ROOT_DIR,
         artifact_path: Optional[Path] = None,
         artifact_path_map: Optional[Dict[str, str]] = None,
+        artifact_uuid: Optional[str] = None,
     ) -> None:
         """Record new deployment or update existing.
 
@@ -183,6 +184,8 @@ class DeploymentTracker:
             artifact: Artifact being deployed
             collection_name: Source collection name
             collection_sha: SHA of artifact content
+            artifact_uuid: Stable UUID from DB cache (ADR-007); optional, omitted when
+                artifact not yet cached
         """
         from datetime import datetime
 
@@ -225,6 +228,7 @@ class DeploymentTracker:
             deployment_profile_id=deployment_profile_id,
             platform=platform,
             profile_root_dir=profile_root_dir,
+            artifact_uuid=artifact_uuid,  # ADR-007; None when artifact not yet cached
         )
 
         if existing is not None:

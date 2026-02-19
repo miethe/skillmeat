@@ -1,10 +1,15 @@
 ---
-title: "Phase 0: Enums & Foundations"
-description: "Platform and Tool enums, frontend type definitions, Artifact model updates"
+title: 'Phase 0: Enums & Foundations'
+description: Platform and Tool enums, frontend type definitions, Artifact model updates
 created: 2026-01-21
 updated: 2026-01-21
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: enhanced-frontmatter-utilization
+prd_ref: null
+plan_ref: null
 ---
-
 # Phase 0: Enums & Foundations
 
 **Duration**: 1 week

@@ -281,7 +281,7 @@ export function useGroup(id: string | undefined): UseQueryResult<Group, Error> {
  * ```tsx
  * const { data: artifacts } = useGroupArtifacts(groupId);
  * artifacts?.map(artifact => (
- *   <div key={artifact.artifact_id}>
+ *   <div key={artifact.artifact_uuid}>
  *     Position: {artifact.position}
  *   </div>
  * ))

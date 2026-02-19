@@ -1,52 +1,61 @@
 ---
 type: progress
-prd: "marketplace-source-detection-improvements"
+prd: marketplace-source-detection-improvements
 phase: 1
-phase_name: "Database & Schema"
+phase_name: Database & Schema
 status: completed
 progress: 100
 total_tasks: 4
 completed_tasks: 4
-effort: "5-8 pts"
+effort: 5-8 pts
 created: 2026-01-05
 updated: 2026-01-05
 completed_at: 2026-01-05
-
-assigned_to: ["data-layer-expert"]
+assigned_to:
+- data-layer-expert
 dependencies: []
-
 tasks:
-  - id: "P1.1"
-    name: "Validate manual_map column"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    effort: "2 pts"
-
-  - id: "P1.2"
-    name: "Validate metadata_json column"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    effort: "2 pts"
-
-  - id: "P1.3"
-    name: "Document manual_map schema"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    effort: "2 pts"
-
-  - id: "P1.4"
-    name: "Create Pydantic validation schemas"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["P1.1", "P1.2", "P1.3"]
-    effort: "3 pts"
-
+- id: P1.1
+  name: Validate manual_map column
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  effort: 2 pts
+- id: P1.2
+  name: Validate metadata_json column
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  effort: 2 pts
+- id: P1.3
+  name: Document manual_map schema
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  effort: 2 pts
+- id: P1.4
+  name: Create Pydantic validation schemas
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - P1.1
+  - P1.2
+  - P1.3
+  effort: 3 pts
 parallelization:
-  batch_1: ["P1.1", "P1.2", "P1.3"]
-  batch_2: ["P1.4"]
+  batch_1:
+  - P1.1
+  - P1.2
+  - P1.3
+  batch_2:
+  - P1.4
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-source-detection-improvements
 ---
 
 # Phase 1: Database & Schema

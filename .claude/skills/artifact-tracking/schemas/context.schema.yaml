@@ -2,26 +2,75 @@ $schema: "http://json-schema.org/draft-07/schema#"
 title: "Context Worknotes Artifact Schema"
 type: object
 description: "JSON Schema for PRD-level context worknotes (YAML frontmatter validation). One file per PRD for agent observations and notes during development."
+allOf:
+  - $ref: "./envelope.schema.yaml"
 
 required:
   - type
   - prd
-  - title
-  - status
-  - created
-  - updated
 
 properties:
-  type:
+  schema_version:
+    type: integer
+    minimum: 1
+    description: "Optional CCDash schema version (v2 recommended)"
+
+  doc_type:
     type: string
     enum: ["context"]
+    description: "Optional CCDash document type alias for compatibility"
+
+  feature_slug:
+    type: string
+    minLength: 3
+    maxLength: 64
+    pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+    description: "Optional feature slug alias for `prd`"
+
+  prd_ref:
+    oneOf:
+      - type: "null"
+      - type: string
+        minLength: 3
+        maxLength: 256
+    default: null
+    description: "Optional reference to PRD document path"
+
+  plan_ref:
+    oneOf:
+      - type: "null"
+      - type: string
+        minLength: 3
+        maxLength: 256
+    default: null
+    description: "Optional reference to parent implementation plan"
+
+  commit_refs:
+    type: array
+    items:
+      type: string
+      minLength: 7
+      maxLength: 64
+    default: []
+    description: "Optional commit references tied to context notes"
+
+  pr_refs:
+    type: array
+    items:
+      type: string
+      minLength: 3
+      maxLength: 64
+    default: []
+    description: "Optional pull request references tied to context notes"
+
+  type:
+    type: string
     description: "Artifact type identifier"
 
   prd:
     type: string
     minLength: 3
     maxLength: 64
-    pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
     description: "PRD identifier in kebab-case (e.g., 'artifact-flow-modal-redesign')"
 
   title:
@@ -32,7 +81,7 @@ properties:
 
   status:
     type: string
-    enum: ["active", "archived", "abandoned"]
+    enum: ["active", "archived", "abandoned", "complete", "not_started", "pending"]
     description: "Context file status (active during development, archived when complete)"
 
   created:
@@ -69,7 +118,6 @@ properties:
     maxItems: 50
     items:
       type: string
-      pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
     default: []
     description: "List of agents who have contributed notes"
 
@@ -78,23 +126,24 @@ properties:
     type: array
     maxItems: 50
     items:
-      type: object
-      required: ["agent", "note_count"]
-      properties:
-        agent:
-          type: string
-          pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
-          description: "Agent identifier"
+      oneOf:
+        - type: object
+          required: ["agent", "note_count"]
+          properties:
+            agent:
+              type: string
+              description: "Agent identifier"
 
-        note_count:
-          type: integer
-          minimum: 1
-          description: "Number of notes from this agent"
+            note_count:
+              type: integer
+              minimum: 1
+              description: "Number of notes from this agent"
 
-        last_contribution:
-          type: string
-          format: "date"
-          description: "Date of last contribution (YYYY-MM-DD)"
+            last_contribution:
+              type: string
+              format: "date"
+              description: "Date of last contribution (YYYY-MM-DD)"
+        - type: string
 
     default: []
     description: "Index of agent contributions for efficient queries"
@@ -114,7 +163,7 @@ properties:
 
         status:
           type: string
-          enum: ["complete", "blocked", "in-progress"]
+          enum: ["complete", "completed", "blocked", "in-progress", "not_started", "not-started", "pending", "partial"]
           description: "Phase status"
 
         reason:
@@ -191,13 +240,11 @@ properties:
     maxItems: 100
     items:
       type: object
-      required: ["id", "question", "decision"]
       properties:
         id:
           type: string
           minLength: 2
           maxLength: 16
-          pattern: "^DECISION-[0-9]+$"
           description: "Decision identifier (e.g., 'DECISION-1')"
 
         question:
@@ -228,7 +275,6 @@ properties:
           type: string
           minLength: 5
           maxLength: 256
-          pattern: "^[a-zA-Z0-9/_.-]+\\.([a-z]{2,})(:[0-9]+-[0-9]+)?$"
           description: "File location where decision is implemented (e.g., 'path/to/file.ts:45')"
 
         phase:
@@ -266,13 +312,12 @@ properties:
             type: string
             minLength: 5
             maxLength: 256
-            pattern: "^(/[a-zA-Z0-9/_{}.-]+|[a-zA-Z0-9._()-]+)$"
           default: []
           description: "API endpoints or functions called (e.g., ['/api/v1/prompts/{id}/blocks'])"
 
         status:
           type: string
-          enum: ["waiting-on-backend", "waiting-on-frontend", "waiting-on-external", "complete", "in-progress"]
+          description: "Integration status"
           default: "in-progress"
           description: "Integration status"
 
@@ -289,7 +334,6 @@ properties:
     maxItems: 100
     items:
       type: object
-      required: ["id", "title", "description", "solution"]
       properties:
         id:
           type: string
@@ -320,7 +364,6 @@ properties:
           type: string
           minLength: 5
           maxLength: 256
-          pattern: "^[a-zA-Z0-9/_.-]+\\.([a-z]{2,})(:[0-9]+-[0-9]+)?$"
           description: "File location of gotcha (e.g., 'BlockEditor.tsx:105-125')"
 
         severity:
@@ -353,7 +396,6 @@ properties:
           type: string
           minLength: 5
           maxLength: 256
-          pattern: "^[a-zA-Z0-9/_.-]+\\.([a-z]{2,})$"
           description: "File path (e.g., 'path/to/file.ts')"
 
         changes:
@@ -387,4 +429,4 @@ properties:
     maxLength: 2048
     description: "Additional notes for agents continuing this work"
 
-additionalProperties: false
+additionalProperties: true

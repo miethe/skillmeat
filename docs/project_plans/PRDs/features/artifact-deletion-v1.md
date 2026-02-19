@@ -21,6 +21,9 @@ related:
 - /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
 - /.claude/rules/web/api-client.md
 - /.claude/rules/web/hooks.md
+schema_version: 2
+doc_type: prd
+feature_slug: artifact-deletion
 ---
 
 # PRD: Artifact Deletion from Collections and Projects

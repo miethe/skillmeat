@@ -3,8 +3,11 @@ feature: clickable-deployment-cards
 status: completed
 scope: frontend
 files_affected:
-  - skillmeat/web/app/collection/page.tsx
+- skillmeat/web/app/collection/page.tsx
 estimated_complexity: simple
+schema_version: 2
+doc_type: quick_feature
+feature_slug: clickable-deployment-cards
 ---
 
 # Clickable Deployment Cards in Artifact Modals

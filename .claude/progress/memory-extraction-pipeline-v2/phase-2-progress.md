@@ -96,6 +96,9 @@ files_modified:
 - tests/test_memory/test_memory_extractor_service.py
 progress: 100
 updated: '2026-02-07'
+schema_version: 2
+doc_type: progress
+feature_slug: memory-extraction-pipeline-v2
 ---
 
 # memory-extraction-pipeline-v2 - Phase 2: Quality Enhancement - Provenance & Scoring

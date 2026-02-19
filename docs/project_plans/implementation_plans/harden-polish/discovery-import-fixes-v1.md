@@ -1,14 +1,29 @@
 ---
-title: "Implementation Plan: Discovery & Import Fixes and Enhancements"
-description: "Comprehensive implementation plan for stabilizing bulk import, adding duplicate detection, and improving deployment UX in SkillMeat discovery workflow"
-audience: [ai-agents, developers, orchestrators]
-tags: [implementation-plan, discovery, import, bulk-operations, duplicate-detection, deployment, harden-polish]
+title: 'Implementation Plan: Discovery & Import Fixes and Enhancements'
+description: Comprehensive implementation plan for stabilizing bulk import, adding
+  duplicate detection, and improving deployment UX in SkillMeat discovery workflow
+audience:
+- ai-agents
+- developers
+- orchestrators
+tags:
+- implementation-plan
+- discovery
+- import
+- bulk-operations
+- duplicate-detection
+- deployment
+- harden-polish
 created: 2026-01-09
 updated: 2026-01-09
-category: "harden-polish"
-status: "done"
-prd_reference: "docs/project_plans/PRDs/harden-polish-discovery-import-fixes-v1.md"
-request_log: "REQ-20260109-skillmeat"
+category: harden-polish
+status: done
+prd_reference: docs/project_plans/PRDs/harden-polish-discovery-import-fixes-v1.md
+request_log: REQ-20260109-skillmeat
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: discovery-import-fixes
+prd_ref: null
 ---
 
 # Implementation Plan: Discovery & Import Fixes and Enhancements

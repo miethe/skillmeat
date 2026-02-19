@@ -1,72 +1,97 @@
 ---
 type: progress
-prd: "marketplace-source-enhancements-v1"
+prd: marketplace-source-enhancements-v1
 phase: 3
-title: "Frontend Exclusions"
+title: Frontend Exclusions
 status: pending
 progress: 0
 total_tasks: 8
 completed_tasks: 0
 story_points: 8
-
 tasks:
-  - id: "TASK-3.1"
-    title: "Update marketplace types with excluded status"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    dependencies: []
-    estimate: "0.5h"
-  - id: "TASK-3.2"
-    title: "Add exclude/restore mutations to hooks"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-3.1"]
-    estimate: "1h"
-  - id: "TASK-3.3"
-    title: "Create ExcludeArtifactDialog component"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.1"]
-    estimate: "2h"
-  - id: "TASK-3.4"
-    title: "Add exclude button to CatalogCard"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.2", "TASK-3.3"]
-    estimate: "1h"
-  - id: "TASK-3.5"
-    title: "Create ExcludedArtifactsList component"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.2"]
-    estimate: "2h"
-  - id: "TASK-3.6"
-    title: "Integrate excluded list into source page"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-3.5"]
-    estimate: "1h"
-  - id: "TASK-3.7"
-    title: "Update Select All logic"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-3.4"]
-    estimate: "0.5h"
-  - id: "TASK-3.8"
-    title: "Frontend integration tests"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-3.6", "TASK-3.7"]
-    estimate: "2h"
-
+- id: TASK-3.1
+  title: Update marketplace types with excluded status
+  status: pending
+  assigned_to:
+  - ui-engineer
+  dependencies: []
+  estimate: 0.5h
+- id: TASK-3.2
+  title: Add exclude/restore mutations to hooks
+  status: pending
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-3.1
+  estimate: 1h
+- id: TASK-3.3
+  title: Create ExcludeArtifactDialog component
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.1
+  estimate: 2h
+- id: TASK-3.4
+  title: Add exclude button to CatalogCard
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.2
+  - TASK-3.3
+  estimate: 1h
+- id: TASK-3.5
+  title: Create ExcludedArtifactsList component
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.2
+  estimate: 2h
+- id: TASK-3.6
+  title: Integrate excluded list into source page
+  status: pending
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-3.5
+  estimate: 1h
+- id: TASK-3.7
+  title: Update Select All logic
+  status: pending
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-3.4
+  estimate: 0.5h
+- id: TASK-3.8
+  title: Frontend integration tests
+  status: pending
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-3.6
+  - TASK-3.7
+  estimate: 2h
 parallelization:
-  batch_1: ["TASK-3.1"]
-  batch_2: ["TASK-3.2", "TASK-3.3"]
-  batch_3: ["TASK-3.4", "TASK-3.5"]
-  batch_4: ["TASK-3.6", "TASK-3.7"]
-  batch_5: ["TASK-3.8"]
-
+  batch_1:
+  - TASK-3.1
+  batch_2:
+  - TASK-3.2
+  - TASK-3.3
+  batch_3:
+  - TASK-3.4
+  - TASK-3.5
+  batch_4:
+  - TASK-3.6
+  - TASK-3.7
+  batch_5:
+  - TASK-3.8
 blockers: []
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-source-enhancements-v1
 ---
 
 # Phase 3: Frontend Exclusions

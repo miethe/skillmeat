@@ -1,6 +1,6 @@
 ---
 phase: 1
-title: Backend — Write-Through Deployment Cache (Core Fix)
+title: "Backend \u2014 Write-Through Deployment Cache (Core Fix)"
 status: completed
 plan_ref: docs/project_plans/implementation_plans/features/deployment-write-through-refactor-v1.md
 parallelization:
@@ -41,6 +41,11 @@ in_progress_tasks: 0
 blocked_tasks: 0
 progress: 100
 updated: '2026-02-11'
+schema_version: 2
+doc_type: progress
+feature_slug: phase-1
+type: progress
+prd: phase-1
 ---
 
 ## Phase 1: Backend — Write-Through Deployment Cache

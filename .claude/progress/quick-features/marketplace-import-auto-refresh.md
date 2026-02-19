@@ -3,9 +3,11 @@ type: quick-feature-plan
 feature_slug: marketplace-import-auto-refresh
 request_log_id: null
 status: completed
-created: 2026-01-04T00:00:00Z
-completed_at: 2026-01-04T00:00:00Z
+created: 2026-01-04 00:00:00+00:00
+completed_at: 2026-01-04 00:00:00+00:00
 estimated_scope: small
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # Marketplace Import Auto-Refresh

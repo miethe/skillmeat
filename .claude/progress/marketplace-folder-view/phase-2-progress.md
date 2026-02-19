@@ -1,200 +1,250 @@
 ---
 type: progress
-prd: "marketplace-folder-view"
+prd: marketplace-folder-view
 phase: 2
-title: "Folder Detail Pane & Bulk Import"
+title: Folder Detail Pane & Bulk Import
 status: completed
-started: "2026-01-29T13:30:00Z"
-completed: "2026-01-29T14:15:00Z"
-
+started: '2026-01-29T13:30:00Z'
+completed: '2026-01-29T14:15:00Z'
 progress: 100
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 13
 completed_tasks: 13
 in_progress_tasks: 0
 blocked_tasks: 0
-
-owners: ["ui-engineer-enhanced", "frontend-developer"]
-contributors: ["ui-designer"]
-
+owners:
+- ui-engineer-enhanced
+- frontend-developer
+contributors:
+- ui-designer
 blockers: []
-
 success_criteria:
-  - id: "SC-2.1"
-    description: "Folder detail header displays title, parent chip, description, 'Import All' button"
-    status: completed
-  - id: "SC-2.2"
-    description: "README extraction works; falls back to AI summary if no README"
-    status: completed
-  - id: "SC-2.3"
-    description: "Artifacts grouped by type in right pane with section headers"
-    status: completed
-  - id: "SC-2.4"
-    description: "Type grouping includes all artifact types; counts accurate"
-    status: completed
-  - id: "SC-2.5"
-    description: "'Import All' bulk action works; progress shown; success/error states handled"
-    status: completed
-  - id: "SC-2.6"
-    description: "Subfolders section renders at bottom when folder has subfolders"
-    status: completed
-  - id: "SC-2.7"
-    description: "Subfolder cards show name, count, and navigate on click"
-    status: completed
-  - id: "SC-2.8"
-    description: "Empty folder state shown when no artifacts match filters"
-    status: completed
-  - id: "SC-2.9"
-    description: "Filters apply to right pane; counts update reactively"
-    status: completed
-  - id: "SC-2.10"
-    description: "Visual polish complete; panes balanced, consistent spacing"
-    status: completed
-  - id: "SC-2.11"
-    description: "E2E tests pass (folder selection -> right pane display -> bulk import)"
-    status: completed
-  - id: "SC-2.12"
-    description: "View mode and filter state persist to localStorage"
-    status: completed
-
+- id: SC-2.1
+  description: Folder detail header displays title, parent chip, description, 'Import
+    All' button
+  status: completed
+- id: SC-2.2
+  description: README extraction works; falls back to AI summary if no README
+  status: completed
+- id: SC-2.3
+  description: Artifacts grouped by type in right pane with section headers
+  status: completed
+- id: SC-2.4
+  description: Type grouping includes all artifact types; counts accurate
+  status: completed
+- id: SC-2.5
+  description: '''Import All'' bulk action works; progress shown; success/error states
+    handled'
+  status: completed
+- id: SC-2.6
+  description: Subfolders section renders at bottom when folder has subfolders
+  status: completed
+- id: SC-2.7
+  description: Subfolder cards show name, count, and navigate on click
+  status: completed
+- id: SC-2.8
+  description: Empty folder state shown when no artifacts match filters
+  status: completed
+- id: SC-2.9
+  description: Filters apply to right pane; counts update reactively
+  status: completed
+- id: SC-2.10
+  description: Visual polish complete; panes balanced, consistent spacing
+  status: completed
+- id: SC-2.11
+  description: E2E tests pass (folder selection -> right pane display -> bulk import)
+  status: completed
+- id: SC-2.12
+  description: View mode and filter state persist to localStorage
+  status: completed
 tasks:
-  - id: "MFV-2.1"
-    title: "Folder detail pane container"
-    status: completed
-    assigned_to: ["ui-engineer-enhanced"]
-    model: sonnet
-    effort: 2
-    priority: high
-    dependencies: []
-    description: "Create right pane container accepting selected folder; renders folder detail header + artifact list"
-
-  - id: "MFV-2.2"
-    title: "Folder detail header"
-    status: completed
-    assigned_to: ["ui-engineer-enhanced"]
-    model: opus
-    effort: 3
-    priority: high
-    dependencies: ["MFV-2.1"]
-    description: "Create header showing: folder title, parent breadcrumb chip, folder description, 'Import All' button"
-
-  - id: "MFV-2.3"
-    title: "README extraction utilities"
-    status: completed
-    assigned_to: ["frontend-developer"]
-    model: sonnet
-    effort: 2
-    priority: high
-    dependencies: []
-    description: "Create utility to extract README from folder artifacts; parse markdown content; extract summary section or first paragraph"
-
-  - id: "MFV-2.4"
-    title: "'Import All' bulk action"
-    status: completed
-    assigned_to: ["ui-engineer-enhanced"]
-    model: opus
-    effort: 3
-    priority: high
-    dependencies: ["MFV-2.2"]
-    description: "Implement bulk import button; import all artifacts in selected folder; show progress indicator; handle success/error states"
-
-  - id: "MFV-2.5"
-    title: "Artifact type section component"
-    status: completed
-    assigned_to: ["ui-engineer-enhanced"]
-    model: sonnet
-    effort: 2
-    priority: high
-    dependencies: []
-    description: "Create component showing artifacts grouped by type with section header (e.g., 'Skills (5)', 'Commands (2)')"
-
-  - id: "MFV-2.6"
-    title: "Type grouping logic"
-    status: completed
-    assigned_to: ["frontend-developer"]
-    model: sonnet
-    effort: 2
-    priority: high
-    dependencies: ["MFV-2.5"]
-    description: "Implement grouping of artifacts by type within folder; handle all artifact types; maintain sort order"
-
-  - id: "MFV-2.7"
-    title: "Subfolders section component"
-    status: completed
-    assigned_to: ["ui-engineer-enhanced"]
-    model: sonnet
-    effort: 2
-    priority: high
-    dependencies: ["MFV-2.1"]
-    description: "Create section rendered at bottom of folder detail pane when folder has subfolders; grid layout of subfolder cards; section header 'Subfolders (N)'"
-
-  - id: "MFV-2.8"
-    title: "Subfolder card component"
-    status: completed
-    assigned_to: ["ui-engineer-enhanced"]
-    model: sonnet
-    effort: 2
-    priority: high
-    dependencies: []
-    description: "Create card showing folder icon, name, and descendant artifact count; click handler to select folder in tree; hover state with folder description preview"
-
-  - id: "MFV-2.9"
-    title: "Subfolder navigation integration"
-    status: completed
-    assigned_to: ["frontend-developer"]
-    model: sonnet
-    effort: 2
-    priority: high
-    dependencies: ["MFV-2.7", "MFV-2.8"]
-    description: "Wire subfolder card clicks to tree selection; update detail pane when subfolder selected; handle keyboard navigation between panes"
-
-  - id: "MFV-2.10"
-    title: "Empty state for folder detail"
-    status: completed
-    assigned_to: ["ui-engineer-enhanced"]
-    model: haiku
-    effort: 1
-    priority: medium
-    dependencies: ["MFV-2.1"]
-    description: "Show helpful empty state when folder has no importable artifacts under current filters"
-
-  - id: "MFV-2.11"
-    title: "Filter integration"
-    status: completed
-    assigned_to: ["frontend-developer"]
-    model: sonnet
-    effort: 2
-    priority: medium
-    dependencies: ["MFV-2.1", "MFV-2.6"]
-    description: "Ensure all filters (type, confidence, search, status) apply to artifacts shown in folder detail pane"
-
-  - id: "MFV-2.12"
-    title: "Visual polish"
-    status: completed
-    assigned_to: ["ui-designer"]
-    model: sonnet
-    effort: 2
-    priority: medium
-    dependencies: ["MFV-2.1", "MFV-2.2", "MFV-2.3", "MFV-2.4", "MFV-2.5", "MFV-2.6", "MFV-2.7", "MFV-2.8", "MFV-2.9", "MFV-2.10", "MFV-2.11"]
-    description: "Review spacing, colors, icon alignment between left/right panes; ensure type section headers consistent"
-
-  - id: "MFV-2.13"
-    title: "E2E tests"
-    status: completed
-    assigned_to: ["frontend-developer"]
-    model: sonnet
-    effort: 2
-    priority: high
-    dependencies: ["MFV-2.12"]
-    description: "Write Playwright tests: toggle to folder view, select folder, see right pane populate, apply filters, use 'Import All' button, navigate via subfolder cards"
-
+- id: MFV-2.1
+  title: Folder detail pane container
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: sonnet
+  effort: 2
+  priority: high
+  dependencies: []
+  description: Create right pane container accepting selected folder; renders folder
+    detail header + artifact list
+- id: MFV-2.2
+  title: Folder detail header
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: opus
+  effort: 3
+  priority: high
+  dependencies:
+  - MFV-2.1
+  description: 'Create header showing: folder title, parent breadcrumb chip, folder
+    description, ''Import All'' button'
+- id: MFV-2.3
+  title: README extraction utilities
+  status: completed
+  assigned_to:
+  - frontend-developer
+  model: sonnet
+  effort: 2
+  priority: high
+  dependencies: []
+  description: Create utility to extract README from folder artifacts; parse markdown
+    content; extract summary section or first paragraph
+- id: MFV-2.4
+  title: '''Import All'' bulk action'
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: opus
+  effort: 3
+  priority: high
+  dependencies:
+  - MFV-2.2
+  description: Implement bulk import button; import all artifacts in selected folder;
+    show progress indicator; handle success/error states
+- id: MFV-2.5
+  title: Artifact type section component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: sonnet
+  effort: 2
+  priority: high
+  dependencies: []
+  description: Create component showing artifacts grouped by type with section header
+    (e.g., 'Skills (5)', 'Commands (2)')
+- id: MFV-2.6
+  title: Type grouping logic
+  status: completed
+  assigned_to:
+  - frontend-developer
+  model: sonnet
+  effort: 2
+  priority: high
+  dependencies:
+  - MFV-2.5
+  description: Implement grouping of artifacts by type within folder; handle all artifact
+    types; maintain sort order
+- id: MFV-2.7
+  title: Subfolders section component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: sonnet
+  effort: 2
+  priority: high
+  dependencies:
+  - MFV-2.1
+  description: Create section rendered at bottom of folder detail pane when folder
+    has subfolders; grid layout of subfolder cards; section header 'Subfolders (N)'
+- id: MFV-2.8
+  title: Subfolder card component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: sonnet
+  effort: 2
+  priority: high
+  dependencies: []
+  description: Create card showing folder icon, name, and descendant artifact count;
+    click handler to select folder in tree; hover state with folder description preview
+- id: MFV-2.9
+  title: Subfolder navigation integration
+  status: completed
+  assigned_to:
+  - frontend-developer
+  model: sonnet
+  effort: 2
+  priority: high
+  dependencies:
+  - MFV-2.7
+  - MFV-2.8
+  description: Wire subfolder card clicks to tree selection; update detail pane when
+    subfolder selected; handle keyboard navigation between panes
+- id: MFV-2.10
+  title: Empty state for folder detail
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  model: haiku
+  effort: 1
+  priority: medium
+  dependencies:
+  - MFV-2.1
+  description: Show helpful empty state when folder has no importable artifacts under
+    current filters
+- id: MFV-2.11
+  title: Filter integration
+  status: completed
+  assigned_to:
+  - frontend-developer
+  model: sonnet
+  effort: 2
+  priority: medium
+  dependencies:
+  - MFV-2.1
+  - MFV-2.6
+  description: Ensure all filters (type, confidence, search, status) apply to artifacts
+    shown in folder detail pane
+- id: MFV-2.12
+  title: Visual polish
+  status: completed
+  assigned_to:
+  - ui-designer
+  model: sonnet
+  effort: 2
+  priority: medium
+  dependencies:
+  - MFV-2.1
+  - MFV-2.2
+  - MFV-2.3
+  - MFV-2.4
+  - MFV-2.5
+  - MFV-2.6
+  - MFV-2.7
+  - MFV-2.8
+  - MFV-2.9
+  - MFV-2.10
+  - MFV-2.11
+  description: Review spacing, colors, icon alignment between left/right panes; ensure
+    type section headers consistent
+- id: MFV-2.13
+  title: E2E tests
+  status: completed
+  assigned_to:
+  - frontend-developer
+  model: sonnet
+  effort: 2
+  priority: high
+  dependencies:
+  - MFV-2.12
+  description: 'Write Playwright tests: toggle to folder view, select folder, see
+    right pane populate, apply filters, use ''Import All'' button, navigate via subfolder
+    cards'
 parallelization:
-  batch_1: ["MFV-2.1", "MFV-2.3", "MFV-2.5", "MFV-2.8"]
-  batch_2: ["MFV-2.2", "MFV-2.6", "MFV-2.7", "MFV-2.10"]
-  batch_3: ["MFV-2.4", "MFV-2.9", "MFV-2.11"]
-  batch_4: ["MFV-2.12"]
-  batch_5: ["MFV-2.13"]
+  batch_1:
+  - MFV-2.1
+  - MFV-2.3
+  - MFV-2.5
+  - MFV-2.8
+  batch_2:
+  - MFV-2.2
+  - MFV-2.6
+  - MFV-2.7
+  - MFV-2.10
+  batch_3:
+  - MFV-2.4
+  - MFV-2.9
+  - MFV-2.11
+  batch_4:
+  - MFV-2.12
+  batch_5:
+  - MFV-2.13
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-folder-view
 ---
 
 # Phase 2: Folder Detail Pane & Bulk Import

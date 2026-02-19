@@ -1,13 +1,25 @@
 ---
-title: "PRD: Feature Name"
-description: "High-level summary of the feature being proposed"
-audience: [ai-agents, developers]
-tags: [prd, planning, feature]
-created: YYYY-MM-DD
-updated: YYYY-MM-DD
-category: "product-planning"
-status: draft
-related: []
+title: "PRD: Feature Name" # Human-readable PRD title
+schema_version: 2 # CCDash frontmatter schema version
+doc_type: prd # Must remain `prd` for PRD documents
+status: draft # draft|approved|in-progress|completed|superseded
+created: YYYY-MM-DD # Initial creation date (YYYY-MM-DD)
+updated: YYYY-MM-DD # Last edit date (YYYY-MM-DD)
+feature_slug: "feature-name" # Kebab-case feature identifier
+feature_version: "v1" # Version label for this feature document set
+prd_ref: null # PRDs are root docs, keep null
+plan_ref: null # Set to implementation plan path when it exists
+related_documents: [] # Related docs (PRDs, plans, ADRs, specs)
+owner: null # Single accountable owner (name or agent)
+contributors: [] # Supporting contributors
+priority: medium # low|medium|high|critical
+risk_level: medium # low|medium|high|critical
+category: "product-planning" # Planning taxonomy label
+tags: [prd, planning, feature] # Search/filter tags
+milestone: null # Optional release/milestone marker
+commit_refs: [] # Commit SHAs added during implementation
+pr_refs: [] # Pull request refs (e.g., #123)
+files_affected: [] # Key files expected to change
 ---
 
 # Feature Brief & Metadata

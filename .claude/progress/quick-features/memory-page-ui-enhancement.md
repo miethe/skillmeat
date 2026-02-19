@@ -29,6 +29,9 @@ in_progress_tasks: 0
 blocked_tasks: 0
 progress: 100
 updated: '2026-02-07'
+schema_version: 2
+doc_type: quick_feature
+feature_slug: memory-page-ui-enhancement
 ---
 
 # Memory Page UI/UX Enhancement

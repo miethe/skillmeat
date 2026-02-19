@@ -509,6 +509,8 @@ class BundleImporter:
             dest_path = collection_path / "commands" / f"{artifact_name}.md"
         elif artifact_type == ArtifactType.AGENT:
             dest_path = collection_path / "agents" / f"{artifact_name}.md"
+        elif artifact_type == ArtifactType.COMPOSITE:
+            dest_path = collection_path / "composites" / artifact_name
         else:
             raise ValueError(f"Unsupported artifact type: {artifact_type}")
 

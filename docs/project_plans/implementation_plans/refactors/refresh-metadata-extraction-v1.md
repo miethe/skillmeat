@@ -1,16 +1,27 @@
 ---
-title: "Implementation Plan: Unify Refresh Metadata Extraction with Import Flow"
-description: "Fix collection refresh to correctly extract descriptions from single-file artifacts by reusing import flow's proven extraction logic"
-audience: [ai-agents, developers]
-tags: [bugfix, refactor, metadata, refresh, collection]
+title: 'Implementation Plan: Unify Refresh Metadata Extraction with Import Flow'
+description: Fix collection refresh to correctly extract descriptions from single-file
+  artifacts by reusing import flow's proven extraction logic
+audience:
+- ai-agents
+- developers
+tags:
+- bugfix
+- refactor
+- metadata
+- refresh
+- collection
 created: 2026-02-03
 updated: 2026-02-03
-category: "refactors"
-status: draft
+category: refactors
+status: inferred_complete
 related:
-  - /docs/project_plans/implementation_plans/refactors/tag-storage-consolidation-v1.md
+- /docs/project_plans/implementation_plans/refactors/tag-storage-consolidation-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: refresh-metadata-extraction
+prd_ref: null
 ---
-
 # Implementation Plan: Unify Refresh Metadata Extraction with Import Flow
 
 **Plan ID**: `IMPL-2026-02-03-REFRESH-METADATA`

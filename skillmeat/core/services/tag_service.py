@@ -410,8 +410,13 @@ class TagService:
     # Artifact Associations
     # =========================================================================
 
-    def sync_artifact_tags(self, artifact_id: str, tags: List[str]) -> List[str]:
-        """Ensure tags exist and sync associations for an artifact."""
+    def sync_artifact_tags(self, artifact_uuid: str, tags: List[str]) -> List[str]:
+        """Ensure tags exist and sync associations for an artifact.
+
+        Args:
+            artifact_uuid: Artifact UUID (artifacts.uuid, ADR-007 stable identity).
+            tags: List of tag names to set on the artifact
+        """
         normalized_tags = self._normalize_tag_names(tags)
         desired_tag_ids: List[str] = []
 
@@ -436,34 +441,34 @@ class TagService:
                 desired_tag_ids.append(tag.id)
 
         desired_ids = set(desired_tag_ids)
-        existing_tags = self.repo.get_artifact_tags(artifact_id=artifact_id)
+        existing_tags = self.repo.get_artifact_tags(artifact_uuid=artifact_uuid)
         existing_ids = {tag.id for tag in existing_tags}
 
         for tag_id in existing_ids - desired_ids:
             try:
                 self.repo.remove_tag_from_artifact(
-                    artifact_id=artifact_id, tag_id=tag_id
+                    artifact_uuid=artifact_uuid, tag_id=tag_id
                 )
             except RepositoryError as e:
                 self.logger.warning(
-                    f"Failed to remove tag {tag_id} from artifact {artifact_id}: {e}"
+                    f"Failed to remove tag {tag_id} from artifact {artifact_uuid}: {e}"
                 )
 
         for tag_id in desired_ids - existing_ids:
             try:
-                self.repo.add_tag_to_artifact(artifact_id=artifact_id, tag_id=tag_id)
+                self.repo.add_tag_to_artifact(artifact_uuid=artifact_uuid, tag_id=tag_id)
             except RepositoryError as e:
                 self.logger.warning(
-                    f"Failed to add tag {tag_id} to artifact {artifact_id}: {e}"
+                    f"Failed to add tag {tag_id} to artifact {artifact_uuid}: {e}"
                 )
 
         return normalized_tags
 
-    def add_tag_to_artifact(self, artifact_id: str, tag_id: str) -> bool:
+    def add_tag_to_artifact(self, artifact_uuid: str, tag_id: str) -> bool:
         """Add tag to artifact.
 
         Args:
-            artifact_id: Artifact identifier
+            artifact_uuid: Artifact UUID (artifacts.uuid, ADR-007 stable identity).
             tag_id: Tag identifier
 
         Returns:
@@ -474,18 +479,18 @@ class TagService:
             LookupError: If repository operation fails
 
         Example:
-            >>> success = service.add_tag_to_artifact("art-123", "tag-456")
+            >>> success = service.add_tag_to_artifact("abc123hex", "tag-456")
             >>> if success:
             ...     print("Tag added to artifact")
         """
-        self.logger.info(f"Adding tag {tag_id} to artifact {artifact_id}")
+        self.logger.info(f"Adding tag {tag_id} to artifact uuid={artifact_uuid}")
 
         try:
             # Create association via repository
-            self.repo.add_tag_to_artifact(artifact_id=artifact_id, tag_id=tag_id)
+            self.repo.add_tag_to_artifact(artifact_uuid=artifact_uuid, tag_id=tag_id)
 
             self.logger.info(
-                f"Successfully added tag {tag_id} to artifact {artifact_id}"
+                f"Successfully added tag {tag_id} to artifact uuid={artifact_uuid}"
             )
             return True
 
@@ -503,35 +508,35 @@ class TagService:
                 self.logger.error(f"Failed to add tag to artifact: {e}")
                 raise LookupError(f"Failed to add tag to artifact: {e}") from e
 
-    def remove_tag_from_artifact(self, artifact_id: str, tag_id: str) -> bool:
+    def remove_tag_from_artifact(self, artifact_uuid: str, tag_id: str) -> bool:
         """Remove tag from artifact.
 
         Args:
-            artifact_id: Artifact identifier
+            artifact_uuid: Artifact UUID (artifacts.uuid, ADR-007 stable identity).
             tag_id: Tag identifier
 
         Returns:
             True if removed, False if association didn't exist
 
         Example:
-            >>> removed = service.remove_tag_from_artifact("art-123", "tag-456")
+            >>> removed = service.remove_tag_from_artifact("abc123hex", "tag-456")
             >>> if removed:
             ...     print("Tag removed from artifact")
         """
-        self.logger.info(f"Removing tag {tag_id} from artifact {artifact_id}")
+        self.logger.info(f"Removing tag {tag_id} from artifact uuid={artifact_uuid}")
 
         try:
             removed = self.repo.remove_tag_from_artifact(
-                artifact_id=artifact_id, tag_id=tag_id
+                artifact_uuid=artifact_uuid, tag_id=tag_id
             )
 
             if removed:
                 self.logger.info(
-                    f"Successfully removed tag {tag_id} from artifact {artifact_id}"
+                    f"Successfully removed tag {tag_id} from artifact uuid={artifact_uuid}"
                 )
             else:
                 self.logger.warning(
-                    f"Association not found: artifact={artifact_id}, tag={tag_id}"
+                    f"Association not found: artifact_uuid={artifact_uuid}, tag={tag_id}"
                 )
 
             return removed
@@ -540,29 +545,29 @@ class TagService:
             self.logger.error(f"Failed to remove tag from artifact: {e}")
             raise LookupError(f"Failed to remove tag from artifact: {e}") from e
 
-    def get_artifact_tags(self, artifact_id: str) -> List[TagResponse]:
+    def get_artifact_tags(self, artifact_uuid: str) -> List[TagResponse]:
         """Get all tags for an artifact.
 
         Args:
-            artifact_id: Artifact identifier
+            artifact_uuid: Artifact UUID (artifacts.uuid, ADR-007 stable identity).
 
         Returns:
             List of TagResponse instances for the artifact
 
         Example:
-            >>> tags = service.get_artifact_tags("art-123")
+            >>> tags = service.get_artifact_tags("abc123hex")
             >>> for tag in tags:
             ...     print(f"- {tag.name}")
         """
-        self.logger.debug(f"Getting tags for artifact: {artifact_id}")
+        self.logger.debug(f"Getting tags for artifact uuid={artifact_uuid}")
 
         # Get tags via repository
-        tags = self.repo.get_artifact_tags(artifact_id=artifact_id)
+        tags = self.repo.get_artifact_tags(artifact_uuid=artifact_uuid)
 
         # Convert to response schemas (no artifact count needed for this view)
         results = [self._tag_to_response(tag) for tag in tags]
 
-        self.logger.debug(f"Found {len(results)} tags for artifact {artifact_id}")
+        self.logger.debug(f"Found {len(results)} tags for artifact uuid={artifact_uuid}")
         return results
 
     # =========================================================================

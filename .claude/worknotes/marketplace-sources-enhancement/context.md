@@ -1,24 +1,18 @@
 ---
-# === CONTEXT WORKNOTES ===
-# PRD-level sticky pad for agent notes and observations during development
-# Optimized for token-efficient queries by AI agents
-
-# Metadata: Identification and Scope
 type: context
-prd: "marketplace-sources-enhancement"
-title: "Marketplace Sources Enhancement - Development Context"
-status: "active"
-created: "2025-01-18"
-updated: "2025-01-18"
-
-# Quick Reference (for fast agent queries)
+prd: marketplace-sources-enhancement
+title: Marketplace Sources Enhancement - Development Context
+status: active
+created: '2025-01-18'
+updated: '2025-01-18'
 critical_notes_count: 0
 implementation_decisions_count: 0
 active_gotchas_count: 0
 agent_contributors: []
-
-# Agent Communication Index
 agents: []
+schema_version: 2
+doc_type: context
+feature_slug: marketplace-sources-enhancement
 ---
 
 # Marketplace Sources Enhancement - Development Context

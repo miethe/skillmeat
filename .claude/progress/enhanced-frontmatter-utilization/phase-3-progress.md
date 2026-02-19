@@ -87,6 +87,9 @@ completed_tasks: 6
 in_progress_tasks: 0
 blocked_tasks: 0
 updated: '2026-01-22'
+schema_version: 2
+doc_type: progress
+feature_slug: enhanced-frontmatter-utilization
 ---
 
 # Phase 3: UI Components & Integration - Progress

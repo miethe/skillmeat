@@ -30,8 +30,8 @@ import tomli_w
 
 TOML_DUMPS = tomli_w.dumps
 
-# Import ArtifactType from the canonical detection module
-from skillmeat.core.artifact_detection import ArtifactType
+# Import canonical enums from the detection module
+from skillmeat.core.artifact_detection import ArtifactType, CompositeType
 
 
 class UpdateStrategy(str, Enum):
@@ -232,6 +232,7 @@ class Artifact:
     origin_source: Optional[str] = None  # Platform type when origin="marketplace" (e.g., "github", "gitlab", "bitbucket")
     target_platforms: Optional[List[Platform]] = None  # None means deployable on all platforms; otherwise restricted to listed platforms
     import_id: Optional[str] = None  # Catalog entry import batch ID
+    uuid: Optional[str] = None  # Stable cross-context identity UUID from DB cache (ADR-007); 32-char hex, no dashes
 
     def __post_init__(self):
         """Validate artifact configuration.
@@ -347,6 +348,8 @@ class Artifact:
             result["target_platforms"] = [platform.value for platform in self.target_platforms]
         if self.import_id is not None:
             result["import_id"] = self.import_id
+        if self.uuid is not None:
+            result["uuid"] = self.uuid
 
         return result
 
@@ -383,6 +386,7 @@ class Artifact:
             origin_source=data.get("origin_source"),
             target_platforms=data.get("target_platforms"),
             import_id=data.get("import_id"),
+            uuid=data.get("uuid"),
         )
 
 
@@ -515,6 +519,8 @@ class ArtifactManager:
             artifact_storage_path = collection_path / "commands" / f"{artifact_name}.md"
         elif artifact_type == ArtifactType.AGENT:
             artifact_storage_path = collection_path / "agents" / f"{artifact_name}.md"
+        elif artifact_type == ArtifactType.COMPOSITE:
+            artifact_storage_path = collection_path / "composites" / artifact_name
         else:
             raise ValueError(f"Unsupported artifact type: {artifact_type}")
 
@@ -549,6 +555,7 @@ class ArtifactManager:
             resolved_version=fetch_result.resolved_version,
             tags=tags or [],
             target_platforms=target_platforms,
+            uuid=self._lookup_collection_artifact_uuid(artifact_name, artifact_type.value),
         )
 
         # Add to collection
@@ -632,6 +639,8 @@ class ArtifactManager:
             artifact_storage_path = collection_path / "commands" / f"{artifact_name}.md"
         elif artifact_type == ArtifactType.AGENT:
             artifact_storage_path = collection_path / "agents" / f"{artifact_name}.md"
+        elif artifact_type == ArtifactType.COMPOSITE:
+            artifact_storage_path = collection_path / "composites" / artifact_name
         else:
             raise ValueError(f"Unsupported artifact type: {artifact_type}")
 
@@ -661,6 +670,7 @@ class ArtifactManager:
             added=datetime.utcnow(),
             tags=tags or [],
             target_platforms=target_platforms,
+            uuid=self._lookup_collection_artifact_uuid(artifact_name, artifact_type.value),
         )
 
         # Add to collection
@@ -2180,3 +2190,48 @@ class ArtifactManager:
                     f"Auto-linking for {artifact_name} took {elapsed_ms:.1f}ms "
                     "(exceeds 100ms target)"
                 )
+
+    def _lookup_collection_artifact_uuid(
+        self,
+        artifact_name: str,
+        artifact_type: str,
+    ) -> Optional[str]:
+        """Look up a stable UUID for an artifact from the DB cache.
+
+        Searches for any cached deployment with the given name and type across all
+        projects.  Returns the first match found, or None when the artifact has never
+        been deployed (and therefore has no cache entry yet).
+
+        This is a best-effort, non-blocking helper.  It never raises — failures
+        silently return None so callers can always omit the UUID field gracefully.
+
+        Args:
+            artifact_name: Artifact name
+            artifact_type: Artifact type string (e.g. "skill")
+
+        Returns:
+            32-char hex UUID string from CachedArtifact.uuid, or None if not found
+        """
+        try:
+            from skillmeat.cache.models import Artifact as CacheArtifact
+            from skillmeat.cache.models import get_session
+
+            session = get_session()
+            try:
+                cache_artifact = (
+                    session.query(CacheArtifact)
+                    .filter_by(name=artifact_name, type=artifact_type)
+                    .first()
+                )
+                if cache_artifact is not None:
+                    return cache_artifact.uuid
+            finally:
+                session.close()
+        except Exception as exc:
+            logging.debug(
+                "UUID lookup for collection artifact %s/%s failed: %s",
+                artifact_type,
+                artifact_name,
+                exc,
+            )
+        return None

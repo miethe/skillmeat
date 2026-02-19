@@ -1,89 +1,101 @@
 ---
 type: progress
-prd: "artifact-deletion-v1"
+prd: artifact-deletion-v1
 phase: 3
-title: "Polish & Documentation"
+title: Polish & Documentation
 status: completed
 progress: 100
 total_tasks: 5
 completed_tasks: 5
 blocked_tasks: 0
-created: "2025-12-20"
-updated: "2025-12-20"
-completed_at: "2025-12-20T21:30:00Z"
-
+created: '2025-12-20'
+updated: '2025-12-20'
+completed_at: '2025-12-20T21:30:00Z'
 tasks:
-  - id: "FE-014"
-    title: "Performance optimization for deployment fetching"
-    status: "completed"
-    priority: "medium"
-    estimate: "0.5pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    file_targets:
-      - "skillmeat/web/components/entity/artifact-deletion-dialog.tsx"
-    notes: "Added useCallback for handlers, optimized query with staleTime/enabled"
-    commit: "e06e014"
-
-  - id: "FE-015"
-    title: "Mobile responsiveness for deletion dialog"
-    status: "completed"
-    priority: "medium"
-    estimate: "0.5pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    file_targets:
-      - "skillmeat/web/components/entity/artifact-deletion-dialog.tsx"
-    notes: "44px touch targets, responsive layout, stacked buttons on mobile"
-    commit: "e06e014"
-
-  - id: "FE-016"
-    title: "Final accessibility pass"
-    status: "completed"
-    priority: "medium"
-    estimate: "0.5pt"
-    assigned_to: ["a11y-sheriff"]
-    dependencies: ["FE-014", "FE-015"]
-    file_targets: []
-    notes: "23 a11y tests passing, zero axe-core violations, WCAG 2.1 AA compliant"
-    commit: "b877d30"
-
-  - id: "FE-017"
-    title: "Update component documentation"
-    status: "completed"
-    priority: "low"
-    estimate: "0.5pt"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    file_targets:
-      - "skillmeat/web/components/entity/README.md"
-    notes: "Created comprehensive README with usage examples and API docs"
-    commit: "e06e014"
-
-  - id: "FE-018"
-    title: "Code review and cleanup"
-    status: "completed"
-    priority: "high"
-    estimate: "0.5pt"
-    assigned_to: ["code-reviewer"]
-    dependencies: ["FE-014", "FE-015", "FE-016"]
-    file_targets: []
-    notes: "Code review passed 94/100, approved for production"
-
+- id: FE-014
+  title: Performance optimization for deployment fetching
+  status: completed
+  priority: medium
+  estimate: 0.5pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  file_targets:
+  - skillmeat/web/components/entity/artifact-deletion-dialog.tsx
+  notes: Added useCallback for handlers, optimized query with staleTime/enabled
+  commit: e06e014
+- id: FE-015
+  title: Mobile responsiveness for deletion dialog
+  status: completed
+  priority: medium
+  estimate: 0.5pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  file_targets:
+  - skillmeat/web/components/entity/artifact-deletion-dialog.tsx
+  notes: 44px touch targets, responsive layout, stacked buttons on mobile
+  commit: e06e014
+- id: FE-016
+  title: Final accessibility pass
+  status: completed
+  priority: medium
+  estimate: 0.5pt
+  assigned_to:
+  - a11y-sheriff
+  dependencies:
+  - FE-014
+  - FE-015
+  file_targets: []
+  notes: 23 a11y tests passing, zero axe-core violations, WCAG 2.1 AA compliant
+  commit: b877d30
+- id: FE-017
+  title: Update component documentation
+  status: completed
+  priority: low
+  estimate: 0.5pt
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  file_targets:
+  - skillmeat/web/components/entity/README.md
+  notes: Created comprehensive README with usage examples and API docs
+  commit: e06e014
+- id: FE-018
+  title: Code review and cleanup
+  status: completed
+  priority: high
+  estimate: 0.5pt
+  assigned_to:
+  - code-reviewer
+  dependencies:
+  - FE-014
+  - FE-015
+  - FE-016
+  file_targets: []
+  notes: Code review passed 94/100, approved for production
 parallelization:
-  batch_1: ["FE-014", "FE-015", "FE-017"]
-  batch_2: ["FE-016"]
-  batch_3: ["FE-018"]
-
+  batch_1:
+  - FE-014
+  - FE-015
+  - FE-017
+  batch_2:
+  - FE-016
+  batch_3:
+  - FE-018
 blockers: []
-
 phase_dependencies:
-  - phase: 2
-    required_tasks: ["FE-009", "FE-010", "FE-011"]
-
+- phase: 2
+  required_tasks:
+  - FE-009
+  - FE-010
+  - FE-011
 references:
-  prd: "docs/project_plans/PRDs/features/artifact-deletion-v1.md"
-  implementation_plan: "docs/project_plans/implementation_plans/features/artifact-deletion-v1.md"
+  prd: docs/project_plans/PRDs/features/artifact-deletion-v1.md
+  implementation_plan: docs/project_plans/implementation_plans/features/artifact-deletion-v1.md
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-deletion-v1
 ---
 
 # Phase 3: Polish & Documentation - COMPLETED ✅

@@ -171,6 +171,10 @@ completed_tasks: 14
 in_progress_tasks: 0
 blocked_tasks: 0
 progress: 100
+schema_version: 2
+doc_type: progress
+feature_slug: groups-all-collections-v1
+type: progress
 ---
 
 # Groups in All Collections View - Progress
