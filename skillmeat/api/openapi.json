@@ -12782,7 +12782,7 @@
           "marketplace-sources"
         ],
         "summary": "List all GitHub sources",
-        "description": "List all GitHub repository sources with cursor-based pagination and optional filtering.\n\n    Returns sources ordered by ID for stable pagination. Use the `cursor`\n    parameter from the previous response to fetch the next page.\n\n    **Filters** (all use AND logic - source must match all provided filters):\n    - `artifact_type`: Filter sources containing artifacts of this type\n    - `tags`: Filter by tags (repeated param, e.g., `?tags=ui&tags=ux`)\n    - `trust_level`: Filter by trust level\n    - `search`: Search in repo name, description, and tags\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
+        "description": "List all GitHub repository sources with cursor-based pagination and optional filtering.\n\n    Returns sources ordered by ID for stable pagination. Use the `cursor`\n    parameter from the previous response to fetch the next page.\n\n    **Filters** (all use AND logic - source must match all provided filters):\n    - `artifact_type`: Filter sources containing artifacts of this type\n      (skill, command, agent, hook, mcp-server, composite)\n    - `tags`: Filter by tags (repeated param, e.g., `?tags=ui&tags=ux`)\n    - `trust_level`: Filter by trust level\n    - `search`: Search in repo name, description, and tags\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
         "operationId": "list_sources_api_v1_marketplace_sources_get",
         "parameters": [
           {
@@ -12830,10 +12830,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Filter by artifact type (skill, command, agent, hook, mcp-server)",
+              "description": "Filter by artifact type (skill, command, agent, hook, mcp-server, composite)",
               "title": "Artifact Type"
             },
-            "description": "Filter by artifact type (skill, command, agent, hook, mcp-server)"
+            "description": "Filter by artifact type (skill, command, agent, hook, mcp-server, composite)"
           },
           {
             "name": "tags",
@@ -38645,6 +38645,45 @@
             "description": "Timestamp of last successful indexing run. None if source has never been indexed.",
             "examples": [
               "2025-12-06T10:30:00Z",
+              null
+            ]
+          },
+          "composite_member_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Member Count",
+            "description": "Total number of child-artifact membership edges across all composite artifacts associated with this source.  Null when the source contains no composite-type artifacts.",
+            "examples": [
+              4,
+              null
+            ]
+          },
+          "composite_child_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Child Types",
+            "description": "Deduplicated list of child artifact types (e.g. 'skill', 'command') found across all composites associated with this source.  Null when the source contains no composite-type artifacts.",
+            "examples": [
+              [
+                "skill",
+                "command"
+              ],
               null
             ]
           }

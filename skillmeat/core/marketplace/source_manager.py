@@ -466,7 +466,7 @@ class SourceManager:
         Args:
             sources: List of sources to filter
             artifact_type: Type to filter by. Valid types: skill, command,
-                          agent, hook, mcp-server
+                          agent, hook, mcp-server, composite
 
         Returns:
             List of sources containing at least one artifact of the specified type

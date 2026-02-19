@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from .common import PageInfo
 
 # Allowed artifact types for validation
-ALLOWED_ARTIFACT_TYPES = {"skill", "command", "agent", "mcp_server", "hook"}
+ALLOWED_ARTIFACT_TYPES = {"skill", "command", "agent", "mcp_server", "hook", "composite"}
 
 
 class ListingResponse(BaseModel):
@@ -1157,6 +1157,28 @@ class SourceResponse(BaseModel):
         description="Timestamp of last successful indexing run. "
         "None if source has never been indexed.",
         examples=["2025-12-06T10:30:00Z", None],
+    )
+
+    # Composite-specific aggregate fields (only populated when the source has
+    # composite-type artifacts; null otherwise to avoid breaking existing clients)
+    composite_member_count: Optional[int] = Field(
+        default=None,
+        description=(
+            "Total number of child-artifact membership edges across all composite "
+            "artifacts associated with this source.  Null when the source contains "
+            "no composite-type artifacts."
+        ),
+        ge=0,
+        examples=[4, None],
+    )
+    composite_child_types: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Deduplicated list of child artifact types (e.g. 'skill', 'command') "
+            "found across all composites associated with this source.  Null when "
+            "the source contains no composite-type artifacts."
+        ),
+        examples=[["skill", "command"], None],
     )
 
     class Config:

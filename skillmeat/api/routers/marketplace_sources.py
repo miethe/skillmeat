@@ -511,15 +511,88 @@ async def _validate_manual_map_paths(
         ) from e
 
 
-def source_to_response(source: MarketplaceSource) -> SourceResponse:
+def get_composite_aggregates() -> Dict[str, Any]:
+    """Compute aggregate composite member data from the local DB cache.
+
+    Returns member count and child artifact types by issuing a single SQL query
+    that JOINs ``composite_memberships`` with ``artifacts`` to collect type
+    information — avoiding N+1 round trips.
+
+    The result is scoped globally (across all collections) because marketplace
+    sources are GitHub repos and there is no direct FK between them and local
+    composite artifacts.  Callers should cache this result per request.
+
+    Returns:
+        Dictionary with two keys:
+
+        .. code-block:: python
+
+            {
+                "member_count": int,        # total membership edges
+                "child_types": List[str],   # deduplicated child artifact types
+            }
+
+        Returns ``{"member_count": 0, "child_types": []}`` on any DB error
+        so that failures are non-fatal and never block source listing.
+    """
+    try:
+        import sqlalchemy as _sa
+        from skillmeat.cache.models import (
+            Artifact,
+            CompositeMembership,
+            get_session,
+        )
+
+        session = get_session()
+        try:
+            rows = (
+                session.query(Artifact.type)
+                .join(
+                    CompositeMembership,
+                    CompositeMembership.child_artifact_uuid == Artifact.uuid,
+                )
+                .distinct()
+                .all()
+            )
+            child_types = [row.type for row in rows if row.type]
+
+            member_count = (
+                session.query(CompositeMembership).count()
+            )
+            return {"member_count": member_count, "child_types": child_types}
+        finally:
+            session.close()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("get_composite_aggregates: DB query failed — %s", exc)
+        return {"member_count": 0, "child_types": []}
+
+
+def source_to_response(
+    source: MarketplaceSource,
+    composite_aggregates: Optional[Dict[str, Any]] = None,
+) -> SourceResponse:
     """Convert MarketplaceSource ORM model to API response.
 
     Args:
-        source: MarketplaceSource ORM instance
+        source: MarketplaceSource ORM instance.
+        composite_aggregates: Optional pre-computed composite aggregate data
+            (from ``get_composite_aggregates()``).  When provided and the
+            source contains composite-type artifacts, ``composite_member_count``
+            and ``composite_child_types`` are populated on the response.  Pass
+            ``None`` to leave those fields null.
 
     Returns:
-        SourceResponse DTO for API
+        SourceResponse DTO for API.
     """
+    counts_by_type = source.get_counts_by_type_dict()
+
+    # Populate composite aggregate fields only when the source has composites
+    composite_member_count: Optional[int] = None
+    composite_child_types: Optional[List[str]] = None
+    if counts_by_type.get("composite", 0) > 0 and composite_aggregates is not None:
+        composite_member_count = composite_aggregates.get("member_count")
+        composite_child_types = composite_aggregates.get("child_types") or []
+
     return SourceResponse(
         id=source.id,
         repo_url=source.repo_url,
@@ -542,7 +615,7 @@ def source_to_response(source: MarketplaceSource) -> SourceResponse:
         repo_description=source.repo_description,
         repo_readme=source.repo_readme,
         tags=source.get_tags_list() or [],
-        counts_by_type=source.get_counts_by_type_dict(),
+        counts_by_type=counts_by_type,
         single_artifact_mode=source.single_artifact_mode or False,
         single_artifact_type=source.single_artifact_type,
         indexing_enabled=source.indexing_enabled,
@@ -563,6 +636,8 @@ def source_to_response(source: MarketplaceSource) -> SourceResponse:
         last_indexed_at=(
             source.clone_target.computed_at if source.clone_target else None
         ),
+        composite_member_count=composite_member_count,
+        composite_child_types=composite_child_types,
     )
 
 
@@ -2195,6 +2270,7 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
 
     **Filters** (all use AND logic - source must match all provided filters):
     - `artifact_type`: Filter sources containing artifacts of this type
+      (skill, command, agent, hook, mcp-server, composite)
     - `tags`: Filter by tags (repeated param, e.g., `?tags=ui&tags=ux`)
     - `trust_level`: Filter by trust level
     - `search`: Search in repo name, description, and tags
@@ -2207,7 +2283,10 @@ async def list_sources(
     cursor: Optional[str] = Query(None, description="Cursor for next page"),
     artifact_type: Optional[str] = Query(
         None,
-        description="Filter by artifact type (skill, command, agent, hook, mcp-server)",
+        description=(
+            "Filter by artifact type "
+            "(skill, command, agent, hook, mcp-server, composite)"
+        ),
     ),
     tags: Optional[List[str]] = Query(
         None, description="Filter by tags (AND logic - must match all)"
@@ -2239,6 +2318,10 @@ async def list_sources(
     source_manager = SourceManager()
 
     try:
+        # Pre-fetch composite aggregates once per request (avoid N+1).
+        # This single query covers all composites across the local DB.
+        composite_aggs = get_composite_aggregates()
+
         # Check if any filters are provided
         has_filters = any([artifact_type, tags, trust_level, search])
 
@@ -2274,8 +2357,12 @@ async def list_sources(
             page_sources = filtered_sources[start_idx:end_idx]
             has_more = end_idx < len(filtered_sources)
 
-            # Convert ORM models to API responses
-            items = [source_to_response(source) for source in page_sources]
+            # Convert ORM models to API responses; pass composite aggregates
+            # so composite-type sources are enriched without N+1 queries.
+            items = [
+                source_to_response(source, composite_aggregates=composite_aggs)
+                for source in page_sources
+            ]
 
             # Build page info
             page_info = PageInfo(
@@ -2306,8 +2393,11 @@ async def list_sources(
             # Without filters: use repository's paginated query for efficiency
             result = source_repo.list_paginated(limit=limit, cursor=cursor)
 
-            # Convert ORM models to API responses
-            items = [source_to_response(source) for source in result.items]
+            # Convert ORM models to API responses; pass composite aggregates.
+            items = [
+                source_to_response(source, composite_aggregates=composite_aggs)
+                for source in result.items
+            ]
 
             # Build page info
             page_info = PageInfo(
