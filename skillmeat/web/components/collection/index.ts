@@ -27,3 +27,5 @@ export { ArtifactBrowseCard, ArtifactBrowseCardSkeleton } from './artifact-brows
 export type { ArtifactBrowseCardProps } from './artifact-browse-card';
 export { ArtifactGroupBadges } from './artifact-group-badges';
 export type { ArtifactGroupBadgesProps } from './artifact-group-badges';
+export { PluginMemberIcons } from './plugin-member-icons';
+export type { PluginMemberIconsProps } from './plugin-member-icons';
