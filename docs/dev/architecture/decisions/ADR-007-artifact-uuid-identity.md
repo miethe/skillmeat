@@ -184,6 +184,86 @@ Keep `type:name` as a unique lookup index on `CachedArtifact` for efficient look
 
 ---
 
+### Phase 2 Assessment: PK Promotion Feasibility (CAI-P5-06)
+
+**Assessment Date**: 2026-02-19
+**Assessed By**: python-backend-engineer (CAI-P5-06)
+**Decision**: **Outcome B — Defer PK Promotion**
+
+#### FK Dependency Graph
+
+The following table maps every `ForeignKey("artifacts.id", ...)` reference in the SQLAlchemy model layer as of Phase 5 completion:
+
+| Model | Table | FK Column | Role | Constraint | Complication |
+|---|---|---|---|---|---|
+| `ArtifactMetadata` | `artifact_metadata` | `artifact_id` | PK (1:1) | CASCADE | `artifact_id` IS the PK — promoting `artifacts.uuid` to PK requires this table's PK column and all identity-map keys to change simultaneously |
+| `ArtifactVersion` | `artifact_versions` | `artifact_id` | non-PK FK | CASCADE | `ArtifactVersion.id` is already `uuid.uuid4().hex`; only the FK column changes — lower risk, but large table (version history rows per artifact) |
+| `ProjectTemplate` | `project_templates` | `default_project_config_id` | optional FK | SET NULL | Soft reference; column name is semantic, not a join key — survives rename straightforwardly |
+| `TemplateEntity` | `template_entities` | `artifact_id` | composite PK member | CASCADE | `artifact_id` is half of the composite PK `(template_id, artifact_id)` — changing PK requires recreating index, all session identity maps for this table invalidated |
+
+**Already migrated to `artifacts.uuid`** (no `artifacts.id` FK remaining after Phase 5):
+- `collection_artifacts.artifact_uuid` (CAI-P5-01)
+- `group_artifacts.artifact_uuid` (CAI-P5-02)
+- `artifact_tags.artifact_uuid` (CAI-P5-03)
+- `composite_memberships.child_artifact_uuid` (Phase 1 / CAI-P1)
+
+#### Risk Analysis
+
+**SQLAlchemy Session Identity Map**
+
+SQLAlchemy uses the mapped PK column as the in-memory session identity key. If `artifacts.id` (`type:name`) is demoted from PK and `uuid` is promoted, every `Session.get(Artifact, some_id)` call site across `repositories.py`, `refresh.py`, the API routers, and the service layer must be audited and updated. Any query that passes a `type:name` string as the identity lookup will silently return `None` rather than raising an error — making the bug invisible until runtime.
+
+**ArtifactMetadata PK coupling**
+
+`ArtifactMetadata.artifact_id` is simultaneously the table's PK and the FK to `artifacts.id`. Changing the parent PK without updating this column and its constraint in a single atomic Alembic migration is unsafe. The migration must: (1) add `artifact_uuid` to `artifact_metadata`, (2) backfill from the join, (3) drop the old PK, (4) add new PK on `artifact_uuid`. SQLite (used in CI) requires a full table-rebuild for each step.
+
+**TemplateEntity composite PK**
+
+`TemplateEntity` uses `(template_id, artifact_id)` as a composite PK. Changing the PK member requires recreating the table in SQLite, and updating every query that bulk-fetches template entities by artifact identity.
+
+**Migration volume**
+
+Five distinct migration steps would be required in sequence:
+1. Add `artifact_uuid` to `artifact_metadata` + backfill + swap PK
+2. Update `artifact_versions.artifact_id` FK to point to `artifacts.uuid`
+3. Update `project_templates.default_project_config_id` FK
+4. Update `template_entities.artifact_id` FK + swap composite PK
+5. Demote `artifacts.id` from PK to `UNIQUE NOT NULL` index + promote `uuid` to PK
+
+Each step requires SQLite-compatible table-rebuild pattern. With SQLite CI constraints and five interdependent migrations, a single regression in any step cascades to all downstream tables.
+
+**Effort estimate**: 3–4 days of implementation plus 1–2 days of test coverage for migration rollback paths. Total: 4–6 days. Exceeds the 2-day threshold in the CAI-P5-06 decision criteria.
+
+#### Decision Rationale
+
+The four remaining `artifacts.id` FK references divide into two categories:
+
+1. **Semantic relationships** (`ArtifactVersion`, `ArtifactMetadata`, `TemplateEntity`): these are tightly coupled to the artifact's mutable identity (`type:name`). There is no immediate correctness problem — these tables track per-artifact history and metadata, not cross-artifact relationships. They do not need rename-stability; they are always accessed through the parent artifact.
+
+2. **Soft reference** (`ProjectTemplate.default_project_config_id`): optional column; rename fragility is acceptable because project templates are user-managed and rarely reference artifacts by stable identity across renames.
+
+All cross-artifact relational tables (`collection_artifacts`, `group_artifacts`, `artifact_tags`, `composite_memberships`) are already on `artifacts.uuid`. The primary driver for Phase 2 — referential integrity for join tables — is fully achieved without PK promotion.
+
+The remaining `artifacts.id` FKs confer no correctness benefit from promotion: they are accessed only through the owning artifact, not queried by UUID from sibling tables. The cost of promotion (5 migrations, SQLite rebuild pattern, session identity map audit across the full codebase) exceeds the value delivered.
+
+#### Outcome
+
+**`artifacts.id` (`type:name`) remains the primary key on the `artifacts` table.**
+
+**`artifacts.uuid` remains a `UNIQUE NOT NULL` indexed secondary column.**
+
+This is a stable long-term decision, not merely a deferral. Promotion would only be warranted if a future feature required cross-database artifact identity (e.g., federation), at which point the effort is revisited with a dedicated ADR.
+
+#### Remaining Work (not deferred — deferred forever unless requirements change)
+
+The following `artifacts.id` FK references are accepted as permanent:
+- `artifact_metadata.artifact_id` — 1:1 metadata blob; always accessed via artifact relationship
+- `artifact_versions.artifact_id` — version history; always queried by artifact
+- `project_templates.default_project_config_id` — soft config reference; acceptable rename fragility
+- `template_entities.artifact_id` — template membership; always queried through template
+
+---
+
 ## Consequences
 
 ### Positive
@@ -300,13 +380,13 @@ Don't add UUIDs. `CompositeMembership.child_artifact_id` stores `type:name` like
 - [ ] Add UUID to `CachedArtifact` API responses (optional, for observability)
 - [ ] Test cascading deletes on artifact removal
 
-### Phase 2 (Post-Composite, TBD)
+### Phase 2 (Post-Composite — CAI-P5)
 
-- [ ] Migrate `collection_artifacts` to UUID FK
-- [ ] Migrate `group_artifacts` to UUID FK
-- [ ] Migrate `artifact_tags` to UUID FK
-- [ ] Drop `type:name` as PK (keep as unique index)
-- [ ] Retire Phase 1 compatibility layer
+- [x] Migrate `collection_artifacts` to UUID FK (CAI-P5-01)
+- [x] Migrate `group_artifacts` to UUID FK (CAI-P5-02)
+- [x] Migrate `artifact_tags` to UUID FK (CAI-P5-03)
+- [x] Assessed feasibility of dropping `type:name` as PK — **Outcome B: deferred permanently** (CAI-P5-06; see "Phase 2 Assessment" section above)
+- [ ] Retire Phase 1 compatibility layer (CAI-P5-08)
 
 ---
 
