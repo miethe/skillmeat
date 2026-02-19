@@ -1,10 +1,15 @@
 """Artifact importer for bulk import operations."""
 
 import logging
+import os
+import re
+import shutil
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from skillmeat.core.artifact import ArtifactManager, ArtifactType
@@ -941,6 +946,140 @@ class ArtifactImporter:
                 details=details,
                 path=artifact.path,
             )
+
+
+# =============================================================================
+# Plugin meta-file storage (CAI-P3-06)
+# =============================================================================
+
+
+def slugify_plugin_name(name: str) -> str:
+    """Convert a plugin name to a safe directory slug.
+
+    Transforms the name to lowercase, replaces spaces and consecutive
+    non-alphanumeric characters with a single hyphen, and strips leading/
+    trailing hyphens.
+
+    Args:
+        name: Raw plugin name (e.g. ``"Git Workflow Pro"``).
+
+    Returns:
+        URL-safe slug (e.g. ``"git-workflow-pro"``).
+
+    Examples::
+
+        >>> slugify_plugin_name("Git Workflow Pro")
+        'git-workflow-pro'
+        >>> slugify_plugin_name("MY_PLUGIN  v2")
+        'my-plugin-v2'
+        >>> slugify_plugin_name("  leading/trailing  ")
+        'leading-trailing'
+    """
+    lowered = name.lower()
+    # Replace any run of non-alphanumeric characters with a single hyphen
+    slugged = re.sub(r"[^a-z0-9]+", "-", lowered)
+    # Strip leading/trailing hyphens
+    return slugged.strip("-")
+
+
+def write_plugin_meta_files(
+    plugin_name: str,
+    meta_files: Dict[str, bytes],
+    collection_path: str,
+) -> str:
+    """Write plugin meta-files to the collection filesystem atomically.
+
+    Creates ``<collection_path>/plugins/<slug>/`` and writes every entry in
+    *meta_files* into that directory.  The write is performed via a temporary
+    directory that is atomically moved into place, so a partial failure never
+    leaves a corrupt plugin directory.
+
+    Children are **not** stored here — they go to their type-specific
+    directories (``skills/``, ``commands/``, etc.).  This function only
+    handles the plugin-level meta-files such as ``plugin.json``,
+    ``README.md``, and ``manifest.toml``.
+
+    Args:
+        plugin_name: Human-readable or machine plugin name.  Will be
+            slugified (lowercase, hyphens for spaces/punctuation) before
+            use as a directory name.
+        meta_files: Mapping of filename → raw bytes.  Keys are plain
+            filenames (no path components).  Values are the file contents.
+            An empty dict is valid and results in an empty plugin directory.
+        collection_path: Absolute path to the root of the collection
+            directory (i.e. the directory that contains ``skills/``,
+            ``commands/``, etc.).
+
+    Returns:
+        Absolute path to the newly created plugin directory as a string.
+
+    Raises:
+        OSError: If the filesystem operation fails (permissions, disk full,
+            etc.).
+        ValueError: If *plugin_name* slugifies to an empty string.
+
+    Example::
+
+        plugin_dir = write_plugin_meta_files(
+            plugin_name="Git Workflow Pro",
+            meta_files={
+                "plugin.json": b'{"name": "git-workflow-pro"}',
+                "README.md": b"# Git Workflow Pro\\n",
+            },
+            collection_path="/home/user/.skillmeat/collections/default",
+        )
+        # plugin_dir == "/home/user/.skillmeat/collections/default/plugins/git-workflow-pro"
+    """
+    slug = slugify_plugin_name(plugin_name)
+    if not slug:
+        raise ValueError(
+            f"Plugin name {plugin_name!r} produced an empty slug after slugification."
+        )
+
+    collection_root = Path(collection_path)
+    plugins_dir = collection_root / "plugins"
+    final_plugin_dir = plugins_dir / slug
+
+    # Write via temp directory inside the same filesystem (plugins_dir) so
+    # that the atomic rename is guaranteed to be on the same device.
+    plugins_dir.mkdir(parents=True, exist_ok=True)
+
+    temp_dir_path = tempfile.mkdtemp(dir=plugins_dir, prefix=f".{slug}.")
+    try:
+        temp_plugin_dir = Path(temp_dir_path)
+
+        for filename, content in meta_files.items():
+            dest_file = temp_plugin_dir / filename
+            # Write file content
+            with open(dest_file, "wb") as fh:
+                fh.write(content)
+                fh.flush()
+                os.fsync(fh.fileno())
+
+        # If a previous plugin directory exists, remove it before the rename
+        # so the atomic replace always succeeds regardless of OS rename
+        # semantics (on Windows, rename fails if target exists).
+        if final_plugin_dir.exists():
+            shutil.rmtree(final_plugin_dir)
+
+        # Atomic rename: temp_dir → final destination
+        Path(temp_dir_path).rename(final_plugin_dir)
+
+    except Exception:
+        # Best-effort cleanup of the temp directory on failure
+        try:
+            shutil.rmtree(temp_dir_path, ignore_errors=True)
+        except Exception:
+            pass
+        raise
+
+    logger.info(
+        "write_plugin_meta_files: wrote %d meta-file(s) for plugin %r to %s",
+        len(meta_files),
+        slug,
+        final_plugin_dir,
+    )
+    return str(final_plugin_dir)
 
 
 # =============================================================================
