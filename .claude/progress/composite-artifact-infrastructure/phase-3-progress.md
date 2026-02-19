@@ -8,8 +8,8 @@ started: null
 completed: null
 overall_progress: 0
 completion_estimate: on-track
-total_tasks: 9
-completed_tasks: 9
+total_tasks: 10
+completed_tasks: 10
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -104,6 +104,16 @@ tasks:
   - CAI-P3-08
   estimated_effort: 1pt
   priority: low
+- id: CAI-P3-10
+  description: Update skillmeat export to accept Composite Artifact ID and generate
+    Bundle zip with composite metadata + all child artifacts
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CAI-P3-03
+  estimated_effort: 1pt
+  priority: medium
 parallelization:
   batch_1:
   - CAI-P3-01
@@ -119,6 +129,8 @@ parallelization:
   batch_5:
   - CAI-P3-08
   - CAI-P3-09
+  batch_6:
+  - CAI-P3-10
   critical_path:
   - CAI-P3-01
   - CAI-P3-02
