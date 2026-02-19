@@ -441,7 +441,7 @@ export function MemberList({
       <div
         id={announcerId}
         role="status"
-        aria-live="assertive"
+        aria-live="polite"
         aria-atomic="true"
         className="sr-only"
       >

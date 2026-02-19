@@ -90,8 +90,8 @@ function CollectionPageSkeleton() {
 function EmptyState({ title, description }: { title: string; description: string }) {
   return (
     <div className="flex h-full items-center justify-center py-12">
-      <div className="text-center">
-        <Package className="mx-auto h-12 w-12 text-muted-foreground/50" />
+      <div className="text-center" role="status" aria-label={title}>
+        <Package className="mx-auto h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
         <h3 className="mt-4 text-lg font-semibold">{title}</h3>
         <p className="mt-2 text-sm text-muted-foreground">{description}</p>
       </div>
@@ -1137,7 +1137,12 @@ function CollectionPageContent() {
       )}
 
       {/* Result count line */}
-      <div className="border-b px-6 py-2 text-sm text-muted-foreground">
+      <div
+        className="border-b px-6 py-2 text-sm text-muted-foreground"
+        aria-live="polite"
+        aria-atomic="true"
+        role="status"
+      >
         {isLoadingArtifacts
           ? 'Loading artifacts...'
           : `Showing ${filteredArtifacts.length} of ${totalCount} artifacts${hasNextPage ? ' (scroll for more)' : ''}`}
@@ -1146,7 +1151,11 @@ function CollectionPageContent() {
       <div className="flex-1 overflow-auto p-6">
         {/* Error State */}
         {error && (
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+          <div
+            className="rounded-lg border border-destructive/50 bg-destructive/10 p-4"
+            role="alert"
+            aria-live="assertive"
+          >
             <p className="text-sm text-destructive">
               Failed to load artifacts. Please try again later.
             </p>
@@ -1247,8 +1256,8 @@ function CollectionPageContent() {
         {!error && !isLoadingArtifacts && (
           <div ref={targetRef} className="flex justify-center py-8">
             {isFetchingNextPage && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin" />
+              <div className="flex items-center gap-2 text-muted-foreground" role="status" aria-live="polite">
+                <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
                 <span className="text-sm">Loading more artifacts...</span>
               </div>
             )}
@@ -1386,8 +1395,8 @@ export default function CollectionPage() {
     <EntityLifecycleProvider mode="collection">
       <Suspense
         fallback={
-          <div className="flex h-screen items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin" />
+          <div className="flex h-screen items-center justify-center" role="status" aria-label="Loading collection">
+            <Loader2 className="h-8 w-8 animate-spin" aria-hidden="true" />
           </div>
         }
       >

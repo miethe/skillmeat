@@ -25,7 +25,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Plus, Loader2, AlertCircle, Users, MoreHorizontal, Eye, Rocket, Trash2 } from 'lucide-react';
+import { Plus, X, Loader2, AlertCircle, Users, MoreHorizontal, Eye, Rocket, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -475,7 +475,7 @@ export function PluginMembersTab({
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium">Members</h3>
+          <h3 id="plugin-members-heading" className="text-sm font-medium">Members</h3>
           <Badge
             variant="secondary"
             className="px-2 py-0.5 text-xs tabular-nums"
@@ -492,11 +492,12 @@ export function PluginMembersTab({
             onClick={() => setIsAddingMember((v) => !v)}
             aria-expanded={isAddingMember}
             aria-controls="plugin-member-search"
+            aria-label={isAddingMember ? 'Cancel adding member' : 'Add member to plugin'}
           >
             {isAddingMember ? (
               <>
-                <span aria-hidden="true">✕</span>
-                <span className="ml-2">Cancel</span>
+                <X className="mr-2 h-4 w-4" aria-hidden="true" />
+                Cancel
               </>
             ) : (
               <>
@@ -537,6 +538,7 @@ export function PluginMembersTab({
           'rounded-md',
           members.length > 6 ? 'h-[420px]' : undefined
         )}
+        aria-label={members.length > 6 ? 'Scrollable member list' : undefined}
       >
         {members.length === 0 ? (
           <MembersEmptyState
@@ -550,6 +552,7 @@ export function PluginMembersTab({
             onRemove={handleRequestRemove}
             disabled={effectiveDisabled}
             renderItemActions={renderMemberActions}
+            aria-labelledby="plugin-members-heading"
           />
         )}
       </ScrollArea>

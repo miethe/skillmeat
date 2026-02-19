@@ -306,10 +306,11 @@ export function ArtifactBrowseCard({
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 truncate text-sm text-blue-600 hover:underline dark:text-blue-400"
                   title={sourceDisplay.displayName}
+                  aria-label={`${sourceDisplay.displayName} (opens in new tab)`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <LucideIcons.Github className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-                  <span className="truncate">{sourceDisplay.displayName}</span>
+                  <span className="truncate" aria-hidden="true">{sourceDisplay.displayName}</span>
                 </a>
               ) : (
                 <p className="truncate text-sm text-muted-foreground" title={authorDisplay}>
@@ -465,10 +466,19 @@ export function ArtifactBrowseCard({
                   'text-xs',
                   onTagClick && 'cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all'
                 )}
-                role="listitem"
+                role={onTagClick ? 'button' : 'listitem'}
+                tabIndex={onTagClick ? 0 : undefined}
+                aria-label={onTagClick ? `Filter by tag: ${tag}` : undefined}
                 onClick={onTagClick ? (e) => {
                   e.stopPropagation();
                   onTagClick(tag);
+                } : undefined}
+                onKeyDown={onTagClick ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onTagClick(tag);
+                  }
                 } : undefined}
               >
                 {tag}
@@ -496,7 +506,7 @@ export function ArtifactBrowseCard({
                           className="h-5 w-5 rounded-full"
                           aria-label="Add tags"
                         >
-                          <LucideIcons.Plus className="h-3 w-3" />
+                          <LucideIcons.Plus className="h-3 w-3" aria-hidden="true" />
                         </Button>
                       }
                     />
@@ -564,10 +574,19 @@ export function ArtifactBrowseCard({
                   'text-xs',
                   onTagClick && 'cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all'
                 )}
-                role="listitem"
+                role={onTagClick ? 'button' : 'listitem'}
+                tabIndex={onTagClick ? 0 : undefined}
+                aria-label={onTagClick ? `Filter by tag: ${tag}` : undefined}
                 onClick={onTagClick ? (e) => {
                   e.stopPropagation();
                   onTagClick(tag);
+                } : undefined}
+                onKeyDown={onTagClick ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onTagClick(tag);
+                  }
                 } : undefined}
               >
                 {tag}
@@ -595,7 +614,7 @@ export function ArtifactBrowseCard({
                           className="h-5 w-5 rounded-full"
                           aria-label="Add tags"
                         >
-                          <LucideIcons.Plus className="h-3 w-3" />
+                          <LucideIcons.Plus className="h-3 w-3" aria-hidden="true" />
                         </Button>
                       }
                     />
