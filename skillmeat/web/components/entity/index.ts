@@ -64,3 +64,5 @@ export type {
 } from './linked-artifacts-section';
 export { CollapsibleActionBar } from './collapsible-action-bar';
 export type { CollapsibleActionBarProps } from './collapsible-action-bar';
+export { PluginMembersTab } from './plugin-members-tab';
+export type { PluginMembersTabProps } from './plugin-members-tab';

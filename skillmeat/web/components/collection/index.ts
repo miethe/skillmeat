@@ -29,3 +29,5 @@ export { ArtifactGroupBadges } from './artifact-group-badges';
 export type { ArtifactGroupBadgesProps } from './artifact-group-badges';
 export { PluginMemberIcons } from './plugin-member-icons';
 export type { PluginMemberIconsProps } from './plugin-member-icons';
+export { CreatePluginDialog } from './create-plugin-dialog';
+export type { CreatePluginDialogProps } from './create-plugin-dialog';
