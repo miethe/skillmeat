@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 5
+completed_tasks: 6
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -70,7 +70,7 @@ tasks:
 - id: CAI-P4-06
   description: Implement version conflict resolution dialog (pinned vs current hash
     mismatch)
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -146,7 +146,7 @@ files_modified:
 - skillmeat/web/components/import-modal.tsx
 - skillmeat/web/__tests__/artifact-detail.test.tsx
 - skillmeat/web/__tests__/e2e/import-flow.spec.ts
-progress: 62
+progress: 75
 updated: '2026-02-18'
 ---
 
