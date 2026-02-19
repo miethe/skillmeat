@@ -25,7 +25,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Plus, Loader2, AlertCircle, Users } from 'lucide-react';
+import { Plus, Loader2, AlertCircle, Users, MoreHorizontal, Eye, Rocket, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -39,9 +39,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MemberList } from '@/components/shared/member-list';
 import { MemberSearchInput } from '@/components/shared/member-search-input';
+import { DeployDialog } from '@/components/collection/deploy-dialog';
 import {
   useArtifactAssociations,
   useAddCompositeMember,
@@ -49,6 +57,7 @@ import {
   useReorderCompositeMembers,
   useToast,
 } from '@/hooks';
+import { useRouter } from 'next/navigation';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 import { cn } from '@/lib/utils';
 
@@ -280,6 +289,7 @@ export function PluginMembersTab({
   disabled = false,
 }: PluginMembersTabProps) {
   const { toast } = useToast();
+  const router = useRouter();
 
   // ── Data ──────────────────────────────────────────────────────────────────
 
@@ -309,6 +319,9 @@ export function PluginMembersTab({
     memberUuid: string;
     name: string;
   } | null>(null);
+
+  // Deploy dialog — triggered from member action menu
+  const [deployTargetArtifact, setDeployTargetArtifact] = useState<Artifact | null>(null);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -372,6 +385,62 @@ export function PluginMembersTab({
   const handleCancelRemove = useCallback(() => {
     setPendingRemove(null);
   }, []);
+
+  // Navigate to artifact detail view
+  const handleViewDetails = useCallback((artifact: Artifact) => {
+    router.push(`/collection?artifact=${encodeURIComponent(artifact.id)}`);
+  }, [router]);
+
+  // Open deploy dialog for a member
+  const handleDeployMember = useCallback((artifact: Artifact) => {
+    setDeployTargetArtifact(artifact);
+  }, []);
+
+  // Per-member action menu renderer passed to MemberList
+  const renderMemberActions = useCallback(
+    (artifact: Artifact) => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Actions for ${artifact.name}`}
+            className={cn(
+              'flex h-5 w-5 shrink-0 items-center justify-center rounded',
+              'text-muted-foreground/40 opacity-0 transition-all duration-150',
+              'group-hover:opacity-100 group-focus-within:opacity-100',
+              'hover:bg-accent hover:text-foreground',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:opacity-100'
+            )}
+          >
+            <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuItem
+            onClick={() => handleViewDetails(artifact)}
+          >
+            <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
+            View Details
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => handleDeployMember(artifact)}
+          >
+            <Rocket className="mr-2 h-4 w-4" aria-hidden="true" />
+            Deploy
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={() => handleRequestRemove(artifact.id)}
+          >
+            <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+            Remove from Plugin
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ),
+    [handleViewDetails, handleDeployMember, handleRequestRemove]
+  );
 
   const handleReorder = useCallback(
     async (reordered: Artifact[]) => {
@@ -480,6 +549,7 @@ export function PluginMembersTab({
             onReorder={handleReorder}
             onRemove={handleRequestRemove}
             disabled={effectiveDisabled}
+            renderItemActions={renderMemberActions}
           />
         )}
       </ScrollArea>
@@ -503,6 +573,14 @@ export function PluginMembersTab({
         isPending={removeMember.isPending}
         onConfirm={handleConfirmRemove}
         onCancel={handleCancelRemove}
+      />
+
+      {/* ── Deploy dialog (triggered from member action menu) ── */}
+      <DeployDialog
+        artifact={deployTargetArtifact}
+        isOpen={deployTargetArtifact !== null}
+        onClose={() => setDeployTargetArtifact(null)}
+        onSuccess={() => setDeployTargetArtifact(null)}
       />
     </div>
   );

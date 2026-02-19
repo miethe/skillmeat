@@ -35,6 +35,10 @@ interface ArtifactGridProps {
   onTagClick?: (tagName: string) => void;
   /** Handler when a group badge is clicked (for filtering) */
   onGroupClick?: (groupId: string) => void;
+  /** Set of selected artifact IDs for bulk operations */
+  selectedArtifactIds?: Set<string>;
+  /** Called when user toggles artifact selection */
+  onToggleArtifactSelect?: (artifact: Artifact) => void;
 }
 
 function ArtifactGridSkeleton() {
@@ -62,6 +66,8 @@ export function ArtifactGrid({
   onDelete,
   onTagClick,
   onGroupClick,
+  selectedArtifactIds,
+  onToggleArtifactSelect,
 }: ArtifactGridProps) {
   const [deleteArtifact, setDeleteArtifact] = useState<Artifact | null>(null);
   const [deployArtifact, setDeployArtifact] = useState<Artifact | null>(null);
@@ -118,6 +124,8 @@ export function ArtifactGrid({
             onCollectionClick={onCollectionClick}
             onTagClick={onTagClick}
             onGroupClick={onGroupClick}
+            isSelected={selectedArtifactIds?.has(artifact.id) ?? false}
+            onToggleSelect={onToggleArtifactSelect}
           />
         ))}
       </div>

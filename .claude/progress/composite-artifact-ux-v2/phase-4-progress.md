@@ -6,7 +6,7 @@ prd: composite-artifact-ux-v2
 feature_slug: composite-artifact-ux-v2
 phase: 4
 title: Collection Plugin Management UI
-status: pending
+status: in_progress
 created: '2026-02-19'
 updated: '2026-02-19'
 prd_ref: docs/project_plans/PRDs/features/composite-artifact-ux-v2.md
@@ -14,8 +14,8 @@ plan_ref: docs/project_plans/implementation_plans/features/composite-artifact-ux
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 12
-completed_tasks: 5
-in_progress_tasks: 0
+completed_tasks: 9
+in_progress_tasks: 1
 blocked_tasks: 0
 at_risk_tasks: 0
 owners:
@@ -65,7 +65,7 @@ tasks:
 - id: CUX-P4-05
   description: CreatePluginDialog — dialog form with name, description, tags, pre-populated
     members; creates via POST /api/v1/composites
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -76,7 +76,7 @@ tasks:
 - id: CUX-P4-06
   description: Create Plugin Button — add 'New Plugin' button to collection toolbar
     and bulk action bar
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -86,7 +86,7 @@ tasks:
 - id: CUX-P4-07
   description: PluginMembersTab — detail page 'Members' tab with member table, add/remove/reorder,
     'Add Member' button
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -96,7 +96,7 @@ tasks:
 - id: CUX-P4-08
   description: Member Actions Menu — View Details, Deploy, Remove from Plugin; destructive
     styling for Remove
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -106,7 +106,7 @@ tasks:
 - id: CUX-P4-09
   description: Plugin Detail Modal — extend BaseArtifactModal for plugins with Members
     tab + existing metadata/sync/deploy tabs
-  status: pending
+  status: in_progress
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -202,7 +202,7 @@ success_criteria:
   description: No regression in existing collection or artifact detail views
   status: pending
 files_modified: []
-progress: 41
+progress: 75
 ---
 # Phase 4: Collection Plugin Management UI
 

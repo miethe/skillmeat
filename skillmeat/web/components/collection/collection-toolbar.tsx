@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Grid3x3, List, Layers, Search, RefreshCw, Filter, X, ArrowUpDown, Check } from 'lucide-react';
+import { Grid3x3, List, Layers, Search, RefreshCw, Filter, X, ArrowUpDown, Check, Blocks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -91,6 +91,8 @@ interface CollectionToolbarProps {
   onFilterModeChange?: (mode: FilterMode) => void;
   /** Handler to clear all filters in a single URL update (avoids stale searchParams race) */
   onClearAllFilters?: () => void;
+  /** Handler to open the Create Plugin dialog */
+  onNewPlugin?: () => void;
 }
 
 /**
@@ -159,6 +161,7 @@ export function CollectionToolbar({
   filterMode = 'and',
   onFilterModeChange,
   onClearAllFilters,
+  onNewPlugin,
 }: CollectionToolbarProps) {
   // Local search state for immediate UI feedback
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -753,6 +756,19 @@ export function CollectionToolbar({
               <Layers className="h-4 w-4" />
             </Button>
           </div>
+
+          {/* New Plugin Button */}
+          {onNewPlugin && (
+            <Button
+              size="sm"
+              onClick={onNewPlugin}
+              className="gap-2 bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+              aria-label="Create new plugin"
+            >
+              <Blocks className="h-4 w-4" aria-hidden="true" />
+              New Plugin
+            </Button>
+          )}
 
           {/* Refresh Button with timestamp */}
           <div className="flex items-center gap-2">

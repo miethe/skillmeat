@@ -103,6 +103,14 @@ export interface MemberListProps {
   className?: string;
   /** Disable all interactions (drag, keyboard, remove). */
   disabled?: boolean;
+  /**
+   * Optional render prop for additional actions per member row.
+   * Rendered after the remove button.  Use for context menus, deploy buttons, etc.
+   * Example: `(artifact) => <MyDropdownMenu artifact={artifact} />`
+   */
+  renderItemActions?: (artifact: Artifact) => React.ReactNode;
+  /** aria-labelledby for the list — matches an external heading element. */
+  'aria-labelledby'?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,6 +128,7 @@ interface SortableItemProps {
   onRemove: (id: string) => void;
   disabled: boolean;
   listId: string;
+  renderItemActions?: (artifact: Artifact) => React.ReactNode;
 }
 
 function SortableItem({
@@ -133,6 +142,7 @@ function SortableItem({
   onRemove,
   disabled,
   listId,
+  renderItemActions,
 }: SortableItemProps) {
   const {
     attributes,
@@ -246,6 +256,9 @@ function SortableItem({
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
+
+      {/* Additional per-item actions (e.g., context menu from PluginMembersTab) */}
+      {renderItemActions?.(artifact)}
     </li>
   );
 }
@@ -292,6 +305,8 @@ export function MemberList({
   onRemove,
   className,
   disabled = false,
+  renderItemActions,
+  'aria-labelledby': ariaLabelledBy,
 }: MemberListProps) {
   const listId = useId();
   const announcerId = useId();
@@ -443,7 +458,8 @@ export function MemberList({
           <ul
             id={listId}
             role="listbox"
-            aria-label="Plugin members"
+            aria-label={ariaLabelledBy ? undefined : 'Plugin members'}
+            aria-labelledby={ariaLabelledBy}
             aria-multiselectable="false"
             aria-orientation="vertical"
             className="flex flex-col gap-1"
@@ -461,6 +477,7 @@ export function MemberList({
                 onRemove={onRemove}
                 disabled={disabled}
                 listId={listId}
+                renderItemActions={renderItemActions}
               />
             ))}
           </ul>

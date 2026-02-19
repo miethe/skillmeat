@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { Package, Loader2, Library } from 'lucide-react';
+import { Package, Loader2, Library, Blocks } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { CollectionHeader } from '@/components/collection/collection-header';
 import { CollectionToolbar } from '@/components/collection/collection-toolbar';
@@ -15,6 +15,7 @@ import {
 } from '@/components/collection/artifact-details-modal';
 import { EditCollectionDialog } from '@/components/collection/edit-collection-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
+import { CreatePluginDialog } from '@/components/collection/create-plugin-dialog';
 import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
 import { AddToGroupDialog } from '@/components/collection/add-to-group-dialog';
 import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
@@ -33,6 +34,7 @@ import {
   useReturnTo,
 } from '@/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import type { Artifact, ArtifactFilters } from '@/types/artifact';
 import type { ArtifactParameters } from '@/types/discovery';
 import { mapApiResponseToArtifact, type ArtifactResponse } from '@/lib/api/mappers';
@@ -198,6 +200,13 @@ function CollectionPageContent() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
+  // Plugin creation state
+  const [showPluginDialog, setShowPluginDialog] = useState(false);
+  const [pluginInitialMembers, setPluginInitialMembers] = useState<Artifact[]>([]);
+
+  // Bulk selection state (for Create Plugin from selected artifacts)
+  const [selectedArtifactIds, setSelectedArtifactIds] = useState<Set<string>>(new Set());
+
   // State for artifact actions from dropdown menu
   const [artifactToDelete, setArtifactToDelete] = useState<Artifact | null>(null);
   const [artifactToEdit, setArtifactToEdit] = useState<Artifact | null>(null);
@@ -297,6 +306,29 @@ function CollectionPageContent() {
     setArtifactForGroups(artifact);
     setShowGroupsDialog(true);
   };
+
+  // Handler to open the Create Plugin dialog (from toolbar button or bulk action)
+  const handleNewPlugin = useCallback((initialMembers: Artifact[] = []) => {
+    setPluginInitialMembers(initialMembers);
+    setShowPluginDialog(true);
+  }, []);
+
+  // Bulk selection handlers
+  const handleToggleArtifactSelect = useCallback((artifact: Artifact) => {
+    setSelectedArtifactIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(artifact.id)) {
+        next.delete(artifact.id);
+      } else {
+        next.add(artifact.id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleClearBulkSelection = useCallback(() => {
+    setSelectedArtifactIds(new Set());
+  }, []);
 
   // Handler to save parameters (same pattern as unified-entity-modal.tsx)
   const handleSaveParameters = async (parameters: ArtifactParameters) => {
@@ -729,6 +761,13 @@ function CollectionPageContent() {
     return artifacts;
   }, [preTagFilterArtifacts, selectedTags, selectedTools, filterMode, sortField, sortOrder]);
 
+  // Derive selected Artifact objects from the currently loaded pool
+  const selectedArtifactsForBulk = useMemo(() => {
+    if (selectedArtifactIds.size === 0) return [];
+    return filteredArtifacts.filter((a) => selectedArtifactIds.has(a.id));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedArtifactIds, filteredArtifacts]);
+
   const hasActiveFilters = useMemo(
     () =>
       Boolean(
@@ -1048,6 +1087,7 @@ function CollectionPageContent() {
         filterMode={filterMode}
         onFilterModeChange={handleFilterModeChange}
         onClearAllFilters={handleClearAllFilters}
+        onNewPlugin={() => handleNewPlugin()}
       />
 
       {/* Active filters row */}
@@ -1062,6 +1102,39 @@ function CollectionPageContent() {
           onChange={handleTypeTabChange}
         />
       </div>
+
+      {/* Bulk action bar — appears when 2+ artifacts are selected */}
+      {selectedArtifactIds.size >= 2 && (
+        <div
+          className="sticky top-0 z-20 flex items-center justify-between border-b bg-indigo-50 px-6 py-2 shadow-sm dark:bg-indigo-950/40"
+          role="region"
+          aria-label={`${selectedArtifactIds.size} artifacts selected`}
+          aria-live="polite"
+        >
+          <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+            {selectedArtifactIds.size} artifact{selectedArtifactIds.size !== 1 ? 's' : ''} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              className="gap-2 bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+              onClick={() => handleNewPlugin(selectedArtifactsForBulk)}
+              aria-label={`Create plugin from ${selectedArtifactIds.size} selected artifacts`}
+            >
+              <Blocks className="h-4 w-4" aria-hidden="true" />
+              Create Plugin
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearBulkSelection}
+              aria-label="Clear selection"
+            >
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Result count line */}
       <div className="border-b px-6 py-2 text-sm text-muted-foreground">
@@ -1125,6 +1198,8 @@ function CollectionPageContent() {
                 onDelete={handleDeleteFromDropdown}
                 onTagClick={handleTagClick}
                 onGroupClick={handleGroupClick}
+                selectedArtifactIds={selectedArtifactIds}
+                onToggleArtifactSelect={handleToggleArtifactSelect}
               />
             ) : viewMode === 'list' ? (
               <ArtifactList
@@ -1161,6 +1236,8 @@ function CollectionPageContent() {
                 onDelete={handleDeleteFromDropdown}
                 onTagClick={handleTagClick}
                 onGroupClick={handleGroupClick}
+                selectedArtifactIds={selectedArtifactIds}
+                onToggleArtifactSelect={handleToggleArtifactSelect}
               />
             )}
           </>
@@ -1286,6 +1363,20 @@ function CollectionPageContent() {
           onSuccess={() => refetch()}
         />
       )}
+
+      {/* Create Plugin Dialog */}
+      <CreatePluginDialog
+        open={showPluginDialog}
+        onOpenChange={(open) => {
+          setShowPluginDialog(open);
+          if (!open) {
+            setPluginInitialMembers([]);
+            setSelectedArtifactIds(new Set());
+          }
+        }}
+        initialMembers={pluginInitialMembers}
+        onSuccess={() => refetch()}
+      />
     </div>
   );
 }

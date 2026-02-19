@@ -19,6 +19,7 @@ import * as LucideIcons from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,6 +77,12 @@ export interface ArtifactBrowseCardProps {
 
   /** Additional CSS classes */
   className?: string;
+
+  /** Whether the card is in selected state (bulk selection mode) */
+  isSelected?: boolean;
+
+  /** Called when user toggles selection checkbox */
+  onToggleSelect?: (artifact: Artifact) => void;
 }
 
 // Type-specific border accent colors for visual differentiation
@@ -153,6 +160,8 @@ export function ArtifactBrowseCard({
   showCollectionBadge = false,
   onCollectionClick,
   className,
+  isSelected = false,
+  onToggleSelect,
 }: ArtifactBrowseCardProps) {
   const config = getArtifactTypeConfig(artifact.type);
 
@@ -242,11 +251,12 @@ export function ArtifactBrowseCard({
   return (
     <Card
       className={cn(
-        'cursor-pointer border-l-4 transition-all',
+        'relative cursor-pointer border-l-4 transition-all',
         'hover:border-primary/50 hover:shadow-md',
         'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
         artifactTypeBorderAccents[artifact.type],
         artifactTypeCardTints[artifact.type],
+        isSelected && 'ring-2 ring-indigo-500 ring-offset-1',
         className
       )}
       onClick={handleCardClick}
@@ -254,9 +264,25 @@ export function ArtifactBrowseCard({
       role="button"
       tabIndex={0}
       aria-label={`View details for ${artifact.name}, ${artifact.type} artifact by ${authorDisplay}`}
+      data-selected={onToggleSelect ? isSelected : undefined}
     >
+      {/* Selection checkbox — shown when onToggleSelect is provided */}
+      {onToggleSelect && (
+        <div
+          className="absolute left-2 top-2 z-10"
+          onClick={(e) => { e.stopPropagation(); onToggleSelect(artifact); }}
+        >
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect(artifact)}
+            aria-label={`Select ${artifact.name}`}
+            className="border-muted-foreground/40 bg-background/80 backdrop-blur-sm"
+          />
+        </div>
+      )}
+
       {/* Header: Icon, Name, Author, Quick Actions */}
-      <div className="p-4 pb-3">
+      <div className={cn('p-4 pb-3', onToggleSelect && 'pl-8')}>
         <div className="flex items-start justify-between gap-2">
           {/* Left: Icon and Name */}
           <div className="flex min-w-0 flex-1 items-center gap-3">
