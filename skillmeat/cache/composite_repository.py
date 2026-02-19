@@ -57,6 +57,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from skillmeat.cache.models import (
     Artifact,
+    CompositeArtifact,
     CompositeMembership,
     create_db_engine,
     create_tables,
@@ -70,9 +71,13 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# DTO type alias — a plain dict describing one membership edge
+# DTO type aliases
 # ---------------------------------------------------------------------------
 MembershipRecord = Dict[str, Any]
+"""A plain dict describing one membership edge (``CompositeMembership`` row)."""
+
+CompositeRecord = Dict[str, Any]
+"""A plain dict describing one composite artifact (``CompositeArtifact`` row)."""
 
 
 # ---------------------------------------------------------------------------
@@ -452,3 +457,290 @@ class CompositeMembershipRepository:
                     child_artifact_uuid,
                 )
             return deleted_count > 0
+
+    # ------------------------------------------------------------------
+    # CompositeArtifact CRUD operations
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _composite_to_dict(composite: CompositeArtifact) -> CompositeRecord:
+        """Convert a ``CompositeArtifact`` ORM row to a plain dict.
+
+        Args:
+            composite: Loaded ORM instance.
+
+        Returns:
+            Plain dictionary safe to return to callers.
+        """
+        return composite.to_dict()
+
+    def get_composite(self, composite_id: str) -> Optional[CompositeRecord]:
+        """Fetch a single CompositeArtifact by its ``type:name`` primary key.
+
+        Args:
+            composite_id: ``type:name`` primary key (e.g. ``"composite:my-plugin"``).
+
+        Returns:
+            ``CompositeRecord`` dict, or ``None`` when not found.
+
+        Example:
+            >>> repo.get_composite("composite:my-plugin")
+            {"id": "composite:my-plugin", "composite_type": "plugin", ...}
+        """
+        session = self._get_session()
+        try:
+            composite = (
+                session.query(CompositeArtifact)
+                .filter(CompositeArtifact.id == composite_id)
+                .first()
+            )
+            if composite is None:
+                return None
+            return self._composite_to_dict(composite)
+        finally:
+            session.close()
+
+    def list_composites(self, collection_id: str) -> List[CompositeRecord]:
+        """Return all CompositeArtifacts for a collection, ordered by id.
+
+        Args:
+            collection_id: Owning collection identifier.
+
+        Returns:
+            List of ``CompositeRecord`` dicts ordered by ``id``.
+
+        Example:
+            >>> repo.list_composites("col-abc")
+            [{"id": "composite:my-plugin", ...}, ...]
+        """
+        session = self._get_session()
+        try:
+            rows = (
+                session.query(CompositeArtifact)
+                .filter(CompositeArtifact.collection_id == collection_id)
+                .order_by(CompositeArtifact.id)
+                .all()
+            )
+            return [self._composite_to_dict(r) for r in rows]
+        finally:
+            session.close()
+
+    def create_composite(
+        self,
+        collection_id: str,
+        composite_id: str,
+        composite_type: str = "plugin",
+        display_name: Optional[str] = None,
+        description: Optional[str] = None,
+        initial_member_uuids: Optional[List[str]] = None,
+        pinned_version_hash: Optional[str] = None,
+    ) -> CompositeRecord:
+        """Create a new ``CompositeArtifact`` row, optionally with member edges.
+
+        Args:
+            collection_id: Owning collection identifier.
+            composite_id: ``type:name`` primary key for the new composite.
+            composite_type: Variant classifier — ``"plugin"``, ``"stack"``,
+                or ``"suite"``.  Defaults to ``"plugin"``.
+            display_name: Optional human-readable label.
+            description: Optional free-text description.
+            initial_member_uuids: Optional list of stable artifact UUIDs to
+                add as membership edges immediately.
+            pinned_version_hash: Optional version pin applied to every initial
+                membership edge.
+
+        Returns:
+            ``CompositeRecord`` dict for the newly created composite, including
+            its initial ``memberships`` list.
+
+        Raises:
+            ConstraintError: When a composite with ``composite_id`` already
+                exists (UNIQUE/PK violation).
+        """
+        with self.transaction() as session:
+            composite = CompositeArtifact(
+                id=composite_id,
+                collection_id=collection_id,
+                composite_type=composite_type,
+                display_name=display_name,
+                description=description,
+            )
+            session.add(composite)
+            session.flush()
+
+            for child_uuid in (initial_member_uuids or []):
+                membership = CompositeMembership(
+                    collection_id=collection_id,
+                    composite_id=composite_id,
+                    child_artifact_uuid=child_uuid,
+                    relationship_type="contains",
+                    pinned_version_hash=pinned_version_hash,
+                )
+                session.add(membership)
+
+            session.flush()
+            session.refresh(composite)
+            result = self._composite_to_dict(composite)
+            logger.info(
+                "Created CompositeArtifact: id=%s type=%s collection=%s members=%d",
+                composite_id,
+                composite_type,
+                collection_id,
+                len(initial_member_uuids or []),
+            )
+            return result
+
+    def update_composite(
+        self,
+        composite_id: str,
+        display_name: Optional[str] = None,
+        description: Optional[str] = None,
+        composite_type: Optional[str] = None,
+    ) -> CompositeRecord:
+        """Update mutable fields on an existing ``CompositeArtifact``.
+
+        Only fields whose argument is not ``None`` are updated, allowing
+        callers to perform partial updates.
+
+        Args:
+            composite_id: ``type:name`` primary key of the composite.
+            display_name: New display name (``None`` = leave unchanged).
+            description: New description (``None`` = leave unchanged).
+            composite_type: New composite type (``None`` = leave unchanged).
+
+        Returns:
+            Updated ``CompositeRecord`` dict.
+
+        Raises:
+            NotFoundError: When no row with ``composite_id`` exists.
+        """
+        with self.transaction() as session:
+            composite = (
+                session.query(CompositeArtifact)
+                .filter(CompositeArtifact.id == composite_id)
+                .first()
+            )
+            if composite is None:
+                raise NotFoundError(
+                    f"CompositeArtifact not found: {composite_id!r}"
+                )
+
+            if display_name is not None:
+                composite.display_name = display_name
+            if description is not None:
+                composite.description = description
+            if composite_type is not None:
+                composite.composite_type = composite_type
+
+            session.flush()
+            session.refresh(composite)
+            result = self._composite_to_dict(composite)
+            logger.info(
+                "Updated CompositeArtifact: id=%s", composite_id
+            )
+            return result
+
+    def delete_composite(
+        self,
+        composite_id: str,
+        cascade_delete_children: bool = False,
+    ) -> bool:
+        """Delete a ``CompositeArtifact`` and optionally its child Artifact rows.
+
+        Membership rows are removed automatically via ``ON DELETE CASCADE`` on
+        ``composite_memberships.composite_id``.  When
+        ``cascade_delete_children=True`` the service additionally deletes the
+        ``Artifact`` rows referenced by the memberships.
+
+        Args:
+            composite_id: ``type:name`` primary key to delete.
+            cascade_delete_children: When ``True``, also hard-delete the child
+                ``Artifact`` rows.  Defaults to ``False``.
+
+        Returns:
+            ``True`` if a row was deleted; ``False`` if not found.
+        """
+        with self.transaction() as session:
+            composite = (
+                session.query(CompositeArtifact)
+                .filter(CompositeArtifact.id == composite_id)
+                .first()
+            )
+            if composite is None:
+                logger.debug(
+                    "delete_composite: no composite found for id=%s",
+                    composite_id,
+                )
+                return False
+
+            # Collect child UUIDs before cascade removes memberships
+            child_uuids: List[str] = [
+                m.child_artifact_uuid for m in composite.memberships
+            ]
+
+            session.delete(composite)
+
+            if cascade_delete_children and child_uuids:
+                session.query(Artifact).filter(
+                    Artifact.uuid.in_(child_uuids)
+                ).delete(synchronize_session=False)
+                logger.info(
+                    "delete_composite: also deleted %d child Artifact rows",
+                    len(child_uuids),
+                )
+
+            logger.info(
+                "Deleted CompositeArtifact: id=%s cascade=%s",
+                composite_id,
+                cascade_delete_children,
+            )
+            return True
+
+    def reorder_members(
+        self,
+        composite_id: str,
+        reorder: List[Dict[str, Any]],
+    ) -> List[MembershipRecord]:
+        """Update the ``position`` field on membership edges in bulk.
+
+        Each entry in ``reorder`` must be a dict with:
+        - ``"child_artifact_uuid"``: Stable artifact UUID.
+        - ``"position"``: New integer position (0-based).
+
+        Args:
+            composite_id: ``type:name`` id of the parent composite.
+            reorder: List of ``{"child_artifact_uuid": str, "position": int}``
+                dicts.
+
+        Returns:
+            Updated list of ``MembershipRecord`` dicts for the composite,
+            ordered by the new positions.
+        """
+        with self.transaction() as session:
+            for item in reorder:
+                updated = (
+                    session.query(CompositeMembership)
+                    .filter(
+                        CompositeMembership.composite_id == composite_id,
+                        CompositeMembership.child_artifact_uuid
+                        == item["child_artifact_uuid"],
+                    )
+                    .first()
+                )
+                if updated is not None:
+                    updated.position = item["position"]
+
+            session.flush()
+            # Re-query ordered results
+            rows = (
+                session.query(CompositeMembership)
+                .filter(CompositeMembership.composite_id == composite_id)
+                .order_by(CompositeMembership.position.asc().nullslast())
+                .all()
+            )
+            logger.info(
+                "reorder_members: updated %d positions for composite=%s",
+                len(reorder),
+                composite_id,
+            )
+            return [self._membership_to_dict(r) for r in rows]

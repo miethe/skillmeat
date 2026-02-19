@@ -49,6 +49,7 @@ from sqlalchemy.orm import Session
 
 from skillmeat.cache.composite_repository import (
     CompositeMembershipRepository,
+    CompositeRecord,
     MembershipRecord,
 )
 from skillmeat.cache.repositories import ConstraintError, NotFoundError
@@ -229,6 +230,246 @@ class CompositeService:
             relationship_type=relationship_type,
             pinned_version_hash=pinned_version_hash,
         )
+
+    def remove_composite_member(
+        self,
+        composite_id: str,
+        child_artifact_id: str,
+    ) -> bool:
+        """Remove a child artifact from a composite by ``type:name``.
+
+        Resolves ``child_artifact_id`` to a UUID and then delegates to
+        ``CompositeMembershipRepository.delete_membership()``.
+
+        Args:
+            composite_id: ``type:name`` id of the parent composite.
+            child_artifact_id: ``type:name`` id of the child artifact to remove.
+
+        Returns:
+            ``True`` if the membership was found and deleted; ``False`` if no
+            matching membership existed.
+
+        Raises:
+            ArtifactNotFoundError: When ``child_artifact_id`` cannot be
+                resolved to a cached artifact.
+        """
+        session = self._repo._get_session()
+        try:
+            child_uuid = self._resolve_uuid(session, child_artifact_id)
+        finally:
+            session.close()
+
+        logger.info(
+            "remove_composite_member: resolved %r → uuid=%s (composite=%s)",
+            child_artifact_id,
+            child_uuid,
+            composite_id,
+        )
+
+        return self._repo.delete_membership(
+            composite_id=composite_id,
+            child_artifact_uuid=child_uuid,
+        )
+
+    def reorder_composite_members(
+        self,
+        composite_id: str,
+        reorder: List[Dict[str, Any]],
+    ) -> List[MembershipRecord]:
+        """Reorder members within a composite.
+
+        Each entry in ``reorder`` must be a dict with ``"artifact_id"``
+        (``type:name``) and ``"position"`` (int ≥ 0).  The service resolves
+        ``artifact_id`` → UUID and delegates to the repository.
+
+        Args:
+            composite_id: ``type:name`` id of the parent composite.
+            reorder: List of ``{"artifact_id": str, "position": int}`` dicts.
+
+        Returns:
+            Updated list of membership records for the composite.
+
+        Raises:
+            ArtifactNotFoundError: When any ``artifact_id`` cannot be resolved.
+        """
+        session = self._repo._get_session()
+        try:
+            resolved = [
+                {"child_artifact_uuid": self._resolve_uuid(session, item["artifact_id"]),
+                 "position": item["position"]}
+                for item in reorder
+            ]
+        finally:
+            session.close()
+
+        logger.info(
+            "reorder_composite_members: composite=%s count=%d",
+            composite_id,
+            len(resolved),
+        )
+
+        return self._repo.reorder_members(
+            composite_id=composite_id,
+            reorder=resolved,
+        )
+
+    def create_composite(
+        self,
+        collection_id: str,
+        composite_id: str,
+        composite_type: str = "plugin",
+        display_name: Optional[str] = None,
+        description: Optional[str] = None,
+        initial_members: Optional[List[str]] = None,
+        pinned_version_hash: Optional[str] = None,
+    ) -> "CompositeRecord":
+        """Create a new CompositeArtifact, optionally with initial members.
+
+        Args:
+            collection_id: Owning collection identifier.
+            composite_id: ``type:name`` id for the new composite
+                (e.g. ``"composite:my-plugin"``).
+            composite_type: Variant — ``"plugin"``, ``"stack"``, or
+                ``"suite"``.  Defaults to ``"plugin"``.
+            display_name: Optional human-readable label.
+            description: Optional free-text description.
+            initial_members: Optional list of child ``type:name`` ids to add
+                immediately.  Each is resolved to a UUID before insertion.
+            pinned_version_hash: Optional version pin applied to every
+                initial member.
+
+        Returns:
+            ``CompositeRecord`` dict for the newly created composite.
+
+        Raises:
+            ArtifactNotFoundError: When any ``initial_members`` entry cannot
+                be resolved to a cached artifact.
+            ConstraintError: When a composite with the same ``composite_id``
+                already exists in the collection.
+        """
+        # Resolve initial members → UUIDs before touching the DB
+        resolved_uuids: List[str] = []
+        if initial_members:
+            session = self._repo._get_session()
+            try:
+                for child_id in initial_members:
+                    resolved_uuids.append(self._resolve_uuid(session, child_id))
+            finally:
+                session.close()
+
+        logger.info(
+            "create_composite: id=%s type=%s collection=%s members=%d",
+            composite_id,
+            composite_type,
+            collection_id,
+            len(resolved_uuids),
+        )
+
+        return self._repo.create_composite(
+            collection_id=collection_id,
+            composite_id=composite_id,
+            composite_type=composite_type,
+            display_name=display_name,
+            description=description,
+            initial_member_uuids=resolved_uuids,
+            pinned_version_hash=pinned_version_hash,
+        )
+
+    def update_composite(
+        self,
+        composite_id: str,
+        display_name: Optional[str] = None,
+        description: Optional[str] = None,
+        composite_type: Optional[str] = None,
+    ) -> "CompositeRecord":
+        """Update mutable fields on an existing CompositeArtifact.
+
+        Args:
+            composite_id: ``type:name`` primary key of the composite to update.
+            display_name: New display name, or ``None`` to leave unchanged.
+            description: New description, or ``None`` to leave unchanged.
+            composite_type: New composite type, or ``None`` to leave unchanged.
+
+        Returns:
+            Updated ``CompositeRecord`` dict.
+
+        Raises:
+            NotFoundError: When no composite with ``composite_id`` exists.
+        """
+        logger.info(
+            "update_composite: id=%s display_name=%r description=%r type=%r",
+            composite_id,
+            display_name,
+            description,
+            composite_type,
+        )
+
+        return self._repo.update_composite(
+            composite_id=composite_id,
+            display_name=display_name,
+            description=description,
+            composite_type=composite_type,
+        )
+
+    def delete_composite(
+        self,
+        composite_id: str,
+        cascade_delete_children: bool = False,
+    ) -> bool:
+        """Delete a CompositeArtifact and optionally its child Artifacts.
+
+        The membership rows are always removed via the ``ON DELETE CASCADE``
+        constraint on ``composite_memberships.composite_id``.  When
+        ``cascade_delete_children=True`` the child ``Artifact`` rows themselves
+        are also deleted.
+
+        Args:
+            composite_id: ``type:name`` primary key of the composite to delete.
+            cascade_delete_children: When ``True``, also delete child Artifact
+                rows.  Defaults to ``False``.
+
+        Returns:
+            ``True`` if the composite was found and deleted; ``False`` when no
+            composite with ``composite_id`` existed.
+        """
+        logger.info(
+            "delete_composite: id=%s cascade_children=%s",
+            composite_id,
+            cascade_delete_children,
+        )
+
+        return self._repo.delete_composite(
+            composite_id=composite_id,
+            cascade_delete_children=cascade_delete_children,
+        )
+
+    def get_composite(
+        self,
+        composite_id: str,
+    ) -> Optional["CompositeRecord"]:
+        """Fetch a single CompositeArtifact by its ``type:name`` id.
+
+        Args:
+            composite_id: ``type:name`` primary key.
+
+        Returns:
+            ``CompositeRecord`` dict, or ``None`` when not found.
+        """
+        return self._repo.get_composite(composite_id=composite_id)
+
+    def list_composites(
+        self,
+        collection_id: str,
+    ) -> List["CompositeRecord"]:
+        """Return all CompositeArtifacts for a collection.
+
+        Args:
+            collection_id: Owning collection identifier.
+
+        Returns:
+            List of ``CompositeRecord`` dicts, ordered by ``id``.
+        """
+        return self._repo.list_composites(collection_id=collection_id)
 
     # ------------------------------------------------------------------
     # Read operations
