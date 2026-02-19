@@ -70,6 +70,7 @@ from skillmeat.api.schemas.artifacts import (
     VersionGraphNodeResponse,
     VersionGraphResponse,
 )
+from skillmeat.api.schemas.associations import AssociationItemDTO, AssociationsDTO
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.discovery import (
     BulkImportRequest,
@@ -122,6 +123,7 @@ from skillmeat.api.services.artifact_cache_service import (
     parse_deployments,
 )
 from skillmeat.api.schemas.deployments import DeploymentSummary
+from skillmeat.cache.composite_repository import CompositeMembershipRepository
 from skillmeat.cache.models import (
     Collection,
     CollectionArtifact,
@@ -2176,9 +2178,7 @@ async def list_artifacts(
                 logger.warning(f"Failed to query import_id from DB: {e}")
                 matching_ids = set()
             artifacts = [
-                a
-                for a in artifacts
-                if f"{a.type.value}:{a.name}" in matching_ids
+                a for a in artifacts if f"{a.type.value}:{a.name}" in matching_ids
             ]
 
         # Sort artifacts for consistent pagination
@@ -4352,7 +4352,9 @@ async def get_artifact_diff(
 
         # Find artifact in collection (with fallback across all collections)
         artifact, resolved_collection = _find_artifact_in_collections(
-            artifact_name, artifact_type, collection_mgr,
+            artifact_name,
+            artifact_type,
+            collection_mgr,
             preferred_collection=collection_name,
         )
 
@@ -4696,7 +4698,9 @@ async def get_artifact_upstream_diff(
 
         # Find artifact (with fallback across collections)
         artifact, collection_name = _find_artifact_in_collections(
-            artifact_name, artifact_type, collection_mgr,
+            artifact_name,
+            artifact_type,
+            collection_mgr,
             preferred_collection=collection,
         )
 
@@ -5107,7 +5111,9 @@ async def get_artifact_source_project_diff(
 
         # Find artifact in collection (with fallback across all collections)
         artifact, resolved_collection = _find_artifact_in_collections(
-            artifact_name, artifact_type, collection_mgr,
+            artifact_name,
+            artifact_type,
+            collection_mgr,
             preferred_collection=collection_name,
         )
 
@@ -5199,7 +5205,9 @@ async def get_artifact_source_project_diff(
                 if upstream_artifact_path.is_dir():
                     source_files = {
                         str(f.relative_to(upstream_artifact_path))
-                        for f in iter_artifact_files(upstream_artifact_path, exclude_dirs)
+                        for f in iter_artifact_files(
+                            upstream_artifact_path, exclude_dirs
+                        )
                     }
                 else:
                     source_files = {upstream_artifact_path.name}
@@ -5208,7 +5216,9 @@ async def get_artifact_source_project_diff(
                 if project_artifact_path.is_dir():
                     project_files = {
                         str(f.relative_to(project_artifact_path))
-                        for f in iter_artifact_files(project_artifact_path, exclude_dirs)
+                        for f in iter_artifact_files(
+                            project_artifact_path, exclude_dirs
+                        )
                     }
                 else:
                     project_files = {project_artifact_path.name}
@@ -5469,7 +5479,9 @@ async def list_artifact_files(
 
         # Find artifact (with fallback across collections)
         artifact, collection_name = _find_artifact_in_collections(
-            artifact_name, artifact_type, collection_mgr,
+            artifact_name,
+            artifact_type,
+            collection_mgr,
             preferred_collection=collection,
         )
 
@@ -5683,7 +5695,9 @@ async def get_artifact_file_content(
 
         # Find artifact (with fallback across collections)
         artifact, collection_name = _find_artifact_in_collections(
-            artifact_name, artifact_type, collection_mgr,
+            artifact_name,
+            artifact_type,
+            collection_mgr,
             preferred_collection=collection,
         )
 
@@ -5935,7 +5949,9 @@ async def update_artifact_file_content(
 
         # Find artifact (with fallback across collections)
         artifact, collection_name = _find_artifact_in_collections(
-            artifact_name, artifact_type, collection_mgr,
+            artifact_name,
+            artifact_type,
+            collection_mgr,
             preferred_collection=collection,
         )
 
@@ -6206,7 +6222,9 @@ async def create_artifact_file(
 
         # Find artifact (with fallback across collections)
         artifact, collection_name = _find_artifact_in_collections(
-            artifact_name, artifact_type, collection_mgr,
+            artifact_name,
+            artifact_type,
+            collection_mgr,
             preferred_collection=collection,
         )
 
@@ -6469,7 +6487,9 @@ async def delete_artifact_file(
 
         # Find artifact (with fallback across collections)
         artifact, collection_name = _find_artifact_in_collections(
-            artifact_name, artifact_type, collection_mgr,
+            artifact_name,
+            artifact_type,
+            collection_mgr,
             preferred_collection=collection,
         )
 
@@ -8061,4 +8081,241 @@ async def get_unlinked_references(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get unlinked references: {str(e)}",
+        )
+
+
+@router.get(
+    "/{artifact_id}/associations",
+    response_model=AssociationsDTO,
+    summary="Get artifact associations",
+    description=(
+        "Return the composite-artifact associations for a given artifact. "
+        "``parents`` lists composites that contain this artifact as a child; "
+        "``children`` lists the child artifacts when this artifact is itself a composite."
+    ),
+    responses={
+        200: {"description": "Successfully retrieved associations"},
+        400: {"model": ErrorResponse, "description": "Invalid artifact ID format"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_artifact_associations(
+    artifact_id: str,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    include_parents: bool = Query(
+        default=True,
+        description="Include composites that contain this artifact as a child",
+    ),
+    include_children: bool = Query(
+        default=True,
+        description="Include child artifacts of this composite",
+    ),
+    relationship_type: Optional[str] = Query(
+        default=None,
+        description="Filter by relationship type (e.g. 'contains')",
+    ),
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name or UUID (uses active collection if omitted)",
+    ),
+) -> AssociationsDTO:
+    """Return composite-membership associations for an artifact.
+
+    Queries the ``composite_memberships`` cache table to return:
+
+    - ``parents``: Composite artifacts (plugins, stacks, suites) that list
+      this artifact as a member.
+    - ``children``: Artifacts that belong to this composite (only populated
+      when ``artifact_id`` itself is a composite).
+
+    Both lists may be empty — an empty response is **not** a 404.  A 404 is
+    only returned when the ``artifact_id`` cannot be resolved to any known
+    artifact in the active collection.
+
+    Args:
+        artifact_id: Artifact identifier in ``type:name`` format
+            (e.g. ``"skill:canvas"`` or ``"composite:my-plugin"``).
+        collection_mgr: Collection manager dependency.
+        _token: Authentication token (dependency injection).
+        include_parents: When ``False``, ``parents`` is always ``[]``.
+        include_children: When ``False``, ``children`` is always ``[]``.
+        relationship_type: Optional filter applied to both parent and child
+            lists after retrieval.
+        collection: Collection name or UUID; defaults to the active collection.
+
+    Returns:
+        AssociationsDTO with ``parents`` and ``children`` lists.
+
+    Raises:
+        HTTPException 400: Invalid ``artifact_id`` format.
+        HTTPException 404: Artifact not found in the resolved collection.
+        HTTPException 500: Unexpected database or service error.
+
+    Example:
+        GET /api/v1/artifacts/composite:my-plugin/associations
+
+        Returns::
+
+            {
+                "artifact_id": "composite:my-plugin",
+                "parents": [],
+                "children": [
+                    {
+                        "artifact_id": "skill:canvas",
+                        "artifact_name": "canvas",
+                        "artifact_type": "skill",
+                        "relationship_type": "contains",
+                        "pinned_version_hash": null,
+                        "created_at": "2025-01-01T00:00:00"
+                    }
+                ]
+            }
+    """
+    try:
+        logger.info(
+            "Getting associations for artifact: %s (collection=%s, "
+            "include_parents=%s, include_children=%s, relationship_type=%s)",
+            artifact_id,
+            collection,
+            include_parents,
+            include_children,
+            relationship_type,
+        )
+
+        # Validate artifact ID format
+        try:
+            artifact_type_str, artifact_name = parse_artifact_id(artifact_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Resolve collection
+        collection_name = collection or collection_mgr.get_active_collection_name()
+
+        # Verify the artifact exists in the collection (filesystem check)
+        try:
+            coll = collection_mgr.load_collection(collection_name)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_name}' not found",
+            )
+
+        try:
+            artifact_type_enum = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unknown artifact type: '{artifact_type_str}'",
+            )
+
+        artifact_obj = coll.find_artifact(artifact_name, artifact_type_enum)
+        if artifact_obj is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found in collection '{collection_name}'",
+            )
+
+        # Resolve the collection_id used in the DB (the collection UUID / name key)
+        # The composite_memberships table stores collection_id as the Collection.id
+        # We look it up via the DB session so we use the canonical value.
+        db_session = get_session()
+        collection_id: Optional[str] = None
+        try:
+            col_row = (
+                db_session.query(Collection)
+                .filter(Collection.name == collection_name)
+                .first()
+            )
+            if col_row is not None:
+                collection_id = col_row.id
+        finally:
+            db_session.close()
+
+        # Fall back to using the collection name directly if not in DB yet
+        if collection_id is None:
+            collection_id = collection_name
+
+        # Query associations via the repository
+        repo = CompositeMembershipRepository()
+        raw = repo.get_associations(artifact_id, collection_id)
+
+        def _build_parent_dto(record: dict) -> AssociationItemDTO:
+            """Convert a parent membership record dict to AssociationItemDTO."""
+            parent_id: str = record.get("composite_id", "")
+            if ":" in parent_id:
+                p_type, p_name = parent_id.split(":", 1)
+            else:
+                p_type, p_name = "composite", parent_id
+            return AssociationItemDTO(
+                artifact_id=parent_id,
+                artifact_name=p_name,
+                artifact_type=p_type,
+                relationship_type=record.get("relationship_type", "contains"),
+                pinned_version_hash=record.get("pinned_version_hash"),
+                created_at=record.get("created_at"),
+            )
+
+        def _build_child_dto(record: dict) -> AssociationItemDTO:
+            """Convert a child membership record dict to AssociationItemDTO."""
+            child_info = record.get("child_artifact") or {}
+            child_id: str = child_info.get("id", record.get("child_artifact_uuid", ""))
+            if ":" in child_id:
+                c_type, c_name = child_id.split(":", 1)
+            else:
+                # UUID fallback — use type from child_artifact dict if available
+                c_type = child_info.get("type", "unknown")
+                c_name = child_info.get("name", child_id)
+            return AssociationItemDTO(
+                artifact_id=child_id,
+                artifact_name=c_name,
+                artifact_type=c_type,
+                relationship_type=record.get("relationship_type", "contains"),
+                pinned_version_hash=record.get("pinned_version_hash"),
+                created_at=record.get("created_at"),
+            )
+
+        parents: List[AssociationItemDTO] = []
+        if include_parents:
+            parents = [_build_parent_dto(r) for r in raw.get("parents", [])]
+            if relationship_type is not None:
+                parents = [
+                    p for p in parents if p.relationship_type == relationship_type
+                ]
+
+        children: List[AssociationItemDTO] = []
+        if include_children:
+            children = [_build_child_dto(r) for r in raw.get("children", [])]
+            if relationship_type is not None:
+                children = [
+                    c for c in children if c.relationship_type == relationship_type
+                ]
+
+        logger.info(
+            "Associations for '%s': %d parent(s), %d child(ren)",
+            artifact_id,
+            len(parents),
+            len(children),
+        )
+
+        return AssociationsDTO(
+            artifact_id=artifact_id,
+            parents=parents,
+            children=children,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed to get associations for '%s': %s", artifact_id, e, exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get associations: {str(e)}",
         )
