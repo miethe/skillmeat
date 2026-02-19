@@ -2,7 +2,8 @@
 
 import logging
 import time
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
@@ -553,7 +554,9 @@ class ArtifactImporter:
         if artifact.target_platforms:
             resolved: List[Platform] = []
             for value in artifact.target_platforms:
-                platform = value if isinstance(value, Platform) else Platform(str(value))
+                platform = (
+                    value if isinstance(value, Platform) else Platform(str(value))
+                )
                 if platform not in resolved:
                     resolved.append(platform)
             return resolved or None
@@ -678,7 +681,9 @@ class ArtifactImporter:
 
         # Check path exists
         if not artifact_path.exists():
-            artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+            artifact_id = (
+                f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+            )
             return ImportResultData(
                 artifact_id=artifact_id,
                 success=False,
@@ -702,7 +707,9 @@ class ArtifactImporter:
         if requires_directory:
             # Directory-based artifacts (skills): must be a directory
             if not artifact_path.is_dir():
-                artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                artifact_id = (
+                    f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                )
                 return ImportResultData(
                     artifact_id=artifact_id,
                     success=False,
@@ -715,7 +722,9 @@ class ArtifactImporter:
         else:
             # File-based artifacts (commands, agents, hooks, mcp): must be a file
             if not artifact_path.is_file():
-                artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                artifact_id = (
+                    f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                )
                 return ImportResultData(
                     artifact_id=artifact_id,
                     success=False,
@@ -796,7 +805,9 @@ class ArtifactImporter:
         if expected_file:
             metadata_path = artifact_path / expected_file
             if not metadata_path.exists():
-                artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                artifact_id = (
+                    f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                )
                 return ImportResultData(
                     artifact_id=artifact_id,
                     success=False,
@@ -930,3 +941,375 @@ class ArtifactImporter:
                 details=details,
                 path=artifact.path,
             )
+
+
+# =============================================================================
+# Transactional plugin import (CAI-P3-03 + CAI-P3-04)
+# =============================================================================
+
+
+@dataclass
+class ImportResult:
+    """Result of a transactional plugin import via :func:`import_plugin_transactional`.
+
+    Attributes:
+        success: ``True`` when the full transaction committed without error.
+        plugin_id: The ``CompositeArtifact.id`` for the imported plugin
+            (format: ``"composite:<name>"``).
+        children_imported: Number of child ``Artifact`` / ``ArtifactVersion``
+            rows that were newly created during this import.
+        children_reused: Number of child artifacts that already existed in the
+            cache and were linked via deduplication rather than re-created.
+        errors: Human-readable error messages.  Empty on success; populated on
+            partial or total failure.
+        transaction_id: UUID string generated per call for distributed tracing
+            and log correlation.
+    """
+
+    success: bool
+    plugin_id: str
+    children_imported: int
+    children_reused: int
+    errors: List[str]
+    transaction_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+
+def import_plugin_transactional(
+    discovered_graph: "DiscoveredGraph",
+    source_url: str,
+    session: "Session",
+    project_id: str,
+    collection_id: str,
+) -> ImportResult:
+    """Import a composite plugin and all its children in a single DB transaction.
+
+    Executes the full import pipeline within the supplied SQLAlchemy ``session``:
+
+    1. For each child in ``discovered_graph.children``:
+
+       a. Compute a SHA-256 content hash via :func:`~skillmeat.core.hashing.compute_artifact_hash`.
+       b. Run deduplication via :func:`~skillmeat.core.deduplication.resolve_artifact_for_import`.
+       c. Execute the decision:
+
+          * ``LINK_EXISTING`` — the content hash already lives in
+            ``ArtifactVersion``; reuse the existing artifact and version IDs.
+          * ``CREATE_NEW_VERSION`` — same name+type exists but with different
+            content; append a new ``ArtifactVersion`` row to the existing
+            ``Artifact``.
+          * ``CREATE_NEW_ARTIFACT`` — no match; create a new ``Artifact`` row
+            and its initial ``ArtifactVersion``.
+
+    2. Create a ``CompositeArtifact`` row for the plugin (idempotent: skips if
+       a row with the same id already exists).
+
+    3. Create one ``CompositeMembership`` row per child, storing
+       ``pinned_version_hash`` equal to the content hash at import time
+       (CAI-P3-04 version pinning).
+
+    4. Commit the transaction.  Any exception triggers an automatic rollback and
+       the function returns a failure ``ImportResult`` — no orphaned rows are
+       left in the database.
+
+    Args:
+        discovered_graph: Composite artifact hierarchy produced by the Phase 2
+            discovery pipeline (a :class:`~skillmeat.core.discovery.DiscoveredGraph`
+            instance).
+        source_url: URL or filesystem path identifying the upstream source of
+            the composite artifact.  Stored on ``CompositeArtifact`` metadata for
+            provenance tracking.
+        session: An *active* SQLAlchemy ``Session``.  The caller owns session
+            lifecycle; this function issues DML within the supplied session and
+            calls ``session.commit()`` on success or ``session.rollback()`` on
+            failure — it does **not** close the session.
+        project_id: The ``Project.id`` that owns the newly created ``Artifact``
+            rows.  Required because ``artifacts.project_id`` is a non-null
+            foreign key.
+        collection_id: The collection identifier used as the owning scope for
+            ``CompositeArtifact`` and ``CompositeMembership`` rows.
+
+    Returns:
+        :class:`ImportResult` describing the outcome.  On success,
+        ``success=True`` and ``plugin_id`` contains the composite's
+        ``type:name`` key.  On failure, ``success=False`` and ``errors``
+        contains one or more diagnostic messages.
+
+    Raises:
+        This function never propagates exceptions — all errors are caught,
+        the transaction is rolled back, and a failure ``ImportResult`` is
+        returned.
+
+    Example::
+
+        from sqlalchemy.orm import Session
+        from skillmeat.core.importer import import_plugin_transactional
+
+        result = import_plugin_transactional(
+            discovered_graph=graph,
+            source_url="github:owner/repo",
+            session=session,
+            project_id="proj-abc",
+            collection_id="col-xyz",
+        )
+        if result.success:
+            print(f"Imported plugin {result.plugin_id}")
+        else:
+            print(f"Import failed: {result.errors}")
+    """
+    # Deferred imports — these modules sit below `importer` in the dependency
+    # graph, but `importer` is imported early by api/routers/artifacts.py which
+    # is loaded during the API server's import chain.  Deferring here prevents
+    # the circular import: cache.models → cache → cache.marketplace →
+    # api.schemas → api → api.routers → core.importer → cache.models.
+    from skillmeat.cache.models import (
+        Artifact,
+        ArtifactVersion,
+        CompositeArtifact,
+        CompositeMembership,
+    )
+    from skillmeat.core.deduplication import (
+        DeduplicationDecision,
+        resolve_artifact_for_import,
+    )
+    from skillmeat.core.hashing import compute_artifact_hash
+
+    transaction_id = str(uuid.uuid4())
+    plugin_name = discovered_graph.parent.name
+    composite_id = f"composite:{plugin_name}"
+
+    _log = logging.getLogger(__name__)
+    _log.info(
+        "import_plugin_transactional started transaction_id=%s composite_id=%s children=%d",
+        transaction_id,
+        composite_id,
+        len(discovered_graph.children),
+    )
+
+    children_imported = 0
+    children_reused = 0
+    errors: List[str] = []
+
+    # Map child name → (artifact_uuid, content_hash) for membership creation
+    child_records: List[Dict[str, Any]] = []
+
+    try:
+        # ------------------------------------------------------------------
+        # Step 1: Process each child artifact
+        # ------------------------------------------------------------------
+        for child in discovered_graph.children:
+            child_id = f"{child.type}:{child.name}"
+
+            # (a) Compute content hash
+            try:
+                content_hash = compute_artifact_hash(child.path)
+            except (FileNotFoundError, ValueError) as exc:
+                _log.warning(
+                    "import_plugin_transactional: hash failed for child %s path=%s: %s",
+                    child_id,
+                    child.path,
+                    exc,
+                )
+                errors.append(
+                    f"Hash computation failed for '{child_id}' (path={child.path}): {exc}"
+                )
+                raise  # abort entire transaction
+
+            # (b) Run deduplication
+            dedup_result = resolve_artifact_for_import(
+                name=child.name,
+                artifact_type=child.type,
+                content_hash=content_hash,
+                session=session,
+            )
+
+            # (c) Execute decision
+            if dedup_result.decision == DeduplicationDecision.LINK_EXISTING:
+                # Reuse existing artifact + version — no new rows needed
+                artifact_uuid_row = (
+                    session.query(Artifact)
+                    .filter(Artifact.id == dedup_result.artifact_id)
+                    .first()
+                )
+                if artifact_uuid_row is None:
+                    # Defensive: artifact disappeared between queries
+                    raise RuntimeError(
+                        f"Deduplication returned LINK_EXISTING for '{child_id}' "
+                        f"but artifact id={dedup_result.artifact_id!r} was not found."
+                    )
+                child_artifact_uuid = artifact_uuid_row.uuid
+                children_reused += 1
+                _log.debug(
+                    "LINK_EXISTING: child=%s artifact_id=%s version_id=%s",
+                    child_id,
+                    dedup_result.artifact_id,
+                    dedup_result.artifact_version_id,
+                )
+
+            elif dedup_result.decision == DeduplicationDecision.CREATE_NEW_VERSION:
+                # Append a new ArtifactVersion to the existing Artifact row
+                existing_artifact = (
+                    session.query(Artifact)
+                    .filter(Artifact.id == dedup_result.artifact_id)
+                    .first()
+                )
+                if existing_artifact is None:
+                    raise RuntimeError(
+                        f"Deduplication returned CREATE_NEW_VERSION for '{child_id}' "
+                        f"but artifact id={dedup_result.artifact_id!r} was not found."
+                    )
+                new_version = ArtifactVersion(
+                    artifact_id=existing_artifact.id,
+                    content_hash=content_hash,
+                    change_origin="sync",
+                    parent_hash=None,
+                )
+                session.add(new_version)
+                session.flush()  # populate new_version.id
+                child_artifact_uuid = existing_artifact.uuid
+                children_imported += 1
+                _log.debug(
+                    "CREATE_NEW_VERSION: child=%s artifact_id=%s new_version_id=%s",
+                    child_id,
+                    existing_artifact.id,
+                    new_version.id,
+                )
+
+            else:
+                # CREATE_NEW_ARTIFACT — new Artifact + initial ArtifactVersion
+                artifact_type_name_id = f"{child.type}:{child.name}"
+                new_artifact = Artifact(
+                    id=artifact_type_name_id,
+                    project_id=project_id,
+                    name=child.name,
+                    type=child.type,
+                    source=source_url,
+                    description=child.description,
+                )
+                session.add(new_artifact)
+                session.flush()  # populate new_artifact.uuid
+
+                new_version = ArtifactVersion(
+                    artifact_id=new_artifact.id,
+                    content_hash=content_hash,
+                    change_origin="sync",
+                    parent_hash=None,
+                )
+                session.add(new_version)
+                session.flush()
+                child_artifact_uuid = new_artifact.uuid
+                children_imported += 1
+                _log.debug(
+                    "CREATE_NEW_ARTIFACT: child=%s artifact_uuid=%s version_id=%s",
+                    child_id,
+                    child_artifact_uuid,
+                    new_version.id,
+                )
+
+            # Accumulate (uuid, content_hash) for membership creation in step 3
+            child_records.append(
+                {
+                    "child_artifact_uuid": child_artifact_uuid,
+                    "pinned_version_hash": content_hash,
+                }
+            )
+
+        # ------------------------------------------------------------------
+        # Step 2: Upsert CompositeArtifact row
+        # ------------------------------------------------------------------
+        existing_composite = (
+            session.query(CompositeArtifact)
+            .filter(CompositeArtifact.id == composite_id)
+            .first()
+        )
+        if existing_composite is None:
+            composite_row = CompositeArtifact(
+                id=composite_id,
+                collection_id=collection_id,
+                composite_type="plugin",
+                display_name=discovered_graph.parent.name,
+                description=discovered_graph.parent.description,
+                metadata_json=None,
+            )
+            session.add(composite_row)
+            session.flush()
+            _log.debug("Created CompositeArtifact: id=%s", composite_id)
+        else:
+            _log.debug("CompositeArtifact already exists: id=%s", composite_id)
+
+        # ------------------------------------------------------------------
+        # Step 3: Create CompositeMembership rows with pinned_version_hash
+        # ------------------------------------------------------------------
+        for record in child_records:
+            existing_membership = (
+                session.query(CompositeMembership)
+                .filter(
+                    CompositeMembership.collection_id == collection_id,
+                    CompositeMembership.composite_id == composite_id,
+                    CompositeMembership.child_artifact_uuid
+                    == record["child_artifact_uuid"],
+                )
+                .first()
+            )
+            if existing_membership is not None:
+                # Already linked — update the pin
+                existing_membership.pinned_version_hash = record["pinned_version_hash"]
+                _log.debug(
+                    "Updated pinned_version_hash on existing membership: "
+                    "composite=%s child_uuid=%s",
+                    composite_id,
+                    record["child_artifact_uuid"],
+                )
+            else:
+                membership = CompositeMembership(
+                    collection_id=collection_id,
+                    composite_id=composite_id,
+                    child_artifact_uuid=record["child_artifact_uuid"],
+                    relationship_type="contains",
+                    pinned_version_hash=record["pinned_version_hash"],
+                )
+                session.add(membership)
+                _log.debug(
+                    "Created CompositeMembership: composite=%s child_uuid=%s hash=%s",
+                    composite_id,
+                    record["child_artifact_uuid"],
+                    record["pinned_version_hash"][:8],
+                )
+
+        # ------------------------------------------------------------------
+        # Step 4: Commit the transaction
+        # ------------------------------------------------------------------
+        session.commit()
+        _log.info(
+            "import_plugin_transactional committed transaction_id=%s composite_id=%s "
+            "imported=%d reused=%d",
+            transaction_id,
+            composite_id,
+            children_imported,
+            children_reused,
+        )
+        return ImportResult(
+            success=True,
+            plugin_id=composite_id,
+            children_imported=children_imported,
+            children_reused=children_reused,
+            errors=[],
+            transaction_id=transaction_id,
+        )
+
+    except Exception as exc:
+        session.rollback()
+        error_msg = str(exc)
+        _log.error(
+            "import_plugin_transactional rolled back transaction_id=%s error=%s",
+            transaction_id,
+            error_msg,
+            exc_info=True,
+        )
+        errors.append(error_msg)
+        return ImportResult(
+            success=False,
+            plugin_id=composite_id,
+            children_imported=0,
+            children_reused=0,
+            errors=errors,
+            transaction_id=transaction_id,
+        )
