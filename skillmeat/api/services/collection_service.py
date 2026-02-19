@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from skillmeat.api.schemas.artifacts import ArtifactCollectionInfo
 from skillmeat.cache.collection_cache import get_collection_count_cache
-from skillmeat.cache.models import Collection, CollectionArtifact
+from skillmeat.cache.models import Artifact, Collection, CollectionArtifact
 
 logger = logging.getLogger(__name__)
 
@@ -70,10 +70,28 @@ class CollectionService:
 
         start_time = time.perf_counter()
 
-        # Query associations for all artifact_ids in a single query
+        # Step 1: Resolve type:name artifact IDs to their UUIDs.
+        # Since CAI-P5-01, CollectionArtifact stores artifact_uuid (FK to
+        # artifacts.uuid) rather than the type:name artifact_id string.
+        # We resolve the external type:name IDs to UUIDs in a single query,
+        # then use those UUIDs to query CollectionArtifact.
+        uuid_rows = (
+            self.db.query(Artifact.id, Artifact.uuid)
+            .filter(Artifact.id.in_(artifact_ids))
+            .all()
+        )
+        # Build bidirectional maps
+        artifact_id_to_uuid: dict = {row[0]: row[1] for row in uuid_rows}
+        uuid_to_artifact_id: dict = {row[1]: row[0] for row in uuid_rows}
+        known_uuids = list(artifact_id_to_uuid.values())
+
+        if not known_uuids:
+            return {aid: [] for aid in artifact_ids}
+
+        # Step 2: Query associations by artifact_uuid
         associations = (
             self.db.query(CollectionArtifact)
-            .filter(CollectionArtifact.artifact_id.in_(artifact_ids))
+            .filter(CollectionArtifact.artifact_uuid.in_(known_uuids))
             .all()
         )
 
@@ -173,8 +191,9 @@ class CollectionService:
         }
 
         for assoc in associations:
-            if assoc.collection_id in collection_map:
-                result[assoc.artifact_id].append(
+            artifact_type_name = uuid_to_artifact_id.get(assoc.artifact_uuid)
+            if artifact_type_name and assoc.collection_id in collection_map:
+                result[artifact_type_name].append(
                     collection_map[assoc.collection_id]
                 )
 

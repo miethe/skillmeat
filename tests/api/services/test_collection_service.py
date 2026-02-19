@@ -14,6 +14,11 @@ from skillmeat.api.schemas.artifacts import ArtifactCollectionInfo
 from skillmeat.cache.collection_cache import get_collection_count_cache
 from skillmeat.cache.models import Collection, CollectionArtifact
 
+# Helper: generate a deterministic UUID hex for a given artifact_id string
+def _make_uuid(artifact_id: str) -> str:
+    """Deterministic UUID hex for test fixtures (not a real UUID)."""
+    return artifact_id.replace(":", "_").replace("-", "_")[:32].ljust(32, "0")
+
 
 class TestCollectionService:
     """Test suite for CollectionService batch and single-artifact methods."""
@@ -77,18 +82,37 @@ class TestCollectionService:
     ) -> CollectionArtifact:
         """Helper to create a mock CollectionArtifact association.
 
+        Since CAI-P5-01, CollectionArtifact stores artifact_uuid (FK to
+        artifacts.uuid) instead of artifact_id (type:name string).
+
         Args:
             collection_id: Collection UUID
-            artifact_id: Artifact ID (e.g., 'skill:canvas')
+            artifact_id: Artifact ID (e.g., 'skill:canvas') — used to derive
+                the deterministic artifact_uuid for tests
 
         Returns:
             Mock CollectionArtifact object with required attributes
         """
         assoc = MagicMock(spec=CollectionArtifact)
         assoc.collection_id = collection_id
-        assoc.artifact_id = artifact_id
+        assoc.artifact_uuid = _make_uuid(artifact_id)
         assoc.added_at = datetime.utcnow()
         return assoc
+
+    def _make_uuid_query_mock(
+        self, artifact_ids: list
+    ) -> MagicMock:
+        """Helper to create the UUID resolution query mock (step 1).
+
+        The service first resolves type:name artifact IDs to UUIDs via:
+            query(Artifact.id, Artifact.uuid).filter(...).all()
+
+        Returns rows as (artifact_id, uuid) tuples matching _make_uuid().
+        """
+        rows = [(aid, _make_uuid(aid)) for aid in artifact_ids]
+        mock_uuid_query = MagicMock(spec=Query)
+        mock_uuid_query.filter.return_value.all.return_value = rows
+        return mock_uuid_query
 
     # =========================================================================
     # Edge Cases
@@ -128,7 +152,10 @@ class TestCollectionService:
         artifact_id = "skill:canvas"
         collection_id = "coll-abc123"
 
-        # Mock association query
+        # Step 1: UUID resolution mock
+        mock_uuid_query = self._make_uuid_query_mock([artifact_id])
+
+        # Mock association query (step 2)
         association = self._create_mock_association(collection_id, artifact_id)
         mock_assoc_query = MagicMock(spec=Query)
         mock_assoc_query.filter.return_value.all.return_value = [association]
@@ -140,8 +167,8 @@ class TestCollectionService:
             (collection, 5)
         ]
 
-        # Setup query side effect: first call -> associations, later calls -> collections
-        mock_session.query.side_effect = [mock_assoc_query, MagicMock(), mock_coll_query]
+        # Setup query side effect: uuid resolution, associations, count subquery, collections
+        mock_session.query.side_effect = [mock_uuid_query, mock_assoc_query, MagicMock(), mock_coll_query]
 
         result = service.get_collection_membership_batch([artifact_id])
 
@@ -160,7 +187,10 @@ class TestCollectionService:
         coll_id_1 = "coll-abc123"
         coll_id_2 = "coll-def456"
 
-        # Mock associations
+        # Step 1: UUID resolution mock
+        mock_uuid_query = self._make_uuid_query_mock([artifact_id])
+
+        # Mock associations (step 2)
         associations = [
             self._create_mock_association(coll_id_1, artifact_id),
             self._create_mock_association(coll_id_2, artifact_id),
@@ -177,7 +207,7 @@ class TestCollectionService:
             (coll_2, 10),
         ]
 
-        mock_session.query.side_effect = [mock_assoc_query, MagicMock(), mock_coll_query]
+        mock_session.query.side_effect = [mock_uuid_query, mock_assoc_query, MagicMock(), mock_coll_query]
 
         result = service.get_collection_membership_batch([artifact_id])
 
@@ -205,10 +235,14 @@ class TestCollectionService:
         coll_id_1 = "coll-abc123"
         coll_id_2 = "coll-def456"
 
-        # Mock associations:
+        # Step 1: UUID resolution mock — artifact_3 ("skill:orphan") has no DB row,
+        # so only artifact_1 and artifact_2 are resolved to UUIDs.
+        mock_uuid_query = self._make_uuid_query_mock([artifact_1, artifact_2])
+
+        # Mock associations (step 2):
         # - artifact_1 in coll_1 and coll_2
         # - artifact_2 in coll_2 only
-        # - artifact_3 in no collections
+        # - artifact_3 has no UUID so it never appears in associations
         associations = [
             self._create_mock_association(coll_id_1, artifact_1),
             self._create_mock_association(coll_id_2, artifact_1),
@@ -226,7 +260,7 @@ class TestCollectionService:
             (coll_2, 8),
         ]
 
-        mock_session.query.side_effect = [mock_assoc_query, MagicMock(), mock_coll_query]
+        mock_session.query.side_effect = [mock_uuid_query, mock_assoc_query, MagicMock(), mock_coll_query]
 
         result = service.get_collection_membership_batch(
             [artifact_1, artifact_2, artifact_3]
@@ -257,7 +291,10 @@ class TestCollectionService:
         artifact_id = "skill:canvas"
         collection_id = "coll-abc123"
 
-        # Mock association
+        # Step 1: UUID resolution mock
+        mock_uuid_query = self._make_uuid_query_mock([artifact_id])
+
+        # Mock association (step 2)
         association = self._create_mock_association(collection_id, artifact_id)
         mock_assoc_query = MagicMock(spec=Query)
         mock_assoc_query.filter.return_value.all.return_value = [association]
@@ -269,7 +306,7 @@ class TestCollectionService:
             (collection, 15)
         ]
 
-        mock_session.query.side_effect = [mock_assoc_query, MagicMock(), mock_coll_query]
+        mock_session.query.side_effect = [mock_uuid_query, mock_assoc_query, MagicMock(), mock_coll_query]
 
         result = service.get_collection_membership_batch([artifact_id])
 
@@ -282,7 +319,10 @@ class TestCollectionService:
         artifact_id = "skill:canvas"
         collection_id = "coll-abc123"
 
-        # Mock association
+        # Step 1: UUID resolution mock
+        mock_uuid_query = self._make_uuid_query_mock([artifact_id])
+
+        # Mock association (step 2)
         association = self._create_mock_association(collection_id, artifact_id)
         mock_assoc_query = MagicMock(spec=Query)
         mock_assoc_query.filter.return_value.all.return_value = [association]
@@ -294,7 +334,7 @@ class TestCollectionService:
             (collection, None)
         ]
 
-        mock_session.query.side_effect = [mock_assoc_query, MagicMock(), mock_coll_query]
+        mock_session.query.side_effect = [mock_uuid_query, mock_assoc_query, MagicMock(), mock_coll_query]
 
         result = service.get_collection_membership_batch([artifact_id])
 
@@ -333,7 +373,10 @@ class TestCollectionService:
         artifact_2 = "skill:no_collections"
         coll_id = "coll-abc123"
 
-        # Only artifact_1 has membership
+        # Step 1: Only artifact_1 resolves to a UUID (artifact_2 has no DB row)
+        mock_uuid_query = self._make_uuid_query_mock([artifact_1])
+
+        # Only artifact_1 has membership (step 2)
         associations = [self._create_mock_association(coll_id, artifact_1)]
         mock_assoc_query = MagicMock(spec=Query)
         mock_assoc_query.filter.return_value.all.return_value = associations
@@ -345,7 +388,7 @@ class TestCollectionService:
             (collection, 3)
         ]
 
-        mock_session.query.side_effect = [mock_assoc_query, MagicMock(), mock_coll_query]
+        mock_session.query.side_effect = [mock_uuid_query, mock_assoc_query, MagicMock(), mock_coll_query]
 
         result = service.get_collection_membership_batch([artifact_1, artifact_2])
 
@@ -365,7 +408,10 @@ class TestCollectionService:
         artifact_id = "skill:canvas"
         collection_id = "coll-abc123"
 
-        # Mock association
+        # Step 1: UUID resolution mock
+        mock_uuid_query = self._make_uuid_query_mock([artifact_id])
+
+        # Mock association (step 2)
         association = self._create_mock_association(collection_id, artifact_id)
         mock_assoc_query = MagicMock(spec=Query)
         mock_assoc_query.filter.return_value.all.return_value = [association]
@@ -377,7 +423,7 @@ class TestCollectionService:
             (collection, 5)
         ]
 
-        mock_session.query.side_effect = [mock_assoc_query, MagicMock(), mock_coll_query]
+        mock_session.query.side_effect = [mock_uuid_query, mock_assoc_query, MagicMock(), mock_coll_query]
 
         # Use single-artifact method
         result = service.get_collection_membership_single(artifact_id)
@@ -413,7 +459,10 @@ class TestCollectionService:
         artifact_id = "skill:canvas"
         collection_id = "coll-abc123"
 
-        # Mock association
+        # Step 1: UUID resolution mock
+        mock_uuid_query = self._make_uuid_query_mock([artifact_id])
+
+        # Mock association (step 2)
         association = self._create_mock_association(collection_id, artifact_id)
         mock_assoc_query = MagicMock(spec=Query)
         mock_assoc_query.filter.return_value.all.return_value = [association]
@@ -425,7 +474,7 @@ class TestCollectionService:
             (collection, 7)
         ]
 
-        mock_session.query.side_effect = [mock_assoc_query, MagicMock(), mock_coll_query]
+        mock_session.query.side_effect = [mock_uuid_query, mock_assoc_query, MagicMock(), mock_coll_query]
 
         result = service.get_collection_membership_batch([artifact_id])
 

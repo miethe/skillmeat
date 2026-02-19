@@ -305,7 +305,7 @@ class Artifact(Base):
     collections: Mapped[List["Collection"]] = relationship(
         "Collection",
         secondary="collection_artifacts",
-        primaryjoin="foreign(CollectionArtifact.artifact_id) == Artifact.id",
+        primaryjoin="Artifact.uuid == foreign(CollectionArtifact.artifact_uuid)",
         secondaryjoin="foreign(CollectionArtifact.collection_id) == Collection.id",
         viewonly=True,
         lazy="select",
@@ -1030,21 +1030,24 @@ class CollectionArtifact(Base):
     """Association between Collection and Artifact (many-to-many).
 
     Links artifacts to collections with tracking of when they were added.
-    This is a pure association table with composite primary key.
+    This is a rich association table (has cached metadata columns in addition
+    to the join keys) with a composite primary key.
 
     Attributes:
         collection_id: Foreign key to collections.id (part of composite PK)
-        artifact_id: Reference to artifacts.id (part of composite PK, NO FK constraint)
+        artifact_uuid: FK to artifacts.uuid with CASCADE delete (part of composite PK)
         added_at: Timestamp when artifact was added to collection
 
     Indexes:
         - idx_collection_artifacts_collection_id: Fast lookup by collection
-        - idx_collection_artifacts_artifact_id: Fast lookup by artifact
+        - idx_collection_artifacts_artifact_uuid: Fast lookup by artifact UUID
         - idx_collection_artifacts_added_at: Sort by addition date
 
     Note:
-        artifact_id intentionally has NO foreign key constraint because artifacts
-        may come from external sources (marketplace, GitHub) that aren't in cache.
+        artifact_uuid references artifacts.uuid (the stable ADR-007 identity
+        column) rather than artifacts.id (the mutable type:name string).  This
+        allows cascade deletes when an artifact is removed from the cache and
+        keeps the join table referentially sound.
     """
 
     __tablename__ = "collection_artifacts"
@@ -1055,7 +1058,12 @@ class CollectionArtifact(Base):
         ForeignKey("collections.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    artifact_id: Mapped[str] = mapped_column(String, primary_key=True)
+    artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+        comment="FK to artifacts.uuid (ADR-007 stable identity) — CASCADE DELETE",
+    )
 
     # Timestamp
     added_at: Mapped[datetime] = mapped_column(
@@ -1084,7 +1092,7 @@ class CollectionArtifact(Base):
     # Indexes
     __table_args__ = (
         Index("idx_collection_artifacts_collection_id", "collection_id"),
-        Index("idx_collection_artifacts_artifact_id", "artifact_id"),
+        Index("idx_collection_artifacts_artifact_uuid", "artifact_uuid"),
         Index("idx_collection_artifacts_added_at", "added_at"),
     )
 
@@ -1100,7 +1108,7 @@ class CollectionArtifact(Base):
         return (
             f"<CollectionArtifact("
             f"collection_id={self.collection_id!r}, "
-            f"artifact_id={self.artifact_id!r}, "
+            f"artifact_uuid={self.artifact_uuid!r}, "
             f"added_at={self.added_at!r})>"
         )
 
