@@ -1,7 +1,7 @@
 /**
  * Artifact Types for SkillMeat Collection
  *
- * These types represent artifacts in the collection (Skills, Commands, Agents, MCP servers, Hooks)
+ * These types represent artifacts in the collection (Skills, Commands, Agents, MCP servers, Hooks, Plugins)
  *
  * @version 2.0.0 - Unified Artifact interface consolidating former Artifact and Entity types
  */
@@ -11,7 +11,7 @@ import { Platform, Tool } from './enums';
 /**
  * Supported artifact types in SkillMeat.
  */
-export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp' | 'hook';
+export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp' | 'hook' | 'composite';
 
 /**
  * Artifact scope determines where the artifact is stored.
@@ -163,7 +163,7 @@ export interface Artifact {
   /** Human-readable artifact name */
   name: string;
 
-  /** Artifact type: skill, command, agent, mcp, or hook */
+  /** Artifact type: skill, command, agent, mcp, hook, or composite */
   type: ArtifactType;
 
   // ============================================================================
@@ -591,6 +591,46 @@ export const ARTIFACT_TYPES: Record<ArtifactType, ArtifactTypeConfig> = {
       ],
     },
   },
+  composite: {
+    type: 'composite',
+    label: 'Plugin',
+    pluralLabel: 'Plugins',
+    icon: 'Blocks',
+    color: 'text-indigo-500',
+    requiredFile: 'PLUGIN.md',
+    formSchema: {
+      fields: [
+        {
+          name: 'name',
+          label: 'Name',
+          type: 'text',
+          required: true,
+          placeholder: 'my-plugin',
+        },
+        {
+          name: 'description',
+          label: 'Description',
+          type: 'textarea',
+          required: false,
+          placeholder: 'What does this plugin do?',
+        },
+        {
+          name: 'tags',
+          label: 'Tags',
+          type: 'tags',
+          required: false,
+          placeholder: 'Add tags...',
+        },
+        {
+          name: 'members',
+          label: 'Members',
+          type: 'tags',
+          required: false,
+          placeholder: 'artifact_id[:position]',
+        },
+      ],
+    },
+  },
 };
 
 // ============================================================================
@@ -627,7 +667,7 @@ export function getArtifactTypeConfig(type: ArtifactType): ArtifactTypeConfig {
  * @example
  * ```ts
  * const types = getAllArtifactTypes();
- * // ['skill', 'command', 'agent', 'mcp', 'hook']
+ * // ['skill', 'command', 'agent', 'mcp', 'hook', 'composite']
  * ```
  */
 export function getAllArtifactTypes(): ArtifactType[] {
@@ -645,6 +685,8 @@ export function getAllArtifactTypes(): ArtifactType[] {
  * ```ts
  * const id = formatArtifactId('skill', 'canvas-design');
  * // "skill:canvas-design"
+ * const pluginId = formatArtifactId('composite', 'my-plugin');
+ * // "composite:my-plugin"
  * ```
  */
 export function formatArtifactId(type: ArtifactType, name: string): string {
@@ -663,6 +705,12 @@ export function formatArtifactId(type: ArtifactType, name: string): string {
  * if (parsed) {
  *   console.log(parsed.type); // "skill"
  *   console.log(parsed.name); // "canvas-design"
+ * }
+ *
+ * const plugin = parseArtifactId('composite:my-plugin');
+ * if (plugin) {
+ *   console.log(plugin.type); // "composite"
+ *   console.log(plugin.name); // "my-plugin"
  * }
  * ```
  */

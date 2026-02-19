@@ -58,7 +58,7 @@ export const tagsSchema = z.array(z.string().min(1, 'Tags cannot be empty')).opt
  * Artifact type validation
  * Supports all current artifact types in SkillMeat
  */
-export const artifactTypeSchema = z.enum(['skill', 'command', 'agent', 'hook', 'mcp'], {
+export const artifactTypeSchema = z.enum(['skill', 'command', 'agent', 'hook', 'mcp', 'composite'], {
   errorMap: () => ({ message: 'Invalid artifact type' }),
 });
 

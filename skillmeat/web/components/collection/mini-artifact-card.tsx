@@ -45,6 +45,7 @@ const typeBarColors: Record<ArtifactType, string> = {
   agent: 'border-l-green-500',
   mcp: 'border-l-orange-500',
   hook: 'border-l-pink-500',
+  composite: 'border-l-indigo-500',
 };
 
 // ============================================================================

@@ -46,9 +46,10 @@ export const PLATFORM_DEFAULTS: Record<string, PlatformDefaults> = {
       agent: 'agents',
       hook: 'hooks',
       mcp: 'mcp',
+      composite: 'plugins',
     },
     config_filenames: ['CLAUDE.md'],
-    supported_artifact_types: ['skill', 'command', 'agent', 'hook', 'mcp'],
+    supported_artifact_types: ['skill', 'command', 'agent', 'hook', 'mcp', 'composite'],
     context_prefixes: ['.claude/context/', '.claude/'],
   },
   codex: {

@@ -54,6 +54,8 @@ function getDefaultDeployPath(artifactType: string): string {
       return '.claude/hooks/';
     case 'agent':
       return '.claude/agents/';
+    case 'composite':
+      return '.claude/plugins/';
     case 'mcp':
     case 'mcp-server':
       return '.claude/mcp/';

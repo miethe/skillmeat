@@ -282,7 +282,7 @@ export function mapApiResponseToArtifact(
   }
 
   // Validate type is a known artifact type
-  const validTypes: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook'];
+  const validTypes: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook', 'composite'];
   if (!validTypes.includes(response.type as ArtifactType)) {
     throw new Error(`Artifact mapping error: unknown type "${response.type}"`);
   }

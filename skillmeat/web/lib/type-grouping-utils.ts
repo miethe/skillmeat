@@ -10,7 +10,7 @@ import type { CatalogEntry, ArtifactType } from '@/types/marketplace';
 /**
  * Display order for artifact types (highest to lowest priority)
  */
-const TYPE_DISPLAY_ORDER: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook'];
+const TYPE_DISPLAY_ORDER: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook', 'composite'];
 
 /**
  * Type display metadata mapping
@@ -23,12 +23,13 @@ const TYPE_DISPLAY_INFO: Record<ArtifactType, { label: string; plural: string; i
     mcp: { label: 'MCP Server', plural: 'MCP Servers', iconName: 'Server' },
     mcp_server: { label: 'MCP Server', plural: 'MCP Servers', iconName: 'Server' }, // Alias
     hook: { label: 'Hook', plural: 'Hooks', iconName: 'Anchor' },
+    composite: { label: 'Plugin', plural: 'Plugins', iconName: 'Blocks' },
   };
 
 /**
  * Group artifacts by their type for display.
  *
- * Groups are returned in a consistent display order (skill, command, agent, mcp, hook).
+ * Groups are returned in a consistent display order (skill, command, agent, mcp, hook, composite).
  * Empty groups are excluded from the result.
  *
  * @param entries - Array of CatalogEntry objects to group

@@ -72,7 +72,7 @@ function ManagePageContent() {
   const urlArtifactId = searchParams.get('artifact');
   const urlTab = searchParams.get('tab') as OperationsModalTab | null;
   const rawUrlType = searchParams.get('type');
-  const allowedTypes: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook'];
+  const allowedTypes: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook', 'composite'];
   const urlType: ArtifactType | 'all' =
     rawUrlType && allowedTypes.includes(rawUrlType as ArtifactType)
       ? (rawUrlType as ArtifactType)

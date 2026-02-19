@@ -8,7 +8,7 @@
 'use client';
 
 import { useState, useCallback, memo } from 'react';
-import { ChevronRight, Sparkles, Terminal, Bot, Server, Anchor } from 'lucide-react';
+import { ChevronRight, Sparkles, Terminal, Bot, Server, Anchor, Blocks } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { ArtifactCompactCard } from './artifact-compact-card';
@@ -58,6 +58,7 @@ const typeConfig: Record<
   mcp: { icon: Server, label: 'MCP', pluralLabel: 'MCP Servers' },
   mcp_server: { icon: Server, label: 'MCP Server', pluralLabel: 'MCP Servers' },
   hook: { icon: Anchor, label: 'Hook', pluralLabel: 'Hooks' },
+  composite: { icon: Blocks, label: 'Plugin', pluralLabel: 'Plugins' },
 };
 
 // ============================================================================

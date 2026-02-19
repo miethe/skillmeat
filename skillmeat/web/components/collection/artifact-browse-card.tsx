@@ -84,6 +84,7 @@ const artifactTypeBorderAccents: Record<ArtifactType, string> = {
   agent: 'border-l-green-500',
   mcp: 'border-l-orange-500',
   hook: 'border-l-pink-500',
+  composite: 'border-l-indigo-500',
 };
 
 // Subtle background tints per artifact type
@@ -93,6 +94,7 @@ const artifactTypeCardTints: Record<ArtifactType, string> = {
   agent: 'bg-green-500/[0.02] dark:bg-green-500/[0.03]',
   mcp: 'bg-orange-500/[0.02] dark:bg-orange-500/[0.03]',
   hook: 'bg-pink-500/[0.02] dark:bg-pink-500/[0.03]',
+  composite: 'bg-indigo-500/[0.02] dark:bg-indigo-500/[0.03]',
 };
 
 // Known tool names from the Tool enum for matching against tags

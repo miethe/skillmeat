@@ -160,6 +160,7 @@ function CatalogCard({
       color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
     },
     hook: { label: 'Hook', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' },
+    composite: { label: 'Plugin', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' },
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
