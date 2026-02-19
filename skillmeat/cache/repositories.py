@@ -3581,11 +3581,11 @@ class TagRepository(BaseRepository[Tag]):
     # REPO-003: Artifact-Tag Associations
     # =========================================================================
 
-    def add_tag_to_artifact(self, artifact_id: str, tag_id: str) -> ArtifactTag:
+    def add_tag_to_artifact(self, artifact_uuid: str, tag_id: str) -> ArtifactTag:
         """Add tag to artifact (create association).
 
         Args:
-            artifact_id: Artifact identifier
+            artifact_uuid: Artifact UUID (artifacts.uuid, ADR-007 stable identity)
             tag_id: Tag identifier
 
         Returns:
@@ -3595,7 +3595,7 @@ class TagRepository(BaseRepository[Tag]):
             RepositoryError: If association already exists or IDs invalid
 
         Example:
-            >>> assoc = repo.add_tag_to_artifact("art-123", "tag-456")
+            >>> assoc = repo.add_tag_to_artifact("abc123hex", "tag-456")
             >>> print(f"Tagged artifact at {assoc.created_at}")
         """
         session = self._get_session()
@@ -3603,25 +3603,24 @@ class TagRepository(BaseRepository[Tag]):
             # Check if association already exists
             existing = (
                 session.query(ArtifactTag)
-                .filter_by(artifact_id=artifact_id, tag_id=tag_id)
+                .filter_by(artifact_uuid=artifact_uuid, tag_id=tag_id)
                 .first()
             )
 
             if existing:
                 raise RepositoryError(
-                    f"Artifact {artifact_id} already has tag {tag_id}"
+                    f"Artifact {artifact_uuid} already has tag {tag_id}"
                 )
 
             # Verify artifact and tag exist
-            # artifact_id uses "type:name" format, matching collection_artifacts.artifact_id
-            ca = (
-                session.query(CollectionArtifact)
-                .filter_by(artifact_id=artifact_id)
+            artifact = (
+                session.query(Artifact)
+                .filter_by(uuid=artifact_uuid)
                 .first()
             )
-            if not ca:
+            if not artifact:
                 raise RepositoryError(
-                    f"Artifact {artifact_id} not found in any collection"
+                    f"Artifact with uuid={artifact_uuid!r} not found in cache"
                 )
 
             tag = session.query(Tag).filter_by(id=tag_id).first()
@@ -3630,7 +3629,7 @@ class TagRepository(BaseRepository[Tag]):
 
             # Create association
             assoc = ArtifactTag(
-                artifact_id=artifact_id,
+                artifact_uuid=artifact_uuid,
                 tag_id=tag_id,
                 created_at=datetime.utcnow(),
             )
@@ -3639,7 +3638,7 @@ class TagRepository(BaseRepository[Tag]):
             session.commit()
             session.refresh(assoc)
 
-            logger.info(f"Added tag {tag_id} to artifact {artifact_id}")
+            logger.info(f"Added tag {tag_id} to artifact uuid={artifact_uuid}")
             return assoc
 
         except IntegrityError as e:
@@ -3648,18 +3647,18 @@ class TagRepository(BaseRepository[Tag]):
         finally:
             session.close()
 
-    def remove_tag_from_artifact(self, artifact_id: str, tag_id: str) -> bool:
+    def remove_tag_from_artifact(self, artifact_uuid: str, tag_id: str) -> bool:
         """Remove tag from artifact (delete association).
 
         Args:
-            artifact_id: Artifact identifier
+            artifact_uuid: Artifact UUID (artifacts.uuid, ADR-007 stable identity)
             tag_id: Tag identifier
 
         Returns:
             True if removed, False if association didn't exist
 
         Example:
-            >>> removed = repo.remove_tag_from_artifact("art-123", "tag-456")
+            >>> removed = repo.remove_tag_from_artifact("abc123hex", "tag-456")
             >>> if removed:
             ...     print("Tag removed from artifact")
         """
@@ -3667,7 +3666,7 @@ class TagRepository(BaseRepository[Tag]):
         try:
             assoc = (
                 session.query(ArtifactTag)
-                .filter_by(artifact_id=artifact_id, tag_id=tag_id)
+                .filter_by(artifact_uuid=artifact_uuid, tag_id=tag_id)
                 .first()
             )
 
@@ -3677,7 +3676,7 @@ class TagRepository(BaseRepository[Tag]):
             session.delete(assoc)
             session.commit()
 
-            logger.info(f"Removed tag {tag_id} from artifact {artifact_id}")
+            logger.info(f"Removed tag {tag_id} from artifact uuid={artifact_uuid}")
             return True
 
         except Exception as e:
@@ -3686,17 +3685,17 @@ class TagRepository(BaseRepository[Tag]):
         finally:
             session.close()
 
-    def get_artifact_tags(self, artifact_id: str) -> List[Tag]:
+    def get_artifact_tags(self, artifact_uuid: str) -> List[Tag]:
         """Get all tags for an artifact.
 
         Args:
-            artifact_id: Artifact identifier
+            artifact_uuid: Artifact UUID (artifacts.uuid, ADR-007 stable identity)
 
         Returns:
             List of Tag instances (ordered by name)
 
         Example:
-            >>> tags = repo.get_artifact_tags("art-123")
+            >>> tags = repo.get_artifact_tags("abc123hex")
             >>> for tag in tags:
             ...     print(f"- {tag.name}")
         """
@@ -3705,12 +3704,12 @@ class TagRepository(BaseRepository[Tag]):
             tags = (
                 session.query(Tag)
                 .join(ArtifactTag, Tag.id == ArtifactTag.tag_id)
-                .filter(ArtifactTag.artifact_id == artifact_id)
+                .filter(ArtifactTag.artifact_uuid == artifact_uuid)
                 .order_by(Tag.name)
                 .all()
             )
 
-            logger.debug(f"Found {len(tags)} tags for artifact {artifact_id}")
+            logger.debug(f"Found {len(tags)} tags for artifact uuid={artifact_uuid}")
             return tags
 
         finally:
@@ -3741,16 +3740,16 @@ class TagRepository(BaseRepository[Tag]):
         try:
             query = (
                 session.query(Artifact)
-                .join(ArtifactTag, Artifact.id == ArtifactTag.artifact_id)
+                .join(ArtifactTag, Artifact.uuid == ArtifactTag.artifact_uuid)
                 .filter(ArtifactTag.tag_id == tag_id)
-                .order_by(ArtifactTag.created_at.desc(), Artifact.id)
+                .order_by(ArtifactTag.created_at.desc(), Artifact.uuid)
             )
 
-            # Apply cursor if provided
+            # Apply cursor if provided (cursor is artifact_uuid)
             if after_cursor:
                 cursor_assoc = (
                     session.query(ArtifactTag)
-                    .filter_by(artifact_id=after_cursor, tag_id=tag_id)
+                    .filter_by(artifact_uuid=after_cursor, tag_id=tag_id)
                     .first()
                 )
                 if cursor_assoc:
@@ -3759,7 +3758,7 @@ class TagRepository(BaseRepository[Tag]):
                             ArtifactTag.created_at < cursor_assoc.created_at,
                             and_(
                                 ArtifactTag.created_at == cursor_assoc.created_at,
-                                Artifact.id > cursor_assoc.artifact_id,
+                                Artifact.uuid > cursor_assoc.artifact_uuid,
                             ),
                         )
                     )
@@ -3767,11 +3766,11 @@ class TagRepository(BaseRepository[Tag]):
             # Fetch limit + 1 to check if more exist
             artifacts = query.limit(limit + 1).all()
 
-            # Determine pagination state
+            # Determine pagination state (cursor is artifact_uuid)
             has_more = len(artifacts) > limit
             if has_more:
                 artifacts = artifacts[:limit]
-                next_cursor = artifacts[-1].id if artifacts else None
+                next_cursor = artifacts[-1].uuid if artifacts else None
             else:
                 next_cursor = None
 
@@ -3804,7 +3803,7 @@ class TagRepository(BaseRepository[Tag]):
         session = self._get_session()
         try:
             count = (
-                session.query(func.count(ArtifactTag.artifact_id))
+                session.query(func.count(ArtifactTag.artifact_uuid))
                 .filter_by(tag_id=tag_id)
                 .scalar()
             )
@@ -3830,11 +3829,11 @@ class TagRepository(BaseRepository[Tag]):
             results = (
                 session.query(
                     Tag,
-                    func.count(ArtifactTag.artifact_id).label("count"),
+                    func.count(ArtifactTag.artifact_uuid).label("count"),
                 )
                 .outerjoin(ArtifactTag, Tag.id == ArtifactTag.tag_id)
                 .group_by(Tag.id)
-                .order_by(func.count(ArtifactTag.artifact_id).desc(), Tag.name)
+                .order_by(func.count(ArtifactTag.artifact_uuid).desc(), Tag.name)
                 .all()
             )
 

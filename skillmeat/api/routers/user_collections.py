@@ -347,10 +347,10 @@ def _sync_all_tags_to_orm(session: Session) -> int:
         try:
             tags = json.loads(ca.tags_json)
             if tags:
-                tag_service.sync_artifact_tags(ca.artifact_id, tags)
+                tag_service.sync_artifact_tags(ca.artifact_uuid, tags)
                 synced += 1
         except Exception as e:
-            logger.warning(f"Tag ORM sync failed for {ca.artifact_id}: {e}")
+            logger.warning(f"Tag ORM sync failed for {ca.artifact_uuid}: {e}")
 
     logger.info(f"Synced tags for {synced}/{len(all_cas)} artifacts to Tag ORM")
     return synced
@@ -798,9 +798,9 @@ def _refresh_single_collection_cache(
             # Sync tags to ORM
             if tag_service and file_artifact.tags:
                 try:
-                    tag_service.sync_artifact_tags(ca.artifact_id, file_artifact.tags)
+                    tag_service.sync_artifact_tags(ca.artifact_uuid, file_artifact.tags)
                 except Exception as e:
-                    logger.warning(f"Tag ORM sync failed for {ca.artifact_id}: {e}")
+                    logger.warning(f"Tag ORM sync failed for {ca.artifact_uuid}: {e}")
 
         except Exception as e:
             error_msg = f"Failed to refresh {ca.artifact_id}: {e}"

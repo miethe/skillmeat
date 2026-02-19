@@ -125,6 +125,7 @@ from skillmeat.api.services.artifact_cache_service import (
 from skillmeat.api.schemas.deployments import DeploymentSummary
 from skillmeat.cache.composite_repository import CompositeMembershipRepository
 from skillmeat.cache.models import (
+    Artifact,
     Collection,
     CollectionArtifact,
     MarketplaceCatalogEntry,
@@ -7335,14 +7336,17 @@ async def update_artifact_tags(
         # Refresh CollectionArtifact cache to keep tags in sync
         try:
             db_session = get_session()
-            cas = (
-                db_session.query(CollectionArtifact)
-                .filter_by(artifact_id=artifact_id)
-                .all()
-            )
-            for ca in cas:
-                ca.tags_json = json.dumps(request.tags) if request.tags else None
-            db_session.commit()
+            # Resolve type:name artifact_id → artifacts.uuid for the FK lookup
+            db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
+            if db_art:
+                cas = (
+                    db_session.query(CollectionArtifact)
+                    .filter_by(artifact_uuid=db_art.uuid)
+                    .all()
+                )
+                for ca in cas:
+                    ca.tags_json = json.dumps(request.tags) if request.tags else None
+                db_session.commit()
             db_session.close()
         except Exception as cache_err:
             logger.warning(
@@ -7409,14 +7413,17 @@ async def add_tag_to_artifact(
         # Update CollectionArtifact.tags_json in DB cache
         try:
             db_session = get_session()
-            cas = (
-                db_session.query(CollectionArtifact)
-                .filter_by(artifact_id=artifact_id)
-                .all()
-            )
-            for ca in cas:
-                ca.tags_json = json.dumps(updated_tags) if updated_tags else None
-            db_session.commit()
+            # Resolve type:name artifact_id → artifacts.uuid for the FK lookup
+            db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
+            if db_art:
+                cas = (
+                    db_session.query(CollectionArtifact)
+                    .filter_by(artifact_uuid=db_art.uuid)
+                    .all()
+                )
+                for ca in cas:
+                    ca.tags_json = json.dumps(updated_tags) if updated_tags else None
+                db_session.commit()
             db_session.close()
         except Exception as cache_err:
             logger.warning(
@@ -7487,14 +7494,17 @@ async def remove_tag_from_artifact(
         # Update CollectionArtifact.tags_json in DB cache
         try:
             db_session = get_session()
-            cas = (
-                db_session.query(CollectionArtifact)
-                .filter_by(artifact_id=artifact_id)
-                .all()
-            )
-            for ca in cas:
-                ca.tags_json = json.dumps(updated_tags) if updated_tags else None
-            db_session.commit()
+            # Resolve type:name artifact_id → artifacts.uuid for the FK lookup
+            db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
+            if db_art:
+                cas = (
+                    db_session.query(CollectionArtifact)
+                    .filter_by(artifact_uuid=db_art.uuid)
+                    .all()
+                )
+                for ca in cas:
+                    ca.tags_json = json.dumps(updated_tags) if updated_tags else None
+                db_session.commit()
             db_session.close()
         except Exception as cache_err:
             logger.warning(

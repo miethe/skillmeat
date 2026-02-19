@@ -248,12 +248,29 @@ class TagWriteService:
         updated = 0
 
         try:
+            from skillmeat.cache.models import Artifact  # local import to avoid cycles
+
             for artifact_id in affected_artifact_ids:
-                # Fetch current tag names from the junction table
+                # Resolve type:name artifact_id → artifacts.uuid
+                artifact = (
+                    session.query(Artifact)
+                    .filter_by(id=artifact_id)
+                    .first()
+                )
+                if not artifact:
+                    logger.debug(
+                        f"update_tags_json_cache: artifact '{artifact_id}' not in "
+                        "cache; skipping"
+                    )
+                    continue
+
+                artifact_uuid = artifact.uuid
+
+                # Fetch current tag names from the junction table (keyed by uuid)
                 tags = (
                     session.query(Tag.name)
                     .join(ArtifactTag, Tag.id == ArtifactTag.tag_id)
-                    .filter(ArtifactTag.artifact_id == artifact_id)
+                    .filter(ArtifactTag.artifact_uuid == artifact_uuid)
                     .all()
                 )
                 tag_names = sorted(t[0] for t in tags)
@@ -261,7 +278,7 @@ class TagWriteService:
                 # Patch tags_json on every CollectionArtifact row for this artifact
                 rows = (
                     session.query(CollectionArtifact)
-                    .filter_by(artifact_id=artifact_id)
+                    .filter_by(artifact_uuid=artifact_uuid)
                     .all()
                 )
                 for row in rows:

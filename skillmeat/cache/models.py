@@ -313,7 +313,7 @@ class Artifact(Base):
     tags: Mapped[List["Tag"]] = relationship(
         "Tag",
         secondary="artifact_tags",
-        primaryjoin="Artifact.id == foreign(ArtifactTag.artifact_id)",
+        primaryjoin="Artifact.uuid == foreign(ArtifactTag.artifact_uuid)",
         secondaryjoin="foreign(ArtifactTag.tag_id) == Tag.id",
         lazy="selectin",
         back_populates="artifacts",
@@ -1176,7 +1176,7 @@ class Tag(Base):
         "Artifact",
         secondary="artifact_tags",
         primaryjoin="Tag.id == ArtifactTag.tag_id",
-        secondaryjoin="foreign(ArtifactTag.artifact_id) == Artifact.id",
+        secondaryjoin="foreign(ArtifactTag.artifact_uuid) == Artifact.uuid",
         lazy="selectin",
         back_populates="tags",
         viewonly=True,
@@ -1227,12 +1227,13 @@ class ArtifactTag(Base):
     can have multiple tags, and each tag can be applied to multiple artifacts.
 
     Attributes:
-        artifact_id: Foreign key to artifacts.id (part of composite PK)
+        artifact_uuid: FK to artifacts.uuid (part of composite PK; CASCADE
+            delete so removing an artifact purges its tag associations)
         tag_id: Foreign key to tags.id (part of composite PK)
         created_at: Timestamp when tag was added to artifact
 
     Indexes:
-        - idx_artifact_tags_artifact_id: Fast lookup by artifact
+        - idx_artifact_tags_artifact_uuid: Fast lookup by artifact UUID
         - idx_artifact_tags_tag_id: Fast lookup by tag
         - idx_artifact_tags_created_at: Sort by tag application date
     """
@@ -1240,9 +1241,13 @@ class ArtifactTag(Base):
     __tablename__ = "artifact_tags"
 
     # Composite primary key
-    # No FK constraint — artifact_id uses "type:name" format from
-    # collection_artifacts, not project-scoped artifacts.id
-    artifact_id: Mapped[str] = mapped_column(String, primary_key=True)
+    # artifact_uuid references artifacts.uuid (ADR-007 stable identity) with
+    # CASCADE delete so that removing an artifact purges all its tag rows.
+    artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+    )
     tag_id: Mapped[str] = mapped_column(
         String, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
     )
@@ -1254,7 +1259,7 @@ class ArtifactTag(Base):
 
     # Indexes
     __table_args__ = (
-        Index("idx_artifact_tags_artifact_id", "artifact_id"),
+        Index("idx_artifact_tags_artifact_uuid", "artifact_uuid"),
         Index("idx_artifact_tags_tag_id", "tag_id"),
         Index("idx_artifact_tags_created_at", "created_at"),
     )
@@ -1262,7 +1267,7 @@ class ArtifactTag(Base):
     def __repr__(self) -> str:
         """Return string representation of ArtifactTag."""
         return (
-            f"<ArtifactTag(artifact_id={self.artifact_id!r}, "
+            f"<ArtifactTag(artifact_uuid={self.artifact_uuid!r}, "
             f"tag_id={self.tag_id!r}, created_at={self.created_at!r})>"
         )
 

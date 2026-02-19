@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 2
+completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -44,7 +44,7 @@ tasks:
   description: 'Migrate artifact_tags to artifact_uuid FK: PK becomes (artifact_uuid,
     tag_id); update Artifact.tags and Tag.artifacts relationships at models.py:299-308,
     1132-1134'
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies:
@@ -165,7 +165,7 @@ files_modified:
 - tests/test_uuid_migration_regression.py
 - tests/conftest.py
 - docs/dev/architecture/decisions/ADR-007-artifact-uuid-identity.md
-progress: 25
+progress: 37
 updated: '2026-02-19'
 ---
 
