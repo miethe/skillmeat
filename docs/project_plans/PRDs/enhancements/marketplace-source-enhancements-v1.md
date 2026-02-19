@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Marketplace Source Enhancements v1
 
 **Status**: Draft

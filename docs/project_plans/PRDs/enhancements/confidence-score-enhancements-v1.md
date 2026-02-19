@@ -1,18 +1,24 @@
 ---
-title: "Confidence Score Enhancements - PRD"
-description: "Add tooltip breakdown, filtering, and fix scoring normalization for marketplace confidence scores"
-audience: [ai-agents, developers]
-tags: [marketplace, confidence-score, ux, filtering]
+title: Confidence Score Enhancements - PRD
+description: Add tooltip breakdown, filtering, and fix scoring normalization for marketplace
+  confidence scores
+audience:
+- ai-agents
+- developers
+tags:
+- marketplace
+- confidence-score
+- ux
+- filtering
 created: 2025-12-27
 updated: 2025-12-27
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - skillmeat/core/marketplace/heuristic_detector.py
-  - skillmeat/api/schemas/marketplace.py
-  - skillmeat/web/components/ScoreBadge.tsx
+- skillmeat/core/marketplace/heuristic_detector.py
+- skillmeat/api/schemas/marketplace.py
+- skillmeat/web/components/ScoreBadge.tsx
 ---
-
 # Confidence Score Enhancements - PRD
 
 **Feature Name**: Confidence Score Enhancements

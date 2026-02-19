@@ -1,17 +1,23 @@
 ---
-title: "Implementation Plan: Artifact Metadata Lookup Service"
-description: "Implement fallback lookup sequence for missing artifact metadata in collection endpoints"
-audience: [ai-agents, developers]
-tags: [implementation, backend, collections, artifacts]
+title: 'Implementation Plan: Artifact Metadata Lookup Service'
+description: Implement fallback lookup sequence for missing artifact metadata in collection
+  endpoints
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- backend
+- collections
+- artifacts
 created: 2025-12-22
 updated: 2025-12-22
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - skillmeat/api/routers/user_collections.py (lines 668-688)
-  - skillmeat/cache/models.py (Artifact, MarketplaceCatalogEntry models)
+- skillmeat/api/routers/user_collections.py (lines 668-688)
+- skillmeat/cache/models.py (Artifact, MarketplaceCatalogEntry models)
 ---
-
 # Implementation Plan: Artifact Metadata Lookup Service
 
 **Complexity:** Small (S) | **Track:** Fast Track

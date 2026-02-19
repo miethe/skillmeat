@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Artifact Flow Modal Redesign
 
 This document outlines the design specifications for the redesigned Artifact Flow Modal in the Skillmeat web application. The goal of this redesign is to provide a consistent, intuitive, and efficient user interface for managing artifact synchronization across Source, Collection, and Project levels from a single location.

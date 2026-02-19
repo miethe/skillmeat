@@ -1,18 +1,29 @@
 ---
-title: "Implementation Plan: Configurable Frontmatter Indexing for Cross-Source Artifact Search"
-description: "Detailed phased implementation with task breakdown and subagent assignments for search indexing controls"
-audience: [ai-agents, developers]
-tags: [implementation, planning, phases, tasks, marketplace, search, configuration, indexing]
+title: 'Implementation Plan: Configurable Frontmatter Indexing for Cross-Source Artifact
+  Search'
+description: Detailed phased implementation with task breakdown and subagent assignments
+  for search indexing controls
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- planning
+- phases
+- tasks
+- marketplace
+- search
+- configuration
+- indexing
 created: 2026-01-20
 updated: 2026-01-23
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/PRDs/enhancements/configurable-frontmatter-caching-v1.md
-  - /docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md
-  - /docs/project_plans/implementation_plans/features/enhanced-frontmatter-utilization-v1.md
+- /docs/project_plans/PRDs/enhancements/configurable-frontmatter-caching-v1.md
+- /docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md
+- /docs/project_plans/implementation_plans/features/enhanced-frontmatter-utilization-v1.md
 ---
-
 # Implementation Plan: Configurable Frontmatter Indexing for Cross-Source Search
 
 **Plan ID**: `IMPL-2026-01-20-configurable-frontmatter-caching`

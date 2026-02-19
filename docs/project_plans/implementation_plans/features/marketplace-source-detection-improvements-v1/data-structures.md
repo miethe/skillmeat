@@ -1,8 +1,8 @@
 ---
-parent: "../marketplace-source-detection-improvements-v1.md"
-section: "Data Structures"
+parent: ../marketplace-source-detection-improvements-v1.md
+section: Data Structures
+status: inferred_complete
 ---
-
 # Appendix: Data Structures
 
 ## Manual Map JSON Schema

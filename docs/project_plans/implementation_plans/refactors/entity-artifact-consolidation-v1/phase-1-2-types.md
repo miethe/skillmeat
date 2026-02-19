@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Phase 1-2: Type Definition & Registry Consolidation
 
 **Phases**: 1 & 2 (combined for type-level changes)

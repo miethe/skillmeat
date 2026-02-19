@@ -1,15 +1,25 @@
 ---
-title: "PRD: Collections & Groups UX Enhancement"
-description: "Add visual indicators for Collections and Groups on artifact cards, implement Groups sidebar navigation, and add Group filtering across collection views"
-audience: [ai-agents, developers]
-tags: [prd, planning, enhancement, ux, collections, groups, cards, filtering]
+title: 'PRD: Collections & Groups UX Enhancement'
+description: Add visual indicators for Collections and Groups on artifact cards, implement
+  Groups sidebar navigation, and add Group filtering across collection views
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- planning
+- enhancement
+- ux
+- collections
+- groups
+- cards
+- filtering
 created: 2026-01-19
 updated: 2026-01-19
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related: []
 ---
-
 # PRD: Collections & Groups UX Enhancement
 
 **Feature Name:** Collections & Groups UX Enhancement

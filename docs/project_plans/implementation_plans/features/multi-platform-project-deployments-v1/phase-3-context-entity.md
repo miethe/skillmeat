@@ -1,8 +1,8 @@
 ---
-title: "Phase 3: Context Entity Generalization"
+title: 'Phase 3: Context Entity Generalization'
 parent: ../multi-platform-project-deployments-v1.md
+status: inferred_complete
 ---
-
 # Phase 3: Context Entity Generalization
 
 **Duration**: 1.5 weeks

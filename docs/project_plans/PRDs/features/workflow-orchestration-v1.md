@@ -1,17 +1,24 @@
 ---
-title: "PRD: Workflow Orchestration Engine"
-description: "A workflow builder for defining multi-stage agentic tasks with specific role assignments and artifact binding."
-audience: [developers, power-users]
-tags: [prd, workflow, orchestration, automation, agents]
+title: 'PRD: Workflow Orchestration Engine'
+description: A workflow builder for defining multi-stage agentic tasks with specific
+  role assignments and artifact binding.
+audience:
+- developers
+- power-users
+tags:
+- prd
+- workflow
+- orchestration
+- automation
+- agents
 created: 2026-02-02
 updated: 2026-02-02
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/PRDs/features/memory-context-system-v1.md
-  - /skillmeat/core/artifact.py
+- /docs/project_plans/PRDs/features/memory-context-system-v1.md
+- /skillmeat/core/artifact.py
 ---
-
 # PRD: Workflow Orchestration Engine
 
 **Feature Name:** Workflow Orchestration Engine (Workflow Composer)

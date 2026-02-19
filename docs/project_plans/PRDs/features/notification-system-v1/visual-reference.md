@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Notification System Visual Reference
 
 **Quick visual guide to the notification system design**

@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Implementation Plan: Layer 1 - Canonical Hooks Registry
 
 **PRD Reference**: docs/project_plans/reports/agentic-code-mapping-recommendations-2026-01-10.md

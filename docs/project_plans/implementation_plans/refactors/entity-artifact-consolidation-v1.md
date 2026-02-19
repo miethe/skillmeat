@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Implementation Plan: Entity and Artifact Type System Consolidation
 
 **Epic ID**: REFACTOR-TYPE-CONSOLIDATION

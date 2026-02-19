@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Phase 2: CLI Management
 
 **Parent Plan**: [agent-context-entities-v1.md](../agent-context-entities-v1.md)

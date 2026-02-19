@@ -1,8 +1,8 @@
 ---
-parent: "../marketplace-source-detection-improvements-v1.md"
-section: "Metrics & Success Criteria"
+parent: ../marketplace-source-detection-improvements-v1.md
+section: Metrics & Success Criteria
+status: inferred_complete
 ---
-
 # Metrics & Success Criteria
 
 ## Implementation Metrics

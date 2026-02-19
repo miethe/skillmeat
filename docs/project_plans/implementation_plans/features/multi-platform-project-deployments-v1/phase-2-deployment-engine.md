@@ -1,8 +1,8 @@
 ---
-title: "Phase 2: Deployment Engine Refactor"
+title: 'Phase 2: Deployment Engine Refactor'
 parent: ../multi-platform-project-deployments-v1.md
+status: inferred_complete
 ---
-
 # Phase 2: Deployment Engine Refactor
 
 **Duration**: 2 weeks

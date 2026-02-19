@@ -1,16 +1,23 @@
 ---
-title: "PRD: Groups in All Collections View"
-description: "Enable adding artifacts to groups from All Collections view with group copy functionality"
-audience: [ai-agents, developers]
-tags: [prd, planning, groups, collections, refactor]
+title: 'PRD: Groups in All Collections View'
+description: Enable adding artifacts to groups from All Collections view with group
+  copy functionality
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- planning
+- groups
+- collections
+- refactor
 created: 2025-01-16
 updated: 2025-01-16
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - .claude/progress/quick-features/collection-card-menu-actions.md
+- .claude/progress/quick-features/collection-card-menu-actions.md
 ---
-
 # Feature Brief & Metadata
 
 **Feature Name:**

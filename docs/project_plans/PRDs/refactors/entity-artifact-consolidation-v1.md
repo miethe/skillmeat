@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Entity and Artifact Type System Consolidation
 
 **Status**: Approved for development

@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Phase 3: Refactor Marketplace Heuristics Detection
 
 **Duration:** 2 weeks

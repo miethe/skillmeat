@@ -1,15 +1,23 @@
 ---
-title: "Implementation Plan: Smart Import & Discovery"
-description: "Detailed breakdown of implementation phases for auto-scanning, metadata auto-population, and bulk import workflows"
-audience: [ai-agents, developers]
-tags: [implementation-plan, planning, enhancement, discovery, import, automation]
+title: 'Implementation Plan: Smart Import & Discovery'
+description: Detailed breakdown of implementation phases for auto-scanning, metadata
+  auto-population, and bulk import workflows
+audience:
+- ai-agents
+- developers
+tags:
+- implementation-plan
+- planning
+- enhancement
+- discovery
+- import
+- automation
 created: 2025-11-30
 updated: 2025-11-30
-category: "project-planning"
-status: active
+category: project-planning
+status: inferred_complete
 prd_link: /docs/project_plans/PRDs/enhancements/smart-import-discovery-v1.md
 ---
-
 # Implementation Plan: Smart Import & Discovery
 
 **Feature Name:** Smart Import & Discovery

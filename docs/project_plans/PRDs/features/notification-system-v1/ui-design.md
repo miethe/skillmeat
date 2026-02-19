@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Notification System UI Design
 
 **Feature**: Notification Center for SkillMeat

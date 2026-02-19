@@ -1,16 +1,24 @@
 ---
-title: "PRD: Composite Artifact Infrastructure"
-description: "Introduce a many-to-many relational model for composite artifacts (Plugins, Stacks, Suites) with deduplication, version pinning, and relationship browsing in the web UI."
-audience: [ai-agents, developers]
-tags: [composite-artifacts, plugins, relational-model, discovery, import]
+title: 'PRD: Composite Artifact Infrastructure'
+description: Introduce a many-to-many relational model for composite artifacts (Plugins,
+  Stacks, Suites) with deduplication, version pinning, and relationship browsing in
+  the web UI.
+audience:
+- ai-agents
+- developers
+tags:
+- composite-artifacts
+- plugins
+- relational-model
+- discovery
+- import
 created: 2026-02-17
 updated: 2026-02-18
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/design-specs/composite-artifact-infrastructure.md
+- /docs/project_plans/design-specs/composite-artifact-infrastructure.md
 ---
-
 # Feature Brief & Metadata
 
 **Feature Name:**

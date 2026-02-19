@@ -1,15 +1,24 @@
 ---
-title: "PRD: Configurable Frontmatter Caching for Cross-Source Artifact Search"
-description: "Add user control over frontmatter caching behavior to balance storage costs against search capabilities"
-audience: [ai-agents, developers]
-tags: [prd, enhancement, marketplace, search, configuration, frontmatter]
+title: 'PRD: Configurable Frontmatter Caching for Cross-Source Artifact Search'
+description: Add user control over frontmatter caching behavior to balance storage
+  costs against search capabilities
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- enhancement
+- marketplace
+- search
+- configuration
+- frontmatter
 created: 2026-01-20
 updated: 2026-01-20
-category: "product-planning"
-status: draft
-related: ["docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md"]
+category: product-planning
+status: inferred_complete
+related:
+- docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md
 ---
-
 # Feature Brief & Metadata
 
 **Feature Name:**

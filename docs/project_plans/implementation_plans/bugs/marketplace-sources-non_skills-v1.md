@@ -1,16 +1,22 @@
 ---
-title: "Implementation Plan: Marketplace Sources Non-Skills Detection Fix"
-description: "Fix heuristic detector to properly classify Commands, Agents, Hooks, and MCP Servers"
-audience: [ai-agents, developers]
-tags: [bugfix, marketplace, detection, heuristic]
+title: 'Implementation Plan: Marketplace Sources Non-Skills Detection Fix'
+description: Fix heuristic detector to properly classify Commands, Agents, Hooks,
+  and MCP Servers
+audience:
+- ai-agents
+- developers
+tags:
+- bugfix
+- marketplace
+- detection
+- heuristic
 created: 2025-12-31
 updated: 2025-12-31
-category: "bugs"
-status: draft
+category: bugs
+status: inferred_complete
 related:
-  - /docs/project_plans/bugs/marketplace-sources-non_skills-v1.md
+- /docs/project_plans/bugs/marketplace-sources-non_skills-v1.md
 ---
-
 # Implementation Plan: Marketplace Sources Non-Skills Detection Fix
 
 **Plan ID**: `IMPL-2025-12-31-MARKETPLACE-DETECTION-FIX`

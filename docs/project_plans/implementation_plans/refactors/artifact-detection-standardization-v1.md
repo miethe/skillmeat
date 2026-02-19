@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Implementation Plan: Artifact Detection Standardization Refactor
 
 **Project:** SkillMeat

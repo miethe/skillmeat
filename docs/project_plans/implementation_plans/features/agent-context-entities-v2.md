@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Implementation Plan: Agent Context Entities v2
 
 **Feature:** Agent Context Entities - Completion Plan

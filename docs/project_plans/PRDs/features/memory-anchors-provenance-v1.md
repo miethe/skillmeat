@@ -1,21 +1,31 @@
 ---
-title: "PRD: Memory Anchors & Rich Provenance"
-description: "Enhance memory items with structured file anchors (typed, with line ranges and commit context), promoted queryable provenance columns, and auto-population from session tool calls and agent metadata."
-audience: [ai-agents, developers, architects]
-tags: [prd, memory, anchors, provenance, extraction, context-engineering]
+title: 'PRD: Memory Anchors & Rich Provenance'
+description: Enhance memory items with structured file anchors (typed, with line ranges
+  and commit context), promoted queryable provenance columns, and auto-population
+  from session tool calls and agent metadata.
+audience:
+- ai-agents
+- developers
+- architects
+tags:
+- prd
+- memory
+- anchors
+- provenance
+- extraction
+- context-engineering
 created: 2026-02-09
 updated: 2026-02-09
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/PRDs/features/memory-extraction-pipeline-v2.md
-  - /docs/project_plans/PRDs/features/memory-context-system-v1-1.md
-  - /docs/project_plans/implementation_plans/features/memory-context-system-gap-closure-v1-2.md
-  - skillmeat/cache/models.py
-  - skillmeat/core/services/memory_extractor_service.py
-  - skillmeat/web/components/memory/memory-details-modal.tsx
+- /docs/project_plans/PRDs/features/memory-extraction-pipeline-v2.md
+- /docs/project_plans/PRDs/features/memory-context-system-v1-1.md
+- /docs/project_plans/implementation_plans/features/memory-context-system-gap-closure-v1-2.md
+- skillmeat/cache/models.py
+- skillmeat/core/services/memory_extractor_service.py
+- skillmeat/web/components/memory/memory-details-modal.tsx
 ---
-
 # PRD: Memory Anchors & Rich Provenance
 
 **Feature Name:** Memory Anchors & Rich Provenance

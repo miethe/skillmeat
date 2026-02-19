@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Implementation Plan: Discovery & Import Enhancement
 
 **Complexity**: L (Large) | **Track**: Full | **Created**: 2025-12-04

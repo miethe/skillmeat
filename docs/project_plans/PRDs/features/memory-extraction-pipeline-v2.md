@@ -1,18 +1,25 @@
 ---
-title: "Memory Extraction Pipeline v2: JSONL Parser & Quality Enhancement"
-description: "Fix JSONL parsing, message filtering, and confidence scoring to enable functional automated memory extraction from Claude Code session transcripts."
-audience: [ai-agents, developers]
-tags: [prd, memory, extraction, jsonl, ai-integration]
+title: 'Memory Extraction Pipeline v2: JSONL Parser & Quality Enhancement'
+description: Fix JSONL parsing, message filtering, and confidence scoring to enable
+  functional automated memory extraction from Claude Code session transcripts.
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- memory
+- extraction
+- jsonl
+- ai-integration
 created: 2026-02-07
 updated: 2026-02-07
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - docs/project_plans/reports/memory-extraction-gap-analysis-2026-02-07.md
-  - skillmeat/core/services/memory_extractor_service.py
-  - skillmeat/api/routers/memory_items.py
+- docs/project_plans/reports/memory-extraction-gap-analysis-2026-02-07.md
+- skillmeat/core/services/memory_extractor_service.py
+- skillmeat/api/routers/memory_items.py
 ---
-
 # Feature Brief & Metadata
 
 **Feature Name:**

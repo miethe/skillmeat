@@ -1,19 +1,26 @@
 ---
-title: "Implementation Plan: Tag Management Architecture Fix"
-description: "Fix artifact_tags FK pointing to wrong table (causing 0 counts), add tag rename/delete write-back to filesystem (collection.toml + SKILL.md frontmatter)"
-audience: [ai-agents, developers]
-tags: [implementation, refactor, tags, data-model, write-back]
+title: 'Implementation Plan: Tag Management Architecture Fix'
+description: Fix artifact_tags FK pointing to wrong table (causing 0 counts), add
+  tag rename/delete write-back to filesystem (collection.toml + SKILL.md frontmatter)
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- refactor
+- tags
+- data-model
+- write-back
 created: 2026-02-04
 updated: 2026-02-04
-category: "refactors"
-status: draft
+category: refactors
+status: inferred_complete
 complexity: Medium
-total_effort: "8-12 hours"
+total_effort: 8-12 hours
 related:
-  - /docs/project_plans/implementation_plans/refactors/tag-storage-consolidation-v1.md
-  - /docs/project_plans/implementation_plans/enhancements/tags-refactor-v1.md
+- /docs/project_plans/implementation_plans/refactors/tag-storage-consolidation-v1.md
+- /docs/project_plans/implementation_plans/enhancements/tags-refactor-v1.md
 ---
-
 # Implementation Plan: Tag Management Architecture Fix
 
 **Plan ID**: `IMPL-2026-02-04-TAG-MGMT-ARCH-FIX`

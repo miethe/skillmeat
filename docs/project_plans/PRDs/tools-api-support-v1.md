@@ -1,18 +1,27 @@
 ---
-title: "PRD: Tools API Support for Artifact Metadata"
-description: "Expose Claude tool usage in artifact APIs and cache to enable tools filtering and badges in /collection."
-audience: [ai-agents, developers, designers]
-tags: [prd, api, metadata, collections, caching, web]
+title: 'PRD: Tools API Support for Artifact Metadata'
+description: Expose Claude tool usage in artifact APIs and cache to enable tools filtering
+  and badges in /collection.
+audience:
+- ai-agents
+- developers
+- designers
+tags:
+- prd
+- api
+- metadata
+- collections
+- caching
+- web
 created: 2026-02-02
 updated: 2026-02-02
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/implementation_plans/refactors/artifact-metadata-cache-v1.md
-  - /docs/design/ui-component-specs-page-refactor.md
-  - /docs/project_plans/implementation_plans/features/manage-collection-page-refactor-v1.md
+- /docs/project_plans/implementation_plans/refactors/artifact-metadata-cache-v1.md
+- /docs/design/ui-component-specs-page-refactor.md
+- /docs/project_plans/implementation_plans/features/manage-collection-page-refactor-v1.md
 ---
-
 # Feature Brief & Metadata
 
 **Feature Name:**

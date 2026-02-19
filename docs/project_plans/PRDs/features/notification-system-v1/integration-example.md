@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Notification System Integration Guide
 
 **Feature**: Notification Center for SkillMeat

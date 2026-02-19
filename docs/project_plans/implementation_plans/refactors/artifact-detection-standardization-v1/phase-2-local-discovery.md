@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Phase 2: Rebuild Local Discovery with Shared Detector
 
 **Duration:** 1 week

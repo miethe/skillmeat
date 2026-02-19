@@ -1,17 +1,25 @@
 ---
-title: "Implementation Plan: Fix Push to Collection and Pull from Source Sync Operations"
-description: "Rewire frontend sync mutations to use working artifact-level sync endpoint instead of stubbed context-sync service"
-audience: [ai-agents, developers]
-tags: [sync, push-to-collection, pull-from-source, bug-fix, frontend, mutations]
+title: 'Implementation Plan: Fix Push to Collection and Pull from Source Sync Operations'
+description: Rewire frontend sync mutations to use working artifact-level sync endpoint
+  instead of stubbed context-sync service
+audience:
+- ai-agents
+- developers
+tags:
+- sync
+- push-to-collection
+- pull-from-source
+- bug-fix
+- frontend
+- mutations
 created: 2026-02-04
 updated: 2026-02-04
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/PRDs/refactors/sync-diff-modal-standardization-v1.md
-  - /docs/project_plans/implementation_plans/refactors/artifact-flow-modal-implementation-plan.md
+- /docs/project_plans/PRDs/refactors/sync-diff-modal-standardization-v1.md
+- /docs/project_plans/implementation_plans/refactors/artifact-flow-modal-implementation-plan.md
 ---
-
 # Implementation Plan: Fix Push to Collection & Pull from Source
 
 **Plan ID**: `IMPL-2026-02-04-SYNC-PUSH-PULL-WIRING`

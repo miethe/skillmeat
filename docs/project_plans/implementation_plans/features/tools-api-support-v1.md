@@ -1,21 +1,28 @@
 ---
-title: "Implementation Plan: Tools API Support for Artifact Metadata"
-description: "Wire up tools field from artifact frontmatter to API responses and database cache for collection filtering and badges."
-audience: [ai-agents, developers]
-tags: [implementation, api, tools, metadata, cache]
+title: 'Implementation Plan: Tools API Support for Artifact Metadata'
+description: Wire up tools field from artifact frontmatter to API responses and database
+  cache for collection filtering and badges.
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- api
+- tools
+- metadata
+- cache
 created: 2026-02-02
 updated: 2026-02-02
-category: "features"
-status: approved
+category: features
+status: inferred_complete
 complexity: Small
-total_effort: "4-5 hours"
+total_effort: 4-5 hours
 phases: 2
 related:
-  - /docs/project_plans/PRDs/tools-api-support-v1.md
-  - /docs/project_plans/implementation_plans/features/manage-collection-page-refactor-v1.md
-  - /docs/project_plans/implementation_plans/features/enhanced-frontmatter-utilization-v1.md
+- /docs/project_plans/PRDs/tools-api-support-v1.md
+- /docs/project_plans/implementation_plans/features/manage-collection-page-refactor-v1.md
+- /docs/project_plans/implementation_plans/features/enhanced-frontmatter-utilization-v1.md
 ---
-
 # Implementation Plan: Tools API Support for Artifact Metadata
 
 **Plan ID**: `IMPL-2026-02-02-tools-api-support`

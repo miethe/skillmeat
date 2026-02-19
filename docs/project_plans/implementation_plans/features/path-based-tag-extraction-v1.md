@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Implementation Plan: Path-Based Tag Extraction
 
 **Feature**: Path-Based Tag Extraction

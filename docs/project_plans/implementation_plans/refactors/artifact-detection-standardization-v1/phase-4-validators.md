@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Phase 4: Align Validators and CLI Defaults
 
 **Duration:** 1 week

@@ -1,20 +1,21 @@
 ---
-title: "Implementation Plan: /manage + /collection Tabs and Filter Bar Unification"
-description: "Standardize artifact browsing structure across /manage and /collection using shared tab and filter-bar components, with an All tab default and consistent placement."
-status: draft
+title: 'Implementation Plan: /manage + /collection Tabs and Filter Bar Unification'
+description: Standardize artifact browsing structure across /manage and /collection
+  using shared tab and filter-bar components, with an All tab default and consistent
+  placement.
+status: inferred_complete
 complexity: Medium
-total_effort: "3-5 days"
+total_effort: 3-5 days
 phases: 5
-category: "harden-polish"
+category: harden-polish
 created: 2026-02-10
 updated: 2026-02-10
 related_specs:
-  - /docs/project_plans/implementation_plans/features/manage-collection-page-refactor-v1.md
-  - /docs/project_plans/implementation_plans/harden-polish/collections-groups-ux-enhancement-v1.md
+- /docs/project_plans/implementation_plans/features/manage-collection-page-refactor-v1.md
+- /docs/project_plans/implementation_plans/harden-polish/collections-groups-ux-enhancement-v1.md
 related_request_logs:
-  - REQ-20260210-skillmeat
+- REQ-20260210-skillmeat
 ---
-
 # Implementation Plan: /manage + /collection Tabs and Filter Bar Unification
 
 ## Executive Summary

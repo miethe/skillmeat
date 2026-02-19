@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Discovery & Import Bug Fixes Implementation Plan
 
 **Created**: 2026-01-12

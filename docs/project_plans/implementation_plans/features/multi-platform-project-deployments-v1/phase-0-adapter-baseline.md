@@ -1,8 +1,8 @@
 ---
-title: "Phase 0: Adapter Baseline"
+title: 'Phase 0: Adapter Baseline'
 parent: ../multi-platform-project-deployments-v1.md
+status: inferred_complete
 ---
-
 # Phase 0: Adapter Baseline
 
 **Duration**: 0.5 week (1-2 days)

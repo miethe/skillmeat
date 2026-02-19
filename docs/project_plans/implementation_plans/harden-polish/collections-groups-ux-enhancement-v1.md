@@ -1,3 +1,6 @@
+---
+status: inferred_complete
+---
 # Implementation Plan: Collections & Groups UX Enhancement v1
 
 **Status**: Ready for Implementation

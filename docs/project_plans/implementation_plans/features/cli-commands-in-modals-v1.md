@@ -1,14 +1,21 @@
 ---
-title: "CLI Commands in Artifact Modals - Implementation Plan"
-description: "Add copy-to-clipboard functionality for CLI deploy commands in artifact cards and modals"
-audience: [ai-agents, developers]
-tags: [implementation, ui, frontend, cli, artifacts]
+title: CLI Commands in Artifact Modals - Implementation Plan
+description: Add copy-to-clipboard functionality for CLI deploy commands in artifact
+  cards and modals
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- ui
+- frontend
+- cli
+- artifacts
 created: 2026-01-30
 updated: 2026-01-30
-category: "product-planning"
-status: ready-for-implementation
+category: product-planning
+status: inferred_complete
 ---
-
 # Implementation Plan: CLI Commands in Artifact Modals
 
 ## Executive Summary
