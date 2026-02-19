@@ -1,7 +1,7 @@
 {
   "$schema": "./features.schema.json",
   "version": "0.3.0-beta",
-  "lastUpdated": "2026-02-06",
+  "lastUpdated": "2026-02-19",
   "categories": [
     {
       "id": "collection",
@@ -427,6 +427,62 @@
       ]
     },
     {
+      "id": "composite",
+      "name": "Composite Artifacts",
+      "icon": "layers",
+      "tagline": "Multi-artifact packages with smart import",
+      "features": [
+        {
+          "id": "plugin-import",
+          "name": "Plugin Import",
+          "description": "Import multi-artifact plugins from GitHub with automatic detection, deduplication, and atomic transactions",
+          "shortDescription": "One-click plugin import",
+          "cliCommand": "skillmeat add",
+          "webPage": "/collection",
+          "since": "0.4.0",
+          "highlight": true
+        },
+        {
+          "id": "composite-detection",
+          "name": "Composite Detection",
+          "description": "Automatically detect plugin roots in repositories via plugin.json manifests or heuristic scanning",
+          "shortDescription": "Auto-detect plugins",
+          "since": "0.4.0"
+        },
+        {
+          "id": "deduplication",
+          "name": "Hash-Based Deduplication",
+          "description": "SHA-256 content hashing prevents duplicate artifacts when importing plugins that share children",
+          "shortDescription": "Smart dedup",
+          "since": "0.4.0"
+        },
+        {
+          "id": "relationship-browsing",
+          "name": "Relationship Browsing",
+          "description": "Browse parent-child relationships with Contains tab and Part of section on artifact detail pages",
+          "shortDescription": "Navigate relationships",
+          "webPage": "/collection/[id]",
+          "since": "0.4.0"
+        },
+        {
+          "id": "plugin-deployment",
+          "name": "Plugin Deployment",
+          "description": "Deploy entire plugins to projects with version conflict detection and resolution",
+          "shortDescription": "Deploy plugins",
+          "cliCommand": "skillmeat deploy",
+          "since": "0.4.0"
+        },
+        {
+          "id": "bundle-export",
+          "name": "Composite Bundle Export",
+          "description": "Export composite artifacts as shareable bundles including all children",
+          "shortDescription": "Export as bundle",
+          "cliCommand": "skillmeat export",
+          "since": "0.4.0"
+        }
+      ]
+    },
+    {
       "id": "interface",
       "name": "Three-Way Interface",
       "icon": "layout",
@@ -496,6 +552,13 @@
       "description": "Event-triggered automations",
       "icon": "anchor",
       "color": "yellow"
+    },
+    {
+      "id": "composite",
+      "name": "Plugin",
+      "description": "Multi-artifact packages bundling skills, commands, and agents",
+      "icon": "layers",
+      "color": "pink"
     }
   ],
   "stats": {

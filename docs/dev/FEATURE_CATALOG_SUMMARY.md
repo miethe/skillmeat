@@ -17,6 +17,21 @@ Quick lookup guide for screenshots, feature verification, and UI planning.
 | **Manage** | `/manage` | Entity-focused view | By type tabs, unified modal detail |
 | **Groups** | `/groups` | Group-based browsing | Two-pane layout (sidebar + artifact grid), DnD group assignment, management hub, color/icon metadata |
 
+### Composite Artifacts (Plugins, Stacks, Suites)
+
+**Feature**: Multi-artifact packages with relational model, smart import, deduplication, version pinning
+**Status**: Implemented (v0.4.0-dev)
+
+| Component | Description |
+|-----------|-------------|
+| **ORM Models** | CompositeArtifact, CompositeMembership (junction table with version pinning) |
+| **API Endpoints** | /api/v1/composites (20+ CRUD and sync operations) |
+| **Import** | Transactional plugin import with atomic guarantees and hash-based deduplication |
+| **UI Components** | CompositeArtifactCard, CompositeMembersList, CompositeDetailModal, CompositeMembershipEditor |
+| **Discovery** | DiscoveredGraph detects composite structure from repos with parent-child relationships |
+| **Integration** | Composite tab in Manage page, "Part of Composites" section in artifact detail, import preview with conflict detection |
+| **Sync** | CompositeVersionDiffViewer for per-member diffs, CompositeSyncDialog for batch sync |
+
 ### Project & Deployment
 
 | Page | Path | Primary Purpose | Key Features |
@@ -219,6 +234,19 @@ POST/DEL     /groups/{id}/artifacts  Add/Remove
 GET/POST     /tags                   List/Bulk assign
 ```
 
+### Composites (Plugins, Stacks, Suites) (20+ endpoints)
+
+```
+GET/POST     /composites             List/Create
+GET/PUT/DEL  /composites/{id}        Get/Update/Delete
+GET          /composites/{id}/members  List child artifacts
+POST/DEL     /composites/{id}/members  Add/Remove artifact
+GET          /composites/{id}/diff   Show version differences
+POST         /composites/{id}/sync   Sync all members
+
+GET          /artifacts/{id}/composites  Get parent composites
+```
+
 ### Projects & Deployments (30+ endpoints)
 
 ```
@@ -289,7 +317,7 @@ GET          /analytics/collections/stats  Collection stats
 {
   id: string
   name: string
-  type: 'skill' | 'command' | 'agent' | 'mcp' | 'hook'
+  type: 'skill' | 'command' | 'agent' | 'mcp' | 'hook' | 'composite'
   scope: 'user' | 'local'
   syncStatus: 'synced' | 'modified' | 'outdated' | 'conflict' | 'error'
   description?: string
@@ -299,6 +327,30 @@ GET          /analytics/collections/stats  Collection stats
   createdAt: ISO8601
   updatedAt: ISO8601
 }
+```
+
+### Composite Type
+
+```typescript
+{
+  id: string
+  collectionId: string
+  name: string
+  type: 'composite'
+  description?: string
+  sourceUrl?: string
+  members: CompositeMembership[]  // Child artifacts with version pinning
+  createdAt: ISO8601
+  updatedAt: ISO8601
+}
+```
+
+### CompositeType (internal type enum)
+
+```
+PLUGIN  - Multi-artifact plugin package
+STACK   - Preconfigured stack of artifacts
+SUITE   - Organized suite of related artifacts
 ```
 
 ### Collection Type

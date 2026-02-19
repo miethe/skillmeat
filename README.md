@@ -1,5 +1,5 @@
 <!-- AUTO-GENERATED: Do not edit directly. See .github/readme/ -->
-<!-- GENERATED: 2026-02-09T18:48:53.531Z -->
+<!-- GENERATED: 2026-02-19T17:12:43.656Z -->
 <!-- VERSION: 0.3.0-beta -->
 
 <!-- BEGIN:hero -->
@@ -275,6 +275,19 @@ _Share and collaborate_
 | Vault Connectors | Team storage (`skillmeat vault`) |
 | Cryptographic Signing | Secure sharing (`skillmeat sign`) |
 
+### Composite Artifacts
+
+_Multi-artifact packages with smart import_
+
+| Feature | Description |
+|---------|-------------|
+| **Plugin Import** | One-click plugin import (`skillmeat add`) |
+| Composite Detection | Auto-detect plugins |
+| Hash-Based Deduplication | Smart dedup |
+| Relationship Browsing | Navigate relationships |
+| Plugin Deployment | Deploy plugins (`skillmeat deploy`) |
+| Composite Bundle Export | Export as bundle (`skillmeat export`) |
+
 ### Three-Way Interface
 
 _CLI + Web UI + API_
@@ -299,6 +312,7 @@ SkillMeat manages multiple artifact types for Claude Code:
 | **Agent** | Autonomous task executors |
 | **MCP Server** | Model Context Protocol servers |
 | **Hook** | Event-triggered automations |
+| **Plugin** | Multi-artifact packages bundling skills, commands, and agents |
 <!-- END:features -->
 
 <!-- BEGIN:cli-reference -->
@@ -320,6 +334,7 @@ SkillMeat provides **116+ commands** across **23 command groups**.
 | **MCP Server Management** | &#x60;skillmeat mcp add&#x60;, &#x60;skillmeat mcp deploy&#x60;, &#x60;skillmeat mcp health&#x60; |
 | **Context Entities** | &#x60;skillmeat context&#x60;, &#x60;skillmeat context deploy&#x60; |
 | **Team Collaboration** | &#x60;skillmeat bundle create&#x60;, &#x60;skillmeat vault&#x60;, &#x60;skillmeat sign&#x60; |
+| **Composite Artifacts** | &#x60;skillmeat add&#x60;, &#x60;skillmeat deploy&#x60;, &#x60;skillmeat export&#x60; |
 | **Three-Way Interface** | &#x60;skillmeat --help&#x60;, &#x60;skillmeat web dev&#x60; |
 
 ### Core Commands
@@ -442,6 +457,16 @@ skillmeat web start               # Start production servers
 | `skillmeat bundle create` | Create bundles |
 | `skillmeat vault` | Team storage |
 | `skillmeat sign` | Secure sharing |
+
+</details>
+<details>
+<summary><strong>Composite Artifacts</strong> - Multi-artifact packages with smart import</summary>
+
+| Command | Description |
+|---------|-------------|
+| `skillmeat add` | One-click plugin import |
+| `skillmeat deploy` | Deploy plugins |
+| `skillmeat export` | Export as bundle |
 
 </details>
 <details>

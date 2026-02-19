@@ -10,11 +10,12 @@
 
 1. [Main Navigation](#main-navigation)
 2. [Pages & Views](#pages--views)
-3. [Reusable Components](#reusable-components)
-4. [Forms & Modals](#forms--modals)
-5. [Dashboard Widgets](#dashboard-widgets)
-6. [Filtering & Sorting](#filtering--sorting)
-7. [API Endpoints](#api-endpoints)
+3. [Composite Artifacts](#composite-artifacts)
+4. [Reusable Components](#reusable-components)
+5. [Forms & Modals](#forms--modals)
+6. [Dashboard Widgets](#dashboard-widgets)
+7. [Filtering & Sorting](#filtering--sorting)
+8. [API Endpoints](#api-endpoints)
 
 ---
 
@@ -37,6 +38,137 @@
 - MCP Servers (/mcp)
 - Settings (/settings)
 - Sharing (/sharing)
+
+---
+
+## Composite Artifacts
+
+**Status**: Implemented (v0.4.0-dev, on feature branch)
+
+**Overview**: Multi-artifact packages with relational model, smart import with deduplication, version pinning, and relationship browsing in the web UI.
+
+### Architecture & Data Model
+
+**ORM Models** (`skillmeat/cache/models.py`):
+- `CompositeArtifact` - Represents a composite package (Plugin, Stack, Suite) scoped to a collection
+  - Fields: id, collection_id, name, type (COMPOSITE), description, source_url, created_at, updated_at
+  - Relationships: memberships (CompositeMembership objects), artifacts (child artifacts via join table)
+- `CompositeMembership` - Join table with metadata linking composite to child artifacts
+  - Fields: id, composite_id, artifact_id, version_hash (pinned hash when imported), added_at
+  - Represents typed relationship with version pinning for reproducibility
+
+**Discovery Integration** (`skillmeat/core/discovery.py`):
+- `DiscoveredGraph` - Enhanced discovery model that detects composite structure
+- Composite detection via file patterns (manifest files, directory structure heuristics)
+- CompositeType enum for future type support (PLUGIN, STACK, SUITE)
+- Graph traversal to identify parent-child relationships
+
+**Import Engine** (`skillmeat/core/importer.py`):
+- Transactional composite import with atomic all-or-nothing guarantees
+- Hash-based deduplication: checks if artifact content hash already exists before creating duplicate
+- Membership metadata persisted with version pinning at import time
+- Conflict detection for version drift when re-importing
+
+### API Endpoints
+
+**Associations Router** (`/api/v1/composites`):
+- `GET /` - List composite artifacts (with collection_id filter)
+- `POST /` - Create composite artifact with initial memberships
+- `GET /{composite_id}` - Get composite detail with membership list
+- `PUT /{composite_id}` - Update composite metadata
+- `DELETE /{composite_id}` - Delete composite (with cascade options)
+- `GET /{composite_id}/members` - List child artifacts in composite
+- `POST /{composite_id}/members` - Add artifact to composite
+- `DELETE /{composite_id}/members/{artifact_id}` - Remove artifact from composite
+- `GET /{composite_id}/diff` - Show version differences for members vs upstream
+- `POST /{composite_id}/sync` - Sync all members from upstream
+
+**Artifact Relations**:
+- `GET /artifacts/{artifact_id}/composites` - Get all composites that contain this artifact
+- `GET /artifacts/{artifact_id}/parts-of` - List parent composites (convenience endpoint)
+
+### Web UI Components
+
+**Composite Artifact Display** (`skillmeat/web/components/composite/`):
+- `CompositeArtifactCard` - Display composite in grid/list views
+  - Shows: name, type badge, member count, source, action menu
+  - Badge with member count and quick visual indicator
+- `CompositeMembersList` - Tabular view of child artifacts in composite
+  - Table with: name, type, version hash, sync status, actions
+  - Version pinning indicator
+- `CompositeDetailModal` - Modal showing full composite information
+  - Tabs: Overview, Members, History, Relationships
+  - Member list with version pinning info
+  - Upstream comparison (if applicable)
+
+**Composite Management**:
+- `CompositeMembershipEditor` - Add/remove artifacts from composite
+  - Search and select artifacts
+  - Bulk add multiple artifacts
+  - Pin version hash on addition
+- `CompositeCreateDialog` - Create new composite from selected artifacts
+  - Name, description, type selection
+  - Select artifacts to include
+  - Auto-detect composite if scanning GitHub
+
+**Artifact Context** (Integration in existing pages):
+- **Collection Page**: Composite artifacts shown in grid/list alongside atomic artifacts
+  - Filter by type includes COMPOSITE option
+  - Composites display member count badge
+- **Artifact Detail Modal**: "Part of Composites" section showing parent relationships
+  - Click to navigate to composite detail
+  - Shows which plugins/suites contain this artifact
+- **Manage Page**: Composite tab in type tabs
+  - Browse all composites in collection
+  - Edit/delete operations
+  - View members inline
+
+**Import Preview** (Discovery/Marketplace):
+- `CompositeImportPreview` - Show detected composite structure before import
+  - Display composite as parent
+  - List all detected members with deduplication warnings
+  - Highlight potential duplicates (same content hash as existing artifacts)
+  - Option to proceed, adjust members, or skip duplicates
+- `DuplicateConflictDialog` - Resolve artifact hash collisions
+  - Show which artifacts would be skipped due to existing hashes
+  - Option: keep existing, replace with new version, or keep both as separate artifacts
+  - Apply choice to all matches or per-item
+
+**Sync & Update**:
+- `CompositeVersionDiffViewer` - Show version differences for all members
+  - Per-member diff panel
+  - Sync all button
+  - Mark individual members for sync or skip
+- `CompositeSyncDialog` - Multi-member sync orchestration
+  - Shows all members and their sync status
+  - Batch sync with merge strategy selection
+  - Conflict resolution for members with conflicts
+
+### Related Features
+
+- **Discovery**: Detects composite structure from GitHub repos and manifests
+- **Smart Import**: Transactional import with atomic guarantees and deduplication
+- **Version Pinning**: Records specific artifact version hash when composite is created
+- **Relationship Browsing**: View parent-child relationships in UI
+- **Sync Operations**: Sync all members of composite together with conflict detection
+
+### Configuration & Storage
+
+**Manifest Integration**:
+- Composite artifacts can be defined in `.claude/manifest.toml`
+- Example: `[[composites]]` section listing member artifacts
+- Version pinning stored in lock file (`manifest.lock`)
+
+**Database Location**:
+- Composites stored in `Artifact` table with `type='composite'`
+- Memberships stored in `CompositeMembership` junction table
+- Collection-scoped: each composite belongs to exactly one collection
+
+### Related Documentation
+
+- **PRD**: `docs/project_plans/PRDs/features/composite-artifact-infrastructure-v1.md`
+- **Design Spec**: `docs/project_plans/design-specs/composite-artifact-infrastructure.md`
+- **ADR-007**: `docs/dev/architecture/decisions/ADR-007-artifact-uuid-identity.md` (discusses composite identity)
 
 ---
 
@@ -1211,6 +1343,28 @@
 - `POST /bulk-import` - Bulk import artifacts
 - `POST /parameters/update` - Update artifact parameters
 
+### Composites Router (`/api/v1/composites`)
+
+**Composite Management**:
+- `GET /` - List composite artifacts (with collection_id filter)
+- `POST /` - Create composite artifact with initial memberships
+- `GET /{composite_id}` - Get composite detail with membership list
+- `PUT /{composite_id}` - Update composite metadata
+- `DELETE /{composite_id}` - Delete composite with cascade options
+
+**Membership Operations**:
+- `GET /{composite_id}/members` - List child artifacts in composite
+- `POST /{composite_id}/members` - Add artifact to composite with version pinning
+- `DELETE /{composite_id}/members/{artifact_id}` - Remove artifact from composite
+
+**Sync & Comparison**:
+- `GET /{composite_id}/diff` - Show version differences for members vs upstream
+- `POST /{composite_id}/sync` - Sync all members from upstream with merge strategy
+
+**Artifact Relations**:
+- `GET /artifacts/{artifact_id}/composites` - Get all composites containing this artifact
+- `GET /artifacts/{artifact_id}/parts-of` - List parent composites (convenience endpoint)
+
 ### Collections Router (`/api/v1/collections` - DEPRECATED)
 
 **Read-Only**:
@@ -1427,9 +1581,9 @@
 
 **Total Reusable Components**: 100+ components
 
-**Total API Endpoints**: 150+ endpoints across 15 routers
+**Total API Endpoints**: 150+ endpoints across 16 routers (including Composites)
 
-**Supported Artifact Types**: 5 (Skill, Command, Agent, MCP, Hook)
+**Supported Artifact Types**: 6 (Skill, Command, Agent, MCP, Hook, Composite)
 
 **Artifact States**: 6 sync statuses (Synced, Modified, Outdated, Conflict, Error, Unknown)
 
