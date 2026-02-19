@@ -1035,6 +1035,28 @@ class GroupArtifact(Base):
         Index("idx_group_artifacts_added_at", "added_at"),
     )
 
+    # Relationship to Artifact (lazy to avoid N+1 in list queries)
+    artifact: Mapped[Optional["Artifact"]] = relationship(
+        "Artifact",
+        primaryjoin="GroupArtifact.artifact_uuid == foreign(Artifact.uuid)",
+        foreign_keys="[GroupArtifact.artifact_uuid]",
+        lazy="select",
+        viewonly=True,
+    )
+
+    @property
+    def artifact_id(self) -> Optional[str]:
+        """Return the artifact's type:name identifier (e.g. 'skill:canvas').
+
+        This is a compatibility shim — the DB FK column is artifact_uuid but
+        many service-layer callers expect the old type:name string.  The value
+        is resolved via the artifact relationship (one extra query per access
+        unless the relationship is already loaded).
+        """
+        if self.artifact is not None:
+            return self.artifact.id
+        return None
+
     def __repr__(self) -> str:
         """Return string representation of GroupArtifact."""
         return (
@@ -1112,6 +1134,28 @@ class CollectionArtifact(Base):
         Index("idx_collection_artifacts_artifact_uuid", "artifact_uuid"),
         Index("idx_collection_artifacts_added_at", "added_at"),
     )
+
+    # Relationship to Artifact (lazy to avoid N+1 in list queries)
+    artifact: Mapped[Optional["Artifact"]] = relationship(
+        "Artifact",
+        primaryjoin="CollectionArtifact.artifact_uuid == foreign(Artifact.uuid)",
+        foreign_keys="[CollectionArtifact.artifact_uuid]",
+        lazy="select",
+        viewonly=True,
+    )
+
+    @property
+    def artifact_id(self) -> Optional[str]:
+        """Return the artifact's type:name identifier (e.g. 'skill:canvas').
+
+        This is a compatibility shim — the DB FK column is artifact_uuid but
+        many service-layer callers expect the old type:name string.  The value
+        is resolved via the artifact relationship (one extra query per access
+        unless the relationship is already loaded).
+        """
+        if self.artifact is not None:
+            return self.artifact.id
+        return None
 
     @property
     def tools(self) -> list[str]:

@@ -2251,22 +2251,28 @@ async def list_artifacts(
                 collections_map = collection_service.get_collection_membership_batch(
                     artifact_ids
                 )
-                # Query DB source and deployments for artifacts
+                # Query DB source and deployments for artifacts.
+                # CollectionArtifact uses artifact_uuid FK; join through Artifact
+                # to resolve type:name identifiers (Artifact.id) for the lookup keys.
                 db_rows = (
                     db_session.query(
-                        CollectionArtifact.artifact_id,
+                        Artifact.id,
                         CollectionArtifact.source,
                         CollectionArtifact.deployments_json,
                     )
-                    .filter(CollectionArtifact.artifact_id.in_(artifact_ids))
+                    .join(
+                        CollectionArtifact,
+                        CollectionArtifact.artifact_uuid == Artifact.uuid,
+                    )
+                    .filter(Artifact.id.in_(artifact_ids))
                     .all()
                 )
                 for row in db_rows:
                     if row.source is not None:
-                        source_lookup[row.artifact_id] = row.source
+                        source_lookup[row.id] = row.source
                     parsed = parse_deployments(row.deployments_json)
                     if parsed:
-                        deployments_lookup[row.artifact_id] = parsed
+                        deployments_lookup[row.id] = parsed
                 db_session.close()
             except Exception as e:
                 logger.warning(f"Failed to query collection memberships: {e}")

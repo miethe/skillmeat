@@ -3,14 +3,14 @@ type: progress
 prd: composite-artifact-infrastructure
 phase: 5
 title: UUID Migration for Existing Join Tables (Backend)
-status: pending
+status: in_progress
 started: null
 completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
 completed_tasks: 3
-in_progress_tasks: 0
+in_progress_tasks: 2
 blocked_tasks: 0
 at_risk_tasks: 0
 owners:
@@ -54,7 +54,7 @@ tasks:
 - id: CAI-P5-04
   description: 'Update repository layer to query via artifact_uuid: all CollectionArtifact/GroupArtifact/ArtifactTag
     queries use UUID join; external DTOs still return type:name'
-  status: pending
+  status: in_progress
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -64,7 +64,7 @@ tasks:
 - id: CAI-P5-05
   description: 'Verify service and API layer correctness post-migration: smoke test
     all collection, group, and tag endpoints; no API surface changes permitted'
-  status: pending
+  status: in_progress
   assigned_to:
   - python-backend-engineer
   dependencies:
