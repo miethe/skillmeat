@@ -1,105 +1,120 @@
 ---
 type: progress
-prd: "collections-navigation"
+prd: collections-navigation
 phase: 3
-title: "Frontend Foundation - Types, Hooks, Context"
-status: "pending"
+title: Frontend Foundation - Types, Hooks, Context
+status: pending
 overall_progress: 0
 total_tasks: 6
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["frontend-developer"]
-contributors: ["ui-engineer-enhanced"]
-
+owners:
+- frontend-developer
+contributors:
+- ui-engineer-enhanced
 tasks:
-  - id: "TASK-3.1"
-    name: "Navigation Restructuring"
-    description: "Add collapsible Collections parent section to sidebar navigation"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TASK-3.2"
-    name: "TypeScript Types for Collections & Groups"
-    description: "Define TypeScript interfaces matching API schemas"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "1.5h"
-    priority: "high"
-
-  - id: "TASK-3.3"
-    name: "useCollections Hook"
-    description: "Custom hook with TanStack Query for collections CRUD"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["TASK-3.2"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TASK-3.4"
-    name: "useGroups Hook"
-    description: "Custom hook for group management operations"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["TASK-3.2"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TASK-3.5"
-    name: "CollectionContext Provider"
-    description: "Shared state provider for current collection selection"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["TASK-3.3", "TASK-3.4"]
-    estimated_effort: "1.5h"
-    priority: "high"
-
-  - id: "TASK-3.6"
-    name: "API Client Integration"
-    description: "API communication layer for collections and groups"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["TASK-3.2"]
-    estimated_effort: "1.5h"
-    priority: "high"
-
+- id: TASK-3.1
+  name: Navigation Restructuring
+  description: Add collapsible Collections parent section to sidebar navigation
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+- id: TASK-3.2
+  name: TypeScript Types for Collections & Groups
+  description: Define TypeScript interfaces matching API schemas
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 1.5h
+  priority: high
+- id: TASK-3.3
+  name: useCollections Hook
+  description: Custom hook with TanStack Query for collections CRUD
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - TASK-3.2
+  estimated_effort: 2h
+  priority: high
+- id: TASK-3.4
+  name: useGroups Hook
+  description: Custom hook for group management operations
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - TASK-3.2
+  estimated_effort: 2h
+  priority: high
+- id: TASK-3.5
+  name: CollectionContext Provider
+  description: Shared state provider for current collection selection
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - TASK-3.3
+  - TASK-3.4
+  estimated_effort: 1.5h
+  priority: high
+- id: TASK-3.6
+  name: API Client Integration
+  description: API communication layer for collections and groups
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - TASK-3.2
+  estimated_effort: 1.5h
+  priority: high
 parallelization:
-  batch_1: ["TASK-3.1", "TASK-3.2"]
-  batch_2: ["TASK-3.3", "TASK-3.4", "TASK-3.6"]
-  batch_3: ["TASK-3.5"]
-  critical_path: ["TASK-3.2", "TASK-3.3", "TASK-3.5"]
-  estimated_total_time: "1w"
-
+  batch_1:
+  - TASK-3.1
+  - TASK-3.2
+  batch_2:
+  - TASK-3.3
+  - TASK-3.4
+  - TASK-3.6
+  batch_3:
+  - TASK-3.5
+  critical_path:
+  - TASK-3.2
+  - TASK-3.3
+  - TASK-3.5
+  estimated_total_time: 1w
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "Navigation sidebar includes Collections section"
-    status: "pending"
-  - id: "SC-2"
-    description: "TypeScript types match backend API schemas exactly"
-    status: "pending"
-  - id: "SC-3"
-    description: "useCollections hook provides all CRUD operations"
-    status: "pending"
-  - id: "SC-4"
-    description: "useGroups hook supports position/reordering"
-    status: "pending"
-  - id: "SC-5"
-    description: "CollectionContext provides shared state across components"
-    status: "pending"
-  - id: "SC-6"
-    description: "API client handles errors gracefully"
-    status: "pending"
-  - id: "SC-7"
-    description: "TanStack Query cache invalidation works correctly"
-    status: "pending"
-
+- id: SC-1
+  description: Navigation sidebar includes Collections section
+  status: pending
+- id: SC-2
+  description: TypeScript types match backend API schemas exactly
+  status: pending
+- id: SC-3
+  description: useCollections hook provides all CRUD operations
+  status: pending
+- id: SC-4
+  description: useGroups hook supports position/reordering
+  status: pending
+- id: SC-5
+  description: CollectionContext provides shared state across components
+  status: pending
+- id: SC-6
+  description: API client handles errors gracefully
+  status: pending
+- id: SC-7
+  description: TanStack Query cache invalidation works correctly
+  status: pending
 files_modified: []
+schema_version: 2
+doc_type: progress
+feature_slug: collections-navigation
 ---
 
 # collections-navigation - Phase 3: Frontend Foundation

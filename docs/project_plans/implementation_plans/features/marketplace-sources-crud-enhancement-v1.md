@@ -19,6 +19,10 @@ category: product-planning
 status: completed
 related:
 - /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: marketplace-sources-crud-enhancement
+prd_ref: null
 ---
 
 # Implementation Plan: Marketplace GitHub Sources CRUD Enhancement

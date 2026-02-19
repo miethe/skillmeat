@@ -1,117 +1,146 @@
 ---
 prd: path-based-tag-extraction-v1
 phase: 1
-name: "Backend Foundation & API"
+name: Backend Foundation & API
 status: completed
 created: 2026-01-04
 updated: 2026-01-04
-completed_at: 2026-01-04T21:15:00Z
+completed_at: 2026-01-04 21:15:00+00:00
 completion: 100
-
 tasks:
-  - id: "TASK-1.1"
-    name: "Database Migration"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    model: "sonnet"
-    dependencies: []
-    estimated_effort: "1h"
-
-  - id: "TASK-1.2"
-    name: "Update Models"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-1.1"]
-    estimated_effort: "1h"
-
-  - id: "TASK-1.3"
-    name: "PathTagConfig & ExtractedSegment Dataclasses"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: []
-    estimated_effort: "2h"
-
-  - id: "TASK-1.4"
-    name: "PathSegmentExtractor Service"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-1.3"]
-    estimated_effort: "3h"
-
-  - id: "TASK-1.5"
-    name: "Scanner Integration"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-1.2", "TASK-1.4"]
-    estimated_effort: "2h"
-
-  - id: "TASK-1.6"
-    name: "API Schemas"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-1.3"]
-    estimated_effort: "1h"
-
-  - id: "TASK-1.7"
-    name: "GET Path Tags Endpoint"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-1.2", "TASK-1.6"]
-    estimated_effort: "1.5h"
-
-  - id: "TASK-1.8"
-    name: "PATCH Path Tags Endpoint"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-1.7"]
-    estimated_effort: "1.5h"
-
-  - id: "TASK-1.9"
-    name: "Unit Tests - Extractor"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-1.4"]
-    estimated_effort: "2h"
-
-  - id: "TASK-1.10"
-    name: "Unit Tests - API"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-1.7", "TASK-1.8"]
-    estimated_effort: "2h"
-
-  - id: "TASK-1.11"
-    name: "Integration Tests"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-1.5", "TASK-1.8"]
-    estimated_effort: "2h"
-
-  - id: "TASK-1.12"
-    name: "Documentation"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    model: "haiku"
-    dependencies: ["TASK-1.11"]
-    estimated_effort: "1h"
-
+- id: TASK-1.1
+  name: Database Migration
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  model: sonnet
+  dependencies: []
+  estimated_effort: 1h
+- id: TASK-1.2
+  name: Update Models
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-1.1
+  estimated_effort: 1h
+- id: TASK-1.3
+  name: PathTagConfig & ExtractedSegment Dataclasses
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies: []
+  estimated_effort: 2h
+- id: TASK-1.4
+  name: PathSegmentExtractor Service
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-1.3
+  estimated_effort: 3h
+- id: TASK-1.5
+  name: Scanner Integration
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-1.2
+  - TASK-1.4
+  estimated_effort: 2h
+- id: TASK-1.6
+  name: API Schemas
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-1.3
+  estimated_effort: 1h
+- id: TASK-1.7
+  name: GET Path Tags Endpoint
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-1.2
+  - TASK-1.6
+  estimated_effort: 1.5h
+- id: TASK-1.8
+  name: PATCH Path Tags Endpoint
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-1.7
+  estimated_effort: 1.5h
+- id: TASK-1.9
+  name: Unit Tests - Extractor
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-1.4
+  estimated_effort: 2h
+- id: TASK-1.10
+  name: Unit Tests - API
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-1.7
+  - TASK-1.8
+  estimated_effort: 2h
+- id: TASK-1.11
+  name: Integration Tests
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-1.5
+  - TASK-1.8
+  estimated_effort: 2h
+- id: TASK-1.12
+  name: Documentation
+  status: completed
+  assigned_to:
+  - documentation-writer
+  model: haiku
+  dependencies:
+  - TASK-1.11
+  estimated_effort: 1h
 parallelization:
-  batch_1: ["TASK-1.1", "TASK-1.3"]
-  batch_2: ["TASK-1.2", "TASK-1.4", "TASK-1.6"]
-  batch_3: ["TASK-1.5", "TASK-1.7", "TASK-1.9"]
-  batch_4: ["TASK-1.8", "TASK-1.10"]
-  batch_5: ["TASK-1.11"]
-  batch_6: ["TASK-1.12"]
+  batch_1:
+  - TASK-1.1
+  - TASK-1.3
+  batch_2:
+  - TASK-1.2
+  - TASK-1.4
+  - TASK-1.6
+  batch_3:
+  - TASK-1.5
+  - TASK-1.7
+  - TASK-1.9
+  batch_4:
+  - TASK-1.8
+  - TASK-1.10
+  batch_5:
+  - TASK-1.11
+  batch_6:
+  - TASK-1.12
+schema_version: 2
+doc_type: progress
+feature_slug: path-based-tag-extraction-v1
+type: progress
 ---
 
 # Phase 1: Backend Foundation & API

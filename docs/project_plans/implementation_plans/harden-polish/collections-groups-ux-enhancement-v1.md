@@ -1,3 +1,10 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: collections-groups-ux-enhancement
+prd_ref: null
+---
 # Implementation Plan: Collections & Groups UX Enhancement v1
 
 **Status**: Ready for Implementation

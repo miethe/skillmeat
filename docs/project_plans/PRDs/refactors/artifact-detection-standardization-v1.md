@@ -1,17 +1,30 @@
 ---
-title: "PRD: Artifact Detection Standardization Refactor"
-description: "Unified detection core for skill, command, agent, hook, and MCP artifacts with consistent type definitions, container aliases, and detection rules across local discovery, marketplace scanning, and validation layers"
-audience: [ai-agents, developers, architects]
-tags: [prd, planning, refactor, detection, architecture, standardization]
+title: 'PRD: Artifact Detection Standardization Refactor'
+description: Unified detection core for skill, command, agent, hook, and MCP artifacts
+  with consistent type definitions, container aliases, and detection rules across
+  local discovery, marketplace scanning, and validation layers
+audience:
+- ai-agents
+- developers
+- architects
+tags:
+- prd
+- planning
+- refactor
+- detection
+- architecture
+- standardization
 created: 2026-01-06
 updated: 2026-01-06
-category: "product-planning"
-status: planned
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/reports/artifact-detection-standardization-2026-01-06.md
-  - /.claude/context/artifact-detection-code-patterns.md
+- /docs/project_plans/reports/artifact-detection-standardization-2026-01-06.md
+- /.claude/context/artifact-detection-code-patterns.md
+schema_version: 2
+doc_type: prd
+feature_slug: artifact-detection-standardization
 ---
-
 # PRD: Artifact Detection Standardization Refactor
 
 **Feature Name:** Artifact Detection Standardization

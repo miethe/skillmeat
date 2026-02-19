@@ -1,3 +1,10 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: artifact-detection-standardization
+prd_ref: null
+---
 # Implementation Plan: Artifact Detection Standardization Refactor
 
 **Project:** SkillMeat

@@ -183,6 +183,9 @@ files_modified:
 - skillmeat/core/marketplace/__init__.py
 progress: 100
 updated: '2026-01-18'
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-sources-enhancement
 ---
 
 # marketplace-sources-enhancement - Phases 1-3: Backend Implementation

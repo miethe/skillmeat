@@ -1,119 +1,145 @@
 ---
 type: progress
-prd: "artifact-detection-standardization-v1"
+prd: artifact-detection-standardization-v1
 phase: 3
-title: "Refactor Marketplace Heuristics Detection"
+title: Refactor Marketplace Heuristics Detection
 status: completed
 progress: 100
 total_tasks: 10
 completed_tasks: 10
-started_at: "2026-01-06T00:00:00Z"
-completed_at: "2026-01-06T23:59:00Z"
-
+started_at: '2026-01-06T00:00:00Z'
+completed_at: '2026-01-06T23:59:00Z'
 tasks:
-  - id: "TASK-3.1"
-    title: "Analyze current heuristic_detector.py implementation"
-    status: "completed"
-    assigned_to: ["Explore"]
-    model: "opus"
-    dependencies: ["Phase 1 complete"]
-    story_points: 2
-    notes: "Deep analysis of 7-signal scoring system, weights, manual mapping mechanism"
-
-  - id: "TASK-3.2"
-    title: "Remove duplicate ArtifactType enum"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.1"]
-    story_points: 1
-    notes: "Removed local enum, updated MCP_SERVER to MCP references"
-
-  - id: "TASK-3.3"
-    title: "Import shared detection components"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.2"]
-    story_points: 2
-    notes: "Added imports for ArtifactType, DetectionResult, ARTIFACT_SIGNATURES, CONTAINER_ALIASES, etc."
-
-  - id: "TASK-3.4"
-    title: "Refactor confidence scoring architecture"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.1", "TASK-3.3"]
-    story_points: 4
-    notes: "Created _get_baseline_detection() and _calculate_marketplace_confidence() separation"
-
-  - id: "TASK-3.5"
-    title: "Implement baseline detection using shared module"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.4"]
-    story_points: 2
-    notes: "Bridges marketplace with shared artifact_detection module"
-
-  - id: "TASK-3.6"
-    title: "Implement marketplace-specific confidence scoring"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-3.4", "TASK-3.5"]
-    story_points: 3
-    notes: "All 7 marketplace signals implemented with documented weights"
-
-  - id: "TASK-3.7"
-    title: "Maintain manual directory mapping"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-3.6"]
-    story_points: 2
-    notes: "Verified manual mapping works with 86-95% confidence levels preserved"
-
-  - id: "TASK-3.8"
-    title: "Update marketplace tests"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-3.1", "TASK-3.7"]
-    story_points: 2
-    notes: "212 marketplace tests passing, MCP_SERVER references updated to MCP"
-
-  - id: "TASK-3.9"
-    title: "Integration testing with Phase 1 & 2"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["All Phase 3 tasks"]
-    story_points: 1
-    notes: "25 new integration tests in test_detection_cross_module.py"
-
-  - id: "TASK-3.10"
-    title: "Documentation and code comments"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["All implementation tasks"]
-    story_points: 1
-    notes: "Module docstring, architecture docs, signal weights documented"
-
+- id: TASK-3.1
+  title: Analyze current heuristic_detector.py implementation
+  status: completed
+  assigned_to:
+  - Explore
+  model: opus
+  dependencies:
+  - Phase 1 complete
+  story_points: 2
+  notes: Deep analysis of 7-signal scoring system, weights, manual mapping mechanism
+- id: TASK-3.2
+  title: Remove duplicate ArtifactType enum
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.1
+  story_points: 1
+  notes: Removed local enum, updated MCP_SERVER to MCP references
+- id: TASK-3.3
+  title: Import shared detection components
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.2
+  story_points: 2
+  notes: Added imports for ArtifactType, DetectionResult, ARTIFACT_SIGNATURES, CONTAINER_ALIASES,
+    etc.
+- id: TASK-3.4
+  title: Refactor confidence scoring architecture
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.1
+  - TASK-3.3
+  story_points: 4
+  notes: Created _get_baseline_detection() and _calculate_marketplace_confidence()
+    separation
+- id: TASK-3.5
+  title: Implement baseline detection using shared module
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.4
+  story_points: 2
+  notes: Bridges marketplace with shared artifact_detection module
+- id: TASK-3.6
+  title: Implement marketplace-specific confidence scoring
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-3.4
+  - TASK-3.5
+  story_points: 3
+  notes: All 7 marketplace signals implemented with documented weights
+- id: TASK-3.7
+  title: Maintain manual directory mapping
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-3.6
+  story_points: 2
+  notes: Verified manual mapping works with 86-95% confidence levels preserved
+- id: TASK-3.8
+  title: Update marketplace tests
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-3.1
+  - TASK-3.7
+  story_points: 2
+  notes: 212 marketplace tests passing, MCP_SERVER references updated to MCP
+- id: TASK-3.9
+  title: Integration testing with Phase 1 & 2
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - All Phase 3 tasks
+  story_points: 1
+  notes: 25 new integration tests in test_detection_cross_module.py
+- id: TASK-3.10
+  title: Documentation and code comments
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - All implementation tasks
+  story_points: 1
+  notes: Module docstring, architecture docs, signal weights documented
 parallelization:
-  batch_1: ["TASK-3.1"]
-  batch_2: ["TASK-3.2", "TASK-3.3"]
-  batch_3: ["TASK-3.4", "TASK-3.5", "TASK-3.6"]
-  batch_4: ["TASK-3.7"]
-  batch_5: ["TASK-3.8", "TASK-3.9", "TASK-3.10"]
-
+  batch_1:
+  - TASK-3.1
+  batch_2:
+  - TASK-3.2
+  - TASK-3.3
+  batch_3:
+  - TASK-3.4
+  - TASK-3.5
+  - TASK-3.6
+  batch_4:
+  - TASK-3.7
+  batch_5:
+  - TASK-3.8
+  - TASK-3.9
+  - TASK-3.10
 quality_gates:
   tests_pass: true
   lint_pass: true
   format_pass: true
   no_circular_imports: true
   backwards_compatible: true
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-detection-standardization-v1
 ---
 
 # Phase 3: Refactor Marketplace Heuristics Detection

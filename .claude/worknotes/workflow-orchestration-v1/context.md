@@ -1,8 +1,11 @@
 ---
 type: context
-prd: "workflow-orchestration-v1"
-created: "2026-02-06"
-updated: "2026-02-06"
+prd: workflow-orchestration-v1
+created: '2026-02-06'
+updated: '2026-02-06'
+schema_version: 2
+doc_type: context
+feature_slug: workflow-orchestration-v1
 ---
 
 # Workflow Orchestration v1 - Agent Context Notes

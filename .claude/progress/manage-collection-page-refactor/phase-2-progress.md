@@ -1,94 +1,122 @@
 ---
 type: progress
-prd: "manage-collection-page-refactor"
+prd: manage-collection-page-refactor
 phase: 2
-title: "Card Components"
-status: "pending"
+title: Card Components
+status: pending
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 5
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["ui-engineer-enhanced", "frontend-developer"]
+owners:
+- ui-engineer-enhanced
+- frontend-developer
 contributors: []
-
 tasks:
-  - id: "CARD-2.1"
-    description: "Create ArtifactBrowseCard component: discovery-focused with type icon, name, author, description (truncated), tags, tools, score badge, quick actions menu. No drift/sync indicators."
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-    model: "opus"
-
-  - id: "CARD-2.2"
-    description: "Create ArtifactOperationsCard component: operations-focused with checkbox, type icon, name, version arrows, deployments, badges (drift/update), sync time, action buttons."
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["CARD-2.3"]
-    estimated_effort: "2h"
-    priority: "high"
-    model: "opus"
-
-  - id: "CARD-2.3"
-    description: "Create shared status utility components: StatusBadge, HealthIndicator, DeploymentBadgeStack with proper styling and tooltips."
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "1.5h"
-    priority: "high"
-    model: "opus"
-
-  - id: "CARD-2.4"
-    description: "Integrate ArtifactBrowseCard into collection page. Replace existing card rendering, update prop passing and event handlers."
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["CARD-2.1"]
-    estimated_effort: "1h"
-    priority: "medium"
-    model: "sonnet"
-
-  - id: "CARD-2.5"
-    description: "Integrate ArtifactOperationsCard into manage page. Replace existing card rendering, integrate bulk selection and action handlers."
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["CARD-2.2"]
-    estimated_effort: "1h"
-    priority: "medium"
-    model: "sonnet"
-
+- id: CARD-2.1
+  description: 'Create ArtifactBrowseCard component: discovery-focused with type icon,
+    name, author, description (truncated), tags, tools, score badge, quick actions
+    menu. No drift/sync indicators.'
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+  model: opus
+- id: CARD-2.2
+  description: 'Create ArtifactOperationsCard component: operations-focused with checkbox,
+    type icon, name, version arrows, deployments, badges (drift/update), sync time,
+    action buttons.'
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - CARD-2.3
+  estimated_effort: 2h
+  priority: high
+  model: opus
+- id: CARD-2.3
+  description: 'Create shared status utility components: StatusBadge, HealthIndicator,
+    DeploymentBadgeStack with proper styling and tooltips.'
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 1.5h
+  priority: high
+  model: opus
+- id: CARD-2.4
+  description: Integrate ArtifactBrowseCard into collection page. Replace existing
+    card rendering, update prop passing and event handlers.
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - CARD-2.1
+  estimated_effort: 1h
+  priority: medium
+  model: sonnet
+- id: CARD-2.5
+  description: Integrate ArtifactOperationsCard into manage page. Replace existing
+    card rendering, integrate bulk selection and action handlers.
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - CARD-2.2
+  estimated_effort: 1h
+  priority: medium
+  model: sonnet
 parallelization:
-  batch_1: ["CARD-2.1", "CARD-2.3"]
-  batch_2: ["CARD-2.2", "CARD-2.4"]
-  batch_3: ["CARD-2.5"]
-  critical_path: ["CARD-2.3", "CARD-2.2", "CARD-2.5"]
-  estimated_total_time: "4-6h"
-
+  batch_1:
+  - CARD-2.1
+  - CARD-2.3
+  batch_2:
+  - CARD-2.2
+  - CARD-2.4
+  batch_3:
+  - CARD-2.5
+  critical_path:
+  - CARD-2.3
+  - CARD-2.2
+  - CARD-2.5
+  estimated_total_time: 4-6h
 blockers: []
-
 success_criteria:
-  - { id: "SC-2.1", description: "ArtifactBrowseCard renders without drift indicators", status: "pending" }
-  - { id: "SC-2.2", description: "ArtifactOperationsCard shows health and deployment status", status: "pending" }
-  - { id: "SC-2.3", description: "Shared utilities (StatusBadge, HealthIndicator, DeploymentBadgeStack) exported and working", status: "pending" }
-  - { id: "SC-2.4", description: "Both cards integrate into pages with no console errors", status: "pending" }
-  - { id: "SC-2.5", description: "Quick actions on browse card and operation buttons on operations card functional", status: "pending" }
-
+- id: SC-2.1
+  description: ArtifactBrowseCard renders without drift indicators
+  status: pending
+- id: SC-2.2
+  description: ArtifactOperationsCard shows health and deployment status
+  status: pending
+- id: SC-2.3
+  description: Shared utilities (StatusBadge, HealthIndicator, DeploymentBadgeStack)
+    exported and working
+  status: pending
+- id: SC-2.4
+  description: Both cards integrate into pages with no console errors
+  status: pending
+- id: SC-2.5
+  description: Quick actions on browse card and operation buttons on operations card
+    functional
+  status: pending
 files_modified:
-  - "skillmeat/web/components/collection/artifact-browse-card.tsx"
-  - "skillmeat/web/components/manage/artifact-operations-card.tsx"
-  - "skillmeat/web/components/shared/status-badge.tsx"
-  - "skillmeat/web/components/shared/health-indicator.tsx"
-  - "skillmeat/web/components/shared/deployment-badge-stack.tsx"
-  - "skillmeat/web/app/collection/page.tsx"
-  - "skillmeat/web/app/manage/page.tsx"
+- skillmeat/web/components/collection/artifact-browse-card.tsx
+- skillmeat/web/components/manage/artifact-operations-card.tsx
+- skillmeat/web/components/shared/status-badge.tsx
+- skillmeat/web/components/shared/health-indicator.tsx
+- skillmeat/web/components/shared/deployment-badge-stack.tsx
+- skillmeat/web/app/collection/page.tsx
+- skillmeat/web/app/manage/page.tsx
+schema_version: 2
+doc_type: progress
+feature_slug: manage-collection-page-refactor
 ---
 
 # manage-collection-page-refactor - Phase 2: Card Components

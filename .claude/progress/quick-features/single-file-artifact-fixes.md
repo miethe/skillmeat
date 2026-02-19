@@ -3,9 +3,11 @@ type: quick-feature-plan
 feature_slug: single-file-artifact-fixes
 request_log_id: null
 status: completed
-created: 2026-01-02T10:00:00Z
-completed_at: 2026-01-02T10:30:00Z
+created: 2026-01-02 10:00:00+00:00
+completed_at: 2026-01-02 10:30:00+00:00
 estimated_scope: small
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # Single-File Artifact Naming and Content Capture Fixes

@@ -4,6 +4,9 @@ feature: artifact-indexing-all-types
 created: 2026-01-27
 completed: 2026-01-27
 type: quick-feature
+schema_version: 2
+doc_type: quick_feature
+feature_slug: artifact-indexing-all-types
 ---
 
 # Fix Artifact Search Indexing for All Types

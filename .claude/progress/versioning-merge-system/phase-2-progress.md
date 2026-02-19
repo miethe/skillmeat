@@ -1,150 +1,177 @@
 ---
 type: progress
-prd: "versioning-merge-system"
+prd: versioning-merge-system
 phase: 2
-title: "Repository Layer - Version CRUD"
-status: "planning"
-started: "2025-12-03"
+title: Repository Layer - Version CRUD
+status: planning
+started: '2025-12-03'
 completed: null
 overall_progress: 0
-completion_estimate: "on-track"
+completion_estimate: on-track
 total_tasks: 11
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["python-backend-engineer", "data-layer-expert"]
+owners:
+- python-backend-engineer
+- data-layer-expert
 contributors: []
-
 tasks:
-  - id: "REPO-001"
-    description: "Create VersionRepository base class with CRUD interface"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "REPO-002"
-    description: "Implement create_version: snapshot files, write metadata TOML"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-001"]
-    estimated_effort: "5h"
-    priority: "high"
-
-  - id: "REPO-003"
-    description: "Implement get_version to retrieve specific version"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-002"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "REPO-004"
-    description: "Implement list_versions with chronological ordering"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-002"]
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "REPO-005"
-    description: "Implement delete_version with safety checks"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-002"]
-    estimated_effort: "2h"
-    priority: "medium"
-
-  - id: "REPO-006"
-    description: "Implement get_version_content for file retrieval"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-003"]
-    estimated_effort: "3h"
-    priority: "medium"
-
-  - id: "REPO-007"
-    description: "Implement version existence check helper"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-003"]
-    estimated_effort: "1h"
-    priority: "medium"
-
-  - id: "REPO-008"
-    description: "Implement get_latest_version helper"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-004"]
-    estimated_effort: "1h"
-    priority: "medium"
-
-  - id: "REPO-009"
-    description: "Implement CollectionVersionRepository for ~/.skillmeat/"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-001"]
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "REPO-010"
-    description: "Implement ProjectVersionRepository for ./.claude/"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-001"]
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "REPO-011"
-    description: "Test TOML read/write for version metadata persistence"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["REPO-002"]
-    estimated_effort: "2h"
-    priority: "high"
-
+- id: REPO-001
+  description: Create VersionRepository base class with CRUD interface
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3h
+  priority: high
+- id: REPO-002
+  description: 'Implement create_version: snapshot files, write metadata TOML'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-001
+  estimated_effort: 5h
+  priority: high
+- id: REPO-003
+  description: Implement get_version to retrieve specific version
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-002
+  estimated_effort: 2h
+  priority: high
+- id: REPO-004
+  description: Implement list_versions with chronological ordering
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-002
+  estimated_effort: 3h
+  priority: high
+- id: REPO-005
+  description: Implement delete_version with safety checks
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-002
+  estimated_effort: 2h
+  priority: medium
+- id: REPO-006
+  description: Implement get_version_content for file retrieval
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-003
+  estimated_effort: 3h
+  priority: medium
+- id: REPO-007
+  description: Implement version existence check helper
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-003
+  estimated_effort: 1h
+  priority: medium
+- id: REPO-008
+  description: Implement get_latest_version helper
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-004
+  estimated_effort: 1h
+  priority: medium
+- id: REPO-009
+  description: Implement CollectionVersionRepository for ~/.skillmeat/
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-001
+  estimated_effort: 3h
+  priority: high
+- id: REPO-010
+  description: Implement ProjectVersionRepository for ./.claude/
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-001
+  estimated_effort: 3h
+  priority: high
+- id: REPO-011
+  description: Test TOML read/write for version metadata persistence
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - REPO-002
+  estimated_effort: 2h
+  priority: high
 parallelization:
-  batch_1: ["REPO-001"]
-  batch_2: ["REPO-002", "REPO-009", "REPO-010"]
-  batch_3: ["REPO-003", "REPO-004", "REPO-005"]
-  batch_4: ["REPO-006", "REPO-007", "REPO-008", "REPO-011"]
-  critical_path: ["REPO-001", "REPO-002", "REPO-003", "REPO-006"]
-  estimated_total_time: "5d"
-
+  batch_1:
+  - REPO-001
+  batch_2:
+  - REPO-002
+  - REPO-009
+  - REPO-010
+  batch_3:
+  - REPO-003
+  - REPO-004
+  - REPO-005
+  batch_4:
+  - REPO-006
+  - REPO-007
+  - REPO-008
+  - REPO-011
+  critical_path:
+  - REPO-001
+  - REPO-002
+  - REPO-003
+  - REPO-006
+  estimated_total_time: 5d
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "VersionRepository base class with full CRUD interface defined"
-    status: "pending"
-  - id: "SC-2"
-    description: "create_version atomically snapshots files and writes .version.toml"
-    status: "pending"
-  - id: "SC-3"
-    description: "get_version retrieves specific version with all metadata intact"
-    status: "pending"
-  - id: "SC-4"
-    description: "list_versions returns chronologically ordered results (oldest to newest)"
-    status: "pending"
-  - id: "SC-5"
-    description: "delete_version safely removes versions with validation checks"
-    status: "pending"
-  - id: "SC-6"
-    description: "get_version_content retrieves individual files from versions (text/binary)"
-    status: "pending"
-  - id: "SC-7"
-    description: "CollectionVersionRepository and ProjectVersionRepository fully functional"
-    status: "pending"
-  - id: "SC-8"
-    description: "All CRUD operations tested end-to-end with >85% coverage"
-    status: "pending"
-  - id: "SC-9"
-    description: "Version metadata persists and loads correctly across sessions"
-    status: "pending"
-  - id: "SC-10"
-    description: "List performance: 100 versions < 100ms"
-    status: "pending"
+- id: SC-1
+  description: VersionRepository base class with full CRUD interface defined
+  status: pending
+- id: SC-2
+  description: create_version atomically snapshots files and writes .version.toml
+  status: pending
+- id: SC-3
+  description: get_version retrieves specific version with all metadata intact
+  status: pending
+- id: SC-4
+  description: list_versions returns chronologically ordered results (oldest to newest)
+  status: pending
+- id: SC-5
+  description: delete_version safely removes versions with validation checks
+  status: pending
+- id: SC-6
+  description: get_version_content retrieves individual files from versions (text/binary)
+  status: pending
+- id: SC-7
+  description: CollectionVersionRepository and ProjectVersionRepository fully functional
+  status: pending
+- id: SC-8
+  description: All CRUD operations tested end-to-end with >85% coverage
+  status: pending
+- id: SC-9
+  description: Version metadata persists and loads correctly across sessions
+  status: pending
+- id: SC-10
+  description: 'List performance: 100 versions < 100ms'
+  status: pending
+schema_version: 2
+doc_type: progress
+feature_slug: versioning-merge-system
 ---
 
 # versioning-merge-system - Phase 2: Repository Layer - Version CRUD

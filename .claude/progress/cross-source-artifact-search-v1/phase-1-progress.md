@@ -143,6 +143,9 @@ files_modified:
 - skillmeat/api/schemas/marketplace.py
 progress: 100
 updated: '2026-01-24'
+schema_version: 2
+doc_type: progress
+feature_slug: cross-source-artifact-search-v1
 ---
 
 # Phase 1: Database + Basic Search API

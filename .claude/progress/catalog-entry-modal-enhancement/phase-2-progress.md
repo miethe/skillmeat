@@ -1,8 +1,8 @@
 ---
 type: progress
-prd: "catalog-entry-modal-enhancement"
+prd: catalog-entry-modal-enhancement
 phase: 2
-title: "Frontend Modal Enhancement"
+title: Frontend Modal Enhancement
 status: completed
 progress: 100
 total_tasks: 10
@@ -11,153 +11,196 @@ blocked_tasks: 0
 created: 2025-12-28
 updated: 2025-12-28
 completed_at: 2025-12-28
-
 tasks:
-  - id: "TASK-2.1"
-    title: "Add read-only mode to FileTree"
-    status: "completed"
-    priority: "high"
-    estimate: "2 pts"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    acceptance: "Add readOnly: boolean prop. When true, hide create/delete file buttons. Disable drag-and-drop."
-    files: ["skillmeat/web/components/entity/file-tree.tsx"]
-    commit: "9136031"
-    completed_at: "2025-12-28"
-
-  - id: "TASK-2.2"
-    title: "Add read-only mode to ContentPane"
-    status: "completed"
-    priority: "high"
-    estimate: "2 pts"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    acceptance: "Add readOnly: boolean prop. When true, hide edit/save buttons, set Monaco editor readOnly: true."
-    files: ["skillmeat/web/components/entity/content-pane.tsx"]
-    commit: "9136031"
-    completed_at: "2025-12-28"
-
-  - id: "TASK-2.3"
-    title: "Refactor CatalogEntryModal for tabs"
-    status: "completed"
-    priority: "high"
-    estimate: "2 pts"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    acceptance: "Add Radix UI Tabs component with Overview and Contents tabs. Maintain existing layout."
-    files: ["skillmeat/web/components/CatalogEntryModal.tsx"]
-    commit: "9136031"
-    completed_at: "2025-12-28"
-
-  - id: "TASK-2.4"
-    title: "Implement Overview tab"
-    status: "completed"
-    priority: "high"
-    estimate: "1 pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.3"]
-    acceptance: "Migrate existing metadata display (badges, confidence scores, metadata grid, action buttons) to Overview tab."
-    files: ["skillmeat/web/components/CatalogEntryModal.tsx"]
-    commit: "9136031"
-    completed_at: "2025-12-28"
-
-  - id: "TASK-2.6"
-    title: "Create TanStack Query hooks"
-    status: "completed"
-    priority: "high"
-    estimate: "2 pts"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-1.3", "TASK-1.4"]
-    acceptance: "useCatalogFileTree(sourceId, artifactPath) and useCatalogFileContent(sourceId, artifactPath, filePath) hooks."
-    files: ["skillmeat/web/hooks/use-catalog-files.ts", "skillmeat/web/lib/api/catalog.ts"]
-    commit: "9136031"
-    completed_at: "2025-12-28"
-    note: "Depends on Phase 1 backend endpoints"
-
-  - id: "TASK-2.5"
-    title: "Implement Contents tab"
-    status: "completed"
-    priority: "high"
-    estimate: "3 pts"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.1", "TASK-2.2", "TASK-2.3", "TASK-2.6"]
-    acceptance: "Add FileTree (left) + ContentPane (right) layout. Wire file selection to update content pane."
-    files: ["skillmeat/web/components/CatalogEntryModal.tsx"]
-    commit: "9136031"
-    completed_at: "2025-12-28"
-
-  - id: "TASK-2.7"
-    title: "Add loading skeletons"
-    status: "completed"
-    priority: "medium"
-    estimate: "1 pt"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-2.5"]
-    acceptance: "Skeleton for file tree (3 rows) and content pane (code editor placeholder) during fetch."
-    files: ["skillmeat/web/components/CatalogEntryModal.tsx"]
-    commit: "9136031"
-    completed_at: "2025-12-28"
-    note: "Leveraged existing FileTree and ContentPane skeleton components"
-
-  - id: "TASK-2.8"
-    title: "Add error states"
-    status: "completed"
-    priority: "medium"
-    estimate: "2 pts"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-2.5"]
-    acceptance: "Rate limit error: 'GitHub rate limit reached. Try again in X minutes.' Fetch error: 'Failed to load file. Try again or View on GitHub.'"
-    files: ["skillmeat/web/components/CatalogEntryModal.tsx"]
-    commit: "9136031"
-    completed_at: "2025-12-28"
-
-  - id: "TASK-2.9"
-    title: "Configure TanStack Query caching"
-    status: "completed"
-    priority: "medium"
-    estimate: "1 pt"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-2.6"]
-    acceptance: "Set staleTime: 5 * 60 * 1000 (5min) for file trees, 30 * 60 * 1000 (30min) for file contents. cacheTime: 30min/2hr."
-    files: ["skillmeat/web/hooks/use-catalog-files.ts"]
-    commit: "9136031"
-    completed_at: "2025-12-28"
-
-  - id: "TASK-2.10"
-    title: "Style tab layout"
-    status: "completed"
-    priority: "medium"
-    estimate: "1 pt"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-2.3", "TASK-2.4", "TASK-2.5"]
-    acceptance: "Match unified-entity-modal design: tab triggers in DialogHeader, content area max-w-6xl, proper spacing."
-    files: ["skillmeat/web/components/CatalogEntryModal.tsx"]
-    commit: "9136031"
-    completed_at: "2025-12-28"
-
+- id: TASK-2.1
+  title: Add read-only mode to FileTree
+  status: completed
+  priority: high
+  estimate: 2 pts
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  acceptance: 'Add readOnly: boolean prop. When true, hide create/delete file buttons.
+    Disable drag-and-drop.'
+  files:
+  - skillmeat/web/components/entity/file-tree.tsx
+  commit: '9136031'
+  completed_at: '2025-12-28'
+- id: TASK-2.2
+  title: Add read-only mode to ContentPane
+  status: completed
+  priority: high
+  estimate: 2 pts
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  acceptance: 'Add readOnly: boolean prop. When true, hide edit/save buttons, set
+    Monaco editor readOnly: true.'
+  files:
+  - skillmeat/web/components/entity/content-pane.tsx
+  commit: '9136031'
+  completed_at: '2025-12-28'
+- id: TASK-2.3
+  title: Refactor CatalogEntryModal for tabs
+  status: completed
+  priority: high
+  estimate: 2 pts
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  acceptance: Add Radix UI Tabs component with Overview and Contents tabs. Maintain
+    existing layout.
+  files:
+  - skillmeat/web/components/CatalogEntryModal.tsx
+  commit: '9136031'
+  completed_at: '2025-12-28'
+- id: TASK-2.4
+  title: Implement Overview tab
+  status: completed
+  priority: high
+  estimate: 1 pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.3
+  acceptance: Migrate existing metadata display (badges, confidence scores, metadata
+    grid, action buttons) to Overview tab.
+  files:
+  - skillmeat/web/components/CatalogEntryModal.tsx
+  commit: '9136031'
+  completed_at: '2025-12-28'
+- id: TASK-2.6
+  title: Create TanStack Query hooks
+  status: completed
+  priority: high
+  estimate: 2 pts
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-1.3
+  - TASK-1.4
+  acceptance: useCatalogFileTree(sourceId, artifactPath) and useCatalogFileContent(sourceId,
+    artifactPath, filePath) hooks.
+  files:
+  - skillmeat/web/hooks/use-catalog-files.ts
+  - skillmeat/web/lib/api/catalog.ts
+  commit: '9136031'
+  completed_at: '2025-12-28'
+  note: Depends on Phase 1 backend endpoints
+- id: TASK-2.5
+  title: Implement Contents tab
+  status: completed
+  priority: high
+  estimate: 3 pts
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.1
+  - TASK-2.2
+  - TASK-2.3
+  - TASK-2.6
+  acceptance: Add FileTree (left) + ContentPane (right) layout. Wire file selection
+    to update content pane.
+  files:
+  - skillmeat/web/components/CatalogEntryModal.tsx
+  commit: '9136031'
+  completed_at: '2025-12-28'
+- id: TASK-2.7
+  title: Add loading skeletons
+  status: completed
+  priority: medium
+  estimate: 1 pt
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-2.5
+  acceptance: Skeleton for file tree (3 rows) and content pane (code editor placeholder)
+    during fetch.
+  files:
+  - skillmeat/web/components/CatalogEntryModal.tsx
+  commit: '9136031'
+  completed_at: '2025-12-28'
+  note: Leveraged existing FileTree and ContentPane skeleton components
+- id: TASK-2.8
+  title: Add error states
+  status: completed
+  priority: medium
+  estimate: 2 pts
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-2.5
+  acceptance: 'Rate limit error: ''GitHub rate limit reached. Try again in X minutes.''
+    Fetch error: ''Failed to load file. Try again or View on GitHub.'''
+  files:
+  - skillmeat/web/components/CatalogEntryModal.tsx
+  commit: '9136031'
+  completed_at: '2025-12-28'
+- id: TASK-2.9
+  title: Configure TanStack Query caching
+  status: completed
+  priority: medium
+  estimate: 1 pt
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-2.6
+  acceptance: 'Set staleTime: 5 * 60 * 1000 (5min) for file trees, 30 * 60 * 1000
+    (30min) for file contents. cacheTime: 30min/2hr.'
+  files:
+  - skillmeat/web/hooks/use-catalog-files.ts
+  commit: '9136031'
+  completed_at: '2025-12-28'
+- id: TASK-2.10
+  title: Style tab layout
+  status: completed
+  priority: medium
+  estimate: 1 pt
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-2.3
+  - TASK-2.4
+  - TASK-2.5
+  acceptance: 'Match unified-entity-modal design: tab triggers in DialogHeader, content
+    area max-w-6xl, proper spacing.'
+  files:
+  - skillmeat/web/components/CatalogEntryModal.tsx
+  commit: '9136031'
+  completed_at: '2025-12-28'
 parallelization:
-  batch_1: ["TASK-2.1", "TASK-2.2", "TASK-2.3"]
-  batch_2: ["TASK-2.4", "TASK-2.6"]
-  batch_3: ["TASK-2.5"]
-  batch_4: ["TASK-2.7", "TASK-2.8", "TASK-2.9", "TASK-2.10"]
-
+  batch_1:
+  - TASK-2.1
+  - TASK-2.2
+  - TASK-2.3
+  batch_2:
+  - TASK-2.4
+  - TASK-2.6
+  batch_3:
+  - TASK-2.5
+  batch_4:
+  - TASK-2.7
+  - TASK-2.8
+  - TASK-2.9
+  - TASK-2.10
 quality_gate:
-  owner: "ui-engineer-enhanced"
+  owner: ui-engineer-enhanced
   criteria:
-    - "Modal renders correctly on all screen sizes (mobile, tablet, desktop)"
-    - "TanStack Query hooks configured with correct staleTime/cacheTime"
-    - "Loading skeletons appear during data fetch (no blank screens)"
-    - "Error states display user-friendly messages (no raw error objects)"
-    - "Design matches unified-entity-modal patterns (Radix UI, Tailwind)"
-  status: "passed"
-  passed_at: "2025-12-28"
-
+  - Modal renders correctly on all screen sizes (mobile, tablet, desktop)
+  - TanStack Query hooks configured with correct staleTime/cacheTime
+  - Loading skeletons appear during data fetch (no blank screens)
+  - Error states display user-friendly messages (no raw error objects)
+  - Design matches unified-entity-modal patterns (Radix UI, Tailwind)
+  status: passed
+  passed_at: '2025-12-28'
 blockers: []
-
 notes:
-  - "Phase 2 depends on Phase 1 completion (TASK-2.6 needs backend endpoints)"
-  - "All 10 tasks completed in single session using batch parallelization"
-  - "Build verified successful after all changes"
+- Phase 2 depends on Phase 1 completion (TASK-2.6 needs backend endpoints)
+- All 10 tasks completed in single session using batch parallelization
+- Build verified successful after all changes
+schema_version: 2
+doc_type: progress
+feature_slug: catalog-entry-modal-enhancement
 ---
 
 # Phase 2: Frontend Modal Enhancement

@@ -1,23 +1,26 @@
 ---
 title: Collections & Site Navigation Enhancement
 version: 1.0
-status: draft
+status: inferred_complete
 priority: high
 date_created: 2025-12-12
 estimated_effort: 65 story points
 timeline: 6 weeks
 complexity: large
 contributors:
-  - architecture-team
-  - frontend-team
-  - backend-team
+- architecture-team
+- frontend-team
+- backend-team
 tags:
-  - navigation
-  - collections
-  - ui-redesign
-  - caching
+- navigation
+- collections
+- ui-redesign
+- caching
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: collections-navigation
+prd_ref: null
 ---
-
 # Implementation Plan: Collections & Site Navigation Enhancement
 
 **Complexity**: L (Large) | **Track**: Full | **Model**: Haiku Orchestration

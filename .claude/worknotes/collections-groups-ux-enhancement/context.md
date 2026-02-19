@@ -1,24 +1,18 @@
 ---
-# === CONTEXT WORKNOTES ===
-# Collections & Groups UX Enhancement - Development Context
-# Shared notes for all agents working on this PRD
-
-# Metadata: Identification and Scope
 type: context
-prd: "collections-groups-ux-enhancement"
-title: "Collections & Groups UX Enhancement - Development Context"
-status: "active"
-created: "2026-01-19"
-updated: "2026-01-19"
-
-# Quick Reference (for fast agent queries)
+prd: collections-groups-ux-enhancement
+title: Collections & Groups UX Enhancement - Development Context
+status: active
+created: '2026-01-19'
+updated: '2026-01-19'
 critical_notes_count: 0
 implementation_decisions_count: 0
 active_gotchas_count: 0
 agent_contributors: []
-
-# Agent Communication Index
 agents: []
+schema_version: 2
+doc_type: context
+feature_slug: collections-groups-ux-enhancement
 ---
 
 # Collections & Groups UX Enhancement - Development Context

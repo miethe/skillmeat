@@ -57,11 +57,15 @@ Write plan to `.claude/progress/quick-features/{feature-slug}.md`:
 ```markdown
 ---
 type: quick-feature-plan
+schema_version: 2
+doc_type: quick_feature
 feature_slug: {slug}
 request_log_id: {id if from REQ input, else null}
 status: in-progress
 created: {ISO date}
 estimated_scope: small|medium
+priority: medium
+owner: null
 ---
 
 # {Feature Title}
@@ -128,6 +132,14 @@ git add {files}
 git commit -m "feat({scope}): {description}
 
 Refs: quick-feature/{feature-slug}"
+```
+
+After committing, append the SHA to quick-feature `commit_refs`:
+
+```bash
+python .claude/skills/artifact-tracking/scripts/update-field.py \
+  -f .claude/progress/quick-features/{feature-slug}.md \
+  --append "commit_refs=${commit_sha}"
 ```
 
 ## Phase 3: Quality Gates

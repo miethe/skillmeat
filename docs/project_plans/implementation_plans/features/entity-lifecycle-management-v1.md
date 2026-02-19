@@ -18,6 +18,10 @@ category: product-planning
 status: completed
 related:
 - /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: entity-lifecycle-management
+prd_ref: null
 ---
 
 # Implementation Plan: Entity Lifecycle Management

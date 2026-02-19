@@ -25,6 +25,10 @@ related:
 - /skillmeat/web/components/entity/diff-viewer.tsx
 - /skillmeat/api/routers/artifacts.py
 - /docs/project_plans/reports/unified-sync-workflow-plan-review-2026-02-05.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: unified-sync-workflow
+prd_ref: null
 ---
 
 # Implementation Plan: Unified Sync Workflow Enhancement

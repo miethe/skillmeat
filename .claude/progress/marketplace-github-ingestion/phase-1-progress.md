@@ -1,82 +1,97 @@
 ---
 type: progress
-prd: "marketplace-github-ingestion"
+prd: marketplace-github-ingestion
 phase: 1
-title: "Database Foundation"
-status: "completed"
-started: "2025-12-06"
-completed: "2025-12-06"
-
+title: Database Foundation
+status: completed
+started: '2025-12-06'
+completed: '2025-12-06'
 overall_progress: 100
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 4
 completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["data-layer-expert"]
-contributors: ["python-backend-engineer"]
-
+owners:
+- data-layer-expert
+contributors:
+- python-backend-engineer
 tasks:
-  - id: "DB-001"
-    description: "Schema: MarketplaceSource table with repo_url, branch, root_hint, manual_map, last_sync, last_error, trust_level, visibility"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "3pts"
-    priority: "high"
-    completed_commit: "fad9cfc"
-
-  - id: "DB-002"
-    description: "Schema: MarketplaceCatalogEntry table with source_id, artifact_type, path, upstream_url, detected_version/sha, detected_at, confidence_score, status"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["DB-001"]
-    estimated_effort: "3pts"
-    priority: "high"
-    completed_commit: "fad9cfc"
-
-  - id: "DB-003"
-    description: "RLS Policies for MarketplaceSource and MarketplaceCatalogEntry with project/user scoping"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["DB-001", "DB-002"]
-    estimated_effort: "2pts"
-    priority: "high"
-    completed_commit: "fad9cfc"
-
-  - id: "DB-004"
-    description: "Indexes and performance optimization for marketplace queries (source_id, artifact_type, status, last_sync)"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["DB-002", "DB-003"]
-    estimated_effort: "2pts"
-    priority: "medium"
-    completed_commit: "fad9cfc"
-
+- id: DB-001
+  description: 'Schema: MarketplaceSource table with repo_url, branch, root_hint,
+    manual_map, last_sync, last_error, trust_level, visibility'
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 3pts
+  priority: high
+  completed_commit: fad9cfc
+- id: DB-002
+  description: 'Schema: MarketplaceCatalogEntry table with source_id, artifact_type,
+    path, upstream_url, detected_version/sha, detected_at, confidence_score, status'
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DB-001
+  estimated_effort: 3pts
+  priority: high
+  completed_commit: fad9cfc
+- id: DB-003
+  description: RLS Policies for MarketplaceSource and MarketplaceCatalogEntry with
+    project/user scoping
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DB-001
+  - DB-002
+  estimated_effort: 2pts
+  priority: high
+  completed_commit: fad9cfc
+- id: DB-004
+  description: Indexes and performance optimization for marketplace queries (source_id,
+    artifact_type, status, last_sync)
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DB-002
+  - DB-003
+  estimated_effort: 2pts
+  priority: medium
+  completed_commit: fad9cfc
 parallelization:
-  batch_1: ["DB-001"]
-  batch_2: ["DB-002"]
-  batch_3: ["DB-003"]
-  batch_4: ["DB-004"]
-  critical_path: ["DB-001", "DB-002", "DB-003", "DB-004"]
-  estimated_total_time: "10h"
-
+  batch_1:
+  - DB-001
+  batch_2:
+  - DB-002
+  batch_3:
+  - DB-003
+  batch_4:
+  - DB-004
+  critical_path:
+  - DB-001
+  - DB-002
+  - DB-003
+  - DB-004
+  estimated_total_time: 10h
 blockers: []
-
 success_criteria:
-  - MarketplaceSource table created with all required columns and foreign keys
-  - MarketplaceCatalogEntry table created with proper relationships
-  - RLS policies enforce project/user-level isolation
-  - Indexes on critical query paths created and performance verified
-  - Migrations are reversible and documented
-
+- MarketplaceSource table created with all required columns and foreign keys
+- MarketplaceCatalogEntry table created with proper relationships
+- RLS policies enforce project/user-level isolation
+- Indexes on critical query paths created and performance verified
+- Migrations are reversible and documented
 files_modified:
-  - "skillmeat/core/models/marketplace.py"
-  - "alembic/versions/[timestamp]_marketplace_schema.py"
-  - "skillmeat/core/database/rls_policies.sql"
+- skillmeat/core/models/marketplace.py
+- alembic/versions/[timestamp]_marketplace_schema.py
+- skillmeat/core/database/rls_policies.sql
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-github-ingestion
 ---
 
 # Phase 1: Database Foundation

@@ -1,65 +1,82 @@
 ---
 type: progress
-prd: "agent-context-entities"
+prd: agent-context-entities
 phase: 6
-phase_title: "Polish & Documentation"
+phase_title: Polish & Documentation
 status: completed
 progress: 100
 total_tasks: 5
 completed_tasks: 5
-created: "2025-12-14"
-updated: "2025-12-15"
-completed_at: "2025-12-15"
-
+created: '2025-12-14'
+updated: '2025-12-15'
+completed_at: '2025-12-15'
 tasks:
-  - id: "TASK-6.1"
-    name: "Create User Guide for Context Entities"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimate: 2
-    commit: "e933aab"
-    files: ["docs/guides/context-entities.md"]
-
-  - id: "TASK-6.2"
-    name: "Create Developer Guide for Templates"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimate: 1
-    commit: "e933aab"
-    files: ["docs/developers/creating-templates.md"]
-
-  - id: "TASK-6.3"
-    name: "Write Video Script for Project Scaffolding"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimate: 1
-    commit: "e933aab"
-    files: ["docs/videos/project-scaffolding-walkthrough.md"]
-
-  - id: "TASK-6.4"
-    name: "Performance Optimization for Template Deployment"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: 1
-    commit: "147e7fe"
-    files: ["skillmeat/core/services/template_service.py", "skillmeat/api/routers/project_templates.py", "pyproject.toml", "tests/test_template_performance.py", "docs/template-deployment-optimization.md"]
-
-  - id: "TASK-6.5"
-    name: "Accessibility Review and Fixes"
-    status: "completed"
-    assigned_to: ["ui-engineer"]
-    dependencies: []
-    estimate: 1
-    commit: "02c18ed"
-    files: ["skillmeat/web/components/context/*.tsx", "skillmeat/web/app/context-entities/page.tsx"]
-
+- id: TASK-6.1
+  name: Create User Guide for Context Entities
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimate: 2
+  commit: e933aab
+  files:
+  - docs/guides/context-entities.md
+- id: TASK-6.2
+  name: Create Developer Guide for Templates
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimate: 1
+  commit: e933aab
+  files:
+  - docs/developers/creating-templates.md
+- id: TASK-6.3
+  name: Write Video Script for Project Scaffolding
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimate: 1
+  commit: e933aab
+  files:
+  - docs/videos/project-scaffolding-walkthrough.md
+- id: TASK-6.4
+  name: Performance Optimization for Template Deployment
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 1
+  commit: 147e7fe
+  files:
+  - skillmeat/core/services/template_service.py
+  - skillmeat/api/routers/project_templates.py
+  - pyproject.toml
+  - tests/test_template_performance.py
+  - docs/template-deployment-optimization.md
+- id: TASK-6.5
+  name: Accessibility Review and Fixes
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies: []
+  estimate: 1
+  commit: 02c18ed
+  files:
+  - skillmeat/web/components/context/*.tsx
+  - skillmeat/web/app/context-entities/page.tsx
 parallelization:
-  batch_1: ["TASK-6.1", "TASK-6.2", "TASK-6.3"]
-  batch_2: ["TASK-6.4", "TASK-6.5"]
+  batch_1:
+  - TASK-6.1
+  - TASK-6.2
+  - TASK-6.3
+  batch_2:
+  - TASK-6.4
+  - TASK-6.5
+schema_version: 2
+doc_type: progress
+feature_slug: agent-context-entities
 ---
 
 # Phase 6: Polish & Documentation

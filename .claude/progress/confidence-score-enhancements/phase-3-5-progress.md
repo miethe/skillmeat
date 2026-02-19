@@ -1,170 +1,215 @@
 ---
 type: progress
-prd: "confidence-score-enhancements"
-phase: "3-5"
+prd: confidence-score-enhancements
+phase: 3-5
 status: completed
 progress: 100
 total_tasks: 21
 completed_tasks: 21
-completed_at: "2025-12-27T21:45:00Z"
-
+completed_at: '2025-12-27T21:45:00Z'
 tasks:
-  - id: "TASK-3.1"
-    name: "Create CatalogEntryModal component"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimate: "2h"
-
-  - id: "TASK-3.2"
-    name: "Build modal header section"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.1"]
-    estimate: "0.5h"
-
-  - id: "TASK-3.3"
-    name: "Create reusable ScoreBreakdown component"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimate: "1h"
-
-  - id: "TASK-3.4"
-    name: "Add confidence section to modal"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.2", "TASK-3.3"]
-    estimate: "0.5h"
-
-  - id: "TASK-3.5"
-    name: "Add description and file list sections"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.1"]
-    estimate: "1h"
-
-  - id: "TASK-3.6"
-    name: "Add action buttons"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.1"]
-    estimate: "0.5h"
-
-  - id: "TASK-3.7"
-    name: "Wire modal to catalog card click"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.1", "TASK-3.4", "TASK-3.5", "TASK-3.6"]
-    estimate: "0.5h"
-
-  - id: "TASK-3.8"
-    name: "Add accessibility features"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.7"]
-    estimate: "0.5h"
-
-  - id: "TASK-3.9"
-    name: "Write Storybook stories for modal"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.8"]
-    estimate: "0.5h"
-
-  - id: "TASK-4.1"
-    name: "Create ScoreBreakdownTooltip wrapper"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.3"]
-    estimate: "1h"
-
-  - id: "TASK-4.2"
-    name: "Update ScoreBadge component"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-4.1"]
-    estimate: "1h"
-
-  - id: "TASK-4.3"
-    name: "Wire breakdown data from API"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-4.2"]
-    estimate: "0.5h"
-
-  - id: "TASK-4.4"
-    name: "Add accessibility (keyboard & aria)"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-4.2"]
-    estimate: "0.5h"
-
-  - id: "TASK-4.5"
-    name: "Write Storybook stories for tooltip"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-4.4"]
-    estimate: "0.5h"
-
-  - id: "TASK-5.1"
-    name: "Create ConfidenceFilter component"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimate: "1.5h"
-
-  - id: "TASK-5.2"
-    name: "Add 'Include low-confidence artifacts' checkbox"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-5.1"]
-    estimate: "0.5h"
-
-  - id: "TASK-5.3"
-    name: "Integrate filter into source page"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-5.2"]
-    estimate: "1h"
-
-  - id: "TASK-5.4"
-    name: "Sync filter state with URL query params"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-5.3"]
-    estimate: "1h"
-
-  - id: "TASK-5.5"
-    name: "Update API client"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimate: "0.5h"
-
-  - id: "TASK-5.6"
-    name: "Wire filter to list updates"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-5.4", "TASK-5.5"]
-    estimate: "1h"
-
-  - id: "TASK-5.7"
-    name: "Test filter shareable URLs"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-5.6"]
-    estimate: "0.5h"
-
+- id: TASK-3.1
+  name: Create CatalogEntryModal component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimate: 2h
+- id: TASK-3.2
+  name: Build modal header section
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.1
+  estimate: 0.5h
+- id: TASK-3.3
+  name: Create reusable ScoreBreakdown component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimate: 1h
+- id: TASK-3.4
+  name: Add confidence section to modal
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.2
+  - TASK-3.3
+  estimate: 0.5h
+- id: TASK-3.5
+  name: Add description and file list sections
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.1
+  estimate: 1h
+- id: TASK-3.6
+  name: Add action buttons
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.1
+  estimate: 0.5h
+- id: TASK-3.7
+  name: Wire modal to catalog card click
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.1
+  - TASK-3.4
+  - TASK-3.5
+  - TASK-3.6
+  estimate: 0.5h
+- id: TASK-3.8
+  name: Add accessibility features
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.7
+  estimate: 0.5h
+- id: TASK-3.9
+  name: Write Storybook stories for modal
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.8
+  estimate: 0.5h
+- id: TASK-4.1
+  name: Create ScoreBreakdownTooltip wrapper
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.3
+  estimate: 1h
+- id: TASK-4.2
+  name: Update ScoreBadge component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-4.1
+  estimate: 1h
+- id: TASK-4.3
+  name: Wire breakdown data from API
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-4.2
+  estimate: 0.5h
+- id: TASK-4.4
+  name: Add accessibility (keyboard & aria)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-4.2
+  estimate: 0.5h
+- id: TASK-4.5
+  name: Write Storybook stories for tooltip
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-4.4
+  estimate: 0.5h
+- id: TASK-5.1
+  name: Create ConfidenceFilter component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimate: 1.5h
+- id: TASK-5.2
+  name: Add 'Include low-confidence artifacts' checkbox
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-5.1
+  estimate: 0.5h
+- id: TASK-5.3
+  name: Integrate filter into source page
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-5.2
+  estimate: 1h
+- id: TASK-5.4
+  name: Sync filter state with URL query params
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-5.3
+  estimate: 1h
+- id: TASK-5.5
+  name: Update API client
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimate: 0.5h
+- id: TASK-5.6
+  name: Wire filter to list updates
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-5.4
+  - TASK-5.5
+  estimate: 1h
+- id: TASK-5.7
+  name: Test filter shareable URLs
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-5.6
+  estimate: 0.5h
 parallelization:
-  batch_1: ["TASK-3.1", "TASK-3.3", "TASK-5.1", "TASK-5.5"]
-  batch_2: ["TASK-3.2", "TASK-3.5", "TASK-3.6", "TASK-5.2"]
-  batch_3: ["TASK-3.4"]
-  batch_4: ["TASK-3.7"]
-  batch_5: ["TASK-3.8", "TASK-4.1", "TASK-5.3"]
-  batch_6: ["TASK-3.9", "TASK-4.2", "TASK-5.4"]
-  batch_7: ["TASK-4.3", "TASK-4.4", "TASK-5.6"]
-  batch_8: ["TASK-4.5", "TASK-5.7"]
+  batch_1:
+  - TASK-3.1
+  - TASK-3.3
+  - TASK-5.1
+  - TASK-5.5
+  batch_2:
+  - TASK-3.2
+  - TASK-3.5
+  - TASK-3.6
+  - TASK-5.2
+  batch_3:
+  - TASK-3.4
+  batch_4:
+  - TASK-3.7
+  batch_5:
+  - TASK-3.8
+  - TASK-4.1
+  - TASK-5.3
+  batch_6:
+  - TASK-3.9
+  - TASK-4.2
+  - TASK-5.4
+  batch_7:
+  - TASK-4.3
+  - TASK-4.4
+  - TASK-5.6
+  batch_8:
+  - TASK-4.5
+  - TASK-5.7
+schema_version: 2
+doc_type: progress
+feature_slug: confidence-score-enhancements
 ---
 
 # Phase 3-5: Frontend Components (Modal, Tooltip, Filter)

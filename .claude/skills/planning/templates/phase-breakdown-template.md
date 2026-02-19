@@ -1,3 +1,31 @@
+---
+title: "Phase [N]: [Phase Name]" # Human-readable phase plan title
+schema_version: 2 # CCDash frontmatter schema version
+doc_type: phase_plan # Must remain `phase_plan`
+status: draft # draft|planning|in-progress|review|completed|blocked
+created: YYYY-MM-DD # Initial creation date (YYYY-MM-DD)
+updated: YYYY-MM-DD # Last edit date (YYYY-MM-DD)
+feature_slug: "feature-name" # Kebab-case feature identifier
+feature_version: "v1" # Version label for this feature document set
+phase: [N] # Numeric phase identifier (integer)
+phase_title: "[Phase Name]" # Short phase name for dashboards
+prd_ref: /docs/project_plans/PRDs/category/feature-name-v1.md # Parent PRD path
+plan_ref: /docs/project_plans/implementation_plans/category/feature-name-v1.md # Parent implementation plan path
+entry_criteria: [] # Preconditions required to start this phase
+exit_criteria: [] # Conditions that define phase completion
+related_documents: [] # Related docs (phase siblings, ADRs, specs)
+owner: null # Single accountable owner (name or agent)
+contributors: [] # Supporting contributors
+priority: medium # low|medium|high|critical
+risk_level: medium # low|medium|high|critical
+category: "product-planning" # Planning taxonomy label
+tags: [phase-plan, implementation] # Search/filter tags
+milestone: null # Optional release/milestone marker
+commit_refs: [] # Commit SHAs added during implementation
+pr_refs: [] # Pull request refs (e.g., #123)
+files_affected: [] # Key files expected to change
+---
+
 # Phase [N]: [Phase Name]
 
 **Parent Plan**: [Link to parent implementation plan]

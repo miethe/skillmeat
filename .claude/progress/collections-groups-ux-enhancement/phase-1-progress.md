@@ -44,7 +44,7 @@ tasks:
   estimated_effort: 2h
   priority: medium
 - id: P1-T4
-  description: Write unit tests for hooks (≥80% coverage)
+  description: "Write unit tests for hooks (\u226580% coverage)"
   status: completed
   assigned_to:
   - backend-typescript-architect
@@ -88,7 +88,7 @@ success_criteria:
   description: Error handling returns fallback values (empty arrays, null)
   status: completed
 - id: SC-7
-  description: ≥80% test coverage for all hooks
+  description: "\u226580% test coverage for all hooks"
   status: completed
 - id: SC-8
   description: JSDoc comments document all exported functions
@@ -102,6 +102,9 @@ files_modified:
 - skillmeat/web/__tests__/hooks/use-artifact-groups.test.ts
 progress: 100
 updated: '2026-01-20'
+schema_version: 2
+doc_type: progress
+feature_slug: collections-groups-ux-enhancement
 ---
 
 # Collections & Groups UX Enhancement - Phase 1: Data Layer & Hooks

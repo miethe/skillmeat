@@ -1,75 +1,95 @@
 ---
 type: progress
-prd: "multi-platform-project-deployments-v1"
+prd: multi-platform-project-deployments-v1
 phase: 0
-title: "Adapter Baseline"
-status: "planning"
+title: Adapter Baseline
+status: planning
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 4
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["documentation-writer", "python-backend-engineer"]
+owners:
+- documentation-writer
+- python-backend-engineer
 contributors: []
-
 tasks:
-  - id: "P0-T1"
-    description: "Finalize & document adapter script - Review setup_agent_platform_links.sh for completeness; add inline documentation; verify flag handling (--install-codex-home-skills)"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "0.5 pts"
-    priority: "high"
-
-  - id: "P0-T2"
-    description: "Write adapter usage guide - Create doc explaining what the adapter does, when to use it (vs native deployments in Phase 2+), limitations, and troubleshooting"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["P0-T1"]
-    estimated_effort: "0.5 pts"
-    priority: "medium"
-
-  - id: "P0-T3"
-    description: "Test adapter on macOS, Linux, Windows - Manual or automated tests verify symlinks created correctly; --install-codex-home-skills works with default and custom CODEX_HOME"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P0-T1"]
-    estimated_effort: "0.5 pts"
-    priority: "high"
-
-  - id: "P0-T4"
-    description: "Add symlink safety warnings to CLI - When running skillmeat init or skillmeat deploy in a project with adapter symlinks, emit informational warning"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P0-T1"]
-    estimated_effort: "0.5 pts"
-    priority: "medium"
-
+- id: P0-T1
+  description: Finalize & document adapter script - Review setup_agent_platform_links.sh
+    for completeness; add inline documentation; verify flag handling (--install-codex-home-skills)
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 0.5 pts
+  priority: high
+- id: P0-T2
+  description: Write adapter usage guide - Create doc explaining what the adapter
+    does, when to use it (vs native deployments in Phase 2+), limitations, and troubleshooting
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - P0-T1
+  estimated_effort: 0.5 pts
+  priority: medium
+- id: P0-T3
+  description: Test adapter on macOS, Linux, Windows - Manual or automated tests verify
+    symlinks created correctly; --install-codex-home-skills works with default and
+    custom CODEX_HOME
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P0-T1
+  estimated_effort: 0.5 pts
+  priority: high
+- id: P0-T4
+  description: Add symlink safety warnings to CLI - When running skillmeat init or
+    skillmeat deploy in a project with adapter symlinks, emit informational warning
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P0-T1
+  estimated_effort: 0.5 pts
+  priority: medium
 parallelization:
-  batch_1: ["P0-T1"]
-  batch_2: ["P0-T2", "P0-T3", "P0-T4"]
-  critical_path: ["P0-T1", "P0-T3"]
-  estimated_total_time: "1 pt (2 batches)"
-
+  batch_1:
+  - P0-T1
+  batch_2:
+  - P0-T2
+  - P0-T3
+  - P0-T4
+  critical_path:
+  - P0-T1
+  - P0-T3
+  estimated_total_time: 1 pt (2 batches)
 blockers: []
-
 success_criteria:
-  - { id: "SC-1", description: "setup_agent_platform_links.sh production-ready and tested on 3+ OSes", status: "pending" }
-  - { id: "SC-2", description: "Inline documentation and usage guide complete and reviewed", status: "pending" }
-  - { id: "SC-3", description: "CLI warnings for symlink scenarios working", status: "pending" }
-  - { id: "SC-4", description: "No regressions to existing skillmeat init or skillmeat deploy behavior", status: "pending" }
-
+- id: SC-1
+  description: setup_agent_platform_links.sh production-ready and tested on 3+ OSes
+  status: pending
+- id: SC-2
+  description: Inline documentation and usage guide complete and reviewed
+  status: pending
+- id: SC-3
+  description: CLI warnings for symlink scenarios working
+  status: pending
+- id: SC-4
+  description: No regressions to existing skillmeat init or skillmeat deploy behavior
+  status: pending
 files_modified:
-  - "scripts/setup_agent_platform_links.sh"
-  - "docs/guides/adapter-strategy.md"
-  - "skillmeat/cli.py"
+- scripts/setup_agent_platform_links.sh
+- docs/guides/adapter-strategy.md
+- skillmeat/cli.py
+schema_version: 2
+doc_type: progress
+feature_slug: multi-platform-project-deployments-v1
 ---
 
 # Phase 0: Adapter Baseline

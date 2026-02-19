@@ -1,16 +1,26 @@
 ---
-title: "Implementation Plan: Groups in All Collections View"
-description: "Phased implementation for groups functionality in All Collections view with group copy feature"
-audience: [ai-agents, developers]
-tags: [implementation, planning, groups, collections]
+title: 'Implementation Plan: Groups in All Collections View'
+description: Phased implementation for groups functionality in All Collections view
+  with group copy feature
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- planning
+- groups
+- collections
 created: 2025-01-16
 updated: 2025-01-16
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/PRDs/enhancements/groups-all-collections-v1.md
+- /docs/project_plans/PRDs/enhancements/groups-all-collections-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: groups-all-collections
+prd_ref: null
 ---
-
 # Implementation Plan: Groups in All Collections View
 
 **Plan ID**: `IMPL-2025-01-16-GROUPS-ALL-COLLECTIONS`

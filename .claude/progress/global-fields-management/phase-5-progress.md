@@ -1,61 +1,74 @@
 ---
 type: progress
-prd: "global-fields-management"
+prd: global-fields-management
 phase: 5
 status: pending
 progress: 0
-
 tasks:
-  - id: "GFM-IMPL-5.1"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    model: "opus"
-
-  - id: "GFM-IMPL-5.2"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced", "python-backend-engineer"]
-    dependencies: []
-    model: "opus"
-
-  - id: "GFM-IMPL-5.3"
-    status: "pending"
-    assigned_to: ["python-backend-engineer", "ui-engineer-enhanced"]
-    dependencies: []
-    model: "opus"
-
-  - id: "GFM-IMPL-5.4"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    model: "sonnet"
-
-  - id: "GFM-IMPL-5.5"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "sonnet"
-
-  - id: "GFM-IMPL-5.6"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "sonnet"
-
-  - id: "GFM-IMPL-5.7"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    model: "sonnet"
-
-  - id: "GFM-IMPL-5.8"
-    status: "pending"
-    assigned_to: ["python-backend-engineer", "ui-engineer-enhanced"]
-    dependencies: []
-    model: "sonnet"
-
+- id: GFM-IMPL-5.1
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  model: opus
+- id: GFM-IMPL-5.2
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  - python-backend-engineer
+  dependencies: []
+  model: opus
+- id: GFM-IMPL-5.3
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  - ui-engineer-enhanced
+  dependencies: []
+  model: opus
+- id: GFM-IMPL-5.4
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  model: sonnet
+- id: GFM-IMPL-5.5
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: sonnet
+- id: GFM-IMPL-5.6
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: sonnet
+- id: GFM-IMPL-5.7
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  model: sonnet
+- id: GFM-IMPL-5.8
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  - ui-engineer-enhanced
+  dependencies: []
+  model: sonnet
 parallelization:
-  batch_1: ["GFM-IMPL-5.1", "GFM-IMPL-5.2", "GFM-IMPL-5.3", "GFM-IMPL-5.4", "GFM-IMPL-5.5", "GFM-IMPL-5.6", "GFM-IMPL-5.7", "GFM-IMPL-5.8"]
+  batch_1:
+  - GFM-IMPL-5.1
+  - GFM-IMPL-5.2
+  - GFM-IMPL-5.3
+  - GFM-IMPL-5.4
+  - GFM-IMPL-5.5
+  - GFM-IMPL-5.6
+  - GFM-IMPL-5.7
+  - GFM-IMPL-5.8
+schema_version: 2
+doc_type: progress
+feature_slug: global-fields-management
 ---
 
 # Phase 5: Polish, Testing & Accessibility

@@ -1,3 +1,9 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: prd
+feature_slug: visual-reference
+---
 # Notification System Visual Reference
 
 **Quick visual guide to the notification system design**

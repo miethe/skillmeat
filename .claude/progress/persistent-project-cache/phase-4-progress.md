@@ -1,62 +1,68 @@
 ---
 type: progress
-prd: "persistent-project-cache"
+prd: persistent-project-cache
 phase: 4
-title: "CLI Integration"
-status: "completed"
+title: CLI Integration
+status: completed
 started: null
-completed: "2025-12-01"
-
+completed: '2025-12-01'
 overall_progress: 100
-completion_estimate: "completed"
-
+completion_estimate: completed
 total_tasks: 4
 completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer"]
+owners:
+- python-backend-engineer
 contributors: []
-
 tasks:
-  - id: "CACHE-4.1"
-    title: "Enhance CLI list command for cache"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-  - id: "CACHE-4.2"
-    title: "Implement CLI cache management commands"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-  - id: "CACHE-4.3"
-    title: "Integrate cache invalidation on CLI write"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-  - id: "CACHE-4.4"
-    title: "Write CLI tests and documentation"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-
+- id: CACHE-4.1
+  title: Enhance CLI list command for cache
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+- id: CACHE-4.2
+  title: Implement CLI cache management commands
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+- id: CACHE-4.3
+  title: Integrate cache invalidation on CLI write
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+- id: CACHE-4.4
+  title: Write CLI tests and documentation
+  status: completed
+  assigned_to:
+  - python-backend-engineer
 parallelization:
-  batch_1: ["CACHE-4.1", "CACHE-4.2", "CACHE-4.3"]
-  batch_2: ["CACHE-4.4"]
-  critical_path: ["CACHE-4.1", "CACHE-4.3"]
-  estimated_total_time: "completed"
-
+  batch_1:
+  - CACHE-4.1
+  - CACHE-4.2
+  - CACHE-4.3
+  batch_2:
+  - CACHE-4.4
+  critical_path:
+  - CACHE-4.1
+  - CACHE-4.3
+  estimated_total_time: completed
 blockers: []
-
 success_criteria:
-  - CLI list command displays cache status
-  - Cache management commands working (view, clear, refresh)
-  - CLI write operations automatically invalidate cache
-  - CLI tests have >95% coverage
-  - Documentation complete and tested
-
+- CLI list command displays cache status
+- Cache management commands working (view, clear, refresh)
+- CLI write operations automatically invalidate cache
+- CLI tests have >95% coverage
+- Documentation complete and tested
 files_modified:
-  - skillmeat/cli.py
-  - skillmeat/core/cache_manager.py
-  - skillmeat/api/app/routers/cache.py
-  - tests/test_cli_cache.py
+- skillmeat/cli.py
+- skillmeat/core/cache_manager.py
+- skillmeat/api/app/routers/cache.py
+- tests/test_cli_cache.py
+schema_version: 2
+doc_type: progress
+feature_slug: persistent-project-cache
 ---
 
 # persistent-project-cache - Phase 4: CLI Integration

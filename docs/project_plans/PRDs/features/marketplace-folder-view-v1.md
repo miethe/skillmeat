@@ -17,6 +17,9 @@ status: completed
 related:
 - REQ-20260123-skillmeat
 - marketplace-source-detection-improvements-v1
+schema_version: 2
+doc_type: prd
+feature_slug: marketplace-folder-view
 ---
 
 # Feature Brief & Metadata

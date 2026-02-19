@@ -116,6 +116,9 @@ success_criteria:
   description: Cache unit tests achieve >80% coverage
   status: pending
 updated: '2026-01-31'
+schema_version: 2
+doc_type: progress
+feature_slug: collection-data-consistency
 ---
 
 # Phase 4: Caching Layer

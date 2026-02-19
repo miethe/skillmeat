@@ -1,80 +1,104 @@
 ---
 type: progress
-prd: "marketplace-source-enhancements-v1"
+prd: marketplace-source-enhancements-v1
 phase: 2
-title: "Backend Exclusions"
+title: Backend Exclusions
 status: in_progress
 progress: 50
 total_tasks: 8
 completed_tasks: 4
 story_points: 8
-last_updated: "2025-12-31T21:30:00Z"
-session_note: "Batch 1-2 completed. Recovered from session interruption."
-
+last_updated: '2025-12-31T21:30:00Z'
+session_note: Batch 1-2 completed. Recovered from session interruption.
 tasks:
-  - id: "TASK-2.1"
-    title: "Add excluded fields to CatalogEntry model"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimate: "1h"
-    completed_at: "2025-12-31T21:00:00Z"
-  - id: "TASK-2.2"
-    title: "Create Alembic migration"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["TASK-2.1"]
-    estimate: "1h"
-    completed_at: "2025-12-31T21:05:00Z"
-    agent_id: "ad49e23"
-  - id: "TASK-2.3"
-    title: "Add excluded status to schemas"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "1h"
-    completed_at: "2025-12-31T21:00:00Z"
-  - id: "TASK-2.4"
-    title: "Create ExcludeArtifactRequest schema"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.3"]
-    estimate: "1h"
-    completed_at: "2025-12-31T21:04:00Z"
-    agent_id: "ab8736f"
-  - id: "TASK-2.5"
-    title: "Add PATCH exclude endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.2", "TASK-2.4"]
-    estimate: "2h"
-  - id: "TASK-2.6"
-    title: "Add restore endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.5"]
-    estimate: "1h"
-  - id: "TASK-2.7"
-    title: "Update catalog list to filter excluded"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.5"]
-    estimate: "1h"
-  - id: "TASK-2.8"
-    title: "Backend API tests"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.6", "TASK-2.7"]
-    estimate: "2h"
-
+- id: TASK-2.1
+  title: Add excluded fields to CatalogEntry model
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimate: 1h
+  completed_at: '2025-12-31T21:00:00Z'
+- id: TASK-2.2
+  title: Create Alembic migration
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - TASK-2.1
+  estimate: 1h
+  completed_at: '2025-12-31T21:05:00Z'
+  agent_id: ad49e23
+- id: TASK-2.3
+  title: Add excluded status to schemas
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 1h
+  completed_at: '2025-12-31T21:00:00Z'
+- id: TASK-2.4
+  title: Create ExcludeArtifactRequest schema
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.3
+  estimate: 1h
+  completed_at: '2025-12-31T21:04:00Z'
+  agent_id: ab8736f
+- id: TASK-2.5
+  title: Add PATCH exclude endpoint
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.2
+  - TASK-2.4
+  estimate: 2h
+- id: TASK-2.6
+  title: Add restore endpoint
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.5
+  estimate: 1h
+- id: TASK-2.7
+  title: Update catalog list to filter excluded
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.5
+  estimate: 1h
+- id: TASK-2.8
+  title: Backend API tests
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.6
+  - TASK-2.7
+  estimate: 2h
 parallelization:
-  batch_1: ["TASK-2.1", "TASK-2.3"]  # COMPLETED
-  batch_2: ["TASK-2.2", "TASK-2.4"]  # COMPLETED
-  batch_3: ["TASK-2.5"]  # PENDING
-  batch_4: ["TASK-2.6", "TASK-2.7"]  # PENDING
-  batch_5: ["TASK-2.8"]  # PENDING
-
+  batch_1:
+  - TASK-2.1
+  - TASK-2.3
+  batch_2:
+  - TASK-2.2
+  - TASK-2.4
+  batch_3:
+  - TASK-2.5
+  batch_4:
+  - TASK-2.6
+  - TASK-2.7
+  batch_5:
+  - TASK-2.8
 blockers: []
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-source-enhancements-v1
 ---
 
 # Phase 2: Backend Exclusions

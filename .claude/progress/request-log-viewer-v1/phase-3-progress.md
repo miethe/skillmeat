@@ -1,63 +1,94 @@
 ---
 type: progress
-prd: "request-log-viewer-v1"
+prd: request-log-viewer-v1
 phase: 3
-title: "Integration & Polish"
-status: "pending"
+title: Integration & Polish
+status: pending
 progress: 0
 total_tasks: 5
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["ui-engineer-enhanced", "python-backend-engineer"]
-created: "2025-01-30"
-updated: "2025-01-30"
-
+owners:
+- ui-engineer-enhanced
+- python-backend-engineer
+created: '2025-01-30'
+updated: '2025-01-30'
 tasks:
-  - id: "TASK-3.1"
-    description: "E2E Playwright testing for full user flow"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.1", "TASK-2.2", "TASK-2.3", "TASK-2.4"]
-    estimated_effort: "0.5d"
-    priority: "high"
-
-  - id: "TASK-3.2"
-    description: "URL state persistence for filter/search state"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.1", "TASK-2.2", "TASK-2.3", "TASK-2.4"]
-    estimated_effort: "0.5d"
-    priority: "medium"
-
-  - id: "TASK-3.3"
-    description: "Performance optimization - caching, pagination"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1", "TASK-2.2", "TASK-2.3", "TASK-2.4"]
-    estimated_effort: "0.5d"
-    priority: "high"
-
-  - id: "TASK-3.4"
-    description: "WCAG 2.1 AA accessibility audit"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.1", "TASK-2.2", "TASK-2.3", "TASK-2.4"]
-    estimated_effort: "0.5d"
-    priority: "medium"
-
-  - id: "TASK-3.5"
-    description: "Error handling and user feedback polish"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.1", "TASK-3.2", "TASK-3.3", "TASK-3.4"]
-    estimated_effort: "1d"
-    priority: "high"
-
+- id: TASK-3.1
+  description: E2E Playwright testing for full user flow
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.1
+  - TASK-2.2
+  - TASK-2.3
+  - TASK-2.4
+  estimated_effort: 0.5d
+  priority: high
+- id: TASK-3.2
+  description: URL state persistence for filter/search state
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.1
+  - TASK-2.2
+  - TASK-2.3
+  - TASK-2.4
+  estimated_effort: 0.5d
+  priority: medium
+- id: TASK-3.3
+  description: Performance optimization - caching, pagination
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  - TASK-2.2
+  - TASK-2.3
+  - TASK-2.4
+  estimated_effort: 0.5d
+  priority: high
+- id: TASK-3.4
+  description: WCAG 2.1 AA accessibility audit
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.1
+  - TASK-2.2
+  - TASK-2.3
+  - TASK-2.4
+  estimated_effort: 0.5d
+  priority: medium
+- id: TASK-3.5
+  description: Error handling and user feedback polish
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.1
+  - TASK-3.2
+  - TASK-3.3
+  - TASK-3.4
+  estimated_effort: 1d
+  priority: high
 parallelization:
-  batch_1: ["TASK-3.1", "TASK-3.2", "TASK-3.3", "TASK-3.4"]
-  batch_2: ["TASK-3.5"]
-  critical_path: ["TASK-3.3", "TASK-3.5"]
+  batch_1:
+  - TASK-3.1
+  - TASK-3.2
+  - TASK-3.3
+  - TASK-3.4
+  batch_2:
+  - TASK-3.5
+  critical_path:
+  - TASK-3.3
+  - TASK-3.5
+schema_version: 2
+doc_type: progress
+feature_slug: request-log-viewer-v1
 ---
 
 # Phase 3: Integration & Polish

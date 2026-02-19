@@ -1,119 +1,132 @@
 ---
 type: progress
-prd: "smart-import-discovery-v1"
+prd: smart-import-discovery-v1
 phase: 1
-title: "Data Layer & Service Foundation"
+title: Data Layer & Service Foundation
 status: pending
 started: null
-updated: "2025-11-30T00:00:00Z"
+updated: '2025-11-30T00:00:00Z'
 completion: 0
 total_tasks: 6
 completed_tasks: 0
-
 tasks:
-  - id: "SID-001"
-    title: "Create GitHub Metadata Extraction Service"
-    description: "Create skillmeat/core/github_metadata.py with GitHubMetadataExtractor class"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_time: "3h"
-    story_points: 8
-    acceptance_criteria:
-      - "Parse user/repo/path format and HTTPS URLs"
-      - "Fetch metadata from GitHub API and file content"
-      - "Extract YAML frontmatter from SKILL.md/COMMAND.md"
-      - "Cache responses with 1-hour TTL"
-      - "Handle GitHub API rate limits and errors gracefully"
-
-  - id: "SID-002"
-    title: "Create Artifact Discovery Service"
-    description: "Create skillmeat/core/discovery.py with ArtifactDiscoveryService class"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_time: "3h"
-    story_points: 8
-    acceptance_criteria:
-      - "Scan .claude/artifacts/ directory recursively"
-      - "Detect artifact types (skill, command, agent, hook, mcp)"
-      - "Extract metadata from frontmatter"
-      - "Validate artifact structure"
-      - "Complete scan <2 seconds for 50+ artifacts"
-
-  - id: "SID-003"
-    title: "Implement Metadata Cache"
-    description: "Create skillmeat/core/cache.py with MetadataCache class"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_time: "1h"
-    story_points: 3
-    acceptance_criteria:
-      - "In-memory cache with configurable TTL (default 1 hour)"
-      - "Track cache hits/misses"
-      - "Thread-safe operations"
-      - "Simple API: get(), set(), invalidate()"
-
-  - id: "SID-004"
-    title: "Create Discovery & Import Schemas"
-    description: "Create/update skillmeat/api/schemas/ with new Pydantic schemas"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SID-001", "SID-002"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "DiscoveredArtifact, DiscoveryRequest, DiscoveryResult schemas"
-      - "BulkImportArtifact, BulkImportRequest, BulkImportResult schemas"
-      - "GitHubMetadata, MetadataFetchRequest, MetadataFetchResponse schemas"
-      - "ArtifactParameters, ParameterUpdateRequest, ParameterUpdateResponse schemas"
-      - "Pydantic v2 syntax with examples"
-
-  - id: "SID-005"
-    title: "Unit Tests: GitHub Metadata Service"
-    description: "Create skillmeat/core/tests/test_github_metadata.py"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SID-001"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - ">80% code coverage"
-      - "Test URL parsing (standard, HTTPS, with version)"
-      - "Test metadata fetching (success, errors, rate limiting)"
-      - "Test caching (hit, miss, TTL expiration)"
-      - "Mock GitHub API calls"
-
-  - id: "SID-006"
-    title: "Unit Tests: Artifact Discovery Service"
-    description: "Create skillmeat/core/tests/test_discovery_service.py"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SID-002"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - ">80% code coverage"
-      - "Test discovery (success, empty, multiple artifacts)"
-      - "Test type detection (all artifact types)"
-      - "Test error handling (invalid artifacts, permissions)"
-      - "Performance benchmark (<2 seconds for 50+ artifacts)"
-
+- id: SID-001
+  title: Create GitHub Metadata Extraction Service
+  description: Create skillmeat/core/github_metadata.py with GitHubMetadataExtractor
+    class
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_time: 3h
+  story_points: 8
+  acceptance_criteria:
+  - Parse user/repo/path format and HTTPS URLs
+  - Fetch metadata from GitHub API and file content
+  - Extract YAML frontmatter from SKILL.md/COMMAND.md
+  - Cache responses with 1-hour TTL
+  - Handle GitHub API rate limits and errors gracefully
+- id: SID-002
+  title: Create Artifact Discovery Service
+  description: Create skillmeat/core/discovery.py with ArtifactDiscoveryService class
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_time: 3h
+  story_points: 8
+  acceptance_criteria:
+  - Scan .claude/artifacts/ directory recursively
+  - Detect artifact types (skill, command, agent, hook, mcp)
+  - Extract metadata from frontmatter
+  - Validate artifact structure
+  - Complete scan <2 seconds for 50+ artifacts
+- id: SID-003
+  title: Implement Metadata Cache
+  description: Create skillmeat/core/cache.py with MetadataCache class
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_time: 1h
+  story_points: 3
+  acceptance_criteria:
+  - In-memory cache with configurable TTL (default 1 hour)
+  - Track cache hits/misses
+  - Thread-safe operations
+  - 'Simple API: get(), set(), invalidate()'
+- id: SID-004
+  title: Create Discovery & Import Schemas
+  description: Create/update skillmeat/api/schemas/ with new Pydantic schemas
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SID-001
+  - SID-002
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - DiscoveredArtifact, DiscoveryRequest, DiscoveryResult schemas
+  - BulkImportArtifact, BulkImportRequest, BulkImportResult schemas
+  - GitHubMetadata, MetadataFetchRequest, MetadataFetchResponse schemas
+  - ArtifactParameters, ParameterUpdateRequest, ParameterUpdateResponse schemas
+  - Pydantic v2 syntax with examples
+- id: SID-005
+  title: 'Unit Tests: GitHub Metadata Service'
+  description: Create skillmeat/core/tests/test_github_metadata.py
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SID-001
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - '>80% code coverage'
+  - Test URL parsing (standard, HTTPS, with version)
+  - Test metadata fetching (success, errors, rate limiting)
+  - Test caching (hit, miss, TTL expiration)
+  - Mock GitHub API calls
+- id: SID-006
+  title: 'Unit Tests: Artifact Discovery Service'
+  description: Create skillmeat/core/tests/test_discovery_service.py
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SID-002
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - '>80% code coverage'
+  - Test discovery (success, empty, multiple artifacts)
+  - Test type detection (all artifact types)
+  - Test error handling (invalid artifacts, permissions)
+  - Performance benchmark (<2 seconds for 50+ artifacts)
 parallelization:
-  batch_1: ["SID-001", "SID-002", "SID-003"]
-  batch_2: ["SID-004", "SID-005", "SID-006"]
-  critical_path: ["SID-001", "SID-004"]
-  estimated_total_time: "8h"
-
+  batch_1:
+  - SID-001
+  - SID-002
+  - SID-003
+  batch_2:
+  - SID-004
+  - SID-005
+  - SID-006
+  critical_path:
+  - SID-001
+  - SID-004
+  estimated_total_time: 8h
 blockers: []
-
 quality_gates:
-  - "All services have >80% unit test coverage"
-  - "Error handling for invalid artifacts, GitHub API errors, missing directories"
-  - "Metadata cache correctly implements TTL"
-  - "All schemas validated against existing artifact structures"
-  - "Performance: discovery scan <2 seconds for 50+ artifacts"
+- All services have >80% unit test coverage
+- Error handling for invalid artifacts, GitHub API errors, missing directories
+- Metadata cache correctly implements TTL
+- All schemas validated against existing artifact structures
+- 'Performance: discovery scan <2 seconds for 50+ artifacts'
+schema_version: 2
+doc_type: progress
+feature_slug: smart-import-discovery-v1
 ---
 
 # Phase 1: Data Layer & Service Foundation

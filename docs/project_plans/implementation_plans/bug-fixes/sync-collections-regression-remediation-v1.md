@@ -8,6 +8,10 @@ created: 2026-01-11
 complexity: medium
 estimated_effort: 8-12 hours
 phases: 3
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: sync-collections-regression-remediation
+prd_ref: null
 ---
 
 # Sync + Collections Regression Remediation - Implementation Plan

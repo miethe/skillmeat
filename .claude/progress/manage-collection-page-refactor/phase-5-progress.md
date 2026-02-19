@@ -1,101 +1,126 @@
 ---
 type: progress
-prd: "manage-collection-page-refactor"
+prd: manage-collection-page-refactor
 phase: 5
-title: "Polish & Testing"
-status: "pending"
+title: Polish & Testing
+status: pending
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 6
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["frontend-developer", "ui-engineer-enhanced"]
-contributors: ["web-accessibility-checker", "testing-specialist"]
-
+owners:
+- frontend-developer
+- ui-engineer-enhanced
+contributors:
+- web-accessibility-checker
+- testing-specialist
 tasks:
-  - id: "POLISH-5.1"
-    description: "Add loading states and skeletons for ArtifactBrowseCard, ArtifactOperationsCard, and modals."
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "1h"
-    priority: "medium"
-    model: "sonnet"
-
-  - id: "POLISH-5.2"
-    description: "Accessibility audit (WCAG AA): ARIA labels, focus management, keyboard navigation on all new components."
-    status: "pending"
-    assigned_to: ["web-accessibility-checker"]
-    dependencies: []
-    estimated_effort: "1.5h"
-    priority: "high"
-    model: "opus"
-
-  - id: "POLISH-5.3"
-    description: "Unit tests for new components (Jest + RTL): cards, modals, filters, utilities. Target >80% coverage."
-    status: "pending"
-    assigned_to: ["testing-specialist"]
-    dependencies: []
-    estimated_effort: "1.5h"
-    priority: "high"
-    model: "opus"
-
-  - id: "POLISH-5.4"
-    description: "E2E tests for cross-navigation flows (Playwright): browse to manage, manage to collection, deep links."
-    status: "pending"
-    assigned_to: ["testing-specialist"]
-    dependencies: []
-    estimated_effort: "1h"
-    priority: "high"
-    model: "opus"
-
-  - id: "POLISH-5.5"
-    description: "Dark mode verification: all new components readable, proper contrast, icons visible, badge colors appropriate."
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "0.5h"
-    priority: "medium"
-    model: "haiku"
-
-  - id: "POLISH-5.6"
-    description: "Performance verification: page load times stable, modal open <200ms, filter changes responsive, no memory leaks."
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "0.5h"
-    priority: "medium"
-    model: "sonnet"
-
+- id: POLISH-5.1
+  description: Add loading states and skeletons for ArtifactBrowseCard, ArtifactOperationsCard,
+    and modals.
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 1h
+  priority: medium
+  model: sonnet
+- id: POLISH-5.2
+  description: 'Accessibility audit (WCAG AA): ARIA labels, focus management, keyboard
+    navigation on all new components.'
+  status: pending
+  assigned_to:
+  - web-accessibility-checker
+  dependencies: []
+  estimated_effort: 1.5h
+  priority: high
+  model: opus
+- id: POLISH-5.3
+  description: 'Unit tests for new components (Jest + RTL): cards, modals, filters,
+    utilities. Target >80% coverage.'
+  status: pending
+  assigned_to:
+  - testing-specialist
+  dependencies: []
+  estimated_effort: 1.5h
+  priority: high
+  model: opus
+- id: POLISH-5.4
+  description: 'E2E tests for cross-navigation flows (Playwright): browse to manage,
+    manage to collection, deep links.'
+  status: pending
+  assigned_to:
+  - testing-specialist
+  dependencies: []
+  estimated_effort: 1h
+  priority: high
+  model: opus
+- id: POLISH-5.5
+  description: 'Dark mode verification: all new components readable, proper contrast,
+    icons visible, badge colors appropriate.'
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 0.5h
+  priority: medium
+  model: haiku
+- id: POLISH-5.6
+  description: 'Performance verification: page load times stable, modal open <200ms,
+    filter changes responsive, no memory leaks.'
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 0.5h
+  priority: medium
+  model: sonnet
 parallelization:
-  batch_1: ["POLISH-5.1", "POLISH-5.2", "POLISH-5.3", "POLISH-5.4", "POLISH-5.5", "POLISH-5.6"]
-  critical_path: ["POLISH-5.2"]
-  estimated_total_time: "2-4h"
-
+  batch_1:
+  - POLISH-5.1
+  - POLISH-5.2
+  - POLISH-5.3
+  - POLISH-5.4
+  - POLISH-5.5
+  - POLISH-5.6
+  critical_path:
+  - POLISH-5.2
+  estimated_total_time: 2-4h
 blockers: []
-
 success_criteria:
-  - { id: "SC-5.1", description: "All new components have loading/skeleton states", status: "pending" }
-  - { id: "SC-5.2", description: "WCAG AA compliance audit passed", status: "pending" }
-  - { id: "SC-5.3", description: "Unit test coverage >80%", status: "pending" }
-  - { id: "SC-5.4", description: "E2E tests cover critical flows", status: "pending" }
-  - { id: "SC-5.5", description: "Dark mode verified", status: "pending" }
-  - { id: "SC-5.6", description: "No performance regressions", status: "pending" }
-
+- id: SC-5.1
+  description: All new components have loading/skeleton states
+  status: pending
+- id: SC-5.2
+  description: WCAG AA compliance audit passed
+  status: pending
+- id: SC-5.3
+  description: Unit test coverage >80%
+  status: pending
+- id: SC-5.4
+  description: E2E tests cover critical flows
+  status: pending
+- id: SC-5.5
+  description: Dark mode verified
+  status: pending
+- id: SC-5.6
+  description: No performance regressions
+  status: pending
 files_modified:
-  - "skillmeat/web/components/collection/artifact-browse-card-skeleton.tsx"
-  - "skillmeat/web/components/manage/artifact-operations-card-skeleton.tsx"
-  - "skillmeat/web/__tests__/components/collection/"
-  - "skillmeat/web/__tests__/components/manage/"
-  - "skillmeat/web/__tests__/components/shared/"
-  - "skillmeat/web/tests/cross-navigation.spec.ts"
+- skillmeat/web/components/collection/artifact-browse-card-skeleton.tsx
+- skillmeat/web/components/manage/artifact-operations-card-skeleton.tsx
+- skillmeat/web/__tests__/components/collection/
+- skillmeat/web/__tests__/components/manage/
+- skillmeat/web/__tests__/components/shared/
+- skillmeat/web/tests/cross-navigation.spec.ts
+schema_version: 2
+doc_type: progress
+feature_slug: manage-collection-page-refactor
 ---
 
 # manage-collection-page-refactor - Phase 5: Polish & Testing

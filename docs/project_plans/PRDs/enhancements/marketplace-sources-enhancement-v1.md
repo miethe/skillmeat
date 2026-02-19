@@ -1,5 +1,8 @@
 ---
 status: completed
+schema_version: 2
+doc_type: prd
+feature_slug: marketplace-sources-enhancement
 ---
 # Marketplace Sources Enhancement v1
 

@@ -18,6 +18,10 @@ status: completed
 related:
 - /docs/project_plans/PRDs/features/cross-source-artifact-search-v1.md
 - /docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: cross-source-artifact-search
+prd_ref: null
 ---
 
 # Implementation Plan: Cross-Source Artifact Search

@@ -3,6 +3,9 @@ feature: combine-deployment-badges
 status: completed
 created: 2026-02-11
 completed: 2026-02-11
+schema_version: 2
+doc_type: quick_feature
+feature_slug: combine-deployment-badges
 ---
 
 # Quick Feature: Combine Deployment Badges on Artifact Cards

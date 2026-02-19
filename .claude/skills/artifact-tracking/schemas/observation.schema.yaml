@@ -2,6 +2,8 @@ $schema: "http://json-schema.org/draft-07/schema#"
 title: "Observation Log Artifact Schema"
 type: object
 description: "JSON Schema for observation log artifacts (YAML frontmatter validation)"
+allOf:
+  - $ref: "./envelope.schema.yaml"
 
 required:
   - type
@@ -10,6 +12,59 @@ required:
   - period
 
 properties:
+  schema_version:
+    type: integer
+    minimum: 1
+    description: "Optional CCDash schema version (v2 recommended)"
+
+  doc_type:
+    type: string
+    enum: ["observation"]
+    description: "Optional CCDash document type alias for compatibility"
+
+  feature_slug:
+    type: string
+    minLength: 3
+    maxLength: 64
+    pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+    description: "Optional feature slug associated with this observation log"
+
+  prd_ref:
+    oneOf:
+      - type: "null"
+      - type: string
+        minLength: 3
+        maxLength: 256
+    default: null
+    description: "Optional reference to related PRD"
+
+  plan_ref:
+    oneOf:
+      - type: "null"
+      - type: string
+        minLength: 3
+        maxLength: 256
+    default: null
+    description: "Optional reference to related implementation plan"
+
+  commit_refs:
+    type: array
+    items:
+      type: string
+      minLength: 7
+      maxLength: 64
+    default: []
+    description: "Optional commit references tied to logged observations"
+
+  pr_refs:
+    type: array
+    items:
+      type: string
+      minLength: 3
+      maxLength: 64
+    default: []
+    description: "Optional pull request references tied to logged observations"
+
   type:
     type: string
     enum: ["observations"]
@@ -201,4 +256,4 @@ properties:
     maxLength: 2048
     description: "General notes about observations in this period"
 
-additionalProperties: false
+additionalProperties: true

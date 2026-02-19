@@ -3,9 +3,11 @@ type: quick-feature-plan
 feature_slug: collection-infinite-scroll
 request_log_id: null
 status: completed
-created: 2026-01-13T00:00:00Z
-completed_at: 2026-01-13T00:30:00Z
+created: 2026-01-13 00:00:00+00:00
+completed_at: 2026-01-13 00:30:00+00:00
 estimated_scope: medium
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # Collection Page Infinite Scroll

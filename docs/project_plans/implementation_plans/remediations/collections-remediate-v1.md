@@ -1,19 +1,29 @@
 ---
-title: "Collections Remediation - Implementation Plan"
-description: "Fix collection filtering and artifact-collection display in modal"
-audience: [ai-agents, developers]
-tags: [implementation, remediation, collections, frontend, bugfix]
+title: Collections Remediation - Implementation Plan
+description: Fix collection filtering and artifact-collection display in modal
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- remediation
+- collections
+- frontend
+- bugfix
 created: 2025-12-21
 updated: 2025-12-21
-category: "remediation"
-status: ready
+category: remediation
+status: inferred_complete
 complexity: Small
 effort: 8 story points
 related:
-  - /docs/project_plans/ideas/collections-remediate-12-18.md
-  - /docs/project_plans/PRDs/enhancements/collections-navigation-v1.md
+- /docs/project_plans/ideas/collections-remediate-12-18.md
+- /docs/project_plans/PRDs/enhancements/collections-navigation-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: collections-remediate
+prd_ref: null
 ---
-
 # Collections Remediation - Implementation Plan
 
 **Feature Name**: Collections Remediation

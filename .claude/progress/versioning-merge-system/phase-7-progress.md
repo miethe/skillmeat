@@ -1,179 +1,202 @@
 ---
 type: progress
-prd: "versioning-merge-system"
+prd: versioning-merge-system
 phase: 7
-title: "API Layer - Version & Merge Endpoints"
-status: "in-progress"
-started: "2025-12-17"
+title: API Layer - Version & Merge Endpoints
+status: in-progress
+started: '2025-12-17'
 completed: null
 overall_progress: 85
-completion_estimate: "1-2h remaining"
+completion_estimate: 1-2h remaining
 total_tasks: 13
 completed_tasks: 10
 in_progress_tasks: 1
 blocked_tasks: 0
-owners: ["python-backend-engineer", "backend-architect"]
-contributors: ["python-backend-engineer", "backend-architect"]
-
-# STATUS NOTE (2025-12-17): Core implementation COMPLETE
-# 11 endpoints registered and functional
-# 26 schemas in OpenAPI spec
-# Tests created but have mocking issues - need dependency override fixes
-# TypeScript SDK regeneration still pending
-
+owners:
+- python-backend-engineer
+- backend-architect
+contributors:
+- python-backend-engineer
+- backend-architect
 tasks:
-  - id: "APIVM-001"
-    description: "GET /api/v1/versions/snapshots - List snapshots with cursor pagination"
-    status: "complete"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3h"
-    priority: "high"
-    notes: "Implemented in versions.py"
-
-  - id: "APIVM-002"
-    description: "GET /api/v1/versions/snapshots/{id} - Get snapshot details"
-    status: "complete"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-    notes: "Implemented in versions.py"
-
-  - id: "APIVM-003"
-    description: "POST /api/v1/versions/snapshots - Create new snapshot"
-    status: "complete"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-    notes: "Implemented in versions.py"
-
-  - id: "APIVM-004"
-    description: "DELETE /api/v1/versions/snapshots/{id} - Delete snapshot"
-    status: "complete"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-    notes: "Implemented in versions.py"
-
-  - id: "APIVM-005"
-    description: "GET /api/v1/versions/snapshots/{id}/rollback-analysis - Analyze rollback safety"
-    status: "complete"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3h"
-    priority: "high"
-    notes: "Implemented in versions.py"
-
-  - id: "APIVM-006"
-    description: "POST /api/v1/versions/snapshots/{id}/rollback - Execute rollback"
-    status: "complete"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3h"
-    priority: "high"
-    notes: "Implemented in versions.py"
-
-  - id: "APIVM-007"
-    description: "POST /api/v1/versions/snapshots/diff - Compare two snapshots"
-    status: "complete"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-    notes: "Implemented in versions.py"
-
-  - id: "APIVM-008"
-    description: "POST /api/v1/merge/analyze, preview, execute, resolve - All merge endpoints"
-    status: "complete"
-    assigned_to: ["backend-architect"]
-    dependencies: []
-    estimated_effort: "6h"
-    priority: "high"
-    notes: "4 endpoints implemented in merge.py"
-
-  - id: "APIVM-009"
-    description: "Define request/response schemas for all endpoints using Pydantic"
-    status: "complete"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3h"
-    priority: "high"
-    notes: "version.py and merge.py schemas created (26 total in OpenAPI)"
-
-  - id: "APIVM-010"
-    description: "Standardize error responses across all endpoints (400, 404, 409, 422, 500)"
-    status: "complete"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-    notes: "HTTPException patterns consistent"
-
-  - id: "APIVM-011"
-    description: "Generate OpenAPI spec and enable Swagger UI documentation"
-    status: "complete"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-    notes: "All schemas and endpoints visible in /docs"
-
-  - id: "APIVM-012"
-    description: "Regenerate TypeScript SDK from OpenAPI spec"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["APIVM-011"]
-    estimated_effort: "2h"
-    priority: "medium"
-    notes: "REMAINING - run openapi-generator after commit"
-
-  - id: "APIVM-013"
-    description: "Create API integration tests for all endpoints (>85% coverage)"
-    status: "in-progress"
-    assigned_to: ["backend-architect"]
-    dependencies: []
-    estimated_effort: "5h"
-    priority: "medium"
-    notes: "PARTIAL - test files created but mocking needs fixes (dependency overrides not applied correctly)"
-
+- id: APIVM-001
+  description: GET /api/v1/versions/snapshots - List snapshots with cursor pagination
+  status: complete
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3h
+  priority: high
+  notes: Implemented in versions.py
+- id: APIVM-002
+  description: GET /api/v1/versions/snapshots/{id} - Get snapshot details
+  status: complete
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+  notes: Implemented in versions.py
+- id: APIVM-003
+  description: POST /api/v1/versions/snapshots - Create new snapshot
+  status: complete
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+  notes: Implemented in versions.py
+- id: APIVM-004
+  description: DELETE /api/v1/versions/snapshots/{id} - Delete snapshot
+  status: complete
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+  notes: Implemented in versions.py
+- id: APIVM-005
+  description: GET /api/v1/versions/snapshots/{id}/rollback-analysis - Analyze rollback
+    safety
+  status: complete
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3h
+  priority: high
+  notes: Implemented in versions.py
+- id: APIVM-006
+  description: POST /api/v1/versions/snapshots/{id}/rollback - Execute rollback
+  status: complete
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3h
+  priority: high
+  notes: Implemented in versions.py
+- id: APIVM-007
+  description: POST /api/v1/versions/snapshots/diff - Compare two snapshots
+  status: complete
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+  notes: Implemented in versions.py
+- id: APIVM-008
+  description: POST /api/v1/merge/analyze, preview, execute, resolve - All merge endpoints
+  status: complete
+  assigned_to:
+  - backend-architect
+  dependencies: []
+  estimated_effort: 6h
+  priority: high
+  notes: 4 endpoints implemented in merge.py
+- id: APIVM-009
+  description: Define request/response schemas for all endpoints using Pydantic
+  status: complete
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3h
+  priority: high
+  notes: version.py and merge.py schemas created (26 total in OpenAPI)
+- id: APIVM-010
+  description: Standardize error responses across all endpoints (400, 404, 409, 422,
+    500)
+  status: complete
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+  notes: HTTPException patterns consistent
+- id: APIVM-011
+  description: Generate OpenAPI spec and enable Swagger UI documentation
+  status: complete
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+  notes: All schemas and endpoints visible in /docs
+- id: APIVM-012
+  description: Regenerate TypeScript SDK from OpenAPI spec
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - APIVM-011
+  estimated_effort: 2h
+  priority: medium
+  notes: REMAINING - run openapi-generator after commit
+- id: APIVM-013
+  description: Create API integration tests for all endpoints (>85% coverage)
+  status: in-progress
+  assigned_to:
+  - backend-architect
+  dependencies: []
+  estimated_effort: 5h
+  priority: medium
+  notes: PARTIAL - test files created but mocking needs fixes (dependency overrides
+    not applied correctly)
 parallelization:
-  batch_1: ["APIVM-001", "APIVM-002", "APIVM-003", "APIVM-004"]
-  batch_2: ["APIVM-005", "APIVM-006", "APIVM-007", "APIVM-008"]
-  batch_3: ["APIVM-009", "APIVM-010"]
-  batch_4: ["APIVM-011", "APIVM-012", "APIVM-013"]
-  critical_path: ["APIVM-001", "APIVM-009", "APIVM-011", "APIVM-012", "APIVM-013"]
-  estimated_total_time: "3-4d"
-
+  batch_1:
+  - APIVM-001
+  - APIVM-002
+  - APIVM-003
+  - APIVM-004
+  batch_2:
+  - APIVM-005
+  - APIVM-006
+  - APIVM-007
+  - APIVM-008
+  batch_3:
+  - APIVM-009
+  - APIVM-010
+  batch_4:
+  - APIVM-011
+  - APIVM-012
+  - APIVM-013
+  critical_path:
+  - APIVM-001
+  - APIVM-009
+  - APIVM-011
+  - APIVM-012
+  - APIVM-013
+  estimated_total_time: 3-4d
 blockers: []
-
 success_criteria:
-  - id: "SC-7.1"
-    description: "All endpoints return correct HTTP status codes (200, 201, 400, 404, 409, 422, 500)"
-    status: "pending"
-  - id: "SC-7.2"
-    description: "OpenAPI schema is complete, valid, and includes all endpoints with examples"
-    status: "pending"
-  - id: "SC-7.3"
-    description: "Pagination works correctly on list endpoints with limit/offset parameters"
-    status: "pending"
-  - id: "SC-7.4"
-    description: "Error responses contain consistent structure with error_code and message"
-    status: "pending"
-  - id: "SC-7.5"
-    description: "TypeScript SDK generates without errors and compiles successfully"
-    status: "pending"
-  - id: "SC-7.6"
-    description: "Integration tests achieve >85% coverage of all endpoints"
-    status: "pending"
-  - id: "SC-7.7"
-    description: "Performance: version list endpoint <100ms, merge preview <2s for 10MB artifact"
-    status: "pending"
-  - id: "SC-7.8"
-    description: "Swagger UI accessible at /docs with complete endpoint documentation"
-    status: "pending"
+- id: SC-7.1
+  description: All endpoints return correct HTTP status codes (200, 201, 400, 404,
+    409, 422, 500)
+  status: pending
+- id: SC-7.2
+  description: OpenAPI schema is complete, valid, and includes all endpoints with
+    examples
+  status: pending
+- id: SC-7.3
+  description: Pagination works correctly on list endpoints with limit/offset parameters
+  status: pending
+- id: SC-7.4
+  description: Error responses contain consistent structure with error_code and message
+  status: pending
+- id: SC-7.5
+  description: TypeScript SDK generates without errors and compiles successfully
+  status: pending
+- id: SC-7.6
+  description: Integration tests achieve >85% coverage of all endpoints
+  status: pending
+- id: SC-7.7
+  description: 'Performance: version list endpoint <100ms, merge preview <2s for 10MB
+    artifact'
+  status: pending
+- id: SC-7.8
+  description: Swagger UI accessible at /docs with complete endpoint documentation
+  status: pending
+schema_version: 2
+doc_type: progress
+feature_slug: versioning-merge-system
 ---
 
 # versioning-merge-system - Phase 7: API Layer - Version & Merge Endpoints

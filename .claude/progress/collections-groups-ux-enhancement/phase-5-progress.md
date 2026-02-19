@@ -58,7 +58,7 @@ tasks:
   priority: medium
   model: sonnet
 - id: P5-T5
-  description: Write unit tests for filter component (≥80% coverage)
+  description: "Write unit tests for filter component (\u226580% coverage)"
   status: completed
   assigned_to:
   - ui-engineer-enhanced
@@ -121,7 +121,7 @@ success_criteria:
   description: Tooltip/help text explains filter availability
   status: pending
 - id: SC-11
-  description: ≥80% test coverage
+  description: "\u226580% test coverage"
   status: pending
 files_modified:
 - skillmeat/web/components/shared/group-filter-select.tsx
@@ -133,6 +133,9 @@ files_modified:
 - skillmeat/web/__tests__/integration/collection-page.test.ts
 progress: 100
 updated: '2026-01-20'
+schema_version: 2
+doc_type: progress
+feature_slug: collections-groups-ux-enhancement
 ---
 
 # Collections & Groups UX Enhancement - Phase 5: Group Filter Integration

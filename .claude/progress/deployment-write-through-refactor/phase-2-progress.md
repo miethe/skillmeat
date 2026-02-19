@@ -1,6 +1,6 @@
 ---
 phase: 2
-title: Backend — Add Deployments to /artifacts Response
+title: "Backend \u2014 Add Deployments to /artifacts Response"
 status: completed
 plan_ref: docs/project_plans/implementation_plans/features/deployment-write-through-refactor-v1.md
 parallelization:
@@ -44,6 +44,11 @@ in_progress_tasks: 0
 blocked_tasks: 0
 progress: 100
 updated: '2026-02-11'
+schema_version: 2
+doc_type: progress
+feature_slug: phase-2
+type: progress
+prd: phase-2
 ---
 
 ## Phase 2: Backend — Add Deployments to /artifacts Response

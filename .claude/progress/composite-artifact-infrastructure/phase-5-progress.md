@@ -72,9 +72,9 @@ tasks:
   estimated_effort: 2pt
   priority: high
 - id: CAI-P5-06
-  description: 'Assess and implement (or defer) PK change: artifacts.id type:name
-    → unique index, artifacts.uuid → PK; document outcome in ADR-007 regardless of
-    decision'
+  description: "Assess and implement (or defer) PK change: artifacts.id type:name\
+    \ \u2192 unique index, artifacts.uuid \u2192 PK; document outcome in ADR-007 regardless\
+    \ of decision"
   status: completed
   assigned_to:
   - data-layer-expert
@@ -143,8 +143,8 @@ success_criteria:
     back cleanly (alembic downgrade -3)
   status: pending
 - id: SC-P5-4
-  description: No API surface changes — external consumers continue to receive type:name
-    identifiers
+  description: "No API surface changes \u2014 external consumers continue to receive\
+    \ type:name identifiers"
   status: pending
 - id: SC-P5-5
   description: No regression in collection management, tagging, or grouping features
@@ -167,6 +167,9 @@ files_modified:
 - docs/dev/architecture/decisions/ADR-007-artifact-uuid-identity.md
 progress: 100
 updated: '2026-02-19'
+schema_version: 2
+doc_type: progress
+feature_slug: composite-artifact-infrastructure
 ---
 
 # composite-artifact-infrastructure - Phase 5: UUID Migration for Existing Join Tables (Backend)

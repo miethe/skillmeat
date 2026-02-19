@@ -144,6 +144,11 @@ completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 progress: 100
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-catalog-ux-enhancements
+type: progress
+prd: marketplace-catalog-ux-enhancements
 ---
 
 # Phase 1 Progress: Pagination & Count Indicator

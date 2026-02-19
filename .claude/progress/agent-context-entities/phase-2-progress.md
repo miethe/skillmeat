@@ -1,86 +1,111 @@
 ---
 type: progress
-prd: "agent-context-entities"
+prd: agent-context-entities
 phase: 2
-phase_title: "CLI Management"
+phase_title: CLI Management
 status: completed
 progress: 100
 total_tasks: 8
 completed_tasks: 8
-created: "2025-12-14"
-updated: "2025-12-15"
-completed_at: "2025-12-15"
-
+created: '2025-12-14'
+updated: '2025-12-15'
+completed_at: '2025-12-15'
 tasks:
-  - id: "TASK-2.1"
-    name: "Create Context Command Group"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: 2
-    completed_commit: "a42b041"
-
-  - id: "TASK-2.2"
-    name: "Implement Context Add Command"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1"]
-    estimate: 3
-    completed_commit: "a42b041"
-
-  - id: "TASK-2.3"
-    name: "Implement Context List Command"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1"]
-    estimate: 2
-    completed_commit: "a42b041"
-
-  - id: "TASK-2.4"
-    name: "Implement Context Show Command"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1"]
-    estimate: 2
-    completed_commit: "a42b041"
-
-  - id: "TASK-2.5"
-    name: "Implement Context Deploy Command"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1"]
-    estimate: 3
-    completed_commit: "a42b041"
-
-  - id: "TASK-2.6"
-    name: "Implement Context Remove Command"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1"]
-    estimate: 1
-    completed_commit: "a42b041"
-
-  - id: "TASK-2.7"
-    name: "CLI Help Documentation"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["TASK-2.2", "TASK-2.3", "TASK-2.4", "TASK-2.5", "TASK-2.6"]
-    estimate: 1
-    completed_commit: "a42b041"
-
-  - id: "TASK-2.8"
-    name: "Integration Testing for CLI"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.2", "TASK-2.3", "TASK-2.4", "TASK-2.5", "TASK-2.6"]
-    estimate: 2
-    completed_commit: "a42b041"
-
+- id: TASK-2.1
+  name: Create Context Command Group
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 2
+  completed_commit: a42b041
+- id: TASK-2.2
+  name: Implement Context Add Command
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  estimate: 3
+  completed_commit: a42b041
+- id: TASK-2.3
+  name: Implement Context List Command
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  estimate: 2
+  completed_commit: a42b041
+- id: TASK-2.4
+  name: Implement Context Show Command
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  estimate: 2
+  completed_commit: a42b041
+- id: TASK-2.5
+  name: Implement Context Deploy Command
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  estimate: 3
+  completed_commit: a42b041
+- id: TASK-2.6
+  name: Implement Context Remove Command
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  estimate: 1
+  completed_commit: a42b041
+- id: TASK-2.7
+  name: CLI Help Documentation
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - TASK-2.2
+  - TASK-2.3
+  - TASK-2.4
+  - TASK-2.5
+  - TASK-2.6
+  estimate: 1
+  completed_commit: a42b041
+- id: TASK-2.8
+  name: Integration Testing for CLI
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.2
+  - TASK-2.3
+  - TASK-2.4
+  - TASK-2.5
+  - TASK-2.6
+  estimate: 2
+  completed_commit: a42b041
 parallelization:
-  batch_1: ["TASK-2.1"]
-  batch_2: ["TASK-2.2", "TASK-2.3", "TASK-2.4", "TASK-2.6"]
-  batch_3: ["TASK-2.5"]
-  batch_4: ["TASK-2.7", "TASK-2.8"]
+  batch_1:
+  - TASK-2.1
+  batch_2:
+  - TASK-2.2
+  - TASK-2.3
+  - TASK-2.4
+  - TASK-2.6
+  batch_3:
+  - TASK-2.5
+  batch_4:
+  - TASK-2.7
+  - TASK-2.8
+schema_version: 2
+doc_type: progress
+feature_slug: agent-context-entities
 ---
 
 # Phase 2: CLI Management - COMPLETED

@@ -187,6 +187,9 @@ parallelization:
   - MFV-1.8
   - MFV-1.9
 updated: '2026-01-29'
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-folder-view
 ---
 
 # Phase 1: Two-Pane Layout & Semantic Tree

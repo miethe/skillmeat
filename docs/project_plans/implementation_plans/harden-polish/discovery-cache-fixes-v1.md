@@ -1,12 +1,25 @@
 ---
-title: "Bug Fix Plan: Discovery Cache & Invalidation Fixes"
-description: "Implementation plan for fixing stale discovery count display and over-broad cache invalidation in SkillMeat web UI"
-audience: [ai-agents, developers]
-tags: [bug-fix, implementation-plan, harden-polish, caching, discovery, frontend]
+title: 'Bug Fix Plan: Discovery Cache & Invalidation Fixes'
+description: Implementation plan for fixing stale discovery count display and over-broad
+  cache invalidation in SkillMeat web UI
+audience:
+- ai-agents
+- developers
+tags:
+- bug-fix
+- implementation-plan
+- harden-polish
+- caching
+- discovery
+- frontend
 created: 2025-12-03
 updated: 2025-12-03
-category: "harden-polish"
+category: harden-polish
 status: done
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: discovery-cache-fixes
+prd_ref: null
 ---
 
 # Bug Fix Plan: Discovery Cache & Invalidation Fixes

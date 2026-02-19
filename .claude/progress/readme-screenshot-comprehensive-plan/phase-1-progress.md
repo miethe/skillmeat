@@ -102,6 +102,9 @@ completed_tasks: 10
 in_progress_tasks: 0
 blocked_tasks: 0
 updated: '2026-01-30'
+schema_version: 2
+doc_type: progress
+feature_slug: readme-screenshot-comprehensive-plan
 ---
 
 # Phase 1: Setup & Data Preparation

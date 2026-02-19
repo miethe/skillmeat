@@ -15,6 +15,9 @@ in_progress_tasks: 0
 blocked_tasks: 0
 progress: 100
 updated: '2026-02-13'
+schema_version: 2
+doc_type: quick_feature
+feature_slug: improve-group-color-picker
 ---
 
 # Improve Group Color Picker

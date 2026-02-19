@@ -1,19 +1,31 @@
 ---
-title: "PRD: Versioning & Merge System"
-description: "Comprehensive version history and three-way merge system for artifacts with rollback support and intelligent conflict resolution"
-audience: [ai-agents, developers]
-tags: [prd, planning, enhancement, versioning, merge, sync, history]
+title: 'PRD: Versioning & Merge System'
+description: Comprehensive version history and three-way merge system for artifacts
+  with rollback support and intelligent conflict resolution
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- planning
+- enhancement
+- versioning
+- merge
+- sync
+- history
 created: 2025-11-30
 updated: 2025-12-15
-category: "product-planning"
-status: in_progress
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
-  - /docs/project_plans/PRDs/enhancements/web-ui-consolidation-v1.md
-  - /skillmeat/core/sync.py
-  - /skillmeat/storage/snapshot.py
+- /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
+- /docs/project_plans/PRDs/enhancements/web-ui-consolidation-v1.md
+- /skillmeat/core/sync.py
+- /skillmeat/storage/snapshot.py
+schema_version: 2
+doc_type: prd
+feature_slug: versioning-merge-system
 ---
-
 # PRD: Versioning & Merge System
 
 **Feature Name:** Versioning & Merge System

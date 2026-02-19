@@ -1,17 +1,30 @@
 ---
-title: "Implementation Plan: Versioning & Merge System"
-description: "Detailed phased implementation for artifact version history, rollback, and three-way merge system"
-audience: [ai-agents, developers]
-tags: [implementation, planning, phases, tasks, versioning, merge, sync]
+title: 'Implementation Plan: Versioning & Merge System'
+description: Detailed phased implementation for artifact version history, rollback,
+  and three-way merge system
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- planning
+- phases
+- tasks
+- versioning
+- merge
+- sync
 created: 2025-11-30
 updated: 2025-11-30
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/PRDs/enhancements/versioning-merge-system-v1.md
-  - /docs/project_plans/implementation_plans/features/entity-lifecycle-management-v1.md
+- /docs/project_plans/PRDs/enhancements/versioning-merge-system-v1.md
+- /docs/project_plans/implementation_plans/features/entity-lifecycle-management-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: versioning-merge-system
+prd_ref: null
 ---
-
 # Implementation Plan: Versioning & Merge System
 
 **Plan ID**: `IMPL-2025-11-30-VERSIONING-MERGE`

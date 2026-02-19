@@ -42,6 +42,10 @@ parallelization:
   batch_7:
   - DOC-001
   - DOC-002
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: memory-anchors-provenance
+prd_ref: null
 ---
 
 # Implementation Plan: Memory Anchors & Rich Provenance

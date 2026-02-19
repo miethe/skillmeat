@@ -234,6 +234,9 @@ quality_gates:
 in_progress_tasks: 0
 blocked_tasks: 0
 progress: 100
+schema_version: 2
+doc_type: progress
+feature_slug: clone-based-artifact-indexing
 ---
 
 # Phase 5: Testing & Benchmarks

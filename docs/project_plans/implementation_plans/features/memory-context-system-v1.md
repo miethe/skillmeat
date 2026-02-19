@@ -21,6 +21,10 @@ status: completed
 related:
 - /docs/project_plans/PRDs/features/memory-context-system-v1.md
 - /docs/project_plans/design-specs/memory-context-system-ui-spec.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: memory-context-system
+prd_ref: null
 ---
 
 # Implementation Plan: Memory & Context Intelligence System

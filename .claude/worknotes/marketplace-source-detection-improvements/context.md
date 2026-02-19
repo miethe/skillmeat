@@ -1,8 +1,11 @@
 ---
 type: context
-prd: "marketplace-source-detection-improvements"
+prd: marketplace-source-detection-improvements
 created: 2026-01-05
 updated: 2026-01-05
+schema_version: 2
+doc_type: context
+feature_slug: marketplace-source-detection-improvements
 ---
 
 # Context: Marketplace Source Detection Improvements

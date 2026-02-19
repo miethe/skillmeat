@@ -1,17 +1,28 @@
 ---
-title: "PRD: Discovery & Import Enhancement"
-description: "Improved artifact import status tracking, pre-scan intelligence, skip persistence, and Discovery Tab component"
-audience: [ai-agents, developers]
-tags: [prd, planning, enhancement, discovery, import, ux]
+title: 'PRD: Discovery & Import Enhancement'
+description: Improved artifact import status tracking, pre-scan intelligence, skip
+  persistence, and Discovery Tab component
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- planning
+- enhancement
+- discovery
+- import
+- ux
 created: 2025-12-04
 updated: 2025-12-15
-category: "product-planning"
-status: in_progress
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/PRDs/features/notification-system-v1.md
-  - /docs/project_plans/PRDs/enhancements/smart-import-discovery-v1.md
+- /docs/project_plans/PRDs/features/notification-system-v1.md
+- /docs/project_plans/PRDs/enhancements/smart-import-discovery-v1.md
+schema_version: 2
+doc_type: prd
+feature_slug: discovery-import-enhancement
 ---
-
 # PRD: Discovery & Import Enhancement
 
 **Feature Name:** Discovery & Import Enhancement

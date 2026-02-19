@@ -1,16 +1,26 @@
 ---
-title: "PRD: Research Swarm Skill"
-description: "A specialized, high-capability skill for deep research decomposition, execution, and synthesis using the Workflow Engine."
-audience: [users, prompt-engineers]
-tags: [prd, skill, research, swarm, synthesis]
+title: 'PRD: Research Swarm Skill'
+description: A specialized, high-capability skill for deep research decomposition,
+  execution, and synthesis using the Workflow Engine.
+audience:
+- users
+- prompt-engineers
+tags:
+- prd
+- skill
+- research
+- swarm
+- synthesis
 created: 2026-02-02
 updated: 2026-02-02
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/PRDs/features/workflow-orchestration-v1.md
+- /docs/project_plans/PRDs/features/workflow-orchestration-v1.md
+schema_version: 2
+doc_type: prd
+feature_slug: research-swarm-skill
 ---
-
 # PRD: Research Swarm Skill
 
 **Feature Name:** Research Swarm Skill

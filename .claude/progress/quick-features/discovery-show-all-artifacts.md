@@ -3,9 +3,11 @@ type: quick-feature-plan
 feature_slug: discovery-show-all-artifacts
 request_log_id: null
 status: completed
-completed_at: 2026-01-13T12:30:00Z
-created: 2026-01-13T12:00:00Z
+completed_at: 2026-01-13 12:30:00+00:00
+created: 2026-01-13 12:00:00+00:00
 estimated_scope: medium
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # Discovery Tab: Show All Detected Artifacts

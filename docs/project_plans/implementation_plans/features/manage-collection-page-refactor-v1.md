@@ -1,19 +1,24 @@
 ---
-title: "Implementation Plan: /manage vs /collection Page Architecture Refactor"
-description: "Detailed implementation plan for separating and clarifying the purpose of the /manage (Operations Dashboard) and /collection (Browse & Discover) pages with distinct card components, modals, and cross-navigation."
-status: approved
+title: 'Implementation Plan: /manage vs /collection Page Architecture Refactor'
+description: Detailed implementation plan for separating and clarifying the purpose
+  of the /manage (Operations Dashboard) and /collection (Browse & Discover) pages
+  with distinct card components, modals, and cross-navigation.
+status: inferred_complete
 complexity: Medium
-total_effort: "22-31 hours"
+total_effort: 22-31 hours
 phases: 6
 related_specs:
-  - /docs/design/ui-component-specs-page-refactor.md
-  - /docs/project_plans/reports/manage-collection-page-architecture-analysis.md
-  - /docs/project_plans/PRDs/tools-api-support-v1.md
+- /docs/design/ui-component-specs-page-refactor.md
+- /docs/project_plans/reports/manage-collection-page-architecture-analysis.md
+- /docs/project_plans/PRDs/tools-api-support-v1.md
 created: 2026-02-01
 updated: 2026-02-02
-category: "features"
+category: features
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: manage-collection-page-refactor
+prd_ref: null
 ---
-
 # Implementation Plan: /manage vs /collection Page Architecture Refactor
 
 **Design Foundation**: Option C - Distinct Purpose Pages with Cross-Links (Approved)

@@ -1,133 +1,161 @@
 ---
 type: progress
-prd: "smart-import-discovery-v1"
+prd: smart-import-discovery-v1
 phase: 3
-title: "Frontend Components & Hooks"
+title: Frontend Components & Hooks
 status: pending
 started: null
-updated: "2025-11-30T00:00:00Z"
+updated: '2025-11-30T00:00:00Z'
 completion: 0
 total_tasks: 7
 completed_tasks: 0
-
 tasks:
-  - id: "SID-013"
-    title: "Create Discovery Banner Component"
-    description: "Create skillmeat/web/components/discovery/DiscoveryBanner.tsx"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SID-007"]
-    estimated_time: "1h"
-    story_points: 3
-    acceptance_criteria:
-      - "Display discovered count"
-      - "Review & Import CTA button"
-      - "Dismissible option"
-      - "Accessible keyboard navigation"
-
-  - id: "SID-014"
-    title: "Create Bulk Import Modal/Table"
-    description: "Create skillmeat/web/components/discovery/BulkImportModal.tsx"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SID-007", "SID-008"]
-    estimated_time: "3h"
-    story_points: 8
-    acceptance_criteria:
-      - "Selectable rows with checkboxes"
-      - "Show type, name, version, source, tags columns"
-      - "Editable parameters per row"
-      - "Import All button for selected"
-      - "Loading and error states"
-
-  - id: "SID-015"
-    title: "Create Auto-Population Form"
-    description: "Create skillmeat/web/components/discovery/AutoPopulationForm.tsx"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SID-009"]
-    estimated_time: "3h"
-    story_points: 8
-    acceptance_criteria:
-      - "URL input with debounced fetch"
-      - "Loading state during fetch"
-      - "Auto-fill name, description, author, topics"
-      - "User can edit auto-populated fields"
-      - "Error handling for failed fetches"
-
-  - id: "SID-016"
-    title: "Create Parameter Editor Modal"
-    description: "Create skillmeat/web/components/discovery/ParameterEditorModal.tsx"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SID-010"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "Edit source, version, scope, tags, aliases"
-      - "Client-side validation with error messages"
-      - "Save/Cancel buttons"
-      - "Loading state during save"
-
-  - id: "SID-017"
-    title: "Create React Query Hooks"
-    description: "Create skillmeat/web/hooks/useDiscovery.ts and related hooks"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SID-007", "SID-008", "SID-009", "SID-010"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "useDiscovery() for scan + bulk import"
-      - "useGitHubMetadata() for URL metadata fetch"
-      - "useEditArtifactParameters() for parameter updates"
-      - "Proper TypeScript types"
-      - "Query invalidation on mutations"
-
-  - id: "SID-018"
-    title: "Form Validation & Error States"
-    description: "Implement consistent form validation using react-hook-form + Zod"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SID-015", "SID-016", "SID-017"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "Client-side validation matching backend"
-      - "Real-time feedback on input"
-      - "Clear error messages"
-      - "Loading/success/error toasts"
-
-  - id: "SID-019"
-    title: "Component Integration Tests"
-    description: "Create skillmeat/web/tests/discovery.test.tsx"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SID-013", "SID-014", "SID-015", "SID-016", "SID-017", "SID-018"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - ">70% component coverage"
-      - "Test user interactions"
-      - "Test callback/mutation functions"
-      - "Test error states"
-
+- id: SID-013
+  title: Create Discovery Banner Component
+  description: Create skillmeat/web/components/discovery/DiscoveryBanner.tsx
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SID-007
+  estimated_time: 1h
+  story_points: 3
+  acceptance_criteria:
+  - Display discovered count
+  - Review & Import CTA button
+  - Dismissible option
+  - Accessible keyboard navigation
+- id: SID-014
+  title: Create Bulk Import Modal/Table
+  description: Create skillmeat/web/components/discovery/BulkImportModal.tsx
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SID-007
+  - SID-008
+  estimated_time: 3h
+  story_points: 8
+  acceptance_criteria:
+  - Selectable rows with checkboxes
+  - Show type, name, version, source, tags columns
+  - Editable parameters per row
+  - Import All button for selected
+  - Loading and error states
+- id: SID-015
+  title: Create Auto-Population Form
+  description: Create skillmeat/web/components/discovery/AutoPopulationForm.tsx
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SID-009
+  estimated_time: 3h
+  story_points: 8
+  acceptance_criteria:
+  - URL input with debounced fetch
+  - Loading state during fetch
+  - Auto-fill name, description, author, topics
+  - User can edit auto-populated fields
+  - Error handling for failed fetches
+- id: SID-016
+  title: Create Parameter Editor Modal
+  description: Create skillmeat/web/components/discovery/ParameterEditorModal.tsx
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SID-010
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - Edit source, version, scope, tags, aliases
+  - Client-side validation with error messages
+  - Save/Cancel buttons
+  - Loading state during save
+- id: SID-017
+  title: Create React Query Hooks
+  description: Create skillmeat/web/hooks/useDiscovery.ts and related hooks
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SID-007
+  - SID-008
+  - SID-009
+  - SID-010
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - useDiscovery() for scan + bulk import
+  - useGitHubMetadata() for URL metadata fetch
+  - useEditArtifactParameters() for parameter updates
+  - Proper TypeScript types
+  - Query invalidation on mutations
+- id: SID-018
+  title: Form Validation & Error States
+  description: Implement consistent form validation using react-hook-form + Zod
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SID-015
+  - SID-016
+  - SID-017
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - Client-side validation matching backend
+  - Real-time feedback on input
+  - Clear error messages
+  - Loading/success/error toasts
+- id: SID-019
+  title: Component Integration Tests
+  description: Create skillmeat/web/tests/discovery.test.tsx
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SID-013
+  - SID-014
+  - SID-015
+  - SID-016
+  - SID-017
+  - SID-018
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - '>70% component coverage'
+  - Test user interactions
+  - Test callback/mutation functions
+  - Test error states
 parallelization:
-  batch_1: ["SID-013", "SID-014", "SID-015", "SID-016"]
-  batch_2: ["SID-017"]
-  batch_3: ["SID-018", "SID-019"]
-  critical_path: ["SID-014", "SID-017", "SID-019"]
-  estimated_total_time: "12h"
-
+  batch_1:
+  - SID-013
+  - SID-014
+  - SID-015
+  - SID-016
+  batch_2:
+  - SID-017
+  batch_3:
+  - SID-018
+  - SID-019
+  critical_path:
+  - SID-014
+  - SID-017
+  - SID-019
+  estimated_total_time: 12h
 blockers: []
-
 quality_gates:
-  - "All 4 components render correctly in isolation and integrated"
-  - "React Query hooks properly handle async operations"
-  - "Form validation matches backend validation"
-  - "Loading states properly displayed"
-  - "Error messages clear and actionable"
-  - "Component tests >70% coverage"
+- All 4 components render correctly in isolation and integrated
+- React Query hooks properly handle async operations
+- Form validation matches backend validation
+- Loading states properly displayed
+- Error messages clear and actionable
+- Component tests >70% coverage
+schema_version: 2
+doc_type: progress
+feature_slug: smart-import-discovery-v1
 ---
 
 # Phase 3: Frontend Components & Hooks

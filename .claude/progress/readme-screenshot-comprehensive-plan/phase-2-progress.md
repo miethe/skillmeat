@@ -47,6 +47,9 @@ success_criteria:
 - All 6 README screenshots captured - COMPLETE
 - Feature screenshots captured (12 of 35)
 - screenshots.json updated - COMPLETE
+schema_version: 2
+doc_type: progress
+feature_slug: readme-screenshot-comprehensive-plan
 ---
 # Phase 2: Screenshot Capture
 

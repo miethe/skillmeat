@@ -1,33 +1,43 @@
 ---
 type: progress
-prd: "artifact-flow-modal-redesign"
+prd: artifact-flow-modal-redesign
 phase: 2
-title: "SyncStatusTab Composite Component"
+title: SyncStatusTab Composite Component
 status: complete
 progress: 100
 total_tasks: 1
 completed_tasks: 1
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["ui-engineer-enhanced"]
-created: "2025-11-29"
-updated: "2025-11-29"
-
+owners:
+- ui-engineer-enhanced
+created: '2025-11-29'
+updated: '2025-11-29'
 tasks:
-  - id: "TASK-2.1"
-    description: "Create SyncStatusTab orchestration component (~300 lines)"
-    status: "complete"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-1.1", "TASK-1.2", "TASK-1.3", "TASK-1.4", "TASK-1.5"]
-    estimated_effort: "3h"
-    priority: "high"
-    file: "skillmeat/web/components/sync-status/sync-status-tab.tsx"
-    actual_lines: 476
-    completed_at: "2025-11-29"
-
+- id: TASK-2.1
+  description: Create SyncStatusTab orchestration component (~300 lines)
+  status: complete
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-1.1
+  - TASK-1.2
+  - TASK-1.3
+  - TASK-1.4
+  - TASK-1.5
+  estimated_effort: 3h
+  priority: high
+  file: skillmeat/web/components/sync-status/sync-status-tab.tsx
+  actual_lines: 476
+  completed_at: '2025-11-29'
 parallelization:
-  batch_1: ["TASK-2.1"]
-  critical_path: ["TASK-2.1"]
+  batch_1:
+  - TASK-2.1
+  critical_path:
+  - TASK-2.1
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-flow-modal-redesign
 ---
 
 # Phase 2: SyncStatusTab Composite Component

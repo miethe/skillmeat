@@ -7,6 +7,9 @@ progress: 0
 created: 2026-01-18
 updated: 2026-01-18
 source: docs/project_plans/implementation_plans/enhancements/marketplace-sources-enhancement-v1/phase-4-6-frontend.md
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-sources-enhancement-v1
 ---
 # Phase 4-6 Progress: Frontend Implementation
 

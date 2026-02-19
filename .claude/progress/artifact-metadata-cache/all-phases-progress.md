@@ -1,441 +1,526 @@
 ---
 type: progress
-prd: "artifact-metadata-cache-v1"
+prd: artifact-metadata-cache-v1
 status: completed
 progress: 100
 total_phases: 5
 total_tasks: 26
-estimated_effort: "12-16 hours (Phases 1-4) + 6-8 hours (Phase 5 future)"
+estimated_effort: 12-16 hours (Phases 1-4) + 6-8 hours (Phase 5 future)
 start_date: 2026-02-01
-
 parallelization:
   batch_1:
     phase: 1
-    tasks: [TASK-1.1, TASK-1.2, TASK-1.3, TASK-1.4, TASK-1.5]
+    tasks:
+    - TASK-1.1
+    - TASK-1.2
+    - TASK-1.3
+    - TASK-1.4
+    - TASK-1.5
     max_parallel: 3
     blocked_by: []
   batch_2:
     phase: 2
-    tasks: [TASK-2.1, TASK-2.2, TASK-2.3, TASK-2.4, TASK-2.5, TASK-2.6, TASK-2.7, TASK-2.8, TASK-2.9]
+    tasks:
+    - TASK-2.1
+    - TASK-2.2
+    - TASK-2.3
+    - TASK-2.4
+    - TASK-2.5
+    - TASK-2.6
+    - TASK-2.7
+    - TASK-2.8
+    - TASK-2.9
     max_parallel: 3
-    blocked_by: [TASK-1.4]
+    blocked_by:
+    - TASK-1.4
   batch_3:
     phase: 3
-    tasks: [TASK-3.1, TASK-3.2, TASK-3.3, TASK-3.4]
+    tasks:
+    - TASK-3.1
+    - TASK-3.2
+    - TASK-3.3
+    - TASK-3.4
     max_parallel: 2
-    blocked_by: [TASK-2.2]
+    blocked_by:
+    - TASK-2.2
   batch_4:
     phase: 4
-    tasks: [TASK-4.1, TASK-4.2, TASK-4.3]
+    tasks:
+    - TASK-4.1
+    - TASK-4.2
+    - TASK-4.3
     max_parallel: 2
-    blocked_by: [TASK-2.1, TASK-2.2]
+    blocked_by:
+    - TASK-2.1
+    - TASK-2.2
     optional: true
   batch_5:
     phase: 5
-    tasks: [TASK-5.1, TASK-5.2, TASK-5.3, TASK-5.4, TASK-5.5]
+    tasks:
+    - TASK-5.1
+    - TASK-5.2
+    - TASK-5.3
+    - TASK-5.4
+    - TASK-5.5
     max_parallel: 2
-    blocked_by: [TASK-3.1]
+    blocked_by:
+    - TASK-3.1
     future: true
-    notes: "Groundwork only - implementation deferred until web editing feature prioritized"
-
+    notes: Groundwork only - implementation deferred until web editing feature prioritized
 tasks:
   TASK-1.1:
     id: TASK-1.1
-    title: "Add metadata fields to CollectionArtifact model"
-    description: "Extend skillmeat/cache/models.py CollectionArtifact model with description, author, license, tags_json, version, source, origin, origin_source, resolved_sha, resolved_version, synced_at fields"
+    title: Add metadata fields to CollectionArtifact model
+    description: Extend skillmeat/cache/models.py CollectionArtifact model with description,
+      author, license, tags_json, version, source, origin, origin_source, resolved_sha,
+      resolved_version, synced_at fields
     phase: 1
     status: completed
     assigned_to: python-backend-engineer
     priority: high
-    effort: "30-40 min"
+    effort: 30-40 min
     dependencies: []
     files:
-      - skillmeat/cache/models.py
-    notes: "Use SQLAlchemy Column types: String, Text, DateTime; tags_json stores JSON array string"
-
+    - skillmeat/cache/models.py
+    notes: 'Use SQLAlchemy Column types: String, Text, DateTime; tags_json stores
+      JSON array string'
   TASK-1.2:
     id: TASK-1.2
-    title: "Create Alembic migration for CollectionArtifact cache fields"
-    description: "Generate and verify migration to add new cache columns to collection_artifacts table without breaking existing data"
+    title: Create Alembic migration for CollectionArtifact cache fields
+    description: Generate and verify migration to add new cache columns to collection_artifacts
+      table without breaking existing data
     phase: 1
     status: completed
     assigned_to: python-backend-engineer
     priority: high
-    effort: "20-30 min"
-    dependencies: [TASK-1.1]
+    effort: 20-30 min
+    dependencies:
+    - TASK-1.1
     files:
-      - skillmeat/cache/migrations/versions/
-    notes: "Use nullable=True for all new columns initially; test upgrade/downgrade"
-
+    - skillmeat/cache/migrations/versions/
+    notes: Use nullable=True for all new columns initially; test upgrade/downgrade
   TASK-1.3:
     id: TASK-1.3
-    title: "Create populate_collection_artifact_metadata() function"
-    description: "Implement populate_collection_artifact_metadata(session, artifact_mgr, collection_mgr) in skillmeat/api/routers/user_collections.py that reads file-based artifacts and upserts CollectionArtifact cache records"
+    title: Create populate_collection_artifact_metadata() function
+    description: Implement populate_collection_artifact_metadata(session, artifact_mgr,
+      collection_mgr) in skillmeat/api/routers/user_collections.py that reads file-based
+      artifacts and upserts CollectionArtifact cache records
     phase: 1
     status: completed
     assigned_to: python-backend-engineer
     priority: high
-    effort: "45-60 min"
-    dependencies: [TASK-1.1]
+    effort: 45-60 min
+    dependencies:
+    - TASK-1.1
     files:
-      - skillmeat/api/routers/user_collections.py
-      - skillmeat/core/artifact.py
-    notes: "Extract metadata from ArtifactMetadata; store tags_json; set synced_at=now()"
-
+    - skillmeat/api/routers/user_collections.py
+    - skillmeat/core/artifact.py
+    notes: Extract metadata from ArtifactMetadata; store tags_json; set synced_at=now()
   TASK-1.4:
     id: TASK-1.4
-    title: "Integrate with migrate_artifacts_to_default_collection()"
-    description: "Modify migrate_artifacts_to_default_collection() to call populate_collection_artifact_metadata() after creating CollectionArtifact associations"
+    title: Integrate with migrate_artifacts_to_default_collection()
+    description: Modify migrate_artifacts_to_default_collection() to call populate_collection_artifact_metadata()
+      after creating CollectionArtifact associations
     phase: 1
     status: completed
     assigned_to: python-backend-engineer
     priority: high
-    effort: "15-20 min"
-    dependencies: [TASK-1.3]
+    effort: 15-20 min
+    dependencies:
+    - TASK-1.3
     files:
-      - skillmeat/api/routers/user_collections.py
-    notes: "Call populate_collection_artifact_metadata() at end of migration function; ensure transactional consistency"
-
+    - skillmeat/api/routers/user_collections.py
+    notes: Call populate_collection_artifact_metadata() at end of migration function;
+      ensure transactional consistency
   TASK-1.5:
     id: TASK-1.5
-    title: "Add startup sync logging"
-    description: "Log startup CollectionArtifact cache population: count of artifacts synced, fields populated, any errors encountered"
+    title: Add startup sync logging
+    description: 'Log startup CollectionArtifact cache population: count of artifacts
+      synced, fields populated, any errors encountered'
     phase: 1
     status: completed
     assigned_to: python-backend-engineer
     priority: medium
-    effort: "10-15 min"
-    dependencies: [TASK-1.4]
+    effort: 10-15 min
+    dependencies:
+    - TASK-1.4
     files:
-      - skillmeat/api/server.py
-      - skillmeat/api/routers/user_collections.py
-    notes: "Use structured logging; log before and after populate_collection_artifact_metadata() call"
-
+    - skillmeat/api/server.py
+    - skillmeat/api/routers/user_collections.py
+    notes: Use structured logging; log before and after populate_collection_artifact_metadata()
+      call
   TASK-2.1:
     id: TASK-2.1
-    title: "Create DB cache refresh endpoint (scoped)"
-    description: "Implement POST /api/v1/user-collections/{collection_id}/refresh-cache to fetch file-based metadata and update CollectionArtifact cache rows for a DB collection"
+    title: Create DB cache refresh endpoint (scoped)
+    description: Implement POST /api/v1/user-collections/{collection_id}/refresh-cache
+      to fetch file-based metadata and update CollectionArtifact cache rows for a
+      DB collection
     phase: 2
     status: completed
     assigned_to: python-backend-engineer
     priority: high
-    effort: "40-50 min"
-    dependencies: [TASK-1.4]
+    effort: 40-50 min
+    dependencies:
+    - TASK-1.4
     files:
-      - skillmeat/api/routers/user_collections.py
-      - skillmeat/api/schemas/user_collections.py
-    notes: "Keep separate from /{collection_id}/refresh (file-based) to avoid collisions"
-
+    - skillmeat/api/routers/user_collections.py
+    - skillmeat/api/schemas/user_collections.py
+    notes: Keep separate from /{collection_id}/refresh (file-based) to avoid collisions
   TASK-2.2:
     id: TASK-2.2
-    title: "Create batch refresh endpoint (all collections)"
-    description: "Implement POST /api/v1/user-collections/refresh-cache to refresh CollectionArtifact cache across all DB collections"
+    title: Create batch refresh endpoint (all collections)
+    description: Implement POST /api/v1/user-collections/refresh-cache to refresh
+      CollectionArtifact cache across all DB collections
     phase: 2
     status: completed
     assigned_to: python-backend-engineer
     priority: high
-    effort: "50-60 min"
-    dependencies: [TASK-1.4]
+    effort: 50-60 min
+    dependencies:
+    - TASK-1.4
     files:
-      - skillmeat/api/routers/user_collections.py
-      - skillmeat/api/schemas/user_collections.py
-    notes: "Return {collections_refreshed, artifacts_refreshed, skipped, errors}"
-
+    - skillmeat/api/routers/user_collections.py
+    - skillmeat/api/schemas/user_collections.py
+    notes: Return {collections_refreshed, artifacts_refreshed, skipped, errors}
   TASK-2.3:
     id: TASK-2.3
-    title: "Add endpoint parameters validation"
-    description: "Validate request parameters: collection_id ownership and request payload; enforce rate limiting for refresh-cache operations"
+    title: Add endpoint parameters validation
+    description: 'Validate request parameters: collection_id ownership and request
+      payload; enforce rate limiting for refresh-cache operations'
     phase: 2
     status: completed
     assigned_to: python-backend-engineer
     priority: medium
-    effort: "20-30 min"
-    dependencies: [TASK-2.1, TASK-2.2]
+    effort: 20-30 min
+    dependencies:
+    - TASK-2.1
+    - TASK-2.2
     files:
-      - skillmeat/api/schemas/user_collections.py
-      - skillmeat/api/middleware/rate_limit.py
-    notes: "Use Pydantic validators; ensure DB collection exists before refresh"
-
+    - skillmeat/api/schemas/user_collections.py
+    - skillmeat/api/middleware/rate_limit.py
+    notes: Use Pydantic validators; ensure DB collection exists before refresh
   TASK-2.4:
     id: TASK-2.4
-    title: "Add error handling and logging"
-    description: "Implement comprehensive error handling for refresh-cache endpoints: malformed metadata, missing fields, collection not found"
+    title: Add error handling and logging
+    description: 'Implement comprehensive error handling for refresh-cache endpoints:
+      malformed metadata, missing fields, collection not found'
     phase: 2
     status: completed
     assigned_to: python-backend-engineer
     priority: high
-    effort: "30-40 min"
-    dependencies: [TASK-2.1, TASK-2.2]
+    effort: 30-40 min
+    dependencies:
+    - TASK-2.1
+    - TASK-2.2
     files:
-      - skillmeat/api/routers/user_collections.py
-      - skillmeat/api/schemas/user_collections.py
-    notes: "Log all errors with context; return detailed error messages in 400/500 responses; track error metrics"
-
+    - skillmeat/api/routers/user_collections.py
+    - skillmeat/api/schemas/user_collections.py
+    notes: Log all errors with context; return detailed error messages in 400/500
+      responses; track error metrics
   TASK-2.5:
     id: TASK-2.5
-    title: "Add unit tests for endpoints"
-    description: "Test refresh-cache endpoints: successful refresh, missing collections, partial failures, batch operations"
+    title: Add unit tests for endpoints
+    description: 'Test refresh-cache endpoints: successful refresh, missing collections,
+      partial failures, batch operations'
     phase: 2
     status: completed
     assigned_to: python-backend-engineer
     priority: high
-    effort: "45-60 min"
-    dependencies: [TASK-2.1, TASK-2.2, TASK-2.4]
+    effort: 45-60 min
+    dependencies:
+    - TASK-2.1
+    - TASK-2.2
+    - TASK-2.4
     files:
-      - skillmeat/api/tests/test_user_collections.py
-    notes: "Mock ArtifactManager; verify CollectionArtifact cache fields updated"
-
+    - skillmeat/api/tests/test_user_collections.py
+    notes: Mock ArtifactManager; verify CollectionArtifact cache fields updated
   TASK-2.6:
     id: TASK-2.6
-    title: "Hook deploy endpoint to refresh cache"
-    description: "After artifacts.py deploy_artifact() completes file operation, trigger cache refresh for deployed artifact"
+    title: Hook deploy endpoint to refresh cache
+    description: After artifacts.py deploy_artifact() completes file operation, trigger
+      cache refresh for deployed artifact
     phase: 2
     status: completed
     assigned_to: python-backend-engineer
     priority: high
-    effort: "30 min"
-    dependencies: [TASK-2.1]
+    effort: 30 min
+    dependencies:
+    - TASK-2.1
     files:
-      - skillmeat/api/routers/artifacts.py
-      - skillmeat/api/services/artifact_cache_service.py
-    notes: "Deploy via web auto-refreshes DB cache; no manual refresh needed; graceful failure handling"
-
+    - skillmeat/api/routers/artifacts.py
+    - skillmeat/api/services/artifact_cache_service.py
+    notes: Deploy via web auto-refreshes DB cache; no manual refresh needed; graceful
+      failure handling
   TASK-2.7:
     id: TASK-2.7
-    title: "Hook sync endpoint to refresh cache"
-    description: "After artifacts.py sync_artifact() completes file operation, trigger cache refresh for synced artifact"
+    title: Hook sync endpoint to refresh cache
+    description: After artifacts.py sync_artifact() completes file operation, trigger
+      cache refresh for synced artifact
     phase: 2
     status: completed
     assigned_to: python-backend-engineer
     priority: high
-    effort: "30 min"
-    dependencies: [TASK-2.1]
+    effort: 30 min
+    dependencies:
+    - TASK-2.1
     files:
-      - skillmeat/api/routers/artifacts.py
-      - skillmeat/api/services/artifact_cache_service.py
-    notes: "Sync via web auto-refreshes DB cache; version changes reflected immediately; graceful failure handling"
-
+    - skillmeat/api/routers/artifacts.py
+    - skillmeat/api/services/artifact_cache_service.py
+    notes: Sync via web auto-refreshes DB cache; version changes reflected immediately;
+      graceful failure handling
   TASK-2.8:
     id: TASK-2.8
-    title: "Hook create/update/delete endpoints"
-    description: "After create/update/delete operations, refresh or invalidate cache for affected artifacts"
+    title: Hook create/update/delete endpoints
+    description: After create/update/delete operations, refresh or invalidate cache
+      for affected artifacts
     phase: 2
     status: completed
     assigned_to: python-backend-engineer
     priority: medium
-    effort: "25-35 min"
-    dependencies: [TASK-2.1]
+    effort: 25-35 min
+    dependencies:
+    - TASK-2.1
     files:
-      - skillmeat/api/routers/artifacts.py
-      - skillmeat/api/services/artifact_cache_service.py
-    notes: "Ensure cache stays fresh after file mutations; handle errors gracefully"
-
+    - skillmeat/api/routers/artifacts.py
+    - skillmeat/api/services/artifact_cache_service.py
+    notes: Ensure cache stays fresh after file mutations; handle errors gracefully
   TASK-2.9:
     id: TASK-2.9
-    title: "Make /user-collections read path DB-first"
-    description: "Use CollectionArtifact cache as primary source; fallback to filesystem only on cache miss"
+    title: Make /user-collections read path DB-first
+    description: Use CollectionArtifact cache as primary source; fallback to filesystem
+      only on cache miss
     phase: 2
     status: completed
     assigned_to: python-backend-engineer
     priority: high
-    effort: "45-60 min"
-    dependencies: [TASK-1.4]
+    effort: 45-60 min
+    dependencies:
+    - TASK-1.4
     files:
-      - skillmeat/api/routers/user_collections.py
-    notes: "Build ArtifactSummary from cached fields; keep marketplace fallback last"
-
+    - skillmeat/api/routers/user_collections.py
+    notes: Build ArtifactSummary from cached fields; keep marketplace fallback last
   TASK-3.1:
     id: TASK-3.1
-    title: "Create staleness detection service"
-    description: "Implement ArtifactCacheService.find_stale_artifacts() for CollectionArtifact cache rows based on synced_at and TTL"
+    title: Create staleness detection service
+    description: Implement ArtifactCacheService.find_stale_artifacts() for CollectionArtifact
+      cache rows based on synced_at and TTL
     phase: 3
     status: completed
     assigned_to: python-backend-engineer
     priority: high
-    effort: "25-35 min"
-    dependencies: [TASK-2.2]
+    effort: 25-35 min
+    dependencies:
+    - TASK-2.2
     files:
-      - skillmeat/api/services/artifact_cache_service.py
-    notes: "Compare CollectionArtifact.synced_at against current time; configurable TTL; return stale count for monitoring"
-
+    - skillmeat/api/services/artifact_cache_service.py
+    notes: Compare CollectionArtifact.synced_at against current time; configurable
+      TTL; return stale count for monitoring
   TASK-3.2:
     id: TASK-3.2
-    title: "Create cache invalidation hook"
-    description: "Implement invalidation mechanism triggered by collection add/remove operations; mark affected cache rows stale"
+    title: Create cache invalidation hook
+    description: Implement invalidation mechanism triggered by collection add/remove
+      operations; mark affected cache rows stale
     phase: 3
     status: completed
     assigned_to: python-backend-engineer
     priority: high
-    effort: "35-45 min"
-    dependencies: [TASK-3.1]
+    effort: 35-45 min
+    dependencies:
+    - TASK-3.1
     files:
-      - skillmeat/api/services/artifact_cache_service.py
-      - skillmeat/api/routers/user_collections.py
-    notes: "Invalidate by collection_id + artifact_id; refresh via refresh-cache endpoint when needed"
-
+    - skillmeat/api/services/artifact_cache_service.py
+    - skillmeat/api/routers/user_collections.py
+    notes: Invalidate by collection_id + artifact_id; refresh via refresh-cache endpoint
+      when needed
   TASK-3.3:
     id: TASK-3.3
-    title: "Create background refresh task (optional)"
-    description: "Implement optional background task to periodically refresh stale CollectionArtifact metadata without blocking API requests"
+    title: Create background refresh task (optional)
+    description: Implement optional background task to periodically refresh stale
+      CollectionArtifact metadata without blocking API requests
     phase: 3
     status: completed
     assigned_to: python-backend-engineer
     priority: low
-    effort: "40-50 min"
-    dependencies: [TASK-3.1, TASK-3.2]
+    effort: 40-50 min
+    dependencies:
+    - TASK-3.1
+    - TASK-3.2
     files:
-      - skillmeat/api/services/background_tasks.py
-      - skillmeat/api/server.py
-    notes: "Optional: start with manual refresh via endpoint, add background task if performance metrics warrant"
-
+    - skillmeat/api/services/background_tasks.py
+    - skillmeat/api/server.py
+    notes: 'Optional: start with manual refresh via endpoint, add background task
+      if performance metrics warrant'
   TASK-3.4:
     id: TASK-3.4
-    title: "Add monitoring metrics"
-    description: "Track cache hit rate, refresh latency, stale cache row count; emit to observability system for dashboard"
+    title: Add monitoring metrics
+    description: Track cache hit rate, refresh latency, stale cache row count; emit
+      to observability system for dashboard
     phase: 3
     status: completed
     assigned_to: python-backend-engineer
     priority: medium
-    effort: "20-30 min"
-    dependencies: [TASK-3.1, TASK-3.2]
+    effort: 20-30 min
+    dependencies:
+    - TASK-3.1
+    - TASK-3.2
     files:
-      - skillmeat/api/services/artifact_cache_service.py
-      - skillmeat/observability/metrics.py
-    notes: "Use Prometheus-style metrics; track: hits, misses, refresh_duration, stale_count"
-
+    - skillmeat/api/services/artifact_cache_service.py
+    - skillmeat/observability/metrics.py
+    notes: 'Use Prometheus-style metrics; track: hits, misses, refresh_duration, stale_count'
   TASK-4.1:
     id: TASK-4.1
-    title: "Add refresh-cache hook to CLI add command"
-    description: "Integrate refresh-cache endpoint call into CLI add command; after artifact added to collection.toml, trigger API to populate cache"
+    title: Add refresh-cache hook to CLI add command
+    description: Integrate refresh-cache endpoint call into CLI add command; after
+      artifact added to collection.toml, trigger API to populate cache
     phase: 4
     status: completed
     assigned_to: python-backend-engineer
     priority: medium
-    effort: "20-25 min"
-    dependencies: [TASK-2.1]
+    effort: 20-25 min
+    dependencies:
+    - TASK-2.1
     files:
-      - skillmeat/cli.py
-    notes: "Implemented _refresh_api_cache() function and integrated into _add_artifact_from_spec(); gracefully handles API unavailability"
-
+    - skillmeat/cli.py
+    notes: Implemented _refresh_api_cache() function and integrated into _add_artifact_from_spec();
+      gracefully handles API unavailability
   TASK-4.2:
     id: TASK-4.2
-    title: "Add refresh-cache hook to CLI sync command"
-    description: "Integrate refresh-cache endpoint call into CLI sync command; after collection.toml synced, trigger batch refresh"
+    title: Add refresh-cache hook to CLI sync command
+    description: Integrate refresh-cache endpoint call into CLI sync command; after
+      collection.toml synced, trigger batch refresh
     phase: 4
     status: completed
     assigned_to: python-backend-engineer
     priority: medium
-    effort: "20-25 min"
-    dependencies: [TASK-2.2]
+    effort: 20-25 min
+    dependencies:
+    - TASK-2.2
     files:
-      - skillmeat/cli.py
-    notes: "Added _refresh_api_cache_batch() function and integrated into sync_pull_cmd; shows refresh stats on success"
-
+    - skillmeat/cli.py
+    notes: Added _refresh_api_cache_batch() function and integrated into sync_pull_cmd;
+      shows refresh stats on success
   TASK-4.3:
     id: TASK-4.3
-    title: "Test end-to-end CLI→API→DB flow"
-    description: "E2E test: CLI add artifact → API syncs metadata → database updated → API query returns full data"
+    title: "Test end-to-end CLI\u2192API\u2192DB flow"
+    description: "E2E test: CLI add artifact \u2192 API syncs metadata \u2192 database\
+      \ updated \u2192 API query returns full data"
     phase: 4
     status: completed
     assigned_to: python-backend-engineer
     priority: medium
-    effort: "25-30 min"
-    dependencies: [TASK-4.1, TASK-4.2]
+    effort: 25-30 min
+    dependencies:
+    - TASK-4.1
+    - TASK-4.2
     files:
-      - tests/test_cli_artifact_sync.py
-    notes: "Created 31 unit tests for _refresh_api_cache() and _refresh_api_cache_batch() functions covering: success, errors, timeouts, connection failures, graceful degradation, endpoint formats, timeouts, and response handling"
-
-  # Phase 5: Web-Based Artifact Editing Groundwork (FUTURE)
-  # Groundwork only - implementation deferred until web editing feature prioritized
-
+    - tests/test_cli_artifact_sync.py
+    notes: 'Created 31 unit tests for _refresh_api_cache() and _refresh_api_cache_batch()
+      functions covering: success, errors, timeouts, connection failures, graceful
+      degradation, endpoint formats, timeouts, and response handling'
   TASK-5.1:
     id: TASK-5.1
-    title: "Create artifact metadata write service"
-    description: "Service that writes metadata changes to file system (collection.toml and artifact frontmatter). File system is source of truth."
+    title: Create artifact metadata write service
+    description: Service that writes metadata changes to file system (collection.toml
+      and artifact frontmatter). File system is source of truth.
     phase: 5
     status: future
     assigned_to: python-backend-engineer
     priority: low
-    effort: "2h"
-    dependencies: [TASK-3.1]
+    effort: 2h
+    dependencies:
+    - TASK-3.1
     files:
-      - skillmeat/api/services/artifact_write_service.py
-    notes: "FUTURE: Ensures correct data flow Web → File → DB. Writes to correct file locations; preserves existing data; handles TOML/YAML correctly"
-
+    - skillmeat/api/services/artifact_write_service.py
+    notes: "FUTURE: Ensures correct data flow Web \u2192 File \u2192 DB. Writes to\
+      \ correct file locations; preserves existing data; handles TOML/YAML correctly"
   TASK-5.2:
     id: TASK-5.2
-    title: "Create PUT /api/v1/artifacts/{id}/metadata endpoint"
-    description: "API endpoint for updating artifact metadata via web. Writes to file system first, then refreshes cache."
+    title: Create PUT /api/v1/artifacts/{id}/metadata endpoint
+    description: API endpoint for updating artifact metadata via web. Writes to file
+      system first, then refreshes cache.
     phase: 5
     status: future
     assigned_to: python-backend-engineer
     priority: low
-    effort: "1.5h"
-    dependencies: [TASK-5.1]
+    effort: 1.5h
+    dependencies:
+    - TASK-5.1
     files:
-      - skillmeat/api/routers/artifacts.py
-      - skillmeat/api/schemas/artifacts.py
-    notes: "FUTURE: Validates input; calls write service; refreshes cache; returns updated artifact"
-
+    - skillmeat/api/routers/artifacts.py
+    - skillmeat/api/schemas/artifacts.py
+    notes: 'FUTURE: Validates input; calls write service; refreshes cache; returns
+      updated artifact'
   TASK-5.3:
     id: TASK-5.3
-    title: "Create POST /api/v1/artifacts endpoint (web add)"
-    description: "API endpoint for adding new artifacts via web UI. Creates file-based artifact first, then syncs to cache."
+    title: Create POST /api/v1/artifacts endpoint (web add)
+    description: API endpoint for adding new artifacts via web UI. Creates file-based
+      artifact first, then syncs to cache.
     phase: 5
     status: future
     assigned_to: python-backend-engineer
     priority: low
-    effort: "2h"
-    dependencies: [TASK-5.1]
+    effort: 2h
+    dependencies:
+    - TASK-5.1
     files:
-      - skillmeat/api/routers/artifacts.py
-      - skillmeat/api/services/artifact_write_service.py
-    notes: "FUTURE: Creates artifact in file system; adds to collection.toml; syncs to DB cache"
-
+    - skillmeat/api/routers/artifacts.py
+    - skillmeat/api/services/artifact_write_service.py
+    notes: 'FUTURE: Creates artifact in file system; adds to collection.toml; syncs
+      to DB cache'
   TASK-5.4:
     id: TASK-5.4
-    title: "Add optimistic locking"
-    description: "Prevent concurrent edits from CLI and web causing conflicts. Version/hash check before write."
+    title: Add optimistic locking
+    description: Prevent concurrent edits from CLI and web causing conflicts. Version/hash
+      check before write.
     phase: 5
     status: future
     assigned_to: python-backend-engineer
     priority: low
-    effort: "1h"
-    dependencies: [TASK-5.2]
+    effort: 1h
+    dependencies:
+    - TASK-5.2
     files:
-      - skillmeat/api/services/artifact_write_service.py
-      - skillmeat/api/routers/artifacts.py
-    notes: "FUTURE: Returns 409 Conflict on version mismatch; prevents lost updates"
-
+    - skillmeat/api/services/artifact_write_service.py
+    - skillmeat/api/routers/artifacts.py
+    notes: 'FUTURE: Returns 409 Conflict on version mismatch; prevents lost updates'
   TASK-5.5:
     id: TASK-5.5
-    title: "Create web UI for metadata editing"
-    description: "Frontend form for editing artifact description, tags, author, license. Follows Design Principles."
+    title: Create web UI for metadata editing
+    description: Frontend form for editing artifact description, tags, author, license.
+      Follows Design Principles.
     phase: 5
     status: future
     assigned_to: ui-engineer-enhanced
     priority: low
-    effort: "2h"
-    dependencies: [TASK-5.2]
+    effort: 2h
+    dependencies:
+    - TASK-5.2
     files:
-      - skillmeat/web/components/artifacts/metadata-edit-form.tsx
-      - skillmeat/web/app/artifacts/[id]/edit/page.tsx
-    notes: "FUTURE: Form validates input; shows loading state; handles errors; uses existing shadcn components"
-
+    - skillmeat/web/components/artifacts/metadata-edit-form.tsx
+    - skillmeat/web/app/artifacts/[id]/edit/page.tsx
+    notes: 'FUTURE: Form validates input; shows loading state; handles errors; uses
+      existing shadcn components'
 completion_criteria:
-  Phase 1: "CollectionArtifact cache fields added, migration applied, startup sync populates cache with 100% of artifacts"
-  Phase 2: "Refresh-cache endpoints tested with 95%+ success rate; cache hooks auto-refresh on deploy/sync/create/delete; /user-collections read path DB-first"
-  Phase 3: "Staleness detection working, invalidation triggers on collection changes, metrics emitted"
-  Phase 4: "CLI commands integrated and E2E tested (optional); all refresh-cache mechanisms coordinated"
-  Phase 5: "FUTURE: Write service writes to file system; PUT endpoint refreshes cache after file write; optimistic locking prevents conflicts"
-
+  Phase 1: CollectionArtifact cache fields added, migration applied, startup sync
+    populates cache with 100% of artifacts
+  Phase 2: Refresh-cache endpoints tested with 95%+ success rate; cache hooks auto-refresh
+    on deploy/sync/create/delete; /user-collections read path DB-first
+  Phase 3: Staleness detection working, invalidation triggers on collection changes,
+    metrics emitted
+  Phase 4: CLI commands integrated and E2E tested (optional); all refresh-cache mechanisms
+    coordinated
+  Phase 5: 'FUTURE: Write service writes to file system; PUT endpoint refreshes cache
+    after file write; optimistic locking prevents conflicts'
 success_metrics:
-  - "CollectionArtifact cache contains metadata for 100% of file-based artifacts"
-  - "/collection page response time <100ms (database-backed)"
-  - "Cache invalidation automatic and reliable"
-  - "Metadata staleness bounded by TTL (default 30 min)"
-  - "Web deploy/sync operations auto-refresh cache (no manual refresh needed)"
-  - "FUTURE: Web editing writes to file first, then refreshes cache (correct data flow)"
+- CollectionArtifact cache contains metadata for 100% of file-based artifacts
+- /collection page response time <100ms (database-backed)
+- Cache invalidation automatic and reliable
+- Metadata staleness bounded by TTL (default 30 min)
+- Web deploy/sync operations auto-refresh cache (no manual refresh needed)
+- 'FUTURE: Web editing writes to file first, then refreshes cache (correct data flow)'
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-metadata-cache-v1
 ---
 
 # Artifact Metadata Cache v1 Progress

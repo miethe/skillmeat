@@ -1,17 +1,29 @@
 ---
-title: "Implementation Plan: Deployment Statistics In-Memory Cache"
-description: "Cache deployment statistics to eliminate repeated filesystem scanning when viewing Sync Status tab"
-audience: [ai-agents, developers]
-tags: [implementation, cache, performance, backend, sync]
+title: 'Implementation Plan: Deployment Statistics In-Memory Cache'
+description: Cache deployment statistics to eliminate repeated filesystem scanning
+  when viewing Sync Status tab
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- cache
+- performance
+- backend
+- sync
 created: 2026-02-04
 updated: 2026-02-04
-category: "implementation"
+category: implementation
 status: completed
 prd_reference: /docs/project_plans/PRDs/refactors/sync-diff-modal-standardization-v1.md
 related:
-  - skillmeat/cache/collection_cache.py
-  - skillmeat/api/routers/artifacts.py (lines 248-326)
-  - skillmeat/api/routers/projects.py (lines 142-207)
+- skillmeat/cache/collection_cache.py
+- skillmeat/api/routers/artifacts.py (lines 248-326)
+- skillmeat/api/routers/projects.py (lines 142-207)
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: deployment-stats-cache
+prd_ref: null
 ---
 
 # Implementation Plan: Deployment Statistics In-Memory Cache

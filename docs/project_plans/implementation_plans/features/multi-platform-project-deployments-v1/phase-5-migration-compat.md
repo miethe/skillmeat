@@ -1,8 +1,13 @@
 ---
-title: "Phase 5: Migration and Compatibility Hardening"
+title: 'Phase 5: Migration and Compatibility Hardening'
 parent: ../multi-platform-project-deployments-v1.md
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: multi-platform-project-deployments
+prd_ref: null
+plan_ref: null
 ---
-
 # Phase 5: Migration and Compatibility Hardening
 
 **Duration**: 0.75 week (3-4 days)

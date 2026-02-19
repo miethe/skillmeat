@@ -409,6 +409,9 @@ files_modified:
 - skillmeat/web/hooks/useConfig.ts
 progress: 100
 updated: '2026-01-23'
+schema_version: 2
+doc_type: progress
+feature_slug: configurable-frontmatter-caching-v1
 ---
 
 # Configurable Frontmatter Caching - Phase 0 Progress

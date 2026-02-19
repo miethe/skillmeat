@@ -1,3 +1,10 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: path-based-tag-extraction
+prd_ref: null
+---
 # Implementation Plan: Path-Based Tag Extraction
 
 **Feature**: Path-Based Tag Extraction

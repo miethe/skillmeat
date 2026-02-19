@@ -1,17 +1,29 @@
 ---
-title: "Implementation Plan: Sync/Diff Modal Standardization"
-description: "Fix sync/diff inconsistencies, add project context to /manage, extract modal foundation, wire mutations"
-audience: [ai-agents, developers]
-tags: [implementation, planning, refactor, sync, diff, modal]
+title: 'Implementation Plan: Sync/Diff Modal Standardization'
+description: Fix sync/diff inconsistencies, add project context to /manage, extract
+  modal foundation, wire mutations
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- planning
+- refactor
+- sync
+- diff
+- modal
 created: 2026-02-04
 updated: 2026-02-04
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/PRDs/refactors/sync-diff-modal-standardization-v1.md
-  - /docs/project_plans/reports/sync-diff-modal-inconsistency-analysis-2026-02-04.md
+- /docs/project_plans/PRDs/refactors/sync-diff-modal-standardization-v1.md
+- /docs/project_plans/reports/sync-diff-modal-inconsistency-analysis-2026-02-04.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: sync-diff-modal-standardization
+prd_ref: null
 ---
-
 # Implementation Plan: Sync/Diff Modal Standardization
 
 **Plan ID**: `IMPL-2026-02-04-SYNC-DIFF-MODAL`

@@ -3,9 +3,11 @@ type: quick-feature-plan
 feature_slug: github-pat-settings
 request_log_id: null
 status: completed
-created: 2026-01-17T00:00:00Z
-completed_at: 2026-01-17T19:43:00Z
+created: 2026-01-17 00:00:00+00:00
+completed_at: 2026-01-17 19:43:00+00:00
 estimated_scope: medium
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # GitHub PAT Settings

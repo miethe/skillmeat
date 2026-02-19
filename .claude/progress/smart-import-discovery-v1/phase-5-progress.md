@@ -1,153 +1,178 @@
 ---
 type: progress
-prd: "smart-import-discovery-v1"
+prd: smart-import-discovery-v1
 phase: 5
-title: "Testing, Documentation & Deployment"
+title: Testing, Documentation & Deployment
 status: pending
 started: null
-updated: "2025-11-30T00:00:00Z"
+updated: '2025-11-30T00:00:00Z'
 completion: 0
 total_tasks: 9
 completed_tasks: 0
-
 tasks:
-  - id: "SID-027"
-    title: "Performance Testing & Optimization"
-    description: "Create performance benchmarks and optimize as needed"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "Discovery <2s for 50+ artifacts"
-      - "Metadata fetch <1s (cached)"
-      - "Bulk import <3s for 20 artifacts"
-
-  - id: "SID-028"
-    title: "Error Scenario Testing"
-    description: "Comprehensive testing of error scenarios"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "GitHub API down handled"
-      - "Invalid artifacts skipped gracefully"
-      - "Network timeouts handled"
-      - "Partial failures rolled back"
-
-  - id: "SID-029"
-    title: "Accessibility Audit"
-    description: "Verify accessibility of new components and flows"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_time: "1h"
-    story_points: 3
-    acceptance_criteria:
-      - "Modal keyboard navigation"
-      - "Table row selection accessible"
-      - "Loading states announced"
-      - "No critical violations"
-
-  - id: "SID-030"
-    title: "User Guide: Discovery"
-    description: "Create user documentation for discovery feature"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["SID-007"]
-    estimated_time: "1h"
-    story_points: 3
-    acceptance_criteria:
-      - "How to use discovery"
-      - "What gets discovered"
-      - "Troubleshooting guide"
-
-  - id: "SID-031"
-    title: "User Guide: Auto-Population"
-    description: "Create user documentation for auto-population feature"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["SID-009"]
-    estimated_time: "1h"
-    story_points: 3
-    acceptance_criteria:
-      - "Supported sources"
-      - "What gets auto-filled"
-      - "Manual override instructions"
-
-  - id: "SID-032"
-    title: "API Documentation"
-    description: "Document new API endpoints and schemas"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["SID-007", "SID-008", "SID-009", "SID-010"]
-    estimated_time: "1h"
-    story_points: 3
-    acceptance_criteria:
-      - "All 4 endpoints documented"
-      - "Request/response examples"
-      - "Error codes explained"
-
-  - id: "SID-033"
-    title: "Feature Flag Implementation"
-    description: "Implement feature flags for gradual rollout"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "ENABLE_AUTO_DISCOVERY flag"
-      - "ENABLE_AUTO_POPULATION flag"
-      - "Easy toggle via environment"
-
-  - id: "SID-034"
-    title: "Monitoring & Error Tracking"
-    description: "Set up monitoring for new features"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "Error tracking configured"
-      - "Performance metrics visible"
-      - "Alert thresholds set"
-
-  - id: "SID-035"
-    title: "Final Integration & Smoke Tests"
-    description: "Full system integration testing"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SID-027", "SID-028", "SID-029", "SID-030", "SID-031", "SID-032", "SID-033", "SID-034"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "All smoke tests pass"
-      - "No data inconsistencies"
-      - "No regressions"
-      - "Ready for deployment"
-
+- id: SID-027
+  title: Performance Testing & Optimization
+  description: Create performance benchmarks and optimize as needed
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - Discovery <2s for 50+ artifacts
+  - Metadata fetch <1s (cached)
+  - Bulk import <3s for 20 artifacts
+- id: SID-028
+  title: Error Scenario Testing
+  description: Comprehensive testing of error scenarios
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - GitHub API down handled
+  - Invalid artifacts skipped gracefully
+  - Network timeouts handled
+  - Partial failures rolled back
+- id: SID-029
+  title: Accessibility Audit
+  description: Verify accessibility of new components and flows
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_time: 1h
+  story_points: 3
+  acceptance_criteria:
+  - Modal keyboard navigation
+  - Table row selection accessible
+  - Loading states announced
+  - No critical violations
+- id: SID-030
+  title: 'User Guide: Discovery'
+  description: Create user documentation for discovery feature
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - SID-007
+  estimated_time: 1h
+  story_points: 3
+  acceptance_criteria:
+  - How to use discovery
+  - What gets discovered
+  - Troubleshooting guide
+- id: SID-031
+  title: 'User Guide: Auto-Population'
+  description: Create user documentation for auto-population feature
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - SID-009
+  estimated_time: 1h
+  story_points: 3
+  acceptance_criteria:
+  - Supported sources
+  - What gets auto-filled
+  - Manual override instructions
+- id: SID-032
+  title: API Documentation
+  description: Document new API endpoints and schemas
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - SID-007
+  - SID-008
+  - SID-009
+  - SID-010
+  estimated_time: 1h
+  story_points: 3
+  acceptance_criteria:
+  - All 4 endpoints documented
+  - Request/response examples
+  - Error codes explained
+- id: SID-033
+  title: Feature Flag Implementation
+  description: Implement feature flags for gradual rollout
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - ENABLE_AUTO_DISCOVERY flag
+  - ENABLE_AUTO_POPULATION flag
+  - Easy toggle via environment
+- id: SID-034
+  title: Monitoring & Error Tracking
+  description: Set up monitoring for new features
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - Error tracking configured
+  - Performance metrics visible
+  - Alert thresholds set
+- id: SID-035
+  title: Final Integration & Smoke Tests
+  description: Full system integration testing
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SID-027
+  - SID-028
+  - SID-029
+  - SID-030
+  - SID-031
+  - SID-032
+  - SID-033
+  - SID-034
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - All smoke tests pass
+  - No data inconsistencies
+  - No regressions
+  - Ready for deployment
 parallelization:
-  batch_1: ["SID-027", "SID-028", "SID-029", "SID-033", "SID-034"]
-  batch_2: ["SID-030", "SID-031", "SID-032"]
-  batch_3: ["SID-035"]
-  critical_path: ["SID-027", "SID-035"]
-  estimated_total_time: "10h"
-
+  batch_1:
+  - SID-027
+  - SID-028
+  - SID-029
+  - SID-033
+  - SID-034
+  batch_2:
+  - SID-030
+  - SID-031
+  - SID-032
+  batch_3:
+  - SID-035
+  critical_path:
+  - SID-027
+  - SID-035
+  estimated_total_time: 10h
 blockers: []
-
 quality_gates:
-  - "Overall test coverage >85% (backend + frontend combined)"
-  - "All performance benchmarks met"
-  - "All documentation complete and reviewed"
-  - "Feature flags implemented and tested"
-  - "Monitoring and error tracking configured"
-  - "Final smoke tests passed"
-  - "No regressions in existing features"
+- Overall test coverage >85% (backend + frontend combined)
+- All performance benchmarks met
+- All documentation complete and reviewed
+- Feature flags implemented and tested
+- Monitoring and error tracking configured
+- Final smoke tests passed
+- No regressions in existing features
+schema_version: 2
+doc_type: progress
+feature_slug: smart-import-discovery-v1
 ---
 
 # Phase 5: Testing, Documentation & Deployment

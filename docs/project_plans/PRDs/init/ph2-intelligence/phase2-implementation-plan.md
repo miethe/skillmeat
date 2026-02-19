@@ -1,15 +1,26 @@
 ---
-title: "Implementation Plan: SkillMeat Phase 2 - Intelligence & Sync"
-description: "Phased AI-agent build-out covering search, smart updates, sync, and analytics deliverables"
-audience: [ai-agents, developers]
-tags: [implementation, planning, phase2, intelligence, sync]
+title: 'Implementation Plan: SkillMeat Phase 2 - Intelligence & Sync'
+description: Phased AI-agent build-out covering search, smart updates, sync, and analytics
+  deliverables
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- planning
+- phase2
+- intelligence
+- sync
 created: 2025-11-10
 updated: 2025-11-10
-category: "product-planning"
+category: product-planning
 status: draft
 related:
-  - /docs/project_plans/ph2-intelligence/AI_AGENT_PRD_PHASE2.md
-  - /docs/project_plans/ph1-initialization/init-prd.md
+- /docs/project_plans/ph2-intelligence/AI_AGENT_PRD_PHASE2.md
+- /docs/project_plans/ph1-initialization/init-prd.md
+schema_version: 2
+doc_type: prd
+feature_slug: phase2-implementation-plan
 ---
 
 # Implementation Plan: SkillMeat Phase 2 - Intelligence & Sync

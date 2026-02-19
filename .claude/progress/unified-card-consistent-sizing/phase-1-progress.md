@@ -6,59 +6,66 @@ status: completed
 created: 2025-12-30
 updated: 2025-12-30
 completed_at: 2025-12-30
-
 tasks:
-  - id: "TASK-1"
-    title: "Modify UnifiedCard content section layout"
-    status: completed
-    assigned_to: ["ui-engineer"]
-    dependencies: []
-    files:
-      - skillmeat/web/components/shared/unified-card.tsx
-    acceptance:
-      - All content rows have fixed minimum heights
-      - Description section always renders (uses nbsp when empty)
-      - Tags section always renders (invisible when empty)
-      - Warnings section always renders (invisible when empty)
-      - Flex layout distributes space correctly
-    commit: 1c117cf
-
-  - id: "TASK-2"
-    title: "Update UnifiedCardSkeleton to match new layout"
-    status: completed
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-1"]
-    files:
-      - skillmeat/web/components/shared/unified-card.tsx
-    acceptance:
-      - Skeleton has same fixed dimensions as content card
-      - Layout matches populated card structure
-    commit: 1c117cf
-
-  - id: "TASK-3"
-    title: "Visual verification and adjustment"
-    status: completed
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-2"]
-    files: []
-    acceptance:
-      - All cards in grid have identical heights
-      - Cards with/without tags align perfectly
-      - Cards with/without descriptions align perfectly
-      - No layout shifts during loading
-    note: "Build passes, CSS changes verified structurally"
-
+- id: TASK-1
+  title: Modify UnifiedCard content section layout
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies: []
+  files:
+  - skillmeat/web/components/shared/unified-card.tsx
+  acceptance:
+  - All content rows have fixed minimum heights
+  - Description section always renders (uses nbsp when empty)
+  - Tags section always renders (invisible when empty)
+  - Warnings section always renders (invisible when empty)
+  - Flex layout distributes space correctly
+  commit: 1c117cf
+- id: TASK-2
+  title: Update UnifiedCardSkeleton to match new layout
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-1
+  files:
+  - skillmeat/web/components/shared/unified-card.tsx
+  acceptance:
+  - Skeleton has same fixed dimensions as content card
+  - Layout matches populated card structure
+  commit: 1c117cf
+- id: TASK-3
+  title: Visual verification and adjustment
+  status: completed
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-2
+  files: []
+  acceptance:
+  - All cards in grid have identical heights
+  - Cards with/without tags align perfectly
+  - Cards with/without descriptions align perfectly
+  - No layout shifts during loading
+  note: Build passes, CSS changes verified structurally
 parallelization:
-  batch_1: ["TASK-1"]
-  batch_2: ["TASK-2"]
-  batch_3: ["TASK-3"]
-
+  batch_1:
+  - TASK-1
+  batch_2:
+  - TASK-2
+  batch_3:
+  - TASK-3
 summary:
   total_tasks: 3
   pending: 0
   in_progress: 0
   completed: 3
   blocked: 0
+schema_version: 2
+doc_type: progress
+feature_slug: unified-card-consistent-sizing
+type: progress
 ---
 
 # Phase 1: Unified Card Consistent Sizing

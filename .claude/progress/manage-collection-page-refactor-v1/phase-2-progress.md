@@ -105,6 +105,10 @@ in_progress_tasks: 0
 blocked_tasks: 0
 progress: 100
 updated: '2026-02-02'
+schema_version: 2
+doc_type: progress
+feature_slug: manage-collection-page-refactor-v1
+type: progress
 ---
 
 # Phase 2: Card Components

@@ -1,12 +1,24 @@
 ---
-title: "Collections API Consolidation - Implementation Plan"
-description: "Consolidate legacy file-based /collections endpoints with modern DB-backed /user-collections system"
-audience: [ai-agents, developers]
-tags: [implementation, refactoring, backend, frontend, api]
+title: Collections API Consolidation - Implementation Plan
+description: Consolidate legacy file-based /collections endpoints with modern DB-backed
+  /user-collections system
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- refactoring
+- backend
+- frontend
+- api
 created: 2025-12-13
 updated: 2025-12-13
-category: "refactoring"
+category: refactoring
 status: completed
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: collections-api-consolidation
+prd_ref: null
 ---
 
 # Implementation Plan: Collections API Consolidation

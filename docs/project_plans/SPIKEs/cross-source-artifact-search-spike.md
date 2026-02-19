@@ -1,11 +1,20 @@
 ---
-title: "SPIKE: Cross-Source Artifact Search"
-spike_id: "SPIKE-2026-01-20-cross-source-artifact-search"
+title: 'SPIKE: Cross-Source Artifact Search'
+spike_id: SPIKE-2026-01-20-cross-source-artifact-search
 date: 2026-01-20
 status: research-complete
 complexity: medium
-related_request: "Marketplace search enhancement"
-tags: [spike, search, marketplace, fts5, artifacts, cross-source]
+related_request: Marketplace search enhancement
+tags:
+- spike
+- search
+- marketplace
+- fts5
+- artifacts
+- cross-source
+schema_version: 2
+doc_type: spike
+feature_slug: cross-source-artifact-search-spike
 ---
 
 # SPIKE: Cross-Source Artifact Search

@@ -1,21 +1,22 @@
 ---
-# === TOOLS API SUPPORT - DEVELOPMENT CONTEXT ===
-# PRD-level sticky pad for agent notes and observations
-
 type: context
-prd: "tools-api-support"
-title: "Tools API Support - Development Context"
-status: "active"
-created: "2026-02-02"
-updated: "2026-02-02"
-
+prd: tools-api-support
+title: Tools API Support - Development Context
+status: active
+created: '2026-02-02'
+updated: '2026-02-02'
 critical_notes_count: 1
 implementation_decisions_count: 2
 active_gotchas_count: 3
-agent_contributors: ["Opus (planner)"]
-
+agent_contributors:
+- Opus (planner)
 agents:
-  - { agent: "Opus", note_count: 6, last_contribution: "2026-02-02" }
+- agent: Opus
+  note_count: 6
+  last_contribution: '2026-02-02'
+schema_version: 2
+doc_type: context
+feature_slug: tools-api-support
 ---
 
 # Tools API Support - Development Context

@@ -1,30 +1,35 @@
 ---
 type: progress
-prd: "PRD-001-confidence-scoring"
+prd: PRD-001-confidence-scoring
 phase: 0
-phase_title: "SPIKE Research"
+phase_title: SPIKE Research
 status: completed
 progress: 100
 total_tasks: 1
 completed_tasks: 1
-estimated_effort: "1 week"
-completed_at: "2025-12-22"
-
+estimated_effort: 1 week
+completed_at: '2025-12-22'
 tasks:
-  - id: "P0-T1"
-    title: "Conduct SPIKE Research"
-    status: "completed"
-    assigned_to: ["lead-architect", "backend-architect"]
-    dependencies: []
-    story_points: 0
-    description: "Research community scoring practices, embedding models, anti-gaming strategies"
-    completed_at: "2025-12-22"
-    deliverables:
-      - ".claude/docs/prd/spike/PRD-001-embedding-research.md"
-      - ".claude/docs/prd/spike/PRD-001-scoring-research.md"
-
+- id: P0-T1
+  title: Conduct SPIKE Research
+  status: completed
+  assigned_to:
+  - lead-architect
+  - backend-architect
+  dependencies: []
+  story_points: 0
+  description: Research community scoring practices, embedding models, anti-gaming
+    strategies
+  completed_at: '2025-12-22'
+  deliverables:
+  - .claude/docs/prd/spike/PRD-001-embedding-research.md
+  - .claude/docs/prd/spike/PRD-001-scoring-research.md
 parallelization:
-  batch_1: ["P0-T1"]
+  batch_1:
+  - P0-T1
+schema_version: 2
+doc_type: progress
+feature_slug: prd-001-confidence-scoring
 ---
 
 # Phase 0: SPIKE Research

@@ -28,6 +28,11 @@ if [ ! -f "$progress_file" ]; then
 fi
 ```
 
+When creating or initializing a progress file, populate linkage fields immediately:
+- `feature_slug`: match `${PRD_NAME}`
+- `prd_ref`: path to parent PRD
+- `plan_ref`: path to parent implementation plan
+
 ## Phase 2: Execute Using Orchestration
 
 ### 2.1 Read Progress YAML Only (Token-Efficient)
@@ -128,6 +133,14 @@ git commit -m "feat(scope): implement {feature}
 - Added tests with {coverage}%
 
 Refs: Phase ${PHASE_NUM}, {task_id}"
+```
+
+After each commit, append the SHA to progress frontmatter:
+
+```bash
+python .claude/skills/artifact-tracking/scripts/update-field.py \
+  -f ${progress_file} \
+  --append "commit_refs=${commit_sha}"
 ```
 
 ## Phase 3: Continuous Testing

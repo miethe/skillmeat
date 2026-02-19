@@ -20,6 +20,10 @@ category: product-planning
 status: completed
 related:
 - /docs/project_plans/PRDs/features/enhanced-frontmatter-utilization-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: enhanced-frontmatter-utilization
+prd_ref: null
 ---
 
 # Implementation Plan: Enhanced Frontmatter Utilization for Marketplace Artifacts

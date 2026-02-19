@@ -1,164 +1,201 @@
 ---
 type: progress
-prd: "discovery-import-enhancement"
+prd: discovery-import-enhancement
 phase: 3
-title: "Frontend - Type Updates & Form Integration"
-status: "completed"
-started: "2025-11-29"
-completed: "2025-12-04"
-
+title: Frontend - Type Updates & Form Integration
+status: completed
+started: '2025-11-29'
+completed: '2025-12-04'
 overall_progress: 100
-completion_estimate: "complete"
-
+completion_estimate: complete
 total_tasks: 11
 completed_tasks: 11
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["frontend-developer", "ui-engineer-enhanced"]
-contributors: ["testing-specialist"]
-
+owners:
+- frontend-developer
+- ui-engineer-enhanced
+contributors:
+- testing-specialist
 tasks:
-  - id: "DIS-3.1"
-    description: "Update discovery.ts types - change ImportResult.success:boolean to status enum (success|skipped|failed)"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "0.5d"
-    priority: "critical"
-
-  - id: "DIS-3.2"
-    description: "Add SkipPreference type interface with project_id, artifact_key, skip_reason, added_date"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "0.5d"
-    priority: "high"
-
-  - id: "DIS-3.3"
-    description: "Update BulkImportModal status display labels - show pre-scan status for each artifact"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["DIS-3.1"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-3.4"
-    description: "Add skip checkbox UI to BulkImportModal with accessibility labels and tooltips"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["DIS-3.1"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-3.5"
-    description: "Implement LocalStorage skip preference persistence utilities with project_id namespacing"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["DIS-3.2"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-3.6"
-    description: "Update useProjectDiscovery hook to integrate skip preference loading and saving"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["DIS-3.5"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-3.7"
-    description: "Update import form submission to collect skip list and send in request"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["DIS-3.6"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-3.8"
-    description: "Unit tests for TypeScript type updates - verify types compile and match backend"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: ["DIS-3.1", "DIS-3.2"]
-    estimated_effort: "0.5d"
-    priority: "medium"
-
-  - id: "DIS-3.9"
-    description: "Unit tests for LocalStorage skip persistence - save/load/clear operations"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: ["DIS-3.5"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-3.10"
-    description: "Unit tests for BulkImportModal - skip checkboxes, status display, form submission"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["DIS-3.3", "DIS-3.4", "DIS-3.7"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-3.11"
-    description: "E2E test for skip preference persistence - checkbox check → reload → skips remain"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: ["DIS-3.5", "DIS-3.9"]
-    estimated_effort: "1d"
-    priority: "medium"
-
+- id: DIS-3.1
+  description: Update discovery.ts types - change ImportResult.success:boolean to
+    status enum (success|skipped|failed)
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 0.5d
+  priority: critical
+- id: DIS-3.2
+  description: Add SkipPreference type interface with project_id, artifact_key, skip_reason,
+    added_date
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 0.5d
+  priority: high
+- id: DIS-3.3
+  description: Update BulkImportModal status display labels - show pre-scan status
+    for each artifact
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - DIS-3.1
+  estimated_effort: 1d
+  priority: high
+- id: DIS-3.4
+  description: Add skip checkbox UI to BulkImportModal with accessibility labels and
+    tooltips
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - DIS-3.1
+  estimated_effort: 1d
+  priority: high
+- id: DIS-3.5
+  description: Implement LocalStorage skip preference persistence utilities with project_id
+    namespacing
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - DIS-3.2
+  estimated_effort: 1d
+  priority: high
+- id: DIS-3.6
+  description: Update useProjectDiscovery hook to integrate skip preference loading
+    and saving
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - DIS-3.5
+  estimated_effort: 1d
+  priority: high
+- id: DIS-3.7
+  description: Update import form submission to collect skip list and send in request
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - DIS-3.6
+  estimated_effort: 1d
+  priority: high
+- id: DIS-3.8
+  description: Unit tests for TypeScript type updates - verify types compile and match
+    backend
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies:
+  - DIS-3.1
+  - DIS-3.2
+  estimated_effort: 0.5d
+  priority: medium
+- id: DIS-3.9
+  description: Unit tests for LocalStorage skip persistence - save/load/clear operations
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies:
+  - DIS-3.5
+  estimated_effort: 1d
+  priority: high
+- id: DIS-3.10
+  description: Unit tests for BulkImportModal - skip checkboxes, status display, form
+    submission
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - DIS-3.3
+  - DIS-3.4
+  - DIS-3.7
+  estimated_effort: 1d
+  priority: high
+- id: DIS-3.11
+  description: "E2E test for skip preference persistence - checkbox check \u2192 reload\
+    \ \u2192 skips remain"
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies:
+  - DIS-3.5
+  - DIS-3.9
+  estimated_effort: 1d
+  priority: medium
 parallelization:
-  batch_1: ["DIS-3.1", "DIS-3.2"]
-  batch_2: ["DIS-3.3", "DIS-3.4", "DIS-3.5"]
-  batch_3: ["DIS-3.6", "DIS-3.7"]
-  batch_4: ["DIS-3.8", "DIS-3.9", "DIS-3.10"]
-  batch_5: ["DIS-3.11"]
-  critical_path: ["DIS-3.1", "DIS-3.5", "DIS-3.6", "DIS-3.7", "DIS-3.10"]
-  estimated_total_time: "6-7 days"
-
+  batch_1:
+  - DIS-3.1
+  - DIS-3.2
+  batch_2:
+  - DIS-3.3
+  - DIS-3.4
+  - DIS-3.5
+  batch_3:
+  - DIS-3.6
+  - DIS-3.7
+  batch_4:
+  - DIS-3.8
+  - DIS-3.9
+  - DIS-3.10
+  batch_5:
+  - DIS-3.11
+  critical_path:
+  - DIS-3.1
+  - DIS-3.5
+  - DIS-3.6
+  - DIS-3.7
+  - DIS-3.10
+  estimated_total_time: 6-7 days
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "All ImportResult TypeScript usages compile without errors"
-    status: "completed"
-  - id: "SC-2"
-    description: "Status enum values match backend (success, skipped, failed)"
-    status: "completed"
-  - id: "SC-3"
-    description: "Skip preference types defined and exported"
-    status: "completed"
-  - id: "SC-4"
-    description: "BulkImportModal renders status labels correctly"
-    status: "completed"
-  - id: "SC-5"
-    description: "Skip checkboxes render and manage state"
-    status: "completed"
-  - id: "SC-6"
-    description: "LocalStorage skip persistence working (save/load/clear)"
-    status: "completed"
-  - id: "SC-7"
-    description: "Form submission includes skip_list in request"
-    status: "completed"
-  - id: "SC-8"
-    description: "Unit test coverage >80%"
-    status: "completed"
-  - id: "SC-9"
-    description: "E2E test passes: skip checkbox → page reload → skips persist"
-    status: "completed"
-  - id: "SC-10"
-    description: "Accessibility: skip checkboxes labeled, screen reader compatible"
-    status: "completed"
-
+- id: SC-1
+  description: All ImportResult TypeScript usages compile without errors
+  status: completed
+- id: SC-2
+  description: Status enum values match backend (success, skipped, failed)
+  status: completed
+- id: SC-3
+  description: Skip preference types defined and exported
+  status: completed
+- id: SC-4
+  description: BulkImportModal renders status labels correctly
+  status: completed
+- id: SC-5
+  description: Skip checkboxes render and manage state
+  status: completed
+- id: SC-6
+  description: LocalStorage skip persistence working (save/load/clear)
+  status: completed
+- id: SC-7
+  description: Form submission includes skip_list in request
+  status: completed
+- id: SC-8
+  description: Unit test coverage >80%
+  status: completed
+- id: SC-9
+  description: "E2E test passes: skip checkbox \u2192 page reload \u2192 skips persist"
+  status: completed
+- id: SC-10
+  description: 'Accessibility: skip checkboxes labeled, screen reader compatible'
+  status: completed
 files_modified:
-  - "skillmeat/web/types/discovery.ts"
-  - "skillmeat/web/components/discovery/BulkImportModal.tsx"
-  - "skillmeat/web/lib/skip-preferences.ts"
-  - "skillmeat/web/hooks/useProjectDiscovery.ts"
-  - "skillmeat/web/__tests__/discovery-types.test.ts"
-  - "skillmeat/web/__tests__/skip-preferences.test.ts"
-  - "skillmeat/web/__tests__/BulkImportModal.test.tsx"
+- skillmeat/web/types/discovery.ts
+- skillmeat/web/components/discovery/BulkImportModal.tsx
+- skillmeat/web/lib/skip-preferences.ts
+- skillmeat/web/hooks/useProjectDiscovery.ts
+- skillmeat/web/__tests__/discovery-types.test.ts
+- skillmeat/web/__tests__/skip-preferences.test.ts
+- skillmeat/web/__tests__/BulkImportModal.test.tsx
+schema_version: 2
+doc_type: progress
+feature_slug: discovery-import-enhancement
 ---
 
 # Discovery & Import Enhancement - Phase 3: Frontend - Type Updates & Form Integration

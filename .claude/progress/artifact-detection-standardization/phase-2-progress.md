@@ -1,113 +1,136 @@
 ---
 type: progress
-prd: "artifact-detection-standardization"
+prd: artifact-detection-standardization
 phase: 2
-phase_title: "Rebuild Local Discovery with Shared Detector"
+phase_title: Rebuild Local Discovery with Shared Detector
 status: completed
 progress: 100
 total_tasks: 9
 completed_tasks: 9
-completed_at: "2026-01-06"
+completed_at: '2026-01-06'
 story_points: 12
-duration: "1 week"
-
+duration: 1 week
 tasks:
-  - id: "TASK-2.1"
-    title: "Analyze Current discovery.py"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: []
-    story_points: 2
-    description: "Analyze current detection logic and create migration plan"
-
-  - id: "TASK-2.2"
-    title: "Import and Wire Shared Module"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-2.1"]
-    story_points: 2
-    description: "Update imports to use shared detection module"
-
-  - id: "TASK-2.3"
-    title: "Replace _detect_artifact_type()"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-2.2"]
-    story_points: 3
-    description: "Replace with detect_artifact() from shared module"
-
-  - id: "TASK-2.4"
-    title: "Add Recursive Directory Traversal"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-2.3"]
-    story_points: 3
-    description: "Detect nested single-file artifacts in subdirectories"
-
-  - id: "TASK-2.5"
-    title: "Implement Deprecation Warnings"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-2.3"]
-    story_points: 2
-    description: "Warn for directory-based commands/agents"
-
-  - id: "TASK-2.6"
-    title: "Update Discovery Tests"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-2.3", "TASK-2.4", "TASK-2.5"]
-    story_points: 2
-    description: "Update existing tests for shared detector"
-
-  - id: "TASK-2.7"
-    title: "Write Nested Discovery Tests"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-2.4"]
-    story_points: 2
-    description: "10+ tests for nested artifact discovery"
-
-  - id: "TASK-2.8"
-    title: "Integration Testing"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-2.6", "TASK-2.7"]
-    story_points: 1
-    description: "Integration tests with Phase 1 module"
-
-  - id: "TASK-2.9"
-    title: "Update Documentation"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-2.8"]
-    story_points: 1
-    description: "Docstrings for refactored discovery.py"
-
+- id: TASK-2.1
+  title: Analyze Current discovery.py
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies: []
+  story_points: 2
+  description: Analyze current detection logic and create migration plan
+- id: TASK-2.2
+  title: Import and Wire Shared Module
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-2.1
+  story_points: 2
+  description: Update imports to use shared detection module
+- id: TASK-2.3
+  title: Replace _detect_artifact_type()
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-2.2
+  story_points: 3
+  description: Replace with detect_artifact() from shared module
+- id: TASK-2.4
+  title: Add Recursive Directory Traversal
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-2.3
+  story_points: 3
+  description: Detect nested single-file artifacts in subdirectories
+- id: TASK-2.5
+  title: Implement Deprecation Warnings
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-2.3
+  story_points: 2
+  description: Warn for directory-based commands/agents
+- id: TASK-2.6
+  title: Update Discovery Tests
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-2.3
+  - TASK-2.4
+  - TASK-2.5
+  story_points: 2
+  description: Update existing tests for shared detector
+- id: TASK-2.7
+  title: Write Nested Discovery Tests
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-2.4
+  story_points: 2
+  description: 10+ tests for nested artifact discovery
+- id: TASK-2.8
+  title: Integration Testing
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-2.6
+  - TASK-2.7
+  story_points: 1
+  description: Integration tests with Phase 1 module
+- id: TASK-2.9
+  title: Update Documentation
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-2.8
+  story_points: 1
+  description: Docstrings for refactored discovery.py
 parallelization:
-  batch_1: ["TASK-2.1"]
-  batch_2: ["TASK-2.2"]
-  batch_3: ["TASK-2.3"]
-  batch_4: ["TASK-2.4", "TASK-2.5"]
-  batch_5: ["TASK-2.6", "TASK-2.7"]
-  batch_6: ["TASK-2.8"]
-  batch_7: ["TASK-2.9"]
-
+  batch_1:
+  - TASK-2.1
+  batch_2:
+  - TASK-2.2
+  batch_3:
+  - TASK-2.3
+  batch_4:
+  - TASK-2.4
+  - TASK-2.5
+  batch_5:
+  - TASK-2.6
+  - TASK-2.7
+  batch_6:
+  - TASK-2.8
+  batch_7:
+  - TASK-2.9
 blockers:
-  - description: "Phase 1 must be complete"
-    blocking_tasks: ["TASK-2.1", "TASK-2.2", "TASK-2.3"]
-    status: "active"
-
+- description: Phase 1 must be complete
+  blocking_tasks:
+  - TASK-2.1
+  - TASK-2.2
+  - TASK-2.3
+  status: active
 notes: []
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-detection-standardization
 ---
 
 # Phase 2: Rebuild Local Discovery with Shared Detector

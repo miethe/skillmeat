@@ -2,79 +2,95 @@
 type: progress
 prd: marketplace-github-ingestion
 phase: 6
-title: "Testing Layer"
+title: Testing Layer
 status: pending
-effort: "20 pts"
+effort: 20 pts
 owner: python-backend-engineer
 contributors:
-  - frontend-developer
-  - testing-specialist
-  - backend-architect
+- frontend-developer
+- testing-specialist
+- backend-architect
 timeline: phase-6-timeline
-
 tasks:
-  - id: "TEST-001"
-    status: "pending"
-    title: "Unit Tests (Backend)"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["UI-007"]
-    estimate: 4
-    priority: "high"
-
-  - id: "TEST-002"
-    status: "pending"
-    title: "Integration Tests (API)"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TEST-001"]
-    estimate: 3
-    priority: "high"
-
-  - id: "TEST-003"
-    status: "pending"
-    title: "Service Tests"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TEST-002"]
-    estimate: 3
-    priority: "high"
-
-  - id: "TEST-004"
-    status: "pending"
-    title: "Component Tests"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["TEST-001"]
-    estimate: 3
-    priority: "high"
-
-  - id: "TEST-005"
-    status: "pending"
-    title: "E2E Tests (Playwright)"
-    assigned_to: ["testing-specialist"]
-    dependencies: ["TEST-004"]
-    estimate: 3
-    priority: "high"
-
-  - id: "TEST-006"
-    status: "pending"
-    title: "Performance Tests"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TEST-005"]
-    estimate: 2
-    priority: "medium"
-
-  - id: "TEST-007"
-    status: "pending"
-    title: "Security Tests"
-    assigned_to: ["backend-architect"]
-    dependencies: ["TEST-006"]
-    estimate: 2
-    priority: "high"
-
+- id: TEST-001
+  status: pending
+  title: Unit Tests (Backend)
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - UI-007
+  estimate: 4
+  priority: high
+- id: TEST-002
+  status: pending
+  title: Integration Tests (API)
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TEST-001
+  estimate: 3
+  priority: high
+- id: TEST-003
+  status: pending
+  title: Service Tests
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TEST-002
+  estimate: 3
+  priority: high
+- id: TEST-004
+  status: pending
+  title: Component Tests
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - TEST-001
+  estimate: 3
+  priority: high
+- id: TEST-005
+  status: pending
+  title: E2E Tests (Playwright)
+  assigned_to:
+  - testing-specialist
+  dependencies:
+  - TEST-004
+  estimate: 3
+  priority: high
+- id: TEST-006
+  status: pending
+  title: Performance Tests
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TEST-005
+  estimate: 2
+  priority: medium
+- id: TEST-007
+  status: pending
+  title: Security Tests
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - TEST-006
+  estimate: 2
+  priority: high
 parallelization:
-  batch_1: ["TEST-001"]
-  batch_2: ["TEST-002", "TEST-003", "TEST-004"]
-  batch_3: ["TEST-005"]
-  batch_4: ["TEST-006"]
-  batch_5: ["TEST-007"]
+  batch_1:
+  - TEST-001
+  batch_2:
+  - TEST-002
+  - TEST-003
+  - TEST-004
+  batch_3:
+  - TEST-005
+  batch_4:
+  - TEST-006
+  batch_5:
+  - TEST-007
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-github-ingestion
 ---
 
 # Phase 6: Testing Layer

@@ -3,9 +3,11 @@ type: quick-feature-plan
 feature_slug: marketplace-auto-refresh-on-exclude
 request_log_id: null
 status: completed
-completed_at: 2026-01-03T00:00:00Z
-created: 2026-01-03T00:00:00Z
+completed_at: 2026-01-03 00:00:00+00:00
+created: 2026-01-03 00:00:00+00:00
 estimated_scope: small
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # Auto-refresh Marketplace Source Page After Artifact Exclusion

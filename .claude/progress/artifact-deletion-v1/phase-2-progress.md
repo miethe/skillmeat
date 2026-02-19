@@ -1,89 +1,102 @@
 ---
 type: progress
-prd: "artifact-deletion-v1"
+prd: artifact-deletion-v1
 phase: 2
-title: "Integration Points"
+title: Integration Points
 status: completed
 progress: 100
 total_tasks: 5
 completed_tasks: 5
 blocked_tasks: 0
-created: "2025-12-20"
-updated: "2025-12-20"
-completed_at: "2025-12-20"
+created: '2025-12-20'
+updated: '2025-12-20'
+completed_at: '2025-12-20'
 commits:
-  - "b750312"
-  - "e15f47a"
-
+- b750312
+- e15f47a
 tasks:
-  - id: "FE-009"
-    title: "Modify EntityActions to use ArtifactDeletionDialog"
-    status: "completed"
-    priority: "high"
-    estimate: "1pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    file_targets:
-      - "skillmeat/web/components/entity/entity-actions.tsx"
-    notes: "Replaced simple delete dialog with ArtifactDeletionDialog, context-aware (collection vs project)"
-
-  - id: "FE-010"
-    title: "Add Delete button to UnifiedEntityModal Overview tab"
-    status: "completed"
-    priority: "high"
-    estimate: "0.5pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    file_targets:
-      - "skillmeat/web/components/entity/unified-entity-modal.tsx"
-    notes: "Added Delete button with destructive styling next to Edit Parameters button"
-
-  - id: "FE-011"
-    title: "Integration tests for deletion flow"
-    status: "completed"
-    priority: "medium"
-    estimate: "1.5pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["FE-009", "FE-010"]
-    file_targets:
-      - "skillmeat/web/__tests__/integration/artifact-deletion.test.tsx"
-    notes: "26 integration tests covering EntityActions, Modal, state management, mutation flow, cache invalidation"
-
-  - id: "FE-012"
-    title: "E2E test for artifact deletion"
-    status: "completed"
-    priority: "medium"
-    estimate: "1.5pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["FE-011"]
-    file_targets:
-      - "skillmeat/web/tests/e2e/artifact-deletion.spec.ts"
-    notes: "30+ Playwright E2E scenarios for deletion from collection, modal, cascading deletion, error handling, mobile responsiveness"
-
-  - id: "FE-013"
-    title: "Verify error handling across integration points"
-    status: "completed"
-    priority: "low"
-    estimate: "0.5pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["FE-011"]
-    file_targets: []
-    notes: "Verification complete - all error handling production ready"
-
+- id: FE-009
+  title: Modify EntityActions to use ArtifactDeletionDialog
+  status: completed
+  priority: high
+  estimate: 1pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  file_targets:
+  - skillmeat/web/components/entity/entity-actions.tsx
+  notes: Replaced simple delete dialog with ArtifactDeletionDialog, context-aware
+    (collection vs project)
+- id: FE-010
+  title: Add Delete button to UnifiedEntityModal Overview tab
+  status: completed
+  priority: high
+  estimate: 0.5pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  file_targets:
+  - skillmeat/web/components/entity/unified-entity-modal.tsx
+  notes: Added Delete button with destructive styling next to Edit Parameters button
+- id: FE-011
+  title: Integration tests for deletion flow
+  status: completed
+  priority: medium
+  estimate: 1.5pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - FE-009
+  - FE-010
+  file_targets:
+  - skillmeat/web/__tests__/integration/artifact-deletion.test.tsx
+  notes: 26 integration tests covering EntityActions, Modal, state management, mutation
+    flow, cache invalidation
+- id: FE-012
+  title: E2E test for artifact deletion
+  status: completed
+  priority: medium
+  estimate: 1.5pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - FE-011
+  file_targets:
+  - skillmeat/web/tests/e2e/artifact-deletion.spec.ts
+  notes: 30+ Playwright E2E scenarios for deletion from collection, modal, cascading
+    deletion, error handling, mobile responsiveness
+- id: FE-013
+  title: Verify error handling across integration points
+  status: completed
+  priority: low
+  estimate: 0.5pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - FE-011
+  file_targets: []
+  notes: Verification complete - all error handling production ready
 parallelization:
-  batch_1: ["FE-009", "FE-010"]
-  batch_2: ["FE-011"]
-  batch_3: ["FE-012", "FE-013"]
-
+  batch_1:
+  - FE-009
+  - FE-010
+  batch_2:
+  - FE-011
+  batch_3:
+  - FE-012
+  - FE-013
 blockers: []
-
 phase_dependencies:
-  - phase: 1
-    required_tasks: ["FE-003", "FE-005"]
-
+- phase: 1
+  required_tasks:
+  - FE-003
+  - FE-005
 references:
-  prd: "docs/project_plans/PRDs/features/artifact-deletion-v1.md"
-  implementation_plan: "docs/project_plans/implementation_plans/features/artifact-deletion-v1.md"
+  prd: docs/project_plans/PRDs/features/artifact-deletion-v1.md
+  implementation_plan: docs/project_plans/implementation_plans/features/artifact-deletion-v1.md
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-deletion-v1
 ---
 
 # Phase 2: Integration Points

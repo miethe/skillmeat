@@ -1,3 +1,11 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: artifact-detection-standardization
+prd_ref: null
+plan_ref: null
+---
 # Phase 4: Align Validators and CLI Defaults
 
 **Duration:** 1 week

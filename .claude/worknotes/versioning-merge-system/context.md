@@ -1,137 +1,142 @@
 ---
 type: context
 prd: versioning-merge-system
-title: "Versioning & Merge System - Development Context"
+title: Versioning & Merge System - Development Context
 status: active
-created: "2025-11-30"
-updated: "2025-12-16"
+created: '2025-11-30'
+updated: '2025-12-16'
 critical_notes_count: 1
 implementation_decisions_count: 6
 active_gotchas_count: 1
-agent_contributors: ["backend-architect", "python-backend-engineer"]
-agents: ["backend-architect", "python-backend-engineer", "data-layer-expert"]
-
+agent_contributors:
+- backend-architect
+- python-backend-engineer
+agents:
+- backend-architect
+- python-backend-engineer
+- data-layer-expert
 phase_status:
-  - phase: 1
-    title: "Storage Infrastructure"
-    status: "partial"
-    progress: 60
-    note: "Different architecture - tarball snapshots vs per-artifact versions"
-  - phase: 2
-    title: "Repository Layer CRUD"
-    status: "partial"
-    progress: 50
-    note: "SnapshotManager + VersionManager provide similar functionality"
-  - phase: 3
-    title: "Repository Comparisons"
-    status: "partial"
-    progress: 40
-    note: "DiffEngine exists; retention policies missing"
-  - phase: 4
-    title: "Service Layer - Version Mgmt"
-    status: "partial"
-    progress: 40
-    note: "VersionManager provides core operations"
-  - phase: 5
-    title: "Three-Way Merge Engine"
-    status: "completed"
-    progress: 100
-    note: "core/merge_engine.py, core/diff_engine.py fully implemented"
-  - phase: 6
-    title: "Rollback & Integration"
-    status: "partial"
-    progress: 40
-    note: "Basic rollback exists; missing intelligent rollback, conflict detection"
-  - phase: 7
-    title: "API Layer"
-    status: "not-started"
-    progress: 0
-    note: "No version/merge REST endpoints"
-  - phase: 8
-    title: "Frontend History Tab"
-    status: "not-started"
-    progress: 0
-    note: "Blocked by Phase 7"
-  - phase: 9
-    title: "Frontend Merge UI"
-    status: "not-started"
-    progress: 0
-    note: "Blocked by Phase 7"
-  - phase: 10
-    title: "Sync Integration"
-    status: "not-started"
-    progress: 0
-    note: "Blocked by Phases 7+9"
-  - phase: 11
-    title: "Testing & Documentation"
-    status: "partial"
-    progress: 30
-    note: "Core tests exist; API/E2E tests missing"
-
+- phase: 1
+  title: Storage Infrastructure
+  status: partial
+  progress: 60
+  note: Different architecture - tarball snapshots vs per-artifact versions
+- phase: 2
+  title: Repository Layer CRUD
+  status: partial
+  progress: 50
+  note: SnapshotManager + VersionManager provide similar functionality
+- phase: 3
+  title: Repository Comparisons
+  status: partial
+  progress: 40
+  note: DiffEngine exists; retention policies missing
+- phase: 4
+  title: Service Layer - Version Mgmt
+  status: partial
+  progress: 40
+  note: VersionManager provides core operations
+- phase: 5
+  title: Three-Way Merge Engine
+  status: completed
+  progress: 100
+  note: core/merge_engine.py, core/diff_engine.py fully implemented
+- phase: 6
+  title: Rollback & Integration
+  status: partial
+  progress: 40
+  note: Basic rollback exists; missing intelligent rollback, conflict detection
+- phase: 7
+  title: API Layer
+  status: not-started
+  progress: 0
+  note: No version/merge REST endpoints
+- phase: 8
+  title: Frontend History Tab
+  status: not-started
+  progress: 0
+  note: Blocked by Phase 7
+- phase: 9
+  title: Frontend Merge UI
+  status: not-started
+  progress: 0
+  note: Blocked by Phase 7
+- phase: 10
+  title: Sync Integration
+  status: not-started
+  progress: 0
+  note: Blocked by Phases 7+9
+- phase: 11
+  title: Testing & Documentation
+  status: partial
+  progress: 30
+  note: Core tests exist; API/E2E tests missing
 blockers: []
-
 decisions:
-  - id: "DEC-001"
-    date: "2025-12-15"
-    title: "Architecture Deviation: Tarball Snapshots"
-    decision: "Implementation uses collection-level tarball snapshots instead of per-artifact versioned directories"
-    rationale: "Faster implementation, simpler storage, works with existing SnapshotManager"
-    impact: "Functionally similar but architecturally different from PRD"
-  - id: "DEC-002"
-    date: "2025-12-15"
-    title: "MergeEngine Implementation"
-    decision: "Implemented three-way merge with Git-style conflict markers via MergeEngine class"
-    rationale: "Clean separation of concerns, reusable across sync/deploy operations"
-    impact: "Phase 5 fully complete"
-
+- id: DEC-001
+  date: '2025-12-15'
+  title: 'Architecture Deviation: Tarball Snapshots'
+  decision: Implementation uses collection-level tarball snapshots instead of per-artifact
+    versioned directories
+  rationale: Faster implementation, simpler storage, works with existing SnapshotManager
+  impact: Functionally similar but architecturally different from PRD
+- id: DEC-002
+  date: '2025-12-15'
+  title: MergeEngine Implementation
+  decision: Implemented three-way merge with Git-style conflict markers via MergeEngine
+    class
+  rationale: Clean separation of concerns, reusable across sync/deploy operations
+  impact: Phase 5 fully complete
 integrations: []
-
 gotchas:
-  - id: "GOTCHA-001"
-    title: "Progress File Status Drift"
-    description: "Progress files showed all phases as 'pending' while significant code existed. Always verify codebase state before trusting progress files."
-    discovered: "2025-12-16"
-    status: "resolved"
-
+- id: GOTCHA-001
+  title: Progress File Status Drift
+  description: Progress files showed all phases as 'pending' while significant code
+    existed. Always verify codebase state before trusting progress files.
+  discovered: '2025-12-16'
+  status: resolved
 modified_files:
-  - path: "skillmeat/core/merge_engine.py"
-    status: "created"
-    lines: 433
-    note: "Three-way merge with conflict detection"
-  - path: "skillmeat/core/diff_engine.py"
-    status: "created"
-    lines: 400
-    note: "File/directory diffing, three-way diff"
-  - path: "skillmeat/core/version.py"
-    status: "created"
-    lines: 261
-    note: "VersionManager with rollback"
-  - path: "skillmeat/core/version_graph.py"
-    status: "created"
-    lines: 626
-    note: "Cross-project version tracking"
-  - path: "skillmeat/storage/snapshot.py"
-    status: "created"
-    lines: 271
-    note: "Tarball-based snapshot system"
-  - path: "skillmeat/models.py"
-    status: "modified"
-    note: "Added MergeResult, MergeStats, ConflictMetadata, ThreeWayDiffResult"
-  - path: "tests/test_merge_engine.py"
-    status: "created"
-    note: "Merge engine unit tests"
-  - path: "tests/test_merge_error_handling.py"
-    status: "created"
-    note: "Error handling tests"
-  - path: "tests/unit/test_version_manager.py"
-    status: "created"
-    note: "Version manager tests"
-  - path: "tests/unit/test_version_graph_builder.py"
-    status: "created"
-    note: "Version graph tests"
-  - path: "tests/integration/test_versioning_workflow.py"
-    status: "created"
-    note: "Integration workflow tests"
+- path: skillmeat/core/merge_engine.py
+  status: created
+  lines: 433
+  note: Three-way merge with conflict detection
+- path: skillmeat/core/diff_engine.py
+  status: created
+  lines: 400
+  note: File/directory diffing, three-way diff
+- path: skillmeat/core/version.py
+  status: created
+  lines: 261
+  note: VersionManager with rollback
+- path: skillmeat/core/version_graph.py
+  status: created
+  lines: 626
+  note: Cross-project version tracking
+- path: skillmeat/storage/snapshot.py
+  status: created
+  lines: 271
+  note: Tarball-based snapshot system
+- path: skillmeat/models.py
+  status: modified
+  note: Added MergeResult, MergeStats, ConflictMetadata, ThreeWayDiffResult
+- path: tests/test_merge_engine.py
+  status: created
+  note: Merge engine unit tests
+- path: tests/test_merge_error_handling.py
+  status: created
+  note: Error handling tests
+- path: tests/unit/test_version_manager.py
+  status: created
+  note: Version manager tests
+- path: tests/unit/test_version_graph_builder.py
+  status: created
+  note: Version graph tests
+- path: tests/integration/test_versioning_workflow.py
+  status: created
+  note: Integration workflow tests
+schema_version: 2
+doc_type: context
+feature_slug: versioning-merge-system
 ---
 
 # Context: Versioning & Merge System Implementation

@@ -90,6 +90,9 @@ files_modified:
 - web/lib/sync-utils.ts
 progress: 100
 updated: '2026-02-04'
+schema_version: 2
+doc_type: progress
+feature_slug: sync-diff-modal-standardization-v1
 ---
 
 # sync-diff-modal-standardization-v1 - Phase 1: Fix Frontend Validation

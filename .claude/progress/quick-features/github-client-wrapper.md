@@ -3,9 +3,11 @@ type: quick-feature-plan
 feature_slug: github-client-wrapper
 parent_feature: github-pat-settings
 status: completed
-completed_at: 2026-01-17T21:30:00Z
-created: 2026-01-17T20:00:00Z
+completed_at: 2026-01-17 21:30:00+00:00
+created: 2026-01-17 20:00:00+00:00
 estimated_scope: large
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # GitHub Client Wrapper

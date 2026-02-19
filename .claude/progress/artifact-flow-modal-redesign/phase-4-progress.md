@@ -1,46 +1,54 @@
 ---
 type: progress
-prd: "artifact-flow-modal-redesign"
+prd: artifact-flow-modal-redesign
 phase: 4
-title: "Polish & Action Wiring"
-status: "completed"
+title: Polish & Action Wiring
+status: completed
 progress: 100
 total_tasks: 2
 completed_tasks: 2
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["ui-engineer-enhanced"]
-created: "2025-11-29"
-updated: "2025-11-29"
-
+owners:
+- ui-engineer-enhanced
+created: '2025-11-29'
+updated: '2025-11-29'
 tasks:
-  - id: "TASK-4.1"
-    description: "Wire all action buttons to API hooks (~100 lines)"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.1"]
-    estimated_effort: "2h"
-    priority: "high"
-    files:
-      - "skillmeat/web/components/entity/sync-status/sync-status-tab.tsx"
-      - "skillmeat/web/components/entity/sync-status/artifact-flow-banner.tsx"
-      - "skillmeat/web/components/entity/sync-status/drift-alert-banner.tsx"
-      - "skillmeat/web/components/entity/sync-status/sync-actions-footer.tsx"
-
-  - id: "TASK-4.2"
-    description: "Add Coming Soon tooltips for unimplemented features (~50 lines)"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.1"]
-    estimated_effort: "1h"
-    priority: "medium"
-    files:
-      - "skillmeat/web/components/entity/sync-status/artifact-flow-banner.tsx"
-      - "skillmeat/web/components/entity/sync-status/sync-actions-footer.tsx"
-
+- id: TASK-4.1
+  description: Wire all action buttons to API hooks (~100 lines)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.1
+  estimated_effort: 2h
+  priority: high
+  files:
+  - skillmeat/web/components/entity/sync-status/sync-status-tab.tsx
+  - skillmeat/web/components/entity/sync-status/artifact-flow-banner.tsx
+  - skillmeat/web/components/entity/sync-status/drift-alert-banner.tsx
+  - skillmeat/web/components/entity/sync-status/sync-actions-footer.tsx
+- id: TASK-4.2
+  description: Add Coming Soon tooltips for unimplemented features (~50 lines)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.1
+  estimated_effort: 1h
+  priority: medium
+  files:
+  - skillmeat/web/components/entity/sync-status/artifact-flow-banner.tsx
+  - skillmeat/web/components/entity/sync-status/sync-actions-footer.tsx
 parallelization:
-  batch_1: ["TASK-4.1", "TASK-4.2"]
-  critical_path: ["TASK-4.1"]
+  batch_1:
+  - TASK-4.1
+  - TASK-4.2
+  critical_path:
+  - TASK-4.1
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-flow-modal-redesign
 ---
 
 # Phase 4: Polish & Action Wiring

@@ -1,13 +1,26 @@
 ---
-title: "PRD: UI/UX Refresh and Design System Unification"
-description: "A comprehensive refresh of the SkillMeat web application UI/UX, including a new logo, color palette, and component designs, and establishing a unified design language for the web and CLI applications."
-audience: [ai-agents, developers, designers]
-tags: [prd, planning, ui, ux, design-system]
+title: 'PRD: UI/UX Refresh and Design System Unification'
+description: A comprehensive refresh of the SkillMeat web application UI/UX, including
+  a new logo, color palette, and component designs, and establishing a unified design
+  language for the web and CLI applications.
+audience:
+- ai-agents
+- developers
+- designers
+tags:
+- prd
+- planning
+- ui
+- ux
+- design-system
 created: 2025-12-16
 updated: 2025-12-16
-category: "product-planning"
+category: product-planning
 status: draft
 related: []
+schema_version: 2
+doc_type: prd
+feature_slug: ui-refresh
 ---
 
 # Feature Brief & Metadata

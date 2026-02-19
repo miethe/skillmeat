@@ -128,7 +128,7 @@ tasks:
   effort: 2
   model: opus
 - id: P5-T2
-  name: Create Migration Guide for Entity→Artifact
+  name: "Create Migration Guide for Entity\u2192Artifact"
   status: completed
   assigned_to:
   - documentation-writer
@@ -187,6 +187,9 @@ completed_tasks: 16
 in_progress_tasks: 0
 blocked_tasks: 0
 updated: '2026-01-28'
+schema_version: 2
+doc_type: progress
+feature_slug: entity-artifact-consolidation-v1
 ---
 
 # Phase 3-5 Progress: Component Migration & Documentation

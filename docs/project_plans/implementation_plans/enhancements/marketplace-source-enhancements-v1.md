@@ -1,3 +1,10 @@
+---
+status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: marketplace-source-enhancements
+prd_ref: null
+---
 # Implementation Plan: Marketplace Source Enhancements v1
 
 **PRD Reference**: `docs/project_plans/PRDs/enhancements/marketplace-source-enhancements-v1.md`

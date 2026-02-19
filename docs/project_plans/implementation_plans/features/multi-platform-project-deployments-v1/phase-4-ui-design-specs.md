@@ -1,15 +1,27 @@
 ---
-title: "Phase 4: UI/UX Design Specifications"
+title: 'Phase 4: UI/UX Design Specifications'
 parent: ../multi-platform-project-deployments-v1.md
-description: "Design specifications for multi-platform deployment frontend components"
-audience: [developers, ui-engineers, designers]
-tags: [design, ui, components, multi-platform, deployments]
+description: Design specifications for multi-platform deployment frontend components
+audience:
+- developers
+- ui-engineers
+- designers
+tags:
+- design
+- ui
+- components
+- multi-platform
+- deployments
 created: 2026-02-07
 updated: 2026-02-07
 category: design
-status: active
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: multi-platform-project-deployments
+prd_ref: null
+plan_ref: null
 ---
-
 # Phase 4: UI/UX Design Specifications
 
 Component design specifications for multi-platform deployment support. All components follow the SkillMeat design language: Linear/Notion-inspired, clean, minimal, precise. Monospace accents for code-related content. Muted colors with accent highlights.

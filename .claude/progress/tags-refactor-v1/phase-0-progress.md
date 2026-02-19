@@ -10,29 +10,29 @@ total_tasks: 1
 completed_tasks: 0
 total_story_points: 1
 completed_story_points: 0
-
 tasks:
-  - id: BUG-001
-    title: Fix Scope Dropdown
-    description: Fix ParameterEditorModal scope field to use 'user'/'local' instead of 'default'
-    status: pending
-    story_points: 1
-    assigned_to:
-      - frontend-developer
-    dependencies: []
-    created_at: "2025-12-18"
-
+- id: BUG-001
+  title: Fix Scope Dropdown
+  description: Fix ParameterEditorModal scope field to use 'user'/'local' instead
+    of 'default'
+  status: pending
+  story_points: 1
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  created_at: '2025-12-18'
 parallelization:
   batch_1:
-    - BUG-001
-
+  - BUG-001
 context_files:
-  - skillmeat/web/components/ParameterEditorModal.tsx
-  - skillmeat/api/app/schemas/artifact.py
-
+- skillmeat/web/components/ParameterEditorModal.tsx
+- skillmeat/api/app/schemas/artifact.py
 blockers: []
-notes: "Blocks artifact editing tests. API schema expects 'user' or 'local', but form currently sends 'default' causing 422 error."
-
+notes: Blocks artifact editing tests. API schema expects 'user' or 'local', but form
+  currently sends 'default' causing 422 error.
+schema_version: 2
+doc_type: progress
+feature_slug: tags-refactor-v1
 ---
 
 # Phase 0: Bug Fix - Artifact Scope Validation

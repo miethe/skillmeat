@@ -1,8 +1,11 @@
 ---
 type: context
-prd: "collections-remediate"
+prd: collections-remediate
 created: 2025-12-21
 updated: 2025-12-21
+schema_version: 2
+doc_type: context
+feature_slug: collections-remediate
 ---
 
 # Collections Remediation - Context Notes

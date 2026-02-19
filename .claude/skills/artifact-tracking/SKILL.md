@@ -15,8 +15,22 @@ Token-efficient tracking artifacts for AI agent orchestration.
 | Batch update | `python scripts/update-batch.py -f FILE --updates "T1:completed,T2:completed"` | ~100 |
 | Query pending | `python scripts/query_artifacts.py --status pending` | ~50 |
 | Validate | `python scripts/validate_artifact.py -f FILE` | ~50 |
+| Update fields | `python scripts/update-field.py -f FILE --set "priority=high"` | ~50 |
+| Scan migration | `python scripts/migrate-frontmatter.py --scan` | ~100 |
 
 **Scripts location**: `.claude/skills/artifact-tracking/scripts/`
+
+## Script Inventory
+
+| Script | Purpose |
+|---|---|
+| `update-status.py` | Update one task status in progress frontmatter |
+| `update-batch.py` | Batch-update multiple task statuses |
+| `manage-plan-status.py` | Read/update/query planning doc status and arbitrary fields |
+| `validate_artifact.py` | Validate frontmatter against schema (`doc_type` auto-detect, strict mode) |
+| `query_artifacts.py` | Query metadata across planning/progress/worknotes docs |
+| `migrate-frontmatter.py` | Scan/dry-run/migrate missing `schema_version`/`doc_type` |
+| `update-field.py` | Generic `--set` and `--append` updates with schema validation |
 
 ## Plan Status Management
 
@@ -24,28 +38,10 @@ Token-efficient tracking artifacts for AI agent orchestration.
 |-----------|---------|--------|
 | Read status | `python scripts/manage-plan-status.py --read FILE` | ~50 |
 | Update status | `python scripts/manage-plan-status.py --file FILE --status STATUS` | ~50 |
-| Query plans | `python scripts/manage-plan-status.py --query --status STATUS` | ~100 |
+| Update any field | `python scripts/manage-plan-status.py --file FILE --field priority --value high` | ~50 |
+| Query plans | `python scripts/manage-plan-status.py --query --status STATUS --type TYPE` | ~100 |
 
-**Use for**: Managing PRD and implementation plan status fields (draft, approved, in-progress, completed, superseded).
-
-**Detailed guide**: `./plan-status-management.md`
-
-## Agent Operations (When Needed)
-
-For complex operations requiring judgment:
-
-| Operation | Agent | When to Use |
-|-----------|-------|-------------|
-| CREATE file | artifact-tracker | New phase, need template |
-| UPDATE complex | artifact-tracker | Blockers with context, decisions |
-| QUERY synthesis | artifact-query | Cross-phase analysis, handoffs |
-| VALIDATE quality | artifact-validator | Pre-completion checks |
-
-**Agent invocation**:
-```
-Task("artifact-tracker", "Create Phase 2 progress for auth-overhaul PRD")
-Task("artifact-query", "Show all blocked tasks in auth-overhaul phases 1-3")
-```
+**Use for**: PRDs, implementation plans, phase plans, SPIKEs, and quick-feature plans.
 
 ## File Locations
 
@@ -58,36 +54,66 @@ Task("artifact-query", "Show all blocked tasks in auth-overhaul phases 1-3")
 
 **Policy**: `.claude/specs/doc-policy-spec.md`
 
-## YAML Format (Source of Truth)
+## YAML Quick Reference (v2)
 
 ```yaml
 ---
 type: progress
+schema_version: 2
+doc_type: progress
 prd: "prd-name"
+feature_slug: "prd-name"
 phase: 2
 status: in_progress
-progress: 40
+created: 2026-02-19
+updated: 2026-02-19
+prd_ref: null
+plan_ref: null
+commit_refs: []
+pr_refs: []
+
+owners: ["agent-name"]
+contributors: []
 
 tasks:
   - id: "TASK-2.1"
-    status: "pending"           # pending|in_progress|completed|blocked
-    assigned_to: ["agent-name"] # REQUIRED for orchestration
-    dependencies: []            # REQUIRED for orchestration
-    model: "opus"               # Optional: opus|sonnet|haiku
+    status: "pending"
+    assigned_to: ["agent-name"]
+    dependencies: []
 
 parallelization:
-  batch_1: ["TASK-2.1", "TASK-2.2"]  # Run parallel
-  batch_2: ["TASK-2.3"]              # After batch_1
+  batch_1: ["TASK-2.1"]
 ---
 ```
 
-## Token Efficiency
+## Schema Inventory
 
-| Operation | Traditional | Optimized | Savings |
-|-----------|-------------|-----------|---------|
-| Task list | 25KB | 2KB | 92% |
-| Query blockers | 75KB | 3KB | 96% |
-| Status update | 25KB | 50 bytes | 99.8% |
+| Schema | Purpose |
+|---|---|
+| `envelope.schema.yaml` | Shared CCDash frontmatter envelope |
+| `prd.schema.yaml` | PRD frontmatter |
+| `implementation-plan.schema.yaml` | Implementation plan frontmatter |
+| `phase-plan.schema.yaml` | Phase breakdown frontmatter |
+| `spike.schema.yaml` | SPIKE frontmatter |
+| `quick-feature.schema.yaml` | Quick feature frontmatter |
+| `report.schema.yaml` | Report frontmatter |
+| `progress.schema.yaml` | Progress tracking (backward-compatible) |
+| `context.schema.yaml` | Context worknotes (backward-compatible) |
+| `bug-fix.schema.yaml` | Bug-fix logs (backward-compatible) |
+| `observation.schema.yaml` | Observation logs (backward-compatible) |
+
+Field-level guidance: `.claude/skills/artifact-tracking/schemas/field-reference.md`
+
+## Post-Implementation Updates
+
+After committing or opening a PR, update traceability fields:
+
+```bash
+python scripts/update-field.py -f FILE --append "commit_refs=<SHA>"
+python scripts/update-field.py -f FILE --append "pr_refs=#123"
+```
+
+Use `commit_refs` and `pr_refs` on PRDs, plans, phase docs, and progress files so CCDash can correlate planning docs with delivery artifacts.
 
 ## Detailed References
 

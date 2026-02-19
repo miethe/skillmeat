@@ -59,6 +59,9 @@ completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 updated: '2026-02-09'
+schema_version: 2
+doc_type: progress
+feature_slug: platform-defaults-auto-population
 ---
 
 # Phase 2: Frontend Foundation

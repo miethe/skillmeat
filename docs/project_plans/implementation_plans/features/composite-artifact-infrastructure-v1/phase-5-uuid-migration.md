@@ -1,17 +1,32 @@
 ---
-title: "Phase 5: UUID Migration for Existing Join Tables (Backend)"
-description: "Migrate collection_artifacts, group_artifacts, and artifact_tags join tables from type:name string references to UUID foreign keys, establishing full referential integrity across the artifact identity layer"
-audience: [ai-agents, developers]
-tags: [implementation, phase-5, database, migration, uuid, orm, repository]
+title: 'Phase 5: UUID Migration for Existing Join Tables (Backend)'
+description: Migrate collection_artifacts, group_artifacts, and artifact_tags join
+  tables from type:name string references to UUID foreign keys, establishing full
+  referential integrity across the artifact identity layer
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- phase-5
+- database
+- migration
+- uuid
+- orm
+- repository
 created: 2026-02-18
 updated: 2026-02-18
-category: "product-planning"
-status: planning
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/implementation_plans/features/composite-artifact-infrastructure-v1.md
-  - /docs/dev/architecture/decisions/ADR-007-artifact-uuid-identity.md
+- /docs/project_plans/implementation_plans/features/composite-artifact-infrastructure-v1.md
+- /docs/dev/architecture/decisions/ADR-007-artifact-uuid-identity.md
+schema_version: 2
+doc_type: phase_plan
+feature_slug: composite-artifact-infrastructure
+prd_ref: null
+plan_ref: null
 ---
-
 # Phase 5: UUID Migration for Existing Join Tables (Backend)
 
 **Phase ID**: CAI-P5

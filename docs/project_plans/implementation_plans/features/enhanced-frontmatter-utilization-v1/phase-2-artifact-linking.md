@@ -1,10 +1,16 @@
 ---
-title: "Phase 2: Artifact Linking"
-description: "LinkedArtifactReference model, auto-linking logic, manual linking API endpoints"
+title: 'Phase 2: Artifact Linking'
+description: LinkedArtifactReference model, auto-linking logic, manual linking API
+  endpoints
 created: 2026-01-21
 updated: 2026-01-21
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: enhanced-frontmatter-utilization
+prd_ref: null
+plan_ref: null
 ---
-
 # Phase 2: Artifact Linking
 
 **Duration**: 1.5 weeks

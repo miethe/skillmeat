@@ -1,12 +1,21 @@
 ---
-title: "Implementation Plan: CCDash Frontmatter Alignment v1"
-description: "Align SkillMeat's project document frontmatter with CCDash's schema spec for cross-document linking, filtering, analytics, and lifecycle tracking"
-audience: [ai-agents, developers]
-tags: [implementation, planning, frontmatter, ccdash, schemas, artifact-tracking]
+title: 'Implementation Plan: CCDash Frontmatter Alignment v1'
+description: Align SkillMeat's project document frontmatter with CCDash's schema spec
+  for cross-document linking, filtering, analytics, and lifecycle tracking
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- planning
+- frontmatter
+- ccdash
+- schemas
+- artifact-tracking
 created: 2026-02-19
-updated: 2026-02-19
-category: "product-planning"
-status: draft
+updated: '2026-02-19'
+category: product-planning
+status: completed
 schema_version: 2
 doc_type: implementation_plan
 feature_slug: ccdash-frontmatter-alignment
@@ -14,9 +23,9 @@ feature_version: v1
 prd_ref: null
 plan_ref: null
 related_documents:
-  - .claude/specs/artifact-structures/ccdash-doc-structure.md
-  - .claude/skills/artifact-tracking/SKILL.md
-  - .claude/skills/planning/SKILL.md
+- .claude/specs/artifact-structures/ccdash-doc-structure.md
+- .claude/skills/artifact-tracking/SKILL.md
+- .claude/skills/planning/SKILL.md
 owner: null
 contributors: []
 priority: medium

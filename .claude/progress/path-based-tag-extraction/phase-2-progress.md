@@ -1,83 +1,101 @@
 ---
 prd: path-based-tag-extraction-v1
 phase: 2
-name: "Frontend UI Components"
+name: Frontend UI Components
 status: pending
 created: 2026-01-04
 updated: 2026-01-04
 completion: 0
-
 tasks:
-  - id: "TASK-2.1"
-    name: "API Client Functions"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    model: "sonnet"
-    dependencies: []
-    estimated_effort: "1h"
-
-  - id: "TASK-2.2"
-    name: "Type Definitions"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    model: "haiku"
-    dependencies: []
-    estimated_effort: "0.5h"
-
-  - id: "TASK-2.3"
-    name: "React Query Hooks"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    model: "opus"
-    dependencies: ["TASK-2.1", "TASK-2.2"]
-    estimated_effort: "1.5h"
-
-  - id: "TASK-2.4"
-    name: "PathTagReview Component"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    model: "opus"
-    dependencies: ["TASK-2.3"]
-    estimated_effort: "3h"
-
-  - id: "TASK-2.5"
-    name: "Modal Integration"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-2.4"]
-    estimated_effort: "1h"
-
-  - id: "TASK-2.6"
-    name: "Accessibility Audit"
-    status: "pending"
-    assigned_to: ["a11y-sheriff"]
-    model: "sonnet"
-    dependencies: ["TASK-2.4"]
-    estimated_effort: "1h"
-
-  - id: "TASK-2.7"
-    name: "E2E Tests"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-2.5"]
-    estimated_effort: "2h"
-
-  - id: "TASK-2.8"
-    name: "Unit Tests"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-2.4"]
-    estimated_effort: "1.5h"
-
+- id: TASK-2.1
+  name: API Client Functions
+  status: pending
+  assigned_to:
+  - ui-engineer
+  model: sonnet
+  dependencies: []
+  estimated_effort: 1h
+- id: TASK-2.2
+  name: Type Definitions
+  status: pending
+  assigned_to:
+  - ui-engineer
+  model: haiku
+  dependencies: []
+  estimated_effort: 0.5h
+- id: TASK-2.3
+  name: React Query Hooks
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  model: opus
+  dependencies:
+  - TASK-2.1
+  - TASK-2.2
+  estimated_effort: 1.5h
+- id: TASK-2.4
+  name: PathTagReview Component
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  model: opus
+  dependencies:
+  - TASK-2.3
+  estimated_effort: 3h
+- id: TASK-2.5
+  name: Modal Integration
+  status: pending
+  assigned_to:
+  - ui-engineer
+  model: sonnet
+  dependencies:
+  - TASK-2.4
+  estimated_effort: 1h
+- id: TASK-2.6
+  name: Accessibility Audit
+  status: pending
+  assigned_to:
+  - a11y-sheriff
+  model: sonnet
+  dependencies:
+  - TASK-2.4
+  estimated_effort: 1h
+- id: TASK-2.7
+  name: E2E Tests
+  status: pending
+  assigned_to:
+  - ui-engineer
+  model: sonnet
+  dependencies:
+  - TASK-2.5
+  estimated_effort: 2h
+- id: TASK-2.8
+  name: Unit Tests
+  status: pending
+  assigned_to:
+  - ui-engineer
+  model: sonnet
+  dependencies:
+  - TASK-2.4
+  estimated_effort: 1.5h
 parallelization:
-  batch_1: ["TASK-2.1", "TASK-2.2"]
-  batch_2: ["TASK-2.3"]
-  batch_3: ["TASK-2.4"]
-  batch_4: ["TASK-2.5", "TASK-2.6", "TASK-2.8"]
-  batch_5: ["TASK-2.7"]
+  batch_1:
+  - TASK-2.1
+  - TASK-2.2
+  batch_2:
+  - TASK-2.3
+  batch_3:
+  - TASK-2.4
+  batch_4:
+  - TASK-2.5
+  - TASK-2.6
+  - TASK-2.8
+  batch_5:
+  - TASK-2.7
+schema_version: 2
+doc_type: progress
+feature_slug: path-based-tag-extraction-v1
+type: progress
 ---
 
 # Phase 2: Frontend UI Components

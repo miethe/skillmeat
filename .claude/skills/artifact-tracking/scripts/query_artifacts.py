@@ -1,38 +1,45 @@
 #!/usr/bin/env python3
 """
-Query helper functions for artifact tracking.
+Efficient artifact metadata querying from markdown frontmatter.
 
-This script provides efficient querying of artifact metadata without loading full bodies,
-filtering by field values (status, agent, phase, tags), aggregation across multiple files,
-and structured results.
-
-Usage:
-    python query_artifacts.py --directory .claude/progress --status in-progress
-    python query_artifacts.py --directory .claude/progress --prd advanced-editing-v2
-    python query_artifacts.py --directory .claude/progress --owner frontend-developer
-    python query_artifacts.py --directory .claude/worknotes --type context --status blocked
-    python query_artifacts.py --directory .claude/progress --aggregate --format json
+Supports legacy artifact filters and CCDash frontmatter filters across planning,
+progress, and worknote directories.
 """
+
+from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
-from dataclasses import dataclass, asdict
-from datetime import datetime
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
 
 
+DEFAULT_DIRECTORIES = [
+    "docs/project_plans/PRDs",
+    "docs/project_plans/implementation_plans",
+    "docs/project_plans/SPIKEs",
+    ".claude/progress",
+    ".claude/worknotes",
+]
+
+
 @dataclass
 class ArtifactMetadata:
-    """Lightweight artifact metadata for queries."""
+    """Lightweight frontmatter metadata record."""
+
     filepath: str
     type: str
+    doc_type: Optional[str]
     title: str
     status: str
     prd: Optional[str] = None
+    feature_slug: Optional[str] = None
+    priority: Optional[str] = None
     phase: Optional[int] = None
     overall_progress: Optional[int] = None
     owners: Optional[List[str]] = None
@@ -44,511 +51,395 @@ class ArtifactMetadata:
     completed_tasks: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
         return asdict(self)
 
 
 def extract_frontmatter_only(filepath: Path) -> Optional[Dict[str, Any]]:
-    """
-    Extract only YAML frontmatter without reading full body (efficient).
+    """Extract frontmatter without reading full markdown body."""
+    try:
+        content = filepath.read_text(encoding="utf-8")
+    except Exception as exc:
+        print(f"Warning: Could not read {filepath}: {exc}", file=sys.stderr)
+        return None
 
-    Args:
-        filepath: Path to artifact file
+    if not content.startswith("---\n"):
+        return None
 
-    Returns:
-        Parsed frontmatter dictionary or None if not found
-    """
-    import re
+    match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
+    if not match:
+        return None
 
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            # Read only first few KB to get frontmatter
-            content = f.read(8192)  # 8KB should be enough for frontmatter
-
-            # Check if content starts with frontmatter delimiter
-            if not content.strip().startswith('---'):
-                return None
-
-            # Find the closing delimiter
-            match = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
-            if not match:
-                return None
-
-            frontmatter_str = match.group(1)
-            return yaml.safe_load(frontmatter_str)
-
-    except Exception as e:
-        print(f"Warning: Could not read {filepath}: {e}", file=sys.stderr)
+        metadata = yaml.safe_load(match.group(1))
+    except Exception as exc:
+        print(f"Warning: Invalid YAML frontmatter in {filepath}: {exc}", file=sys.stderr)
         return None
+
+    if not isinstance(metadata, dict):
+        return None
+    return metadata
 
 
 def load_artifact_metadata(filepath: Path) -> Optional[ArtifactMetadata]:
-    """
-    Load lightweight metadata from artifact file.
-
-    Args:
-        filepath: Path to artifact file
-
-    Returns:
-        ArtifactMetadata object or None if loading failed
-    """
+    """Load metadata from a markdown file frontmatter."""
     frontmatter = extract_frontmatter_only(filepath)
     if frontmatter is None:
         return None
 
-    try:
-        metadata = ArtifactMetadata(
-            filepath=str(filepath),
-            type=frontmatter.get('type', 'unknown'),
-            title=frontmatter.get('title', filepath.name),
-            status=frontmatter.get('status', 'unknown'),
-            prd=frontmatter.get('prd'),
-            phase=frontmatter.get('phase'),
-            overall_progress=frontmatter.get('overall_progress'),
-            owners=frontmatter.get('owners', []),
-            contributors=frontmatter.get('contributors', []),
-            started=frontmatter.get('started'),
-            completed=frontmatter.get('completed'),
-            blockers_count=len(frontmatter.get('blockers', [])),
-            total_tasks=frontmatter.get('total_tasks'),
-            completed_tasks=frontmatter.get('completed_tasks'),
-        )
-        return metadata
+    owners = frontmatter.get("owners")
+    owner = frontmatter.get("owner")
+    owners_list: List[str] = []
 
-    except Exception as e:
-        print(f"Warning: Could not parse metadata from {filepath}: {e}", file=sys.stderr)
-        return None
+    if isinstance(owners, list):
+        owners_list.extend(str(item) for item in owners)
+    if owner and isinstance(owner, str):
+        owners_list.append(owner)
+
+    metadata = ArtifactMetadata(
+        filepath=str(filepath),
+        type=str(frontmatter.get("type") or "unknown"),
+        doc_type=frontmatter.get("doc_type"),
+        title=str(frontmatter.get("title") or filepath.name),
+        status=str(frontmatter.get("status") or "unknown"),
+        prd=frontmatter.get("prd") or frontmatter.get("prd_ref"),
+        feature_slug=frontmatter.get("feature_slug") or frontmatter.get("prd"),
+        priority=frontmatter.get("priority"),
+        phase=frontmatter.get("phase"),
+        overall_progress=frontmatter.get("overall_progress") or frontmatter.get("progress"),
+        owners=owners_list,
+        contributors=frontmatter.get("contributors") or [],
+        started=frontmatter.get("started"),
+        completed=frontmatter.get("completed"),
+        blockers_count=len(frontmatter.get("blockers", [])) if isinstance(frontmatter.get("blockers"), list) else 0,
+        total_tasks=frontmatter.get("total_tasks"),
+        completed_tasks=frontmatter.get("completed_tasks"),
+    )
+    return metadata
 
 
-def find_artifacts(directory: Path, pattern: str = "*.md") -> List[Path]:
-    """
-    Find all artifact files in directory.
+def find_artifacts(directories: List[Path], pattern: str = "*.md") -> List[Path]:
+    """Find markdown artifacts in one or more directories."""
+    files: List[Path] = []
+    seen = set()
 
-    Args:
-        directory: Directory to search
-        pattern: Glob pattern for files (default: *.md)
+    for directory in directories:
+        if not directory.exists():
+            continue
 
-    Returns:
-        List of file paths
-    """
-    if not directory.exists():
-        raise FileNotFoundError(f"Directory not found: {directory}")
+        for filepath in sorted(directory.rglob(pattern)):
+            path_str = str(filepath)
+            if path_str in seen:
+                continue
+            seen.add(path_str)
+            files.append(filepath)
 
-    # Recursively find all markdown files
-    return sorted(directory.rglob(pattern))
+    return files
 
 
 def filter_artifacts(
     artifacts: List[ArtifactMetadata],
     artifact_type: Optional[str] = None,
+    doc_type: Optional[str] = None,
     status: Optional[str] = None,
     prd: Optional[str] = None,
     phase: Optional[int] = None,
     owner: Optional[str] = None,
     contributor: Optional[str] = None,
+    feature_slug: Optional[str] = None,
+    priority: Optional[str] = None,
     has_blockers: Optional[bool] = None,
 ) -> List[ArtifactMetadata]:
-    """
-    Filter artifacts by criteria.
-
-    Args:
-        artifacts: List of artifact metadata
-        artifact_type: Filter by type (progress, context, etc.)
-        status: Filter by status
-        prd: Filter by PRD identifier
-        phase: Filter by phase number
-        owner: Filter by owner
-        contributor: Filter by contributor
-        has_blockers: Filter by blocker presence
-
-    Returns:
-        Filtered list of artifacts
-    """
+    """Filter metadata records by supported predicates."""
     filtered = artifacts
 
     if artifact_type:
-        filtered = [a for a in filtered if a.type == artifact_type]
+        filtered = [
+            item
+            for item in filtered
+            if item.type == artifact_type or (item.doc_type is not None and item.doc_type == artifact_type)
+        ]
+
+    if doc_type:
+        filtered = [item for item in filtered if item.doc_type == doc_type]
 
     if status:
-        filtered = [a for a in filtered if a.status == status]
+        filtered = [item for item in filtered if item.status == status]
 
     if prd:
-        filtered = [a for a in filtered if a.prd == prd]
+        filtered = [item for item in filtered if item.prd == prd]
 
     if phase is not None:
-        filtered = [a for a in filtered if a.phase == phase]
+        filtered = [item for item in filtered if item.phase == phase]
 
     if owner:
-        filtered = [a for a in filtered if a.owners and owner in a.owners]
+        filtered = [item for item in filtered if item.owners and owner in item.owners]
 
     if contributor:
-        filtered = [a for a in filtered if a.contributors and contributor in a.contributors]
+        filtered = [item for item in filtered if item.contributors and contributor in item.contributors]
+
+    if feature_slug:
+        filtered = [item for item in filtered if item.feature_slug == feature_slug]
+
+    if priority:
+        filtered = [item for item in filtered if item.priority == priority]
 
     if has_blockers is not None:
         if has_blockers:
-            filtered = [a for a in filtered if a.blockers_count > 0]
+            filtered = [item for item in filtered if item.blockers_count > 0]
         else:
-            filtered = [a for a in filtered if a.blockers_count == 0]
+            filtered = [item for item in filtered if item.blockers_count == 0]
 
     return filtered
 
 
 def aggregate_metrics(artifacts: List[ArtifactMetadata]) -> Dict[str, Any]:
-    """
-    Aggregate metrics across artifacts.
-
-    Args:
-        artifacts: List of artifact metadata
-
-    Returns:
-        Dictionary of aggregated metrics
-    """
+    """Compute aggregate metrics for query results."""
     if not artifacts:
         return {
             "total_artifacts": 0,
             "by_type": {},
+            "by_doc_type": {},
             "by_status": {},
-            "by_prd": {},
+            "by_feature_slug": {},
             "total_blockers": 0,
             "average_progress": 0,
+            "total_tasks": 0,
+            "completed_tasks": 0,
+            "task_completion_rate": 0,
         }
 
-    # Count by type
     by_type: Dict[str, int] = {}
+    by_doc_type: Dict[str, int] = {}
+    by_status: Dict[str, int] = {}
+    by_feature_slug: Dict[str, int] = {}
+
+    total_blockers = 0
+    progress_values: List[int] = []
+    total_tasks = 0
+    completed_tasks = 0
+
     for artifact in artifacts:
         by_type[artifact.type] = by_type.get(artifact.type, 0) + 1
-
-    # Count by status
-    by_status: Dict[str, int] = {}
-    for artifact in artifacts:
+        if artifact.doc_type:
+            by_doc_type[artifact.doc_type] = by_doc_type.get(artifact.doc_type, 0) + 1
         by_status[artifact.status] = by_status.get(artifact.status, 0) + 1
 
-    # Count by PRD
-    by_prd: Dict[str, int] = {}
-    for artifact in artifacts:
-        if artifact.prd:
-            by_prd[artifact.prd] = by_prd.get(artifact.prd, 0) + 1
+        if artifact.feature_slug:
+            by_feature_slug[artifact.feature_slug] = by_feature_slug.get(artifact.feature_slug, 0) + 1
 
-    # Total blockers
-    total_blockers = sum(a.blockers_count for a in artifacts)
+        total_blockers += artifact.blockers_count
 
-    # Average progress (only for artifacts with progress)
-    progress_values = [a.overall_progress for a in artifacts if a.overall_progress is not None]
+        if artifact.overall_progress is not None:
+            progress_values.append(int(artifact.overall_progress))
+
+        if artifact.total_tasks is not None:
+            total_tasks += int(artifact.total_tasks)
+        if artifact.completed_tasks is not None:
+            completed_tasks += int(artifact.completed_tasks)
+
     average_progress = sum(progress_values) / len(progress_values) if progress_values else 0
-
-    # Task metrics (only for progress artifacts)
-    progress_artifacts = [a for a in artifacts if a.type == 'progress' and a.total_tasks is not None]
-    total_tasks_sum = sum(a.total_tasks or 0 for a in progress_artifacts)
-    completed_tasks_sum = sum(a.completed_tasks or 0 for a in progress_artifacts)
 
     return {
         "total_artifacts": len(artifacts),
         "by_type": by_type,
+        "by_doc_type": by_doc_type,
         "by_status": by_status,
-        "by_prd": by_prd,
+        "by_feature_slug": by_feature_slug,
         "total_blockers": total_blockers,
         "average_progress": round(average_progress, 1),
-        "total_tasks": total_tasks_sum,
-        "completed_tasks": completed_tasks_sum,
-        "task_completion_rate": round((completed_tasks_sum / total_tasks_sum * 100), 1) if total_tasks_sum > 0 else 0,
+        "total_tasks": total_tasks,
+        "completed_tasks": completed_tasks,
+        "task_completion_rate": round((completed_tasks / total_tasks * 100), 1) if total_tasks else 0,
     }
 
 
 def format_table_output(artifacts: List[ArtifactMetadata]) -> str:
-    """
-    Format artifacts as ASCII table.
-
-    Args:
-        artifacts: List of artifact metadata
-
-    Returns:
-        Formatted table string
-    """
+    """Render table output for terminal use."""
     if not artifacts:
         return "No artifacts found."
 
-    lines = []
+    lines = [
+        "=" * 124,
+        f"Found {len(artifacts)} artifact(s)",
+        "=" * 124,
+        f"{'DocType':<20} {'Status':<14} {'Feature':<24} {'Priority':<10} {'Phase':<6} {'Title':<38}",
+        "-" * 124,
+    ]
 
-    # Header
-    lines.append("=" * 100)
-    lines.append(f"Found {len(artifacts)} artifact(s)")
-    lines.append("=" * 100)
-
-    # Table header
-    lines.append(f"{'Type':<12} {'Status':<15} {'PRD':<20} {'Phase':<6} {'Progress':<10} {'Title':<30}")
-    lines.append("-" * 100)
-
-    # Table rows
     for artifact in artifacts:
-        type_str = artifact.type[:11]
-        status_str = artifact.status[:14]
-        prd_str = (artifact.prd or 'N/A')[:19]
-        phase_str = str(artifact.phase) if artifact.phase else 'N/A'
-        progress_str = f"{artifact.overall_progress}%" if artifact.overall_progress is not None else 'N/A'
-        title_str = artifact.title[:29]
+        doc_type = (artifact.doc_type or artifact.type or "unknown")[:19]
+        status = artifact.status[:13]
+        feature = (artifact.feature_slug or "N/A")[:23]
+        priority = (artifact.priority or "N/A")[:9]
+        phase = str(artifact.phase) if artifact.phase is not None else "N/A"
+        title = artifact.title[:37]
+        lines.append(f"{doc_type:<20} {status:<14} {feature:<24} {priority:<10} {phase:<6} {title:<38}")
 
-        lines.append(f"{type_str:<12} {status_str:<15} {prd_str:<20} {phase_str:<6} {progress_str:<10} {title_str:<30}")
-
-    lines.append("=" * 100)
-
+    lines.append("=" * 124)
     return "\n".join(lines)
 
 
 def format_json_output(artifacts: List[ArtifactMetadata]) -> str:
-    """
-    Format artifacts as JSON.
-
-    Args:
-        artifacts: List of artifact metadata
-
-    Returns:
-        JSON string
-    """
-    data = [artifact.to_dict() for artifact in artifacts]
-    return json.dumps(data, indent=2, default=str)
+    """Render JSON output."""
+    return json.dumps([artifact.to_dict() for artifact in artifacts], indent=2)
 
 
 def format_summary_output(artifacts: List[ArtifactMetadata]) -> str:
-    """
-    Format artifacts as summary with aggregated metrics.
-
-    Args:
-        artifacts: List of artifact metadata
-
-    Returns:
-        Formatted summary string
-    """
+    """Render aggregate summary output."""
     metrics = aggregate_metrics(artifacts)
+    lines = [
+        "=" * 70,
+        "Artifact Query Summary",
+        "=" * 70,
+        f"Total Artifacts: {metrics['total_artifacts']}",
+        "",
+        "By Legacy Type:",
+    ]
 
-    lines = []
-    lines.append("=" * 70)
-    lines.append("Artifact Query Summary")
-    lines.append("=" * 70)
-    lines.append(f"Total Artifacts: {metrics['total_artifacts']}")
+    for key, value in sorted(metrics["by_type"].items()):
+        lines.append(f"  {key}: {value}")
+
     lines.append("")
+    lines.append("By Doc Type:")
+    for key, value in sorted(metrics["by_doc_type"].items()):
+        lines.append(f"  {key}: {value}")
 
-    lines.append("By Type:")
-    for artifact_type, count in sorted(metrics['by_type'].items()):
-        lines.append(f"  {artifact_type}: {count}")
     lines.append("")
-
     lines.append("By Status:")
-    for status, count in sorted(metrics['by_status'].items()):
-        lines.append(f"  {status}: {count}")
-    lines.append("")
+    for key, value in sorted(metrics["by_status"].items()):
+        lines.append(f"  {key}: {value}")
 
-    if metrics['by_prd']:
-        lines.append("By PRD:")
-        for prd, count in sorted(metrics['by_prd'].items()):
-            lines.append(f"  {prd}: {count}")
+    if metrics["by_feature_slug"]:
         lines.append("")
+        lines.append("By Feature Slug:")
+        for key, value in sorted(metrics["by_feature_slug"].items()):
+            lines.append(f"  {key}: {value}")
 
-    lines.append(f"Total Blockers: {metrics['total_blockers']}")
-    lines.append(f"Average Progress: {metrics['average_progress']}%")
-    lines.append(f"Total Tasks: {metrics['total_tasks']}")
-    lines.append(f"Completed Tasks: {metrics['completed_tasks']}")
-    lines.append(f"Task Completion Rate: {metrics['task_completion_rate']}%")
-    lines.append("=" * 70)
-
+    lines.extend(
+        [
+            "",
+            f"Total Blockers: {metrics['total_blockers']}",
+            f"Average Progress: {metrics['average_progress']}%",
+            f"Total Tasks: {metrics['total_tasks']}",
+            f"Completed Tasks: {metrics['completed_tasks']}",
+            f"Task Completion Rate: {metrics['task_completion_rate']}%",
+            "=" * 70,
+        ]
+    )
     return "\n".join(lines)
 
 
 def query_artifacts(
-    directory: Path,
+    directories: List[Path],
     artifact_type: Optional[str] = None,
+    doc_type: Optional[str] = None,
     status: Optional[str] = None,
     prd: Optional[str] = None,
     phase: Optional[int] = None,
     owner: Optional[str] = None,
     contributor: Optional[str] = None,
+    feature_slug: Optional[str] = None,
+    priority: Optional[str] = None,
     has_blockers: Optional[bool] = None,
-    output_format: str = 'table',
+    output_format: str = "table",
     aggregate: bool = False,
 ) -> str:
-    """
-    Query artifacts and return formatted results.
+    """Query metadata and return formatted results."""
+    filepaths = find_artifacts(directories)
 
-    Args:
-        directory: Directory to search
-        artifact_type: Filter by type
-        status: Filter by status
-        prd: Filter by PRD
-        phase: Filter by phase
-        owner: Filter by owner
-        contributor: Filter by contributor
-        has_blockers: Filter by blocker presence
-        output_format: Output format (table, json, summary)
-        aggregate: Show aggregated metrics
-
-    Returns:
-        Formatted query results
-    """
-    # Find all artifact files
-    filepaths = find_artifacts(directory)
-
-    # Load metadata (efficiently - only frontmatter)
-    artifacts = []
+    artifacts: List[ArtifactMetadata] = []
     for filepath in filepaths:
         metadata = load_artifact_metadata(filepath)
         if metadata:
             artifacts.append(metadata)
 
-    # Filter artifacts
     filtered = filter_artifacts(
         artifacts,
         artifact_type=artifact_type,
+        doc_type=doc_type,
         status=status,
         prd=prd,
         phase=phase,
         owner=owner,
         contributor=contributor,
+        feature_slug=feature_slug,
+        priority=priority,
         has_blockers=has_blockers,
     )
 
-    # Format output
-    if aggregate or output_format == 'summary':
+    if aggregate or output_format == "summary":
         return format_summary_output(filtered)
-    elif output_format == 'json':
+    if output_format == "json":
         return format_json_output(filtered)
-    else:  # table
-        return format_table_output(filtered)
+    return format_table_output(filtered)
 
 
-def main():
-    """Main entry point for query_artifacts script."""
+def main() -> None:
+    """CLI entrypoint."""
     parser = argparse.ArgumentParser(
-        description="Query artifact tracking files efficiently",
+        description="Query artifact metadata from markdown frontmatter",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Find all in-progress artifacts
-  python query_artifacts.py --directory .claude/progress --status in-progress
-
-  # Find artifacts for specific PRD
-  python query_artifacts.py --directory .claude/progress --prd advanced-editing-v2
-
-  # Find artifacts owned by specific agent
-  python query_artifacts.py --directory .claude/progress --owner frontend-developer
-
-  # Find blocked context artifacts
-  python query_artifacts.py --directory .claude/worknotes --type context --status blocked
-
-  # Show aggregated metrics
-  python query_artifacts.py --directory .claude/progress --aggregate
-
-  # Output as JSON
-  python query_artifacts.py --directory .claude/progress --format json
-        """
+  python query_artifacts.py --status in-progress
+  python query_artifacts.py --doc-type prd --priority high
+  python query_artifacts.py --directory .claude/progress --type progress --format json
+""",
     )
 
     parser.add_argument(
-        '--directory',
-        '-d',
+        "--directory",
+        "-d",
+        action="append",
         type=Path,
-        required=True,
-        help='Directory to search for artifacts'
+        help="Directory to search (repeatable). Defaults to project planning/progress/worknotes roots.",
     )
-
-    parser.add_argument(
-        '--type',
-        '-t',
-        choices=['progress', 'context', 'bug-fix', 'observation'],
-        help='Filter by artifact type'
-    )
-
-    parser.add_argument(
-        '--status',
-        '-s',
-        help='Filter by status (e.g., in-progress, complete, blocked)'
-    )
-
-    parser.add_argument(
-        '--prd',
-        '-p',
-        help='Filter by PRD identifier'
-    )
-
-    parser.add_argument(
-        '--phase',
-        type=int,
-        help='Filter by phase number'
-    )
-
-    parser.add_argument(
-        '--owner',
-        '-o',
-        help='Filter by owner agent'
-    )
-
-    parser.add_argument(
-        '--contributor',
-        '-c',
-        help='Filter by contributor agent'
-    )
-
-    parser.add_argument(
-        '--has-blockers',
-        action='store_true',
-        help='Filter to only artifacts with blockers'
-    )
-
-    parser.add_argument(
-        '--no-blockers',
-        action='store_true',
-        help='Filter to only artifacts without blockers'
-    )
-
-    parser.add_argument(
-        '--format',
-        '-f',
-        choices=['table', 'json', 'summary'],
-        default='table',
-        help='Output format (default: table)'
-    )
-
-    parser.add_argument(
-        '--aggregate',
-        '-a',
-        action='store_true',
-        help='Show aggregated metrics across all artifacts'
-    )
+    parser.add_argument("--type", "-t", help="Legacy type filter (e.g., progress, context)")
+    parser.add_argument("--doc-type", help="CCDash doc_type filter (e.g., prd, implementation_plan)")
+    parser.add_argument("--status", "-s", help="Filter by status")
+    parser.add_argument("--prd", "-p", help="Filter by prd/prd_ref")
+    parser.add_argument("--phase", type=int, help="Filter by phase number")
+    parser.add_argument("--owner", "-o", help="Filter by owner")
+    parser.add_argument("--contributor", "-c", help="Filter by contributor")
+    parser.add_argument("--feature-slug", help="Filter by feature_slug")
+    parser.add_argument("--priority", help="Filter by priority")
+    parser.add_argument("--has-blockers", action="store_true", help="Only results with blockers")
+    parser.add_argument("--no-blockers", action="store_true", help="Only results without blockers")
+    parser.add_argument("--format", "-f", choices=["table", "json", "summary"], default="table")
+    parser.add_argument("--aggregate", "-a", action="store_true", help="Show aggregate metrics")
 
     args = parser.parse_args()
 
-    # Determine has_blockers value
-    has_blockers = None
-    if args.has_blockers:
-        has_blockers = True
-    elif args.no_blockers:
-        has_blockers = False
+    if args.has_blockers and args.no_blockers:
+        print("Error: Cannot use --has-blockers and --no-blockers together", file=sys.stderr)
+        sys.exit(1)
+
+    has_blockers = True if args.has_blockers else False if args.no_blockers else None
+
+    directories = args.directory or [Path(path) for path in DEFAULT_DIRECTORIES]
 
     try:
-        # Query artifacts
         result = query_artifacts(
-            args.directory,
+            directories=directories,
             artifact_type=args.type,
+            doc_type=args.doc_type,
             status=args.status,
             prd=args.prd,
             phase=args.phase,
             owner=args.owner,
             contributor=args.contributor,
+            feature_slug=args.feature_slug,
+            priority=args.priority,
             has_blockers=has_blockers,
             output_format=args.format,
             aggregate=args.aggregate,
         )
-
         print(result)
         sys.exit(0)
-
-    except FileNotFoundError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        import traceback
-        traceback.print_exc()
+    except Exception as exc:  # pragma: no cover - defensive CLI error path
+        print(f"Error querying artifacts: {exc}", file=sys.stderr)
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

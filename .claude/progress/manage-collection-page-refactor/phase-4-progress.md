@@ -1,72 +1,90 @@
 ---
 type: progress
-prd: "manage-collection-page-refactor"
+prd: manage-collection-page-refactor
 phase: 4
-title: "Filter Components"
-status: "pending"
+title: Filter Components
+status: pending
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 3
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["frontend-developer"]
-contributors: ["ui-engineer-enhanced"]
-
+owners:
+- frontend-developer
+contributors:
+- ui-engineer-enhanced
 tasks:
-  - id: "FILTER-4.1"
-    description: "Create ManagePageFilters component: Project dropdown, Status filter (All, Needs Update, Has Drift, Deployed, Error), Type filter, search input."
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "1.5h"
-    priority: "high"
-    model: "opus"
-
-  - id: "FILTER-4.2"
-    description: "Enhance CollectionPageFilters with tools multi-select popover. Add to existing filters (Collection, Group, Type, Tags, Search)."
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "1h"
-    priority: "medium"
-    model: "sonnet"
-
-  - id: "FILTER-4.3"
-    description: "Add filter state to URL for bookmarkability. Serialize filter state to query params, restore on page load, update on filter change."
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["FILTER-4.1", "FILTER-4.2"]
-    estimated_effort: "1.5h"
-    priority: "high"
-    model: "opus"
-
+- id: FILTER-4.1
+  description: 'Create ManagePageFilters component: Project dropdown, Status filter
+    (All, Needs Update, Has Drift, Deployed, Error), Type filter, search input.'
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 1.5h
+  priority: high
+  model: opus
+- id: FILTER-4.2
+  description: Enhance CollectionPageFilters with tools multi-select popover. Add
+    to existing filters (Collection, Group, Type, Tags, Search).
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 1h
+  priority: medium
+  model: sonnet
+- id: FILTER-4.3
+  description: Add filter state to URL for bookmarkability. Serialize filter state
+    to query params, restore on page load, update on filter change.
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - FILTER-4.1
+  - FILTER-4.2
+  estimated_effort: 1.5h
+  priority: high
+  model: opus
 parallelization:
-  batch_1: ["FILTER-4.1", "FILTER-4.2"]
-  batch_2: ["FILTER-4.3"]
-  critical_path: ["FILTER-4.1", "FILTER-4.3"]
-  estimated_total_time: "2-4h"
-
+  batch_1:
+  - FILTER-4.1
+  - FILTER-4.2
+  batch_2:
+  - FILTER-4.3
+  critical_path:
+  - FILTER-4.1
+  - FILTER-4.3
+  estimated_total_time: 2-4h
 blockers: []
-
 success_criteria:
-  - { id: "SC-4.1", description: "ManagePageFilters component renders with all filter types", status: "pending" }
-  - { id: "SC-4.2", description: "CollectionPageFilters has Tools filter working", status: "pending" }
-  - { id: "SC-4.3", description: "Filter state persists in URL", status: "pending" }
-  - { id: "SC-4.4", description: "Filters can be bookmarked and shared", status: "pending" }
-  - { id: "SC-4.5", description: "No console errors on filter changes", status: "pending" }
-
+- id: SC-4.1
+  description: ManagePageFilters component renders with all filter types
+  status: pending
+- id: SC-4.2
+  description: CollectionPageFilters has Tools filter working
+  status: pending
+- id: SC-4.3
+  description: Filter state persists in URL
+  status: pending
+- id: SC-4.4
+  description: Filters can be bookmarked and shared
+  status: pending
+- id: SC-4.5
+  description: No console errors on filter changes
+  status: pending
 files_modified:
-  - "skillmeat/web/components/manage/manage-page-filters.tsx"
-  - "skillmeat/web/components/collection/collection-page-filters.tsx"
-  - "skillmeat/web/app/manage/page.tsx"
-  - "skillmeat/web/app/collection/page.tsx"
+- skillmeat/web/components/manage/manage-page-filters.tsx
+- skillmeat/web/components/collection/collection-page-filters.tsx
+- skillmeat/web/app/manage/page.tsx
+- skillmeat/web/app/collection/page.tsx
+schema_version: 2
+doc_type: progress
+feature_slug: manage-collection-page-refactor
 ---
 
 # manage-collection-page-refactor - Phase 4: Filter Components

@@ -107,6 +107,9 @@ files_modified:
 - skillmeat/web/components/shared/page-header.tsx
 progress: 100
 updated: '2026-02-02'
+schema_version: 2
+doc_type: progress
+feature_slug: manage-collection-page-refactor
 ---
 
 # manage-collection-page-refactor - Phase 1: Page Structure & Navigation

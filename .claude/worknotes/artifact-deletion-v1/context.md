@@ -1,9 +1,12 @@
 ---
 type: context
-prd: "artifact-deletion-v1"
-feature: "Artifact Deletion from Collections and Projects"
-created: "2025-12-20"
-updated: "2025-12-20"
+prd: artifact-deletion-v1
+feature: Artifact Deletion from Collections and Projects
+created: '2025-12-20'
+updated: '2025-12-20'
+schema_version: 2
+doc_type: context
+feature_slug: artifact-deletion-v1
 ---
 
 # Artifact Deletion Feature - Context

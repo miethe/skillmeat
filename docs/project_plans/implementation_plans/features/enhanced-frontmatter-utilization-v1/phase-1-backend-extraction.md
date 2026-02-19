@@ -1,10 +1,15 @@
 ---
-title: "Phase 1: Backend Extraction & Caching"
-description: "Database schema, frontmatter extraction, tools field, metadata auto-population"
+title: 'Phase 1: Backend Extraction & Caching'
+description: Database schema, frontmatter extraction, tools field, metadata auto-population
 created: 2026-01-21
 updated: 2026-01-21
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: enhanced-frontmatter-utilization
+prd_ref: null
+plan_ref: null
 ---
-
 # Phase 1: Backend Extraction & Caching
 
 **Duration**: 1.5 weeks

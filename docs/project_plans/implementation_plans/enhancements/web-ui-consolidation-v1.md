@@ -1,16 +1,26 @@
 ---
-title: "Implementation Plan: Web UI Consolidation & Enhancements"
-description: "Phased implementation for unified entity display, content viewing, sync, and performance"
-audience: [ai-agents, developers]
-tags: [implementation, web-ui, frontend, codemirror]
+title: 'Implementation Plan: Web UI Consolidation & Enhancements'
+description: Phased implementation for unified entity display, content viewing, sync,
+  and performance
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- web-ui
+- frontend
+- codemirror
 created: 2025-11-25
 updated: 2025-11-25
-category: "product-planning"
-status: draft
+category: product-planning
+status: inferred_complete
 related:
-  - /docs/project_plans/PRDs/enhancements/web-ui-consolidation-v1.md
+- /docs/project_plans/PRDs/enhancements/web-ui-consolidation-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: web-ui-consolidation
+prd_ref: null
 ---
-
 # Implementation Plan: Web UI Consolidation & Enhancements
 
 **PRD:** `docs/project_plans/PRDs/enhancements/web-ui-consolidation-v1.md`

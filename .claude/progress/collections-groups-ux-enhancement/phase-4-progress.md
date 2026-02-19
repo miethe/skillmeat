@@ -4,8 +4,8 @@ prd: collections-groups-ux-enhancement
 phase: 4
 title: Groups Sidebar Page
 status: completed
-started: "2026-01-20T12:10:00Z"
-completed: "2026-01-20T12:35:00Z"
+started: '2026-01-20T12:10:00Z'
+completed: '2026-01-20T12:35:00Z'
 overall_progress: 100
 completion_estimate: on-track
 total_tasks: 6
@@ -62,7 +62,7 @@ tasks:
   estimated_effort: 1.5h
   priority: medium
 - id: P4-T6
-  description: Write unit and integration tests (≥80% coverage)
+  description: "Write unit and integration tests (\u226580% coverage)"
   status: completed
   assigned_to:
   - frontend-developer
@@ -127,10 +127,10 @@ success_criteria:
   description: 'URL query param: ?group=<group-id>'
   status: pending
 - id: SC-12
-  description: 'Performance: groups load ≤200ms; artifacts ≤500ms'
+  description: "Performance: groups load \u2264200ms; artifacts \u2264500ms"
   status: pending
 - id: SC-13
-  description: ≥80% unit test coverage
+  description: "\u226580% unit test coverage"
   status: pending
 - id: SC-14
   description: E2E happy path test passes
@@ -147,6 +147,9 @@ files_modified:
 - skillmeat/web/tests/e2e/groups-page.spec.ts
 progress: 100
 updated: '2026-01-20'
+schema_version: 2
+doc_type: progress
+feature_slug: collections-groups-ux-enhancement
 ---
 
 # Collections & Groups UX Enhancement - Phase 4: Groups Sidebar Page

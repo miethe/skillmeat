@@ -1,154 +1,172 @@
 ---
 type: progress
-prd: "PRD-001-confidence-scoring"
-phase: "3-5"
-phase_title: "Community, Web UI, Advanced"
+prd: PRD-001-confidence-scoring
+phase: 3-5
+phase_title: Community, Web UI, Advanced
 status: completed
 progress: 100
 total_tasks: 12
 completed_tasks: 12
-estimated_effort: "5-6 weeks"
+estimated_effort: 5-6 weeks
 story_points: 23
 dependencies:
-  - phase: 2
-    status: "must_complete"
-
+- phase: 2
+  status: must_complete
 tasks:
-  # Phase 3 tasks
-  - id: "P3-T1"
-    title: "Score Aggregation Framework"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    story_points: 3
-    phase: 3
-    commit: "P3-T1 implementation"
-    tests: 29
-    coverage: "97.67%"
-
-  - id: "P3-T2"
-    title: "GitHub Stars Import"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3-T1"]
-    story_points: 3
-    phase: 3
-    commit: "6579984"
-    tests: 35
-
-  - id: "P3-T3"
-    title: "Score Freshness Decay"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3-T1"]
-    story_points: 2
-    phase: 3
-    commit: "caae3ec"
-    tests: 45
-    coverage: "100%"
-
-  - id: "P3-T4"
-    title: "CLI: scores import/refresh"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3-T2", "P3-T3"]
-    story_points: 2
-    phase: 3
-    commit: "7b2d492"
-    tests: 19
-
-  # Phase 4 tasks
-  - id: "P4-T1"
-    title: "Score Display on Artifact Cards (ScoreBadge)"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: []
-    story_points: 3
-    phase: 4
-    commit: "Phase 2-4 session"
-    tests: 20
-
-  - id: "P4-T2"
-    title: "Trust Badge Component (TrustBadges)"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: []
-    story_points: 3
-    phase: 4
-    commit: "Phase 2-4 session"
-    tests: 21
-
-  - id: "P4-T3"
-    title: "Rating Dialog Component"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: ["P4-T1"]
-    story_points: 2
-    phase: 4
-    commit: "RatingDialog.tsx"
-    tests: 46
-    coverage: "94.91%"
-
-  - id: "P4-T4"
-    title: "Search Confidence Sorting"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4-T1"]
-    story_points: 2
-    phase: 4
-    commit: "f73dd4b"
-    tests: 8
-
-  - id: "P4-T5"
-    title: "Score Breakdown View"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4-T1"]
-    story_points: 2
-    phase: 4
-    commit: "Phase 2-4 session"
-    tests: 23
-
-  # Phase 5 tasks
-  - id: "P5-T1"
-    title: "Weight Customization"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    story_points: 1
-    phase: 5
-    commit: "97294a9"
-
-  - id: "P5-T2"
-    title: "Historical Success Tracking"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    story_points: 1
-    phase: 5
-    commit: "524501a"
-
-  - id: "P5-T3"
-    title: "Anti-Gaming Protections"
-    status: "completed"
-    assigned_to: ["python-backend-engineer", "backend-architect"]
-    dependencies: []
-    story_points: 1
-    phase: 5
-    commit: "a980c34"
-    tests: 24
-    coverage: "98.5%"
-
+- id: P3-T1
+  title: Score Aggregation Framework
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  story_points: 3
+  phase: 3
+  commit: P3-T1 implementation
+  tests: 29
+  coverage: 97.67%
+- id: P3-T2
+  title: GitHub Stars Import
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3-T1
+  story_points: 3
+  phase: 3
+  commit: '6579984'
+  tests: 35
+- id: P3-T3
+  title: Score Freshness Decay
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3-T1
+  story_points: 2
+  phase: 3
+  commit: caae3ec
+  tests: 45
+  coverage: 100%
+- id: P3-T4
+  title: 'CLI: scores import/refresh'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3-T2
+  - P3-T3
+  story_points: 2
+  phase: 3
+  commit: 7b2d492
+  tests: 19
+- id: P4-T1
+  title: Score Display on Artifact Cards (ScoreBadge)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies: []
+  story_points: 3
+  phase: 4
+  commit: Phase 2-4 session
+  tests: 20
+- id: P4-T2
+  title: Trust Badge Component (TrustBadges)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies: []
+  story_points: 3
+  phase: 4
+  commit: Phase 2-4 session
+  tests: 21
+- id: P4-T3
+  title: Rating Dialog Component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies:
+  - P4-T1
+  story_points: 2
+  phase: 4
+  commit: RatingDialog.tsx
+  tests: 46
+  coverage: 94.91%
+- id: P4-T4
+  title: Search Confidence Sorting
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4-T1
+  story_points: 2
+  phase: 4
+  commit: f73dd4b
+  tests: 8
+- id: P4-T5
+  title: Score Breakdown View
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4-T1
+  story_points: 2
+  phase: 4
+  commit: Phase 2-4 session
+  tests: 23
+- id: P5-T1
+  title: Weight Customization
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  story_points: 1
+  phase: 5
+  commit: 97294a9
+- id: P5-T2
+  title: Historical Success Tracking
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  story_points: 1
+  phase: 5
+  commit: 524501a
+- id: P5-T3
+  title: Anti-Gaming Protections
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  - backend-architect
+  dependencies: []
+  story_points: 1
+  phase: 5
+  commit: a980c34
+  tests: 24
+  coverage: 98.5%
 parallelization:
-  # Phase 3
-  batch_1: ["P3-T1"]
-  batch_2: ["P3-T2", "P3-T3"]
-  batch_3: ["P3-T4"]
-  # Phase 4 (can parallel with Phase 3)
-  batch_4: ["P4-T1", "P4-T2"]
-  batch_5: ["P4-T3", "P4-T4"]
-  # Phase 5
-  batch_6: ["P5-T1", "P5-T2", "P5-T3"]
+  batch_1:
+  - P3-T1
+  batch_2:
+  - P3-T2
+  - P3-T3
+  batch_3:
+  - P3-T4
+  batch_4:
+  - P4-T1
+  - P4-T2
+  batch_5:
+  - P4-T3
+  - P4-T4
+  batch_6:
+  - P5-T1
+  - P5-T2
+  - P5-T3
+schema_version: 2
+doc_type: progress
+feature_slug: prd-001-confidence-scoring
 ---
 
 # Phases 3-5: Community, Web UI, Advanced

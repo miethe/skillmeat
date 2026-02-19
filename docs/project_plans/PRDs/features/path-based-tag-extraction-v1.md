@@ -19,6 +19,9 @@ status: completed
 related:
 - /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
 - /docs/project_plans/PRDs/enhancements/marketplace-source-enhancements-v1.md
+schema_version: 2
+doc_type: prd
+feature_slug: path-based-tag-extraction
 ---
 
 # PRD: Path-Based Tag Extraction

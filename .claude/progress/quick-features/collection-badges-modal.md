@@ -4,9 +4,12 @@ status: completed
 created: 2026-01-31
 completed: 2026-01-31
 files_affected:
-  - skillmeat/web/lib/utils/collection-colors.ts (NEW)
-  - skillmeat/web/components/entity/unified-entity-modal.tsx
+- skillmeat/web/lib/utils/collection-colors.ts (NEW)
+- skillmeat/web/components/entity/unified-entity-modal.tsx
 scope: quick-feature
+schema_version: 2
+doc_type: quick_feature
+feature_slug: collection-badges-modal
 ---
 
 # Collection Badges in Modal Overview

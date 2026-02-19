@@ -1,3 +1,30 @@
+---
+title: "SPIKE: [Feature/Decision Name]" # Human-readable spike title
+schema_version: 2 # CCDash frontmatter schema version
+doc_type: spike # Must remain `spike`
+status: draft # draft|planning|in-progress|review|completed|archived
+created: YYYY-MM-DD # Initial creation date (YYYY-MM-DD)
+updated: YYYY-MM-DD # Last edit date (YYYY-MM-DD)
+feature_slug: "feature-name" # Kebab-case feature identifier
+feature_version: "v1" # Version label for this feature document set
+priority: medium # low|medium|high|critical
+risk_level: medium # low|medium|high|critical
+owner: null # Single accountable owner (name or agent)
+contributors: [] # Supporting contributors
+prd_ref: null # Set parent PRD path when applicable
+plan_ref: null # Set parent implementation plan path when applicable
+related_documents: [] # Related docs (PRD, plans, ADRs, references)
+research_questions: [] # Questions the spike will answer
+complexity: medium # small|medium|large|xl
+estimated_research_time: null # e.g., "2d" or "6h"
+category: "research" # Document classification
+tags: [spike, research] # Search/filter tags
+milestone: null # Optional release/milestone marker
+commit_refs: [] # Commit SHAs added during implementation
+pr_refs: [] # Pull request refs (e.g., #123)
+files_affected: [] # Key files expected to change
+---
+
 # SPIKE Document Template
 
 <!--

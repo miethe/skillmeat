@@ -1,231 +1,280 @@
 ---
 type: progress
-prd: "enhanced-frontmatter-utilization"
+prd: enhanced-frontmatter-utilization
 phase: 0
 status: pending
 progress: 0
 created: 2026-01-21
 updated: 2026-01-21
-
 tasks:
-  # Phase 0: Enums & Foundations (8 pts)
-  - id: "P0-T1"
-    name: "Create Platform enum"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "sonnet"
-    effort: 1
-
-  - id: "P0-T2"
-    name: "Create Tool enum with all 17 Claude Code tools"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "sonnet"
-    effort: 2
-
-  - id: "P0-T3"
-    name: "Create frontend Platform and Tool type definitions"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["P0-T1", "P0-T2"]
-    model: "sonnet"
-    effort: 2
-
-  - id: "P0-T4"
-    name: "Add tools field to backend Artifact/ArtifactMetadata"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P0-T2"]
-    model: "opus"
-    effort: 2
-
-  - id: "P0-T5"
-    name: "Add tools field to frontend Artifact types"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["P0-T3", "P0-T4"]
-    model: "sonnet"
-    effort: 1
-
-  # Phase 1: Backend Extraction (14 pts)
-  - id: "P1-T1"
-    name: "Add frontmatter parsing to artifact detection"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P0-T4"]
-    model: "opus"
-    effort: 3
-
-  - id: "P1-T2"
-    name: "Implement description auto-population from frontmatter"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T1"]
-    model: "opus"
-    effort: 2
-
-  - id: "P1-T3"
-    name: "Implement tools extraction from frontmatter"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T1", "P0-T2"]
-    model: "opus"
-    effort: 3
-
-  - id: "P1-T4"
-    name: "Update API schemas for tools field"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["P0-T4"]
-    model: "sonnet"
-    effort: 2
-
-  - id: "P1-T5"
-    name: "Database migration for tools field"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["P0-T4"]
-    model: "opus"
-    effort: 2
-
-  - id: "P1-T6"
-    name: "Unit tests for frontmatter extraction"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T1", "P1-T2", "P1-T3"]
-    model: "sonnet"
-    effort: 2
-
-  # Phase 2: Artifact Linking (16 pts)
-  - id: "P2-T1"
-    name: "Create LinkedArtifactReference dataclass"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T1"]
-    model: "opus"
-    effort: 2
-
-  - id: "P2-T2"
-    name: "Add linked_artifacts field to Artifact model"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T1"]
-    model: "opus"
-    effort: 2
-
-  - id: "P2-T3"
-    name: "Implement auto-linking logic during import"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T2"]
-    model: "opus"
-    effort: 4
-
-  - id: "P2-T4"
-    name: "Create unlinked_references tracking"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T3"]
-    model: "opus"
-    effort: 2
-
-  - id: "P2-T5"
-    name: "API endpoints for manual artifact linking"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["P2-T2"]
-    model: "opus"
-    effort: 3
-
-  - id: "P2-T6"
-    name: "Frontend types for linked artifacts"
-    status: "pending"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["P2-T1"]
-    model: "sonnet"
-    effort: 2
-
-  - id: "P2-T7"
-    name: "Unit tests for artifact linking"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T3", "P2-T4"]
-    model: "sonnet"
-    effort: 1
-
-  # Phase 3: UI Components (18 pts)
-  - id: "P3-T1"
-    name: "Update ContentPane to exclude raw frontmatter"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P1-T1"]
-    model: "opus"
-    effort: 2
-
-  - id: "P3-T2"
-    name: "Create LinkedArtifactsSection component"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P2-T6"]
-    model: "opus"
-    effort: 4
-
-  - id: "P3-T3"
-    name: "Create ArtifactLinkingDialog component"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P2-T5", "P2-T6"]
-    model: "opus"
-    effort: 5
-
-  - id: "P3-T4"
-    name: "Add tools filter to artifact search"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["P0-T5", "P1-T4"]
-    model: "sonnet"
-    effort: 3
-
-  - id: "P3-T5"
-    name: "Integration testing for linking UI"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P3-T2", "P3-T3"]
-    model: "sonnet"
-    effort: 2
-
-  - id: "P3-T6"
-    name: "E2E tests for complete workflow"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["P3-T1", "P3-T2", "P3-T3", "P3-T4"]
-    model: "sonnet"
-    effort: 2
-
+- id: P0-T1
+  name: Create Platform enum
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: sonnet
+  effort: 1
+- id: P0-T2
+  name: Create Tool enum with all 17 Claude Code tools
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: sonnet
+  effort: 2
+- id: P0-T3
+  name: Create frontend Platform and Tool type definitions
+  status: pending
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - P0-T1
+  - P0-T2
+  model: sonnet
+  effort: 2
+- id: P0-T4
+  name: Add tools field to backend Artifact/ArtifactMetadata
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P0-T2
+  model: opus
+  effort: 2
+- id: P0-T5
+  name: Add tools field to frontend Artifact types
+  status: pending
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - P0-T3
+  - P0-T4
+  model: sonnet
+  effort: 1
+- id: P1-T1
+  name: Add frontmatter parsing to artifact detection
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P0-T4
+  model: opus
+  effort: 3
+- id: P1-T2
+  name: Implement description auto-population from frontmatter
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T1
+  model: opus
+  effort: 2
+- id: P1-T3
+  name: Implement tools extraction from frontmatter
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T1
+  - P0-T2
+  model: opus
+  effort: 3
+- id: P1-T4
+  name: Update API schemas for tools field
+  status: pending
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - P0-T4
+  model: sonnet
+  effort: 2
+- id: P1-T5
+  name: Database migration for tools field
+  status: pending
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - P0-T4
+  model: opus
+  effort: 2
+- id: P1-T6
+  name: Unit tests for frontmatter extraction
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T1
+  - P1-T2
+  - P1-T3
+  model: sonnet
+  effort: 2
+- id: P2-T1
+  name: Create LinkedArtifactReference dataclass
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T1
+  model: opus
+  effort: 2
+- id: P2-T2
+  name: Add linked_artifacts field to Artifact model
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T1
+  model: opus
+  effort: 2
+- id: P2-T3
+  name: Implement auto-linking logic during import
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T2
+  model: opus
+  effort: 4
+- id: P2-T4
+  name: Create unlinked_references tracking
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T3
+  model: opus
+  effort: 2
+- id: P2-T5
+  name: API endpoints for manual artifact linking
+  status: pending
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - P2-T2
+  model: opus
+  effort: 3
+- id: P2-T6
+  name: Frontend types for linked artifacts
+  status: pending
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - P2-T1
+  model: sonnet
+  effort: 2
+- id: P2-T7
+  name: Unit tests for artifact linking
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T3
+  - P2-T4
+  model: sonnet
+  effort: 1
+- id: P3-T1
+  name: Update ContentPane to exclude raw frontmatter
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P1-T1
+  model: opus
+  effort: 2
+- id: P3-T2
+  name: Create LinkedArtifactsSection component
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P2-T6
+  model: opus
+  effort: 4
+- id: P3-T3
+  name: Create ArtifactLinkingDialog component
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P2-T5
+  - P2-T6
+  model: opus
+  effort: 5
+- id: P3-T4
+  name: Add tools filter to artifact search
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - P0-T5
+  - P1-T4
+  model: sonnet
+  effort: 3
+- id: P3-T5
+  name: Integration testing for linking UI
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P3-T2
+  - P3-T3
+  model: sonnet
+  effort: 2
+- id: P3-T6
+  name: E2E tests for complete workflow
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - P3-T1
+  - P3-T2
+  - P3-T3
+  - P3-T4
+  model: sonnet
+  effort: 2
 parallelization:
-  # Phase 0 batches
-  batch_0_1: ["P0-T1", "P0-T2"]
-  batch_0_2: ["P0-T3", "P0-T4"]
-  batch_0_3: ["P0-T5"]
-
-  # Phase 1 batches
-  batch_1_1: ["P1-T1", "P1-T4", "P1-T5"]
-  batch_1_2: ["P1-T2", "P1-T3"]
-  batch_1_3: ["P1-T6"]
-
-  # Phase 2 batches
-  batch_2_1: ["P2-T1"]
-  batch_2_2: ["P2-T2", "P2-T6"]
-  batch_2_3: ["P2-T3", "P2-T5"]
-  batch_2_4: ["P2-T4", "P2-T7"]
-
-  # Phase 3 batches
-  batch_3_1: ["P3-T1", "P3-T4"]
-  batch_3_2: ["P3-T2"]
-  batch_3_3: ["P3-T3"]
-  batch_3_4: ["P3-T5", "P3-T6"]
+  batch_0_1:
+  - P0-T1
+  - P0-T2
+  batch_0_2:
+  - P0-T3
+  - P0-T4
+  batch_0_3:
+  - P0-T5
+  batch_1_1:
+  - P1-T1
+  - P1-T4
+  - P1-T5
+  batch_1_2:
+  - P1-T2
+  - P1-T3
+  batch_1_3:
+  - P1-T6
+  batch_2_1:
+  - P2-T1
+  batch_2_2:
+  - P2-T2
+  - P2-T6
+  batch_2_3:
+  - P2-T3
+  - P2-T5
+  batch_2_4:
+  - P2-T4
+  - P2-T7
+  batch_3_1:
+  - P3-T1
+  - P3-T4
+  batch_3_2:
+  - P3-T2
+  batch_3_3:
+  - P3-T3
+  batch_3_4:
+  - P3-T5
+  - P3-T6
+schema_version: 2
+doc_type: progress
+feature_slug: enhanced-frontmatter-utilization
 ---
 
 # Enhanced Frontmatter Utilization - Progress Tracking

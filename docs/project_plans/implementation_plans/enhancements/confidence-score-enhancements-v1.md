@@ -1,25 +1,36 @@
 ---
-title: "Implementation Plan: Confidence Score Enhancements"
-description: "Normalize scoring algorithm, add tooltip breakdown, enable filtering, and show low-confidence artifacts"
-audience: [ai-agents, developers]
-tags: [implementation, marketplace, confidence-score, frontend, backend]
+title: 'Implementation Plan: Confidence Score Enhancements'
+description: Normalize scoring algorithm, add tooltip breakdown, enable filtering,
+  and show low-confidence artifacts
+audience:
+- ai-agents
+- developers
+tags:
+- implementation
+- marketplace
+- confidence-score
+- frontend
+- backend
 created: 2025-12-27
 updated: 2025-12-28
-category: "product-planning"
-status: in-progress
+category: product-planning
+status: inferred_complete
 phase_status:
   phase_1_2: completed
   phase_3_5: completed
   phase_6: deferred
 related:
-  - skillmeat/core/marketplace/heuristic_detector.py
-  - skillmeat/cache/models.py
-  - skillmeat/api/schemas/marketplace.py
-  - skillmeat/api/routers/marketplace_sources.py
-  - skillmeat/web/components/ScoreBadge.tsx
-  - docs/project_plans/PRDs/enhancements/confidence-score-enhancements-v1.md
+- skillmeat/core/marketplace/heuristic_detector.py
+- skillmeat/cache/models.py
+- skillmeat/api/schemas/marketplace.py
+- skillmeat/api/routers/marketplace_sources.py
+- skillmeat/web/components/ScoreBadge.tsx
+- docs/project_plans/PRDs/enhancements/confidence-score-enhancements-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: confidence-score-enhancements
+prd_ref: null
 ---
-
 # Implementation Plan: Confidence Score Enhancements
 
 **Complexity:** Large (L) | **Track:** Full Track

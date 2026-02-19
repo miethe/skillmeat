@@ -1,52 +1,65 @@
 ---
 type: progress
-prd: "global-fields-management"
+prd: global-fields-management
 phase: 1
 status: pending
 progress: 0
-
 tasks:
-  - id: "GFM-IMPL-1.1"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "opus"
-
-  - id: "GFM-IMPL-1.2"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["GFM-IMPL-1.1"]
-    model: "opus"
-
-  - id: "GFM-IMPL-1.3"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "sonnet"
-
-  - id: "GFM-IMPL-1.4"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["GFM-IMPL-1.2", "GFM-IMPL-1.3"]
-    model: "opus"
-
-  - id: "GFM-IMPL-1.5"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["GFM-IMPL-1.4"]
-    model: "sonnet"
-
-  - id: "GFM-IMPL-1.6"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["GFM-IMPL-1.2"]
-    model: "sonnet"
-
+- id: GFM-IMPL-1.1
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: opus
+- id: GFM-IMPL-1.2
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - GFM-IMPL-1.1
+  model: opus
+- id: GFM-IMPL-1.3
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: sonnet
+- id: GFM-IMPL-1.4
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - GFM-IMPL-1.2
+  - GFM-IMPL-1.3
+  model: opus
+- id: GFM-IMPL-1.5
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - GFM-IMPL-1.4
+  model: sonnet
+- id: GFM-IMPL-1.6
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - GFM-IMPL-1.2
+  model: sonnet
 parallelization:
-  batch_1: ["GFM-IMPL-1.1", "GFM-IMPL-1.3"]
-  batch_2: ["GFM-IMPL-1.2"]
-  batch_3: ["GFM-IMPL-1.4", "GFM-IMPL-1.6"]
-  batch_4: ["GFM-IMPL-1.5"]
+  batch_1:
+  - GFM-IMPL-1.1
+  - GFM-IMPL-1.3
+  batch_2:
+  - GFM-IMPL-1.2
+  batch_3:
+  - GFM-IMPL-1.4
+  - GFM-IMPL-1.6
+  batch_4:
+  - GFM-IMPL-1.5
+schema_version: 2
+doc_type: progress
+feature_slug: global-fields-management
 ---
 
 # Phase 1: Backend Infrastructure & Field Registry

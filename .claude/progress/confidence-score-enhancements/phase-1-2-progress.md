@@ -1,125 +1,157 @@
 ---
 type: progress
-prd: "confidence-score-enhancements"
-phase: "1-2"
+prd: confidence-score-enhancements
+phase: 1-2
 status: completed
 progress: 100
 total_tasks: 15
 completed_tasks: 15
-completed_at: "2025-12-27T16:00:00Z"
-
+completed_at: '2025-12-27T16:00:00Z'
 tasks:
-  - id: "TASK-1.1"
-    name: "Define normalization constant"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "0.5h"
-
-  - id: "TASK-1.2"
-    name: "Refactor _score_directory() return value"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.1"]
-    estimate: "1h"
-
-  - id: "TASK-1.3"
-    name: "Implement breakdown construction"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.2"]
-    estimate: "1h"
-
-  - id: "TASK-1.4"
-    name: "Integrate normalization into detector"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.1", "TASK-1.3"]
-    estimate: "1h"
-
-  - id: "TASK-1.5"
-    name: "Add comprehensive unit tests"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.4"]
-    estimate: "1.5h"
-
-  - id: "TASK-1.6"
-    name: "Update HeuristicMatch TypedDict"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.3"]
-    estimate: "0.5h"
-
-  - id: "TASK-2.1"
-    name: "Create Alembic migration"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "1h"
-
-  - id: "TASK-2.2"
-    name: "Update MarketplaceCatalogEntry model"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1"]
-    estimate: "0.5h"
-
-  - id: "TASK-2.3"
-    name: "Update CatalogEntryResponse schema"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.6"]
-    estimate: "0.5h"
-
-  - id: "TASK-2.4"
-    name: "Modify catalog query to hydrate breakdown"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.2"]
-    estimate: "0.5h"
-
-  - id: "TASK-2.5"
-    name: "Add filter query parameters"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimate: "1h"
-
-  - id: "TASK-2.6"
-    name: "Implement confidence range filter logic"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.5"]
-    estimate: "1h"
-
-  - id: "TASK-2.7"
-    name: "Implement low-confidence toggle"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.5"]
-    estimate: "1h"
-
-  - id: "TASK-2.8"
-    name: "Write integration tests"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.4", "TASK-2.6", "TASK-2.7"]
-    estimate: "2h"
-
-  - id: "TASK-2.9"
-    name: "Create data migration"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1"]
-    estimate: "1h"
-
+- id: TASK-1.1
+  name: Define normalization constant
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 0.5h
+- id: TASK-1.2
+  name: Refactor _score_directory() return value
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.1
+  estimate: 1h
+- id: TASK-1.3
+  name: Implement breakdown construction
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.2
+  estimate: 1h
+- id: TASK-1.4
+  name: Integrate normalization into detector
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.1
+  - TASK-1.3
+  estimate: 1h
+- id: TASK-1.5
+  name: Add comprehensive unit tests
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.4
+  estimate: 1.5h
+- id: TASK-1.6
+  name: Update HeuristicMatch TypedDict
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.3
+  estimate: 0.5h
+- id: TASK-2.1
+  name: Create Alembic migration
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 1h
+- id: TASK-2.2
+  name: Update MarketplaceCatalogEntry model
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  estimate: 0.5h
+- id: TASK-2.3
+  name: Update CatalogEntryResponse schema
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.6
+  estimate: 0.5h
+- id: TASK-2.4
+  name: Modify catalog query to hydrate breakdown
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.2
+  estimate: 0.5h
+- id: TASK-2.5
+  name: Add filter query parameters
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimate: 1h
+- id: TASK-2.6
+  name: Implement confidence range filter logic
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.5
+  estimate: 1h
+- id: TASK-2.7
+  name: Implement low-confidence toggle
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.5
+  estimate: 1h
+- id: TASK-2.8
+  name: Write integration tests
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.4
+  - TASK-2.6
+  - TASK-2.7
+  estimate: 2h
+- id: TASK-2.9
+  name: Create data migration
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  estimate: 1h
 parallelization:
-  batch_1: ["TASK-1.1", "TASK-2.1", "TASK-2.5"]
-  batch_2: ["TASK-1.2", "TASK-2.2", "TASK-2.9", "TASK-2.6", "TASK-2.7"]
-  batch_3: ["TASK-1.3", "TASK-1.6"]
-  batch_4: ["TASK-1.4", "TASK-2.3", "TASK-2.4"]
-  batch_5: ["TASK-1.5", "TASK-2.8"]
+  batch_1:
+  - TASK-1.1
+  - TASK-2.1
+  - TASK-2.5
+  batch_2:
+  - TASK-1.2
+  - TASK-2.2
+  - TASK-2.9
+  - TASK-2.6
+  - TASK-2.7
+  batch_3:
+  - TASK-1.3
+  - TASK-1.6
+  batch_4:
+  - TASK-1.4
+  - TASK-2.3
+  - TASK-2.4
+  batch_5:
+  - TASK-1.5
+  - TASK-2.8
+schema_version: 2
+doc_type: progress
+feature_slug: confidence-score-enhancements
 ---
 
 # Phase 1-2: Score Normalization & Database Backend

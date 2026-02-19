@@ -1,78 +1,79 @@
 ---
 type: context
-prd: "collection-data-consistency"
-title: "Collection Data Consistency & Performance Optimization Context"
-status: "pending"
-created: "2026-01-30"
-updated: "2026-01-30"
-
+prd: collection-data-consistency
+title: Collection Data Consistency & Performance Optimization Context
+status: pending
+created: '2026-01-30'
+updated: '2026-01-30'
 phase_status:
-  - phase: 1
-    title: "Critical Performance Fix"
-    status: "pending"
-    reason: null
-  - phase: 2
-    title: "Frontend Mapping Consolidation"
-    status: "pending"
-    reason: null
-  - phase: 3
-    title: "API Endpoint Consistency"
-    status: "pending"
-    reason: "Depends on Phase 1"
-  - phase: 4
-    title: "Caching Layer"
-    status: "pending"
-    reason: "Depends on Phase 3"
-  - phase: 5
-    title: "Frontend Data Preloading"
-    status: "pending"
-    reason: "Depends on Phase 2"
-
+- phase: 1
+  title: Critical Performance Fix
+  status: pending
+  reason: null
+- phase: 2
+  title: Frontend Mapping Consolidation
+  status: pending
+  reason: null
+- phase: 3
+  title: API Endpoint Consistency
+  status: pending
+  reason: Depends on Phase 1
+- phase: 4
+  title: Caching Layer
+  status: pending
+  reason: Depends on Phase 3
+- phase: 5
+  title: Frontend Data Preloading
+  status: pending
+  reason: Depends on Phase 2
 blockers: []
-
 decisions:
-  - id: "DECISION-1"
-    question: "How to fix N+1 query for collection artifact counts?"
-    decision: "Single aggregation query with GROUP BY"
-    rationale: "Replaces 100+ queries with 1 query, ~10x performance improvement"
-    tradeoffs: "Slightly more complex query logic"
-    location: "skillmeat/api/routers/artifacts.py"
-  - id: "DECISION-2"
-    question: "Where to centralize Entity mapping?"
-    decision: "New file: lib/api/entity-mapper.ts"
-    rationale: "Single source of truth, eliminates 3 duplicate mapping locations"
-    tradeoffs: "Migration effort across multiple components"
-    location: "skillmeat/web/lib/api/entity-mapper.ts"
-  - id: "DECISION-3"
-    question: "How to ensure endpoint consistency?"
-    decision: "CollectionService abstraction"
-    rationale: "Centralized service ensures all endpoints use same query pattern"
-    tradeoffs: "New service layer to maintain"
-    location: "skillmeat/api/services/collection_service.py"
-  - id: "DECISION-4"
-    question: "Caching strategy for collection counts?"
-    decision: "TTL-based in-memory cache with 5-minute expiration"
-    rationale: "Simple, effective, matches typical user session patterns"
-    tradeoffs: "Eventually consistent (5-minute staleness window)"
-    location: "skillmeat/cache/collection_cache.py"
-
+- id: DECISION-1
+  question: How to fix N+1 query for collection artifact counts?
+  decision: Single aggregation query with GROUP BY
+  rationale: Replaces 100+ queries with 1 query, ~10x performance improvement
+  tradeoffs: Slightly more complex query logic
+  location: skillmeat/api/routers/artifacts.py
+- id: DECISION-2
+  question: Where to centralize Entity mapping?
+  decision: 'New file: lib/api/entity-mapper.ts'
+  rationale: Single source of truth, eliminates 3 duplicate mapping locations
+  tradeoffs: Migration effort across multiple components
+  location: skillmeat/web/lib/api/entity-mapper.ts
+- id: DECISION-3
+  question: How to ensure endpoint consistency?
+  decision: CollectionService abstraction
+  rationale: Centralized service ensures all endpoints use same query pattern
+  tradeoffs: New service layer to maintain
+  location: skillmeat/api/services/collection_service.py
+- id: DECISION-4
+  question: Caching strategy for collection counts?
+  decision: TTL-based in-memory cache with 5-minute expiration
+  rationale: Simple, effective, matches typical user session patterns
+  tradeoffs: Eventually consistent (5-minute staleness window)
+  location: skillmeat/cache/collection_cache.py
 integrations:
-  - system: "frontend"
-    component: "EntityModal"
-    calls: ["GET /api/v1/artifacts", "GET /api/v1/artifacts/{id}"]
-    status: "pending-optimization"
-  - system: "frontend"
-    component: "CollectionPage"
-    calls: ["GET /api/v1/artifacts"]
-    status: "pending-mapping-fix"
-  - system: "frontend"
-    component: "ProjectManagePage"
-    calls: ["GET /api/v1/projects/{id}/artifacts"]
-    status: "pending-mapping-fix"
-
+- system: frontend
+  component: EntityModal
+  calls:
+  - GET /api/v1/artifacts
+  - GET /api/v1/artifacts/{id}
+  status: pending-optimization
+- system: frontend
+  component: CollectionPage
+  calls:
+  - GET /api/v1/artifacts
+  status: pending-mapping-fix
+- system: frontend
+  component: ProjectManagePage
+  calls:
+  - GET /api/v1/projects/{id}/artifacts
+  status: pending-mapping-fix
 gotchas: []
-
 modified_files: []
+schema_version: 2
+doc_type: context
+feature_slug: collection-data-consistency
 ---
 
 # Collection Data Consistency & Performance Optimization Context

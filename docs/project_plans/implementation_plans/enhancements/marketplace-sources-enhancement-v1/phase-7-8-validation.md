@@ -1,10 +1,18 @@
 ---
-title: "Phases 7-8: Testing & Documentation"
-description: "Quality assurance, testing, and documentation for marketplace sources enhancement"
+title: 'Phases 7-8: Testing & Documentation'
+description: Quality assurance, testing, and documentation for marketplace sources
+  enhancement
 parent: ../marketplace-sources-enhancement-v1.md
-phases: [7, 8]
+phases:
+- 7
+- 8
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: marketplace-sources-enhancement
+prd_ref: null
+plan_ref: null
 ---
-
 # Phases 7-8: Testing & Documentation
 
 **Parent Plan**: [Marketplace Sources Enhancement v1](../marketplace-sources-enhancement-v1.md)

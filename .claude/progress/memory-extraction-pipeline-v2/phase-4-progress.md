@@ -95,6 +95,9 @@ files_modified:
 - skillmeat/api/openapi.json
 progress: 100
 updated: '2026-02-08'
+schema_version: 2
+doc_type: progress
+feature_slug: memory-extraction-pipeline-v2
 ---
 
 # memory-extraction-pipeline-v2 - Phase 4: Testing, Documentation & Release

@@ -192,6 +192,9 @@ success_criteria:
 files_modified: []
 progress: 100
 updated: '2026-02-05'
+schema_version: 2
+doc_type: progress
+feature_slug: memory-context-system-v1
 ---
 
 # memory-context-system-v1 - Phase 2: Service + API Layer

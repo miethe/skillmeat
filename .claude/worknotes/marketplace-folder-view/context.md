@@ -1,89 +1,88 @@
 ---
 type: context
-prd: "marketplace-folder-view"
-title: "Marketplace Folder View Implementation Context"
+prd: marketplace-folder-view
+title: Marketplace Folder View Implementation Context
 status: not_started
 created: 2026-01-28
 updated: 2026-01-29
-
 phase_status:
-  - phase: 1
-    status: not_started
-    title: "Two-Pane Layout & Semantic Tree"
-    reason: null
-  - phase: 2
-    status: not_started
-    title: "Folder Detail Pane & Bulk Import"
-    reason: "Waiting for Phase 1 completion"
-  - phase: 3
-    status: not_started
-    title: "Accessibility & Performance Optimization"
-    reason: "Waiting for Phase 2 completion"
-
+- phase: 1
+  status: not_started
+  title: Two-Pane Layout & Semantic Tree
+  reason: null
+- phase: 2
+  status: not_started
+  title: Folder Detail Pane & Bulk Import
+  reason: Waiting for Phase 1 completion
+- phase: 3
+  status: not_started
+  title: Accessibility & Performance Optimization
+  reason: Waiting for Phase 2 completion
 blockers: []
-
 decisions:
-  - id: "DECISION-1"
-    question: "What layout architecture for folder view?"
-    decision: "Two-pane master-detail layout (25% left, 75% right)"
-    rationale: "Aligns with Gemini design spec; provides clear navigation in left pane and rich detail in right pane"
-    tradeoffs: "More complex layout; responsive handling needed for smaller screens"
-    location: "skillmeat/web/app/marketplace/sources/[id]/components/source-folder-layout.tsx"
-
-  - id: "DECISION-2"
-    question: "How to filter folders in navigation tree?"
-    decision: "Semantic filtering - exclude root folders and leaf artifact containers"
-    rationale: "Root folders (plugins/, src/, skills/) and leaf containers (commands/, agents/, mcp_servers/) add noise; intermediate folders are most useful for navigation"
-    tradeoffs: "May hide some folders users expect; semantic rules need tuning"
-    location: "skillmeat/web/lib/tree-filter-utils.ts"
-
-  - id: "DECISION-3"
-    question: "Where should tree building logic live?"
-    decision: "Client-side only, no API changes"
-    rationale: "Uses existing CatalogEntry.path field; avoids backend complexity"
-    tradeoffs: "Larger catalogs may need virtualization in future"
-    location: "skillmeat/web/lib/tree-builder.ts"
-
-  - id: "DECISION-4"
-    question: "Which UI primitive for collapsible folders?"
-    decision: "Radix Collapsible via shadcn/ui"
-    rationale: "Consistent with existing design system; built-in accessibility"
-    tradeoffs: "None significant"
-    location: "skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx"
-
-  - id: "DECISION-5"
-    question: "How to display folder content in right pane?"
-    decision: "Group artifacts by type with section headers + bulk import"
-    rationale: "Type grouping provides clear organization; bulk import enables fast collection building"
-    tradeoffs: "More complex UI than simple list; type sections need styling"
-    location: "skillmeat/web/app/marketplace/sources/[id]/components/artifact-type-section.tsx"
-
-  - id: "DECISION-6"
-    question: "How to handle performance for large trees?"
-    decision: "Lazy rendering (Phase 3) + memoization"
-    rationale: "Collapsed folders don't render children until expanded"
-    tradeoffs: "Initial expand may have slight delay; mitigated by memoization"
-    location: "skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx"
-
-  - id: "DECISION-7"
-    question: "Keyboard navigation pattern?"
-    decision: "Roving tabindex with arrow key navigation + Tab between panes"
-    rationale: "Standard tree widget pattern; matches ARIA authoring practices"
-    tradeoffs: "Implementation complexity; handled by Phase 3"
-    location: "skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx"
-
-  - id: "DECISION-8"
-    question: "How to handle mixed-content folders (folders with both direct artifacts AND subfolders)?"
-    decision: "Direct artifacts shown in type sections above Subfolders section; tree node badges show (N) for direct count, [M] for total descendants on hover; visual indicator (dot/icon) for mixed-content folders"
-    rationale: "Clear separation between direct content and navigation to children; count badges provide at-a-glance information without requiring expansion; hover-for-total reduces visual clutter while keeping info accessible"
-    tradeoffs: "More complex tree node rendering; two count numbers may confuse users initially"
-    location: "skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx"
-
+- id: DECISION-1
+  question: What layout architecture for folder view?
+  decision: Two-pane master-detail layout (25% left, 75% right)
+  rationale: Aligns with Gemini design spec; provides clear navigation in left pane
+    and rich detail in right pane
+  tradeoffs: More complex layout; responsive handling needed for smaller screens
+  location: skillmeat/web/app/marketplace/sources/[id]/components/source-folder-layout.tsx
+- id: DECISION-2
+  question: How to filter folders in navigation tree?
+  decision: Semantic filtering - exclude root folders and leaf artifact containers
+  rationale: Root folders (plugins/, src/, skills/) and leaf containers (commands/,
+    agents/, mcp_servers/) add noise; intermediate folders are most useful for navigation
+  tradeoffs: May hide some folders users expect; semantic rules need tuning
+  location: skillmeat/web/lib/tree-filter-utils.ts
+- id: DECISION-3
+  question: Where should tree building logic live?
+  decision: Client-side only, no API changes
+  rationale: Uses existing CatalogEntry.path field; avoids backend complexity
+  tradeoffs: Larger catalogs may need virtualization in future
+  location: skillmeat/web/lib/tree-builder.ts
+- id: DECISION-4
+  question: Which UI primitive for collapsible folders?
+  decision: Radix Collapsible via shadcn/ui
+  rationale: Consistent with existing design system; built-in accessibility
+  tradeoffs: None significant
+  location: skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx
+- id: DECISION-5
+  question: How to display folder content in right pane?
+  decision: Group artifacts by type with section headers + bulk import
+  rationale: Type grouping provides clear organization; bulk import enables fast collection
+    building
+  tradeoffs: More complex UI than simple list; type sections need styling
+  location: skillmeat/web/app/marketplace/sources/[id]/components/artifact-type-section.tsx
+- id: DECISION-6
+  question: How to handle performance for large trees?
+  decision: Lazy rendering (Phase 3) + memoization
+  rationale: Collapsed folders don't render children until expanded
+  tradeoffs: Initial expand may have slight delay; mitigated by memoization
+  location: skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx
+- id: DECISION-7
+  question: Keyboard navigation pattern?
+  decision: Roving tabindex with arrow key navigation + Tab between panes
+  rationale: Standard tree widget pattern; matches ARIA authoring practices
+  tradeoffs: Implementation complexity; handled by Phase 3
+  location: skillmeat/web/app/marketplace/sources/[id]/components/semantic-tree.tsx
+- id: DECISION-8
+  question: How to handle mixed-content folders (folders with both direct artifacts
+    AND subfolders)?
+  decision: Direct artifacts shown in type sections above Subfolders section; tree
+    node badges show (N) for direct count, [M] for total descendants on hover; visual
+    indicator (dot/icon) for mixed-content folders
+  rationale: Clear separation between direct content and navigation to children; count
+    badges provide at-a-glance information without requiring expansion; hover-for-total
+    reduces visual clutter while keeping info accessible
+  tradeoffs: More complex tree node rendering; two count numbers may confuse users
+    initially
+  location: skillmeat/web/app/marketplace/sources/[id]/components/tree-node.tsx
 integrations: []
-
 gotchas: []
-
 modified_files: []
+schema_version: 2
+doc_type: context
+feature_slug: marketplace-folder-view
 ---
 
 # Marketplace Folder View Implementation Context

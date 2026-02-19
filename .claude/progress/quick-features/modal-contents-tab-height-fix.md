@@ -6,7 +6,10 @@ created: 2025-01-14
 completed: 2025-01-14
 estimated_effort: 30min
 files_affected:
-  - skillmeat/web/components/entity/unified-entity-modal.tsx
+- skillmeat/web/components/entity/unified-entity-modal.tsx
+schema_version: 2
+doc_type: quick_feature
+feature_slug: modal-contents-tab-height-fix
 ---
 
 # Quick Feature: Modal Contents Tab Height Fix

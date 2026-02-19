@@ -2,6 +2,9 @@
 type: quick-feature
 status: in_progress
 created: 2026-02-07
+schema_version: 2
+doc_type: quick_feature
+feature_slug: prd-plan-status-manager
 ---
 
 # Quick Feature: PRD/Plan Status Manager

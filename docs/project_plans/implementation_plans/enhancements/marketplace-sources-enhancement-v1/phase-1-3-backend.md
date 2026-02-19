@@ -1,10 +1,19 @@
 ---
-title: "Phases 1-3: Backend Implementation"
-description: "Database schema, repository layer, and API endpoints for marketplace sources enhancement"
+title: 'Phases 1-3: Backend Implementation'
+description: Database schema, repository layer, and API endpoints for marketplace
+  sources enhancement
 parent: ../marketplace-sources-enhancement-v1.md
-phases: [1, 2, 3]
+phases:
+- 1
+- 2
+- 3
+status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: marketplace-sources-enhancement
+prd_ref: null
+plan_ref: null
 ---
-
 # Phases 1-3: Backend Implementation
 
 **Parent Plan**: [Marketplace Sources Enhancement v1](../marketplace-sources-enhancement-v1.md)
