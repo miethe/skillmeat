@@ -18,6 +18,9 @@ related:
 - skillmeat/core/marketplace/heuristic_detector.py
 - skillmeat/api/schemas/marketplace.py
 - skillmeat/web/components/ScoreBadge.tsx
+schema_version: 2
+doc_type: prd
+feature_slug: confidence-score-enhancements
 ---
 # Confidence Score Enhancements - PRD
 

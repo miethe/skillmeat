@@ -1,178 +1,232 @@
 ---
 type: progress
-prd: "discovery-import-enhancement"
+prd: discovery-import-enhancement
 phase: 5
-title: "Integration & End-to-End Testing"
-status: "completed"
-started: "2025-12-04"
-completed: "2025-12-04"
-
+title: Integration & End-to-End Testing
+status: completed
+started: '2025-12-04'
+completed: '2025-12-04'
 overall_progress: 100
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 12
 completed_tasks: 12
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["testing-specialist", "web-accessibility-checker"]
-contributors: ["frontend-developer", "documentation-writer"]
-
+owners:
+- testing-specialist
+- web-accessibility-checker
+contributors:
+- frontend-developer
+- documentation-writer
 tasks:
-  - id: "DIS-5.1"
-    description: "Integration test - full discovery workflow (discovery → pre-scan → filter → import → notification)"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: []
-    estimated_effort: "1.5d"
-    priority: "critical"
-    completion_notes: "Created 16 integration tests in test_discovery_import_integration.py - all passing. Tests cover discovery endpoint, pre-scan filtering, import mutation, notification creation, and state consistency."
-
-  - id: "DIS-5.2"
-    description: "Verify Notification System integration with new ImportResult.status enum and breakdown display"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "critical"
-    completion_notes: "Created 25 notification integration tests - all passing. Tests verify ImportResult.status enum consumption, breakdown display (Imported:N | Skipped:N | Failed:N), skip reason visibility, and Notification Center persistence."
-
-  - id: "DIS-5.3"
-    description: "Performance validation - discovery scan <2 seconds on typical project (500 Collection, 200 Project)"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "high"
-    completion_notes: "Created performance benchmark tests - all targets met. Discovery scan completes in <2 seconds on typical project (500 Collection, 200 Project). Pre-scan filtering optimized and verified."
-
-  - id: "DIS-5.4"
-    description: "E2E test full skip workflow - mark skip → import → verify saved → future discovery excludes"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "high"
-    completion_notes: "Created E2E skip workflow tests in skip-workflow.spec.ts - 7 new tests. Tests verify marking skip checkboxes, import with skips, LocalStorage persistence, and future discovery exclusion of skipped artifacts."
-
-  - id: "DIS-5.5"
-    description: "E2E test Discovery Tab interactions - view → filter → sort → manage skips → re-scan"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "high"
-    completion_notes: "Added E2E Discovery Tab interaction tests - full coverage of filter, sort, skip management, and re-scan functionality. Tab navigation, state persistence, and UI updates verified."
-
-  - id: "DIS-5.6"
-    description: "Accessibility audit - Discovery Tab keyboard navigation, screen reader compatibility"
-    status: "completed"
-    assigned_to: ["web-accessibility-checker"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "high"
-    completion_notes: "Accessibility audit complete - 90% WCAG 2.1 AA compliant. Discovery Tab fully keyboard navigable (Tab, Shift+Tab, Enter, Arrow keys), screen reader compatible with proper ARIA labels and roles. 70 accessibility tests created."
-
-  - id: "DIS-5.7"
-    description: "Accessibility audit - skip checkboxes labels, keyboard access, screen reader support"
-    status: "completed"
-    assigned_to: ["web-accessibility-checker"]
-    dependencies: []
-    estimated_effort: "0.5d"
-    priority: "high"
-    completion_notes: "Skip checkbox accessibility audit - all pass. Proper <label for> associations, keyboard access verified, screen reader announces state correctly, focus indicators visible. 50 accessibility tests created."
-
-  - id: "DIS-5.8"
-    description: "Load test - discovery on large project (500+ Collection, 300+ Project artifacts)"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "medium"
-    completion_notes: "Load tests created - 500+ artifacts handled smoothly. Discovery completes in <800ms even with large artifact sets. UI responsive, no memory leaks detected. All performance targets exceeded."
-
-  - id: "DIS-5.9"
-    description: "Cross-browser testing - LocalStorage persistence and UI rendering (Chrome, Firefox, Safari)"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: []
-    estimated_effort: "0.5d"
-    priority: "medium"
-    completion_notes: "Cross-browser testing configured - 22 tests across Chrome, Firefox, and Safari. LocalStorage persistence verified on all browsers, UI renders consistently, skip preferences maintained across browser sessions."
-
-  - id: "DIS-5.10"
-    description: "Error handling & edge cases - network failure, corrupted files, missing directory"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "high"
-    completion_notes: "Error handling tests created - 22 tests covering network failures, permission issues, file corruption, and missing directories. All scenarios handled gracefully with appropriate user feedback and recovery options."
-
-  - id: "DIS-5.11"
-    description: "Update Notification to show detailed breakdown (Imported:N | Skipped:N | Failed:N)"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "high"
-    completion_notes: "NotificationCenter updated with detailed import breakdown UI. Shows counts for Imported, Skipped, and Failed artifacts. Click-through available for per-artifact details and skip reason visibility."
-
-  - id: "DIS-5.12"
-    description: "Update OpenAPI documentation with ImportResult enum, skip endpoints, DiscoveryResult filtering"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "0.5d"
-    priority: "medium"
-    completion_notes: "OpenAPI documentation updated for ImportStatus enum and skip endpoints. All new schema definitions documented with example responses. DiscoveryResult filtering and skip preference endpoints fully specified."
-
+- id: DIS-5.1
+  description: "Integration test - full discovery workflow (discovery \u2192 pre-scan\
+    \ \u2192 filter \u2192 import \u2192 notification)"
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies: []
+  estimated_effort: 1.5d
+  priority: critical
+  completion_notes: Created 16 integration tests in test_discovery_import_integration.py
+    - all passing. Tests cover discovery endpoint, pre-scan filtering, import mutation,
+    notification creation, and state consistency.
+- id: DIS-5.2
+  description: Verify Notification System integration with new ImportResult.status
+    enum and breakdown display
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies: []
+  estimated_effort: 1d
+  priority: critical
+  completion_notes: Created 25 notification integration tests - all passing. Tests
+    verify ImportResult.status enum consumption, breakdown display (Imported:N | Skipped:N
+    | Failed:N), skip reason visibility, and Notification Center persistence.
+- id: DIS-5.3
+  description: Performance validation - discovery scan <2 seconds on typical project
+    (500 Collection, 200 Project)
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies: []
+  estimated_effort: 1d
+  priority: high
+  completion_notes: Created performance benchmark tests - all targets met. Discovery
+    scan completes in <2 seconds on typical project (500 Collection, 200 Project).
+    Pre-scan filtering optimized and verified.
+- id: DIS-5.4
+  description: "E2E test full skip workflow - mark skip \u2192 import \u2192 verify\
+    \ saved \u2192 future discovery excludes"
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies: []
+  estimated_effort: 1d
+  priority: high
+  completion_notes: Created E2E skip workflow tests in skip-workflow.spec.ts - 7 new
+    tests. Tests verify marking skip checkboxes, import with skips, LocalStorage persistence,
+    and future discovery exclusion of skipped artifacts.
+- id: DIS-5.5
+  description: "E2E test Discovery Tab interactions - view \u2192 filter \u2192 sort\
+    \ \u2192 manage skips \u2192 re-scan"
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies: []
+  estimated_effort: 1d
+  priority: high
+  completion_notes: Added E2E Discovery Tab interaction tests - full coverage of filter,
+    sort, skip management, and re-scan functionality. Tab navigation, state persistence,
+    and UI updates verified.
+- id: DIS-5.6
+  description: Accessibility audit - Discovery Tab keyboard navigation, screen reader
+    compatibility
+  status: completed
+  assigned_to:
+  - web-accessibility-checker
+  dependencies: []
+  estimated_effort: 1d
+  priority: high
+  completion_notes: Accessibility audit complete - 90% WCAG 2.1 AA compliant. Discovery
+    Tab fully keyboard navigable (Tab, Shift+Tab, Enter, Arrow keys), screen reader
+    compatible with proper ARIA labels and roles. 70 accessibility tests created.
+- id: DIS-5.7
+  description: Accessibility audit - skip checkboxes labels, keyboard access, screen
+    reader support
+  status: completed
+  assigned_to:
+  - web-accessibility-checker
+  dependencies: []
+  estimated_effort: 0.5d
+  priority: high
+  completion_notes: Skip checkbox accessibility audit - all pass. Proper <label for>
+    associations, keyboard access verified, screen reader announces state correctly,
+    focus indicators visible. 50 accessibility tests created.
+- id: DIS-5.8
+  description: Load test - discovery on large project (500+ Collection, 300+ Project
+    artifacts)
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies: []
+  estimated_effort: 1d
+  priority: medium
+  completion_notes: Load tests created - 500+ artifacts handled smoothly. Discovery
+    completes in <800ms even with large artifact sets. UI responsive, no memory leaks
+    detected. All performance targets exceeded.
+- id: DIS-5.9
+  description: Cross-browser testing - LocalStorage persistence and UI rendering (Chrome,
+    Firefox, Safari)
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies: []
+  estimated_effort: 0.5d
+  priority: medium
+  completion_notes: Cross-browser testing configured - 22 tests across Chrome, Firefox,
+    and Safari. LocalStorage persistence verified on all browsers, UI renders consistently,
+    skip preferences maintained across browser sessions.
+- id: DIS-5.10
+  description: Error handling & edge cases - network failure, corrupted files, missing
+    directory
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies: []
+  estimated_effort: 1d
+  priority: high
+  completion_notes: Error handling tests created - 22 tests covering network failures,
+    permission issues, file corruption, and missing directories. All scenarios handled
+    gracefully with appropriate user feedback and recovery options.
+- id: DIS-5.11
+  description: Update Notification to show detailed breakdown (Imported:N | Skipped:N
+    | Failed:N)
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 1d
+  priority: high
+  completion_notes: NotificationCenter updated with detailed import breakdown UI.
+    Shows counts for Imported, Skipped, and Failed artifacts. Click-through available
+    for per-artifact details and skip reason visibility.
+- id: DIS-5.12
+  description: Update OpenAPI documentation with ImportResult enum, skip endpoints,
+    DiscoveryResult filtering
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 0.5d
+  priority: medium
+  completion_notes: OpenAPI documentation updated for ImportStatus enum and skip endpoints.
+    All new schema definitions documented with example responses. DiscoveryResult
+    filtering and skip preference endpoints fully specified.
 parallelization:
-  batch_1: ["DIS-5.1", "DIS-5.2", "DIS-5.3", "DIS-5.4", "DIS-5.5", "DIS-5.6", "DIS-5.7", "DIS-5.8", "DIS-5.9", "DIS-5.10"]
-  batch_2: ["DIS-5.11", "DIS-5.12"]
-  critical_path: ["DIS-5.1", "DIS-5.2", "DIS-5.3", "DIS-5.6"]
-  estimated_total_time: "8-10 days"
-
+  batch_1:
+  - DIS-5.1
+  - DIS-5.2
+  - DIS-5.3
+  - DIS-5.4
+  - DIS-5.5
+  - DIS-5.6
+  - DIS-5.7
+  - DIS-5.8
+  - DIS-5.9
+  - DIS-5.10
+  batch_2:
+  - DIS-5.11
+  - DIS-5.12
+  critical_path:
+  - DIS-5.1
+  - DIS-5.2
+  - DIS-5.3
+  - DIS-5.6
+  estimated_total_time: 8-10 days
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "End-to-end discovery → import → notification flow completes without errors"
-    status: "met"
-  - id: "SC-2"
-    description: "Notification System displays new status enum values correctly"
-    status: "met"
-  - id: "SC-3"
-    description: "Skip preferences persist across all browsers (LocalStorage validated)"
-    status: "met"
-  - id: "SC-4"
-    description: "Performance: discovery <2 seconds on typical project"
-    status: "met"
-  - id: "SC-5"
-    description: "Load test passes: 500+ artifacts handled smoothly"
-    status: "met"
-  - id: "SC-6"
-    description: "Accessibility: Discovery Tab keyboard navigable, screen reader compatible"
-    status: "met"
-  - id: "SC-7"
-    description: "Error handling: network failures, corrupted files, missing directories handled gracefully"
-    status: "met"
-  - id: "SC-8"
-    description: "All E2E tests pass: skip workflow, tab interactions, discovery filtering"
-    status: "met"
-  - id: "SC-9"
-    description: "OpenAPI documentation updated and accurate"
-    status: "met"
-
+- id: SC-1
+  description: "End-to-end discovery \u2192 import \u2192 notification flow completes\
+    \ without errors"
+  status: met
+- id: SC-2
+  description: Notification System displays new status enum values correctly
+  status: met
+- id: SC-3
+  description: Skip preferences persist across all browsers (LocalStorage validated)
+  status: met
+- id: SC-4
+  description: 'Performance: discovery <2 seconds on typical project'
+  status: met
+- id: SC-5
+  description: 'Load test passes: 500+ artifacts handled smoothly'
+  status: met
+- id: SC-6
+  description: 'Accessibility: Discovery Tab keyboard navigable, screen reader compatible'
+  status: met
+- id: SC-7
+  description: 'Error handling: network failures, corrupted files, missing directories
+    handled gracefully'
+  status: met
+- id: SC-8
+  description: 'All E2E tests pass: skip workflow, tab interactions, discovery filtering'
+  status: met
+- id: SC-9
+  description: OpenAPI documentation updated and accurate
+  status: met
 files_modified:
-  - "tests/integration/test_discovery_full_workflow.py"
-  - "tests/integration/test_notification_integration.py"
-  - "skillmeat/web/tests/e2e/full-discovery-workflow.spec.ts"
-  - "skillmeat/web/tests/e2e/skip-workflow.spec.ts"
-  - "skillmeat/web/tests/e2e/discovery-tab-interactions.spec.ts"
-  - "skillmeat/web/components/notifications/NotificationItem.tsx"
-  - "docs/api/openapi.json"
+- tests/integration/test_discovery_full_workflow.py
+- tests/integration/test_notification_integration.py
+- skillmeat/web/tests/e2e/full-discovery-workflow.spec.ts
+- skillmeat/web/tests/e2e/skip-workflow.spec.ts
+- skillmeat/web/tests/e2e/discovery-tab-interactions.spec.ts
+- skillmeat/web/components/notifications/NotificationItem.tsx
+- docs/api/openapi.json
+schema_version: 2
+doc_type: progress
+feature_slug: discovery-import-enhancement
 ---
 
 # Discovery & Import Enhancement - Phase 5: Integration & End-to-End Testing

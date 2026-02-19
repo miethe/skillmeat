@@ -6,12 +6,19 @@
 
 # Metadata: Identification and Classification
 type: progress
+schema_version: 2                        # CCDash schema version (aliases existing progress format)
+doc_type: progress                       # CCDash doc type alias for `type: progress`
 prd: "[PRD_ID]"                          # e.g., "advanced-editing-v2", "artifact-flow-modal-redesign"
+feature_slug: "[PRD_ID]"                 # Mirrors `prd` for CCDash feature linking
+prd_ref: null                            # Optional path to parent PRD markdown file
+plan_ref: null                           # Optional path to parent implementation plan
 phase: [PHASE_NUMBER]                    # e.g., 1, 2, 3 (integer, not string)
 title: "[PHASE_TITLE]"                   # e.g., "3-Panel Sync Status Redesign"
 status: "planning"                       # planning|in-progress|review|complete|blocked
 started: "[YYYY-MM-DD]"                  # Start date of this phase
 completed: null                          # "YYYY-MM-DD" when complete, null if in progress
+commit_refs: []                          # Commit SHAs captured as phase work lands
+pr_refs: []                              # Pull request refs captured after PR creation
 
 # Overall Progress: Status and Estimates
 overall_progress: [0-100]                # 0-100, e.g., 35 for 35% complete

@@ -6,6 +6,9 @@ completed: 2026-01-27
 related_prd: cross-source-artifact-search-v1
 scope: 1 file
 estimated_effort: single-session
+schema_version: 2
+doc_type: quick_feature
+feature_slug: search-ranking-enhancement
 ---
 
 # Search Results Ranking Enhancement

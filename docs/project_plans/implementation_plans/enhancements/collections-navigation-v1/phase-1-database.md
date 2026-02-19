@@ -8,6 +8,11 @@ assigned_to:
 dependencies: []
 story_points: 8
 duration: 1 week
+schema_version: 2
+doc_type: phase_plan
+feature_slug: collections-navigation
+prd_ref: null
+plan_ref: null
 ---
 # Phase 1: Database Layer
 

@@ -1,127 +1,153 @@
 ---
 type: progress
-prd: "smart-import-discovery-v1"
+prd: smart-import-discovery-v1
 phase: 4
-title: "Page Integration & UX Polish"
+title: Page Integration & UX Polish
 status: pending
 started: null
-updated: "2025-11-30T00:00:00Z"
+updated: '2025-11-30T00:00:00Z'
 completion: 0
 total_tasks: 7
 completed_tasks: 0
-
 tasks:
-  - id: "SID-020"
-    title: "Integrate Discovery into /manage Page"
-    description: "Update skillmeat/web/app/manage/page.tsx with discovery banner and modal"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SID-007", "SID-013", "SID-014"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "Scan on page load"
-      - "Show banner when artifacts found"
-      - "Modal flow from discovery to import"
-      - "Success feedback after import"
-
-  - id: "SID-021"
-    title: "Integrate Auto-Population into Add Form"
-    description: "Update artifact add form with GitHub URL auto-population"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SID-009", "SID-015"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "URL field with debounced fetch"
-      - "Auto-fill form fields"
-      - "Error recovery for failed fetches"
-      - "Clear form after successful import"
-
-  - id: "SID-022"
-    title: "Integrate Parameter Editor into Entity Detail"
-    description: "Update artifact detail page with Edit Parameters button"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SID-010", "SID-016"]
-    estimated_time: "1h"
-    story_points: 3
-    acceptance_criteria:
-      - "Edit button placement in overview tab"
-      - "Modal open/close correctly"
-      - "Success feedback after save"
-      - "Refresh detail page with updated values"
-
-  - id: "SID-023"
-    title: "Polish Loading States & Error Messages"
-    description: "Improve UX across all discovery components"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SID-014", "SID-015", "SID-016"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "Skeleton screens for table loading"
-      - "Clear error toasts with actionable messages"
-      - "Rollback feedback for partial failures"
-      - "Accessible announcements for screen readers"
-
-  - id: "SID-024"
-    title: "Analytics Instrumentation"
-    description: "Add event tracking for discovery and auto-population features"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SID-007", "SID-008", "SID-009", "SID-010"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "Track discovery scans, imports, parameter edits"
-      - "Include relevant metadata (count, duration, source)"
-      - "No performance impact from tracking"
-
-  - id: "SID-025"
-    title: "E2E Tests: Discovery Flow"
-    description: "Create skillmeat/web/e2e/discovery.spec.ts"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SID-020"]
-    estimated_time: "3h"
-    story_points: 8
-    acceptance_criteria:
-      - "Full discovery -> import flow tested"
-      - "All UI elements properly selected and interacted with"
-      - "Success criteria verified at end"
-
-  - id: "SID-026"
-    title: "E2E Tests: Auto-Population Flow"
-    description: "Create skillmeat/web/e2e/auto-population.spec.ts"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SID-021"]
-    estimated_time: "3h"
-    story_points: 8
-    acceptance_criteria:
-      - "Full auto-population -> import flow tested"
-      - "Metadata fetched and form filled correctly"
-      - "User edits preserved if made"
-
+- id: SID-020
+  title: Integrate Discovery into /manage Page
+  description: Update skillmeat/web/app/manage/page.tsx with discovery banner and
+    modal
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SID-007
+  - SID-013
+  - SID-014
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - Scan on page load
+  - Show banner when artifacts found
+  - Modal flow from discovery to import
+  - Success feedback after import
+- id: SID-021
+  title: Integrate Auto-Population into Add Form
+  description: Update artifact add form with GitHub URL auto-population
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SID-009
+  - SID-015
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - URL field with debounced fetch
+  - Auto-fill form fields
+  - Error recovery for failed fetches
+  - Clear form after successful import
+- id: SID-022
+  title: Integrate Parameter Editor into Entity Detail
+  description: Update artifact detail page with Edit Parameters button
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SID-010
+  - SID-016
+  estimated_time: 1h
+  story_points: 3
+  acceptance_criteria:
+  - Edit button placement in overview tab
+  - Modal open/close correctly
+  - Success feedback after save
+  - Refresh detail page with updated values
+- id: SID-023
+  title: Polish Loading States & Error Messages
+  description: Improve UX across all discovery components
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SID-014
+  - SID-015
+  - SID-016
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - Skeleton screens for table loading
+  - Clear error toasts with actionable messages
+  - Rollback feedback for partial failures
+  - Accessible announcements for screen readers
+- id: SID-024
+  title: Analytics Instrumentation
+  description: Add event tracking for discovery and auto-population features
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SID-007
+  - SID-008
+  - SID-009
+  - SID-010
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - Track discovery scans, imports, parameter edits
+  - Include relevant metadata (count, duration, source)
+  - No performance impact from tracking
+- id: SID-025
+  title: 'E2E Tests: Discovery Flow'
+  description: Create skillmeat/web/e2e/discovery.spec.ts
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SID-020
+  estimated_time: 3h
+  story_points: 8
+  acceptance_criteria:
+  - Full discovery -> import flow tested
+  - All UI elements properly selected and interacted with
+  - Success criteria verified at end
+- id: SID-026
+  title: 'E2E Tests: Auto-Population Flow'
+  description: Create skillmeat/web/e2e/auto-population.spec.ts
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SID-021
+  estimated_time: 3h
+  story_points: 8
+  acceptance_criteria:
+  - Full auto-population -> import flow tested
+  - Metadata fetched and form filled correctly
+  - User edits preserved if made
 parallelization:
-  batch_1: ["SID-020", "SID-021", "SID-022"]
-  batch_2: ["SID-023", "SID-024"]
-  batch_3: ["SID-025", "SID-026"]
-  critical_path: ["SID-020", "SID-025"]
-  estimated_total_time: "12h"
-
+  batch_1:
+  - SID-020
+  - SID-021
+  - SID-022
+  batch_2:
+  - SID-023
+  - SID-024
+  batch_3:
+  - SID-025
+  - SID-026
+  critical_path:
+  - SID-020
+  - SID-025
+  estimated_total_time: 12h
 blockers: []
-
 quality_gates:
-  - "All 3 pages/modals properly integrated"
-  - "E2E tests cover main user journeys"
-  - "Analytics events firing correctly"
-  - "Error scenarios tested and handled"
-  - "Loading states appropriate for each operation"
-  - "Accessibility checks passed"
+- All 3 pages/modals properly integrated
+- E2E tests cover main user journeys
+- Analytics events firing correctly
+- Error scenarios tested and handled
+- Loading states appropriate for each operation
+- Accessibility checks passed
+schema_version: 2
+doc_type: progress
+feature_slug: smart-import-discovery-v1
 ---
 
 # Phase 4: Page Integration & UX Polish

@@ -1,132 +1,231 @@
 #!/usr/bin/env python3
 """
-Validate artifact against JSON Schema.
+Validate markdown frontmatter against artifact schemas.
 
-This script loads schemas, parses YAML frontmatter, validates against the schema using
-jsonschema library, reports errors with helpful messages, and returns pass/fail status.
-
-Usage:
-    python validate_artifact.py artifact.md
-    python validate_artifact.py artifact.md --artifact-type progress
-    python validate_artifact.py artifact.md --verbose
-    python validate_artifact.py artifact.md --schema-dir ../schemas
+Supports legacy artifact types and CCDash-aligned doc_type-driven schemas.
 """
+
+from __future__ import annotations
 
 import argparse
 import sys
+import warnings
+from datetime import date, datetime
 from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Tuple, Union
+from urllib.parse import unquote, urlparse
 
 import jsonschema
 import yaml
 
+warnings.filterwarnings(
+    "ignore",
+    category=DeprecationWarning,
+    message="jsonschema.RefResolver is deprecated.*",
+)
 
-def load_schema(artifact_type: str, schema_dir: Optional[Path] = None) -> Dict[str, Any]:
-    """
-    Load JSON Schema for artifact type.
 
-    Args:
-        artifact_type: Type of artifact (progress, context, bug-fix, observation)
-        schema_dir: Directory containing schema files (default: ../schemas)
+SCHEMA_FILENAME_MAP = {
+    "progress": "progress.schema.yaml",
+    "context": "context.schema.yaml",
+    "bug-fix": "bug-fix.schema.yaml",
+    "observation": "observation.schema.yaml",
+    "prd": "prd.schema.yaml",
+    "implementation-plan": "implementation-plan.schema.yaml",
+    "phase-plan": "phase-plan.schema.yaml",
+    "spike": "spike.schema.yaml",
+    "quick-feature": "quick-feature.schema.yaml",
+    "report": "report.schema.yaml",
+}
 
-    Returns:
-        Schema dictionary
+ARTIFACT_TYPE_ALIASES = {
+    "bug_fix": "bug-fix",
+    "bug-fix": "bug-fix",
+    "observation": "observation",
+    "observations": "observation",
+    "implementation": "implementation-plan",
+    "implementation-plan": "implementation-plan",
+    "implementation_plan": "implementation-plan",
+    "phase-plan": "phase-plan",
+    "phase_plan": "phase-plan",
+    "quick-feature": "quick-feature",
+    "quick_feature": "quick-feature",
+    "quick-feature-plan": "quick-feature",
+    "prd": "prd",
+    "progress": "progress",
+    "context": "context",
+    "spike": "spike",
+    "report": "report",
+}
 
-    Raises:
-        FileNotFoundError: If schema file doesn't exist
-        yaml.YAMLError: If schema file is invalid
-    """
+DOC_TYPE_TO_ARTIFACT = {
+    "progress": "progress",
+    "context": "context",
+    "bug_fix": "bug-fix",
+    "observation": "observation",
+    "prd": "prd",
+    "implementation_plan": "implementation-plan",
+    "phase_plan": "phase-plan",
+    "spike": "spike",
+    "quick_feature": "quick-feature",
+    "report": "report",
+}
+
+LEGACY_TYPE_TO_ARTIFACT = {
+    "progress": "progress",
+    "context": "context",
+    "bug-fixes": "bug-fix",
+    "observations": "observation",
+    "quick-feature-plan": "quick-feature",
+}
+
+BASE_STRICT_FIELDS = [
+    "schema_version",
+    "doc_type",
+    "title",
+    "status",
+    "created",
+    "updated",
+    "feature_slug",
+]
+
+STRICT_FIELDS_BY_TYPE = {
+    "implementation-plan": BASE_STRICT_FIELDS + ["prd_ref"],
+    "phase-plan": BASE_STRICT_FIELDS + ["phase", "phase_title", "prd_ref", "plan_ref"],
+}
+
+
+def normalize_artifact_type(artifact_type: str) -> Optional[str]:
+    """Normalize artifact/doc-type aliases to canonical artifact type names."""
+    if not artifact_type:
+        return None
+    return ARTIFACT_TYPE_ALIASES.get(artifact_type)
+
+
+def resolve_schema_path(artifact_type: str, schema_dir: Optional[Path] = None) -> Path:
+    """Resolve schema file path for an artifact type."""
+    canonical = normalize_artifact_type(artifact_type)
+    if canonical is None or canonical not in SCHEMA_FILENAME_MAP:
+        raise FileNotFoundError(f"Unsupported artifact type: {artifact_type}")
+
     if schema_dir is None:
-        # Default to ../schemas relative to this script
-        script_dir = Path(__file__).parent
-        schema_dir = script_dir.parent / 'schemas'
+        schema_dir = Path(__file__).parent.parent / "schemas"
 
-    schema_filename = f"{artifact_type}.schema.yaml"
-    schema_path = schema_dir / schema_filename
-
+    schema_path = schema_dir / SCHEMA_FILENAME_MAP[canonical]
     if not schema_path.exists():
         raise FileNotFoundError(f"Schema not found: {schema_path}")
+    return schema_path
 
-    with open(schema_path, 'r', encoding='utf-8') as f:
-        schema = yaml.safe_load(f)
 
-    return schema
+def load_schema(artifact_type: str, schema_dir: Optional[Path] = None) -> Dict[str, Any]:
+    """Load schema for artifact type."""
+    schema_path = resolve_schema_path(artifact_type, schema_dir)
+    with schema_path.open("r", encoding="utf-8") as handle:
+        return yaml.safe_load(handle)
 
 
 def extract_frontmatter(file_content: str) -> Optional[str]:
-    """
-    Extract YAML frontmatter from file content.
-
-    Args:
-        file_content: Full file content
-
-    Returns:
-        YAML frontmatter string (without delimiters) or None if not found
-    """
+    """Extract frontmatter block without delimiters."""
     import re
 
-    # Check if content starts with frontmatter delimiter
-    if not file_content.strip().startswith('---'):
+    if not file_content.startswith("---\n"):
         return None
 
-    # Find the closing delimiter
-    match = re.match(r'^---\n(.*?)\n---', file_content, re.DOTALL)
-    if match:
-        return match.group(1)
+    match = re.match(r"^---\n(.*?)\n---", file_content, re.DOTALL)
+    if not match:
+        return None
+    return match.group(1)
+
+
+def parse_frontmatter(frontmatter_str: str) -> Dict[str, Any]:
+    """Parse YAML frontmatter into a dictionary."""
+    def normalize_yaml_scalars(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {key: normalize_yaml_scalars(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [normalize_yaml_scalars(item) for item in value]
+        if isinstance(value, (date, datetime)):
+            return value.isoformat()
+        return value
+
+    metadata = yaml.safe_load(frontmatter_str)
+    if metadata is None:
+        return {}
+    if not isinstance(metadata, dict):
+        raise yaml.YAMLError("Frontmatter must parse to a mapping")
+    return normalize_yaml_scalars(metadata)
+
+
+def detect_artifact_type(metadata: Dict[str, Any]) -> Optional[str]:
+    """Detect artifact type from doc_type first, then legacy type field."""
+    doc_type = metadata.get("doc_type")
+    if isinstance(doc_type, str):
+        artifact_type = DOC_TYPE_TO_ARTIFACT.get(doc_type)
+        if artifact_type:
+            return artifact_type
+
+    legacy_type = metadata.get("type")
+    if isinstance(legacy_type, str):
+        artifact_type = LEGACY_TYPE_TO_ARTIFACT.get(legacy_type)
+        if artifact_type:
+            return artifact_type
 
     return None
 
 
-def parse_frontmatter(frontmatter_str: str) -> Dict[str, Any]:
-    """
-    Parse YAML frontmatter string.
-
-    Args:
-        frontmatter_str: YAML string to parse
-
-    Returns:
-        Parsed metadata dictionary
-
-    Raises:
-        yaml.YAMLError: If YAML is invalid
-    """
-    return yaml.safe_load(frontmatter_str)
-
-
-def validate_metadata(metadata: Dict[str, Any], schema: Dict[str, Any]) -> tuple[bool, list[str]]:
-    """
-    Validate metadata against schema.
-
-    Args:
-        metadata: Metadata to validate
-        schema: JSON Schema
-
-    Returns:
-        Tuple of (is_valid, error_messages)
-    """
-    errors = []
+def validate_metadata(
+    metadata: Dict[str, Any],
+    schema: Dict[str, Any],
+    schema_path: Optional[Path] = None,
+) -> Tuple[bool, list[str]]:
+    """Validate metadata against schema, including $ref resolution."""
+    errors: list[str] = []
 
     try:
-        # Create validator
-        validator = jsonschema.Draft7Validator(schema)
+        validator_cls = jsonschema.validators.validator_for(schema)
+        validator_cls.check_schema(schema)
 
-        # Validate and collect errors
-        validation_errors = list(validator.iter_errors(metadata))
+        if schema_path is not None:
+            def yaml_file_handler(uri: str) -> Dict[str, Any]:
+                parsed = urlparse(uri)
+                yaml_path = Path(unquote(parsed.path))
+                with yaml_path.open("r", encoding="utf-8") as handle:
+                    return yaml.safe_load(handle)
 
+            resolver = jsonschema.RefResolver(
+                base_uri=schema_path.resolve().as_uri(),
+                referrer=schema,
+                handlers={"file": yaml_file_handler},
+            )
+            validator = validator_cls(schema, resolver=resolver)
+        else:
+            validator = validator_cls(schema)
+
+        validation_errors = sorted(validator.iter_errors(metadata), key=lambda err: list(err.path))
         if not validation_errors:
             return True, []
 
-        # Format error messages
         for error in validation_errors:
-            path = ".".join(str(p) for p in error.path) if error.path else "root"
+            path = ".".join(str(part) for part in error.path) if error.path else "root"
             errors.append(f"  [{path}] {error.message}")
-
         return False, errors
 
-    except Exception as e:
-        errors.append(f"Validation error: {e}")
+    except Exception as exc:
+        errors.append(f"Validation error: {exc}")
         return False, errors
+
+
+def strict_recommended_field_errors(metadata: Dict[str, Any], artifact_type: str) -> list[str]:
+    """Return missing-field errors for strict recommended field validation."""
+    fields = STRICT_FIELDS_BY_TYPE.get(artifact_type, BASE_STRICT_FIELDS)
+    missing = []
+    for field in fields:
+        value = metadata.get(field)
+        if field not in metadata or value in (None, "", []):
+            missing.append(field)
+
+    return [f"  [strict] Missing recommended field: {field}" for field in missing]
 
 
 def format_validation_report(
@@ -134,76 +233,40 @@ def format_validation_report(
     artifact_type: str,
     is_valid: bool,
     errors: list[str],
+    strict: bool = False,
     metadata: Optional[Dict[str, Any]] = None,
-    verbose: bool = False
+    verbose: bool = False,
 ) -> str:
-    """
-    Format a human-readable validation report.
-
-    Args:
-        filepath: Path to the artifact file
-        artifact_type: Type of artifact
-        is_valid: Whether validation passed
-        errors: List of error messages
-        metadata: Metadata dictionary (optional, for verbose output)
-        verbose: Include detailed metadata in report
-
-    Returns:
-        Formatted report string
-    """
-    lines = []
-
-    # Header
-    lines.append("=" * 70)
-    lines.append(f"Artifact Validation Report")
-    lines.append("=" * 70)
-    lines.append(f"File: {filepath}")
-    lines.append(f"Type: {artifact_type}")
-    lines.append(f"Status: {'✓ VALID' if is_valid else '✗ INVALID'}")
-    lines.append("=" * 70)
+    """Format a human-readable validation report."""
+    lines = [
+        "=" * 70,
+        "Artifact Validation Report",
+        "=" * 70,
+        f"File: {filepath}",
+        f"Type: {artifact_type}",
+        f"Mode: {'strict' if strict else 'standard'}",
+        f"Status: {'✓ VALID' if is_valid else '✗ INVALID'}",
+        "=" * 70,
+    ]
 
     if is_valid:
         lines.append("\n✓ All validations passed!")
-
         if verbose and metadata:
             lines.append("\nMetadata Summary:")
-            lines.append(f"  Title: {metadata.get('title', 'N/A')}")
-            lines.append(f"  PRD: {metadata.get('prd', 'N/A')}")
-
-            if 'phase' in metadata:
-                lines.append(f"  Phase: {metadata.get('phase', 'N/A')}")
-
-            lines.append(f"  Status: {metadata.get('status', 'N/A')}")
-
-            if artifact_type == 'progress':
-                lines.append(f"  Progress: {metadata.get('overall_progress', 0)}%")
-                lines.append(f"  Tasks: {metadata.get('total_tasks', 0)} total, "
-                           f"{metadata.get('completed_tasks', 0)} completed")
-
+            for field in ["title", "doc_type", "type", "status", "feature_slug", "created", "updated"]:
+                if field in metadata:
+                    lines.append(f"  {field}: {metadata.get(field)}")
     else:
-        lines.append(f"\n✗ Validation failed with {len(errors)} error(s):")
-        lines.append("")
-        for error in errors:
-            lines.append(error)
+        lines.append(f"\n✗ Validation failed with {len(errors)} error(s):\n")
+        lines.extend(errors)
 
         lines.append("\nSuggestions:")
-        if any("required" in err.lower() for err in errors):
-            lines.append("  • Check that all required fields are present")
-        if any("type" in err.lower() for err in errors):
-            lines.append("  • Verify that field types match the schema")
-        if any("pattern" in err.lower() for err in errors):
-            lines.append("  • Check field formats (e.g., dates, IDs, kebab-case)")
-        if any("enum" in err.lower() for err in errors):
-            lines.append("  • Ensure enum values match allowed options")
-
-        lines.append("\nTo fix errors:")
-        lines.append("  1. Review the schema file for field requirements")
-        lines.append("  2. Update the YAML frontmatter to match the schema")
-        lines.append("  3. Re-run validation to verify fixes")
+        lines.append("  • Check required fields and enum values")
+        lines.append("  • Ensure frontmatter parses as valid YAML")
+        lines.append("  • Re-run with --verbose for detail")
 
     lines.append("")
     lines.append("=" * 70)
-
     return "\n".join(lines)
 
 
@@ -211,153 +274,132 @@ def validate_artifact_file(
     filepath: Union[Path, str, StringIO],
     artifact_type: Optional[str] = None,
     schema_dir: Optional[Path] = None,
-    verbose: bool = False
+    verbose: bool = False,
+    strict: bool = False,
 ) -> bool:
-    """
-    Validate an artifact file against its schema.
-
-    Args:
-        filepath: Path to artifact file or StringIO object
-        artifact_type: Type of artifact (auto-detected if None)
-        schema_dir: Directory containing schema files
-        verbose: Print detailed validation report
-
-    Returns:
-        True if validation passed, False otherwise
-    """
+    """Validate one artifact file or in-memory frontmatter content."""
     try:
-        # Read file content
         if isinstance(filepath, StringIO):
             content = filepath.getvalue()
-            filepath_display = "<StringIO>"
+            filepath_display: Union[str, Path] = "<StringIO>"
         else:
-            filepath = Path(filepath)
-            if not filepath.exists():
-                print(f"Error: File not found: {filepath}", file=sys.stderr)
+            file_path = Path(filepath)
+            if not file_path.exists():
+                print(f"Error: File not found: {file_path}", file=sys.stderr)
                 return False
-            content = filepath.read_text(encoding='utf-8')
-            filepath_display = str(filepath)
+            content = file_path.read_text(encoding="utf-8")
+            filepath_display = file_path
 
-        # Extract frontmatter
         frontmatter_str = extract_frontmatter(content)
         if frontmatter_str is None:
             print(f"Error: No YAML frontmatter found in {filepath_display}", file=sys.stderr)
-            print("Expected frontmatter format:", file=sys.stderr)
-            print("---", file=sys.stderr)
-            print("field: value", file=sys.stderr)
-            print("---", file=sys.stderr)
             return False
 
-        # Parse frontmatter
         try:
             metadata = parse_frontmatter(frontmatter_str)
-        except yaml.YAMLError as e:
-            print(f"Error: Invalid YAML frontmatter in {filepath_display}", file=sys.stderr)
-            print(f"YAML error: {e}", file=sys.stderr)
+        except yaml.YAMLError as exc:
+            print(f"Error: Invalid YAML frontmatter in {filepath_display}: {exc}", file=sys.stderr)
             return False
 
-        # Auto-detect artifact type if not provided
-        if artifact_type is None:
-            artifact_type = metadata.get('type')
+        if artifact_type is not None:
+            canonical_type = normalize_artifact_type(artifact_type)
+            if canonical_type is None:
+                print(f"Error: Unsupported artifact type: {artifact_type}", file=sys.stderr)
+                return False
+            artifact_type = canonical_type
+        else:
+            artifact_type = detect_artifact_type(metadata)
             if artifact_type is None:
-                print(f"Error: No 'type' field in frontmatter and no --artifact-type specified",
-                      file=sys.stderr)
+                print(
+                    f"Error: Could not auto-detect artifact type from doc_type/type in {filepath_display}",
+                    file=sys.stderr,
+                )
                 return False
 
-        # Load schema
-        try:
-            schema = load_schema(artifact_type, schema_dir)
-        except FileNotFoundError as e:
-            print(f"Error: {e}", file=sys.stderr)
-            return False
-        except yaml.YAMLError as e:
-            print(f"Error: Invalid schema file: {e}", file=sys.stderr)
-            return False
+        schema_path = resolve_schema_path(artifact_type, schema_dir)
+        schema = load_schema(artifact_type, schema_dir)
+        is_valid, errors = validate_metadata(metadata, schema, schema_path)
 
-        # Validate metadata
-        is_valid, errors = validate_metadata(metadata, schema)
+        if strict:
+            errors.extend(strict_recommended_field_errors(metadata, artifact_type))
+            if errors:
+                is_valid = False
 
-        # Print report if verbose or if validation failed
         if verbose or not is_valid:
-            report = format_validation_report(
-                filepath_display,
-                artifact_type,
-                is_valid,
-                errors,
-                metadata,
-                verbose
+            print(
+                format_validation_report(
+                    filepath=filepath_display,
+                    artifact_type=artifact_type,
+                    is_valid=is_valid,
+                    errors=errors,
+                    strict=strict,
+                    metadata=metadata,
+                    verbose=verbose,
+                )
             )
-            print(report)
 
         return is_valid
 
-    except Exception as e:
-        print(f"Error validating {filepath}: {e}", file=sys.stderr)
-        import traceback
-        traceback.print_exc()
+    except FileNotFoundError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return False
+    except Exception as exc:  # pragma: no cover - defensive CLI error path
+        print(f"Error validating {filepath}: {exc}", file=sys.stderr)
         return False
 
 
-def main():
-    """Main entry point for validate_artifact script."""
+def resolve_cli_artifact(args: argparse.Namespace) -> Optional[Path]:
+    """Resolve artifact path from --file or positional argument."""
+    if args.file and args.artifact:
+        print("Error: Use either --file/-f or positional artifact, not both.", file=sys.stderr)
+        return None
+    if args.file:
+        return args.file
+    if args.artifact:
+        return args.artifact
+    print("Error: Missing artifact path. Provide positional path or --file/-f.", file=sys.stderr)
+    return None
+
+
+def main() -> None:
+    """CLI entrypoint."""
     parser = argparse.ArgumentParser(
-        description="Validate artifact against JSON Schema",
+        description="Validate artifact frontmatter against JSON Schema",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Validate with auto-detected type
-  python validate_artifact.py phase-1-progress.md
-
-  # Validate with explicit type
-  python validate_artifact.py phase-1-progress.md --artifact-type progress
-
-  # Verbose output
-  python validate_artifact.py phase-1-progress.md --verbose
-
-  # Custom schema directory
-  python validate_artifact.py artifact.md --schema-dir /path/to/schemas
-        """
+  python validate_artifact.py path/to/file.md
+  python validate_artifact.py -f path/to/file.md --artifact-type prd
+  python validate_artifact.py path/to/file.md --strict --verbose
+""",
     )
 
+    parser.add_argument("artifact", nargs="?", type=Path, help="Artifact file path")
+    parser.add_argument("--file", "-f", type=Path, help="Artifact file path")
     parser.add_argument(
-        'artifact',
-        type=Path,
-        help='Path to artifact file to validate'
+        "--artifact-type",
+        "-t",
+        choices=sorted(SCHEMA_FILENAME_MAP.keys()),
+        help="Explicit artifact type (auto-detected by default)",
     )
-
-    parser.add_argument(
-        '--artifact-type',
-        '-t',
-        choices=['progress', 'context', 'bug-fix', 'observation'],
-        help='Type of artifact (auto-detected from frontmatter if not specified)'
-    )
-
-    parser.add_argument(
-        '--schema-dir',
-        '-s',
-        type=Path,
-        help='Directory containing schema files (default: ../schemas)'
-    )
-
-    parser.add_argument(
-        '--verbose',
-        '-v',
-        action='store_true',
-        help='Print detailed validation report'
-    )
+    parser.add_argument("--schema-dir", "-s", type=Path, help="Custom schema directory")
+    parser.add_argument("--strict", action="store_true", help="Require recommended CCDash fields")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Print detailed validation report")
 
     args = parser.parse_args()
+    artifact = resolve_cli_artifact(args)
+    if artifact is None:
+        sys.exit(1)
 
-    # Validate artifact
     is_valid = validate_artifact_file(
-        args.artifact,
-        args.artifact_type,
-        args.schema_dir,
-        args.verbose
+        filepath=artifact,
+        artifact_type=args.artifact_type,
+        schema_dir=args.schema_dir,
+        verbose=args.verbose,
+        strict=args.strict,
     )
-
     sys.exit(0 if is_valid else 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

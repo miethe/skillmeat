@@ -17,6 +17,9 @@ updated: 2025-12-18
 related_documents:
 - integration-points.md
 - task-2.4-implementation.md
+schema_version: 2
+doc_type: prd
+feature_slug: versioning-analysis-index
 ---
 # SkillMeat Sync System Analysis - Complete Documentation Index
 

@@ -21,6 +21,9 @@ related:
 - /docs/project_plans/implementation_plans/refactors/artifact-metadata-cache-v1.md
 - /docs/design/ui-component-specs-page-refactor.md
 - /docs/project_plans/implementation_plans/features/manage-collection-page-refactor-v1.md
+schema_version: 2
+doc_type: prd
+feature_slug: tools-api-support
 ---
 # Feature Brief & Metadata
 

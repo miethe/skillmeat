@@ -17,6 +17,11 @@ category: product-planning
 status: completed
 related:
 - /docs/project_plans/implementation_plans/features/composite-artifact-infrastructure-v1.md
+schema_version: 2
+doc_type: phase_plan
+feature_slug: composite-artifact-infrastructure
+prd_ref: null
+plan_ref: null
 ---
 
 # Phase 2: Enhanced Discovery (Graph-Aware Detection)

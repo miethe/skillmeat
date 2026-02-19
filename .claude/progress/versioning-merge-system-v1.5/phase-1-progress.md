@@ -2,75 +2,81 @@
 type: progress
 prd: versioning-merge-system-v1.5
 phase: 1
-title: "Core Baseline Support (Fix Three-Way Merge)"
+title: Core Baseline Support (Fix Three-Way Merge)
 status: completed
 created: 2025-12-17
 updated: 2025-12-17
 completed_at: 2025-12-17
-duration_estimate: "2-3 days"
-effort_estimate: "16-24h"
+duration_estimate: 2-3 days
+effort_estimate: 16-24h
 priority: HIGH
-
 tasks:
-  - id: "TASK-1.1"
-    description: "Add merge_base_snapshot field to deployment metadata schema"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3-4h"
-    priority: "HIGH"
-    files:
-      - "skillmeat/core/deployment.py"
-      - "skillmeat/api/schemas/deployments.py"
-
-  - id: "TASK-1.2"
-    description: "Update deploy_artifact() to store baseline hash on deployment"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3-4h"
-    priority: "HIGH"
-    files:
-      - "skillmeat/storage/deployment.py"
-      - "skillmeat/core/deployment.py"
-
-  - id: "TASK-1.3"
-    description: "Modify three_way_merge() to retrieve baseline from metadata"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "4-6h"
-    priority: "HIGH"
-    files:
-      - "skillmeat/core/sync.py"
-      - "skillmeat/storage/snapshot.py"
-
-  - id: "TASK-1.4"
-    description: "Add fallback logic for old deployments (no baseline)"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3-4h"
-    priority: "HIGH"
-    files:
-      - "skillmeat/core/sync.py"
-
-  - id: "TASK-1.5"
-    description: "Write unit tests for merge base retrieval"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3-6h"
-    priority: "HIGH"
-    files:
-      - "tests/test_three_way_merge.py"
-      - "tests/test_deployment_baseline.py"
-      - "tests/test_sync_merge_fallback.py"
-
+- id: TASK-1.1
+  description: Add merge_base_snapshot field to deployment metadata schema
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3-4h
+  priority: HIGH
+  files:
+  - skillmeat/core/deployment.py
+  - skillmeat/api/schemas/deployments.py
+- id: TASK-1.2
+  description: Update deploy_artifact() to store baseline hash on deployment
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3-4h
+  priority: HIGH
+  files:
+  - skillmeat/storage/deployment.py
+  - skillmeat/core/deployment.py
+- id: TASK-1.3
+  description: Modify three_way_merge() to retrieve baseline from metadata
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 4-6h
+  priority: HIGH
+  files:
+  - skillmeat/core/sync.py
+  - skillmeat/storage/snapshot.py
+- id: TASK-1.4
+  description: Add fallback logic for old deployments (no baseline)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3-4h
+  priority: HIGH
+  files:
+  - skillmeat/core/sync.py
+- id: TASK-1.5
+  description: Write unit tests for merge base retrieval
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3-6h
+  priority: HIGH
+  files:
+  - tests/test_three_way_merge.py
+  - tests/test_deployment_baseline.py
+  - tests/test_sync_merge_fallback.py
 parallelization:
-  batch_1: ["TASK-1.1", "TASK-1.2", "TASK-1.3", "TASK-1.4", "TASK-1.5"]
-
+  batch_1:
+  - TASK-1.1
+  - TASK-1.2
+  - TASK-1.3
+  - TASK-1.4
+  - TASK-1.5
 completion: 100%
+schema_version: 2
+doc_type: progress
+feature_slug: versioning-merge-system-v1-5
 ---
 
 # Phase 1: Core Baseline Support (Fix Three-Way Merge)

@@ -112,6 +112,9 @@ files_modified:
 - skillmeat/web/app/marketplace/sources/page.tsx
 progress: 100
 updated: '2026-01-24'
+schema_version: 2
+doc_type: progress
+feature_slug: cross-source-artifact-search-v1
 ---
 
 # Phase 3: Frontend UI

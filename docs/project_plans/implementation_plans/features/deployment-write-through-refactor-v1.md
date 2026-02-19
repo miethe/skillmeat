@@ -11,6 +11,10 @@ tags:
 - cache
 - data-flow
 - refactor
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: deployment-write-through-refactor
+prd_ref: null
 ---
 
 # Deployment Data Write-Through Refactor

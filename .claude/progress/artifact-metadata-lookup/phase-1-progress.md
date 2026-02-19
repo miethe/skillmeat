@@ -3,38 +3,48 @@ prd: artifact-metadata-lookup
 phase: 1
 status: completed
 completion: 100%
-completed_at: 2025-12-22T00:00:00Z
+completed_at: 2025-12-22 00:00:00+00:00
 tasks:
-  - id: "AML-1"
-    title: "Create artifact lookup utility"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    commit: "ebe78e4"
-  - id: "AML-2"
-    title: "Implement cache table lookup"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    commit: "ebe78e4"
-  - id: "AML-3"
-    title: "Implement marketplace catalog fallback"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    commit: "ebe78e4"
-  - id: "AML-4"
-    title: "Implement minimal fallback response"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    commit: "ebe78e4"
-  - id: "AML-5"
-    title: "Update router endpoint"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    commit: "ebe78e4"
-  - id: "AML-6"
-    title: "Write comprehensive tests"
-    status: "completed"
-    assigned_to: ["python-pro"]
-    commit: "ebe78e4"
+- id: AML-1
+  title: Create artifact lookup utility
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  commit: ebe78e4
+- id: AML-2
+  title: Implement cache table lookup
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  commit: ebe78e4
+- id: AML-3
+  title: Implement marketplace catalog fallback
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  commit: ebe78e4
+- id: AML-4
+  title: Implement minimal fallback response
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  commit: ebe78e4
+- id: AML-5
+  title: Update router endpoint
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  commit: ebe78e4
+- id: AML-6
+  title: Write comprehensive tests
+  status: completed
+  assigned_to:
+  - python-pro
+  commit: ebe78e4
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-metadata-lookup
+type: progress
 ---
 
 # Artifact Metadata Lookup Service - Phase 1 Complete

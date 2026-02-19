@@ -1,87 +1,108 @@
 ---
 type: progress
-prd: "PRD-001-confidence-scoring"
+prd: PRD-001-confidence-scoring
 phase: 2
-phase_title: "Match Analysis Engine"
+phase_title: Match Analysis Engine
 status: not_started
 progress: 0
 total_tasks: 9
 completed_tasks: 0
-estimated_effort: "2-3 weeks"
+estimated_effort: 2-3 weeks
 story_points: 16
 dependencies:
-  - phase: 1
-    status: "must_complete"
-
+- phase: 1
+  status: must_complete
 tasks:
-  - id: "P2-T1"
-    title: "Implement MatchAnalyzer (Keyword)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    story_points: 4
-
-  - id: "P2-T2"
-    title: "Implement SemanticScorer (Embeddings)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer", "backend-architect"]
-    dependencies: []
-    story_points: 6
-
-  - id: "P2-T3"
-    title: "Implement ContextBooster"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    story_points: 3
-
-  - id: "P2-T4"
-    title: "Implement ScoreCalculator"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T1", "P2-T2", "P2-T3"]
-    story_points: 2
-
-  - id: "P2-T5"
-    title: "CLI: skillmeat match command"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T4"]
-    story_points: 3
-
-  - id: "P2-T6"
-    title: "CLI: skillmeat match --json"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T5"]
-    story_points: 2
-
-  - id: "P2-T7"
-    title: "API: GET /api/v1/match"
-    status: "pending"
-    assigned_to: ["python-backend-engineer", "backend-architect"]
-    dependencies: ["P2-T4"]
-    story_points: 4
-
-  - id: "P2-T8"
-    title: "Error Handling & Degradation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T2"]
-    story_points: 1
-
-  - id: "P2-T9"
-    title: "OpenTelemetry Instrumentation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T7"]
-    story_points: 1
-
+- id: P2-T1
+  title: Implement MatchAnalyzer (Keyword)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  story_points: 4
+- id: P2-T2
+  title: Implement SemanticScorer (Embeddings)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  - backend-architect
+  dependencies: []
+  story_points: 6
+- id: P2-T3
+  title: Implement ContextBooster
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  story_points: 3
+- id: P2-T4
+  title: Implement ScoreCalculator
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T1
+  - P2-T2
+  - P2-T3
+  story_points: 2
+- id: P2-T5
+  title: 'CLI: skillmeat match command'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T4
+  story_points: 3
+- id: P2-T6
+  title: 'CLI: skillmeat match --json'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T5
+  story_points: 2
+- id: P2-T7
+  title: 'API: GET /api/v1/match'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  - backend-architect
+  dependencies:
+  - P2-T4
+  story_points: 4
+- id: P2-T8
+  title: Error Handling & Degradation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T2
+  story_points: 1
+- id: P2-T9
+  title: OpenTelemetry Instrumentation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T7
+  story_points: 1
 parallelization:
-  batch_1: ["P2-T1", "P2-T2", "P2-T3"]
-  batch_2: ["P2-T4", "P2-T8"]
-  batch_3: ["P2-T5", "P2-T7"]
-  batch_4: ["P2-T6", "P2-T9"]
+  batch_1:
+  - P2-T1
+  - P2-T2
+  - P2-T3
+  batch_2:
+  - P2-T4
+  - P2-T8
+  batch_3:
+  - P2-T5
+  - P2-T7
+  batch_4:
+  - P2-T6
+  - P2-T9
+schema_version: 2
+doc_type: progress
+feature_slug: prd-001-confidence-scoring
 ---
 
 # Phase 2: Match Analysis Engine

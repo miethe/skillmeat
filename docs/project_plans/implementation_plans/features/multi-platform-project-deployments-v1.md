@@ -22,6 +22,10 @@ status: inferred_complete
 related:
 - /docs/project_plans/PRDs/features/agent-context-entities-v1.md
 - /docs/project_plans/PRDs/features/enhanced-frontmatter-utilization-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: multi-platform-project-deployments
+prd_ref: null
 ---
 # Implementation Plan: Multi-Platform Project Deployments (v1)
 

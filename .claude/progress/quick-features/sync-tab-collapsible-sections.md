@@ -4,16 +4,19 @@ status: completed
 created: 2026-02-05
 scope: 2 components, ~2 files
 tasks:
-  - id: COLL-1
-    name: "Auto-collapsing empty deployments message"
-    status: completed
-    file: skillmeat/web/components/entity/project-selector-for-diff.tsx
-    assigned_to: ui-engineer-enhanced
-  - id: COLL-2
-    name: "Collapsible ArtifactFlowBanner with smart collapsed state"
-    status: completed
-    file: skillmeat/web/components/sync-status/artifact-flow-banner.tsx
-    assigned_to: ui-engineer-enhanced
+- id: COLL-1
+  name: Auto-collapsing empty deployments message
+  status: completed
+  file: skillmeat/web/components/entity/project-selector-for-diff.tsx
+  assigned_to: ui-engineer-enhanced
+- id: COLL-2
+  name: Collapsible ArtifactFlowBanner with smart collapsed state
+  status: completed
+  file: skillmeat/web/components/sync-status/artifact-flow-banner.tsx
+  assigned_to: ui-engineer-enhanced
+schema_version: 2
+doc_type: quick_feature
+feature_slug: sync-tab-collapsible-sections
 ---
 
 # Sync Tab Collapsible Sections

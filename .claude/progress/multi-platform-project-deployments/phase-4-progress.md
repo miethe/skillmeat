@@ -1,219 +1,331 @@
 ---
 type: progress
-prd: "multi-platform-project-deployments-v1"
+prd: multi-platform-project-deployments-v1
 phase: 4
-title: "Discovery, Cache, and UI/UX"
-status: "in-progress"
-started: "2026-02-09"
+title: Discovery, Cache, and UI/UX
+status: in-progress
+started: '2026-02-09'
 completed: null
-
 overall_progress: 95
-completion_estimate: "blocked-on-validation"
-
+completion_estimate: blocked-on-validation
 total_tasks: 19
 completed_tasks: 17
 in_progress_tasks: 2
 blocked_tasks: 0
 at_risk_tasks: 2
-
-owners: ["python-backend-engineer", "ui-engineer-enhanced", "frontend-developer"]
-contributors: ["ui-designer"]
-
+owners:
+- python-backend-engineer
+- ui-engineer-enhanced
+- frontend-developer
+contributors:
+- ui-designer
 tasks:
-  - id: "P4-T1"
-    description: "Extend FileWatcher to all profile roots - Update skillmeat/cache/watcher.py to monitor all configured profile roots (.codex/, .gemini/, custom); emit events with profile info"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T5"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "P4-T2"
-    description: "Update cache invalidation for profile-aware changes - Modify cache invalidation to handle all profiles; refresh_single_artifact_cache accepts profile param; project stats aggregate across profiles"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P4-T1"]
-    estimated_effort: "1.5 pts"
-    priority: "high"
-
-  - id: "P4-T3"
-    description: "Implement platform detection on artifact import - Scan source structure for .codex/.gemini dirs; auto-tag artifacts with target_platforms from source; users can override"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T2", "P2-T5"]
-    estimated_effort: "1.5 pts"
-    priority: "medium"
-
-  - id: "P4-T4"
-    description: "Create DeploymentProfile selector component - Build React dropdown component showing available profiles (Claude, Codex, Gemini, custom); default to primary; clear descriptions per platform"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P1-T6"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "P4-T5"
-    description: "Update deploy-dialog component for profile support - Modify deploy-dialog.tsx to include profile selector; add --all-profiles checkbox for one-click deploy to all"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["P4-T4"]
-    estimated_effort: "1.5 pts"
-    priority: "high"
-
-  - id: "P4-T6"
-    description: "Update template-deploy-wizard for profile awareness - Modify template-deploy-wizard.tsx to accept profile during template deployment; context entities in template respect profile"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["P4-T4"]
-    estimated_effort: "1.5 pts"
-    priority: "medium"
-
-  - id: "P4-T7"
-    description: "Add profile parameter to API client deployment calls - Update skillmeat/web/lib/api/deployments.ts to send deployment_profile_id in deploy requests"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["P2-T10"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "P4-T8"
-    description: "Generate CLI commands with profile support - Update skillmeat/web/lib/cli-commands.ts to generate deploy commands with --profile and --all-profiles flags"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["P2-T6"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
-  - id: "P4-T9"
-    description: "Create deployment status component showing profiles - Build component displaying status segmented by profile; artifact name, version, deployed profiles (checkmarks), last deployed time per profile"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P2-T11"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "P4-T10"
-    description: "Create cross-platform sync comparison view - Build UI showing sync state across profiles (e.g., Claude: v1.2, Codex: v1.1, Gemini: none); highlight mismatches; suggest sync actions"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P2-T11", "P3-T13"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "P4-T11"
-    description: "Add artifact filter by target_platforms - Extend artifact list/search UI to filter by target_platforms (show Codex-only, universal, etc.); platform tags in list"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["P1-T4"]
-    estimated_effort: "1.5 pts"
-    priority: "medium"
-
-  - id: "P4-T12"
-    description: "Create deployment profile management UI - Build page at /projects/[id]/profiles for viewing/editing profiles; add profiles, update artifact path maps, configure context prefixes"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P1-T11"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "P4-T13"
-    description: "Create hooks for profile-aware deployment state - Build useDeploymentProfiles(projectId), useDeploymentStatus(artifactId, projectId), useProfileSelector() hooks; add to hooks/index.ts"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["P2-T10", "P2-T11"]
-    estimated_effort: "1.5 pts"
-    priority: "high"
-
-  - id: "P4-T14"
-    description: "Update frontend types for profile info - Extend types/deployments.ts with DeploymentProfile, DeploymentStatus; update types/artifacts.ts with target_platforms; match backend schemas"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["P1-T7", "P4-T7"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "P4-T15"
-    description: "Add profile selection to context entity deploy UI - Extend context entity deployment UI with profile selector; match artifact deploy UX"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["P3-T7"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
-  - id: "P4-T16"
-    description: "Design platform badge/icon component - Create reusable component showing platform badges (Claude Code, Codex, Gemini icons); used in selectors, status, filters"
-    status: "completed"
-    assigned_to: ["ui-designer"]
-    dependencies: []
-    estimated_effort: "0.5 pts"
-    priority: "medium"
-
-  - id: "P4-T17"
-    description: "Update API endpoints to return profile info - Ensure GET /projects/{id} returns deployment_profiles, GET /artifacts/{id} returns target_platforms, status returns per-profile breakdown"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T10", "P2-T11"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "P4-T18"
-    description: "Frontend integration tests: profile selection and deploy - Test deploying with profile selector; test all-profiles; test sync status view; test artifact platform filter"
-    status: "in_progress"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["P4-T5", "P4-T9", "P4-T10"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "P4-T19"
-    description: "End-to-end test: multi-platform deployment workflow - Full E2E: create project, set up profiles, deploy via UI, verify status, verify CLI commands match UI state"
-    status: "in_progress"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["P4-T5", "P4-T9", "P4-T18"]
-    estimated_effort: "1.5 pts"
-    priority: "high"
-
+- id: P4-T1
+  description: Extend FileWatcher to all profile roots - Update skillmeat/cache/watcher.py
+    to monitor all configured profile roots (.codex/, .gemini/, custom); emit events
+    with profile info
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T5
+  estimated_effort: 2 pts
+  priority: high
+- id: P4-T2
+  description: Update cache invalidation for profile-aware changes - Modify cache
+    invalidation to handle all profiles; refresh_single_artifact_cache accepts profile
+    param; project stats aggregate across profiles
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P4-T1
+  estimated_effort: 1.5 pts
+  priority: high
+- id: P4-T3
+  description: Implement platform detection on artifact import - Scan source structure
+    for .codex/.gemini dirs; auto-tag artifacts with target_platforms from source;
+    users can override
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T2
+  - P2-T5
+  estimated_effort: 1.5 pts
+  priority: medium
+- id: P4-T4
+  description: Create DeploymentProfile selector component - Build React dropdown
+    component showing available profiles (Claude, Codex, Gemini, custom); default
+    to primary; clear descriptions per platform
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P1-T6
+  estimated_effort: 2 pts
+  priority: high
+- id: P4-T5
+  description: Update deploy-dialog component for profile support - Modify deploy-dialog.tsx
+    to include profile selector; add --all-profiles checkbox for one-click deploy
+    to all
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - P4-T4
+  estimated_effort: 1.5 pts
+  priority: high
+- id: P4-T6
+  description: Update template-deploy-wizard for profile awareness - Modify template-deploy-wizard.tsx
+    to accept profile during template deployment; context entities in template respect
+    profile
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - P4-T4
+  estimated_effort: 1.5 pts
+  priority: medium
+- id: P4-T7
+  description: Add profile parameter to API client deployment calls - Update skillmeat/web/lib/api/deployments.ts
+    to send deployment_profile_id in deploy requests
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - P2-T10
+  estimated_effort: 1 pt
+  priority: high
+- id: P4-T8
+  description: Generate CLI commands with profile support - Update skillmeat/web/lib/cli-commands.ts
+    to generate deploy commands with --profile and --all-profiles flags
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - P2-T6
+  estimated_effort: 1 pt
+  priority: medium
+- id: P4-T9
+  description: Create deployment status component showing profiles - Build component
+    displaying status segmented by profile; artifact name, version, deployed profiles
+    (checkmarks), last deployed time per profile
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P2-T11
+  estimated_effort: 2 pts
+  priority: high
+- id: P4-T10
+  description: 'Create cross-platform sync comparison view - Build UI showing sync
+    state across profiles (e.g., Claude: v1.2, Codex: v1.1, Gemini: none); highlight
+    mismatches; suggest sync actions'
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P2-T11
+  - P3-T13
+  estimated_effort: 2 pts
+  priority: high
+- id: P4-T11
+  description: Add artifact filter by target_platforms - Extend artifact list/search
+    UI to filter by target_platforms (show Codex-only, universal, etc.); platform
+    tags in list
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - P1-T4
+  estimated_effort: 1.5 pts
+  priority: medium
+- id: P4-T12
+  description: Create deployment profile management UI - Build page at /projects/[id]/profiles
+    for viewing/editing profiles; add profiles, update artifact path maps, configure
+    context prefixes
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P1-T11
+  estimated_effort: 2 pts
+  priority: high
+- id: P4-T13
+  description: Create hooks for profile-aware deployment state - Build useDeploymentProfiles(projectId),
+    useDeploymentStatus(artifactId, projectId), useProfileSelector() hooks; add to
+    hooks/index.ts
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - P2-T10
+  - P2-T11
+  estimated_effort: 1.5 pts
+  priority: high
+- id: P4-T14
+  description: Update frontend types for profile info - Extend types/deployments.ts
+    with DeploymentProfile, DeploymentStatus; update types/artifacts.ts with target_platforms;
+    match backend schemas
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - P1-T7
+  - P4-T7
+  estimated_effort: 1 pt
+  priority: high
+- id: P4-T15
+  description: Add profile selection to context entity deploy UI - Extend context
+    entity deployment UI with profile selector; match artifact deploy UX
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - P3-T7
+  estimated_effort: 1 pt
+  priority: medium
+- id: P4-T16
+  description: Design platform badge/icon component - Create reusable component showing
+    platform badges (Claude Code, Codex, Gemini icons); used in selectors, status,
+    filters
+  status: completed
+  assigned_to:
+  - ui-designer
+  dependencies: []
+  estimated_effort: 0.5 pts
+  priority: medium
+- id: P4-T17
+  description: Update API endpoints to return profile info - Ensure GET /projects/{id}
+    returns deployment_profiles, GET /artifacts/{id} returns target_platforms, status
+    returns per-profile breakdown
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T10
+  - P2-T11
+  estimated_effort: 1 pt
+  priority: high
+- id: P4-T18
+  description: 'Frontend integration tests: profile selection and deploy - Test deploying
+    with profile selector; test all-profiles; test sync status view; test artifact
+    platform filter'
+  status: in_progress
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - P4-T5
+  - P4-T9
+  - P4-T10
+  estimated_effort: 2 pts
+  priority: high
+- id: P4-T19
+  description: 'End-to-end test: multi-platform deployment workflow - Full E2E: create
+    project, set up profiles, deploy via UI, verify status, verify CLI commands match
+    UI state'
+  status: in_progress
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - P4-T5
+  - P4-T9
+  - P4-T18
+  estimated_effort: 1.5 pts
+  priority: high
 parallelization:
-  batch_1: ["P4-T1", "P4-T3", "P4-T4", "P4-T7", "P4-T8", "P4-T11", "P4-T12", "P4-T13", "P4-T16", "P4-T17"]
-  batch_2: ["P4-T2", "P4-T5", "P4-T6", "P4-T9", "P4-T10", "P4-T14", "P4-T15"]
-  batch_3: ["P4-T18"]
-  batch_4: ["P4-T19"]
-  critical_path: ["P4-T4", "P4-T5", "P4-T18", "P4-T19"]
-  estimated_total_time: "20 pts (4 batches)"
-
+  batch_1:
+  - P4-T1
+  - P4-T3
+  - P4-T4
+  - P4-T7
+  - P4-T8
+  - P4-T11
+  - P4-T12
+  - P4-T13
+  - P4-T16
+  - P4-T17
+  batch_2:
+  - P4-T2
+  - P4-T5
+  - P4-T6
+  - P4-T9
+  - P4-T10
+  - P4-T14
+  - P4-T15
+  batch_3:
+  - P4-T18
+  batch_4:
+  - P4-T19
+  critical_path:
+  - P4-T4
+  - P4-T5
+  - P4-T18
+  - P4-T19
+  estimated_total_time: 20 pts (4 batches)
 blockers:
-  - "Frontend dependency install blocked by restricted network (ENOTFOUND registry.npmjs.org), preventing Jest and Playwright execution."
-
+- Frontend dependency install blocked by restricted network (ENOTFOUND registry.npmjs.org),
+  preventing Jest and Playwright execution.
 success_criteria:
-  - { id: "SC-1", description: "FileWatcher monitors all profile roots; cache invalidation working for all platforms", status: "completed" }
-  - { id: "SC-2", description: "Platform detection on import working; artifacts tagged with source platform", status: "completed" }
-  - { id: "SC-3", description: "Deploy dialog renders profile selector; form includes profile ID", status: "completed" }
-  - { id: "SC-4", description: "--all-profiles checkbox/flag works; artifacts deploy to all profiles", status: "completed" }
-  - { id: "SC-5", description: "Deployment status component shows per-profile breakdown correctly", status: "completed" }
-  - { id: "SC-6", description: "Cross-platform sync comparison UI renders and highlights mismatches", status: "completed" }
-  - { id: "SC-7", description: "Artifact filtering by target_platforms working in search/list", status: "completed" }
-  - { id: "SC-8", description: "Profile management UI allows creating/editing profiles", status: "completed" }
-  - { id: "SC-9", description: "Hooks exported in hooks/index.ts and documented", status: "completed" }
-  - { id: "SC-10", description: "Frontend types match backend API contracts", status: "completed" }
-  - { id: "SC-11", description: "All integration and E2E tests passing", status: "in_progress" }
-  - { id: "SC-12", description: "Accessibility audit passed for new UI components", status: "pending" }
-
+- id: SC-1
+  description: FileWatcher monitors all profile roots; cache invalidation working
+    for all platforms
+  status: completed
+- id: SC-2
+  description: Platform detection on import working; artifacts tagged with source
+    platform
+  status: completed
+- id: SC-3
+  description: Deploy dialog renders profile selector; form includes profile ID
+  status: completed
+- id: SC-4
+  description: --all-profiles checkbox/flag works; artifacts deploy to all profiles
+  status: completed
+- id: SC-5
+  description: Deployment status component shows per-profile breakdown correctly
+  status: completed
+- id: SC-6
+  description: Cross-platform sync comparison UI renders and highlights mismatches
+  status: completed
+- id: SC-7
+  description: Artifact filtering by target_platforms working in search/list
+  status: completed
+- id: SC-8
+  description: Profile management UI allows creating/editing profiles
+  status: completed
+- id: SC-9
+  description: Hooks exported in hooks/index.ts and documented
+  status: completed
+- id: SC-10
+  description: Frontend types match backend API contracts
+  status: completed
+- id: SC-11
+  description: All integration and E2E tests passing
+  status: in_progress
+- id: SC-12
+  description: Accessibility audit passed for new UI components
+  status: pending
 files_modified:
-  - "skillmeat/cache/watcher.py"
-  - "skillmeat/api/routers/deployments.py"
-  - "skillmeat/api/routers/projects.py"
-  - "skillmeat/web/components/profile-selector.tsx"
-  - "skillmeat/web/components/platform-badge.tsx"
-  - "skillmeat/web/components/deployment-status-profile-view.tsx"
-  - "skillmeat/web/components/sync-comparison-view.tsx"
-  - "skillmeat/web/components/collection/deploy-dialog.tsx"
-  - "skillmeat/web/components/templates/template-deploy-wizard.tsx"
-  - "skillmeat/web/components/artifact-list.tsx"
-  - "skillmeat/web/app/projects/[id]/profiles/"
-  - "skillmeat/web/lib/api/deployments.ts"
-  - "skillmeat/web/lib/cli-commands.ts"
-  - "skillmeat/web/hooks/index.ts"
-  - "skillmeat/web/types/deployments.ts"
-  - "skillmeat/web/types/artifact.ts"
+- skillmeat/cache/watcher.py
+- skillmeat/api/routers/deployments.py
+- skillmeat/api/routers/projects.py
+- skillmeat/web/components/profile-selector.tsx
+- skillmeat/web/components/platform-badge.tsx
+- skillmeat/web/components/deployment-status-profile-view.tsx
+- skillmeat/web/components/sync-comparison-view.tsx
+- skillmeat/web/components/collection/deploy-dialog.tsx
+- skillmeat/web/components/templates/template-deploy-wizard.tsx
+- skillmeat/web/components/artifact-list.tsx
+- skillmeat/web/app/projects/[id]/profiles/
+- skillmeat/web/lib/api/deployments.ts
+- skillmeat/web/lib/cli-commands.ts
+- skillmeat/web/hooks/index.ts
+- skillmeat/web/types/deployments.ts
+- skillmeat/web/types/artifact.ts
+schema_version: 2
+doc_type: progress
+feature_slug: multi-platform-project-deployments-v1
 ---
 
 # Phase 4: Discovery, Cache, and UI/UX

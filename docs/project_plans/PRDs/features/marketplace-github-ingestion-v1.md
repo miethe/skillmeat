@@ -1,15 +1,26 @@
 ---
-title: "PRD: GitHub Marketplace Ingestion"
-description: "Ingest GitHub repos (including awesome lists) into Marketplace with auto-scan, manual overrides, and import/update visibility"
-audience: [ai-agents, developers]
-tags: [prd, marketplace, github, ingestion, discovery]
+title: 'PRD: GitHub Marketplace Ingestion'
+description: Ingest GitHub repos (including awesome lists) into Marketplace with auto-scan,
+  manual overrides, and import/update visibility
+audience:
+- ai-agents
+- developers
+tags:
+- prd
+- marketplace
+- github
+- ingestion
+- discovery
 created: 2025-12-03
 updated: 2025-12-15
-category: "product-planning"
+category: product-planning
 status: completed
 related:
-  - /docs/project_plans/SPIKEs/marketplace-github-ingestion-spike.md
-  - /docs/project_plans/PRDs/enhancements/smart-import-discovery-v1.md
+- /docs/project_plans/SPIKEs/marketplace-github-ingestion-spike.md
+- /docs/project_plans/PRDs/enhancements/smart-import-discovery-v1.md
+schema_version: 2
+doc_type: prd
+feature_slug: marketplace-github-ingestion
 ---
 
 # PRD: GitHub Marketplace Ingestion

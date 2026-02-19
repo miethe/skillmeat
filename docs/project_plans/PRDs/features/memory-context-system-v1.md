@@ -23,6 +23,9 @@ related:
 - /docs/project_plans/PRDs/features/agent-context-entities-v1.md
 - /skillmeat/cache/models.py
 - /skillmeat/core/services/context_sync.py
+schema_version: 2
+doc_type: prd
+feature_slug: memory-context-system
 ---
 
 # Feature Brief & Metadata

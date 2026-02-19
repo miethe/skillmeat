@@ -25,6 +25,10 @@ related:
 - /docs/project_plans/implementation_plans/refactors/tag-storage-consolidation-v1.md
 - /docs/project_plans/implementation_plans/refactors/refresh-metadata-extraction-v1.md
 - /docs/project_plans/implementation_plans/refactors/artifact-metadata-cache-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: data-flow-standardization
+prd_ref: null
 ---
 # Implementation Plan: Data Flow Standardization
 

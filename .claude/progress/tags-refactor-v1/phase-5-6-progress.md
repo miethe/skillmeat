@@ -10,148 +10,138 @@ total_tasks: 10
 completed_tasks: 0
 total_story_points: 16
 completed_story_points: 0
-
 tasks:
-  - id: UI-001
-    title: Tag Input Design
-    description: Design tag input component spec (shadcn.io style, not shadcn/ui)
-    status: pending
-    story_points: 2
-    assigned_to:
-      - ui-engineer-enhanced
-    dependencies:
-      - API-005
-    created_at: "2025-12-18"
-
-  - id: UI-002
-    title: Tag Input Component
-    description: Implement TagInput component with all features
-    status: pending
-    story_points: 3
-    assigned_to:
-      - ui-engineer-enhanced
-    dependencies:
-      - UI-001
-    created_at: "2025-12-18"
-
-  - id: UI-003
-    title: Tag Badge Component
-    description: Update Badge component for tag display with colors
-    status: pending
-    story_points: 1
-    assigned_to:
-      - ui-engineer-enhanced
-    dependencies:
-      - UI-002
-    created_at: "2025-12-18"
-
-  - id: UI-004
-    title: Parameter Editor Integration
-    description: Integrate TagInput into ParameterEditorModal
-    status: pending
-    story_points: 2
-    assigned_to:
-      - frontend-developer
-    dependencies:
-      - UI-003
-    created_at: "2025-12-18"
-
-  - id: UI-005
-    title: Tag Display in Detail View
-    description: Show tags on artifact detail view (read-only)
-    status: pending
-    story_points: 1
-    assigned_to:
-      - frontend-developer
-    dependencies:
-      - UI-004
-    created_at: "2025-12-18"
-
-  - id: UI-006
-    title: Accessibility
-    description: Implement WCAG 2.1 AA features
-    status: pending
-    story_points: 1
-    assigned_to:
-      - ui-engineer-enhanced
-    dependencies:
-      - UI-005
-    created_at: "2025-12-18"
-
-  - id: FILTER-001
-    title: Tag Filter Popover
-    description: Create popover showing all tags with artifact counts
-    status: pending
-    story_points: 2
-    assigned_to:
-      - ui-engineer-enhanced
-    dependencies:
-      - UI-006
-    created_at: "2025-12-18"
-
-  - id: FILTER-002
-    title: Tag Filter Button
-    description: Add tag filter button to artifact views (collections, search)
-    status: pending
-    story_points: 2
-    assigned_to:
-      - ui-engineer-enhanced
-    dependencies:
-      - FILTER-001
-    created_at: "2025-12-18"
-
-  - id: FILTER-003
-    title: Filter Integration
-    description: Integrate tag filtering with artifact list queries
-    status: pending
-    story_points: 2
-    assigned_to:
-      - frontend-developer
-    dependencies:
-      - FILTER-002
-    created_at: "2025-12-18"
-
-  - id: FILTER-004
-    title: Dashboard Tags Widget
-    description: Add tag metrics to analytics dashboard
-    status: pending
-    story_points: 2
-    assigned_to:
-      - frontend-developer
-    dependencies:
-      - FILTER-003
-    created_at: "2025-12-18"
-
+- id: UI-001
+  title: Tag Input Design
+  description: Design tag input component spec (shadcn.io style, not shadcn/ui)
+  status: pending
+  story_points: 2
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - API-005
+  created_at: '2025-12-18'
+- id: UI-002
+  title: Tag Input Component
+  description: Implement TagInput component with all features
+  status: pending
+  story_points: 3
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - UI-001
+  created_at: '2025-12-18'
+- id: UI-003
+  title: Tag Badge Component
+  description: Update Badge component for tag display with colors
+  status: pending
+  story_points: 1
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - UI-002
+  created_at: '2025-12-18'
+- id: UI-004
+  title: Parameter Editor Integration
+  description: Integrate TagInput into ParameterEditorModal
+  status: pending
+  story_points: 2
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - UI-003
+  created_at: '2025-12-18'
+- id: UI-005
+  title: Tag Display in Detail View
+  description: Show tags on artifact detail view (read-only)
+  status: pending
+  story_points: 1
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - UI-004
+  created_at: '2025-12-18'
+- id: UI-006
+  title: Accessibility
+  description: Implement WCAG 2.1 AA features
+  status: pending
+  story_points: 1
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - UI-005
+  created_at: '2025-12-18'
+- id: FILTER-001
+  title: Tag Filter Popover
+  description: Create popover showing all tags with artifact counts
+  status: pending
+  story_points: 2
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - UI-006
+  created_at: '2025-12-18'
+- id: FILTER-002
+  title: Tag Filter Button
+  description: Add tag filter button to artifact views (collections, search)
+  status: pending
+  story_points: 2
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - FILTER-001
+  created_at: '2025-12-18'
+- id: FILTER-003
+  title: Filter Integration
+  description: Integrate tag filtering with artifact list queries
+  status: pending
+  story_points: 2
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - FILTER-002
+  created_at: '2025-12-18'
+- id: FILTER-004
+  title: Dashboard Tags Widget
+  description: Add tag metrics to analytics dashboard
+  status: pending
+  story_points: 2
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - FILTER-003
+  created_at: '2025-12-18'
 parallelization:
   batch_1:
-    - UI-001
+  - UI-001
   batch_2:
-    - UI-002
+  - UI-002
   batch_3:
-    - UI-003
+  - UI-003
   batch_4:
-    - UI-004
+  - UI-004
   batch_5:
-    - UI-005
+  - UI-005
   batch_6:
-    - UI-006
+  - UI-006
   batch_7:
-    - FILTER-001
+  - FILTER-001
   batch_8:
-    - FILTER-002
+  - FILTER-002
   batch_9:
-    - FILTER-003
+  - FILTER-003
   batch_10:
-    - FILTER-004
-
+  - FILTER-004
 context_files:
-  - skillmeat/web/components/
-  - skillmeat/web/hooks/
-  - skillmeat/web/lib/api/
-
+- skillmeat/web/components/
+- skillmeat/web/hooks/
+- skillmeat/web/lib/api/
 blockers: []
-notes: "Frontend implementation for tags system. Phases 5-6 build UI components and filtering. Depends on API-005 completion."
-
+notes: Frontend implementation for tags system. Phases 5-6 build UI components and
+  filtering. Depends on API-005 completion.
+schema_version: 2
+doc_type: progress
+feature_slug: tags-refactor-v1
 ---
 
 # Phases 5-6: Frontend Implementation

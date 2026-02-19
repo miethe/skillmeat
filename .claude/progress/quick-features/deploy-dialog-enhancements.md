@@ -4,8 +4,11 @@ status: completed
 created: 2026-02-10
 scope: frontend-only
 files_affected:
-  - skillmeat/web/app/projects/[id]/manage/components/deploy-from-collection-dialog.tsx
-  - skillmeat/web/app/projects/[id]/manage/page.tsx
+- skillmeat/web/app/projects/[id]/manage/components/deploy-from-collection-dialog.tsx
+- skillmeat/web/app/projects/[id]/manage/page.tsx
+schema_version: 2
+doc_type: quick_feature
+feature_slug: deploy-dialog-enhancements
 ---
 
 # Deploy from Collection Dialog Enhancements

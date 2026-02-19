@@ -19,6 +19,9 @@ status: inferred_complete
 related:
 - /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
 - /docs/project_plans/artifact-version-tracking-sync-prd.md
+schema_version: 2
+doc_type: prd
+feature_slug: web-ui-consolidation
 ---
 # PRD: Web UI Consolidation & Enhancements
 

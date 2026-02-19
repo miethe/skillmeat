@@ -1,18 +1,22 @@
 ---
 type: context
-prd: "memory-extraction-pipeline-v2"
-title: "Memory Extraction Pipeline v2 - Development Context"
-status: "active"
-created: "2026-02-07"
-updated: "2026-02-07"
-
+prd: memory-extraction-pipeline-v2
+title: Memory Extraction Pipeline v2 - Development Context
+status: active
+created: '2026-02-07'
+updated: '2026-02-07'
 critical_notes_count: 2
 implementation_decisions_count: 1
 active_gotchas_count: 2
-agent_contributors: ["opus-orchestrator"]
-
+agent_contributors:
+- opus-orchestrator
 agents:
-  - { agent: "opus-orchestrator", note_count: 5, last_contribution: "2026-02-07" }
+- agent: opus-orchestrator
+  note_count: 5
+  last_contribution: '2026-02-07'
+schema_version: 2
+doc_type: context
+feature_slug: memory-extraction-pipeline-v2
 ---
 
 # Memory Extraction Pipeline v2 - Development Context

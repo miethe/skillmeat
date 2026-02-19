@@ -1,14 +1,25 @@
 ---
-title: "Context Entities Page Fix - Implementation Plan"
-description: "Fix broken context entities page: entity type display, form visibility, and design consistency"
-audience: [ai-agents, developers]
-tags: [bug-fix, frontend, context-entities, ui]
+title: Context Entities Page Fix - Implementation Plan
+description: 'Fix broken context entities page: entity type display, form visibility,
+  and design consistency'
+audience:
+- ai-agents
+- developers
+tags:
+- bug-fix
+- frontend
+- context-entities
+- ui
 created: 2025-12-20
 updated: 2025-12-20
-category: "bug-fix"
+category: bug-fix
 status: in-progress
 related:
-  - /docs/dev/designs/screenshots/context-entities-v1.png
+- /docs/dev/designs/screenshots/context-entities-v1.png
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: context-entities-page-fix
+prd_ref: null
 ---
 
 # Context Entities Page Fix - Implementation Plan

@@ -20,6 +20,10 @@ total_effort: 8-12 hours
 related:
 - /docs/project_plans/implementation_plans/refactors/tag-storage-consolidation-v1.md
 - /docs/project_plans/implementation_plans/enhancements/tags-refactor-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: tag-management-architecture-fix
+prd_ref: null
 ---
 # Implementation Plan: Tag Management Architecture Fix
 

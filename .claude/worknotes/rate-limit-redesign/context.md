@@ -1,9 +1,12 @@
 ---
 type: context
-prd: "rate-limit-redesign"
-request_log: "REQ-20260128-skillmeat"
+prd: rate-limit-redesign
+request_log: REQ-20260128-skillmeat
 created: 2026-01-31
 updated: 2026-01-31
+schema_version: 2
+doc_type: context
+feature_slug: rate-limit-redesign
 ---
 
 # Rate Limit Redesign - Context

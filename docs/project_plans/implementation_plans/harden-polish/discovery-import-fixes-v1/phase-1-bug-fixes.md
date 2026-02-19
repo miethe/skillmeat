@@ -8,6 +8,11 @@ duration: 2 weeks
 effort: 12-16 story points
 priority: CRITICAL
 status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: discovery-import-fixes
+prd_ref: null
+plan_ref: null
 ---
 # Phase 1: Bug Fixes & Stabilization
 

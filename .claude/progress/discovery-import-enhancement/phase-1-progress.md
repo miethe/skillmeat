@@ -1,135 +1,170 @@
 ---
 type: progress
-prd: "discovery-import-enhancement"
+prd: discovery-import-enhancement
 phase: 1
-title: "Backend - Import Status Logic & Pre-scan"
-status: "completed"
-started: "2025-12-04"
-completed: "2025-12-04"
-
+title: Backend - Import Status Logic & Pre-scan
+status: completed
+started: '2025-12-04'
+completed: '2025-12-04'
 overall_progress: 100
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 9
 completed_tasks: 9
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer", "data-layer-expert"]
-contributors: ["testing-specialist", "backend-architect"]
-
+owners:
+- python-backend-engineer
+- data-layer-expert
+contributors:
+- testing-specialist
+- backend-architect
 tasks:
-  - id: "DIS-1.1"
-    description: "Update ImportResult schema - change success:bool to status enum (success/skipped/failed) + add skip_reason field"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "2d"
-    priority: "critical"
-
-  - id: "DIS-1.2"
-    description: "Implement pre-scan check in ArtifactDiscoveryService for Collection & Project existence verification"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "1.5d"
-    priority: "critical"
-
-  - id: "DIS-1.3"
-    description: "Update ArtifactDiscoveryService.discover() to filter results using pre-scan check; implement early return for 0 importable artifacts"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DIS-1.2"]
-    estimated_effort: "1.5d"
-    priority: "critical"
-
-  - id: "DIS-1.4"
-    description: "Implement status determination logic (success/skipped/failed) based on artifact location and import outcome"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DIS-1.1"]
-    estimated_effort: "1.5d"
-    priority: "critical"
-
-  - id: "DIS-1.5"
-    description: "Update BulkImportResult schema - add skipped_count and per-location import counts (collection vs project)"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["DIS-1.1"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-1.6"
-    description: "Update all discovery/import API endpoints to use new schemas; verify OpenAPI documentation"
-    status: "completed"
-    assigned_to: ["backend-architect"]
-    dependencies: ["DIS-1.1", "DIS-1.5"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-1.7"
-    description: "Unit tests for pre-scan logic - all combinations (artifact in Collection only, Project only, both, neither) and error cases"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: ["DIS-1.2", "DIS-1.3"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-1.8"
-    description: "Unit tests for status enum determination - all scenarios (success adds, skipped exists, failed error)"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: ["DIS-1.4"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-1.9"
-    description: "Integration tests for full discovery flow - scan → pre-check → filter → return with new status enum"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: ["DIS-1.1", "DIS-1.3", "DIS-1.4", "DIS-1.6"]
-    estimated_effort: "1d"
-    priority: "high"
-
+- id: DIS-1.1
+  description: Update ImportResult schema - change success:bool to status enum (success/skipped/failed)
+    + add skip_reason field
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 2d
+  priority: critical
+- id: DIS-1.2
+  description: Implement pre-scan check in ArtifactDiscoveryService for Collection
+    & Project existence verification
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 1.5d
+  priority: critical
+- id: DIS-1.3
+  description: Update ArtifactDiscoveryService.discover() to filter results using
+    pre-scan check; implement early return for 0 importable artifacts
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DIS-1.2
+  estimated_effort: 1.5d
+  priority: critical
+- id: DIS-1.4
+  description: Implement status determination logic (success/skipped/failed) based
+    on artifact location and import outcome
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DIS-1.1
+  estimated_effort: 1.5d
+  priority: critical
+- id: DIS-1.5
+  description: Update BulkImportResult schema - add skipped_count and per-location
+    import counts (collection vs project)
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DIS-1.1
+  estimated_effort: 1d
+  priority: high
+- id: DIS-1.6
+  description: Update all discovery/import API endpoints to use new schemas; verify
+    OpenAPI documentation
+  status: completed
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - DIS-1.1
+  - DIS-1.5
+  estimated_effort: 1d
+  priority: high
+- id: DIS-1.7
+  description: Unit tests for pre-scan logic - all combinations (artifact in Collection
+    only, Project only, both, neither) and error cases
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies:
+  - DIS-1.2
+  - DIS-1.3
+  estimated_effort: 1d
+  priority: high
+- id: DIS-1.8
+  description: Unit tests for status enum determination - all scenarios (success adds,
+    skipped exists, failed error)
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies:
+  - DIS-1.4
+  estimated_effort: 1d
+  priority: high
+- id: DIS-1.9
+  description: "Integration tests for full discovery flow - scan \u2192 pre-check\
+    \ \u2192 filter \u2192 return with new status enum"
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies:
+  - DIS-1.1
+  - DIS-1.3
+  - DIS-1.4
+  - DIS-1.6
+  estimated_effort: 1d
+  priority: high
 parallelization:
-  batch_1: ["DIS-1.1", "DIS-1.2"]
-  batch_2: ["DIS-1.3", "DIS-1.4", "DIS-1.5"]
-  batch_3: ["DIS-1.6"]
-  batch_4: ["DIS-1.7", "DIS-1.8"]
-  batch_5: ["DIS-1.9"]
-  critical_path: ["DIS-1.1", "DIS-1.4", "DIS-1.6", "DIS-1.9"]
-  estimated_total_time: "8-10 days"
-
+  batch_1:
+  - DIS-1.1
+  - DIS-1.2
+  batch_2:
+  - DIS-1.3
+  - DIS-1.4
+  - DIS-1.5
+  batch_3:
+  - DIS-1.6
+  batch_4:
+  - DIS-1.7
+  - DIS-1.8
+  batch_5:
+  - DIS-1.9
+  critical_path:
+  - DIS-1.1
+  - DIS-1.4
+  - DIS-1.6
+  - DIS-1.9
+  estimated_total_time: 8-10 days
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "All ImportResult usages updated to use status enum (0 remaining success:bool)"
-    status: "pending"
-  - id: "SC-2"
-    description: "Pre-scan check performance <2 seconds on typical project (500 Collection, 200 Project artifacts)"
-    status: "pending"
-  - id: "SC-3"
-    description: "Import status determination tests pass (all scenarios covered)"
-    status: "pending"
-  - id: "SC-4"
-    description: "Discovery endpoint returns filtered results with new schema"
-    status: "pending"
-  - id: "SC-5"
-    description: "Unit test coverage >80% for pre-scan and status mapping logic"
-    status: "pending"
-  - id: "SC-6"
-    description: "Integration tests pass: discovery → import → result"
-    status: "pending"
-
+- id: SC-1
+  description: All ImportResult usages updated to use status enum (0 remaining success:bool)
+  status: pending
+- id: SC-2
+  description: Pre-scan check performance <2 seconds on typical project (500 Collection,
+    200 Project artifacts)
+  status: pending
+- id: SC-3
+  description: Import status determination tests pass (all scenarios covered)
+  status: pending
+- id: SC-4
+  description: Discovery endpoint returns filtered results with new schema
+  status: pending
+- id: SC-5
+  description: Unit test coverage >80% for pre-scan and status mapping logic
+  status: pending
+- id: SC-6
+  description: "Integration tests pass: discovery \u2192 import \u2192 result"
+  status: pending
 files_modified:
-  - "skillmeat/api/schemas/discovery.py"
-  - "skillmeat/core/discovery.py"
-  - "skillmeat/core/importer.py"
-  - "skillmeat/api/routers/artifacts.py"
-  - "tests/core/test_discovery_prescan.py"
-  - "tests/core/test_import_status_enum.py"
+- skillmeat/api/schemas/discovery.py
+- skillmeat/core/discovery.py
+- skillmeat/core/importer.py
+- skillmeat/api/routers/artifacts.py
+- tests/core/test_discovery_prescan.py
+- tests/core/test_import_status_enum.py
+schema_version: 2
+doc_type: progress
+feature_slug: discovery-import-enhancement
 ---
 
 # Discovery & Import Enhancement - Phase 1: Backend - Import Status Logic & Pre-scan

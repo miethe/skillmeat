@@ -1,21 +1,25 @@
 ---
-title: "TASK-2.4: Sync Version Tracking Implementation"
-description: Completed implementation of version tracking for sync operations. Automatically creates ArtifactVersion records with parent hash tracking and lineage management.
+title: 'TASK-2.4: Sync Version Tracking Implementation'
+description: Completed implementation of version tracking for sync operations. Automatically
+  creates ArtifactVersion records with parent hash tracking and lineage management.
 phase: 2
 status: complete
 category: implementation-completed
 audience: developers
 tags:
-  - sync-versioning
-  - version-lineage
-  - artifact-tracking
-  - implementation-complete
-  - phase-2
+- sync-versioning
+- version-lineage
+- artifact-tracking
+- implementation-complete
+- phase-2
 created: 2025-12-17
 updated: 2025-12-18
 related_documents:
-  - versioning-analysis-index.md
-  - integration-points.md
+- versioning-analysis-index.md
+- integration-points.md
+schema_version: 2
+doc_type: prd
+feature_slug: task-2-4-implementation
 ---
 
 # TASK-2.4: Sync Version Tracking Implementation

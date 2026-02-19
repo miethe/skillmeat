@@ -1,163 +1,200 @@
 ---
 type: progress
-prd: "marketplace-source-detection-improvements"
+prd: marketplace-source-detection-improvements
 phase: 2
-phase_name: "Backend Detection Engine"
+phase_name: Backend Detection Engine
 status: completed
 progress: 100
 total_tasks: 18
 completed_tasks: 18
-effort: "20-30 pts"
+effort: 20-30 pts
 created: 2026-01-05
 updated: 2026-01-05
 completed_at: 2026-01-05
-
-assigned_to: ["python-backend-engineer"]
-dependencies: [1]
-
+assigned_to:
+- python-backend-engineer
+dependencies:
+- 1
 tasks:
-  # Manual Mapping (5 tasks)
-  - id: "P2.1a"
-    name: "Update detector signature"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1.4"]
-    effort: "2 pts"
-
-  - id: "P2.1b"
-    name: "Implement directory matching"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.1a"]
-    effort: "5 pts"
-
-  - id: "P2.1c"
-    name: "Apply hierarchical inheritance"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.1b"]
-    effort: "3 pts"
-
-  - id: "P2.1d"
-    name: "Set confidence scoring"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.1c"]
-    effort: "2 pts"
-
-  - id: "P2.1e"
-    name: "Unit tests for mapping"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.1d"]
-    effort: "3 pts"
-
-  # Content Hashing (4 tasks)
-  - id: "P2.2a"
-    name: "Implement SHA256 hashing"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1.4"]
-    effort: "3 pts"
-
-  - id: "P2.2b"
-    name: "Add hash caching"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.2a"]
-    effort: "2 pts"
-
-  - id: "P2.2c"
-    name: "Add file size limit"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.2a"]
-    effort: "2 pts"
-
-  - id: "P2.2d"
-    name: "Unit tests for hashing"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.2b", "P2.2c"]
-    effort: "3 pts"
-
-  # Deduplication (5 tasks)
-  - id: "P2.3a"
-    name: "Create DeduplicationEngine class"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.2a"]
-    effort: "4 pts"
-
-  - id: "P2.3b"
-    name: "Implement within-source dedup"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.3a"]
-    effort: "4 pts"
-
-  - id: "P2.3c"
-    name: "Implement cross-source dedup"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.3b"]
-    effort: "4 pts"
-
-  - id: "P2.3d"
-    name: "Implement exclusion marking"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.3c"]
-    effort: "2 pts"
-
-  - id: "P2.3e"
-    name: "Unit tests for dedup"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.3d"]
-    effort: "4 pts"
-
-  # Integration (4 tasks)
-  - id: "P2.4a"
-    name: "Wire into scan workflow"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.1e", "P2.3e"]
-    effort: "3 pts"
-
-  - id: "P2.4b"
-    name: "Return dedup counts"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.4a"]
-    effort: "2 pts"
-
-  - id: "P2.4c"
-    name: "Integration tests"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.4b"]
-    effort: "3 pts"
-
-  - id: "P2.4d"
-    name: "Performance validation"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2.4c"]
-    effort: "2 pts"
-
+- id: P2.1a
+  name: Update detector signature
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1.4
+  effort: 2 pts
+- id: P2.1b
+  name: Implement directory matching
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.1a
+  effort: 5 pts
+- id: P2.1c
+  name: Apply hierarchical inheritance
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.1b
+  effort: 3 pts
+- id: P2.1d
+  name: Set confidence scoring
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.1c
+  effort: 2 pts
+- id: P2.1e
+  name: Unit tests for mapping
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.1d
+  effort: 3 pts
+- id: P2.2a
+  name: Implement SHA256 hashing
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1.4
+  effort: 3 pts
+- id: P2.2b
+  name: Add hash caching
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.2a
+  effort: 2 pts
+- id: P2.2c
+  name: Add file size limit
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.2a
+  effort: 2 pts
+- id: P2.2d
+  name: Unit tests for hashing
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.2b
+  - P2.2c
+  effort: 3 pts
+- id: P2.3a
+  name: Create DeduplicationEngine class
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.2a
+  effort: 4 pts
+- id: P2.3b
+  name: Implement within-source dedup
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.3a
+  effort: 4 pts
+- id: P2.3c
+  name: Implement cross-source dedup
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.3b
+  effort: 4 pts
+- id: P2.3d
+  name: Implement exclusion marking
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.3c
+  effort: 2 pts
+- id: P2.3e
+  name: Unit tests for dedup
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.3d
+  effort: 4 pts
+- id: P2.4a
+  name: Wire into scan workflow
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.1e
+  - P2.3e
+  effort: 3 pts
+- id: P2.4b
+  name: Return dedup counts
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.4a
+  effort: 2 pts
+- id: P2.4c
+  name: Integration tests
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.4b
+  effort: 3 pts
+- id: P2.4d
+  name: Performance validation
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2.4c
+  effort: 2 pts
 parallelization:
-  batch_1: ["P2.1a", "P2.2a"]
-  batch_2: ["P2.1b", "P2.2b", "P2.2c"]
-  batch_3: ["P2.1c", "P2.2d", "P2.3a"]
-  batch_4: ["P2.1d", "P2.3b"]
-  batch_5: ["P2.1e", "P2.3c"]
-  batch_6: ["P2.3d"]
-  batch_7: ["P2.3e"]
-  batch_8: ["P2.4a"]
-  batch_9: ["P2.4b"]
-  batch_10: ["P2.4c"]
-  batch_11: ["P2.4d"]
+  batch_1:
+  - P2.1a
+  - P2.2a
+  batch_2:
+  - P2.1b
+  - P2.2b
+  - P2.2c
+  batch_3:
+  - P2.1c
+  - P2.2d
+  - P2.3a
+  batch_4:
+  - P2.1d
+  - P2.3b
+  batch_5:
+  - P2.1e
+  - P2.3c
+  batch_6:
+  - P2.3d
+  batch_7:
+  - P2.3e
+  batch_8:
+  - P2.4a
+  batch_9:
+  - P2.4b
+  batch_10:
+  - P2.4c
+  batch_11:
+  - P2.4d
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-source-detection-improvements
 ---
 
 # Phase 2: Backend Detection Engine

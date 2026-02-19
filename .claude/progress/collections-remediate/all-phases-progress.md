@@ -1,7 +1,7 @@
 ---
 type: progress
-prd: "collections-remediate"
-phase: "all"
+prd: collections-remediate
+phase: all
 status: pending
 progress: 0
 total_tasks: 10
@@ -9,93 +9,117 @@ completed_tasks: 0
 effort_points: 8
 created: 2025-12-21
 updated: 2025-12-21
-
 tasks:
-  # Phase 1: Collection Filtering Fix (3 pts)
-  - id: "TASK-1.1"
-    title: "Update page.tsx to use conditional hook"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    effort: "2h"
-    phase: 1
-  - id: "TASK-1.2"
-    title: "Handle loading states"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-1.1"]
-    effort: "30m"
-    phase: 1
-  - id: "TASK-1.3"
-    title: "Handle empty state"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-1.1"]
-    effort: "30m"
-    phase: 1
-
-  # Phase 2: Modal Collections Tab Fix (3 pts)
-  - id: "TASK-2.1"
-    title: "Update Entity type"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    effort: "15m"
-    phase: 2
-  - id: "TASK-2.2"
-    title: "Fix artifactToEntity conversion"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.1"]
-    effort: "30m"
-    phase: 2
-  - id: "TASK-2.3"
-    title: "Update modal Collections tab"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.2"]
-    effort: "1h"
-    phase: 2
-  - id: "TASK-2.4"
-    title: "Add/remove collection from tab"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.3"]
-    effort: "1h"
-    phase: 2
-
-  # Phase 3: Testing & Polish (2 pts)
-  - id: "TASK-3.1"
-    title: "Manual E2E testing"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-1.3", "TASK-2.4"]
-    effort: "1h"
-    phase: 3
-  - id: "TASK-3.2"
-    title: "Edge case handling"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.1"]
-    effort: "30m"
-    phase: 3
-  - id: "TASK-3.3"
-    title: "Update unit tests"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.1"]
-    effort: "30m"
-    phase: 3
-
+- id: TASK-1.1
+  title: Update page.tsx to use conditional hook
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  effort: 2h
+  phase: 1
+- id: TASK-1.2
+  title: Handle loading states
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-1.1
+  effort: 30m
+  phase: 1
+- id: TASK-1.3
+  title: Handle empty state
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-1.1
+  effort: 30m
+  phase: 1
+- id: TASK-2.1
+  title: Update Entity type
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  effort: 15m
+  phase: 2
+- id: TASK-2.2
+  title: Fix artifactToEntity conversion
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.1
+  effort: 30m
+  phase: 2
+- id: TASK-2.3
+  title: Update modal Collections tab
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.2
+  effort: 1h
+  phase: 2
+- id: TASK-2.4
+  title: Add/remove collection from tab
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.3
+  effort: 1h
+  phase: 2
+- id: TASK-3.1
+  title: Manual E2E testing
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-1.3
+  - TASK-2.4
+  effort: 1h
+  phase: 3
+- id: TASK-3.2
+  title: Edge case handling
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.1
+  effort: 30m
+  phase: 3
+- id: TASK-3.3
+  title: Update unit tests
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.1
+  effort: 30m
+  phase: 3
 parallelization:
-  batch_1: ["TASK-1.1", "TASK-2.1"]  # Phase 1 & 2 starts (independent)
-  batch_2: ["TASK-1.2", "TASK-1.3", "TASK-2.2"]  # After batch_1
-  batch_3: ["TASK-2.3"]  # After TASK-2.2
-  batch_4: ["TASK-2.4"]  # After TASK-2.3
-  batch_5: ["TASK-3.1"]  # After Phase 1 & 2 complete
-  batch_6: ["TASK-3.2", "TASK-3.3"]  # After TASK-3.1
-
+  batch_1:
+  - TASK-1.1
+  - TASK-2.1
+  batch_2:
+  - TASK-1.2
+  - TASK-1.3
+  - TASK-2.2
+  batch_3:
+  - TASK-2.3
+  batch_4:
+  - TASK-2.4
+  batch_5:
+  - TASK-3.1
+  batch_6:
+  - TASK-3.2
+  - TASK-3.3
 blockers: []
+schema_version: 2
+doc_type: progress
+feature_slug: collections-remediate
 ---
 
 # Collections Remediation - Progress Tracking

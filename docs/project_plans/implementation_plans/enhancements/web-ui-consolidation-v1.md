@@ -16,6 +16,10 @@ category: product-planning
 status: inferred_complete
 related:
 - /docs/project_plans/PRDs/enhancements/web-ui-consolidation-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: web-ui-consolidation
+prd_ref: null
 ---
 # Implementation Plan: Web UI Consolidation & Enhancements
 

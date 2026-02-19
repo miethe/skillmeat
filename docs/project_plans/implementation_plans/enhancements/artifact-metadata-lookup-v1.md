@@ -17,6 +17,10 @@ status: inferred_complete
 related:
 - skillmeat/api/routers/user_collections.py (lines 668-688)
 - skillmeat/cache/models.py (Artifact, MarketplaceCatalogEntry models)
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: artifact-metadata-lookup
+prd_ref: null
 ---
 # Implementation Plan: Artifact Metadata Lookup Service
 

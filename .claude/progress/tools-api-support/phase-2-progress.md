@@ -112,6 +112,9 @@ files_modified:
 - tests/
 progress: 100
 updated: '2026-02-02'
+schema_version: 2
+doc_type: progress
+feature_slug: tools-api-support
 ---
 
 # tools-api-support - Phase 2: Cache Population & API Wiring

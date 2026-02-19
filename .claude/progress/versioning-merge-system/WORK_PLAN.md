@@ -1,110 +1,133 @@
 ---
 prd: versioning-merge-system
 total_phases: 11
-priority_phases: [5, 6, 4, 7, 10, 11]  # Complete core, then API/frontend, then integration
-skip_phases: []  # None - all phases needed
+priority_phases:
+- 5
+- 6
+- 4
+- 7
+- 10
+- 11
+skip_phases: []
 estimated_total_effort: 40h
 last_updated: 2025-12-17
-
 phase_execution_order:
-  # Core Backend (finish foundation)
-  - phase: 5
-    status: complete
-    effort: 0h
-    priority: critical
-    reason: "Three-way merge engine complete with all tests"
-
-  - phase: 6
-    status: complete
-    effort: 0h
-    priority: critical
-    reason: "Intelligent rollback and VersionMergeService implemented"
-    blocks: []
-
-  - phase: 4
-    status: complete
-    effort: 0h
-    priority: high
-    reason: "Auto-capture hooks and pagination implemented"
-    blocks: []
-
-  - phase: 1
-    status: partial
-    effort: 2h
-    priority: medium
-    reason: "Storage schema completeness (optional - tarball works)"
-    blocks: []
-
-  - phase: 2
-    status: partial
-    effort: 3h
-    priority: medium
-    reason: "Repository abstraction for cleaner separation"
-    blocks: []
-
-  - phase: 3
-    status: partial
-    effort: 3h
-    priority: medium
-    reason: "Retention policies and lineage queries"
-    blocks: []
-
-  # API Layer
-  - phase: 7
-    status: complete
-    effort: 0h
-    priority: high
-    reason: "REST API for version/merge operations complete"
-    depends_on: [4, 6]
-    blocks: [8, 9]
-    notes: "Routers: versions.py, merge.py. Endpoints: /analyze, /preview, /execute, /resolve"
-
-  # Frontend
-  - phase: 8
-    status: complete
-    effort: 0h
-    priority: medium
-    reason: "History tab UI complete"
-    depends_on: [7]
-    notes: "Components: VersionTimeline, RollbackDialog, VersionComparisonView, SnapshotHistoryTab, SnapshotMetadata"
-
-  - phase: 9
-    status: complete
-    effort: 0h
-    priority: medium
-    reason: "Merge conflict resolution UI complete"
-    depends_on: [7]
-    notes: "10 components: MergeWorkflowDialog, ConflictList, ConflictResolver, ColoredDiffViewer, etc."
-
-  # Integration & Polish
-  - phase: 10
-    status: complete
-    effort: 0h
-    priority: high
-    reason: "Sync integration complete - all backend wired, minor UI gap documented"
-    depends_on: [4, 6]
-    notes: "95% complete. Backend: three-way merge, auto-snapshot, rollback all working. Frontend: minor gap - merge button in SyncStatusTab shows 'Coming Soon' due to snapshot ID vs version string mismatch."
-
-  - phase: 11
-    status: partial
-    effort: 2h
-    priority: medium
-    reason: "Documentation complete, tests remaining"
-    depends_on: [7, 8, 9, 10]
-    notes: "All 6 documentation tasks complete (2025-12-17). Unit/E2E tests deferred."
-
+- phase: 5
+  status: complete
+  effort: 0h
+  priority: critical
+  reason: Three-way merge engine complete with all tests
+- phase: 6
+  status: complete
+  effort: 0h
+  priority: critical
+  reason: Intelligent rollback and VersionMergeService implemented
+  blocks: []
+- phase: 4
+  status: complete
+  effort: 0h
+  priority: high
+  reason: Auto-capture hooks and pagination implemented
+  blocks: []
+- phase: 1
+  status: partial
+  effort: 2h
+  priority: medium
+  reason: Storage schema completeness (optional - tarball works)
+  blocks: []
+- phase: 2
+  status: partial
+  effort: 3h
+  priority: medium
+  reason: Repository abstraction for cleaner separation
+  blocks: []
+- phase: 3
+  status: partial
+  effort: 3h
+  priority: medium
+  reason: Retention policies and lineage queries
+  blocks: []
+- phase: 7
+  status: complete
+  effort: 0h
+  priority: high
+  reason: REST API for version/merge operations complete
+  depends_on:
+  - 4
+  - 6
+  blocks:
+  - 8
+  - 9
+  notes: 'Routers: versions.py, merge.py. Endpoints: /analyze, /preview, /execute,
+    /resolve'
+- phase: 8
+  status: complete
+  effort: 0h
+  priority: medium
+  reason: History tab UI complete
+  depends_on:
+  - 7
+  notes: 'Components: VersionTimeline, RollbackDialog, VersionComparisonView, SnapshotHistoryTab,
+    SnapshotMetadata'
+- phase: 9
+  status: complete
+  effort: 0h
+  priority: medium
+  reason: Merge conflict resolution UI complete
+  depends_on:
+  - 7
+  notes: '10 components: MergeWorkflowDialog, ConflictList, ConflictResolver, ColoredDiffViewer,
+    etc.'
+- phase: 10
+  status: complete
+  effort: 0h
+  priority: high
+  reason: Sync integration complete - all backend wired, minor UI gap documented
+  depends_on:
+  - 4
+  - 6
+  notes: '95% complete. Backend: three-way merge, auto-snapshot, rollback all working.
+    Frontend: minor gap - merge button in SyncStatusTab shows ''Coming Soon'' due
+    to snapshot ID vs version string mismatch.'
+- phase: 11
+  status: partial
+  effort: 2h
+  priority: medium
+  reason: Documentation complete, tests remaining
+  depends_on:
+  - 7
+  - 8
+  - 9
+  - 10
+  notes: All 6 documentation tasks complete (2025-12-17). Unit/E2E tests deferred.
 agent_assignments:
-  phase_1: [python-backend-engineer]
-  phase_2: [python-backend-engineer]
-  phase_3: [python-backend-engineer]
-  phase_4: [python-backend-engineer]
-  phase_5: []  # COMPLETE
-  phase_6: [python-backend-engineer, ultrathink-debugger]
-  phase_7: [python-backend-engineer]
-  phase_8: [ui-engineer-enhanced]
-  phase_9: [ui-engineer-enhanced]
-  phase_10: [python-backend-engineer]
-  phase_11: [python-backend-engineer, documentation-writer]
+  phase_1:
+  - python-backend-engineer
+  phase_2:
+  - python-backend-engineer
+  phase_3:
+  - python-backend-engineer
+  phase_4:
+  - python-backend-engineer
+  phase_5: []
+  phase_6:
+  - python-backend-engineer
+  - ultrathink-debugger
+  phase_7:
+  - python-backend-engineer
+  phase_8:
+  - ui-engineer-enhanced
+  phase_9:
+  - ui-engineer-enhanced
+  phase_10:
+  - python-backend-engineer
+  phase_11:
+  - python-backend-engineer
+  - documentation-writer
+schema_version: 2
+doc_type: progress
+feature_slug: versioning-merge-system
+type: progress
 ---
 
 # Versioning & Merge System - Work Plan

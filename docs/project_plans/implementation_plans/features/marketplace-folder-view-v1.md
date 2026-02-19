@@ -17,6 +17,10 @@ category: product-planning
 status: completed
 related:
 - /docs/project_plans/PRDs/features/marketplace-folder-view-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: marketplace-folder-view
+prd_ref: null
 ---
 
 # Implementation Plan: Marketplace Folder View

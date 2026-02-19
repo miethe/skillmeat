@@ -1,5 +1,9 @@
 ---
 status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: agent-context-entities
+prd_ref: null
 ---
 # Implementation Plan: Agent Context Entities v2
 

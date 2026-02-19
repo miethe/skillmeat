@@ -1,104 +1,138 @@
 ---
 type: progress
-prd: "manage-collection-page-refactor"
+prd: manage-collection-page-refactor
 phase: 3
-title: "Modal Separation"
-status: "pending"
+title: Modal Separation
+status: pending
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 6
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["ui-engineer-enhanced", "frontend-developer"]
+owners:
+- ui-engineer-enhanced
+- frontend-developer
 contributors: []
-
 tasks:
-  - id: "MODAL-3.1"
-    description: "Create ArtifactDetailsModal (collection-focused): Overview (default), Contents, Links, Collections, Sources, History tabs (reuse existing data). Includes 'Manage Artifact' button. Upstream summary shown when available."
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["MODAL-3.3"]
-    estimated_effort: "2.5h"
-    priority: "high"
-    model: "opus"
-
-  - id: "MODAL-3.2"
-    description: "Create ArtifactOperationsModal (manage-focused): Overview, Contents, Status (default), Sync Status, Deployments, Version History tabs (reuse existing data). Includes 'Collection Details' button."
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["MODAL-3.3"]
-    estimated_effort: "2.5h"
-    priority: "high"
-    model: "opus"
-
-  - id: "MODAL-3.3"
-    description: "Extract shared modal components: TabNavigation, ModalHeader, TabContent wrapper for reuse across both modals."
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "1h"
-    priority: "high"
-    model: "opus"
-
-  - id: "MODAL-3.4"
-    description: "Update ModalCollectionsTab component with dual-button navigation showing 'View in Collection' and 'Manage Artifact' for each collection."
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "1h"
-    priority: "medium"
-    model: "sonnet"
-
-  - id: "MODAL-3.5"
-    description: "Implement cross-navigation state preservation: URL state includes origin, return navigation possible, modal reopens correctly."
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["MODAL-3.1", "MODAL-3.2"]
-    estimated_effort: "1h"
-    priority: "medium"
-    model: "opus"
-
-  - id: "MODAL-3.6"
-    description: "Integrate modals into respective pages: ArtifactDetailsModal to collection page, ArtifactOperationsModal to manage page."
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["MODAL-3.1", "MODAL-3.2", "MODAL-3.5"]
-    estimated_effort: "1h"
-    priority: "medium"
-    model: "sonnet"
-
+- id: MODAL-3.1
+  description: 'Create ArtifactDetailsModal (collection-focused): Overview (default),
+    Contents, Links, Collections, Sources, History tabs (reuse existing data). Includes
+    ''Manage Artifact'' button. Upstream summary shown when available.'
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - MODAL-3.3
+  estimated_effort: 2.5h
+  priority: high
+  model: opus
+- id: MODAL-3.2
+  description: 'Create ArtifactOperationsModal (manage-focused): Overview, Contents,
+    Status (default), Sync Status, Deployments, Version History tabs (reuse existing
+    data). Includes ''Collection Details'' button.'
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - MODAL-3.3
+  estimated_effort: 2.5h
+  priority: high
+  model: opus
+- id: MODAL-3.3
+  description: 'Extract shared modal components: TabNavigation, ModalHeader, TabContent
+    wrapper for reuse across both modals.'
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 1h
+  priority: high
+  model: opus
+- id: MODAL-3.4
+  description: Update ModalCollectionsTab component with dual-button navigation showing
+    'View in Collection' and 'Manage Artifact' for each collection.
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 1h
+  priority: medium
+  model: sonnet
+- id: MODAL-3.5
+  description: 'Implement cross-navigation state preservation: URL state includes
+    origin, return navigation possible, modal reopens correctly.'
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - MODAL-3.1
+  - MODAL-3.2
+  estimated_effort: 1h
+  priority: medium
+  model: opus
+- id: MODAL-3.6
+  description: 'Integrate modals into respective pages: ArtifactDetailsModal to collection
+    page, ArtifactOperationsModal to manage page.'
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - MODAL-3.1
+  - MODAL-3.2
+  - MODAL-3.5
+  estimated_effort: 1h
+  priority: medium
+  model: sonnet
 parallelization:
-  batch_1: ["MODAL-3.3", "MODAL-3.4"]
-  batch_2: ["MODAL-3.1", "MODAL-3.2"]
-  batch_3: ["MODAL-3.5"]
-  batch_4: ["MODAL-3.6"]
-  critical_path: ["MODAL-3.3", "MODAL-3.1", "MODAL-3.5", "MODAL-3.6"]
-  estimated_total_time: "6-8h"
-
+  batch_1:
+  - MODAL-3.3
+  - MODAL-3.4
+  batch_2:
+  - MODAL-3.1
+  - MODAL-3.2
+  batch_3:
+  - MODAL-3.5
+  batch_4:
+  - MODAL-3.6
+  critical_path:
+  - MODAL-3.3
+  - MODAL-3.1
+  - MODAL-3.5
+  - MODAL-3.6
+  estimated_total_time: 6-8h
 blockers: []
-
 success_criteria:
-  - { id: "SC-3.1", description: "ArtifactDetailsModal shows discovery-focused content (overview/contents/links/collections/sources/history)", status: "pending" }
-  - { id: "SC-3.2", description: "ArtifactOperationsModal shows operations-focused content (status/sync/deployments/version history)", status: "pending" }
-  - { id: "SC-3.3", description: "Cross-navigation buttons present in both modals", status: "pending" }
-  - { id: "SC-3.4", description: "Modals integrate into pages without errors", status: "pending" }
-  - { id: "SC-3.5", description: "All tabs in both modals render and function correctly", status: "pending" }
-
+- id: SC-3.1
+  description: ArtifactDetailsModal shows discovery-focused content (overview/contents/links/collections/sources/history)
+  status: pending
+- id: SC-3.2
+  description: ArtifactOperationsModal shows operations-focused content (status/sync/deployments/version
+    history)
+  status: pending
+- id: SC-3.3
+  description: Cross-navigation buttons present in both modals
+  status: pending
+- id: SC-3.4
+  description: Modals integrate into pages without errors
+  status: pending
+- id: SC-3.5
+  description: All tabs in both modals render and function correctly
+  status: pending
 files_modified:
-  - "skillmeat/web/components/collection/artifact-details-modal.tsx"
-  - "skillmeat/web/components/manage/artifact-operations-modal.tsx"
-  - "skillmeat/web/components/shared/modal-header.tsx"
-  - "skillmeat/web/components/shared/cross-navigation-buttons.tsx"
-  - "skillmeat/web/components/entity/modal-collections-tab.tsx"
-  - "skillmeat/web/app/collection/page.tsx"
-  - "skillmeat/web/app/manage/page.tsx"
+- skillmeat/web/components/collection/artifact-details-modal.tsx
+- skillmeat/web/components/manage/artifact-operations-modal.tsx
+- skillmeat/web/components/shared/modal-header.tsx
+- skillmeat/web/components/shared/cross-navigation-buttons.tsx
+- skillmeat/web/components/entity/modal-collections-tab.tsx
+- skillmeat/web/app/collection/page.tsx
+- skillmeat/web/app/manage/page.tsx
+schema_version: 2
+doc_type: progress
+feature_slug: manage-collection-page-refactor
 ---
 
 # manage-collection-page-refactor - Phase 3: Modal Separation

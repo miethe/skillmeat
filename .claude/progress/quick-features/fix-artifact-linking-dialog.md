@@ -4,11 +4,14 @@ created: 2026-02-13
 completed: 2026-02-13
 feature: Fix ArtifactLinkingDialog - focus borders, alignment, search, advanced filters
 files:
-  - skillmeat/web/components/entity/artifact-linking-dialog.tsx
-  - skillmeat/web/components/ui/tag-filter-popover.tsx (reuse)
-  - skillmeat/web/components/ui/tool-filter-popover.tsx (reuse)
+- skillmeat/web/components/entity/artifact-linking-dialog.tsx
+- skillmeat/web/components/ui/tag-filter-popover.tsx (reuse)
+- skillmeat/web/components/ui/tool-filter-popover.tsx (reuse)
 commits:
-  - 8f84d4ac fix(web): structural fix for ArtifactLinkingDialog overflow
+- 8f84d4ac fix(web): structural fix for ArtifactLinkingDialog overflow
+schema_version: 2
+doc_type: quick_feature
+feature_slug: fix-artifact-linking-dialog
 ---
 
 # Fix ArtifactLinkingDialog

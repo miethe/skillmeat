@@ -25,6 +25,9 @@ related:
 - skillmeat/cache/models.py
 - skillmeat/core/services/memory_extractor_service.py
 - skillmeat/web/components/memory/memory-details-modal.tsx
+schema_version: 2
+doc_type: prd
+feature_slug: memory-anchors-provenance
 ---
 # PRD: Memory Anchors & Rich Provenance
 

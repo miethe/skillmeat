@@ -3,9 +3,11 @@ type: quick-feature-plan
 feature_slug: skill-detection-and-sorting
 request_log_id: null
 status: completed
-completed_at: 2026-01-02T00:00:00Z
-created: 2026-01-02T00:00:00Z
+completed_at: 2026-01-02 00:00:00+00:00
+created: 2026-01-02 00:00:00+00:00
 estimated_scope: small
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # Fix Skill Detection & Add Confidence Sorting

@@ -19,6 +19,10 @@ effort: 8 story points
 related:
 - /docs/project_plans/ideas/collections-remediate-12-18.md
 - /docs/project_plans/PRDs/enhancements/collections-navigation-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: collections-remediate
+prd_ref: null
 ---
 # Collections Remediation - Implementation Plan
 

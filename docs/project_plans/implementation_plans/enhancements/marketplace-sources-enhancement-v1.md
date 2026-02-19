@@ -17,6 +17,10 @@ category: product-planning
 status: inferred_complete
 related:
 - /docs/project_plans/PRDs/enhancements/marketplace-sources-enhancement-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: marketplace-sources-enhancement
+prd_ref: null
 ---
 # Implementation Plan: Marketplace Sources Enhancement v1
 

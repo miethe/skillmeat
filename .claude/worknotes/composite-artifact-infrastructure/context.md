@@ -1,17 +1,20 @@
 ---
 type: context
-prd: "composite-artifact-infrastructure"
-title: "Composite Artifact Infrastructure - Development Context"
-status: "active"
-created: "2026-02-17"
-updated: "2026-02-18"
-
+prd: composite-artifact-infrastructure
+title: Composite Artifact Infrastructure - Development Context
+status: active
+created: '2026-02-17'
+updated: '2026-02-18'
 critical_notes_count: 0
 implementation_decisions_count: 1
 active_gotchas_count: 0
-agent_contributors: ["ai-artifacts-engineer"]
-
-agents: ["ai-artifacts-engineer"]
+agent_contributors:
+- ai-artifacts-engineer
+agents:
+- ai-artifacts-engineer
+schema_version: 2
+doc_type: context
+feature_slug: composite-artifact-infrastructure
 ---
 
 # Composite Artifact Infrastructure - Development Context

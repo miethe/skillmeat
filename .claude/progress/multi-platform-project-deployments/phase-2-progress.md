@@ -278,6 +278,9 @@ files_modified:
 - tests/test_symlink_path_resolution.py
 progress: 100
 updated: '2026-02-07'
+schema_version: 2
+doc_type: progress
+feature_slug: multi-platform-project-deployments-v1
 ---
 
 # Phase 2: Deployment Engine Refactor

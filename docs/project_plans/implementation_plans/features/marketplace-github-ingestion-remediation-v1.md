@@ -19,6 +19,10 @@ related:
 - /docs/project_plans/implementation_plans/features/marketplace-github-ingestion-v1.md
 - /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
 - /.claude/worknotes/marketplace-gaps-quick-ref.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: marketplace-github-ingestion-remediation
+prd_ref: null
 ---
 
 # Implementation Plan: Marketplace GitHub Ingestion Remediation

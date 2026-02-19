@@ -53,7 +53,7 @@ tasks:
   estimated_effort: 2h
   priority: medium
 - id: P2-T5
-  description: Write unit tests for badge components (≥80% coverage)
+  description: "Write unit tests for badge components (\u226580% coverage)"
   status: completed
   assigned_to:
   - ui-engineer-enhanced
@@ -107,10 +107,10 @@ success_criteria:
   description: 'Accessibility: each badge has aria-label, keyboard-navigable'
   status: pending
 - id: SC-9
-  description: 'No performance regression: card render ≤50ms per card'
+  description: "No performance regression: card render \u226450ms per card"
   status: pending
 - id: SC-10
-  description: ≥80% unit test coverage
+  description: "\u226580% unit test coverage"
   status: pending
 files_modified:
 - skillmeat/web/components/shared/unified-card.tsx
@@ -119,6 +119,9 @@ files_modified:
 - skillmeat/web/__tests__/components/collection-badge-stack.test.ts
 progress: 100
 updated: '2026-01-20'
+schema_version: 2
+doc_type: progress
+feature_slug: collections-groups-ux-enhancement
 ---
 
 # Collections & Groups UX Enhancement - Phase 2: Collection Badges on Cards

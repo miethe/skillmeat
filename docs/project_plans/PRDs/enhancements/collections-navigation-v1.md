@@ -20,6 +20,9 @@ category: product-planning
 status: inferred_complete
 related:
 - /docs/project_plans/implementation_plans/enhancements/collections-navigation-v1.md
+schema_version: 2
+doc_type: prd
+feature_slug: collections-navigation
 ---
 # PRD: Collections & Site Navigation Enhancement
 

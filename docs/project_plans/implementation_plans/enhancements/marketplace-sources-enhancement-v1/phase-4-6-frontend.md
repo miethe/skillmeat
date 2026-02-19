@@ -7,6 +7,11 @@ phases:
 - 5
 - 6
 status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: marketplace-sources-enhancement
+prd_ref: null
+plan_ref: null
 ---
 # Phases 4-6: Frontend Implementation
 

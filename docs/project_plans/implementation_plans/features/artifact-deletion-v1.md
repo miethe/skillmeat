@@ -21,6 +21,10 @@ related:
 - /docs/project_plans/PRDs/features/artifact-deletion-v1.md
 - /.claude/rules/web/api-client.md
 - /.claude/rules/web/hooks.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: artifact-deletion
+prd_ref: null
 ---
 
 # Implementation Plan: Artifact Deletion from Collections and Projects

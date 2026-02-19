@@ -19,6 +19,9 @@ related:
 - /docs/project_plans/ph1-initialization/init-prd.md
 - /docs/project_plans/ph3-advanced/adr-0001-web-platform.md
 - /docs/project_plans/ph3-advanced/design-team-marketplace.md
+schema_version: 2
+doc_type: prd
+feature_slug: phase3-implementation-plan
 ---
 # Implementation Plan: SkillMeat Phase 3 - Advanced Experience
 

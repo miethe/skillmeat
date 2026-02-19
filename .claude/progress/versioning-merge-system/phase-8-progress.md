@@ -1,165 +1,200 @@
 ---
 type: progress
-prd: "versioning-merge-system"
+prd: versioning-merge-system
 phase: 8
-title: "Frontend - History Tab & Version Browsing"
-status: "in-progress"
-started: "2025-12-17"
+title: Frontend - History Tab & Version Browsing
+status: in-progress
+started: '2025-12-17'
 completed: null
 overall_progress: 70
-completion_estimate: "1-2h remaining"
+completion_estimate: 1-2h remaining
 total_tasks: 10
 completed_tasks: 7
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["ui-engineer-enhanced", "frontend-developer"]
-contributors: ["ui-engineer-enhanced"]
-
-# STATUS NOTE (2025-12-17): Major progress - 7 of 10 tasks complete
-# All core components created: VersionTimeline, SnapshotMetadata, VersionComparisonView, RollbackDialog, SnapshotHistoryTab
-# Remaining: HIST-003 (content viewer), HIST-008/009/010 (loading states, pagination, keyboard nav)
-# Files created: types/snapshot.ts, lib/api/snapshots.ts, hooks/use-snapshots.ts, components/history/*
-
+owners:
+- ui-engineer-enhanced
+- frontend-developer
+contributors:
+- ui-engineer-enhanced
 tasks:
-  - id: "HIST-001"
-    description: "Build VersionTimeline component with chronological list of all versions, version info display, and action buttons"
-    status: "complete"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "5 pts"
-    priority: "high"
-    notes: "Created version-timeline.tsx with timeline UI, compare selection, restore/view buttons"
-
-  - id: "HIST-002"
-    description: "Build version metadata display component showing hash, commit timestamp, files changed count, and change summary"
-    status: "complete"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["HIST-001"]
-    estimated_effort: "3 pts"
-    priority: "high"
-    notes: "Created snapshot-metadata.tsx with copy-to-clipboard, safety analysis display"
-
-  - id: "HIST-003"
-    description: "Build VersionContentViewer component for read-only file viewing with syntax highlighting and navigation"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "5 pts"
-    priority: "medium"
-    notes: "Deferred - not critical for MVP since snapshots are tarballs"
-
-  - id: "HIST-004"
-    description: "Build VersionComparisonView component for side-by-side diff display between versions"
-    status: "complete"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "5 pts"
-    priority: "high"
-    notes: "Created version-comparison-view.tsx with stats cards, file lists by change type"
-
-  - id: "HIST-005"
-    description: "Add Compare button to version timeline with selection logic for comparing two versions"
-    status: "complete"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["HIST-001"]
-    estimated_effort: "2 pts"
-    priority: "medium"
-    notes: "Integrated into VersionTimeline with checkbox selection (max 2)"
-
-  - id: "HIST-006"
-    description: "Add Restore button with confirmation dialog and rollback confirmation messaging"
-    status: "complete"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["HIST-001"]
-    estimated_effort: "3 pts"
-    priority: "medium"
-    notes: "Created rollback-dialog.tsx with safety analysis, confirmation flow, result display"
-
-  - id: "HIST-007"
-    description: "Wire History tab into artifact detail modal, ensure tab switching works correctly"
-    status: "complete"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["HIST-002"]
-    estimated_effort: "3 pts"
-    priority: "high"
-    notes: "Created snapshot-history-tab.tsx container component with create snapshot dialog"
-
-  - id: "HIST-008"
-    description: "Handle loading states (skeleton loaders), error states (error boundaries), and empty states"
-    status: "partial"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["HIST-001"]
-    estimated_effort: "2 pts"
-    priority: "medium"
-    notes: "Loading/empty states implemented in VersionTimeline; error boundaries pending"
-
-  - id: "HIST-009"
-    description: "Implement pagination or virtualization for large version histories (100+ versions)"
-    status: "partial"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["HIST-001"]
-    estimated_effort: "3 pts"
-    priority: "medium"
-    notes: "Cursor pagination supported via hooks; virtualization not yet implemented"
-
-  - id: "HIST-010"
-    description: "Implement keyboard navigation support (arrow keys, Enter to select, Escape to close)"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["HIST-001"]
-    estimated_effort: "2 pts"
-    priority: "low"
-    notes: "Future enhancement"
-
+- id: HIST-001
+  description: Build VersionTimeline component with chronological list of all versions,
+    version info display, and action buttons
+  status: complete
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 5 pts
+  priority: high
+  notes: Created version-timeline.tsx with timeline UI, compare selection, restore/view
+    buttons
+- id: HIST-002
+  description: Build version metadata display component showing hash, commit timestamp,
+    files changed count, and change summary
+  status: complete
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - HIST-001
+  estimated_effort: 3 pts
+  priority: high
+  notes: Created snapshot-metadata.tsx with copy-to-clipboard, safety analysis display
+- id: HIST-003
+  description: Build VersionContentViewer component for read-only file viewing with
+    syntax highlighting and navigation
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 5 pts
+  priority: medium
+  notes: Deferred - not critical for MVP since snapshots are tarballs
+- id: HIST-004
+  description: Build VersionComparisonView component for side-by-side diff display
+    between versions
+  status: complete
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 5 pts
+  priority: high
+  notes: Created version-comparison-view.tsx with stats cards, file lists by change
+    type
+- id: HIST-005
+  description: Add Compare button to version timeline with selection logic for comparing
+    two versions
+  status: complete
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - HIST-001
+  estimated_effort: 2 pts
+  priority: medium
+  notes: Integrated into VersionTimeline with checkbox selection (max 2)
+- id: HIST-006
+  description: Add Restore button with confirmation dialog and rollback confirmation
+    messaging
+  status: complete
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - HIST-001
+  estimated_effort: 3 pts
+  priority: medium
+  notes: Created rollback-dialog.tsx with safety analysis, confirmation flow, result
+    display
+- id: HIST-007
+  description: Wire History tab into artifact detail modal, ensure tab switching works
+    correctly
+  status: complete
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - HIST-002
+  estimated_effort: 3 pts
+  priority: high
+  notes: Created snapshot-history-tab.tsx container component with create snapshot
+    dialog
+- id: HIST-008
+  description: Handle loading states (skeleton loaders), error states (error boundaries),
+    and empty states
+  status: partial
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - HIST-001
+  estimated_effort: 2 pts
+  priority: medium
+  notes: Loading/empty states implemented in VersionTimeline; error boundaries pending
+- id: HIST-009
+  description: Implement pagination or virtualization for large version histories
+    (100+ versions)
+  status: partial
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - HIST-001
+  estimated_effort: 3 pts
+  priority: medium
+  notes: Cursor pagination supported via hooks; virtualization not yet implemented
+- id: HIST-010
+  description: Implement keyboard navigation support (arrow keys, Enter to select,
+    Escape to close)
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - HIST-001
+  estimated_effort: 2 pts
+  priority: low
+  notes: Future enhancement
 parallelization:
-  batch_1: ["HIST-001"]
-  batch_2: ["HIST-002", "HIST-003", "HIST-004", "HIST-005", "HIST-006", "HIST-008", "HIST-009", "HIST-010"]
-  batch_3: ["HIST-007"]
-  critical_path: ["HIST-001", "HIST-002", "HIST-007"]
-  estimated_total_time: "4-5d"
-
+  batch_1:
+  - HIST-001
+  batch_2:
+  - HIST-002
+  - HIST-003
+  - HIST-004
+  - HIST-005
+  - HIST-006
+  - HIST-008
+  - HIST-009
+  - HIST-010
+  batch_3:
+  - HIST-007
+  critical_path:
+  - HIST-001
+  - HIST-002
+  - HIST-007
+  estimated_total_time: 4-5d
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "History tab displays correctly in artifact detail modal with clear navigation"
-    status: "complete"
-  - id: "SC-2"
-    description: "Version timeline shows all versions with creation time, hash, and file count"
-    status: "complete"
-  - id: "SC-3"
-    description: "Content viewer renders all supported file types with proper formatting"
-    status: "pending"
-  - id: "SC-4"
-    description: "Comparison view shows correct diffs between selected versions"
-    status: "complete"
-  - id: "SC-5"
-    description: "Restore dialog displays confirmation message and confirms user intent"
-    status: "complete"
-  - id: "SC-6"
-    description: "Handles 100+ versions efficiently without performance degradation"
-    status: "partial"
-  - id: "SC-7"
-    description: "Keyboard navigation functional for timeline, comparison, and restore actions"
-    status: "pending"
-  - id: "SC-8"
-    description: "Component tests achieve >80% coverage for all History-related components"
-    status: "pending"
-  - id: "SC-9"
-    description: "Responsive design works correctly on mobile (320px), tablet (768px), and desktop (1920px)"
-    status: "partial"
-
+- id: SC-1
+  description: History tab displays correctly in artifact detail modal with clear
+    navigation
+  status: complete
+- id: SC-2
+  description: Version timeline shows all versions with creation time, hash, and file
+    count
+  status: complete
+- id: SC-3
+  description: Content viewer renders all supported file types with proper formatting
+  status: pending
+- id: SC-4
+  description: Comparison view shows correct diffs between selected versions
+  status: complete
+- id: SC-5
+  description: Restore dialog displays confirmation message and confirms user intent
+  status: complete
+- id: SC-6
+  description: Handles 100+ versions efficiently without performance degradation
+  status: partial
+- id: SC-7
+  description: Keyboard navigation functional for timeline, comparison, and restore
+    actions
+  status: pending
+- id: SC-8
+  description: Component tests achieve >80% coverage for all History-related components
+  status: pending
+- id: SC-9
+  description: Responsive design works correctly on mobile (320px), tablet (768px),
+    and desktop (1920px)
+  status: partial
 files_modified:
-  - "skillmeat/web/types/snapshot.ts"
-  - "skillmeat/web/lib/api/snapshots.ts"
-  - "skillmeat/web/lib/api/index.ts"
-  - "skillmeat/web/hooks/use-snapshots.ts"
-  - "skillmeat/web/components/history/version-timeline.tsx"
-  - "skillmeat/web/components/history/snapshot-metadata.tsx"
-  - "skillmeat/web/components/history/version-comparison-view.tsx"
-  - "skillmeat/web/components/history/rollback-dialog.tsx"
-  - "skillmeat/web/components/history/snapshot-history-tab.tsx"
-  - "skillmeat/web/components/history/index.ts"
+- skillmeat/web/types/snapshot.ts
+- skillmeat/web/lib/api/snapshots.ts
+- skillmeat/web/lib/api/index.ts
+- skillmeat/web/hooks/use-snapshots.ts
+- skillmeat/web/components/history/version-timeline.tsx
+- skillmeat/web/components/history/snapshot-metadata.tsx
+- skillmeat/web/components/history/version-comparison-view.tsx
+- skillmeat/web/components/history/rollback-dialog.tsx
+- skillmeat/web/components/history/snapshot-history-tab.tsx
+- skillmeat/web/components/history/index.ts
+schema_version: 2
+doc_type: progress
+feature_slug: versioning-merge-system
 ---
 
 # versioning-merge-system - Phase 8: Frontend - History Tab & Version Browsing

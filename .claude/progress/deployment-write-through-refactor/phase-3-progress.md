@@ -1,6 +1,6 @@
 ---
 phase: 3
-title: Frontend — Revert to /artifacts Endpoint
+title: "Frontend \u2014 Revert to /artifacts Endpoint"
 status: completed
 plan_ref: docs/project_plans/implementation_plans/features/deployment-write-through-refactor-v1.md
 parallelization:
@@ -33,6 +33,11 @@ in_progress_tasks: 0
 blocked_tasks: 0
 progress: 100
 updated: '2026-02-11'
+schema_version: 2
+doc_type: progress
+feature_slug: phase-3
+type: progress
+prd: phase-3
 ---
 
 ## Phase 3: Frontend — Revert to /artifacts Endpoint

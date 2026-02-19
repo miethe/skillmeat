@@ -3,9 +3,11 @@ type: quick-feature-plan
 feature_slug: marketplace-source-filter-bar
 request_log_id: null
 status: completed
-completed_at: 2026-01-03T00:00:00Z
-created: 2026-01-03T00:00:00Z
+completed_at: 2026-01-03 00:00:00+00:00
+created: 2026-01-03 00:00:00+00:00
 estimated_scope: medium
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # Marketplace Source Detail - Redesign Filter/Sort/Search Bar

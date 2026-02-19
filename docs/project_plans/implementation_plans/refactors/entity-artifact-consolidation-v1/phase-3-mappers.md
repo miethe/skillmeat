@@ -1,5 +1,10 @@
 ---
 status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: entity-artifact-consolidation
+prd_ref: null
+plan_ref: null
 ---
 # Phase 3: API Mapper Centralization
 

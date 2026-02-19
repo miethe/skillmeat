@@ -22,6 +22,9 @@ related:
 - /docs/project_plans/PRDs/enhancements/web-ui-consolidation-v1.md
 - /skillmeat/core/sync.py
 - /skillmeat/storage/snapshot.py
+schema_version: 2
+doc_type: prd
+feature_slug: versioning-merge-system
 ---
 # PRD: Versioning & Merge System
 

@@ -20,6 +20,10 @@ status: inferred_complete
 related:
 - /docs/project_plans/PRDs/enhancements/versioning-merge-system-v1.md
 - /docs/project_plans/implementation_plans/features/entity-lifecycle-management-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: versioning-merge-system
+prd_ref: null
 ---
 # Implementation Plan: Versioning & Merge System
 

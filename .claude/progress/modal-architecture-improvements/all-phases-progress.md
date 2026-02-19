@@ -88,7 +88,7 @@ tasks:
   model: sonnet
   estimate_hours: 0.5
 - id: COMP-007
-  name: Complete `entity` → `artifact` prop migration
+  name: "Complete `entity` \u2192 `artifact` prop migration"
   phase: 2
   status: completed
   assigned_to: ui-engineer-enhanced
@@ -165,6 +165,9 @@ completed_tasks: 14
 in_progress_tasks: 0
 blocked_tasks: 0
 updated: '2026-01-28'
+schema_version: 2
+doc_type: progress
+feature_slug: modal-architecture-improvements
 ---
 
 # Modal Architecture Improvements - All Phases Progress

@@ -107,6 +107,9 @@ files_modified:
 - tests/test_composite_detection.py
 progress: 100
 updated: '2026-02-18'
+schema_version: 2
+doc_type: progress
+feature_slug: composite-artifact-infrastructure
 ---
 
 # composite-artifact-infrastructure - Phase 2: Enhanced Discovery (Core)

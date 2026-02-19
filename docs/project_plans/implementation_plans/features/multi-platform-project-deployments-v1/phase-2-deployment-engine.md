@@ -2,6 +2,11 @@
 title: 'Phase 2: Deployment Engine Refactor'
 parent: ../multi-platform-project-deployments-v1.md
 status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: multi-platform-project-deployments
+prd_ref: null
+plan_ref: null
 ---
 # Phase 2: Deployment Engine Refactor
 

@@ -1,160 +1,194 @@
 ---
 type: progress
-prd: "marketplace-source-detection-improvements"
+prd: marketplace-source-detection-improvements
 phase: 4
-phase_name: "Frontend UI"
+phase_name: Frontend UI
 status: not_started
 progress: 0
 total_tasks: 17
 completed_tasks: 0
-effort: "20-28 pts"
+effort: 20-28 pts
 created: 2026-01-05
 updated: 2026-01-05
-
-assigned_to: ["ui-engineer-enhanced"]
-dependencies: [3]
-
+assigned_to:
+- ui-engineer-enhanced
+dependencies:
+- 3
 tasks:
-  # Modal Component (6 tasks)
-  - id: "P4.1a"
-    name: "Create DirectoryMapModal component"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P3.4b"]
-    effort: "4 pts"
-
-  - id: "P4.1b"
-    name: "Implement file tree rendering"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.1a"]
-    effort: "3 pts"
-
-  - id: "P4.1c"
-    name: "Implement type dropdown"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.1a"]
-    effort: "3 pts"
-
-  - id: "P4.1d"
-    name: "Implement hierarchical logic"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.1b", "P4.1c"]
-    effort: "3 pts"
-
-  - id: "P4.1e"
-    name: "Add save/cancel/rescan buttons"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.1d"]
-    effort: "2 pts"
-
-  - id: "P4.1f"
-    name: "Unit tests for modal"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.1e"]
-    effort: "3 pts"
-
-  # Toolbar Integration (3 tasks)
-  - id: "P4.2a"
-    name: "Add Map Directories button"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.1f"]
-    effort: "2 pts"
-
-  - id: "P4.2b"
-    name: "Wire button to modal"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.2a"]
-    effort: "1 pt"
-
-  - id: "P4.2c"
-    name: "Test toolbar integration"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.2b"]
-    effort: "1 pt"
-
-  # Source Detail Updates (5 tasks)
-  - id: "P4.3a"
-    name: "Display current mappings"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.2c"]
-    effort: "2 pts"
-
-  - id: "P4.3b"
-    name: "Show dedup counts in scan results"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.3a"]
-    effort: "2 pts"
-
-  - id: "P4.3c"
-    name: "Add duplicate badge to entries"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.3b"]
-    effort: "2 pts"
-
-  - id: "P4.3d"
-    name: "Update marketplace.ts types"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.3c"]
-    effort: "2 pts"
-
-  - id: "P4.3e"
-    name: "Test source detail updates"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.3d"]
-    effort: "2 pts"
-
-  # Notifications (3 tasks)
-  - id: "P4.4a"
-    name: "Add dedup count to scan toast"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.3e"]
-    effort: "2 pts"
-
-  - id: "P4.4b"
-    name: "Add filter for duplicates in excluded list"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.4a"]
-    effort: "2 pts"
-
-  - id: "P4.4c"
-    name: "Test notifications"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P4.4b"]
-    effort: "1 pt"
-
+- id: P4.1a
+  name: Create DirectoryMapModal component
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P3.4b
+  effort: 4 pts
+- id: P4.1b
+  name: Implement file tree rendering
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.1a
+  effort: 3 pts
+- id: P4.1c
+  name: Implement type dropdown
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.1a
+  effort: 3 pts
+- id: P4.1d
+  name: Implement hierarchical logic
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.1b
+  - P4.1c
+  effort: 3 pts
+- id: P4.1e
+  name: Add save/cancel/rescan buttons
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.1d
+  effort: 2 pts
+- id: P4.1f
+  name: Unit tests for modal
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.1e
+  effort: 3 pts
+- id: P4.2a
+  name: Add Map Directories button
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.1f
+  effort: 2 pts
+- id: P4.2b
+  name: Wire button to modal
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.2a
+  effort: 1 pt
+- id: P4.2c
+  name: Test toolbar integration
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.2b
+  effort: 1 pt
+- id: P4.3a
+  name: Display current mappings
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.2c
+  effort: 2 pts
+- id: P4.3b
+  name: Show dedup counts in scan results
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.3a
+  effort: 2 pts
+- id: P4.3c
+  name: Add duplicate badge to entries
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.3b
+  effort: 2 pts
+- id: P4.3d
+  name: Update marketplace.ts types
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.3c
+  effort: 2 pts
+- id: P4.3e
+  name: Test source detail updates
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.3d
+  effort: 2 pts
+- id: P4.4a
+  name: Add dedup count to scan toast
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.3e
+  effort: 2 pts
+- id: P4.4b
+  name: Add filter for duplicates in excluded list
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.4a
+  effort: 2 pts
+- id: P4.4c
+  name: Test notifications
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P4.4b
+  effort: 1 pt
 parallelization:
-  batch_1: ["P4.1a"]
-  batch_2: ["P4.1b", "P4.1c"]
-  batch_3: ["P4.1d"]
-  batch_4: ["P4.1e"]
-  batch_5: ["P4.1f"]
-  batch_6: ["P4.2a"]
-  batch_7: ["P4.2b"]
-  batch_8: ["P4.2c"]
-  batch_9: ["P4.3a"]
-  batch_10: ["P4.3b"]
-  batch_11: ["P4.3c"]
-  batch_12: ["P4.3d"]
-  batch_13: ["P4.3e"]
-  batch_14: ["P4.4a"]
-  batch_15: ["P4.4b"]
-  batch_16: ["P4.4c"]
+  batch_1:
+  - P4.1a
+  batch_2:
+  - P4.1b
+  - P4.1c
+  batch_3:
+  - P4.1d
+  batch_4:
+  - P4.1e
+  batch_5:
+  - P4.1f
+  batch_6:
+  - P4.2a
+  batch_7:
+  - P4.2b
+  batch_8:
+  - P4.2c
+  batch_9:
+  - P4.3a
+  batch_10:
+  - P4.3b
+  batch_11:
+  - P4.3c
+  batch_12:
+  - P4.3d
+  batch_13:
+  - P4.3e
+  batch_14:
+  - P4.4a
+  batch_15:
+  - P4.4b
+  batch_16:
+  - P4.4c
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-source-detection-improvements
 ---
 
 # Phase 4: Frontend UI

@@ -17,6 +17,9 @@ category: product-planning
 status: inferred_complete
 related:
 - /docs/project_plans/PRDs/features/workflow-orchestration-v1.md
+schema_version: 2
+doc_type: prd
+feature_slug: research-swarm-skill
 ---
 # PRD: Research Swarm Skill
 

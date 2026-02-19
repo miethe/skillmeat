@@ -1,9 +1,12 @@
 ---
 type: context
-prd: "discovery-import-fixes-v1"
+prd: discovery-import-fixes-v1
 created: 2026-01-09
 updated: 2026-01-09
-request_log: "REQ-20260109-skillmeat"
+request_log: REQ-20260109-skillmeat
+schema_version: 2
+doc_type: context
+feature_slug: discovery-import-fixes-v1
 ---
 
 # Discovery Import Fixes - Agent Context

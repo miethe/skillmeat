@@ -2,95 +2,106 @@
 type: progress
 prd: versioning-merge-system-v1.5
 phase: 5
-title: "Web UI Integration"
+title: Web UI Integration
 status: complete
 created: 2025-12-17
 updated: 2025-12-17
 completed: 2025-12-17
-duration_estimate: "2 days"
-effort_estimate: "12-16h"
-actual_effort: "10h"
+duration_estimate: 2 days
+effort_estimate: 12-16h
+actual_effort: 10h
 priority: MEDIUM
-
 tasks:
-  - id: "TASK-5.1"
-    description: "Update frontend types to include change_origin field"
-    status: "complete"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "1-2h"
-    actual_effort: "1h"
-    priority: "MEDIUM"
-    completed: "2025-12-17"
-    files:
-      - "skillmeat/web/types/sync.ts"
-      - "skillmeat/web/types/drift.ts"
-
-  - id: "TASK-5.2"
-    description: "Add ChangeBadge component for change origin display"
-    status: "complete"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "3-4h"
-    actual_effort: "3h"
-    priority: "MEDIUM"
-    completed: "2025-12-17"
-    files:
-      - "skillmeat/web/components/sync/ChangeBadge.tsx"
-
-  - id: "TASK-5.3"
-    description: "Update diff viewer to show badges"
-    status: "complete"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-5.2"]
-    estimated_effort: "3-4h"
-    actual_effort: "2h"
-    priority: "MEDIUM"
-    completed: "2025-12-17"
-    files:
-      - "skillmeat/web/components/sync/DiffViewer.tsx"
-
-  - id: "TASK-5.4"
-    description: "Update version timeline to show change origin labels"
-    status: "complete"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-5.2"]
-    estimated_effort: "2-3h"
-    actual_effort: "2h"
-    priority: "MEDIUM"
-    completed: "2025-12-17"
-    files:
-      - "skillmeat/web/components/sync/VersionTimeline.tsx"
-
-  - id: "TASK-5.5"
-    description: "Add tooltips explaining badge meanings"
-    status: "complete"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-5.2"]
-    estimated_effort: "1-2h"
-    actual_effort: "1h"
-    priority: "LOW"
-    completed: "2025-12-17"
-    files:
-      - "skillmeat/web/components/sync/ChangeBadge.tsx"
-
-  - id: "TASK-5.6"
-    description: "Write frontend tests for badge rendering"
-    status: "complete"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-5.2"]
-    estimated_effort: "2-3h"
-    actual_effort: "1h"
-    priority: "MEDIUM"
-    completed: "2025-12-17"
-    files:
-      - "skillmeat/web/__tests__/components/sync/ChangeBadge.test.tsx"
-
+- id: TASK-5.1
+  description: Update frontend types to include change_origin field
+  status: complete
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 1-2h
+  actual_effort: 1h
+  priority: MEDIUM
+  completed: '2025-12-17'
+  files:
+  - skillmeat/web/types/sync.ts
+  - skillmeat/web/types/drift.ts
+- id: TASK-5.2
+  description: Add ChangeBadge component for change origin display
+  status: complete
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 3-4h
+  actual_effort: 3h
+  priority: MEDIUM
+  completed: '2025-12-17'
+  files:
+  - skillmeat/web/components/sync/ChangeBadge.tsx
+- id: TASK-5.3
+  description: Update diff viewer to show badges
+  status: complete
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-5.2
+  estimated_effort: 3-4h
+  actual_effort: 2h
+  priority: MEDIUM
+  completed: '2025-12-17'
+  files:
+  - skillmeat/web/components/sync/DiffViewer.tsx
+- id: TASK-5.4
+  description: Update version timeline to show change origin labels
+  status: complete
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-5.2
+  estimated_effort: 2-3h
+  actual_effort: 2h
+  priority: MEDIUM
+  completed: '2025-12-17'
+  files:
+  - skillmeat/web/components/sync/VersionTimeline.tsx
+- id: TASK-5.5
+  description: Add tooltips explaining badge meanings
+  status: complete
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-5.2
+  estimated_effort: 1-2h
+  actual_effort: 1h
+  priority: LOW
+  completed: '2025-12-17'
+  files:
+  - skillmeat/web/components/sync/ChangeBadge.tsx
+- id: TASK-5.6
+  description: Write frontend tests for badge rendering
+  status: complete
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-5.2
+  estimated_effort: 2-3h
+  actual_effort: 1h
+  priority: MEDIUM
+  completed: '2025-12-17'
+  files:
+  - skillmeat/web/__tests__/components/sync/ChangeBadge.test.tsx
 parallelization:
-  batch_1: ["TASK-5.1", "TASK-5.2"]
-  batch_2: ["TASK-5.3", "TASK-5.4", "TASK-5.5", "TASK-5.6"]
-
+  batch_1:
+  - TASK-5.1
+  - TASK-5.2
+  batch_2:
+  - TASK-5.3
+  - TASK-5.4
+  - TASK-5.5
+  - TASK-5.6
 completion: 100%
+schema_version: 2
+doc_type: progress
+feature_slug: versioning-merge-system-v1-5
 ---
 
 # Phase 5: Web UI Integration

@@ -18,6 +18,9 @@ category: product-planning
 status: inferred_complete
 related:
 - /docs/project_plans/design-specs/composite-artifact-infrastructure.md
+schema_version: 2
+doc_type: prd
+feature_slug: composite-artifact-infrastructure
 ---
 # Feature Brief & Metadata
 

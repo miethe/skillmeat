@@ -1,150 +1,172 @@
 ---
-# === PROGRESS TRACKING: Phases 4-6 Frontend ===
-# Components, pages, and dialogs for marketplace sources enhancement
-
-# Metadata: Identification and Classification
 type: progress
-prd: "marketplace-sources-enhancement"
+prd: marketplace-sources-enhancement
 phase: 4
-title: "Phases 4-6: Frontend Implementation"
-status: "planning"
-started: "2025-01-18"
+title: 'Phases 4-6: Frontend Implementation'
+status: planning
+started: '2025-01-18'
 completed: null
-
-# Overall Progress
 overall_progress: 0
-completion_estimate: "on-track"
-
-# Task Counts
+completion_estimate: on-track
 total_tasks: 10
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-# Ownership
-owners: ["ui-engineer-enhanced", "frontend-developer"]
+owners:
+- ui-engineer-enhanced
+- frontend-developer
 contributors: []
-
-# === TASKS (SOURCE OF TRUTH) ===
 tasks:
-  # Phase 4: Components
-  - id: "UI-001"
-    description: "Create SourceFilterBar component with artifact type, tags, trust level filters"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "UI-002"
-    description: "Create TagBadge component (reuse patterns from collection)"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "1.5h"
-    priority: "medium"
-
-  - id: "UI-003"
-    description: "Redesign SourceCard with tags, count tooltip, description fallback"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: ["UI-002"]
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "UI-004"
-    description: "Create RepoDetailsModal with ContentPane for description/README"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "medium"
-
-  - id: "UI-005"
-    description: "Create artifact count tooltip component (CountBadge)"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "1h"
-    priority: "medium"
-
-  # Phase 5: Pages Integration
-  - id: "UI-006"
-    description: "Integrate filters into Sources list page with URL state sync"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["UI-001", "API-002"]
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "UI-007"
-    description: "Add status filtering to Source detail page catalog"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["API-002"]
-    estimated_effort: "2h"
-    priority: "medium"
-
-  - id: "UI-008"
-    description: "Add Repo Details button to detail page (opens RepoDetailsModal)"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["UI-004", "API-003"]
-    estimated_effort: "1h"
-    priority: "medium"
-
-  # Phase 6: Dialogs
-  - id: "UI-009"
-    description: "Update CreateSourceDialog with import toggles (description, README)"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["API-001"]
-    estimated_effort: "1.5h"
-    priority: "high"
-
-  - id: "UI-010"
-    description: "Update EditSourceDialog with toggles and tags input"
-    status: "pending"
-    assigned_to: ["frontend-developer", "ui-engineer-enhanced"]
-    dependencies: ["UI-009"]
-    estimated_effort: "2h"
-    priority: "high"
-
-# Parallelization Strategy
+- id: UI-001
+  description: Create SourceFilterBar component with artifact type, tags, trust level
+    filters
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+- id: UI-002
+  description: Create TagBadge component (reuse patterns from collection)
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 1.5h
+  priority: medium
+- id: UI-003
+  description: Redesign SourceCard with tags, count tooltip, description fallback
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies:
+  - UI-002
+  estimated_effort: 3h
+  priority: high
+- id: UI-004
+  description: Create RepoDetailsModal with ContentPane for description/README
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 2h
+  priority: medium
+- id: UI-005
+  description: Create artifact count tooltip component (CountBadge)
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 1h
+  priority: medium
+- id: UI-006
+  description: Integrate filters into Sources list page with URL state sync
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - UI-001
+  - API-002
+  estimated_effort: 3h
+  priority: high
+- id: UI-007
+  description: Add status filtering to Source detail page catalog
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - API-002
+  estimated_effort: 2h
+  priority: medium
+- id: UI-008
+  description: Add Repo Details button to detail page (opens RepoDetailsModal)
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - UI-004
+  - API-003
+  estimated_effort: 1h
+  priority: medium
+- id: UI-009
+  description: Update CreateSourceDialog with import toggles (description, README)
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - API-001
+  estimated_effort: 1.5h
+  priority: high
+- id: UI-010
+  description: Update EditSourceDialog with toggles and tags input
+  status: pending
+  assigned_to:
+  - frontend-developer
+  - ui-engineer-enhanced
+  dependencies:
+  - UI-009
+  estimated_effort: 2h
+  priority: high
 parallelization:
-  batch_1: ["UI-001", "UI-002", "UI-004", "UI-005"]
-  batch_2: ["UI-003"]
-  batch_3: ["UI-006", "UI-007", "UI-008", "UI-009"]
-  batch_4: ["UI-010"]
-  critical_path: ["UI-001", "UI-006", "UI-009", "UI-010"]
-  estimated_total_time: "10h"
-
-# Blockers
+  batch_1:
+  - UI-001
+  - UI-002
+  - UI-004
+  - UI-005
+  batch_2:
+  - UI-003
+  batch_3:
+  - UI-006
+  - UI-007
+  - UI-008
+  - UI-009
+  batch_4:
+  - UI-010
+  critical_path:
+  - UI-001
+  - UI-006
+  - UI-009
+  - UI-010
+  estimated_total_time: 10h
 blockers: []
-
-# Success Criteria
 success_criteria:
-  - { id: "SC-1", description: "SourceFilterBar renders correctly with all filter options", status: "pending" }
-  - { id: "SC-2", description: "Tag badges display with proper overflow handling (+n more)", status: "pending" }
-  - { id: "SC-3", description: "Count badge shows total and type breakdown on hover", status: "pending" }
-  - { id: "SC-4", description: "Filter state synced with URL query parameters", status: "pending" }
-  - { id: "SC-5", description: "RepoDetailsModal accessible and keyboard navigable", status: "pending" }
-  - { id: "SC-6", description: "All components meet WCAG 2.1 AA standards", status: "pending" }
-  - { id: "SC-7", description: "Components work on desktop, tablet, mobile", status: "pending" }
-
-# Files Modified
+- id: SC-1
+  description: SourceFilterBar renders correctly with all filter options
+  status: pending
+- id: SC-2
+  description: Tag badges display with proper overflow handling (+n more)
+  status: pending
+- id: SC-3
+  description: Count badge shows total and type breakdown on hover
+  status: pending
+- id: SC-4
+  description: Filter state synced with URL query parameters
+  status: pending
+- id: SC-5
+  description: RepoDetailsModal accessible and keyboard navigable
+  status: pending
+- id: SC-6
+  description: All components meet WCAG 2.1 AA standards
+  status: pending
+- id: SC-7
+  description: Components work on desktop, tablet, mobile
+  status: pending
 files_modified:
-  - "skillmeat/web/types/marketplace.ts"
-  - "skillmeat/web/components/marketplace/source-card.tsx"
-  - "skillmeat/web/components/marketplace/source-filter-bar.tsx"
-  - "skillmeat/web/components/marketplace/repo-details-modal.tsx"
-  - "skillmeat/web/components/marketplace/tag-badge.tsx"
-  - "skillmeat/web/components/marketplace/count-badge.tsx"
-  - "skillmeat/web/app/marketplace/sources/page.tsx"
-  - "skillmeat/web/app/marketplace/sources/[id]/page.tsx"
-  - "skillmeat/web/components/dialogs/create-source-dialog.tsx"
-  - "skillmeat/web/components/dialogs/edit-source-dialog.tsx"
+- skillmeat/web/types/marketplace.ts
+- skillmeat/web/components/marketplace/source-card.tsx
+- skillmeat/web/components/marketplace/source-filter-bar.tsx
+- skillmeat/web/components/marketplace/repo-details-modal.tsx
+- skillmeat/web/components/marketplace/tag-badge.tsx
+- skillmeat/web/components/marketplace/count-badge.tsx
+- skillmeat/web/app/marketplace/sources/page.tsx
+- skillmeat/web/app/marketplace/sources/[id]/page.tsx
+- skillmeat/web/components/dialogs/create-source-dialog.tsx
+- skillmeat/web/components/dialogs/edit-source-dialog.tsx
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-sources-enhancement
 ---
 
 # marketplace-sources-enhancement - Phases 4-6: Frontend Implementation

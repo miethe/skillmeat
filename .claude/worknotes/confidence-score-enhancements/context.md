@@ -1,8 +1,11 @@
 ---
 type: context
-prd: "confidence-score-enhancements"
+prd: confidence-score-enhancements
 created: 2025-12-27
 last_updated: 2025-12-27
+schema_version: 2
+doc_type: context
+feature_slug: confidence-score-enhancements
 ---
 
 # Confidence Score Enhancements - Context

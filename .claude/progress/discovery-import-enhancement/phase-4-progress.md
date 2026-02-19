@@ -1,180 +1,223 @@
 ---
 type: progress
-prd: "discovery-import-enhancement"
+prd: discovery-import-enhancement
 phase: 4
-title: "Frontend - Discovery Tab & UI Polish"
-status: "completed"
-started: "2025-12-04"
-completed: "2025-12-04"
-
+title: Frontend - Discovery Tab & UI Polish
+status: completed
+started: '2025-12-04'
+completed: '2025-12-04'
 overall_progress: 100
-completion_estimate: "complete"
-
+completion_estimate: complete
 total_tasks: 12
 completed_tasks: 12
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["ui-engineer-enhanced"]
-contributors: ["frontend-developer", "testing-specialist"]
-
+owners:
+- ui-engineer-enhanced
+contributors:
+- frontend-developer
+- testing-specialist
 tasks:
-  - id: "DIS-4.1"
-    description: "Create DiscoveryTab.tsx component with artifact table/list displaying metadata and status badges"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "1.5d"
-    priority: "critical"
-
-  - id: "DIS-4.2"
-    description: "Add artifact filtering and sorting controls to Discovery Tab (by status, type, date)"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["DIS-4.1"]
-    estimated_effort: "1d"
-    priority: "high"
-    completion_notes: "Implemented comprehensive filtering and sorting with debounced search (300ms), status/type filters, sort by name/type/discovered_at, clear filters button, and filtered count display. All acceptance criteria met."
-
-  - id: "DIS-4.3"
-    description: "Integrate DiscoveryTab into Project Detail page with tab switcher (Deployed | Discovery)"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["DIS-4.1"]
-    estimated_effort: "1d"
-    priority: "critical"
-    completion_notes: "Integrated tab switcher with URL state (?tab=deployed|discovery), wired up DiscoveryTab with proper props, added handlers for import and view details."
-
-  - id: "DIS-4.4"
-    description: "Update DiscoveryBanner visibility logic - only show if importable_count > 0"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "0.5d"
-    priority: "medium"
-
-  - id: "DIS-4.5"
-    description: "Update toast-utils.ts to display detailed breakdown (Imported:N | Skipped:N | Failed:N)"
-    status: "completed"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-4.6"
-    description: "Add skip management UI in Discovery Tab - list skipped artifacts with Un-skip buttons"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["DIS-4.1"]
-    estimated_effort: "1d"
-    priority: "high"
-    completion_notes: "Created SkipPreferencesList component with collapsible accordion, un-skip buttons, clear all with confirmation dialog. Added 12 unit tests."
-
-  - id: "DIS-4.7"
-    description: "Add artifact context menu with Import, Skip, View details, Copy source actions"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["DIS-4.1"]
-    estimated_effort: "0.5d"
-    priority: "medium"
-    completion_notes: "Created ArtifactActions component with dropdown menu, integrated into DiscoveryTab rows. Added 11 unit tests."
-
-  - id: "DIS-4.8"
-    description: "Unit tests for DiscoveryTab rendering with various artifact lists and filters"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["DIS-4.1", "DIS-4.2"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-4.9"
-    description: "Unit tests for banner visibility logic - only shown when importable_count > 0"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: ["DIS-4.4"]
-    estimated_effort: "0.5d"
-    priority: "medium"
-
-  - id: "DIS-4.10"
-    description: "Unit tests for toast utilities - detailed breakdown display"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: ["DIS-4.5"]
-    estimated_effort: "0.5d"
-    priority: "medium"
-
-  - id: "DIS-4.11"
-    description: "E2E test for Discovery Tab navigation - tab visible, clickable, state persists via URL"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: ["DIS-4.3"]
-    estimated_effort: "1d"
-    priority: "high"
-    completion_notes: "Added 6 E2E tests for tab navigation including tab visibility, URL state, browser navigation, and badge count."
-
-  - id: "DIS-4.12"
-    description: "E2E test for skip management in tab - Un-skip artifact and verify updated in future discovery"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: ["DIS-4.6"]
-    estimated_effort: "1d"
-    priority: "high"
-    completion_notes: "Added 5 E2E tests for skip management including skip via context menu, skip preferences list, un-skip, persistence, and clear all."
-
+- id: DIS-4.1
+  description: Create DiscoveryTab.tsx component with artifact table/list displaying
+    metadata and status badges
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 1.5d
+  priority: critical
+- id: DIS-4.2
+  description: Add artifact filtering and sorting controls to Discovery Tab (by status,
+    type, date)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - DIS-4.1
+  estimated_effort: 1d
+  priority: high
+  completion_notes: Implemented comprehensive filtering and sorting with debounced
+    search (300ms), status/type filters, sort by name/type/discovered_at, clear filters
+    button, and filtered count display. All acceptance criteria met.
+- id: DIS-4.3
+  description: Integrate DiscoveryTab into Project Detail page with tab switcher (Deployed
+    | Discovery)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - DIS-4.1
+  estimated_effort: 1d
+  priority: critical
+  completion_notes: Integrated tab switcher with URL state (?tab=deployed|discovery),
+    wired up DiscoveryTab with proper props, added handlers for import and view details.
+- id: DIS-4.4
+  description: Update DiscoveryBanner visibility logic - only show if importable_count
+    > 0
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 0.5d
+  priority: medium
+- id: DIS-4.5
+  description: Update toast-utils.ts to display detailed breakdown (Imported:N | Skipped:N
+    | Failed:N)
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 1d
+  priority: high
+- id: DIS-4.6
+  description: Add skip management UI in Discovery Tab - list skipped artifacts with
+    Un-skip buttons
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - DIS-4.1
+  estimated_effort: 1d
+  priority: high
+  completion_notes: Created SkipPreferencesList component with collapsible accordion,
+    un-skip buttons, clear all with confirmation dialog. Added 12 unit tests.
+- id: DIS-4.7
+  description: Add artifact context menu with Import, Skip, View details, Copy source
+    actions
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - DIS-4.1
+  estimated_effort: 0.5d
+  priority: medium
+  completion_notes: Created ArtifactActions component with dropdown menu, integrated
+    into DiscoveryTab rows. Added 11 unit tests.
+- id: DIS-4.8
+  description: Unit tests for DiscoveryTab rendering with various artifact lists and
+    filters
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - DIS-4.1
+  - DIS-4.2
+  estimated_effort: 1d
+  priority: high
+- id: DIS-4.9
+  description: Unit tests for banner visibility logic - only shown when importable_count
+    > 0
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies:
+  - DIS-4.4
+  estimated_effort: 0.5d
+  priority: medium
+- id: DIS-4.10
+  description: Unit tests for toast utilities - detailed breakdown display
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies:
+  - DIS-4.5
+  estimated_effort: 0.5d
+  priority: medium
+- id: DIS-4.11
+  description: E2E test for Discovery Tab navigation - tab visible, clickable, state
+    persists via URL
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies:
+  - DIS-4.3
+  estimated_effort: 1d
+  priority: high
+  completion_notes: Added 6 E2E tests for tab navigation including tab visibility,
+    URL state, browser navigation, and badge count.
+- id: DIS-4.12
+  description: E2E test for skip management in tab - Un-skip artifact and verify updated
+    in future discovery
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies:
+  - DIS-4.6
+  estimated_effort: 1d
+  priority: high
+  completion_notes: Added 5 E2E tests for skip management including skip via context
+    menu, skip preferences list, un-skip, persistence, and clear all.
 parallelization:
-  batch_1: ["DIS-4.1", "DIS-4.4", "DIS-4.5"]
-  batch_2: ["DIS-4.2", "DIS-4.3", "DIS-4.6", "DIS-4.7"]
-  batch_3: ["DIS-4.8", "DIS-4.9", "DIS-4.10"]
-  batch_4: ["DIS-4.11", "DIS-4.12"]
-  critical_path: ["DIS-4.1", "DIS-4.2", "DIS-4.3", "DIS-4.8"]
-  estimated_total_time: "8-10 days"
-
+  batch_1:
+  - DIS-4.1
+  - DIS-4.4
+  - DIS-4.5
+  batch_2:
+  - DIS-4.2
+  - DIS-4.3
+  - DIS-4.6
+  - DIS-4.7
+  batch_3:
+  - DIS-4.8
+  - DIS-4.9
+  - DIS-4.10
+  batch_4:
+  - DIS-4.11
+  - DIS-4.12
+  critical_path:
+  - DIS-4.1
+  - DIS-4.2
+  - DIS-4.3
+  - DIS-4.8
+  estimated_total_time: 8-10 days
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "DiscoveryTab component renders correctly with various data sets"
-    status: "pending"
-  - id: "SC-2"
-    description: "Artifact filters and sorting functional"
-    status: "pending"
-  - id: "SC-3"
-    description: "Tab switcher integrated into Project Detail, tab state persists"
-    status: "pending"
-  - id: "SC-4"
-    description: "Banner only shows when importable_count > 0"
-    status: "pending"
-  - id: "SC-5"
-    description: "Toast utilities display detailed breakdown with counts"
-    status: "pending"
-  - id: "SC-6"
-    description: "Skip management UI functional (Un-skip, Clear all)"
-    status: "pending"
-  - id: "SC-7"
-    description: "Artifact actions menu keyboard accessible"
-    status: "pending"
-  - id: "SC-8"
-    description: "Unit test coverage >80%"
-    status: "pending"
-  - id: "SC-9"
-    description: "E2E tests pass: tab navigation, skip management"
-    status: "pending"
-  - id: "SC-10"
-    description: "Visual design consistent with existing UI"
-    status: "pending"
-
+- id: SC-1
+  description: DiscoveryTab component renders correctly with various data sets
+  status: pending
+- id: SC-2
+  description: Artifact filters and sorting functional
+  status: pending
+- id: SC-3
+  description: Tab switcher integrated into Project Detail, tab state persists
+  status: pending
+- id: SC-4
+  description: Banner only shows when importable_count > 0
+  status: pending
+- id: SC-5
+  description: Toast utilities display detailed breakdown with counts
+  status: pending
+- id: SC-6
+  description: Skip management UI functional (Un-skip, Clear all)
+  status: pending
+- id: SC-7
+  description: Artifact actions menu keyboard accessible
+  status: pending
+- id: SC-8
+  description: Unit test coverage >80%
+  status: pending
+- id: SC-9
+  description: 'E2E tests pass: tab navigation, skip management'
+  status: pending
+- id: SC-10
+  description: Visual design consistent with existing UI
+  status: pending
 files_modified:
-  - "skillmeat/web/components/discovery/DiscoveryTab.tsx"
-  - "skillmeat/web/components/discovery/ArtifactActions.tsx"
-  - "skillmeat/web/components/discovery/SkipPreferencesList.tsx"
-  - "skillmeat/web/app/projects/[id]/page.tsx"
-  - "skillmeat/web/components/discovery/DiscoveryBanner.tsx"
-  - "skillmeat/web/lib/toast-utils.ts"
-  - "skillmeat/web/__tests__/DiscoveryTab.test.tsx"
-  - "skillmeat/web/__tests__/toast-utils.test.ts"
-  - "skillmeat/web/tests/e2e/discovery-tab-navigation.spec.ts"
-  - "skillmeat/web/tests/e2e/skip-management.spec.ts"
+- skillmeat/web/components/discovery/DiscoveryTab.tsx
+- skillmeat/web/components/discovery/ArtifactActions.tsx
+- skillmeat/web/components/discovery/SkipPreferencesList.tsx
+- skillmeat/web/app/projects/[id]/page.tsx
+- skillmeat/web/components/discovery/DiscoveryBanner.tsx
+- skillmeat/web/lib/toast-utils.ts
+- skillmeat/web/__tests__/DiscoveryTab.test.tsx
+- skillmeat/web/__tests__/toast-utils.test.ts
+- skillmeat/web/tests/e2e/discovery-tab-navigation.spec.ts
+- skillmeat/web/tests/e2e/skip-management.spec.ts
+schema_version: 2
+doc_type: progress
+feature_slug: discovery-import-enhancement
 ---
 
 # Discovery & Import Enhancement - Phase 4: Frontend - Discovery Tab & UI Polish

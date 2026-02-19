@@ -1,131 +1,138 @@
 ---
-# === MARKETPLACE NON-SKILLS DETECTION FIX ===
-# Single-phase bug fix tracking for heuristic detector improvements
-# REQUIRED FIELDS: assigned_to, dependencies for EVERY task
-
-# Metadata: Identification and Classification
 type: progress
-prd: "marketplace-sources-non_skills-v1"
+prd: marketplace-sources-non_skills-v1
 phase: 1
-title: "Detection Algorithm Fix"
-status: "completed"
-started: "2025-12-31"
-completed: "2026-01-01"
-
-# Overall Progress: Status and Estimates
+title: Detection Algorithm Fix
+status: completed
+started: '2025-12-31'
+completed: '2026-01-01'
 overall_progress: 100
-completion_estimate: "complete"
-
-# Task Counts: Machine-readable task state
+completion_estimate: complete
 total_tasks: 6
 completed_tasks: 6
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-# Ownership: Primary and secondary agents
-owners: ["python-backend-engineer"]
-contributors: ["code-reviewer"]
-
-# === ORCHESTRATION QUICK REFERENCE ===
-# All tasks with assignments and dependencies
+owners:
+- python-backend-engineer
+contributors:
+- code-reviewer
 tasks:
-  - id: "FIX-001"
-    description: "Container Type Propagation - Modify container logic to propagate type hints to children"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "FIX-002"
-    description: "Frontmatter Parsing - Add YAML frontmatter parsing to extract artifact type"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "FIX-003"
-    description: "Scoring Weight Adjustment - Increase container hint weight, reduce depth penalty"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["FIX-001"]
-    estimated_effort: "2h"
-    priority: "medium"
-
-  - id: "FIX-004"
-    description: "Organization Path Metadata - Add organization_path field to capture directory structure"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["FIX-001"]
-    estimated_effort: "3h"
-    priority: "medium"
-
-  - id: "FIX-005"
-    description: "Multi-Type Test Suite - Comprehensive tests for all artifact types and organization_path"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["FIX-001", "FIX-002", "FIX-003", "FIX-004"]
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "FIX-006"
-    description: "Regression Testing - Run full test suite, verify no skill detection regressions"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["FIX-005"]
-    estimated_effort: "2h"
-    priority: "high"
-
-# Parallelization Strategy (computed from dependencies)
+- id: FIX-001
+  description: Container Type Propagation - Modify container logic to propagate type
+    hints to children
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3h
+  priority: high
+- id: FIX-002
+  description: Frontmatter Parsing - Add YAML frontmatter parsing to extract artifact
+    type
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3h
+  priority: high
+- id: FIX-003
+  description: Scoring Weight Adjustment - Increase container hint weight, reduce
+    depth penalty
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - FIX-001
+  estimated_effort: 2h
+  priority: medium
+- id: FIX-004
+  description: Organization Path Metadata - Add organization_path field to capture
+    directory structure
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - FIX-001
+  estimated_effort: 3h
+  priority: medium
+- id: FIX-005
+  description: Multi-Type Test Suite - Comprehensive tests for all artifact types
+    and organization_path
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - FIX-001
+  - FIX-002
+  - FIX-003
+  - FIX-004
+  estimated_effort: 3h
+  priority: high
+- id: FIX-006
+  description: Regression Testing - Run full test suite, verify no skill detection
+    regressions
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - FIX-005
+  estimated_effort: 2h
+  priority: high
 parallelization:
-  batch_1: ["FIX-001", "FIX-002"]
-  batch_2: ["FIX-003", "FIX-004"]
-  batch_3: ["FIX-005"]
-  batch_4: ["FIX-006"]
-  critical_path: ["FIX-001", "FIX-003", "FIX-005", "FIX-006"]
-  estimated_total_time: "10h"
-
-# Critical Blockers: None currently
+  batch_1:
+  - FIX-001
+  - FIX-002
+  batch_2:
+  - FIX-003
+  - FIX-004
+  batch_3:
+  - FIX-005
+  batch_4:
+  - FIX-006
+  critical_path:
+  - FIX-001
+  - FIX-003
+  - FIX-005
+  - FIX-006
+  estimated_total_time: 10h
 blockers: []
-
-# Success Criteria: Acceptance conditions for phase completion
 success_criteria:
-  - id: "SC-1"
-    description: "All existing tests pass (no regressions)"
-    status: "completed"
-    result: "101/101 tests passing"
-  - id: "SC-2"
-    description: "Commands detection accuracy >= 95%"
-    status: "completed"
-    result: "100% accuracy in tests"
-  - id: "SC-3"
-    description: "Agents detection accuracy >= 95%"
-    status: "completed"
-    result: "100% accuracy in tests"
-  - id: "SC-4"
-    description: "Hooks detection accuracy >= 95%"
-    status: "completed"
-    result: "100% accuracy in tests"
-  - id: "SC-5"
-    description: "MCP Servers detection accuracy >= 95%"
-    status: "completed"
-    result: "100% accuracy in tests"
-  - id: "SC-6"
-    description: "organization_path populated correctly for all artifacts"
-    status: "completed"
-    result: "8 dedicated tests passing"
-  - id: "SC-7"
-    description: "Test coverage for heuristic_detector.py > 85%"
-    status: "completed"
-    result: "87.14% coverage"
-
-# Files Modified: What's being changed in this phase
+- id: SC-1
+  description: All existing tests pass (no regressions)
+  status: completed
+  result: 101/101 tests passing
+- id: SC-2
+  description: Commands detection accuracy >= 95%
+  status: completed
+  result: 100% accuracy in tests
+- id: SC-3
+  description: Agents detection accuracy >= 95%
+  status: completed
+  result: 100% accuracy in tests
+- id: SC-4
+  description: Hooks detection accuracy >= 95%
+  status: completed
+  result: 100% accuracy in tests
+- id: SC-5
+  description: MCP Servers detection accuracy >= 95%
+  status: completed
+  result: 100% accuracy in tests
+- id: SC-6
+  description: organization_path populated correctly for all artifacts
+  status: completed
+  result: 8 dedicated tests passing
+- id: SC-7
+  description: Test coverage for heuristic_detector.py > 85%
+  status: completed
+  result: 87.14% coverage
 files_modified:
-  - "skillmeat/core/marketplace/heuristic_detector.py"
-  - "skillmeat/api/schemas/marketplace.py"
-  - "tests/core/marketplace/test_heuristic_detector.py"
+- skillmeat/core/marketplace/heuristic_detector.py
+- skillmeat/api/schemas/marketplace.py
+- tests/core/marketplace/test_heuristic_detector.py
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-sources-non-skills-v1
 ---
 
 # marketplace-sources-non_skills-v1 - Phase 1: Detection Algorithm Fix

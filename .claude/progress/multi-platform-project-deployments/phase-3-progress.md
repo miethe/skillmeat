@@ -1,169 +1,252 @@
 ---
 type: progress
-prd: "multi-platform-project-deployments-v1"
+prd: multi-platform-project-deployments-v1
 phase: 3
-title: "Context Entity Generalization"
-status: "completed"
-started: "2026-02-08T00:00:00Z"
-completed: "2026-02-08T00:00:00Z"
-
+title: Context Entity Generalization
+status: completed
+started: '2026-02-08T00:00:00Z'
+completed: '2026-02-08T00:00:00Z'
 overall_progress: 100
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 14
 completed_tasks: 14
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer"]
-contributors: ["data-layer-expert"]
-
+owners:
+- python-backend-engineer
+contributors:
+- data-layer-expert
 tasks:
-  - id: "P3-T1"
-    description: "Audit context entity validation layers - Identify all path validation in API schemas, core validators, and route-level checks; document validation matrix with file, line, current behavior"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "0.5 pts"
-    priority: "critical"
-
-  - id: "P3-T2"
-    description: "Create context-aware path validator utility - Create skillmeat/core/validators/context_path_validator.py with validate_context_path() using profile's context_path_prefixes; prevent path traversal"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P2-T2", "P1-T5"]
-    estimated_effort: "1.5 pts"
-    priority: "critical"
-
-  - id: "P3-T3"
-    description: "Refactor API schema validators - Replace hardcoded .claude/ prefix check in skillmeat/api/schemas/context_entity.py with profile-aware validator"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3-T2"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "P3-T4"
-    description: "Refactor core domain validators (3-layer sync) - Update skillmeat/core/validators/context_entity.py and skillmeat/api/routers/context_entities.py to use unified profile-aware validator; DRY principle; coordinate in single PR"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3-T2"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "P3-T5"
-    description: "Add project_config_filenames field to DeploymentProfile - Add list[str] field to core model and DB model; create migration with sensible defaults per platform"
-    status: "completed"
-    assigned_to: ["data-layer-expert", "python-backend-engineer"]
-    dependencies: ["P1-T5", "P1-T6"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "P3-T6"
-    description: "Update context entity deployment to profile-aware filenames - Deploy logic checks project-config files per profile; context entities deploy alongside any profile's project config"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3-T5", "P2-T3"]
-    estimated_effort: "1.5 pts"
-    priority: "high"
-
-  - id: "P3-T7"
-    description: "Add profile selector to context entity deploy options - Update CLI context deploy with --profile; update API endpoint with deployment_profile_id; validation uses selected profile's path rules"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3-T2", "P3-T4"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "P3-T8"
-    description: "Extend ContextEntity model with target_platforms - Add optional target_platforms: list[Platform] | None field; DB column; API schema update"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T1"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
-  - id: "P3-T9"
-    description: "Implement context entity platform filtering - Check entity's target_platforms during deploy; return error if profile platform not in list unless --force flag used"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3-T8"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
-  - id: "P3-T10"
-    description: "Unit tests: context path validator - Test multiple profile configurations, path traversal prevention, prefix matching across .claude/.codex/.gemini, platform targeting filters"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3-T2", "P3-T9"]
-    estimated_effort: "1.5 pts"
-    priority: "high"
-
-  - id: "P3-T11"
-    description: "Integration test: context entity deployment across profiles - Test project with Claude + Codex profiles; deploy context entity to both; verify path rules respected; verify platform targeting"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3-T6", "P3-T7", "P3-T9"]
-    estimated_effort: "1.5 pts"
-    priority: "high"
-
-  - id: "P3-T12"
-    description: "Integration test: project config file discovery per profile - Test context entity deployment when project-config files exist in different profile roots (CLAUDE.md in .claude/, GEMINI.md in .gemini/)"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3-T6"]
-    estimated_effort: "1.5 pts"
-    priority: "medium"
-
-  - id: "P3-T13"
-    description: "Update context entity API response to include platform info - Extend ContextEntityRead schema with target_platforms and deployed_to per-profile breakdown; update OpenAPI docs"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3-T8"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
-  - id: "P3-T14"
-    description: "Backward compatibility: auto-detect project config roots - For existing projects without explicit profile config_filenames, auto-detect .claude/*.md config files and add to default profile's context_path_prefixes"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P3-T6"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
+- id: P3-T1
+  description: Audit context entity validation layers - Identify all path validation
+    in API schemas, core validators, and route-level checks; document validation matrix
+    with file, line, current behavior
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 0.5 pts
+  priority: critical
+- id: P3-T2
+  description: Create context-aware path validator utility - Create skillmeat/core/validators/context_path_validator.py
+    with validate_context_path() using profile's context_path_prefixes; prevent path
+    traversal
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P2-T2
+  - P1-T5
+  estimated_effort: 1.5 pts
+  priority: critical
+- id: P3-T3
+  description: Refactor API schema validators - Replace hardcoded .claude/ prefix
+    check in skillmeat/api/schemas/context_entity.py with profile-aware validator
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3-T2
+  estimated_effort: 1 pt
+  priority: high
+- id: P3-T4
+  description: Refactor core domain validators (3-layer sync) - Update skillmeat/core/validators/context_entity.py
+    and skillmeat/api/routers/context_entities.py to use unified profile-aware validator;
+    DRY principle; coordinate in single PR
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3-T2
+  estimated_effort: 2 pts
+  priority: high
+- id: P3-T5
+  description: Add project_config_filenames field to DeploymentProfile - Add list[str]
+    field to core model and DB model; create migration with sensible defaults per
+    platform
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  - python-backend-engineer
+  dependencies:
+  - P1-T5
+  - P1-T6
+  estimated_effort: 1 pt
+  priority: high
+- id: P3-T6
+  description: Update context entity deployment to profile-aware filenames - Deploy
+    logic checks project-config files per profile; context entities deploy alongside
+    any profile's project config
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3-T5
+  - P2-T3
+  estimated_effort: 1.5 pts
+  priority: high
+- id: P3-T7
+  description: Add profile selector to context entity deploy options - Update CLI
+    context deploy with --profile; update API endpoint with deployment_profile_id;
+    validation uses selected profile's path rules
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3-T2
+  - P3-T4
+  estimated_effort: 1 pt
+  priority: high
+- id: P3-T8
+  description: 'Extend ContextEntity model with target_platforms - Add optional target_platforms:
+    list[Platform] | None field; DB column; API schema update'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T1
+  estimated_effort: 1 pt
+  priority: medium
+- id: P3-T9
+  description: Implement context entity platform filtering - Check entity's target_platforms
+    during deploy; return error if profile platform not in list unless --force flag
+    used
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3-T8
+  estimated_effort: 1 pt
+  priority: medium
+- id: P3-T10
+  description: 'Unit tests: context path validator - Test multiple profile configurations,
+    path traversal prevention, prefix matching across .claude/.codex/.gemini, platform
+    targeting filters'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3-T2
+  - P3-T9
+  estimated_effort: 1.5 pts
+  priority: high
+- id: P3-T11
+  description: 'Integration test: context entity deployment across profiles - Test
+    project with Claude + Codex profiles; deploy context entity to both; verify path
+    rules respected; verify platform targeting'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3-T6
+  - P3-T7
+  - P3-T9
+  estimated_effort: 1.5 pts
+  priority: high
+- id: P3-T12
+  description: 'Integration test: project config file discovery per profile - Test
+    context entity deployment when project-config files exist in different profile
+    roots (CLAUDE.md in .claude/, GEMINI.md in .gemini/)'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3-T6
+  estimated_effort: 1.5 pts
+  priority: medium
+- id: P3-T13
+  description: Update context entity API response to include platform info - Extend
+    ContextEntityRead schema with target_platforms and deployed_to per-profile breakdown;
+    update OpenAPI docs
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3-T8
+  estimated_effort: 1 pt
+  priority: medium
+- id: P3-T14
+  description: 'Backward compatibility: auto-detect project config roots - For existing
+    projects without explicit profile config_filenames, auto-detect .claude/*.md config
+    files and add to default profile''s context_path_prefixes'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P3-T6
+  estimated_effort: 1 pt
+  priority: high
 parallelization:
-  batch_1: ["P3-T1", "P3-T8"]
-  batch_2: ["P3-T2", "P3-T5", "P3-T9"]
-  batch_3: ["P3-T3", "P3-T4", "P3-T6", "P3-T13"]
-  batch_4: ["P3-T7", "P3-T10", "P3-T12", "P3-T14"]
-  batch_5: ["P3-T11"]
-  critical_path: ["P3-T1", "P3-T2", "P3-T4", "P3-T7", "P3-T11"]
-  estimated_total_time: "18 pts (5 batches)"
-
+  batch_1:
+  - P3-T1
+  - P3-T8
+  batch_2:
+  - P3-T2
+  - P3-T5
+  - P3-T9
+  batch_3:
+  - P3-T3
+  - P3-T4
+  - P3-T6
+  - P3-T13
+  batch_4:
+  - P3-T7
+  - P3-T10
+  - P3-T12
+  - P3-T14
+  batch_5:
+  - P3-T11
+  critical_path:
+  - P3-T1
+  - P3-T2
+  - P3-T4
+  - P3-T7
+  - P3-T11
+  estimated_total_time: 18 pts (5 batches)
 blockers: []
-
 success_criteria:
-  - { id: "SC-1", description: "All three context entity validation layers refactored to unified profile-aware validator", status: "completed" }
-  - { id: "SC-2", description: "Path traversal tests pass; security review approved", status: "completed" }
-  - { id: "SC-3", description: "Context entities deployable to multiple profile roots in same project", status: "completed" }
-  - { id: "SC-4", description: "Platform targeting works correctly; --force override tested", status: "completed" }
-  - { id: "SC-5", description: "Project config file detection per profile working", status: "completed" }
-  - { id: "SC-6", description: "API response includes deployed profiles and platform info", status: "completed" }
-  - { id: "SC-7", description: "Backward compatibility: existing context entities auto-detect their profile", status: "completed" }
-  - { id: "SC-8", description: "Integration tests pass: cross-profile context deployment, config file discovery", status: "completed" }
-
+- id: SC-1
+  description: All three context entity validation layers refactored to unified profile-aware
+    validator
+  status: completed
+- id: SC-2
+  description: Path traversal tests pass; security review approved
+  status: completed
+- id: SC-3
+  description: Context entities deployable to multiple profile roots in same project
+  status: completed
+- id: SC-4
+  description: Platform targeting works correctly; --force override tested
+  status: completed
+- id: SC-5
+  description: Project config file detection per profile working
+  status: completed
+- id: SC-6
+  description: API response includes deployed profiles and platform info
+  status: completed
+- id: SC-7
+  description: 'Backward compatibility: existing context entities auto-detect their
+    profile'
+  status: completed
+- id: SC-8
+  description: 'Integration tests pass: cross-profile context deployment, config file
+    discovery'
+  status: completed
 files_modified:
-  - "skillmeat/core/validators/context_path_validator.py"
-  - "skillmeat/core/validators/context_entity.py"
-  - "skillmeat/core/path_resolver.py"
-  - "skillmeat/api/schemas/context_entity.py"
-  - "skillmeat/api/routers/context_entities.py"
-  - "skillmeat/cache/repositories.py"
-  - "skillmeat/cli.py"
-  - "tests/test_core_context_path_validator.py"
-  - "tests/test_context_entity_cross_profile.py"
-  - "tests/integration/test_context_cli.py"
+- skillmeat/core/validators/context_path_validator.py
+- skillmeat/core/validators/context_entity.py
+- skillmeat/core/path_resolver.py
+- skillmeat/api/schemas/context_entity.py
+- skillmeat/api/routers/context_entities.py
+- skillmeat/cache/repositories.py
+- skillmeat/cli.py
+- tests/test_core_context_path_validator.py
+- tests/test_context_entity_cross_profile.py
+- tests/integration/test_context_cli.py
+schema_version: 2
+doc_type: progress
+feature_slug: multi-platform-project-deployments-v1
 ---
 
 # Phase 3: Context Entity Generalization

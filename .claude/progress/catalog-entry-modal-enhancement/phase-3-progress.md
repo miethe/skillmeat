@@ -1,8 +1,8 @@
 ---
 type: progress
-prd: "catalog-entry-modal-enhancement"
+prd: catalog-entry-modal-enhancement
 phase: 3
-title: "Polish & Testing"
+title: Polish & Testing
 status: completed
 progress: 100
 total_tasks: 10
@@ -11,174 +11,244 @@ blocked_tasks: 0
 created: 2025-12-28
 updated: 2025-12-28
 completed_at: 2025-12-28
-
 tasks:
-  - id: "TASK-3.1"
-    title: "Auto-select default file"
-    status: "completed"
-    priority: "medium"
-    estimate: "1 pt"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-2.5"]
-    acceptance: "When Contents tab opens, auto-select first .md file (case-insensitive). Fallback: first file alphabetically."
-    files: ["skillmeat/web/components/CatalogEntryModal.tsx"]
-    commit: "7db09a4"
-    completed_at: "2025-12-28"
-    note: "Added useEffect to auto-select first .md file when file tree loads, fallback to first file alphabetically"
+- id: TASK-3.1
+  title: Auto-select default file
+  status: completed
+  priority: medium
+  estimate: 1 pt
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-2.5
+  acceptance: 'When Contents tab opens, auto-select first .md file (case-insensitive).
+    Fallback: first file alphabetically.'
+  files:
+  - skillmeat/web/components/CatalogEntryModal.tsx
+  commit: 7db09a4
+  completed_at: '2025-12-28'
+  note: Added useEffect to auto-select first .md file when file tree loads, fallback
+    to first file alphabetically
+- id: TASK-3.2
+  title: Implement file size truncation
+  status: completed
+  priority: medium
+  estimate: 1 pt
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.4
+  acceptance: 'Backend: Truncate files >1MB to first 10,000 lines. Return truncated:
+    true in response.'
+  files:
+  - skillmeat/core/marketplace/github_scanner.py
+  - skillmeat/api/schemas/marketplace.py
+  commit: 7db09a4
+  completed_at: '2025-12-28'
+  note: 'Added MAX_FILE_SIZE (1MB), MAX_LINES (10000) constants. Truncates text files
+    >1MB, returns truncated: true and original_size in response.'
+- id: TASK-3.3
+  title: Add truncation UI
+  status: completed
+  priority: medium
+  estimate: 1 pt
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-3.2
+  acceptance: 'Frontend: Show warning banner ''Large file truncated. [View full file
+    on GitHub]'' when truncated: true.'
+  files:
+  - skillmeat/web/components/CatalogEntryModal.tsx
+  - skillmeat/web/components/entity/content-pane.tsx
+  commit: 5d57836
+  completed_at: '2025-12-28'
+  note: Added TruncationBanner component with amber warning styling, formatBytes helper,
+    and GitHub link builder
+- id: TASK-3.4
+  title: Integration tests for GitHub errors
+  status: completed
+  priority: high
+  estimate: 2 pts
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.3
+  - TASK-1.4
+  - TASK-1.6
+  acceptance: Test rate limit (403), not found (404), timeout scenarios. Mock GitHub
+    API responses.
+  files:
+  - skillmeat/api/tests/integration/test_github_client_errors.py
+  commit: e64458f
+  completed_at: '2025-12-28'
+  note: 21 integration tests covering rate limit (429/Retry-After), 404 handling,
+    timeout scenarios with mocked GitHub responses
+- id: TASK-3.5
+  title: E2E test for file preview
+  status: completed
+  priority: high
+  estimate: 2 pts
+  assigned_to:
+  - ui-engineer
+  dependencies:
+  - TASK-2.5
+  acceptance: "Playwright test: Navigate to source detail \u2192 click catalog entry\
+    \ \u2192 click Contents tab \u2192 select file \u2192 verify content displays."
+  files:
+  - skillmeat/web/tests/e2e/catalog-preview.spec.ts
+  commit: e64458f
+  completed_at: '2025-12-28'
+  note: 21 E2E tests covering happy path, error handling, modal behavior, import actions,
+    accessibility, and empty states
+- id: TASK-3.6
+  title: Accessibility audit
+  status: completed
+  priority: high
+  estimate: 2 pts
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.5
+  acceptance: 'Keyboard nav: Tab through file tree, Enter to select, Arrow keys to
+    expand/collapse. Screen reader: ARIA labels for tree items, content pane.'
+  files:
+  - skillmeat/web/components/CatalogEntryModal.tsx
+  - skillmeat/web/components/entity/file-tree.tsx
+  - skillmeat/web/components/entity/content-pane.tsx
+  commit: 0b0b8a0
+  completed_at: '2025-12-28'
+  note: 'Implemented comprehensive accessibility features:
 
-  - id: "TASK-3.2"
-    title: "Implement file size truncation"
-    status: "completed"
-    priority: "medium"
-    estimate: "1 pt"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.4"]
-    acceptance: "Backend: Truncate files >1MB to first 10,000 lines. Return truncated: true in response."
-    files: ["skillmeat/core/marketplace/github_scanner.py", "skillmeat/api/schemas/marketplace.py"]
-    commit: "7db09a4"
-    completed_at: "2025-12-28"
-    note: "Added MAX_FILE_SIZE (1MB), MAX_LINES (10000) constants. Truncates text files >1MB, returns truncated: true and original_size in response."
+    - FileTree: Added role="tree", role="treeitem", aria-selected, aria-expanded,
+    aria-level
 
-  - id: "TASK-3.3"
-    title: "Add truncation UI"
-    status: "completed"
-    priority: "medium"
-    estimate: "1 pt"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-3.2"]
-    acceptance: "Frontend: Show warning banner 'Large file truncated. [View full file on GitHub]' when truncated: true."
-    files: ["skillmeat/web/components/CatalogEntryModal.tsx", "skillmeat/web/components/entity/content-pane.tsx"]
-    commit: "5d57836"
-    completed_at: "2025-12-28"
-    note: "Added TruncationBanner component with amber warning styling, formatBytes helper, and GitHub link builder"
+    - Roving tabindex for efficient keyboard focus management
 
-  - id: "TASK-3.4"
-    title: "Integration tests for GitHub errors"
-    status: "completed"
-    priority: "high"
-    estimate: "2 pts"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.3", "TASK-1.4", "TASK-1.6"]
-    acceptance: "Test rate limit (403), not found (404), timeout scenarios. Mock GitHub API responses."
-    files: ["skillmeat/api/tests/integration/test_github_client_errors.py"]
-    commit: "e64458f"
-    completed_at: "2025-12-28"
-    note: "21 integration tests covering rate limit (429/Retry-After), 404 handling, timeout scenarios with mocked GitHub responses"
+    - Full keyboard navigation: ArrowUp/Down (move), ArrowRight (expand/enter child),
+    ArrowLeft (collapse/parent), Home, End
 
-  - id: "TASK-3.5"
-    title: "E2E test for file preview"
-    status: "completed"
-    priority: "high"
-    estimate: "2 pts"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-2.5"]
-    acceptance: "Playwright test: Navigate to source detail → click catalog entry → click Contents tab → select file → verify content displays."
-    files: ["skillmeat/web/tests/e2e/catalog-preview.spec.ts"]
-    commit: "e64458f"
-    completed_at: "2025-12-28"
-    note: "21 E2E tests covering happy path, error handling, modal behavior, import actions, accessibility, and empty states"
+    - ContentPane: Added role="region", aria-label, aria-labelledby
 
-  - id: "TASK-3.6"
-    title: "Accessibility audit"
-    status: "completed"
-    priority: "high"
-    estimate: "2 pts"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.5"]
-    acceptance: "Keyboard nav: Tab through file tree, Enter to select, Arrow keys to expand/collapse. Screen reader: ARIA labels for tree items, content pane."
-    files: ["skillmeat/web/components/CatalogEntryModal.tsx", "skillmeat/web/components/entity/file-tree.tsx", "skillmeat/web/components/entity/content-pane.tsx"]
-    commit: "0b0b8a0"
-    completed_at: "2025-12-28"
-    note: |
-      Implemented comprehensive accessibility features:
-      - FileTree: Added role="tree", role="treeitem", aria-selected, aria-expanded, aria-level
-      - Roving tabindex for efficient keyboard focus management
-      - Full keyboard navigation: ArrowUp/Down (move), ArrowRight (expand/enter child), ArrowLeft (collapse/parent), Home, End
-      - ContentPane: Added role="region", aria-label, aria-labelledby
-      - Breadcrumb: Added nav role with aria-label, aria-current for current file
-      - All icons marked aria-hidden="true"
-      - Delete button has aria-label for screen readers
-      - Added data-testid attributes for testing
+    - Breadcrumb: Added nav role with aria-label, aria-current for current file
 
-  - id: "TASK-3.7"
-    title: "Performance testing"
-    status: "completed"
-    priority: "medium"
-    estimate: "2 pts"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.5", "TASK-2.9"]
-    acceptance: "Measure cache hit rate (target >70%), file tree load time (<3s), content load time (<2s cached, <5s uncached)."
-    files: ["skillmeat/api/tests/test_file_cache_performance.py"]
-    commit: "e64458f"
-    completed_at: "2025-12-28"
-    note: "13 performance tests validating >70% cache hit rate (actual 90-99%), <1ms cached load times, concurrent access, LRU eviction"
+    - All icons marked aria-hidden="true"
 
-  - id: "TASK-3.8"
-    title: "Security review"
-    status: "completed"
-    priority: "high"
-    estimate: "1 pt"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.3", "TASK-1.4"]
-    acceptance: "Validate file paths (no ../), sanitize content before Monaco editor, CSP headers for XSS prevention."
-    files: ["skillmeat/api/routers/marketplace_sources.py", "skillmeat/api/tests/test_file_endpoint_security.py"]
-    commit: "0b0b8a0"
-    completed_at: "2025-12-28"
-    note: "Added validate_file_path() and validate_source_id() functions. 61 security tests covering path traversal, null bytes, absolute paths, URL-encoded attacks"
+    - Delete button has aria-label for screen readers
 
-  - id: "TASK-3.9"
-    title: "User documentation"
-    status: "completed"
-    priority: "low"
-    estimate: "1 pt"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["TASK-2.5"]
-    acceptance: "Add 'Previewing Catalog Artifacts' section to user guide. Include screenshots of Contents tab."
-    files: ["docs/user/guides/marketplace-usage-guide.md"]
-    commit: "0bbf135"
-    completed_at: "2025-12-28"
-    note: "Added comprehensive 'Previewing Catalog Artifacts' section with file browser features, large file handling, rate limits, tips, and troubleshooting"
+    - Added data-testid attributes for testing
 
-  - id: "TASK-3.10"
-    title: "Create ADR for caching"
-    status: "completed"
-    priority: "low"
-    estimate: "1 pt"
-    assigned_to: ["documentation-complex"]
-    dependencies: ["TASK-1.5", "TASK-2.9"]
-    acceptance: "Document caching strategy: TTLs, invalidation rules, cache key format, LRU eviction policy."
-    files: ["docs/dev/architecture/decisions/ADR-006-catalog-file-caching.md"]
-    commit: "0bbf135"
-    completed_at: "2025-12-28"
-    note: "ADR-006 documenting two-layer cache strategy (backend LRU + frontend TanStack Query), TTLs, cache keys, consequences"
-
+    '
+- id: TASK-3.7
+  title: Performance testing
+  status: completed
+  priority: medium
+  estimate: 2 pts
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.5
+  - TASK-2.9
+  acceptance: Measure cache hit rate (target >70%), file tree load time (<3s), content
+    load time (<2s cached, <5s uncached).
+  files:
+  - skillmeat/api/tests/test_file_cache_performance.py
+  commit: e64458f
+  completed_at: '2025-12-28'
+  note: 13 performance tests validating >70% cache hit rate (actual 90-99%), <1ms
+    cached load times, concurrent access, LRU eviction
+- id: TASK-3.8
+  title: Security review
+  status: completed
+  priority: high
+  estimate: 1 pt
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.3
+  - TASK-1.4
+  acceptance: Validate file paths (no ../), sanitize content before Monaco editor,
+    CSP headers for XSS prevention.
+  files:
+  - skillmeat/api/routers/marketplace_sources.py
+  - skillmeat/api/tests/test_file_endpoint_security.py
+  commit: 0b0b8a0
+  completed_at: '2025-12-28'
+  note: Added validate_file_path() and validate_source_id() functions. 61 security
+    tests covering path traversal, null bytes, absolute paths, URL-encoded attacks
+- id: TASK-3.9
+  title: User documentation
+  status: completed
+  priority: low
+  estimate: 1 pt
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - TASK-2.5
+  acceptance: Add 'Previewing Catalog Artifacts' section to user guide. Include screenshots
+    of Contents tab.
+  files:
+  - docs/user/guides/marketplace-usage-guide.md
+  commit: 0bbf135
+  completed_at: '2025-12-28'
+  note: Added comprehensive 'Previewing Catalog Artifacts' section with file browser
+    features, large file handling, rate limits, tips, and troubleshooting
+- id: TASK-3.10
+  title: Create ADR for caching
+  status: completed
+  priority: low
+  estimate: 1 pt
+  assigned_to:
+  - documentation-complex
+  dependencies:
+  - TASK-1.5
+  - TASK-2.9
+  acceptance: 'Document caching strategy: TTLs, invalidation rules, cache key format,
+    LRU eviction policy.'
+  files:
+  - docs/dev/architecture/decisions/ADR-006-catalog-file-caching.md
+  commit: 0bbf135
+  completed_at: '2025-12-28'
+  note: ADR-006 documenting two-layer cache strategy (backend LRU + frontend TanStack
+    Query), TTLs, cache keys, consequences
 parallelization:
-  batch_1: ["TASK-3.1", "TASK-3.2"]
-  batch_2: ["TASK-3.3"]
-  batch_3: ["TASK-3.4", "TASK-3.5", "TASK-3.6", "TASK-3.7", "TASK-3.8"]
-  batch_4: ["TASK-3.9", "TASK-3.10"]
-
+  batch_1:
+  - TASK-3.1
+  - TASK-3.2
+  batch_2:
+  - TASK-3.3
+  batch_3:
+  - TASK-3.4
+  - TASK-3.5
+  - TASK-3.6
+  - TASK-3.7
+  - TASK-3.8
+  batch_4:
+  - TASK-3.9
+  - TASK-3.10
 quality_gate:
-  owner: "python-backend-engineer"
+  owner: python-backend-engineer
   passed: true
-  passed_at: "2025-12-28"
+  passed_at: '2025-12-28'
   criteria:
-    - "First .md file auto-selected in Contents tab (or first alphabetically) ✅"
-    - "Files >1MB truncated with 'View full file on GitHub' link ✅"
-    - "Integration tests cover GitHub 403, 404, timeout scenarios ✅"
-    - "E2E test validates full user workflow (browse → preview → import) ✅"
-    - "WCAG 2.1 AA compliance for keyboard nav and screen readers ✅"
-    - "Performance test confirms cache hit rate >70% ✅"
-    - "Security audit passes (no XSS, path traversal vulnerabilities) ✅"
-    - "User documentation and ADR published ✅"
-
+  - "First .md file auto-selected in Contents tab (or first alphabetically) \u2705"
+  - "Files >1MB truncated with 'View full file on GitHub' link \u2705"
+  - "Integration tests cover GitHub 403, 404, timeout scenarios \u2705"
+  - "E2E test validates full user workflow (browse \u2192 preview \u2192 import) \u2705"
+  - "WCAG 2.1 AA compliance for keyboard nav and screen readers \u2705"
+  - "Performance test confirms cache hit rate >70% \u2705"
+  - "Security audit passes (no XSS, path traversal vulnerabilities) \u2705"
+  - "User documentation and ADR published \u2705"
 blockers: []
-
 notes:
-  - "Phase 3 depends on Phase 2 completion (most tasks need Contents tab)"
-  - "TASK-3.2 can start early (only depends on Phase 1)"
-  - "All 10 tasks completed successfully on 2025-12-28"
-  - "Total test coverage: 21 integration + 21 E2E + 13 performance + 61 security = 116 new tests"
+- Phase 3 depends on Phase 2 completion (most tasks need Contents tab)
+- TASK-3.2 can start early (only depends on Phase 1)
+- All 10 tasks completed successfully on 2025-12-28
+- 'Total test coverage: 21 integration + 21 E2E + 13 performance + 61 security = 116
+  new tests'
+schema_version: 2
+doc_type: progress
+feature_slug: catalog-entry-modal-enhancement
 ---
 
 # Phase 3: Polish & Testing - COMPLETED

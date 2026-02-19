@@ -4,9 +4,12 @@ status: completed
 created: 2026-02-04
 feature: Deploy Button with CLI Dropdown
 files_affected:
-  - skillmeat/web/components/shared/deploy-button.tsx (NEW)
-  - skillmeat/web/components/collection/artifact-details-modal.tsx
-  - skillmeat/web/components/manage/artifact-operations-modal.tsx
+- skillmeat/web/components/shared/deploy-button.tsx (NEW)
+- skillmeat/web/components/collection/artifact-details-modal.tsx
+- skillmeat/web/components/manage/artifact-operations-modal.tsx
+schema_version: 2
+doc_type: quick_feature
+feature_slug: deploy-button-with-cli-dropdown
 ---
 
 # Deploy Button with CLI Dropdown

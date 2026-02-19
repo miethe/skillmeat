@@ -1,13 +1,16 @@
 ---
-title: "Fix Marketplace Import: Symlinks + Single-Artifact Naming"
+title: 'Fix Marketplace Import: Symlinks + Single-Artifact Naming'
 type: quick-feature
 status: completed
 created: 2025-02-05
 estimated_effort: 2-3 hours
 files_affected:
-  - skillmeat/core/marketplace/import_coordinator.py
-  - skillmeat/core/marketplace/github_scanner.py
-  - skillmeat/core/marketplace/heuristic_detector.py
+- skillmeat/core/marketplace/import_coordinator.py
+- skillmeat/core/marketplace/github_scanner.py
+- skillmeat/core/marketplace/heuristic_detector.py
+schema_version: 2
+doc_type: quick_feature
+feature_slug: marketplace-symlink-import-fix
 ---
 
 # Fix Marketplace Import: Symlinks + Single-Artifact Naming

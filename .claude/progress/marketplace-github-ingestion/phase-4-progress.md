@@ -1,107 +1,128 @@
 ---
 type: progress
-prd: "marketplace-github-ingestion"
+prd: marketplace-github-ingestion
 phase: 4
-title: "API Layer"
-status: "planning"
+title: API Layer
+status: planning
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 7
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer"]
-contributors: ["backend-architect"]
-
+owners:
+- python-backend-engineer
+contributors:
+- backend-architect
 tasks:
-  - id: "API-001"
-    description: "Marketplace sources router: POST/GET sources, GET source by ID, PATCH source"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SVC-007"]
-    estimated_effort: "3pts"
-    priority: "high"
-
-  - id: "API-002"
-    description: "Marketplace rescan endpoint: POST sources/{id}/rescan with background job"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["API-001"]
-    estimated_effort: "2pts"
-    priority: "high"
-
-  - id: "API-003"
-    description: "Marketplace artifacts listing: GET sources/{id}/artifacts with filtering and pagination"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["API-001"]
-    estimated_effort: "2pts"
-    priority: "high"
-
-  - id: "API-004"
-    description: "Marketplace import endpoint: POST sources/{id}/import for single and bulk imports"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["SVC-006"]
-    estimated_effort: "3pts"
-    priority: "high"
-
-  - id: "API-005"
-    description: "Error handling and validation middleware for marketplace endpoints"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["API-004"]
-    estimated_effort: "2pts"
-    priority: "medium"
-
-  - id: "API-006"
-    description: "Authentication and authorization checks for marketplace operations"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["API-005"]
-    estimated_effort: "2pts"
-    priority: "high"
-
-  - id: "API-007"
-    description: "Background job integration for scans (Celery/APScheduler setup)"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["API-002"]
-    estimated_effort: "2pts"
-    priority: "medium"
-
+- id: API-001
+  description: 'Marketplace sources router: POST/GET sources, GET source by ID, PATCH
+    source'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SVC-007
+  estimated_effort: 3pts
+  priority: high
+- id: API-002
+  description: 'Marketplace rescan endpoint: POST sources/{id}/rescan with background
+    job'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - API-001
+  estimated_effort: 2pts
+  priority: high
+- id: API-003
+  description: 'Marketplace artifacts listing: GET sources/{id}/artifacts with filtering
+    and pagination'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - API-001
+  estimated_effort: 2pts
+  priority: high
+- id: API-004
+  description: 'Marketplace import endpoint: POST sources/{id}/import for single and
+    bulk imports'
+  status: pending
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - SVC-006
+  estimated_effort: 3pts
+  priority: high
+- id: API-005
+  description: Error handling and validation middleware for marketplace endpoints
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - API-004
+  estimated_effort: 2pts
+  priority: medium
+- id: API-006
+  description: Authentication and authorization checks for marketplace operations
+  status: pending
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - API-005
+  estimated_effort: 2pts
+  priority: high
+- id: API-007
+  description: Background job integration for scans (Celery/APScheduler setup)
+  status: pending
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - API-002
+  estimated_effort: 2pts
+  priority: medium
 parallelization:
-  batch_1: ["API-001"]
-  batch_2: ["API-002", "API-003", "API-004"]
-  batch_3: ["API-005", "API-007"]
-  batch_4: ["API-006"]
-  critical_path: ["API-001", "API-002", "API-004", "API-005", "API-006"]
-  estimated_total_time: "16h"
-
+  batch_1:
+  - API-001
+  batch_2:
+  - API-002
+  - API-003
+  - API-004
+  batch_3:
+  - API-005
+  - API-007
+  batch_4:
+  - API-006
+  critical_path:
+  - API-001
+  - API-002
+  - API-004
+  - API-005
+  - API-006
+  estimated_total_time: 16h
 blockers: []
-
 success_criteria:
-  - All marketplace endpoints implemented following FastAPI patterns
-  - Endpoints return proper HTTP status codes and error responses
-  - Background rescan job executes asynchronously with status tracking
-  - Filtering and pagination work on artifact listings
-  - Authentication enforces project-level access control
-  - Input validation prevents malformed requests
-  - Endpoints tested with unit and integration tests
-  - OpenAPI documentation generated automatically
-
+- All marketplace endpoints implemented following FastAPI patterns
+- Endpoints return proper HTTP status codes and error responses
+- Background rescan job executes asynchronously with status tracking
+- Filtering and pagination work on artifact listings
+- Authentication enforces project-level access control
+- Input validation prevents malformed requests
+- Endpoints tested with unit and integration tests
+- OpenAPI documentation generated automatically
 files_modified:
-  - "skillmeat/api/routers/marketplace.py"
-  - "skillmeat/api/schemas/marketplace.py"
-  - "skillmeat/api/middleware/marketplace_auth.py"
-  - "skillmeat/core/jobs/marketplace_scan.py"
-  - "tests/integration/test_marketplace_api.py"
+- skillmeat/api/routers/marketplace.py
+- skillmeat/api/schemas/marketplace.py
+- skillmeat/api/middleware/marketplace_auth.py
+- skillmeat/core/jobs/marketplace_scan.py
+- tests/integration/test_marketplace_api.py
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-github-ingestion
 ---
 
 # Phase 4: API Layer

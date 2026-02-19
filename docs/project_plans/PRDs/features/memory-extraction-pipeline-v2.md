@@ -19,6 +19,9 @@ related:
 - docs/project_plans/reports/memory-extraction-gap-analysis-2026-02-07.md
 - skillmeat/core/services/memory_extractor_service.py
 - skillmeat/api/routers/memory_items.py
+schema_version: 2
+doc_type: prd
+feature_slug: memory-extraction-pipeline
 ---
 # Feature Brief & Metadata
 

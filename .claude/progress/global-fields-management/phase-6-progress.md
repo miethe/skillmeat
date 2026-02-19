@@ -1,43 +1,50 @@
 ---
 type: progress
-prd: "global-fields-management"
+prd: global-fields-management
 phase: 6
 status: pending
 progress: 0
-
 tasks:
-  - id: "GFM-IMPL-6.1"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    model: "sonnet"
-
-  - id: "GFM-IMPL-6.2"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    model: "sonnet"
-
-  - id: "GFM-IMPL-6.3"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    model: "sonnet"
-
-  - id: "GFM-IMPL-6.4"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    model: "haiku"
-
-  - id: "GFM-IMPL-6.5"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    model: "sonnet"
-
+- id: GFM-IMPL-6.1
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  model: sonnet
+- id: GFM-IMPL-6.2
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  model: sonnet
+- id: GFM-IMPL-6.3
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  model: sonnet
+- id: GFM-IMPL-6.4
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  model: haiku
+- id: GFM-IMPL-6.5
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  model: sonnet
 parallelization:
-  batch_1: ["GFM-IMPL-6.1", "GFM-IMPL-6.2", "GFM-IMPL-6.3", "GFM-IMPL-6.4", "GFM-IMPL-6.5"]
+  batch_1:
+  - GFM-IMPL-6.1
+  - GFM-IMPL-6.2
+  - GFM-IMPL-6.3
+  - GFM-IMPL-6.4
+  - GFM-IMPL-6.5
+schema_version: 2
+doc_type: progress
+feature_slug: global-fields-management
 ---
 
 # Phase 6: Documentation & Deployment

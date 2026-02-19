@@ -18,6 +18,11 @@ category: implementation
 status: inferred_complete
 parent_plan: /docs/project_plans/implementation_plans/enhancements/persistent-project-cache-v1.md
 prd_reference: /docs/project_plans/PRDs/enhancements/persistent-project-cache-v1.md
+schema_version: 2
+doc_type: phase_plan
+feature_slug: persistent-project-cache
+prd_ref: null
+plan_ref: null
 ---
 # Phases 3-4: Integration Layers
 

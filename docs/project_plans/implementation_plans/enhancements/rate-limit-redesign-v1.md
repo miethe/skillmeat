@@ -17,6 +17,10 @@ status: inferred_complete
 related:
 - /skillmeat/api/middleware/rate_limit.py
 - /tests/api/test_middleware/test_rate_limit.py
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: rate-limit-redesign
+prd_ref: null
 ---
 # Implementation Plan: API Rate Limiting Redesign
 

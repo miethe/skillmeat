@@ -9,6 +9,11 @@ effort: 18-22 story points
 priority: HIGH
 depends_on: phase-1-bug-fixes.md
 status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: discovery-import-fixes
+prd_ref: null
+plan_ref: null
 ---
 # Phase 2: Duplicate Detection & Review Workflow
 

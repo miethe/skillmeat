@@ -1,77 +1,92 @@
 ---
 type: progress
-prd: "request-log-viewer-v1"
+prd: request-log-viewer-v1
 phase: 4
-title: "Documentation & Deployment"
-status: "pending"
+title: Documentation & Deployment
+status: pending
 progress: 0
 total_tasks: 5
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["documentation-writer", "python-backend-engineer"]
-created: "2026-01-30"
-updated: "2026-01-30"
-
+owners:
+- documentation-writer
+- python-backend-engineer
+created: '2026-01-30'
+updated: '2026-01-30'
 tasks:
-  - id: "TASK-4.1"
-    description: "OpenAPI documentation verification"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "0.5 days"
-    priority: "high"
-    files:
-      - "skillmeat/api/routers/request_logs.py"
-      - "skillmeat/api/schemas/request_log.py"
-
-  - id: "TASK-4.2"
-    description: "Create ADR for subprocess integration"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "0.5 days"
-    priority: "high"
-    files:
-      - "docs/architecture/decisions/"
-
-  - id: "TASK-4.3"
-    description: "Feature flag implementation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "0.5 days"
-    priority: "high"
-    files:
-      - "skillmeat/api/config.py"
-      - "skillmeat/api/routers/request_logs.py"
-
-  - id: "TASK-4.4"
-    description: "User guide and README updates"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "0.5 days"
-    priority: "medium"
-    files:
-      - "README.md"
-      - "docs/features/request-log-viewer.md"
-
-  - id: "TASK-4.5"
-    description: "Beta release planning and monitoring setup"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-4.1", "TASK-4.2", "TASK-4.3", "TASK-4.4"]
-    estimated_effort: "0.5 days"
-    priority: "high"
-    files:
-      - "skillmeat/api/routers/request_logs.py"
-      - "skillmeat/observability/"
-
+- id: TASK-4.1
+  description: OpenAPI documentation verification
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 0.5 days
+  priority: high
+  files:
+  - skillmeat/api/routers/request_logs.py
+  - skillmeat/api/schemas/request_log.py
+- id: TASK-4.2
+  description: Create ADR for subprocess integration
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 0.5 days
+  priority: high
+  files:
+  - docs/architecture/decisions/
+- id: TASK-4.3
+  description: Feature flag implementation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 0.5 days
+  priority: high
+  files:
+  - skillmeat/api/config.py
+  - skillmeat/api/routers/request_logs.py
+- id: TASK-4.4
+  description: User guide and README updates
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 0.5 days
+  priority: medium
+  files:
+  - README.md
+  - docs/features/request-log-viewer.md
+- id: TASK-4.5
+  description: Beta release planning and monitoring setup
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-4.1
+  - TASK-4.2
+  - TASK-4.3
+  - TASK-4.4
+  estimated_effort: 0.5 days
+  priority: high
+  files:
+  - skillmeat/api/routers/request_logs.py
+  - skillmeat/observability/
 parallelization:
-  batch_1: ["TASK-4.1", "TASK-4.2", "TASK-4.3", "TASK-4.4"]
-  batch_2: ["TASK-4.5"]
-  critical_path: ["TASK-4.3", "TASK-4.5"]
+  batch_1:
+  - TASK-4.1
+  - TASK-4.2
+  - TASK-4.3
+  - TASK-4.4
+  batch_2:
+  - TASK-4.5
+  critical_path:
+  - TASK-4.3
+  - TASK-4.5
+schema_version: 2
+doc_type: progress
+feature_slug: request-log-viewer-v1
 ---
 
 # Phase 4: Documentation & Deployment

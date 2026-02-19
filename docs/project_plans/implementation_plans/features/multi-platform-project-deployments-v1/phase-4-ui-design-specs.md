@@ -16,6 +16,11 @@ created: 2026-02-07
 updated: 2026-02-07
 category: design
 status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: multi-platform-project-deployments
+prd_ref: null
+plan_ref: null
 ---
 # Phase 4: UI/UX Design Specifications
 

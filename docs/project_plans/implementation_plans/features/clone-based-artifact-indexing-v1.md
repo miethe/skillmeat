@@ -17,6 +17,10 @@ category: product-planning
 status: completed
 related:
 - /docs/project_plans/SPIKEs/clone-based-artifact-indexing-spike.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: clone-based-artifact-indexing
+prd_ref: null
 ---
 
 # Implementation Plan: Clone-Based Artifact Indexing

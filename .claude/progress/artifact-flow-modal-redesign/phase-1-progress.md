@@ -1,67 +1,76 @@
 ---
 type: progress
-prd: "artifact-flow-modal-redesign"
+prd: artifact-flow-modal-redesign
 phase: 1
-title: "3-Panel Sync Status Redesign - Sub-Components"
-status: "completed"
+title: 3-Panel Sync Status Redesign - Sub-Components
+status: completed
 progress: 100
 total_tasks: 5
 completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["ui-engineer-enhanced"]
-created: "2025-11-29"
-updated: "2025-11-29"
-
+owners:
+- ui-engineer-enhanced
+created: '2025-11-29'
+updated: '2025-11-29'
 tasks:
-  - id: "TASK-1.1"
-    description: "Create ArtifactFlowBanner component (~150 lines)"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "medium"
-    file: "skillmeat/web/components/sync-status/artifact-flow-banner.tsx"
-
-  - id: "TASK-1.2"
-    description: "Create ComparisonSelector component (~80 lines)"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "1h"
-    priority: "medium"
-    file: "skillmeat/web/components/sync-status/comparison-selector.tsx"
-
-  - id: "TASK-1.3"
-    description: "Create DriftAlertBanner component (~100 lines)"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "1.5h"
-    priority: "medium"
-    file: "skillmeat/web/components/sync-status/drift-alert-banner.tsx"
-
-  - id: "TASK-1.4"
-    description: "Create FilePreviewPane component (~120 lines)"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "medium"
-    file: "skillmeat/web/components/sync-status/file-preview-pane.tsx"
-
-  - id: "TASK-1.5"
-    description: "Create SyncActionsFooter component (~80 lines)"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "1h"
-    priority: "medium"
-    file: "skillmeat/web/components/sync-status/sync-actions-footer.tsx"
-
+- id: TASK-1.1
+  description: Create ArtifactFlowBanner component (~150 lines)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 2h
+  priority: medium
+  file: skillmeat/web/components/sync-status/artifact-flow-banner.tsx
+- id: TASK-1.2
+  description: Create ComparisonSelector component (~80 lines)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 1h
+  priority: medium
+  file: skillmeat/web/components/sync-status/comparison-selector.tsx
+- id: TASK-1.3
+  description: Create DriftAlertBanner component (~100 lines)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 1.5h
+  priority: medium
+  file: skillmeat/web/components/sync-status/drift-alert-banner.tsx
+- id: TASK-1.4
+  description: Create FilePreviewPane component (~120 lines)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 2h
+  priority: medium
+  file: skillmeat/web/components/sync-status/file-preview-pane.tsx
+- id: TASK-1.5
+  description: Create SyncActionsFooter component (~80 lines)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 1h
+  priority: medium
+  file: skillmeat/web/components/sync-status/sync-actions-footer.tsx
 parallelization:
-  batch_1: ["TASK-1.1", "TASK-1.2", "TASK-1.3", "TASK-1.4", "TASK-1.5"]
-  critical_path: ["TASK-1.1"]
+  batch_1:
+  - TASK-1.1
+  - TASK-1.2
+  - TASK-1.3
+  - TASK-1.4
+  - TASK-1.5
+  critical_path:
+  - TASK-1.1
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-flow-modal-redesign
 ---
 
 # Phase 1: 3-Panel Sync Status - Sub-Components

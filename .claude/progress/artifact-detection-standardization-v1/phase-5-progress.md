@@ -99,6 +99,9 @@ completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
 updated: '2026-01-07'
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-detection-standardization-v1
 ---
 
 # Phase 5: Testing & Safeguards - Adjusted Scope

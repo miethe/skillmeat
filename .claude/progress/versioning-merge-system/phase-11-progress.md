@@ -1,228 +1,242 @@
 ---
 type: progress
-prd: "versioning-merge-system"
+prd: versioning-merge-system
 phase: 11
-title: "Testing & Documentation"
-status: "partial"
-started: "2025-12-03"
+title: Testing & Documentation
+status: partial
+started: '2025-12-03'
 completed: null
 overall_progress: 61
-completion_estimate: "docs-complete-tests-pending"
+completion_estimate: docs-complete-tests-pending
 total_tasks: 18
 completed_tasks: 11
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["python-backend-engineer", "ui-engineer-enhanced", "documentation-writer"]
+owners:
+- python-backend-engineer
+- ui-engineer-enhanced
+- documentation-writer
 contributors: []
-
-# STATUS NOTE: PARTIAL - Documentation complete, tests pending
-# Completed documentation (2025-12-17):
-#   - docs/features/versioning/api-reference.md (DOC-001)
-#   - docs/features/versioning/user-guide-history.md (DOC-002)
-#   - docs/features/versioning/user-guide-merge.md (DOC-003)
-#   - docs/architecture/versioning/README.md (DOC-004)
-#   - docs/development/versioning/dev-guide-apis.md (DOC-005)
-#   - docs/developers/versioning/dev-guide-merge-engine.md (DOC-006)
-# Existing tests:
-#   - tests/test_merge_engine.py (merge logic)
-#   - tests/test_merge_error_handling.py (error cases)
-#   - tests/unit/test_version_manager.py (version operations)
-#   - tests/unit/test_version_graph_builder.py (graph building)
-#   - tests/integration/test_versioning_workflow.py (workflows)
-# Deferred: Unit tests (TEST-001-012), E2E tests
-
 tasks:
-  - id: "TEST-001"
-    description: "Unit tests for storage layer (>90% coverage)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3 pts"
-    priority: "high"
-
-  - id: "TEST-002"
-    description: "Unit tests for repository layer (>85% coverage)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3 pts"
-    priority: "high"
-
-  - id: "TEST-003"
-    description: "Unit tests for merge engine with 50+ scenarios (>90% coverage)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "5 pts"
-    priority: "high"
-
-  - id: "TEST-004"
-    description: "Unit tests for services (>80% coverage)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3 pts"
-    priority: "high"
-
-  - id: "TEST-005"
-    description: "Integration tests for version workflows"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TEST-001"]
-    estimated_effort: "4 pts"
-    priority: "high"
-
-  - id: "TEST-006"
-    description: "Integration tests for merge workflows"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TEST-003"]
-    estimated_effort: "4 pts"
-    priority: "high"
-
-  - id: "TEST-007"
-    description: "Integration tests for API endpoints (>85% coverage)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TEST-004"]
-    estimated_effort: "4 pts"
-    priority: "high"
-
-  - id: "TEST-008"
-    description: "Component tests for frontend (>80% coverage)"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "4 pts"
-    priority: "high"
-
-  - id: "TEST-009"
-    description: "E2E tests for history workflow"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TEST-008"]
-    estimated_effort: "3 pts"
-    priority: "high"
-
-  - id: "TEST-010"
-    description: "E2E tests for merge workflow"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TEST-008"]
-    estimated_effort: "4 pts"
-    priority: "high"
-
-  - id: "TEST-011"
-    description: "E2E tests for sync integration"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TEST-008"]
-    estimated_effort: "3 pts"
-    priority: "high"
-
-  - id: "TEST-012"
-    description: "Performance tests and benchmarks"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TEST-007"]
-    estimated_effort: "3 pts"
-    priority: "medium"
-
-  - id: "DOC-001"
-    description: "API documentation for all endpoints (OpenAPI)"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "2 pts"
-    priority: "high"
-    completed_at: "2025-12-17"
-    output: "docs/features/versioning/api-reference.md"
-
-  - id: "DOC-002"
-    description: "User guide for version history feature"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "2 pts"
-    priority: "high"
-    completed_at: "2025-12-17"
-    output: "docs/features/versioning/user-guide-history.md"
-
-  - id: "DOC-003"
-    description: "User guide for merge workflow"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "2 pts"
-    priority: "high"
-    completed_at: "2025-12-17"
-    output: "docs/features/versioning/user-guide-merge.md"
-
-  - id: "DOC-004"
-    description: "Architecture documentation"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "2 pts"
-    priority: "high"
-    completed_at: "2025-12-17"
-    output: "docs/architecture/versioning/README.md"
-
-  - id: "DOC-005"
-    description: "Developer guide for version APIs"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "2 pts"
-    priority: "medium"
-    completed_at: "2025-12-17"
-    output: "docs/development/versioning/dev-guide-apis.md"
-
-  - id: "DOC-006"
-    description: "Developer guide for merge engine"
-    status: "completed"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "2 pts"
-    priority: "medium"
-    completed_at: "2025-12-17"
-    output: "docs/developers/versioning/dev-guide-merge-engine.md"
-
+- id: TEST-001
+  description: Unit tests for storage layer (>90% coverage)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3 pts
+  priority: high
+- id: TEST-002
+  description: Unit tests for repository layer (>85% coverage)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3 pts
+  priority: high
+- id: TEST-003
+  description: Unit tests for merge engine with 50+ scenarios (>90% coverage)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 5 pts
+  priority: high
+- id: TEST-004
+  description: Unit tests for services (>80% coverage)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3 pts
+  priority: high
+- id: TEST-005
+  description: Integration tests for version workflows
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TEST-001
+  estimated_effort: 4 pts
+  priority: high
+- id: TEST-006
+  description: Integration tests for merge workflows
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TEST-003
+  estimated_effort: 4 pts
+  priority: high
+- id: TEST-007
+  description: Integration tests for API endpoints (>85% coverage)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TEST-004
+  estimated_effort: 4 pts
+  priority: high
+- id: TEST-008
+  description: Component tests for frontend (>80% coverage)
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 4 pts
+  priority: high
+- id: TEST-009
+  description: E2E tests for history workflow
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TEST-008
+  estimated_effort: 3 pts
+  priority: high
+- id: TEST-010
+  description: E2E tests for merge workflow
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TEST-008
+  estimated_effort: 4 pts
+  priority: high
+- id: TEST-011
+  description: E2E tests for sync integration
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TEST-008
+  estimated_effort: 3 pts
+  priority: high
+- id: TEST-012
+  description: Performance tests and benchmarks
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TEST-007
+  estimated_effort: 3 pts
+  priority: medium
+- id: DOC-001
+  description: API documentation for all endpoints (OpenAPI)
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 2 pts
+  priority: high
+  completed_at: '2025-12-17'
+  output: docs/features/versioning/api-reference.md
+- id: DOC-002
+  description: User guide for version history feature
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 2 pts
+  priority: high
+  completed_at: '2025-12-17'
+  output: docs/features/versioning/user-guide-history.md
+- id: DOC-003
+  description: User guide for merge workflow
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 2 pts
+  priority: high
+  completed_at: '2025-12-17'
+  output: docs/features/versioning/user-guide-merge.md
+- id: DOC-004
+  description: Architecture documentation
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 2 pts
+  priority: high
+  completed_at: '2025-12-17'
+  output: docs/architecture/versioning/README.md
+- id: DOC-005
+  description: Developer guide for version APIs
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 2 pts
+  priority: medium
+  completed_at: '2025-12-17'
+  output: docs/development/versioning/dev-guide-apis.md
+- id: DOC-006
+  description: Developer guide for merge engine
+  status: completed
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 2 pts
+  priority: medium
+  completed_at: '2025-12-17'
+  output: docs/developers/versioning/dev-guide-merge-engine.md
 parallelization:
-  batch_1: ["TEST-001", "TEST-002", "TEST-003", "TEST-004", "DOC-001", "DOC-004"]
-  batch_2: ["TEST-005", "TEST-006", "TEST-007", "DOC-002", "DOC-003", "DOC-005", "DOC-006"]
-  batch_3: ["TEST-008", "TEST-009", "TEST-010", "TEST-011", "TEST-012"]
-  critical_path: ["TEST-001", "TEST-005", "TEST-009"]
-  estimated_total_time: "4-5d"
-
+  batch_1:
+  - TEST-001
+  - TEST-002
+  - TEST-003
+  - TEST-004
+  - DOC-001
+  - DOC-004
+  batch_2:
+  - TEST-005
+  - TEST-006
+  - TEST-007
+  - DOC-002
+  - DOC-003
+  - DOC-005
+  - DOC-006
+  batch_3:
+  - TEST-008
+  - TEST-009
+  - TEST-010
+  - TEST-011
+  - TEST-012
+  critical_path:
+  - TEST-001
+  - TEST-005
+  - TEST-009
+  estimated_total_time: 4-5d
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "Unit test coverage >85% across all layers"
-    status: "pending"
-  - id: "SC-2"
-    description: "Integration tests cover all version and merge workflows"
-    status: "pending"
-  - id: "SC-3"
-    description: "E2E tests pass for critical user paths (history, merge, sync)"
-    status: "pending"
-  - id: "SC-4"
-    description: "Performance benchmarks met for all critical operations"
-    status: "pending"
-  - id: "SC-5"
-    description: "User documentation clear and complete for all features"
-    status: "completed"
-  - id: "SC-6"
-    description: "API documentation in OpenAPI format, all endpoints covered"
-    status: "completed"
-  - id: "SC-7"
-    description: "No regressions in existing functionality"
-    status: "pending"
-  - id: "SC-8"
-    description: "Accessibility audit passes WCAG 2.1 AA"
-    status: "pending"
-
+- id: SC-1
+  description: Unit test coverage >85% across all layers
+  status: pending
+- id: SC-2
+  description: Integration tests cover all version and merge workflows
+  status: pending
+- id: SC-3
+  description: E2E tests pass for critical user paths (history, merge, sync)
+  status: pending
+- id: SC-4
+  description: Performance benchmarks met for all critical operations
+  status: pending
+- id: SC-5
+  description: User documentation clear and complete for all features
+  status: completed
+- id: SC-6
+  description: API documentation in OpenAPI format, all endpoints covered
+  status: completed
+- id: SC-7
+  description: No regressions in existing functionality
+  status: pending
+- id: SC-8
+  description: Accessibility audit passes WCAG 2.1 AA
+  status: pending
+schema_version: 2
+doc_type: progress
+feature_slug: versioning-merge-system
 ---
 
 # versioning-merge-system - Phase 11: Testing & Documentation

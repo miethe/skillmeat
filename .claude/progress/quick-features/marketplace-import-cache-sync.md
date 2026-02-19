@@ -6,6 +6,8 @@ status: completed
 created: 2026-02-10
 completed_at: 2026-02-10
 estimated_scope: medium
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # Marketplace Import Cache Sync Refactor

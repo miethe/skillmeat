@@ -1,116 +1,141 @@
 ---
 type: progress
-prd: "smart-import-discovery-v1"
+prd: smart-import-discovery-v1
 phase: 2
-title: "API Endpoints & Integration"
+title: API Endpoints & Integration
 status: pending
 started: null
-updated: "2025-11-30T00:00:00Z"
+updated: '2025-11-30T00:00:00Z'
 completion: 0
 total_tasks: 6
 completed_tasks: 0
-
 tasks:
-  - id: "SID-007"
-    title: "Implement Discovery Endpoint"
-    description: "Add POST /api/v1/artifacts/discover endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SID-002", "SID-004"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "POST /discover returns discovered artifacts"
-      - "Validates .claude/ path"
-      - "Proper HTTP status codes (200, 400, 401, 500)"
-      - "Logs discovery results"
-
-  - id: "SID-008"
-    title: "Implement Bulk Import Endpoint"
-    description: "Add POST /api/v1/artifacts/discover/import endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SID-002", "SID-003", "SID-004"]
-    estimated_time: "3h"
-    story_points: 8
-    acceptance_criteria:
-      - "POST /discover/import validates batch"
-      - "Imports atomically (all-or-nothing)"
-      - "Returns per-artifact results"
-      - "Updates manifest and lock file"
-
-  - id: "SID-009"
-    title: "Implement GitHub Metadata Endpoint"
-    description: "Add GET /api/v1/artifacts/metadata/github endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SID-001", "SID-004"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "GET /metadata/github fetches metadata"
-      - "Uses cache for repeated requests"
-      - "Validates GitHub URL format"
-      - "Handles errors gracefully"
-
-  - id: "SID-010"
-    title: "Implement Parameter Edit Endpoint"
-    description: "Add PUT /api/v1/artifacts/{artifact_id}/parameters endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SID-004"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "PUT /{id}/parameters updates source/version/tags/scope"
-      - "Validates input parameters"
-      - "Atomic manifest/lock file update"
-      - "Returns clear error messages"
-
-  - id: "SID-011"
-    title: "Integration Tests: API Endpoints"
-    description: "Create skillmeat/api/tests/test_discovery_endpoints.py"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SID-007", "SID-008", "SID-009", "SID-010"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - ">70% endpoint coverage"
-      - "Test all HTTP status codes"
-      - "Test request/response validation"
-      - "Test error scenarios"
-
-  - id: "SID-012"
-    title: "Error Handling & Validation"
-    description: "Implement consistent error handling across all layers"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SID-007", "SID-008", "SID-009", "SID-010"]
-    estimated_time: "2h"
-    story_points: 5
-    acceptance_criteria:
-      - "Consistent error response format"
-      - "User-friendly error messages"
-      - "Proper HTTP status codes"
-      - "Validation consistency: frontend mirrors backend"
-
+- id: SID-007
+  title: Implement Discovery Endpoint
+  description: Add POST /api/v1/artifacts/discover endpoint
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SID-002
+  - SID-004
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - POST /discover returns discovered artifacts
+  - Validates .claude/ path
+  - Proper HTTP status codes (200, 400, 401, 500)
+  - Logs discovery results
+- id: SID-008
+  title: Implement Bulk Import Endpoint
+  description: Add POST /api/v1/artifacts/discover/import endpoint
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SID-002
+  - SID-003
+  - SID-004
+  estimated_time: 3h
+  story_points: 8
+  acceptance_criteria:
+  - POST /discover/import validates batch
+  - Imports atomically (all-or-nothing)
+  - Returns per-artifact results
+  - Updates manifest and lock file
+- id: SID-009
+  title: Implement GitHub Metadata Endpoint
+  description: Add GET /api/v1/artifacts/metadata/github endpoint
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SID-001
+  - SID-004
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - GET /metadata/github fetches metadata
+  - Uses cache for repeated requests
+  - Validates GitHub URL format
+  - Handles errors gracefully
+- id: SID-010
+  title: Implement Parameter Edit Endpoint
+  description: Add PUT /api/v1/artifacts/{artifact_id}/parameters endpoint
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SID-004
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - PUT /{id}/parameters updates source/version/tags/scope
+  - Validates input parameters
+  - Atomic manifest/lock file update
+  - Returns clear error messages
+- id: SID-011
+  title: 'Integration Tests: API Endpoints'
+  description: Create skillmeat/api/tests/test_discovery_endpoints.py
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SID-007
+  - SID-008
+  - SID-009
+  - SID-010
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - '>70% endpoint coverage'
+  - Test all HTTP status codes
+  - Test request/response validation
+  - Test error scenarios
+- id: SID-012
+  title: Error Handling & Validation
+  description: Implement consistent error handling across all layers
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SID-007
+  - SID-008
+  - SID-009
+  - SID-010
+  estimated_time: 2h
+  story_points: 5
+  acceptance_criteria:
+  - Consistent error response format
+  - User-friendly error messages
+  - Proper HTTP status codes
+  - 'Validation consistency: frontend mirrors backend'
 parallelization:
-  batch_1: ["SID-007", "SID-009", "SID-010"]
-  batch_2: ["SID-008"]
-  batch_3: ["SID-011", "SID-012"]
-  critical_path: ["SID-007", "SID-008", "SID-011"]
-  estimated_total_time: "9h"
-
+  batch_1:
+  - SID-007
+  - SID-009
+  - SID-010
+  batch_2:
+  - SID-008
+  batch_3:
+  - SID-011
+  - SID-012
+  critical_path:
+  - SID-007
+  - SID-008
+  - SID-011
+  estimated_total_time: 9h
 blockers: []
-
 quality_gates:
-  - "All 4 endpoints implemented and tested"
-  - "Atomic operations verified for bulk import"
-  - "Error responses follow consistent format"
-  - "GitHub rate limiting handled gracefully"
-  - "Integration tests >70% coverage"
-  - "Performance: bulk import <3 seconds for 20 artifacts"
+- All 4 endpoints implemented and tested
+- Atomic operations verified for bulk import
+- Error responses follow consistent format
+- GitHub rate limiting handled gracefully
+- Integration tests >70% coverage
+- 'Performance: bulk import <3 seconds for 20 artifacts'
+schema_version: 2
+doc_type: progress
+feature_slug: smart-import-discovery-v1
 ---
 
 # Phase 2: API Endpoints & Integration

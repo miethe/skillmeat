@@ -87,6 +87,9 @@ completed_tasks: 8
 in_progress_tasks: 0
 blocked_tasks: 0
 updated: '2026-02-03'
+schema_version: 2
+doc_type: progress
+feature_slug: refresh-metadata-extraction-v1
 ---
 
 # Refresh Metadata Extraction v1 - All Phases Progress

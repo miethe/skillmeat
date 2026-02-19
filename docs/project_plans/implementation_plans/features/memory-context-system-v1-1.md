@@ -23,6 +23,10 @@ related:
 - /docs/project_plans/design-specs/memory-context-system-v1-1-ui-spec.md
 - /docs/project_plans/implementation_plans/features/memory-context-system-v1.md
 - /.claude/skills/skillmeat-cli/SKILL.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: memory-context-system-v1-1
+prd_ref: null
 ---
 
 # Implementation Plan: Memory & Context Intelligence System v1.1

@@ -17,6 +17,9 @@ updated: 2025-12-18
 related_documents:
 - versioning-analysis-index.md
 - task-2.4-implementation.md
+schema_version: 2
+doc_type: prd
+feature_slug: integration-points
 ---
 # Sync & Versioning System Integration Points
 

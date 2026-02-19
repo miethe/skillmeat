@@ -26,6 +26,10 @@ related:
 - skillmeat/api/routers/marketplace_sources.py
 - skillmeat/web/components/ScoreBadge.tsx
 - docs/project_plans/PRDs/enhancements/confidence-score-enhancements-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: confidence-score-enhancements
+prd_ref: null
 ---
 # Implementation Plan: Confidence Score Enhancements
 

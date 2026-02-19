@@ -3,9 +3,13 @@ feature: memory-dynamic-promotion-flow
 status: completed
 created: 2026-02-06
 files_affected:
-  - skillmeat/web/components/memory/memory-detail-panel.tsx
-  - skillmeat/web/components/memory/memory-card.tsx
-  - skillmeat/web/components/memory/memory-page-content.tsx (if needed for new mutation wiring)
+- skillmeat/web/components/memory/memory-detail-panel.tsx
+- skillmeat/web/components/memory/memory-card.tsx
+- skillmeat/web/components/memory/memory-page-content.tsx (if needed for new mutation
+  wiring)
+schema_version: 2
+doc_type: quick_feature
+feature_slug: memory-dynamic-promotion-flow
 ---
 
 # Dynamic Memory Status Promotion Flow

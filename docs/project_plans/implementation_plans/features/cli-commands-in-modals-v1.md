@@ -15,6 +15,10 @@ created: 2026-01-30
 updated: 2026-01-30
 category: product-planning
 status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: cli-commands-in-modals
+prd_ref: null
 ---
 # Implementation Plan: CLI Commands in Artifact Modals
 

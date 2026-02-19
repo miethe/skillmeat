@@ -1,29 +1,22 @@
 ---
-# === CONTEXT WORKNOTES TEMPLATE ===
-# PRD-level sticky pad for agent notes and observations during development
-# This file can start empty or nearly empty and grows as agents add notes
-# Optimized for token-efficient queries by AI agents
-
-# Metadata: Identification and Scope
 type: context
-prd: "data-flow-standardization"
-title: "Data Flow Standardization - Development Context"
-status: "active"
-created: "2026-02-04"
-updated: "2026-02-04"
-
-# Quick Reference (for fast agent queries)
+prd: data-flow-standardization
+title: Data Flow Standardization - Development Context
+status: active
+created: '2026-02-04'
+updated: '2026-02-04'
 critical_notes_count: 1
 implementation_decisions_count: 1
 active_gotchas_count: 0
-agent_contributors: ["opus"]
-
-# Agent Communication Index (for efficient lookups)
-# Format: { agent: "agent-name", note_count: N, last_contribution: "YYYY-MM-DD" }
+agent_contributors:
+- opus
 agents:
-  - agent: "opus"
-    note_count: 1
-    last_contribution: "2026-02-04"
+- agent: opus
+  note_count: 1
+  last_contribution: '2026-02-04'
+schema_version: 2
+doc_type: context
+feature_slug: data-flow-standardization
 ---
 
 # Data Flow Standardization - Development Context

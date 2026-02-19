@@ -76,6 +76,9 @@ completed_tasks: 8
 in_progress_tasks: 0
 blocked_tasks: 0
 updated: '2026-02-04'
+schema_version: 2
+doc_type: progress
+feature_slug: sync-push-pull-wiring
 ---
 
 # Phase 1-2 Progress: Sync Push/Pull Wiring Fix

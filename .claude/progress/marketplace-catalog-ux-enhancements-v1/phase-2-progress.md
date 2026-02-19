@@ -3,94 +3,87 @@ prd: marketplace-catalog-ux-enhancements-v1
 phase: 2
 title: Bulk Tag Application
 status: completed
-started_at: "2026-01-08T12:00:00Z"
-completed_at: "2026-01-08T13:15:00Z"
+started_at: '2026-01-08T12:00:00Z'
+completed_at: '2026-01-08T13:15:00Z'
 total_story_points: 13.5
-
-# Agent assignment and parallelization strategy
 parallelization:
   batch_1:
-    - TASK-2.1
+  - TASK-2.1
   batch_2:
-    - TASK-2.2
+  - TASK-2.2
   batch_3:
-    - TASK-2.3
+  - TASK-2.3
   batch_4:
-    - TASK-2.4
+  - TASK-2.4
   batch_5:
-    - TASK-2.5
-    - TASK-2.6
-
-# Task list with dependencies
+  - TASK-2.5
+  - TASK-2.6
 tasks:
-  - id: TASK-2.1
-    title: Extract directories from catalog
-    status: completed
-    story_points: 1
-    assigned_to: ui-engineer
-    dependencies: []
-    started_at: "2026-01-08T12:00:00Z"
-    completed_at: "2026-01-08T12:10:00Z"
-
-  - id: TASK-2.2
-    title: Create BulkTagDialog component
-    status: completed
-    story_points: 4
-    assigned_to: ui-engineer-enhanced
-    dependencies:
-      - TASK-2.1
-    started_at: "2026-01-08T12:10:00Z"
-    completed_at: "2026-01-08T12:25:00Z"
-
-  - id: TASK-2.3
-    title: Implement directory tag options
-    status: completed
-    story_points: 3
-    assigned_to: ui-engineer-enhanced
-    dependencies:
-      - TASK-2.2
-    started_at: "2026-01-08T12:25:00Z"
-    completed_at: "2026-01-08T12:40:00Z"
-
-  - id: TASK-2.4
-    title: Implement tag application logic
-    status: completed
-    story_points: 2
-    assigned_to: ui-engineer
-    dependencies:
-      - TASK-2.3
-    started_at: "2026-01-08T12:40:00Z"
-    completed_at: "2026-01-08T12:55:00Z"
-
-  - id: TASK-2.5
-    title: Wire dialog to catalog toolbar
-    status: completed
-    story_points: 1.5
-    assigned_to: ui-engineer
-    dependencies:
-      - TASK-2.2
-      - TASK-2.4
-    started_at: "2026-01-08T12:55:00Z"
-    completed_at: "2026-01-08T13:10:00Z"
-
-  - id: TASK-2.6
-    title: Unit and integration tests
-    status: completed
-    story_points: 2
-    assigned_to: ui-engineer
-    dependencies:
-      - TASK-2.4
-    started_at: "2026-01-08T12:55:00Z"
-    completed_at: "2026-01-08T13:10:00Z"
-
-# Success criteria
+- id: TASK-2.1
+  title: Extract directories from catalog
+  status: completed
+  story_points: 1
+  assigned_to: ui-engineer
+  dependencies: []
+  started_at: '2026-01-08T12:00:00Z'
+  completed_at: '2026-01-08T12:10:00Z'
+- id: TASK-2.2
+  title: Create BulkTagDialog component
+  status: completed
+  story_points: 4
+  assigned_to: ui-engineer-enhanced
+  dependencies:
+  - TASK-2.1
+  started_at: '2026-01-08T12:10:00Z'
+  completed_at: '2026-01-08T12:25:00Z'
+- id: TASK-2.3
+  title: Implement directory tag options
+  status: completed
+  story_points: 3
+  assigned_to: ui-engineer-enhanced
+  dependencies:
+  - TASK-2.2
+  started_at: '2026-01-08T12:25:00Z'
+  completed_at: '2026-01-08T12:40:00Z'
+- id: TASK-2.4
+  title: Implement tag application logic
+  status: completed
+  story_points: 2
+  assigned_to: ui-engineer
+  dependencies:
+  - TASK-2.3
+  started_at: '2026-01-08T12:40:00Z'
+  completed_at: '2026-01-08T12:55:00Z'
+- id: TASK-2.5
+  title: Wire dialog to catalog toolbar
+  status: completed
+  story_points: 1.5
+  assigned_to: ui-engineer
+  dependencies:
+  - TASK-2.2
+  - TASK-2.4
+  started_at: '2026-01-08T12:55:00Z'
+  completed_at: '2026-01-08T13:10:00Z'
+- id: TASK-2.6
+  title: Unit and integration tests
+  status: completed
+  story_points: 2
+  assigned_to: ui-engineer
+  dependencies:
+  - TASK-2.4
+  started_at: '2026-01-08T12:55:00Z'
+  completed_at: '2026-01-08T13:10:00Z'
 success_criteria:
-  - Dialog shows detected directories from artifact paths
-  - Each directory has manual Tags and Path-based Suggested Tags options
-  - Tags apply to all artifacts matching directory prefix
-  - Dialog handles 50+ directories without lag
-  - Toast feedback shows updated artifact count
-  - ">80% unit test coverage"
+- Dialog shows detected directories from artifact paths
+- Each directory has manual Tags and Path-based Suggested Tags options
+- Tags apply to all artifacts matching directory prefix
+- Dialog handles 50+ directories without lag
+- Toast feedback shows updated artifact count
+- '>80% unit test coverage'
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-catalog-ux-enhancements-v1
+type: progress
 ---
 
 # Phase 2: Bulk Tag Application

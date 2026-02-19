@@ -9,6 +9,11 @@ dependencies:
 - Phase 4 (Collection Features)
 story_points: 12
 duration: 1.5 weeks
+schema_version: 2
+doc_type: phase_plan
+feature_slug: collections-navigation
+prd_ref: null
+plan_ref: null
 ---
 # Phase 5: Groups & Deployment Dashboard
 

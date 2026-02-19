@@ -4,87 +4,81 @@ prd: collections-navigation-v1
 phase: 1
 title: Database Layer
 status: completed
-completed_at: "2025-12-12"
+completed_at: '2025-12-12'
 progress: 100
 total_tasks: 5
 completed_tasks: 5
 total_story_points: 8.5
 completed_story_points: 8.5
-
 tasks:
-  - id: TASK-1.1
-    title: Collection Model
-    description: SQLAlchemy ORM model for collections
-    status: completed
-    story_points: 2
-    assigned_to:
-      - data-layer-expert
-    dependencies: []
-    created_at: "2025-12-12"
-
-  - id: TASK-1.2
-    title: Group Model
-    description: SQLAlchemy ORM model for groups
-    status: completed
-    story_points: 2
-    assigned_to:
-      - data-layer-expert
-    dependencies: []
-    created_at: "2025-12-12"
-
-  - id: TASK-1.3
-    title: CollectionArtifact Association
-    description: M2M association for Collection↔Artifact
-    status: completed
-    story_points: 1.5
-    assigned_to:
-      - data-layer-expert
-    dependencies:
-      - TASK-1.1
-      - TASK-1.2
-    created_at: "2025-12-12"
-
-  - id: TASK-1.4
-    title: GroupArtifact Association
-    description: M2M association for Group↔Artifact
-    status: completed
-    story_points: 1.5
-    assigned_to:
-      - data-layer-expert
-    dependencies:
-      - TASK-1.1
-      - TASK-1.2
-    created_at: "2025-12-12"
-
-  - id: TASK-1.5
-    title: Alembic Migration
-    description: Database migration for new schema
-    status: completed
-    story_points: 1.5
-    assigned_to:
-      - python-backend-engineer
-    dependencies:
-      - TASK-1.3
-      - TASK-1.4
-    created_at: "2025-12-12"
-
+- id: TASK-1.1
+  title: Collection Model
+  description: SQLAlchemy ORM model for collections
+  status: completed
+  story_points: 2
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  created_at: '2025-12-12'
+- id: TASK-1.2
+  title: Group Model
+  description: SQLAlchemy ORM model for groups
+  status: completed
+  story_points: 2
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  created_at: '2025-12-12'
+- id: TASK-1.3
+  title: CollectionArtifact Association
+  description: "M2M association for Collection\u2194Artifact"
+  status: completed
+  story_points: 1.5
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - TASK-1.1
+  - TASK-1.2
+  created_at: '2025-12-12'
+- id: TASK-1.4
+  title: GroupArtifact Association
+  description: "M2M association for Group\u2194Artifact"
+  status: completed
+  story_points: 1.5
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - TASK-1.1
+  - TASK-1.2
+  created_at: '2025-12-12'
+- id: TASK-1.5
+  title: Alembic Migration
+  description: Database migration for new schema
+  status: completed
+  story_points: 1.5
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.3
+  - TASK-1.4
+  created_at: '2025-12-12'
 parallelization:
   batch_1:
-    - TASK-1.1
-    - TASK-1.2
+  - TASK-1.1
+  - TASK-1.2
   batch_2:
-    - TASK-1.3
-    - TASK-1.4
+  - TASK-1.3
+  - TASK-1.4
   batch_3:
-    - TASK-1.5
-
+  - TASK-1.5
 context_files:
-  - skillmeat/cache/models.py
-  - skillmeat/core/
-
+- skillmeat/cache/models.py
+- skillmeat/core/
 blockers: []
-notes: ""
-
+notes: ''
+schema_version: 2
+doc_type: progress
+feature_slug: collections-navigation-v1
 ---
 
 # Phase 1: Database Layer

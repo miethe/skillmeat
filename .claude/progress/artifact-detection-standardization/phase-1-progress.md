@@ -1,113 +1,140 @@
 ---
 type: progress
-prd: "artifact-detection-standardization"
+prd: artifact-detection-standardization
 phase: 1
-phase_title: "Create Shared Detection Core Module"
+phase_title: Create Shared Detection Core Module
 status: completed
 progress: 100
 total_tasks: 9
 completed_tasks: 9
 story_points: 13
-duration: "1 week"
-completed_at: "2026-01-06"
-
+duration: 1 week
+completed_at: '2026-01-06'
 tasks:
-  - id: "TASK-1.1"
-    title: "Define Core Data Structures"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: []
-    story_points: 3
-    description: "Create ArtifactType enum, DetectionResult dataclass, ArtifactSignature dataclass"
-
-  - id: "TASK-1.2"
-    title: "Create Artifact Signatures Registry"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-1.1"]
-    story_points: 3
-    description: "Define ARTIFACT_SIGNATURES dict mapping ArtifactType to signature requirements"
-
-  - id: "TASK-1.3"
-    title: "Define Container Alias Registries"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-1.1"]
-    story_points: 2
-    description: "Create CONTAINER_ALIASES and MANIFEST_FILES registries"
-
-  - id: "TASK-1.4"
-    title: "Implement normalize_container_name()"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-1.3"]
-    story_points: 2
-    description: "Container name normalization function with all aliases support"
-
-  - id: "TASK-1.5"
-    title: "Implement Core Detection Functions"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-1.1", "TASK-1.2", "TASK-1.3", "TASK-1.4"]
-    story_points: 3
-    description: "Implement infer_artifact_type(), detect_artifact(), extract_manifest_file()"
-
-  - id: "TASK-1.6"
-    title: "Create Custom Exceptions"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: []
-    story_points: 1
-    description: "Define InvalidContainerError, InvalidArtifactTypeError, DetectionError"
-
-  - id: "TASK-1.7"
-    title: "Update artifact.py Imports"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-1.1"]
-    story_points: 1
-    description: "Import ArtifactType from new detection module"
-
-  - id: "TASK-1.8"
-    title: "Write Unit Tests"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "opus"
-    dependencies: ["TASK-1.1", "TASK-1.2", "TASK-1.3", "TASK-1.4", "TASK-1.5", "TASK-1.6", "TASK-1.7"]
-    story_points: 2
-    description: "Create 20+ test cases covering all major functions"
-
-  - id: "TASK-1.9"
-    title: "Documentation and Docstrings"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    model: "sonnet"
-    dependencies: ["TASK-1.8"]
-    story_points: 1
-    description: "Add comprehensive module-level docstrings"
-
+- id: TASK-1.1
+  title: Define Core Data Structures
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies: []
+  story_points: 3
+  description: Create ArtifactType enum, DetectionResult dataclass, ArtifactSignature
+    dataclass
+- id: TASK-1.2
+  title: Create Artifact Signatures Registry
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-1.1
+  story_points: 3
+  description: Define ARTIFACT_SIGNATURES dict mapping ArtifactType to signature requirements
+- id: TASK-1.3
+  title: Define Container Alias Registries
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-1.1
+  story_points: 2
+  description: Create CONTAINER_ALIASES and MANIFEST_FILES registries
+- id: TASK-1.4
+  title: Implement normalize_container_name()
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-1.3
+  story_points: 2
+  description: Container name normalization function with all aliases support
+- id: TASK-1.5
+  title: Implement Core Detection Functions
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-1.1
+  - TASK-1.2
+  - TASK-1.3
+  - TASK-1.4
+  story_points: 3
+  description: Implement infer_artifact_type(), detect_artifact(), extract_manifest_file()
+- id: TASK-1.6
+  title: Create Custom Exceptions
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies: []
+  story_points: 1
+  description: Define InvalidContainerError, InvalidArtifactTypeError, DetectionError
+- id: TASK-1.7
+  title: Update artifact.py Imports
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-1.1
+  story_points: 1
+  description: Import ArtifactType from new detection module
+- id: TASK-1.8
+  title: Write Unit Tests
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: opus
+  dependencies:
+  - TASK-1.1
+  - TASK-1.2
+  - TASK-1.3
+  - TASK-1.4
+  - TASK-1.5
+  - TASK-1.6
+  - TASK-1.7
+  story_points: 2
+  description: Create 20+ test cases covering all major functions
+- id: TASK-1.9
+  title: Documentation and Docstrings
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  model: sonnet
+  dependencies:
+  - TASK-1.8
+  story_points: 1
+  description: Add comprehensive module-level docstrings
 parallelization:
-  batch_1: ["TASK-1.1", "TASK-1.6"]
-  batch_2: ["TASK-1.2", "TASK-1.3", "TASK-1.7"]
-  batch_3: ["TASK-1.4"]
-  batch_4: ["TASK-1.5"]
-  batch_5: ["TASK-1.8"]
-  batch_6: ["TASK-1.9"]
-
+  batch_1:
+  - TASK-1.1
+  - TASK-1.6
+  batch_2:
+  - TASK-1.2
+  - TASK-1.3
+  - TASK-1.7
+  batch_3:
+  - TASK-1.4
+  batch_4:
+  - TASK-1.5
+  batch_5:
+  - TASK-1.8
+  batch_6:
+  - TASK-1.9
 blockers: []
 notes:
-  - "All 9 tasks completed on 2026-01-06"
-  - "52 unit tests passing (exceeds 20+ requirement)"
-  - "765 lines in artifact_detection.py (exceeds ~400 estimate)"
-  - "No circular imports verified"
-  - "All artifact.py tests still passing"
+- All 9 tasks completed on 2026-01-06
+- 52 unit tests passing (exceeds 20+ requirement)
+- 765 lines in artifact_detection.py (exceeds ~400 estimate)
+- No circular imports verified
+- All artifact.py tests still passing
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-detection-standardization
 ---
 
 # Phase 1: Create Shared Detection Core Module

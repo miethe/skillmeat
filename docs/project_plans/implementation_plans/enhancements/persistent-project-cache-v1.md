@@ -21,6 +21,10 @@ prd_reference: /docs/project_plans/PRDs/enhancements/persistent-project-cache-v1
 related:
 - /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
 - /docs/project_plans/PRDs/enhancements/web-ui-consolidation-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: persistent-project-cache
+prd_ref: null
 ---
 # Implementation Plan: Persistent Project Cache
 

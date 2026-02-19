@@ -2,74 +2,90 @@
 type: progress
 prd: marketplace-github-ingestion
 phase: 5
-title: "UI Layer"
+title: UI Layer
 status: pending
-effort: "19 pts"
+effort: 19 pts
 owner: ui-engineer-enhanced
 contributors:
-  - frontend-developer
-  - ui-designer
+- frontend-developer
+- ui-designer
 timeline: phase-5-timeline
-
 tasks:
-  - id: "UI-001"
-    status: "pending"
-    title: "Marketplace List Page Design"
-    assigned_to: ["ui-designer"]
-    dependencies: ["API-007"]
-    estimate: 2
-    priority: "high"
-
-  - id: "UI-002"
-    status: "pending"
-    title: "Add Source Modal (Stepper)"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["UI-001"]
-    estimate: 3
-    priority: "high"
-
-  - id: "UI-003"
-    status: "pending"
-    title: "Marketplace Detail Page"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["UI-002"]
-    estimate: 3
-    priority: "high"
-
-  - id: "UI-004"
-    status: "pending"
-    title: "Artifact Cards & Status Chips"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["UI-003"]
-    estimate: 3
-    priority: "high"
-
-  - id: "UI-005"
-    status: "pending"
-    title: "API Integration"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["UI-004"]
-    estimate: 4
-    priority: "high"
-
-  - id: "UI-006"
-    status: "pending"
-    title: "Loading & Error States"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["UI-005"]
-    estimate: 2
-    priority: "high"
-
-  - id: "UI-007"
-    status: "pending"
-    title: "Accessibility & Responsive"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["UI-006"]
-    estimate: 2
-    priority: "high"
-
+- id: UI-001
+  status: pending
+  title: Marketplace List Page Design
+  assigned_to:
+  - ui-designer
+  dependencies:
+  - API-007
+  estimate: 2
+  priority: high
+- id: UI-002
+  status: pending
+  title: Add Source Modal (Stepper)
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - UI-001
+  estimate: 3
+  priority: high
+- id: UI-003
+  status: pending
+  title: Marketplace Detail Page
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - UI-002
+  estimate: 3
+  priority: high
+- id: UI-004
+  status: pending
+  title: Artifact Cards & Status Chips
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - UI-003
+  estimate: 3
+  priority: high
+- id: UI-005
+  status: pending
+  title: API Integration
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - UI-004
+  estimate: 4
+  priority: high
+- id: UI-006
+  status: pending
+  title: Loading & Error States
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - UI-005
+  estimate: 2
+  priority: high
+- id: UI-007
+  status: pending
+  title: Accessibility & Responsive
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - UI-006
+  estimate: 2
+  priority: high
 parallelization:
-  chain: ["UI-001", "UI-002", "UI-003", "UI-004", "UI-005", "UI-006", "UI-007"]
+  chain:
+  - UI-001
+  - UI-002
+  - UI-003
+  - UI-004
+  - UI-005
+  - UI-006
+  - UI-007
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-github-ingestion
 ---
 
 # Phase 5: UI Layer

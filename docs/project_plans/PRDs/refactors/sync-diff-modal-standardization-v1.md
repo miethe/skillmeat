@@ -24,6 +24,9 @@ related:
 - /docs/project_plans/reports/sync-diff-modal-inconsistency-analysis-2026-02-04.md
 - /docs/project_plans/PRDs/enhancements/artifact-flow-modal-redesign.md
 - /docs/project_plans/implementation_plans/refactors/modal-architecture-improvements-r2r3.md
+schema_version: 2
+doc_type: prd
+feature_slug: sync-diff-modal-standardization
 ---
 # PRD: Sync/Diff Modal Standardization Refactor
 

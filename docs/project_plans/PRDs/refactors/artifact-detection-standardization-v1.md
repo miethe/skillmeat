@@ -21,6 +21,9 @@ status: inferred_complete
 related:
 - /docs/project_plans/reports/artifact-detection-standardization-2026-01-06.md
 - /.claude/context/artifact-detection-code-patterns.md
+schema_version: 2
+doc_type: prd
+feature_slug: artifact-detection-standardization
 ---
 # PRD: Artifact Detection Standardization Refactor
 

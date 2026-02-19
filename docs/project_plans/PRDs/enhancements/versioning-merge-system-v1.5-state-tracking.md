@@ -24,6 +24,9 @@ related:
 - /skillmeat/storage/snapshot.py
 - /skillmeat/storage/deployment.py
 - /skillmeat/services/hash_service.py
+schema_version: 2
+doc_type: prd
+feature_slug: versioning-merge-system-v1-5-state-tracking
 ---
 # PRD Addendum: Artifact State Origin Tracking (v1.5)
 

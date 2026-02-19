@@ -87,6 +87,9 @@ success_criteria:
   description: StaleTime configured appropriately (5 minutes)
   status: verified
 updated: '2026-01-31'
+schema_version: 2
+doc_type: progress
+feature_slug: collection-data-consistency
 ---
 
 # Phase 5: Frontend Data Preloading

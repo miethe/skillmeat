@@ -338,6 +338,9 @@ files_modified:
 - skillmeat/web/hooks/index.ts
 progress: 100
 updated: '2026-01-12'
+schema_version: 2
+doc_type: progress
+feature_slug: hooks-canonical-registry
 ---
 
 # hooks-canonical-registry - All Phases: Canonical Hooks Registry Implementation

@@ -17,6 +17,10 @@ updated: 2025-11-30
 category: project-planning
 status: inferred_complete
 prd_link: /docs/project_plans/PRDs/enhancements/smart-import-discovery-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: smart-import-discovery
+prd_ref: null
 ---
 # Implementation Plan: Smart Import & Discovery
 

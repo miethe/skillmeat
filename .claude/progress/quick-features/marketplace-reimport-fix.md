@@ -1,11 +1,14 @@
 ---
-title: "Marketplace Re-import Fix"
+title: Marketplace Re-import Fix
 status: completed
 created: 2025-01-23
 completed: 2025-01-23
 feature_type: bug_fix_with_enhancement
 complexity: medium
 files_affected: 5
+schema_version: 2
+doc_type: quick_feature
+feature_slug: marketplace-reimport-fix
 ---
 
 # Marketplace Re-import Fix

@@ -1,104 +1,116 @@
 ---
 type: progress
-prd: "collections-navigation"
+prd: collections-navigation
 phase: 5
-title: "Groups & Deployment Dashboard"
-status: "pending"
+title: Groups & Deployment Dashboard
+status: pending
 overall_progress: 0
 total_tasks: 6
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["ui-engineer-enhanced"]
-contributors: ["frontend-developer"]
-
+owners:
+- ui-engineer-enhanced
+contributors:
+- frontend-developer
 tasks:
-  - id: "TASK-5.1"
-    name: "Grouped View with Drag-and-Drop"
-    description: "Grouped artifact view with drag-and-drop reordering using dnd-kit"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "TASK-5.2"
-    name: "Manage Groups Dialog"
-    description: "CRUD dialog for group management with membership controls"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2.5h"
-    priority: "high"
-
-  - id: "TASK-5.3"
-    name: "Deployment Dashboard (formerly /manage)"
-    description: "Convert /manage page to deployment-focused dashboard with filters and search"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "TASK-5.4"
-    name: "Deployment Card Component"
-    description: "Card component displaying deployment status, versions, and actions"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "1.5h"
-    priority: "medium"
-
-  - id: "TASK-5.5"
-    name: "Deployment Summary Endpoint Integration"
-    description: "Integrate API deployment summary endpoint with dashboard"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "1.5h"
-    priority: "medium"
-
-  - id: "TASK-5.6"
-    name: "Unified Modal Deployments Tab"
-    description: "Add Deployments tab to artifact modal showing all deployments"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["TASK-5.4"]
-    estimated_effort: "2h"
-    priority: "medium"
-
+- id: TASK-5.1
+  name: Grouped View with Drag-and-Drop
+  description: Grouped artifact view with drag-and-drop reordering using dnd-kit
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 3h
+  priority: high
+- id: TASK-5.2
+  name: Manage Groups Dialog
+  description: CRUD dialog for group management with membership controls
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 2.5h
+  priority: high
+- id: TASK-5.3
+  name: Deployment Dashboard (formerly /manage)
+  description: Convert /manage page to deployment-focused dashboard with filters and
+    search
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 3h
+  priority: high
+- id: TASK-5.4
+  name: Deployment Card Component
+  description: Card component displaying deployment status, versions, and actions
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 1.5h
+  priority: medium
+- id: TASK-5.5
+  name: Deployment Summary Endpoint Integration
+  description: Integrate API deployment summary endpoint with dashboard
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 1.5h
+  priority: medium
+- id: TASK-5.6
+  name: Unified Modal Deployments Tab
+  description: Add Deployments tab to artifact modal showing all deployments
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - TASK-5.4
+  estimated_effort: 2h
+  priority: medium
 parallelization:
-  batch_1: ["TASK-5.1", "TASK-5.2", "TASK-5.3", "TASK-5.4", "TASK-5.5"]
-  batch_2: ["TASK-5.6"]
-  critical_path: ["TASK-5.1", "TASK-5.2", "TASK-5.3"]
-  estimated_total_time: "1.5w"
-
+  batch_1:
+  - TASK-5.1
+  - TASK-5.2
+  - TASK-5.3
+  - TASK-5.4
+  - TASK-5.5
+  batch_2:
+  - TASK-5.6
+  critical_path:
+  - TASK-5.1
+  - TASK-5.2
+  - TASK-5.3
+  estimated_total_time: 1.5w
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "Grouped view displays artifacts organized by groups"
-    status: "pending"
-  - id: "SC-2"
-    description: "Drag-and-drop reordering works within groups"
-    status: "pending"
-  - id: "SC-3"
-    description: "Manage Groups dialog supports CRUD operations"
-    status: "pending"
-  - id: "SC-4"
-    description: "Deployment dashboard shows aggregated stats"
-    status: "pending"
-  - id: "SC-5"
-    description: "Deployment cards display status and version info"
-    status: "pending"
-  - id: "SC-6"
-    description: "Modal Deployments tab lists all deployments for artifact"
-    status: "pending"
-  - id: "SC-7"
-    description: "All drag-drop operations persist to backend"
-    status: "pending"
-
+- id: SC-1
+  description: Grouped view displays artifacts organized by groups
+  status: pending
+- id: SC-2
+  description: Drag-and-drop reordering works within groups
+  status: pending
+- id: SC-3
+  description: Manage Groups dialog supports CRUD operations
+  status: pending
+- id: SC-4
+  description: Deployment dashboard shows aggregated stats
+  status: pending
+- id: SC-5
+  description: Deployment cards display status and version info
+  status: pending
+- id: SC-6
+  description: Modal Deployments tab lists all deployments for artifact
+  status: pending
+- id: SC-7
+  description: All drag-drop operations persist to backend
+  status: pending
 files_modified: []
+schema_version: 2
+doc_type: progress
+feature_slug: collections-navigation
 ---
 
 # collections-navigation - Phase 5: Groups & Deployment Dashboard

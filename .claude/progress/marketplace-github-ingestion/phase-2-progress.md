@@ -1,80 +1,93 @@
 ---
 type: progress
-prd: "marketplace-github-ingestion"
+prd: marketplace-github-ingestion
 phase: 2
-title: "Repository Layer"
-status: "completed"
-started: "2025-12-06T10:00:00Z"
-completed: "2025-12-06T11:30:00Z"
-
+title: Repository Layer
+status: completed
+started: '2025-12-06T10:00:00Z'
+completed: '2025-12-06T11:30:00Z'
 overall_progress: 100
-completion_estimate: "completed"
-
+completion_estimate: completed
 total_tasks: 4
 completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer"]
-contributors: ["data-layer-expert"]
-
+owners:
+- python-backend-engineer
+contributors:
+- data-layer-expert
 tasks:
-  - id: "REPO-001"
-    description: "MarketplaceSourceRepository with CRUD operations and query methods"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DB-004"]
-    estimated_effort: "3pts"
-    priority: "high"
-    commit: "10307db"
-
-  - id: "REPO-002"
-    description: "MarketplaceCatalogRepository with filtering, sorting, and bulk operations"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DB-004"]
-    estimated_effort: "4pts"
-    priority: "high"
-    commit: "10307db"
-
-  - id: "REPO-003"
-    description: "Query methods for source lookup, catalog filtering by type/status, and joined queries"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-001", "REPO-002"]
-    estimated_effort: "2pts"
-    priority: "high"
-    commit: "10307db"
-
-  - id: "REPO-004"
-    description: "Transaction handling for multi-table operations (catalog updates, status transitions)"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["REPO-002"]
-    estimated_effort: "2pts"
-    priority: "medium"
-    commit: "10307db"
-
+- id: REPO-001
+  description: MarketplaceSourceRepository with CRUD operations and query methods
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DB-004
+  estimated_effort: 3pts
+  priority: high
+  commit: 10307db
+- id: REPO-002
+  description: MarketplaceCatalogRepository with filtering, sorting, and bulk operations
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DB-004
+  estimated_effort: 4pts
+  priority: high
+  commit: 10307db
+- id: REPO-003
+  description: Query methods for source lookup, catalog filtering by type/status,
+    and joined queries
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-001
+  - REPO-002
+  estimated_effort: 2pts
+  priority: high
+  commit: 10307db
+- id: REPO-004
+  description: Transaction handling for multi-table operations (catalog updates, status
+    transitions)
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - REPO-002
+  estimated_effort: 2pts
+  priority: medium
+  commit: 10307db
 parallelization:
-  batch_1: ["REPO-001", "REPO-002"]
-  batch_2: ["REPO-003", "REPO-004"]
-  critical_path: ["REPO-001", "REPO-002", "REPO-003", "REPO-004"]
-  estimated_total_time: "11h"
-
+  batch_1:
+  - REPO-001
+  - REPO-002
+  batch_2:
+  - REPO-003
+  - REPO-004
+  critical_path:
+  - REPO-001
+  - REPO-002
+  - REPO-003
+  - REPO-004
+  estimated_total_time: 11h
 blockers: []
-
 success_criteria:
-  - MarketplaceSourceRepository provides all CRUD operations
-  - MarketplaceCatalogRepository supports filtering, sorting, and bulk updates
-  - Query methods handle complex joins and filters efficiently
-  - Transaction handling ensures data consistency during bulk operations
-  - Repository methods are tested with unit and integration tests
-
+- MarketplaceSourceRepository provides all CRUD operations
+- MarketplaceCatalogRepository supports filtering, sorting, and bulk updates
+- Query methods handle complex joins and filters efficiently
+- Transaction handling ensures data consistency during bulk operations
+- Repository methods are tested with unit and integration tests
 files_modified:
-  - "skillmeat/cache/repositories.py"
-  - "skillmeat/cache/__init__.py"
-  - "skillmeat/api/schemas/marketplace.py"
+- skillmeat/cache/repositories.py
+- skillmeat/cache/__init__.py
+- skillmeat/api/schemas/marketplace.py
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-github-ingestion
 ---
 
 # Phase 2: Repository Layer

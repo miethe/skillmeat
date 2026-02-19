@@ -17,6 +17,9 @@ category: product-planning
 status: inferred_complete
 related:
 - .claude/progress/quick-features/collection-card-menu-actions.md
+schema_version: 2
+doc_type: prd
+feature_slug: groups-all-collections
 ---
 # Feature Brief & Metadata
 

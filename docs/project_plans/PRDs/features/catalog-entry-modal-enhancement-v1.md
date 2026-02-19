@@ -19,6 +19,9 @@ related:
 - /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
 - /skillmeat/web/components/CatalogEntryModal.tsx
 - /skillmeat/web/components/entity/unified-entity-modal.tsx
+schema_version: 2
+doc_type: prd
+feature_slug: catalog-entry-modal-enhancement
 ---
 
 # PRD: Catalog Entry Modal Enhancement with File Contents Preview

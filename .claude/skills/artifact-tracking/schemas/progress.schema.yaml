@@ -2,22 +2,67 @@ $schema: "http://json-schema.org/draft-07/schema#"
 title: "Progress Tracking Artifact Schema"
 type: object
 description: "JSON Schema for progress tracking artifacts (YAML frontmatter validation)"
+allOf:
+  - $ref: "./envelope.schema.yaml"
 
 required:
   - type
   - prd
-  - phase
-  - title
-  - status
-  - started
-  - overall_progress
-  - total_tasks
-  - completed_tasks
-  - in_progress_tasks
-  - blocked_tasks
-  - tasks             # REQUIRED: All tasks with assignments and dependencies
 
 properties:
+  schema_version:
+    type: integer
+    minimum: 1
+    description: "Optional CCDash schema version (v2 recommended)"
+
+  doc_type:
+    type: string
+    enum: ["progress"]
+    description: "Optional CCDash document type alias for compatibility"
+
+  feature_slug:
+    type: string
+    minLength: 3
+    maxLength: 64
+    pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+    description: "Optional feature slug alias for `prd`"
+
+  prd_ref:
+    oneOf:
+      - type: "null"
+      - type: string
+        minLength: 3
+        maxLength: 256
+    default: null
+    description: "Optional reference to PRD document path"
+
+  plan_ref:
+    oneOf:
+      - type: "null"
+      - type: string
+        minLength: 3
+        maxLength: 256
+    default: null
+    description: "Optional reference to parent implementation plan"
+
+  commit_refs:
+    type: array
+    items:
+      type: string
+      minLength: 7
+      maxLength: 64
+    default: []
+    description: "Optional commit references tied to this phase"
+
+  pr_refs:
+    type: array
+    items:
+      type: string
+      minLength: 3
+      maxLength: 64
+    default: []
+    description: "Optional pull request references tied to this phase"
+
   type:
     type: string
     enum: ["progress"]
@@ -27,13 +72,16 @@ properties:
     type: string
     minLength: 3
     maxLength: 64
-    pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
     description: "PRD identifier in kebab-case (e.g., 'advanced-editing-v2')"
 
   phase:
-    type: integer
-    minimum: 1
-    maximum: 99
+    oneOf:
+      - type: integer
+        minimum: 0
+        maximum: 99
+      - type: string
+        minLength: 1
+        maxLength: 16
     description: "Phase number (1, 2, 3, etc.)"
 
   title:
@@ -44,31 +92,31 @@ properties:
 
   status:
     type: string
-    enum: ["planning", "in-progress", "review", "complete", "blocked"]
     description: "Current phase status"
 
   started:
-    type: string
-    format: "date"
+    oneOf:
+      - type: "null"
+      - type: string
     description: "Phase start date in YYYY-MM-DD format"
 
   completed:
     oneOf:
       - type: "null"
       - type: string
-        format: "date"
+      - type: array
+      - type: object
     default: null
     description: "Phase completion date in YYYY-MM-DD format (null if not complete)"
 
   overall_progress:
-    type: integer
+    type: number
     minimum: 0
     maximum: 100
     description: "Overall progress percentage (0-100)"
 
   completion_estimate:
     type: string
-    enum: ["on-track", "at-risk", "blocked", "ahead"]
     default: "on-track"
     description: "Estimated completion status based on current progress"
 
@@ -100,7 +148,6 @@ properties:
       type: string
       minLength: 3
       maxLength: 64
-      pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
     default: []
     description: "Primary agents responsible for phase (kebab-case identifiers)"
 
@@ -111,67 +158,39 @@ properties:
       type: string
       minLength: 3
       maxLength: 64
-      pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
     default: []
     description: "Secondary agents contributing to phase"
 
   # === ORCHESTRATION QUICK REFERENCE (REQUIRED) ===
   tasks:
-    type: array
-    minItems: 1
-    maxItems: 100
-    items:
-      type: object
-      required: ["id", "description", "status", "assigned_to", "dependencies"]
-      properties:
-        id:
-          type: string
-          minLength: 6
-          maxLength: 32
-          pattern: "^TASK-[0-9]+\\.[0-9]+$"
-          description: "Task identifier (e.g., 'TASK-1.1', 'TASK-2.3')"
-
-        description:
-          type: string
-          minLength: 10
-          maxLength: 512
-          description: "Brief task description"
-
-        status:
-          type: string
-          enum: ["pending", "in_progress", "complete", "blocked", "at_risk"]
-          description: "Current task status"
-
-        assigned_to:
-          type: array
-          minItems: 1
-          maxItems: 5
-          items:
-            type: string
-            minLength: 3
-            maxLength: 64
-            pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
-          description: "Agent(s) assigned to this task (REQUIRED)"
-
-        dependencies:
-          type: array
-          maxItems: 20
-          items:
-            type: string
-            pattern: "^TASK-[0-9]+\\.[0-9]+$"
-          description: "Task IDs that must complete before this task (REQUIRED, empty array if none)"
-
-        estimated_effort:
-          type: string
-          maxLength: 16
-          pattern: "^[0-9]+(\\.[0-9]+)?[hd]$"
-          description: "Estimated effort (e.g., '2h', '1.5h', '3d')"
-
-        priority:
-          type: string
-          enum: ["low", "medium", "high", "critical"]
-          default: "medium"
-          description: "Task priority"
+    oneOf:
+      - type: array
+        maxItems: 500
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+            description:
+              type: string
+            status:
+              type: string
+            assigned_to:
+              oneOf:
+                - type: array
+                  items:
+                    type: string
+                - type: string
+            dependencies:
+              oneOf:
+                - type: array
+                  items: {}
+                - type: object
+            estimated_effort:
+              type: string
+            priority:
+              type: string
+      - type: object
 
     description: "All tasks with required assigned_to and dependencies fields for orchestration"
 
@@ -179,44 +198,42 @@ properties:
     type: object
     properties:
       batch_1:
-        type: array
-        items:
-          type: string
-          pattern: "^TASK-[0-9]+\\.[0-9]+$"
+        oneOf:
+          - type: array
+            items: {}
+          - type: object
         description: "Tasks in first batch (can run in parallel)"
 
       batch_2:
-        type: array
-        items:
-          type: string
-          pattern: "^TASK-[0-9]+\\.[0-9]+$"
+        oneOf:
+          - type: array
+            items: {}
+          - type: object
         description: "Tasks in second batch"
 
       batch_3:
-        type: array
-        items:
-          type: string
-          pattern: "^TASK-[0-9]+\\.[0-9]+$"
+        oneOf:
+          - type: array
+            items: {}
+          - type: object
         description: "Tasks in third batch"
 
       batch_4:
-        type: array
-        items:
-          type: string
-          pattern: "^TASK-[0-9]+\\.[0-9]+$"
+        oneOf:
+          - type: array
+            items: {}
+          - type: object
         description: "Tasks in fourth batch"
 
       critical_path:
-        type: array
-        items:
-          type: string
-          pattern: "^TASK-[0-9]+\\.[0-9]+$"
+        oneOf:
+          - type: array
+            items: {}
+          - type: object
         description: "Longest dependency chain (critical path)"
 
       estimated_total_time:
         type: string
-        maxLength: 16
-        pattern: "^[0-9]+(\\.[0-9]+)?[hd]$"
         description: "Total time if batches run optimally (e.g., '5h')"
 
     description: "Parallelization strategy computed from dependencies"
@@ -225,53 +242,9 @@ properties:
     type: array
     maxItems: 50
     items:
-      type: object
-      required: ["id", "title", "status"]
-      properties:
-        id:
-          type: string
-          minLength: 2
-          maxLength: 32
-          pattern: "^[A-Z]+-[0-9]+$"
-          description: "Blocker identifier (e.g., 'BLOCKER-1')"
-
-        title:
-          type: string
-          minLength: 5
-          maxLength: 256
-          description: "Blocker title"
-
-        description:
-          type: string
-          maxLength: 1024
-          description: "Detailed blocker description"
-
-        status:
-          type: string
-          enum: ["active", "resolved", "workaround"]
-          description: "Current blocker status"
-
-        depends_on:
-          oneOf:
-            - type: "null"
-            - type: array
-              maxItems: 20
-              items:
-                type: string
-                pattern: "^TASK-[0-9]+\\.[0-9]+$"
-          default: null
-          description: "Task IDs this blocker depends on (e.g., ['TASK-1.1', 'TASK-2.3'])"
-
-        severity:
-          type: string
-          enum: ["critical", "high", "medium", "low"]
-          default: "high"
-          description: "Blocker severity level"
-
-        workaround:
-          type: string
-          maxLength: 1024
-          description: "Workaround if status is 'workaround'"
+      oneOf:
+        - type: object
+        - type: string
 
     default: []
     description: "Array of blocking issues preventing progress"
@@ -280,34 +253,22 @@ properties:
     type: array
     maxItems: 50
     items:
-      type: object
-      required: ["id", "description"]
-      properties:
-        id:
-          type: string
-          minLength: 2
-          maxLength: 16
-          pattern: "^SC-[0-9]+$"
-          description: "Success criteria identifier (e.g., 'SC-1')"
-
-        description:
-          type: string
-          minLength: 10
-          maxLength: 512
-          description: "What must be true for success"
-
-        status:
-          type: string
-          enum: ["pending", "met"]
-          default: "pending"
-          description: "Whether criteria has been met"
+      oneOf:
+        - type: object
+        - type: string
 
     default: []
     description: "Measurable success criteria for phase completion"
 
   notes:
-    type: string
-    maxLength: 2048
+    oneOf:
+      - type: string
+        maxLength: 2048
+      - type: array
+        items:
+          type: string
+        maxItems: 200
     description: "Additional context or notes for future agents"
 
 additionalProperties: false
+additionalProperties: true

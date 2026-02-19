@@ -20,6 +20,10 @@ total_effort: 6-10 hours
 related:
 - /docs/project_plans/implementation_plans/enhancements/tags-refactor-v1.md
 - /docs/project_plans/implementation_plans/refactors/artifact-metadata-cache-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: tag-storage-consolidation
+prd_ref: null
 ---
 # Implementation Plan: Tag Storage Consolidation
 

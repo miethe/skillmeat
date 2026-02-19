@@ -1,11 +1,19 @@
 ---
-title: "SPIKE: GitHub Marketplace Ingestion"
-spike_id: "SPIKE-2025-12-03-marketplace-github-ingestion"
+title: 'SPIKE: GitHub Marketplace Ingestion'
+spike_id: SPIKE-2025-12-03-marketplace-github-ingestion
 date: 2025-12-03
 status: research
 complexity: medium
-related_request: "Marketplace GitHub ingestion"
-tags: [spike, marketplace, github, ingestion, discovery]
+related_request: Marketplace GitHub ingestion
+tags:
+- spike
+- marketplace
+- github
+- ingestion
+- discovery
+schema_version: 2
+doc_type: spike
+feature_slug: marketplace-github-ingestion-spike
 ---
 
 # SPIKE: GitHub Marketplace Ingestion

@@ -20,6 +20,9 @@ status: completed
 related:
 - docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md
 - docs/project_plans/PRDs/enhancements/configurable-frontmatter-caching-v1.md
+schema_version: 2
+doc_type: prd
+feature_slug: cross-source-artifact-search
 ---
 
 # Feature Brief & Metadata

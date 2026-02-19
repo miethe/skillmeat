@@ -1,109 +1,107 @@
 ---
-# === PROGRESS TRACKING TEMPLATE ===
-# Phase-level task tracking optimized for AI agent orchestration
-# REQUIRED FIELDS: assigned_to, dependencies for EVERY task
-# Copy this template and replace all [PLACEHOLDER] values
-
-# Metadata: Identification and Classification
 type: progress
-prd: "data-flow-standardization"
+prd: data-flow-standardization
 phase: 2
-title: "Backend Cache-First Reads"
-status: "planning"
-started: "2026-02-04"
+title: Backend Cache-First Reads
+status: planning
+started: '2026-02-04'
 completed: null
-
-# Overall Progress: Status and Estimates
 overall_progress: 0
-completion_estimate: "on-track"
-
-# Task Counts: Machine-readable task state
+completion_estimate: on-track
 total_tasks: 6
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-# Ownership: Primary and secondary agents
-owners: ["python-backend-engineer"]
-contributors: ["ui-engineer-enhanced"]
-
-# === TASKS (SOURCE OF TRUTH) ===
-# Machine-readable task definitions with assignments and dependencies
-# Update using: python scripts/update-status.py -f FILE -t TASK-X -s [pending|in_progress|complete|blocked|at-risk]
+owners:
+- python-backend-engineer
+contributors:
+- ui-engineer-enhanced
 tasks:
-  - id: "TASK-2.1"
-    description: "Add cache-first read path for `GET /artifacts` list endpoint in `api/routers/artifacts.py:1680-1800`"
-    status: "deferred"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-    notes: "DEFERRED pending further architecture analysis. artifact-metadata-cache-v1.md already handles DB-first reads for `/user-collections/{id}/artifacts`. Adding cache-first to root `/artifacts` requires careful dual-stack architecture consideration."
-
-  - id: "TASK-2.2"
-    description: "Add cache-first read path for `GET /artifacts/{id}` detail endpoint in `api/routers/artifacts.py:1993-2112`"
-    status: "deferred"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-    notes: "DEFERRED pending further architecture analysis. artifact-metadata-cache-v1.md already handles DB-first reads for `/user-collections/{id}/artifacts`. Adding cache-first to root `/artifacts` requires careful dual-stack architecture consideration."
-
-  - id: "TASK-2.3"
-    description: "Add `refresh_single_artifact_cache()` after file create in `api/routers/artifacts.py:~5350`"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "30m"
-    priority: "high"
-
-  - id: "TASK-2.4"
-    description: "Add `refresh_single_artifact_cache()` after file update in `api/routers/artifacts.py:~5100`"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "30m"
-    priority: "high"
-
-  - id: "TASK-2.5"
-    description: "Add `refresh_single_artifact_cache()` after file delete in `api/routers/artifacts.py:~5610`"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "30m"
-    priority: "high"
-
-  - id: "TASK-2.6"
-    description: "Migrate `useSync()` from raw `fetch()` to `apiRequest()` in `hooks/useSync.ts:59`"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "30m"
-    priority: "low"
-
-# Parallelization Strategy (computed from dependencies)
+- id: TASK-2.1
+  description: Add cache-first read path for `GET /artifacts` list endpoint in `api/routers/artifacts.py:1680-1800`
+  status: deferred
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+  notes: DEFERRED pending further architecture analysis. artifact-metadata-cache-v1.md
+    already handles DB-first reads for `/user-collections/{id}/artifacts`. Adding
+    cache-first to root `/artifacts` requires careful dual-stack architecture consideration.
+- id: TASK-2.2
+  description: Add cache-first read path for `GET /artifacts/{id}` detail endpoint
+    in `api/routers/artifacts.py:1993-2112`
+  status: deferred
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+  notes: DEFERRED pending further architecture analysis. artifact-metadata-cache-v1.md
+    already handles DB-first reads for `/user-collections/{id}/artifacts`. Adding
+    cache-first to root `/artifacts` requires careful dual-stack architecture consideration.
+- id: TASK-2.3
+  description: Add `refresh_single_artifact_cache()` after file create in `api/routers/artifacts.py:~5350`
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 30m
+  priority: high
+- id: TASK-2.4
+  description: Add `refresh_single_artifact_cache()` after file update in `api/routers/artifacts.py:~5100`
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 30m
+  priority: high
+- id: TASK-2.5
+  description: Add `refresh_single_artifact_cache()` after file delete in `api/routers/artifacts.py:~5610`
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 30m
+  priority: high
+- id: TASK-2.6
+  description: Migrate `useSync()` from raw `fetch()` to `apiRequest()` in `hooks/useSync.ts:59`
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 30m
+  priority: low
 parallelization:
-  batch_1: ["TASK-2.3", "TASK-2.4", "TASK-2.5", "TASK-2.6"]
-  deferred: ["TASK-2.1", "TASK-2.2"]
-  critical_path: ["TASK-2.3"]
-  estimated_total_time: "30m"  # If run optimally (parallel batch)
-
-# Critical Blockers: For immediate visibility
+  batch_1:
+  - TASK-2.3
+  - TASK-2.4
+  - TASK-2.5
+  - TASK-2.6
+  deferred:
+  - TASK-2.1
+  - TASK-2.2
+  critical_path:
+  - TASK-2.3
+  estimated_total_time: 30m
 blockers: []
-
-# Success Criteria: Acceptance conditions for phase completion
-success_criteria: [
-  { id: "SC-1", description: "File mutations trigger cache refresh (metadata stays fresh)", status: "pending" },
-  { id: "SC-2", description: "useSync uses unified apiRequest client", status: "pending" },
-  { id: "SC-3", description: "(Deferred) All artifact endpoints use cache-first reads", status: "deferred" }
-]
-
-# Files Modified: What's being changed in this phase
-files_modified: [
-  "skillmeat/api/routers/artifacts.py",
-  "skillmeat/web/hooks/useSync.ts"
-]
+success_criteria:
+- id: SC-1
+  description: File mutations trigger cache refresh (metadata stays fresh)
+  status: pending
+- id: SC-2
+  description: useSync uses unified apiRequest client
+  status: pending
+- id: SC-3
+  description: (Deferred) All artifact endpoints use cache-first reads
+  status: deferred
+files_modified:
+- skillmeat/api/routers/artifacts.py
+- skillmeat/web/hooks/useSync.ts
+schema_version: 2
+doc_type: progress
+feature_slug: data-flow-standardization
 ---
 
 # data-flow-standardization - Phase 2: Backend Cache-First Reads

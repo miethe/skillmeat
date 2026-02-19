@@ -221,6 +221,9 @@ phase_summary:
   total_story_points: 13.25
   assigned_agent: python-backend-engineer
   is_critical_path: false
+schema_version: 2
+doc_type: progress
+feature_slug: collection-artifact-refresh
 ---
 
 # Phase 2: CLI Command Implementation

@@ -14,6 +14,10 @@ related_specs:
 created: 2026-02-01
 updated: 2026-02-02
 category: features
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: manage-collection-page-refactor
+prd_ref: null
 ---
 # Implementation Plan: /manage vs /collection Page Architecture Refactor
 

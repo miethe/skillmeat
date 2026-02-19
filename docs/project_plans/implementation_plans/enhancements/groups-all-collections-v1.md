@@ -16,6 +16,10 @@ category: product-planning
 status: inferred_complete
 related:
 - /docs/project_plans/PRDs/enhancements/groups-all-collections-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: groups-all-collections
+prd_ref: null
 ---
 # Implementation Plan: Groups in All Collections View
 

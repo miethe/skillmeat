@@ -22,6 +22,10 @@ related:
 - /docs/project_plans/PRDs/tools-api-support-v1.md
 - /docs/project_plans/implementation_plans/features/manage-collection-page-refactor-v1.md
 - /docs/project_plans/implementation_plans/features/enhanced-frontmatter-utilization-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: tools-api-support
+prd_ref: null
 ---
 # Implementation Plan: Tools API Support for Artifact Metadata
 

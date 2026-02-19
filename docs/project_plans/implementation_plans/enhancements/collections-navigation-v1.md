@@ -16,6 +16,10 @@ tags:
 - collections
 - ui-redesign
 - caching
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: collections-navigation
+prd_ref: null
 ---
 # Implementation Plan: Collections & Site Navigation Enhancement
 

@@ -10,7 +10,7 @@ completed_tasks: 12
 in_progress_tasks: 0
 blocked_tasks: 0
 deferred_tasks: 4
-notes: "BE-412, BE-413, BE-414, BE-415 deferred per user request"
+notes: BE-412, BE-413, BE-414, BE-415 deferred per user request
 owners:
 - python-backend-engineer
 contributors: []
@@ -177,7 +177,7 @@ tasks:
   - tests/core/test_collection_refresher_fields.py
 - id: BE-413
   title: 'Integration test: end-to-end update flow'
-  description: Test detect→decide→refresh→verify flow
+  description: "Test detect\u2192decide\u2192refresh\u2192verify flow"
   status: deferred
   assigned_to:
   - python-backend-engineer
@@ -240,6 +240,9 @@ parallelization:
   - BE-402
   - BE-408
   - BE-413
+schema_version: 2
+doc_type: progress
+feature_slug: collection-artifact-refresh-v1
 ---
 
 # Phase 4: Advanced Features & Performance Testing

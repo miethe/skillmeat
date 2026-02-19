@@ -9,6 +9,11 @@ effort: 6-8 story points
 priority: MEDIUM
 depends_on: phase-1-bug-fixes.md
 status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: discovery-import-fixes
+prd_ref: null
+plan_ref: null
 ---
 # Phase 3: Deployment UX Improvements
 

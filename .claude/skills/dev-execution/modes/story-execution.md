@@ -120,6 +120,11 @@ Create `${plan_file}` with:
 - [ ] End-to-end tests
 ```
 
+If using YAML frontmatter progress files, include:
+- `schema_version: 2`
+- `doc_type: quick_feature` (or matching doc type for the tracker)
+- `prd_ref` and `plan_ref` when parent docs exist
+
 ## Phase 2: Implementation
 
 ### 2.1 Mark In-Progress (if from request-log)
@@ -167,6 +172,14 @@ Frontend checklist per component:
 ```bash
 git add ${file}
 git commit -m "feat(${story_id}): implement $(basename ${file})"
+```
+
+After committing, append commit SHA to tracker metadata:
+
+```bash
+python .claude/skills/artifact-tracking/scripts/update-field.py \
+  -f ${progress_file} \
+  --append "commit_refs=${commit_sha}"
 ```
 
 ## Phase 3: Testing

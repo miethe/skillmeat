@@ -1,31 +1,37 @@
 ---
 type: progress
-prd: "artifact-flow-modal-redesign"
+prd: artifact-flow-modal-redesign
 phase: 3
-title: "Integration into Unified Entity Modal"
-status: "completed"
+title: Integration into Unified Entity Modal
+status: completed
 progress: 100
 total_tasks: 1
 completed_tasks: 1
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["ui-engineer-enhanced"]
-created: "2025-11-29"
-updated: "2025-11-29"
-
+owners:
+- ui-engineer-enhanced
+created: '2025-11-29'
+updated: '2025-11-29'
 tasks:
-  - id: "TASK-3.1"
-    description: "Integrate SyncStatusTab into unified-entity-modal.tsx (~100 lines)"
-    status: "completed"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-2.1"]
-    estimated_effort: "1h"
-    priority: "high"
-    file: "skillmeat/web/components/entity/unified-entity-modal.tsx"
-
+- id: TASK-3.1
+  description: Integrate SyncStatusTab into unified-entity-modal.tsx (~100 lines)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-2.1
+  estimated_effort: 1h
+  priority: high
+  file: skillmeat/web/components/entity/unified-entity-modal.tsx
 parallelization:
-  batch_1: ["TASK-3.1"]
-  critical_path: ["TASK-3.1"]
+  batch_1:
+  - TASK-3.1
+  critical_path:
+  - TASK-3.1
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-flow-modal-redesign
 ---
 
 # Phase 3: Integration into Unified Entity Modal

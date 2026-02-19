@@ -1,171 +1,194 @@
 ---
 type: progress
-prd: "discovery-import-enhancement"
+prd: discovery-import-enhancement
 phase: 6
-title: "Monitoring, Optimization & Release"
-status: "planning"
+title: Monitoring, Optimization & Release
+status: planning
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 12
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer", "frontend-developer", "documentation-writer"]
-contributors: ["testing-specialist"]
-
+owners:
+- python-backend-engineer
+- frontend-developer
+- documentation-writer
+contributors:
+- testing-specialist
 tasks:
-  - id: "DIS-6.1"
-    description: "Add analytics tracking for UI interactions (skip checkbox, Discovery Tab views, filters)"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-6.2"
-    description: "Add backend metrics - discovery pre-scan hit rate, skip adoption, import status distribution"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-6.3"
-    description: "Add structured logging with trace IDs for discovery/import operations"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "0.5d"
-    priority: "medium"
-
-  - id: "DIS-6.4"
-    description: "Performance optimization if Phase 5 shows >2 seconds - caching, indexing, parallelization"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-6.5"
-    description: "Bug fixes and UI polish from Phase 5 testing - spacing, colors, error messages"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-6.6"
-    description: "User guide - 'Understanding Import Status' explaining success/skipped/failed"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-6.7"
-    description: "User guide - Skip Preferences feature documentation with step-by-step instructions"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "0.5d"
-    priority: "high"
-
-  - id: "DIS-6.8"
-    description: "API documentation - status enum values, skip reasons, integration examples"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "0.5d"
-    priority: "medium"
-
-  - id: "DIS-6.9"
-    description: "Release notes - new features, breaking changes (success→status enum), migration guide"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    estimated_effort: "0.5d"
-    priority: "high"
-
-  - id: "DIS-6.10"
-    description: "Feature flag setup - ENABLE_DISCOVERY_TAB, ENABLE_SKIP_PREFERENCES (default: true)"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    estimated_effort: "0.5d"
-    priority: "medium"
-
-  - id: "DIS-6.11"
-    description: "Feature flag backend - Skip preferences flag, toggleable via config"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "0.5d"
-    priority: "medium"
-
-  - id: "DIS-6.12"
-    description: "Final QA & smoke tests - discovery works, import works, skip works, no regressions"
-    status: "pending"
-    assigned_to: ["testing-specialist"]
-    dependencies: []
-    estimated_effort: "1d"
-    priority: "critical"
-
+- id: DIS-6.1
+  description: Add analytics tracking for UI interactions (skip checkbox, Discovery
+    Tab views, filters)
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 1d
+  priority: high
+- id: DIS-6.2
+  description: Add backend metrics - discovery pre-scan hit rate, skip adoption, import
+    status distribution
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 1d
+  priority: high
+- id: DIS-6.3
+  description: Add structured logging with trace IDs for discovery/import operations
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 0.5d
+  priority: medium
+- id: DIS-6.4
+  description: Performance optimization if Phase 5 shows >2 seconds - caching, indexing,
+    parallelization
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 1d
+  priority: high
+- id: DIS-6.5
+  description: Bug fixes and UI polish from Phase 5 testing - spacing, colors, error
+    messages
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 1d
+  priority: high
+- id: DIS-6.6
+  description: User guide - 'Understanding Import Status' explaining success/skipped/failed
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 1d
+  priority: high
+- id: DIS-6.7
+  description: User guide - Skip Preferences feature documentation with step-by-step
+    instructions
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 0.5d
+  priority: high
+- id: DIS-6.8
+  description: API documentation - status enum values, skip reasons, integration examples
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 0.5d
+  priority: medium
+- id: DIS-6.9
+  description: "Release notes - new features, breaking changes (success\u2192status\
+    \ enum), migration guide"
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  estimated_effort: 0.5d
+  priority: high
+- id: DIS-6.10
+  description: 'Feature flag setup - ENABLE_DISCOVERY_TAB, ENABLE_SKIP_PREFERENCES
+    (default: true)'
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  estimated_effort: 0.5d
+  priority: medium
+- id: DIS-6.11
+  description: Feature flag backend - Skip preferences flag, toggleable via config
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 0.5d
+  priority: medium
+- id: DIS-6.12
+  description: Final QA & smoke tests - discovery works, import works, skip works,
+    no regressions
+  status: pending
+  assigned_to:
+  - testing-specialist
+  dependencies: []
+  estimated_effort: 1d
+  priority: critical
 parallelization:
-  batch_1: ["DIS-6.1", "DIS-6.2", "DIS-6.3", "DIS-6.4", "DIS-6.5", "DIS-6.6", "DIS-6.7", "DIS-6.8", "DIS-6.9", "DIS-6.10", "DIS-6.11"]
-  batch_2: ["DIS-6.12"]
-  critical_path: ["DIS-6.4", "DIS-6.5", "DIS-6.12"]
-  estimated_total_time: "3-5 days"
-
+  batch_1:
+  - DIS-6.1
+  - DIS-6.2
+  - DIS-6.3
+  - DIS-6.4
+  - DIS-6.5
+  - DIS-6.6
+  - DIS-6.7
+  - DIS-6.8
+  - DIS-6.9
+  - DIS-6.10
+  - DIS-6.11
+  batch_2:
+  - DIS-6.12
+  critical_path:
+  - DIS-6.4
+  - DIS-6.5
+  - DIS-6.12
+  estimated_total_time: 3-5 days
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "Analytics events tracked for all UI interactions"
-    status: "pending"
-  - id: "SC-2"
-    description: "Backend metrics logged for discovery and import operations"
-    status: "pending"
-  - id: "SC-3"
-    description: "Performance optimization complete (if needed): <2 seconds"
-    status: "pending"
-  - id: "SC-4"
-    description: "All bugs fixed and UI polished"
-    status: "pending"
-  - id: "SC-5"
-    description: "User guides written and integrated"
-    status: "pending"
-  - id: "SC-6"
-    description: "API documentation complete"
-    status: "pending"
-  - id: "SC-7"
-    description: "Release notes and migration guide prepared"
-    status: "pending"
-  - id: "SC-8"
-    description: "Feature flags implemented and tested"
-    status: "pending"
-  - id: "SC-9"
-    description: "Final smoke tests pass: no regressions"
-    status: "pending"
-  - id: "SC-10"
-    description: "Release ready for production deployment"
-    status: "pending"
-
+- id: SC-1
+  description: Analytics events tracked for all UI interactions
+  status: pending
+- id: SC-2
+  description: Backend metrics logged for discovery and import operations
+  status: pending
+- id: SC-3
+  description: 'Performance optimization complete (if needed): <2 seconds'
+  status: pending
+- id: SC-4
+  description: All bugs fixed and UI polished
+  status: pending
+- id: SC-5
+  description: User guides written and integrated
+  status: pending
+- id: SC-6
+  description: API documentation complete
+  status: pending
+- id: SC-7
+  description: Release notes and migration guide prepared
+  status: pending
+- id: SC-8
+  description: Feature flags implemented and tested
+  status: pending
+- id: SC-9
+  description: 'Final smoke tests pass: no regressions'
+  status: pending
+- id: SC-10
+  description: Release ready for production deployment
+  status: pending
 files_modified:
-  - "skillmeat/web/lib/analytics.ts"
-  - "skillmeat/core/discovery.py"
-  - "skillmeat/api/config.py"
-  - "skillmeat/web/components/discovery/DiscoveryTab.tsx"
-  - "docs/guides/understanding-import-status.md"
-  - "docs/guides/skip-preferences-guide.md"
-  - "docs/api/status-enum-reference.md"
-  - "docs/RELEASE-NOTES-v1.1.0.md"
-  - "tests/smoke/discovery-smoke-tests.py"
+- skillmeat/web/lib/analytics.ts
+- skillmeat/core/discovery.py
+- skillmeat/api/config.py
+- skillmeat/web/components/discovery/DiscoveryTab.tsx
+- docs/guides/understanding-import-status.md
+- docs/guides/skip-preferences-guide.md
+- docs/api/status-enum-reference.md
+- docs/RELEASE-NOTES-v1.1.0.md
+- tests/smoke/discovery-smoke-tests.py
+schema_version: 2
+doc_type: progress
+feature_slug: discovery-import-enhancement
 ---
 
 # Discovery & Import Enhancement - Phase 6: Monitoring, Optimization & Release

@@ -3,9 +3,11 @@ type: quick-feature-plan
 feature_slug: marketplace-source-auto-scan
 request_log_id: REQ-20260104-skillmeat-01
 status: completed
-created: 2026-01-04T19:30:00Z
-completed_at: 2026-01-04T20:15:00Z
+created: 2026-01-04 19:30:00+00:00
+completed_at: 2026-01-04 20:15:00+00:00
 estimated_scope: medium
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # Marketplace Sources: Auto-scan on add + Smart URL inference

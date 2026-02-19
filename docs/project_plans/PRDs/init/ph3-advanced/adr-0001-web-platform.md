@@ -10,6 +10,9 @@ tags:
 - web
 - architecture
 - phase3
+schema_version: 2
+doc_type: prd
+feature_slug: adr-0001-web-platform
 ---
 # ADR-0001 — Web Platform Stack for SkillMeat Phase 3
 

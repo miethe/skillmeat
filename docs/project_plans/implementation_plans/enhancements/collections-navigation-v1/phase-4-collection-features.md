@@ -9,6 +9,11 @@ dependencies:
 - Phase 3 (Frontend Foundation)
 story_points: 15
 duration: 1.5 weeks
+schema_version: 2
+doc_type: phase_plan
+feature_slug: collections-navigation
+prd_ref: null
+plan_ref: null
 ---
 # Phase 4: Collection Features
 

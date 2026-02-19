@@ -1,5 +1,9 @@
 ---
 status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: sourcing-algorithm-plugin-detection
+prd_ref: null
 ---
 # Implementation Plan: Sourcing Algorithm Plugin Detection Enhancement v1
 

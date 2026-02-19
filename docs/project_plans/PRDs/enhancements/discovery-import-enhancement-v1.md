@@ -19,6 +19,9 @@ status: inferred_complete
 related:
 - /docs/project_plans/PRDs/features/notification-system-v1.md
 - /docs/project_plans/PRDs/enhancements/smart-import-discovery-v1.md
+schema_version: 2
+doc_type: prd
+feature_slug: discovery-import-enhancement
 ---
 # PRD: Discovery & Import Enhancement
 

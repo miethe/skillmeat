@@ -23,6 +23,10 @@ related:
 - /docs/project_plans/PRDs/enhancements/configurable-frontmatter-caching-v1.md
 - /docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md
 - /docs/project_plans/implementation_plans/features/enhanced-frontmatter-utilization-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: configurable-frontmatter-caching
+prd_ref: null
 ---
 # Implementation Plan: Configurable Frontmatter Indexing for Cross-Source Search
 

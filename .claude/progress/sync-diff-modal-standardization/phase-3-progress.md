@@ -91,6 +91,9 @@ files_modified:
 - web/components/manage/artifact-operations-modal.tsx
 progress: 100
 updated: '2026-02-04'
+schema_version: 2
+doc_type: progress
+feature_slug: sync-diff-modal-standardization-v1
 ---
 
 # sync-diff-modal-standardization-v1 - Phase 3: Extract BaseArtifactModal Foundation

@@ -1,16 +1,21 @@
 ---
-title: "SkillMeat Documentation Cleanup & Release Plan"
-description: "Comprehensive plan to clean up policy violations and prepare documentation for v0.3.0-beta release"
+title: SkillMeat Documentation Cleanup & Release Plan
+description: Comprehensive plan to clean up policy violations and prepare documentation
+  for v0.3.0-beta release
 created_at: 2025-12-14
 status: draft
 priority: high
 audience: developers,maintainers
 category: project-planning
 tags:
-  - documentation
-  - release-prep
-  - policy-enforcement
-  - cleanup
+- documentation
+- release-prep
+- policy-enforcement
+- cleanup
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: documentation-cleanup-plan
+prd_ref: null
 ---
 
 # SkillMeat Documentation Cleanup & Release Plan

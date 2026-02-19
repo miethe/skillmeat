@@ -1,120 +1,137 @@
 ---
 type: progress
-prd: "artifact-deletion-v1"
+prd: artifact-deletion-v1
 phase: 1
-title: "Core Dialog & Hook"
+title: Core Dialog & Hook
 status: completed
 progress: 100
 total_tasks: 8
 completed_tasks: 8
 blocked_tasks: 0
-created: "2025-12-20"
-updated: "2025-12-20"
-completed_at: "2025-12-20"
-commit: "87764fa"
-
+created: '2025-12-20'
+updated: '2025-12-20'
+completed_at: '2025-12-20'
+commit: 87764fa
 tasks:
-  - id: "FE-001"
-    title: "Create API client function for artifact deletion"
-    status: "completed"
-    priority: "high"
-    estimate: "0.5pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    file_targets:
-      - "skillmeat/web/lib/api/artifacts.ts"
-    notes: "Added deleteArtifactFromCollection function with proper error handling"
-
-  - id: "FE-002"
-    title: "Create useArtifactDeletion hook with TanStack Query"
-    status: "completed"
-    priority: "high"
-    estimate: "1pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["FE-001"]
-    file_targets:
-      - "skillmeat/web/hooks/use-artifact-deletion.ts"
-    notes: "Mutation hook with Promise.allSettled for parallel undeployments, cache invalidation"
-
-  - id: "FE-003"
-    title: "Create ArtifactDeletionDialog component (Step 1 - Primary)"
-    status: "completed"
-    priority: "high"
-    estimate: "1.5pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["FE-002"]
-    file_targets:
-      - "skillmeat/web/components/entity/artifact-deletion-dialog.tsx"
-    notes: "Primary confirmation step with context-aware messaging and toggle options"
-
-  - id: "FE-004"
-    title: "Implement Project Selection expandable section"
-    status: "completed"
-    priority: "medium"
-    estimate: "1.5pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["FE-003"]
-    file_targets:
-      - "skillmeat/web/components/entity/artifact-deletion-dialog.tsx"
-    notes: "Expandable section with checkboxes, Select All/Deselect All, scrollable list"
-
-  - id: "FE-005"
-    title: "Implement Deployment Warning expandable section (RED styling)"
-    status: "completed"
-    priority: "medium"
-    estimate: "1.5pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["FE-003"]
-    file_targets:
-      - "skillmeat/web/components/entity/artifact-deletion-dialog.tsx"
-    notes: "RED warning banner, AlertTriangle icons, destructive styling for filesystem deletion"
-
-  - id: "FE-006"
-    title: "Unit tests for useArtifactDeletion hook"
-    status: "completed"
-    priority: "medium"
-    estimate: "1pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["FE-002"]
-    file_targets:
-      - "skillmeat/web/__tests__/hooks/use-artifact-deletion.test.tsx"
-    notes: "16 tests covering all mutation scenarios, partial failures, cache invalidation"
-
-  - id: "FE-007"
-    title: "Component tests for ArtifactDeletionDialog"
-    status: "completed"
-    priority: "medium"
-    estimate: "1pt"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["FE-005"]
-    file_targets:
-      - "skillmeat/web/__tests__/components/entity/artifact-deletion-dialog.test.tsx"
-    notes: "33 tests covering dialog flow, toggles, project/deployment selection, accessibility"
-
-  - id: "FE-008"
-    title: "Accessibility audit for Phase 1 components"
-    status: "completed"
-    priority: "low"
-    estimate: "1pt"
-    assigned_to: ["a11y-sheriff"]
-    dependencies: ["FE-007"]
-    file_targets:
-      - "skillmeat/web/__tests__/a11y/artifact-deletion-dialog.a11y.test.tsx"
-    notes: "23 axe-core tests, WCAG AA compliance, keyboard navigation, screen reader support"
-
+- id: FE-001
+  title: Create API client function for artifact deletion
+  status: completed
+  priority: high
+  estimate: 0.5pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  file_targets:
+  - skillmeat/web/lib/api/artifacts.ts
+  notes: Added deleteArtifactFromCollection function with proper error handling
+- id: FE-002
+  title: Create useArtifactDeletion hook with TanStack Query
+  status: completed
+  priority: high
+  estimate: 1pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - FE-001
+  file_targets:
+  - skillmeat/web/hooks/use-artifact-deletion.ts
+  notes: Mutation hook with Promise.allSettled for parallel undeployments, cache invalidation
+- id: FE-003
+  title: Create ArtifactDeletionDialog component (Step 1 - Primary)
+  status: completed
+  priority: high
+  estimate: 1.5pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - FE-002
+  file_targets:
+  - skillmeat/web/components/entity/artifact-deletion-dialog.tsx
+  notes: Primary confirmation step with context-aware messaging and toggle options
+- id: FE-004
+  title: Implement Project Selection expandable section
+  status: completed
+  priority: medium
+  estimate: 1.5pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - FE-003
+  file_targets:
+  - skillmeat/web/components/entity/artifact-deletion-dialog.tsx
+  notes: Expandable section with checkboxes, Select All/Deselect All, scrollable list
+- id: FE-005
+  title: Implement Deployment Warning expandable section (RED styling)
+  status: completed
+  priority: medium
+  estimate: 1.5pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - FE-003
+  file_targets:
+  - skillmeat/web/components/entity/artifact-deletion-dialog.tsx
+  notes: RED warning banner, AlertTriangle icons, destructive styling for filesystem
+    deletion
+- id: FE-006
+  title: Unit tests for useArtifactDeletion hook
+  status: completed
+  priority: medium
+  estimate: 1pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - FE-002
+  file_targets:
+  - skillmeat/web/__tests__/hooks/use-artifact-deletion.test.tsx
+  notes: 16 tests covering all mutation scenarios, partial failures, cache invalidation
+- id: FE-007
+  title: Component tests for ArtifactDeletionDialog
+  status: completed
+  priority: medium
+  estimate: 1pt
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - FE-005
+  file_targets:
+  - skillmeat/web/__tests__/components/entity/artifact-deletion-dialog.test.tsx
+  notes: 33 tests covering dialog flow, toggles, project/deployment selection, accessibility
+- id: FE-008
+  title: Accessibility audit for Phase 1 components
+  status: completed
+  priority: low
+  estimate: 1pt
+  assigned_to:
+  - a11y-sheriff
+  dependencies:
+  - FE-007
+  file_targets:
+  - skillmeat/web/__tests__/a11y/artifact-deletion-dialog.a11y.test.tsx
+  notes: 23 axe-core tests, WCAG AA compliance, keyboard navigation, screen reader
+    support
 parallelization:
-  batch_1: ["FE-001"]
-  batch_2: ["FE-002"]
-  batch_3: ["FE-003", "FE-006"]
-  batch_4: ["FE-004", "FE-005"]
-  batch_5: ["FE-007"]
-  batch_6: ["FE-008"]
-
+  batch_1:
+  - FE-001
+  batch_2:
+  - FE-002
+  batch_3:
+  - FE-003
+  - FE-006
+  batch_4:
+  - FE-004
+  - FE-005
+  batch_5:
+  - FE-007
+  batch_6:
+  - FE-008
 blockers: []
-
 references:
-  prd: "docs/project_plans/PRDs/features/artifact-deletion-v1.md"
-  implementation_plan: "docs/project_plans/implementation_plans/features/artifact-deletion-v1.md"
+  prd: docs/project_plans/PRDs/features/artifact-deletion-v1.md
+  implementation_plan: docs/project_plans/implementation_plans/features/artifact-deletion-v1.md
+schema_version: 2
+doc_type: progress
+feature_slug: artifact-deletion-v1
 ---
 
 # Phase 1: Core Dialog & Hook

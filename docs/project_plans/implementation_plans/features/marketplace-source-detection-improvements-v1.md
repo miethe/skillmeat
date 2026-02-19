@@ -8,6 +8,10 @@ status: inferred_complete
 complexity: Medium (M)
 estimated_effort: 55-70 story points
 estimated_timeline: 4-5 weeks
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: marketplace-source-detection-improvements
+prd_ref: null
 ---
 # Implementation Plan: Marketplace Source Detection Improvements
 

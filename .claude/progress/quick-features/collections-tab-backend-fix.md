@@ -3,9 +3,11 @@ type: quick-feature-plan
 feature_slug: collections-tab-backend-fix
 request_log_id: REQ-20251220-skillmeat-02
 status: completed
-created: 2026-01-11T00:00:00Z
-completed_at: 2026-01-11T00:00:00Z
+created: 2026-01-11 00:00:00+00:00
+completed_at: 2026-01-11 00:00:00+00:00
 estimated_scope: small
+schema_version: 2
+doc_type: quick_feature
 ---
 
 # Collections Tab Backend Fix - Complete API Support

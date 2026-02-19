@@ -19,6 +19,10 @@ status: inferred_complete
 related:
 - /docs/project_plans/PRDs/refactors/sync-diff-modal-standardization-v1.md
 - /docs/project_plans/implementation_plans/refactors/artifact-flow-modal-implementation-plan.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: sync-push-pull-wiring
+prd_ref: null
 ---
 # Implementation Plan: Fix Push to Collection & Pull from Source
 

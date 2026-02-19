@@ -1,17 +1,18 @@
 ---
 type: context
-prd: "multi-platform-project-deployments-v1"
-title: "Multi-Platform Project Deployments - Development Context"
-status: "active"
-created: "2026-02-07"
-updated: "2026-02-07"
-
+prd: multi-platform-project-deployments-v1
+title: Multi-Platform Project Deployments - Development Context
+status: active
+created: '2026-02-07'
+updated: '2026-02-07'
 critical_notes_count: 0
 implementation_decisions_count: 0
 active_gotchas_count: 0
 agent_contributors: []
-
 agents: []
+schema_version: 2
+doc_type: context
+feature_slug: multi-platform-project-deployments-v1
 ---
 
 # Multi-Platform Project Deployments - Development Context

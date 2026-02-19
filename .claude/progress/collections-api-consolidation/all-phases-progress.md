@@ -1,189 +1,230 @@
 ---
 type: progress
-prd: "collections-api-consolidation"
+prd: collections-api-consolidation
 status: not_started
 progress: 0
 total_tasks: 21
 completed_tasks: 0
-
 tasks:
-  # Phase 1: Backend API Gap Filling
-  - id: "TASK-1.1"
-    title: "Add GET /user-collections/{id}/artifacts endpoint"
-    status: "pending"
-    estimate: "3 SP"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    phase: 1
-
-  - id: "TASK-1.2"
-    title: "Update user_collections schema"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.1"]
-    phase: 1
-
-  - id: "TASK-1.3"
-    title: "Add copy artifact endpoint (optional)"
-    status: "pending"
-    estimate: "2 SP"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    phase: 1
-
-  - id: "TASK-1.4"
-    title: "Add move artifact endpoint (optional)"
-    status: "pending"
-    estimate: "2 SP"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-1.3"]
-    phase: 1
-
-  # Phase 2: Frontend API Client
-  - id: "TASK-2.1"
-    title: "Refactor fetchCollections()"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: []
-    phase: 2
-
-  - id: "TASK-2.2"
-    title: "Refactor fetchCollection(id)"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: []
-    phase: 2
-
-  - id: "TASK-2.3"
-    title: "Fix updateCollection()"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: []
-    phase: 2
-
-  - id: "TASK-2.4"
-    title: "Fix deleteCollection()"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: []
-    phase: 2
-
-  - id: "TASK-2.5"
-    title: "Fix addArtifactToCollection()"
-    status: "pending"
-    estimate: "2 SP"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: []
-    phase: 2
-
-  - id: "TASK-2.6"
-    title: "Fix removeArtifactFromCollection()"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: []
-    phase: 2
-
-  - id: "TASK-2.7"
-    title: "Update copy/move or remove stubs"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: []
-    phase: 2
-
-  - id: "TASK-2.8"
-    title: "Update TypeScript types"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: []
-    phase: 2
-
-  # Phase 3: Frontend Hooks
-  - id: "TASK-3.1"
-    title: "Update useCollections() hook"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: ["TASK-2.1"]
-    phase: 3
-
-  - id: "TASK-3.2"
-    title: "Update useCollection(id) hook"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: ["TASK-2.2"]
-    phase: 3
-
-  - id: "TASK-3.3"
-    title: "Implement useUpdateCollection()"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: ["TASK-2.3"]
-    phase: 3
-
-  - id: "TASK-3.4"
-    title: "Implement useDeleteCollection()"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: ["TASK-2.4"]
-    phase: 3
-
-  - id: "TASK-3.5"
-    title: "Implement useAddArtifactToCollection()"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: ["TASK-2.5"]
-    phase: 3
-
-  - id: "TASK-3.6"
-    title: "Implement useRemoveArtifactFromCollection()"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["ui-engineer-enhanced", "frontend-developer"]
-    dependencies: ["TASK-2.6"]
-    phase: 3
-
-  # Phase 5: Deprecation & Cleanup
-  - id: "TASK-5.1"
-    title: "Add deprecation warnings to old endpoints"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    phase: 5
-
-  - id: "TASK-5.2"
-    title: "Update API documentation"
-    status: "pending"
-    estimate: "1 SP"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    phase: 5
-
-  - id: "TASK-5.3"
-    title: "Add removal timeline and migration guide"
-    status: "pending"
-    estimate: "0.5 SP"
-    assigned_to: ["documentation-writer"]
-    dependencies: []
-    phase: 5
-
+- id: TASK-1.1
+  title: Add GET /user-collections/{id}/artifacts endpoint
+  status: pending
+  estimate: 3 SP
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  phase: 1
+- id: TASK-1.2
+  title: Update user_collections schema
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.1
+  phase: 1
+- id: TASK-1.3
+  title: Add copy artifact endpoint (optional)
+  status: pending
+  estimate: 2 SP
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  phase: 1
+- id: TASK-1.4
+  title: Add move artifact endpoint (optional)
+  status: pending
+  estimate: 2 SP
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-1.3
+  phase: 1
+- id: TASK-2.1
+  title: Refactor fetchCollections()
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies: []
+  phase: 2
+- id: TASK-2.2
+  title: Refactor fetchCollection(id)
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies: []
+  phase: 2
+- id: TASK-2.3
+  title: Fix updateCollection()
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies: []
+  phase: 2
+- id: TASK-2.4
+  title: Fix deleteCollection()
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies: []
+  phase: 2
+- id: TASK-2.5
+  title: Fix addArtifactToCollection()
+  status: pending
+  estimate: 2 SP
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies: []
+  phase: 2
+- id: TASK-2.6
+  title: Fix removeArtifactFromCollection()
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies: []
+  phase: 2
+- id: TASK-2.7
+  title: Update copy/move or remove stubs
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies: []
+  phase: 2
+- id: TASK-2.8
+  title: Update TypeScript types
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies: []
+  phase: 2
+- id: TASK-3.1
+  title: Update useCollections() hook
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies:
+  - TASK-2.1
+  phase: 3
+- id: TASK-3.2
+  title: Update useCollection(id) hook
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies:
+  - TASK-2.2
+  phase: 3
+- id: TASK-3.3
+  title: Implement useUpdateCollection()
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies:
+  - TASK-2.3
+  phase: 3
+- id: TASK-3.4
+  title: Implement useDeleteCollection()
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies:
+  - TASK-2.4
+  phase: 3
+- id: TASK-3.5
+  title: Implement useAddArtifactToCollection()
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies:
+  - TASK-2.5
+  phase: 3
+- id: TASK-3.6
+  title: Implement useRemoveArtifactFromCollection()
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - ui-engineer-enhanced
+  - frontend-developer
+  dependencies:
+  - TASK-2.6
+  phase: 3
+- id: TASK-5.1
+  title: Add deprecation warnings to old endpoints
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  phase: 5
+- id: TASK-5.2
+  title: Update API documentation
+  status: pending
+  estimate: 1 SP
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  phase: 5
+- id: TASK-5.3
+  title: Add removal timeline and migration guide
+  status: pending
+  estimate: 0.5 SP
+  assigned_to:
+  - documentation-writer
+  dependencies: []
+  phase: 5
 parallelization:
-  batch_1: ["TASK-1.1", "TASK-1.2", "TASK-1.3", "TASK-1.4"]
-  batch_2: ["TASK-2.1", "TASK-2.2", "TASK-2.3", "TASK-2.4", "TASK-2.5", "TASK-2.6", "TASK-2.7", "TASK-2.8"]
-  batch_3: ["TASK-3.1", "TASK-3.2", "TASK-3.3", "TASK-3.4", "TASK-3.5", "TASK-3.6"]
-  batch_4: ["TASK-5.1", "TASK-5.2", "TASK-5.3"]
+  batch_1:
+  - TASK-1.1
+  - TASK-1.2
+  - TASK-1.3
+  - TASK-1.4
+  batch_2:
+  - TASK-2.1
+  - TASK-2.2
+  - TASK-2.3
+  - TASK-2.4
+  - TASK-2.5
+  - TASK-2.6
+  - TASK-2.7
+  - TASK-2.8
+  batch_3:
+  - TASK-3.1
+  - TASK-3.2
+  - TASK-3.3
+  - TASK-3.4
+  - TASK-3.5
+  - TASK-3.6
+  batch_4:
+  - TASK-5.1
+  - TASK-5.2
+  - TASK-5.3
+schema_version: 2
+doc_type: progress
+feature_slug: collections-api-consolidation
 ---
 
 # Collections API Consolidation Progress

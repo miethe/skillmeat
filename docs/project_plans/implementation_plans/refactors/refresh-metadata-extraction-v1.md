@@ -17,6 +17,10 @@ category: refactors
 status: inferred_complete
 related:
 - /docs/project_plans/implementation_plans/refactors/tag-storage-consolidation-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: refresh-metadata-extraction
+prd_ref: null
 ---
 # Implementation Plan: Unify Refresh Metadata Extraction with Import Flow
 

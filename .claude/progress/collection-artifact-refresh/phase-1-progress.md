@@ -230,7 +230,8 @@ tasks:
     '
 - id: BE-110
   title: Implement refresh_metadata()
-  description: Orchestrate refresh for single artifact (fetch → detect → apply)
+  description: "Orchestrate refresh for single artifact (fetch \u2192 detect \u2192\
+    \ apply)"
   story_points: 1.5
   assigned_to: python-backend-engineer
   section: 1.2 Core Implementation
@@ -288,23 +289,11 @@ tasks:
   dependencies:
   - BE-110
   - BE-111
-  notes: 'Logging levels:
-
-    - INFO: refresh start/complete, summary stats
-
-    - DEBUG: per-artifact progress, field changes
-
-    - ERROR: API failures, parsing errors, update failures
-
-    Exception handling:
-
-    - GitHubClientError → log and record in result
-
-    - ValidationError → skip artifact, log warning
-
-    - Unexpected errors → log and continue
-
-    '
+  notes: "Logging levels:\n- INFO: refresh start/complete, summary stats\n- DEBUG:\
+    \ per-artifact progress, field changes\n- ERROR: API failures, parsing errors,\
+    \ update failures\nException handling:\n- GitHubClientError \u2192 log and record\
+    \ in result\n- ValidationError \u2192 skip artifact, log warning\n- Unexpected\
+    \ errors \u2192 log and continue\n"
 - id: BE-113
   title: Unit tests for _parse_source_spec()
   description: Test artifact source parsing with various formats
@@ -497,6 +486,10 @@ blocked_tasks: 0
 progress: 100
 status: completed
 updated: '2026-01-21'
+schema_version: 2
+doc_type: progress
+feature_slug: collection-artifact-refresh
+type: progress
 ---
 
 ## Phase Status

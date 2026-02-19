@@ -16,6 +16,10 @@ category: bugs
 status: inferred_complete
 related:
 - /docs/project_plans/bugs/marketplace-sources-non_skills-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: marketplace-sources-non-skills
+prd_ref: null
 ---
 # Implementation Plan: Marketplace Sources Non-Skills Detection Fix
 

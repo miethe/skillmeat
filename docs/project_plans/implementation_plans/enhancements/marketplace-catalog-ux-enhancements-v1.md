@@ -1,20 +1,30 @@
 ---
-title: "Implementation Plan: Marketplace Artifact Catalog UX Enhancements"
-description: "Four small UX improvements to the marketplace source catalog: pagination styling, UX clarity, artifact count indicator, and bulk tag application"
-requirement: "REQ-20260108-skillmeat"
-complexity: "Medium (M)"
-track: "Standard Track"
-estimated_effort: "18 story points"
-timeline: "5-6 days (1 week with buffer)"
+title: 'Implementation Plan: Marketplace Artifact Catalog UX Enhancements'
+description: 'Four small UX improvements to the marketplace source catalog: pagination
+  styling, UX clarity, artifact count indicator, and bulk tag application'
+requirement: REQ-20260108-skillmeat
+complexity: Medium (M)
+track: Standard Track
+estimated_effort: 18 story points
+timeline: 5-6 days (1 week with buffer)
 created: 2026-01-08
 updated: 2026-01-08
-status: "completed"
-tags: [implementation-plan, marketplace, ui, ux-enhancement, pagination]
+status: completed
+tags:
+- implementation-plan
+- marketplace
+- ui
+- ux-enhancement
+- pagination
 related:
-  - /skillmeat/web/app/marketplace/sources/[id]/page.tsx
-  - /skillmeat/web/app/marketplace/sources/[id]/components/catalog-list.tsx
-  - /skillmeat/web/hooks/useMarketplaceSources.ts
-  - /skillmeat/api/routers/marketplace_sources.py
+- /skillmeat/web/app/marketplace/sources/[id]/page.tsx
+- /skillmeat/web/app/marketplace/sources/[id]/components/catalog-list.tsx
+- /skillmeat/web/hooks/useMarketplaceSources.ts
+- /skillmeat/api/routers/marketplace_sources.py
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: marketplace-catalog-ux-enhancements
+prd_ref: null
 ---
 
 # Implementation Plan: Marketplace Artifact Catalog UX Enhancements

@@ -4,6 +4,11 @@ description: Database schema, frontmatter extraction, tools field, metadata auto
 created: 2026-01-21
 updated: 2026-01-21
 status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: enhanced-frontmatter-utilization
+prd_ref: null
+plan_ref: null
 ---
 # Phase 1: Backend Extraction & Caching
 

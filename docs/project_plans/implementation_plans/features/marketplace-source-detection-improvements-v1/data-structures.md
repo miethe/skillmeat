@@ -2,6 +2,10 @@
 parent: ../marketplace-source-detection-improvements-v1.md
 section: Data Structures
 status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: data-structures
+prd_ref: null
 ---
 # Appendix: Data Structures
 

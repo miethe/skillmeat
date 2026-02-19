@@ -18,6 +18,9 @@ status: inferred_complete
 related:
 - /docs/project_plans/PRDs/features/memory-context-system-v1.md
 - /skillmeat/core/artifact.py
+schema_version: 2
+doc_type: prd
+feature_slug: workflow-orchestration
 ---
 # PRD: Workflow Orchestration Engine
 

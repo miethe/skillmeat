@@ -1,5 +1,8 @@
 ---
 status: inferred_complete
+schema_version: 2
+doc_type: prd
+feature_slug: artifact-flow-modal-redesign
 ---
 # Artifact Flow Modal Redesign
 

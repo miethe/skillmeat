@@ -16,6 +16,10 @@ category: bugs
 status: inferred_complete
 related:
 - /docs/project_plans/implementation_plans/bugs/marketplace-sources-non_skills-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: marketplace-single-file-artifacts
+prd_ref: null
 ---
 # Bug Fix: Single-File Artifact Detection
 

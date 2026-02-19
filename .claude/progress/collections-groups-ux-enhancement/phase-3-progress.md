@@ -52,7 +52,7 @@ tasks:
   estimated_effort: 2h
   priority: medium
 - id: P3-T5
-  description: Write unit tests for group badge components (≥80% coverage)
+  description: "Write unit tests for group badge components (\u226580% coverage)"
   status: completed
   assigned_to:
   - ui-engineer-enhanced
@@ -115,7 +115,7 @@ success_criteria:
   description: No groups message if collection has no groups
   status: pending
 - id: SC-12
-  description: ≥80% unit test coverage
+  description: "\u226580% unit test coverage"
   status: pending
 files_modified:
 - skillmeat/web/components/shared/unified-card.tsx
@@ -127,6 +127,9 @@ files_modified:
 - skillmeat/web/__tests__/components/modal-collections-tab.test.ts
 progress: 100
 updated: '2026-01-20'
+schema_version: 2
+doc_type: progress
+feature_slug: collections-groups-ux-enhancement
 ---
 
 # Collections & Groups UX Enhancement - Phase 3: Group Badges + Modal Enhancement

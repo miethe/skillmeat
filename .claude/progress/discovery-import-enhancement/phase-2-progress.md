@@ -1,140 +1,166 @@
 ---
 type: progress
-prd: "discovery-import-enhancement"
+prd: discovery-import-enhancement
 phase: 2
-title: "Backend - Skip Persistence & Endpoints"
-status: "completed"
-started: "2025-11-29"
-completed: "2025-12-04"
-
+title: Backend - Skip Persistence & Endpoints
+status: completed
+started: '2025-11-29'
+completed: '2025-12-04'
 overall_progress: 100
-completion_estimate: "complete"
-
+completion_estimate: complete
 total_tasks: 9
 completed_tasks: 9
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer", "backend-architect"]
-contributors: ["testing-specialist", "data-layer-expert"]
-
+owners:
+- python-backend-engineer
+- backend-architect
+contributors:
+- testing-specialist
+- data-layer-expert
 tasks:
-  - id: "DIS-2.1"
-    description: "Design skip preference schema for TOML/JSON storage in .claude/.skillmeat_skip_prefs.toml"
-    status: "completed"
-    assigned_to: ["backend-architect"]
-    dependencies: []
-    estimated_effort: "0.5d"
-    priority: "high"
-
-  - id: "DIS-2.2"
-    description: "Implement SkipPreferenceManager class with CRUD operations and thread-safe file handling"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DIS-2.1"]
-    estimated_effort: "1.5d"
-    priority: "critical"
-
-  - id: "DIS-2.3"
-    description: "Integrate skip preference check into ArtifactDiscoveryService.discover() to filter skipped artifacts"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DIS-2.2"]
-    estimated_effort: "1d"
-    priority: "critical"
-
-  - id: "DIS-2.4"
-    description: "Add API endpoints: POST/DELETE skip preferences, GET list skips for project"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DIS-2.2"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-2.5"
-    description: "Update BulkImportRequest schema to include optional skip_list parameter"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "0.5d"
-    priority: "medium"
-
-  - id: "DIS-2.6"
-    description: "Update BulkImportResult to include skipped_artifacts with reasons"
-    status: "completed"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["DIS-2.5"]
-    estimated_effort: "0.5d"
-    priority: "medium"
-
-  - id: "DIS-2.7"
-    description: "Unit tests for SkipPreferenceManager - CRUD, file handling, edge cases"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: ["DIS-2.2"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-2.8"
-    description: "Unit tests for skip integration in discovery - filtering, performance <100ms overhead"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: ["DIS-2.3"]
-    estimated_effort: "1d"
-    priority: "high"
-
-  - id: "DIS-2.9"
-    description: "Integration tests for full skip workflow - discovery → mark skip → import → future discovery excludes skipped"
-    status: "completed"
-    assigned_to: ["testing-specialist"]
-    dependencies: ["DIS-2.4", "DIS-2.6"]
-    estimated_effort: "1d"
-    priority: "high"
-
+- id: DIS-2.1
+  description: Design skip preference schema for TOML/JSON storage in .claude/.skillmeat_skip_prefs.toml
+  status: completed
+  assigned_to:
+  - backend-architect
+  dependencies: []
+  estimated_effort: 0.5d
+  priority: high
+- id: DIS-2.2
+  description: Implement SkipPreferenceManager class with CRUD operations and thread-safe
+    file handling
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DIS-2.1
+  estimated_effort: 1.5d
+  priority: critical
+- id: DIS-2.3
+  description: Integrate skip preference check into ArtifactDiscoveryService.discover()
+    to filter skipped artifacts
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DIS-2.2
+  estimated_effort: 1d
+  priority: critical
+- id: DIS-2.4
+  description: 'Add API endpoints: POST/DELETE skip preferences, GET list skips for
+    project'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DIS-2.2
+  estimated_effort: 1d
+  priority: high
+- id: DIS-2.5
+  description: Update BulkImportRequest schema to include optional skip_list parameter
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 0.5d
+  priority: medium
+- id: DIS-2.6
+  description: Update BulkImportResult to include skipped_artifacts with reasons
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - DIS-2.5
+  estimated_effort: 0.5d
+  priority: medium
+- id: DIS-2.7
+  description: Unit tests for SkipPreferenceManager - CRUD, file handling, edge cases
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies:
+  - DIS-2.2
+  estimated_effort: 1d
+  priority: high
+- id: DIS-2.8
+  description: Unit tests for skip integration in discovery - filtering, performance
+    <100ms overhead
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies:
+  - DIS-2.3
+  estimated_effort: 1d
+  priority: high
+- id: DIS-2.9
+  description: "Integration tests for full skip workflow - discovery \u2192 mark skip\
+    \ \u2192 import \u2192 future discovery excludes skipped"
+  status: completed
+  assigned_to:
+  - testing-specialist
+  dependencies:
+  - DIS-2.4
+  - DIS-2.6
+  estimated_effort: 1d
+  priority: high
 parallelization:
-  batch_1: ["DIS-2.1", "DIS-2.5"]
-  batch_2: ["DIS-2.2", "DIS-2.3", "DIS-2.4", "DIS-2.6"]
-  batch_3: ["DIS-2.7", "DIS-2.8"]
-  batch_4: ["DIS-2.9"]
-  critical_path: ["DIS-2.1", "DIS-2.2", "DIS-2.3", "DIS-2.9"]
-  estimated_total_time: "5-6 days"
-
+  batch_1:
+  - DIS-2.1
+  - DIS-2.5
+  batch_2:
+  - DIS-2.2
+  - DIS-2.3
+  - DIS-2.4
+  - DIS-2.6
+  batch_3:
+  - DIS-2.7
+  - DIS-2.8
+  batch_4:
+  - DIS-2.9
+  critical_path:
+  - DIS-2.1
+  - DIS-2.2
+  - DIS-2.3
+  - DIS-2.9
+  estimated_total_time: 5-6 days
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "Skip preference schema designed and approved"
-    status: "completed"
-  - id: "SC-2"
-    description: "SkipPreferenceManager CRUD operations functional"
-    status: "completed"
-  - id: "SC-3"
-    description: "Skip check integrated into discovery with <100ms overhead"
-    status: "completed"
-  - id: "SC-4"
-    description: "API endpoints working and authenticated"
-    status: "completed"
-  - id: "SC-5"
-    description: "Skip preferences persisted correctly to filesystem"
-    status: "completed"
-  - id: "SC-6"
-    description: "Performance validation: discovery <2.1s with skip checks"
-    status: "completed"
-  - id: "SC-7"
-    description: "Unit test coverage >80%"
-    status: "completed"
-  - id: "SC-8"
-    description: "Integration tests pass: skip workflow end-to-end"
-    status: "completed"
-
+- id: SC-1
+  description: Skip preference schema designed and approved
+  status: completed
+- id: SC-2
+  description: SkipPreferenceManager CRUD operations functional
+  status: completed
+- id: SC-3
+  description: Skip check integrated into discovery with <100ms overhead
+  status: completed
+- id: SC-4
+  description: API endpoints working and authenticated
+  status: completed
+- id: SC-5
+  description: Skip preferences persisted correctly to filesystem
+  status: completed
+- id: SC-6
+  description: 'Performance validation: discovery <2.1s with skip checks'
+  status: completed
+- id: SC-7
+  description: Unit test coverage >80%
+  status: completed
+- id: SC-8
+  description: 'Integration tests pass: skip workflow end-to-end'
+  status: completed
 files_modified:
-  - "skillmeat/core/skip_preferences.py"
-  - "skillmeat/api/schemas/discovery.py"
-  - "skillmeat/api/routers/artifacts.py"
-  - "skillmeat/core/discovery.py"
-  - "tests/core/test_skip_preferences.py"
-  - "tests/core/test_skip_integration.py"
+- skillmeat/core/skip_preferences.py
+- skillmeat/api/schemas/discovery.py
+- skillmeat/api/routers/artifacts.py
+- skillmeat/core/discovery.py
+- tests/core/test_skip_preferences.py
+- tests/core/test_skip_integration.py
+schema_version: 2
+doc_type: progress
+feature_slug: discovery-import-enhancement
 ---
 
 # Discovery & Import Enhancement - Phase 2: Backend - Skip Persistence & Endpoints

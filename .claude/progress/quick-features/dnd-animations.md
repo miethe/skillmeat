@@ -4,24 +4,27 @@ status: completed
 created: 2026-02-16
 scope: frontend
 files_affected:
-  - skillmeat/web/components/collection/grouped-artifact-view.tsx
-  - skillmeat/web/components/collection/mini-artifact-card.tsx
-  - skillmeat/web/components/collection/group-sidebar.tsx
-  - skillmeat/web/components/collection/remove-from-group-zone.tsx
-  - skillmeat/web/tailwind.config.js
+- skillmeat/web/components/collection/grouped-artifact-view.tsx
+- skillmeat/web/components/collection/mini-artifact-card.tsx
+- skillmeat/web/components/collection/group-sidebar.tsx
+- skillmeat/web/components/collection/remove-from-group-zone.tsx
+- skillmeat/web/tailwind.config.js
 tasks:
-  - id: DND-1
-    title: "Shrink + fade drag overlay and add drop-into-group animation"
-    status: pending
-    assigned_to: ui-engineer-enhanced
-  - id: DND-2
-    title: "Group sidebar drop success animation (checkmark + count increment)"
-    status: pending
-    assigned_to: ui-engineer-enhanced
-  - id: DND-3
-    title: "Poof animation for remove-from-group drop"
-    status: pending
-    assigned_to: ui-engineer-enhanced
+- id: DND-1
+  title: Shrink + fade drag overlay and add drop-into-group animation
+  status: pending
+  assigned_to: ui-engineer-enhanced
+- id: DND-2
+  title: Group sidebar drop success animation (checkmark + count increment)
+  status: pending
+  assigned_to: ui-engineer-enhanced
+- id: DND-3
+  title: Poof animation for remove-from-group drop
+  status: pending
+  assigned_to: ui-engineer-enhanced
+schema_version: 2
+doc_type: quick_feature
+feature_slug: dnd-animations
 ---
 
 # Quick Feature: Drag-and-Drop Animations for Groups View

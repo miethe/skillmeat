@@ -1,5 +1,10 @@
 ---
 status: inferred_complete
+schema_version: 2
+doc_type: phase_plan
+feature_slug: agent-context-entities
+prd_ref: null
+plan_ref: null
 ---
 # Phase 3: Web UI for Context Entities
 

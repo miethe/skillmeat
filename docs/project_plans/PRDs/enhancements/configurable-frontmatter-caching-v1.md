@@ -18,6 +18,9 @@ category: product-planning
 status: inferred_complete
 related:
 - docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md
+schema_version: 2
+doc_type: prd
+feature_slug: configurable-frontmatter-caching
 ---
 # Feature Brief & Metadata
 

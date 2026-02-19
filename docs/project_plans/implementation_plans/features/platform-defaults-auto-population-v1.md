@@ -17,6 +17,10 @@ category: product-planning
 status: completed
 related:
 - /docs/project_plans/PRDs/features/multi-platform-deployment-upgrade.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: platform-defaults-auto-population
+prd_ref: null
 ---
 
 # Implementation Plan: Platform Defaults Auto-Population

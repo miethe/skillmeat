@@ -19,6 +19,9 @@ updated: '2026-02-07'
 category: product-planning
 status: completed
 related: []
+schema_version: 2
+doc_type: prd
+feature_slug: enhanced-frontmatter-utilization
 ---
 
 # PRD: Enhanced Frontmatter Utilization for Marketplace Artifacts

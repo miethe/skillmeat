@@ -21,6 +21,10 @@ status: completed
 related:
 - /docs/project_plans/PRDs/features/composite-artifact-infrastructure-v1.md
 - /docs/project_plans/design-specs/composite-artifact-infrastructure.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: composite-artifact-infrastructure
+prd_ref: null
 ---
 
 # Implementation Plan: Composite Artifact Infrastructure

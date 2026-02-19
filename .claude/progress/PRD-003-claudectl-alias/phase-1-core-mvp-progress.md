@@ -1,99 +1,127 @@
 ---
 type: progress
-prd: "PRD-003-claudectl-alias"
+prd: PRD-003-claudectl-alias
 phase: 1
-phase_title: "Core MVP"
+phase_title: Core MVP
 status: completed
 progress: 100
 total_tasks: 11
 completed_tasks: 11
-estimated_effort: "2 weeks"
+estimated_effort: 2 weeks
 story_points: 20
-
 tasks:
-  - id: "P1-T1"
-    title: "Smart Defaults Module"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    story_points: 5
-
-  - id: "P1-T2"
-    title: "CLI Flag Implementation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T1"]
-    story_points: 3
-
-  - id: "P1-T3"
-    title: "Add Command Integration"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T2"]
-    story_points: 4
-
-  - id: "P1-T4"
-    title: "Deploy Command Integration"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T2"]
-    story_points: 4
-
-  - id: "P1-T5"
-    title: "Remove & Undeploy Commands"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T2"]
-    story_points: 3
-
-  - id: "P1-T6"
-    title: "Wrapper Script Creation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    story_points: 2
-
-  - id: "P1-T7"
-    title: "Bash Completion"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T3", "P1-T4"]
-    story_points: 4
-
-  - id: "P1-T8"
-    title: "Installation Command"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T6", "P1-T7"]
-    story_points: 4
-
-  - id: "P1-T9"
-    title: "Unit Tests (Defaults)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T1"]
-    story_points: 3
-
-  - id: "P1-T10"
-    title: "Integration Tests (Workflows)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T3", "P1-T4", "P1-T5"]
-    story_points: 4
-
-  - id: "P1-T11"
-    title: "Exit Code Validation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P1-T3", "P1-T4", "P1-T5"]
-    story_points: 2
-
+- id: P1-T1
+  title: Smart Defaults Module
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  story_points: 5
+- id: P1-T2
+  title: CLI Flag Implementation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T1
+  story_points: 3
+- id: P1-T3
+  title: Add Command Integration
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T2
+  story_points: 4
+- id: P1-T4
+  title: Deploy Command Integration
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T2
+  story_points: 4
+- id: P1-T5
+  title: Remove & Undeploy Commands
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T2
+  story_points: 3
+- id: P1-T6
+  title: Wrapper Script Creation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  story_points: 2
+- id: P1-T7
+  title: Bash Completion
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T3
+  - P1-T4
+  story_points: 4
+- id: P1-T8
+  title: Installation Command
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T6
+  - P1-T7
+  story_points: 4
+- id: P1-T9
+  title: Unit Tests (Defaults)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T1
+  story_points: 3
+- id: P1-T10
+  title: Integration Tests (Workflows)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T3
+  - P1-T4
+  - P1-T5
+  story_points: 4
+- id: P1-T11
+  title: Exit Code Validation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P1-T3
+  - P1-T4
+  - P1-T5
+  story_points: 2
 parallelization:
-  batch_1: ["P1-T1", "P1-T6"]
-  batch_2: ["P1-T2", "P1-T9"]
-  batch_3: ["P1-T3", "P1-T4", "P1-T5"]
-  batch_4: ["P1-T7", "P1-T10", "P1-T11"]
-  batch_5: ["P1-T8"]
+  batch_1:
+  - P1-T1
+  - P1-T6
+  batch_2:
+  - P1-T2
+  - P1-T9
+  batch_3:
+  - P1-T3
+  - P1-T4
+  - P1-T5
+  batch_4:
+  - P1-T7
+  - P1-T10
+  - P1-T11
+  batch_5:
+  - P1-T8
+schema_version: 2
+doc_type: progress
+feature_slug: prd-003-claudectl-alias
 ---
 
 # Phase 1: Core MVP

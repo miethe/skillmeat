@@ -1,107 +1,119 @@
 ---
 type: progress
-prd: "collections-navigation"
+prd: collections-navigation
 phase: 2
-title: "Backend API - Collections & Groups CRUD"
-status: "pending"
+title: Backend API - Collections & Groups CRUD
+status: pending
 overall_progress: 0
 total_tasks: 6
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
-owners: ["python-backend-engineer"]
-contributors: ["backend-architect"]
-
+owners:
+- python-backend-engineer
+contributors:
+- backend-architect
 tasks:
-  - id: "TASK-2.1"
-    name: "Collections CRUD Router"
-    description: "FastAPI router for collection management endpoints"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "TASK-2.2"
-    name: "Groups CRUD Router"
-    description: "FastAPI router for group management endpoints"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "3h"
-    priority: "high"
-
-  - id: "TASK-2.3"
-    name: "Collection-Artifact Association Endpoints"
-    description: "Endpoints for managing artifact membership in collections (add, remove, move, copy)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TASK-2.4"
-    name: "Group-Artifact Association Endpoints"
-    description: "Endpoints for managing artifact membership in groups with position/reordering"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.2"]
-    estimated_effort: "2h"
-    priority: "high"
-
-  - id: "TASK-2.5"
-    name: "Deployment Summary Endpoints"
-    description: "API endpoints for deployment dashboard data (aggregations and summaries)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "medium"
-
-  - id: "TASK-2.6"
-    name: "Pydantic Schemas"
-    description: "Request/response models for all new endpoints"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "1h"
-    priority: "high"
-
+- id: TASK-2.1
+  name: Collections CRUD Router
+  description: FastAPI router for collection management endpoints
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3h
+  priority: high
+- id: TASK-2.2
+  name: Groups CRUD Router
+  description: FastAPI router for group management endpoints
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 3h
+  priority: high
+- id: TASK-2.3
+  name: Collection-Artifact Association Endpoints
+  description: Endpoints for managing artifact membership in collections (add, remove,
+    move, copy)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  estimated_effort: 2h
+  priority: high
+- id: TASK-2.4
+  name: Group-Artifact Association Endpoints
+  description: Endpoints for managing artifact membership in groups with position/reordering
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.2
+  estimated_effort: 2h
+  priority: high
+- id: TASK-2.5
+  name: Deployment Summary Endpoints
+  description: API endpoints for deployment dashboard data (aggregations and summaries)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2h
+  priority: medium
+- id: TASK-2.6
+  name: Pydantic Schemas
+  description: Request/response models for all new endpoints
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 1h
+  priority: high
 parallelization:
-  batch_1: ["TASK-2.1", "TASK-2.2", "TASK-2.5", "TASK-2.6"]
-  batch_2: ["TASK-2.3", "TASK-2.4"]
-  critical_path: ["TASK-2.1", "TASK-2.3"]
-  estimated_total_time: "1.5w"
-
+  batch_1:
+  - TASK-2.1
+  - TASK-2.2
+  - TASK-2.5
+  - TASK-2.6
+  batch_2:
+  - TASK-2.3
+  - TASK-2.4
+  critical_path:
+  - TASK-2.1
+  - TASK-2.3
+  estimated_total_time: 1.5w
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "All CRUD routers implemented and tested"
-    status: "pending"
-  - id: "SC-2"
-    description: "Link/unlink/move/copy operations working correctly"
-    status: "pending"
-  - id: "SC-3"
-    description: "Deployment summary endpoints returning correct aggregations"
-    status: "pending"
-  - id: "SC-4"
-    description: "All Pydantic models created with proper validation"
-    status: "pending"
-  - id: "SC-5"
-    description: "Consistent error handling across all endpoints"
-    status: "pending"
-  - id: "SC-6"
-    description: "Test coverage >90% for router code"
-    status: "pending"
-  - id: "SC-7"
-    description: "All endpoints respond in <100ms (deployment summary <100ms)"
-    status: "pending"
-  - id: "SC-8"
-    description: "OpenAPI docs auto-generated and accurate"
-    status: "pending"
-
+- id: SC-1
+  description: All CRUD routers implemented and tested
+  status: pending
+- id: SC-2
+  description: Link/unlink/move/copy operations working correctly
+  status: pending
+- id: SC-3
+  description: Deployment summary endpoints returning correct aggregations
+  status: pending
+- id: SC-4
+  description: All Pydantic models created with proper validation
+  status: pending
+- id: SC-5
+  description: Consistent error handling across all endpoints
+  status: pending
+- id: SC-6
+  description: Test coverage >90% for router code
+  status: pending
+- id: SC-7
+  description: All endpoints respond in <100ms (deployment summary <100ms)
+  status: pending
+- id: SC-8
+  description: OpenAPI docs auto-generated and accurate
+  status: pending
 files_modified: []
+schema_version: 2
+doc_type: progress
+feature_slug: collections-navigation
 ---
 
 # collections-navigation - Phase 2: Backend API

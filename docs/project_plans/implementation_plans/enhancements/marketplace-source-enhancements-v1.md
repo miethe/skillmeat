@@ -1,5 +1,9 @@
 ---
 status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: marketplace-source-enhancements
+prd_ref: null
 ---
 # Implementation Plan: Marketplace Source Enhancements v1
 

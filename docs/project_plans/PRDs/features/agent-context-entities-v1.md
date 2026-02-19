@@ -20,6 +20,9 @@ related:
 - /docs/project_plans/PRDs/features/entity-lifecycle-management-v1.md
 - /docs/project_plans/PRDs/features/notification-system-v1.md
 - /.claude/specs/README.md
+schema_version: 2
+doc_type: prd
+feature_slug: agent-context-entities
 ---
 
 # PRD: Agent Context Entities

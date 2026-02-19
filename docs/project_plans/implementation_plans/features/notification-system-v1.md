@@ -19,6 +19,10 @@ prd: /docs/project_plans/PRDs/features/notification-system-v1.md
 complexity: Medium
 track: Standard
 status: inferred_complete
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: docs-project-plans-prds-features-notification-system-v1-md
+prd_ref: null
 ---
 # Implementation Plan: Notification System
 

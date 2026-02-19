@@ -19,6 +19,10 @@ status: inferred_complete
 related:
 - /docs/project_plans/PRDs/refactors/sync-diff-modal-standardization-v1.md
 - /docs/project_plans/reports/sync-diff-modal-inconsistency-analysis-2026-02-04.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: sync-diff-modal-standardization
+prd_ref: null
 ---
 # Implementation Plan: Sync/Diff Modal Standardization
 

@@ -1,143 +1,170 @@
 ---
 type: progress
-prd: "collection-refresh"
+prd: collection-refresh
 phase: 4
-title: "Update Detection & Advanced Features"
+title: Update Detection & Advanced Features
 status: pending
 progress: 0
 created: 2025-01-21
 updated: 2025-01-21
-
 tasks:
-  # 4.1: SHA-Based Update Detection
-  - id: "BE-401"
-    name: "Implement check_updates() method"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["Phase 1"]
-    estimate: "1.5 pts"
-
-  - id: "BE-402"
-    name: "Integrate with SyncManager.check_drift()"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-401"]
-    estimate: "1 pt"
-
-  - id: "BE-403"
-    name: "Implement --check-only CLI flag"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-401"]
-    estimate: "0.75 pts"
-
-  - id: "BE-404"
-    name: "Add API query parameter mode=check"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-401"]
-    estimate: "0.75 pts"
-
-  # 4.2: Selective Field Refresh
-  - id: "BE-405"
-    name: "Add field whitelist configuration"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["Phase 1"]
-    estimate: "0.75 pts"
-
-  - id: "BE-406"
-    name: "Implement field-selective CLI flag"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-405"]
-    estimate: "0.75 pts"
-
-  - id: "BE-407"
-    name: "Add field validation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-405"]
-    estimate: "0.5 pts"
-
-  # 4.3: Rollback Support
-  - id: "BE-408"
-    name: "Implement refresh snapshot creation"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["Phase 1"]
-    estimate: "0.75 pts"
-
-  - id: "BE-409"
-    name: "Add --rollback flag to CLI"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-408"]
-    estimate: "0.75 pts"
-
-  - id: "BE-410"
-    name: "Document rollback procedure"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["BE-408"]
-    estimate: "0.5 pts"
-    model: "haiku"
-
-  # 4.4: Advanced Tests & Performance
-  - id: "BE-411"
-    name: "Unit tests: update detection"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-401"]
-    estimate: "1 pt"
-
-  - id: "BE-412"
-    name: "Unit tests: field selective refresh"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-405"]
-    estimate: "0.75 pts"
-
-  - id: "BE-413"
-    name: "Integration test: end-to-end update flow"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["BE-401"]
-    estimate: "1.5 pts"
-
-  - id: "BE-414"
-    name: "Performance: large collection refresh"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["Phase 1"]
-    estimate: "1 pt"
-
-  - id: "BE-415"
-    name: "Stress test: concurrent refreshes"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["Phase 1"]
-    estimate: "1 pt"
-
+- id: BE-401
+  name: Implement check_updates() method
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - Phase 1
+  estimate: 1.5 pts
+- id: BE-402
+  name: Integrate with SyncManager.check_drift()
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-401
+  estimate: 1 pt
+- id: BE-403
+  name: Implement --check-only CLI flag
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-401
+  estimate: 0.75 pts
+- id: BE-404
+  name: Add API query parameter mode=check
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-401
+  estimate: 0.75 pts
+- id: BE-405
+  name: Add field whitelist configuration
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - Phase 1
+  estimate: 0.75 pts
+- id: BE-406
+  name: Implement field-selective CLI flag
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-405
+  estimate: 0.75 pts
+- id: BE-407
+  name: Add field validation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-405
+  estimate: 0.5 pts
+- id: BE-408
+  name: Implement refresh snapshot creation
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - Phase 1
+  estimate: 0.75 pts
+- id: BE-409
+  name: Add --rollback flag to CLI
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-408
+  estimate: 0.75 pts
+- id: BE-410
+  name: Document rollback procedure
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - BE-408
+  estimate: 0.5 pts
+  model: haiku
+- id: BE-411
+  name: 'Unit tests: update detection'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-401
+  estimate: 1 pt
+- id: BE-412
+  name: 'Unit tests: field selective refresh'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-405
+  estimate: 0.75 pts
+- id: BE-413
+  name: 'Integration test: end-to-end update flow'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - BE-401
+  estimate: 1.5 pts
+- id: BE-414
+  name: 'Performance: large collection refresh'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - Phase 1
+  estimate: 1 pt
+- id: BE-415
+  name: 'Stress test: concurrent refreshes'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - Phase 1
+  estimate: 1 pt
 parallelization:
-  batch_1: ["BE-401", "BE-405", "BE-408"]
-  batch_2: ["BE-402", "BE-403", "BE-404", "BE-406", "BE-407", "BE-409", "BE-410"]
-  batch_3: ["BE-411", "BE-412", "BE-413", "BE-414", "BE-415"]
-
+  batch_1:
+  - BE-401
+  - BE-405
+  - BE-408
+  batch_2:
+  - BE-402
+  - BE-403
+  - BE-404
+  - BE-406
+  - BE-407
+  - BE-409
+  - BE-410
+  batch_3:
+  - BE-411
+  - BE-412
+  - BE-413
+  - BE-414
+  - BE-415
 quality_gates:
-  - "check_updates() correctly compares SHAs and detects available updates"
-  - "SyncManager integration provides accurate drift detection"
-  - "--check-only CLI flag works and displays update summary"
-  - "API mode=check query parameter returns correct results"
-  - "Field whitelist configuration recognized and applied"
-  - "--fields CLI flag filters refresh to specified fields only"
-  - "Invalid field names rejected with helpful error message"
-  - "Pre-refresh snapshots created and tagged correctly"
-  - "Rollback restores collection to pre-refresh state"
-  - "All unit tests pass with >90% coverage"
-  - "Integration tests pass with real-world scenarios"
-  - "Performance acceptable for large collections"
-  - "Thread-safe and handles concurrent operations"
+- check_updates() correctly compares SHAs and detects available updates
+- SyncManager integration provides accurate drift detection
+- --check-only CLI flag works and displays update summary
+- API mode=check query parameter returns correct results
+- Field whitelist configuration recognized and applied
+- --fields CLI flag filters refresh to specified fields only
+- Invalid field names rejected with helpful error message
+- Pre-refresh snapshots created and tagged correctly
+- Rollback restores collection to pre-refresh state
+- All unit tests pass with >90% coverage
+- Integration tests pass with real-world scenarios
+- Performance acceptable for large collections
+- Thread-safe and handles concurrent operations
+schema_version: 2
+doc_type: progress
+feature_slug: collection-refresh
 ---
 
 # Phase 4: Update Detection & Advanced Features

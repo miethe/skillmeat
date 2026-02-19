@@ -2,103 +2,117 @@
 type: progress
 prd: versioning-merge-system-v1.5
 phase: 2
-title: "Version Lineage Tracking"
+title: Version Lineage Tracking
 status: completed
 created: 2025-12-17
 updated: 2025-12-17
 completed_at: 2025-12-17
-duration_estimate: "1-2 days"
-effort_estimate: "8-16h"
+duration_estimate: 1-2 days
+effort_estimate: 8-16h
 priority: HIGH
-
 tasks:
-  - id: "TASK-2.1"
-    description: "Add database migration for change_origin enum column"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "1-2h"
-    priority: "HIGH"
-    commit: "bf021c6"
-    files:
-      - "skillmeat/cache/migrations/versions/20251217_1500_add_artifact_versions.py"
-
-  - id: "TASK-2.2"
-    description: "Update ArtifactVersion model with change_origin field"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1"]
-    estimated_effort: "1-2h"
-    priority: "HIGH"
-    commit: "bf021c6"
-    files:
-      - "skillmeat/cache/models.py"
-
-  - id: "TASK-2.3"
-    description: "Populate parent_hash on deployment (parent=NULL)"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1"]
-    estimated_effort: "2-3h"
-    priority: "HIGH"
-    commit: "bf021c6"
-    files:
-      - "skillmeat/core/deployment.py"
-      - "skillmeat/core/version_tracking.py"
-
-  - id: "TASK-2.4"
-    description: "Populate parent_hash on sync (parent=previous hash)"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1"]
-    estimated_effort: "2-3h"
-    priority: "HIGH"
-    commit: "bf021c6"
-    files:
-      - "skillmeat/core/sync.py"
-
-  - id: "TASK-2.5"
-    description: "Populate version_lineage array"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1"]
-    estimated_effort: "2-4h"
-    priority: "HIGH"
-    commit: "bf021c6"
-    files:
-      - "skillmeat/core/version_lineage.py"
-
-  - id: "TASK-2.6"
-    description: "Add database indexes on content_hash and parent_hash"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1"]
-    estimated_effort: "1-2h"
-    priority: "MEDIUM"
-    commit: "bf021c6"
-    files:
-      - "skillmeat/cache/migrations/versions/20251217_1500_add_artifact_versions.py"
-
-  - id: "TASK-2.7"
-    description: "Write unit tests for version chain creation"
-    status: "completed"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["TASK-2.1"]
-    estimated_effort: "2-4h"
-    priority: "HIGH"
-    commit: "bf021c6"
-    files:
-      - "tests/test_version_lineage.py"
-      - "tests/core/test_version_lineage_utils.py"
-      - "tests/unit/test_version_tracking.py"
-      - "tests/unit/test_deployment_version_integration.py"
-      - "tests/unit/test_sync_version_creation.py"
-
+- id: TASK-2.1
+  description: Add database migration for change_origin enum column
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 1-2h
+  priority: HIGH
+  commit: bf021c6
+  files:
+  - skillmeat/cache/migrations/versions/20251217_1500_add_artifact_versions.py
+- id: TASK-2.2
+  description: Update ArtifactVersion model with change_origin field
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  estimated_effort: 1-2h
+  priority: HIGH
+  commit: bf021c6
+  files:
+  - skillmeat/cache/models.py
+- id: TASK-2.3
+  description: Populate parent_hash on deployment (parent=NULL)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  estimated_effort: 2-3h
+  priority: HIGH
+  commit: bf021c6
+  files:
+  - skillmeat/core/deployment.py
+  - skillmeat/core/version_tracking.py
+- id: TASK-2.4
+  description: Populate parent_hash on sync (parent=previous hash)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  estimated_effort: 2-3h
+  priority: HIGH
+  commit: bf021c6
+  files:
+  - skillmeat/core/sync.py
+- id: TASK-2.5
+  description: Populate version_lineage array
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  estimated_effort: 2-4h
+  priority: HIGH
+  commit: bf021c6
+  files:
+  - skillmeat/core/version_lineage.py
+- id: TASK-2.6
+  description: Add database indexes on content_hash and parent_hash
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  estimated_effort: 1-2h
+  priority: MEDIUM
+  commit: bf021c6
+  files:
+  - skillmeat/cache/migrations/versions/20251217_1500_add_artifact_versions.py
+- id: TASK-2.7
+  description: Write unit tests for version chain creation
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - TASK-2.1
+  estimated_effort: 2-4h
+  priority: HIGH
+  commit: bf021c6
+  files:
+  - tests/test_version_lineage.py
+  - tests/core/test_version_lineage_utils.py
+  - tests/unit/test_version_tracking.py
+  - tests/unit/test_deployment_version_integration.py
+  - tests/unit/test_sync_version_creation.py
 parallelization:
-  batch_1: ["TASK-2.1"]
-  batch_2: ["TASK-2.2", "TASK-2.3", "TASK-2.4", "TASK-2.5", "TASK-2.6", "TASK-2.7"]
-
+  batch_1:
+  - TASK-2.1
+  batch_2:
+  - TASK-2.2
+  - TASK-2.3
+  - TASK-2.4
+  - TASK-2.5
+  - TASK-2.6
+  - TASK-2.7
 completion: 100%
+schema_version: 2
+doc_type: progress
+feature_slug: versioning-merge-system-v1-5
 ---
 
 # Phase 2: Version Lineage Tracking

@@ -1,94 +1,108 @@
 ---
 type: progress
-prd: "marketplace-github-ingestion-remediation"
+prd: marketplace-github-ingestion-remediation
 phase: 1
-title: "Wire Existing Components"
-status: "completed"
-started: "2025-12-26T15:00:00Z"
-completed: "2025-12-26T15:30:00Z"
-
+title: Wire Existing Components
+status: completed
+started: '2025-12-26T15:00:00Z'
+completed: '2025-12-26T15:30:00Z'
 overall_progress: 100
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 5
 completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer"]
+owners:
+- python-backend-engineer
 contributors: []
-
 tasks:
-  - id: "REM-1.1"
-    description: "Wire Heuristic Import - uncomment import in github_scanner.py:30-34"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "5min"
-    priority: "critical"
-    file: "skillmeat/core/marketplace/github_scanner.py"
-    lines: "30-34"
-
-  - id: "REM-1.2"
-    description: "Wire Detector Init - uncomment self.detector = HeuristicDetector() in line 101"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REM-1.1"]
-    estimated_effort: "5min"
-    priority: "critical"
-    file: "skillmeat/core/marketplace/github_scanner.py"
-    lines: "101"
-
-  - id: "REM-1.3"
-    description: "Wire scan_repository - uncomment detect_artifacts_in_tree call, remove placeholder"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REM-1.2"]
-    estimated_effort: "10min"
-    priority: "critical"
-    file: "skillmeat/core/marketplace/github_scanner.py"
-    lines: "159-174"
-
-  - id: "REM-1.4"
-    description: "Wire scan_github_source - uncomment detect_artifacts_in_tree call, remove placeholder"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REM-1.2"]
-    estimated_effort: "10min"
-    priority: "critical"
-    file: "skillmeat/core/marketplace/github_scanner.py"
-    lines: "464-478"
-
-  - id: "REM-1.5"
-    description: "Wire Diff Engine - replace hardcoded new_entries=[] with CatalogDiffEngine call"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REM-1.3"]
-    estimated_effort: "15min"
-    priority: "high"
-    file: "skillmeat/api/routers/marketplace_sources.py"
-    lines: "545-548"
-
+- id: REM-1.1
+  description: Wire Heuristic Import - uncomment import in github_scanner.py:30-34
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 5min
+  priority: critical
+  file: skillmeat/core/marketplace/github_scanner.py
+  lines: 30-34
+- id: REM-1.2
+  description: Wire Detector Init - uncomment self.detector = HeuristicDetector()
+    in line 101
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REM-1.1
+  estimated_effort: 5min
+  priority: critical
+  file: skillmeat/core/marketplace/github_scanner.py
+  lines: '101'
+- id: REM-1.3
+  description: Wire scan_repository - uncomment detect_artifacts_in_tree call, remove
+    placeholder
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REM-1.2
+  estimated_effort: 10min
+  priority: critical
+  file: skillmeat/core/marketplace/github_scanner.py
+  lines: 159-174
+- id: REM-1.4
+  description: Wire scan_github_source - uncomment detect_artifacts_in_tree call,
+    remove placeholder
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REM-1.2
+  estimated_effort: 10min
+  priority: critical
+  file: skillmeat/core/marketplace/github_scanner.py
+  lines: 464-478
+- id: REM-1.5
+  description: Wire Diff Engine - replace hardcoded new_entries=[] with CatalogDiffEngine
+    call
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REM-1.3
+  estimated_effort: 15min
+  priority: high
+  file: skillmeat/api/routers/marketplace_sources.py
+  lines: 545-548
 parallelization:
-  batch_1: ["REM-1.1"]
-  batch_2: ["REM-1.2"]
-  batch_3: ["REM-1.3", "REM-1.4"]
-  batch_4: ["REM-1.5"]
-  critical_path: ["REM-1.1", "REM-1.2", "REM-1.3", "REM-1.5"]
-  estimated_total_time: "45min"
-
+  batch_1:
+  - REM-1.1
+  batch_2:
+  - REM-1.2
+  batch_3:
+  - REM-1.3
+  - REM-1.4
+  batch_4:
+  - REM-1.5
+  critical_path:
+  - REM-1.1
+  - REM-1.2
+  - REM-1.3
+  - REM-1.5
+  estimated_total_time: 45min
 blockers: []
-
 success_criteria:
-  - All imports resolve without circular dependency errors
-  - python -m skillmeat.core.marketplace.heuristic_detector shows detection output
-  - pytest tests/core/marketplace/test_heuristic_detector.py passes
-  - Scanner returns non-empty artifacts for test repo
-
+- All imports resolve without circular dependency errors
+- python -m skillmeat.core.marketplace.heuristic_detector shows detection output
+- pytest tests/core/marketplace/test_heuristic_detector.py passes
+- Scanner returns non-empty artifacts for test repo
 files_modified:
-  - "skillmeat/core/marketplace/github_scanner.py"
-  - "skillmeat/api/routers/marketplace_sources.py"
+- skillmeat/core/marketplace/github_scanner.py
+- skillmeat/api/routers/marketplace_sources.py
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-github-ingestion-remediation
 ---
 
 # Phase 1: Wire Existing Components

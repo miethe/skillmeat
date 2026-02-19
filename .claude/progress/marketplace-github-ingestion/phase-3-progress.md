@@ -1,113 +1,136 @@
 ---
 type: progress
-prd: "marketplace-github-ingestion"
+prd: marketplace-github-ingestion
 phase: 3
-title: "Service Layer"
-status: "planning"
+title: Service Layer
+status: planning
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 7
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["backend-architect"]
-contributors: ["python-backend-engineer"]
-
+owners:
+- backend-architect
+contributors:
+- python-backend-engineer
 tasks:
-  - id: "SVC-001"
-    description: "DTOs and service models for marketplace sources and catalog entries"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["REPO-004"]
-    estimated_effort: "2pts"
-    priority: "high"
-
-  - id: "SVC-002"
-    description: "Heuristic detector for artifact discovery (directory hints, file patterns, scoring)"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["SVC-001"]
-    estimated_effort: "5pts"
-    priority: "high"
-
-  - id: "SVC-003"
-    description: "GitHub scanning service (clone/API, file traversal, metadata extraction)"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["SVC-002"]
-    estimated_effort: "5pts"
-    priority: "high"
-
-  - id: "SVC-004"
-    description: "README link harvester for secondary repo discovery (dedup, cycle guard, depth limit)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SVC-003"]
-    estimated_effort: "3pts"
-    priority: "medium"
-
-  - id: "SVC-005"
-    description: "Catalog diff engine to detect new/updated/removed entries (commit hash, file checksum)"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["SVC-004"]
-    estimated_effort: "3pts"
-    priority: "high"
-
-  - id: "SVC-006"
-    description: "Import coordinator to map upstream artifacts to collection and mark as imported"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SVC-005"]
-    estimated_effort: "3pts"
-    priority: "high"
-
-  - id: "SVC-007"
-    description: "Error handling, observability, and logging for marketplace operations"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["SVC-006"]
-    estimated_effort: "2pts"
-    priority: "medium"
-
+- id: SVC-001
+  description: DTOs and service models for marketplace sources and catalog entries
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - REPO-004
+  estimated_effort: 2pts
+  priority: high
+- id: SVC-002
+  description: Heuristic detector for artifact discovery (directory hints, file patterns,
+    scoring)
+  status: pending
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - SVC-001
+  estimated_effort: 5pts
+  priority: high
+- id: SVC-003
+  description: GitHub scanning service (clone/API, file traversal, metadata extraction)
+  status: pending
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - SVC-002
+  estimated_effort: 5pts
+  priority: high
+- id: SVC-004
+  description: README link harvester for secondary repo discovery (dedup, cycle guard,
+    depth limit)
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SVC-003
+  estimated_effort: 3pts
+  priority: medium
+- id: SVC-005
+  description: Catalog diff engine to detect new/updated/removed entries (commit hash,
+    file checksum)
+  status: pending
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - SVC-004
+  estimated_effort: 3pts
+  priority: high
+- id: SVC-006
+  description: Import coordinator to map upstream artifacts to collection and mark
+    as imported
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SVC-005
+  estimated_effort: 3pts
+  priority: high
+- id: SVC-007
+  description: Error handling, observability, and logging for marketplace operations
+  status: pending
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - SVC-006
+  estimated_effort: 2pts
+  priority: medium
 parallelization:
-  batch_1: ["SVC-001"]
-  batch_2: ["SVC-002"]
-  batch_3: ["SVC-003"]
-  batch_4: ["SVC-004"]
-  batch_5: ["SVC-005"]
-  batch_6: ["SVC-006"]
-  batch_7: ["SVC-007"]
-  critical_path: ["SVC-001", "SVC-002", "SVC-003", "SVC-004", "SVC-005", "SVC-006", "SVC-007"]
-  estimated_total_time: "23h"
-
+  batch_1:
+  - SVC-001
+  batch_2:
+  - SVC-002
+  batch_3:
+  - SVC-003
+  batch_4:
+  - SVC-004
+  batch_5:
+  - SVC-005
+  batch_6:
+  - SVC-006
+  batch_7:
+  - SVC-007
+  critical_path:
+  - SVC-001
+  - SVC-002
+  - SVC-003
+  - SVC-004
+  - SVC-005
+  - SVC-006
+  - SVC-007
+  estimated_total_time: 23h
 blockers: []
-
 success_criteria:
-  - DTOs properly define marketplace data contracts
-  - Heuristic detector accurately identifies artifacts with confidence scoring
-  - GitHub scanning handles both API and clone methods with rate limiting
-  - README link harvester safely explores secondary repos with cycle protection
-  - Catalog diff engine correctly identifies status changes
-  - Import coordinator maps upstream to local artifacts consistently
-  - Error handling surfaces meaningful messages to users
-  - Structured logging enables observability and debugging
-
+- DTOs properly define marketplace data contracts
+- Heuristic detector accurately identifies artifacts with confidence scoring
+- GitHub scanning handles both API and clone methods with rate limiting
+- README link harvester safely explores secondary repos with cycle protection
+- Catalog diff engine correctly identifies status changes
+- Import coordinator maps upstream to local artifacts consistently
+- Error handling surfaces meaningful messages to users
+- Structured logging enables observability and debugging
 files_modified:
-  - "skillmeat/core/schemas/marketplace.py"
-  - "skillmeat/core/services/marketplace_heuristic.py"
-  - "skillmeat/core/services/github_scanner.py"
-  - "skillmeat/core/services/readme_harvester.py"
-  - "skillmeat/core/services/catalog_diff.py"
-  - "skillmeat/core/services/marketplace_importer.py"
-  - "skillmeat/core/observability/marketplace_metrics.py"
-  - "tests/unit/services/test_marketplace_services.py"
+- skillmeat/core/schemas/marketplace.py
+- skillmeat/core/services/marketplace_heuristic.py
+- skillmeat/core/services/github_scanner.py
+- skillmeat/core/services/readme_harvester.py
+- skillmeat/core/services/catalog_diff.py
+- skillmeat/core/services/marketplace_importer.py
+- skillmeat/core/observability/marketplace_metrics.py
+- tests/unit/services/test_marketplace_services.py
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-github-ingestion
 ---
 
 # Phase 3: Service Layer

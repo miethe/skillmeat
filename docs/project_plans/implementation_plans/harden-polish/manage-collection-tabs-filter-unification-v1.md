@@ -15,6 +15,10 @@ related_specs:
 - /docs/project_plans/implementation_plans/harden-polish/collections-groups-ux-enhancement-v1.md
 related_request_logs:
 - REQ-20260210-skillmeat
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: manage-collection-tabs-filter-unification
+prd_ref: null
 ---
 # Implementation Plan: /manage + /collection Tabs and Filter Bar Unification
 

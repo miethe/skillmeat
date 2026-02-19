@@ -1,10 +1,10 @@
 ---
 type: context
 prd: smart-import-discovery
-title: "Smart Import & Discovery - Development Context"
+title: Smart Import & Discovery - Development Context
 status: active
-created: "2025-11-30"
-updated: "2025-11-30"
+created: '2025-11-30'
+updated: '2025-11-30'
 critical_notes_count: 0
 implementation_decisions_count: 5
 active_gotchas_count: 0
@@ -16,6 +16,9 @@ decisions: []
 integrations: []
 gotchas: []
 modified_files: []
+schema_version: 2
+doc_type: context
+feature_slug: smart-import-discovery
 ---
 
 # Smart Import & Discovery - Implementation Context

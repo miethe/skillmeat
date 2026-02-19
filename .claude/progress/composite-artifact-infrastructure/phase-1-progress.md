@@ -47,8 +47,8 @@ tasks:
   estimated_effort: 2pt
   priority: critical
 - id: CAI-P1-04
-  description: Define CompositeArtifact and CompositeMembership ORM models with UUID
-    FK (child_artifact_uuid → artifacts.uuid, ondelete=CASCADE)
+  description: "Define CompositeArtifact and CompositeMembership ORM models with UUID\
+    \ FK (child_artifact_uuid \u2192 artifacts.uuid, ondelete=CASCADE)"
   status: completed
   assigned_to:
   - data-layer-expert
@@ -68,8 +68,8 @@ tasks:
   estimated_effort: 1pt
   priority: high
 - id: CAI-P1-06
-  description: Implement composite membership repository CRUD and service-layer type:name
-    → UUID resolution (composite_service.py)
+  description: "Implement composite membership repository CRUD and service-layer type:name\
+    \ \u2192 UUID resolution (composite_service.py)"
   status: completed
   assigned_to:
   - python-backend-engineer
@@ -98,8 +98,8 @@ tasks:
   estimated_effort: 2pt
   priority: medium
 - id: CAI-P1-09
-  description: 'Integration tests: FK constraints, cascading deletes, type:name →
-    UUID resolution end-to-end, migration round-trip'
+  description: "Integration tests: FK constraints, cascading deletes, type:name \u2192\
+    \ UUID resolution end-to-end, migration round-trip"
   status: completed
   assigned_to:
   - python-backend-engineer
@@ -112,7 +112,7 @@ parallelization:
     tasks:
     - CAI-P1-01
     - CAI-P1-02
-    note: Independent — enum addition and UUID column are separate concerns
+    note: "Independent \u2014 enum addition and UUID column are separate concerns"
   batch_2:
     tasks:
     - CAI-P1-03
@@ -153,7 +153,7 @@ success_criteria:
   description: Cascading delete removes memberships when child artifact deleted
   status: pending
 - id: SC-P1-4
-  description: type:name → UUID resolution works correctly in service layer
+  description: "type:name \u2192 UUID resolution works correctly in service layer"
   status: pending
 - id: SC-P1-5
   description: UUID appears in .skillmeat-deployed.toml and manifest.toml (additive,
@@ -181,6 +181,9 @@ files_modified:
 - tests/conftest.py
 progress: 100
 updated: '2026-02-18'
+schema_version: 2
+doc_type: progress
+feature_slug: composite-artifact-infrastructure
 ---
 
 # composite-artifact-infrastructure - Phase 1: Core Relationships (Database & ORM)

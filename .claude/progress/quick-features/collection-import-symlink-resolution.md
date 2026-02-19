@@ -4,7 +4,10 @@ status: completed
 created: 2025-02-06
 scope: single-file fix
 files_affected:
-  - skillmeat/core/marketplace/import_coordinator.py
+- skillmeat/core/marketplace/import_coordinator.py
+schema_version: 2
+doc_type: quick_feature
+feature_slug: collection-import-symlink-resolution
 ---
 
 # Fix: Symlink Resolution During Collection Import

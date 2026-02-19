@@ -1,101 +1,123 @@
 ---
 type: progress
-prd: "marketplace-source-detection-improvements"
+prd: marketplace-source-detection-improvements
 phase: 5
-phase_name: "Testing & Documentation"
+phase_name: Testing & Documentation
 status: not_started
 progress: 0
 total_tasks: 10
 completed_tasks: 0
-effort: "8-12 pts"
+effort: 8-12 pts
 created: 2026-01-05
 updated: 2026-01-05
-
-assigned_to: ["python-backend-engineer", "documentation-writer"]
-dependencies: [4]
-
+assigned_to:
+- python-backend-engineer
+- documentation-writer
+dependencies:
+- 4
 tasks:
-  # Integration Tests (4 tasks)
-  - id: "P5.1a"
-    name: "E2E test: mapping → scan → dedup"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P4.4c"]
-    effort: "3 pts"
-
-  - id: "P5.1b"
-    name: "E2E test: cross-source dedup"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P5.1a"]
-    effort: "2 pts"
-
-  - id: "P5.1c"
-    name: "Edge case tests"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P5.1b"]
-    effort: "2 pts"
-
-  - id: "P5.1d"
-    name: "Performance benchmark"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P5.1c"]
-    effort: "2 pts"
-
-  # Documentation (3 tasks)
-  - id: "P5.2a"
-    name: "User guide for mapping"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["P4.4c"]
-    effort: "2 pts"
-
-  - id: "P5.2b"
-    name: "API documentation update"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["P5.2a"]
-    effort: "1 pt"
-
-  - id: "P5.2c"
-    name: "Developer guide for dedup"
-    status: "pending"
-    assigned_to: ["documentation-writer"]
-    dependencies: ["P5.2b"]
-    effort: "2 pts"
-
-  # Deployment (3 tasks)
-  - id: "P5.3a"
-    name: "Deployment checklist"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P5.1d", "P5.2c"]
-    effort: "1 pt"
-
-  - id: "P5.3b"
-    name: "Rollback procedure"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P5.3a"]
-    effort: "1 pt"
-
-  - id: "P5.3c"
-    name: "Feature flag setup"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["P5.3b"]
-    effort: "1 pt"
-
+- id: P5.1a
+  name: "E2E test: mapping \u2192 scan \u2192 dedup"
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P4.4c
+  effort: 3 pts
+- id: P5.1b
+  name: 'E2E test: cross-source dedup'
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P5.1a
+  effort: 2 pts
+- id: P5.1c
+  name: Edge case tests
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P5.1b
+  effort: 2 pts
+- id: P5.1d
+  name: Performance benchmark
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P5.1c
+  effort: 2 pts
+- id: P5.2a
+  name: User guide for mapping
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - P4.4c
+  effort: 2 pts
+- id: P5.2b
+  name: API documentation update
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - P5.2a
+  effort: 1 pt
+- id: P5.2c
+  name: Developer guide for dedup
+  status: pending
+  assigned_to:
+  - documentation-writer
+  dependencies:
+  - P5.2b
+  effort: 2 pts
+- id: P5.3a
+  name: Deployment checklist
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P5.1d
+  - P5.2c
+  effort: 1 pt
+- id: P5.3b
+  name: Rollback procedure
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P5.3a
+  effort: 1 pt
+- id: P5.3c
+  name: Feature flag setup
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - P5.3b
+  effort: 1 pt
 parallelization:
-  batch_1: ["P5.1a", "P5.2a"]
-  batch_2: ["P5.1b", "P5.2b"]
-  batch_3: ["P5.1c", "P5.2c"]
-  batch_4: ["P5.1d"]
-  batch_5: ["P5.3a"]
-  batch_6: ["P5.3b"]
-  batch_7: ["P5.3c"]
+  batch_1:
+  - P5.1a
+  - P5.2a
+  batch_2:
+  - P5.1b
+  - P5.2b
+  batch_3:
+  - P5.1c
+  - P5.2c
+  batch_4:
+  - P5.1d
+  batch_5:
+  - P5.3a
+  batch_6:
+  - P5.3b
+  batch_7:
+  - P5.3c
+schema_version: 2
+doc_type: progress
+feature_slug: marketplace-source-detection-improvements
 ---
 
 # Phase 5: Testing & Documentation

@@ -24,6 +24,10 @@ related:
 - /docs/project_plans/specs/workflow-orchestration-schema-spec.md
 - /docs/project_plans/design/workflow-orchestration-ui-spec.md
 - /docs/project_plans/implementation_plans/features/memory-context-system-v1.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: workflow-orchestration
+prd_ref: null
 ---
 # Implementation Plan: Workflow Orchestration Engine
 

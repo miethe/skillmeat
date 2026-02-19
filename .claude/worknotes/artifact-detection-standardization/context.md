@@ -1,8 +1,11 @@
 ---
 type: context
-prd: "artifact-detection-standardization"
-created: "2026-01-06"
-updated: "2026-01-06"
+prd: artifact-detection-standardization
+created: '2026-01-06'
+updated: '2026-01-06'
+schema_version: 2
+doc_type: context
+feature_slug: artifact-detection-standardization
 ---
 
 # Artifact Detection Standardization - Context Notes

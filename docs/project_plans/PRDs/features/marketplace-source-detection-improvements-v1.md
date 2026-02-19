@@ -20,6 +20,9 @@ related:
 - /docs/project_plans/PRDs/features/marketplace-github-ingestion-v1.md
 - /docs/project_plans/bugs/marketplace-sources-non_skills-v1.md
 - /docs/project_plans/implementation_plans/features/marketplace-sources-crud-enhancement-v1.md
+schema_version: 2
+doc_type: prd
+feature_slug: marketplace-source-detection-improvements
 ---
 
 # PRD: Marketplace Source Detection Improvements

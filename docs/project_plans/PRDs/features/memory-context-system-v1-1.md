@@ -25,6 +25,9 @@ related:
 - /docs/project_plans/implementation_plans/features/memory-context-system-v1.md
 - /docs/project_plans/design-specs/memory-context-system-ui-spec.md
 - /.claude/skills/skillmeat-cli/SKILL.md
+schema_version: 2
+doc_type: prd
+feature_slug: memory-context-system-v1-1
 ---
 
 # PRD: Memory & Context Intelligence System v1.1

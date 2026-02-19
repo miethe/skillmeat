@@ -21,6 +21,10 @@ total_effort: 12-17 hours
 related:
 - /docs/spikes/SPIKE-collection-data-consistency.md
 - /docs/project_plans/reports/artifact-modal-architecture-analysis.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: collection-data-consistency
+prd_ref: null
 ---
 # Implementation Plan: Collection Data Consistency & Performance Optimization
 

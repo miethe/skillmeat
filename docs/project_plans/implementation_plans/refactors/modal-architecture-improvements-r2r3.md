@@ -16,6 +16,10 @@ category: product-planning
 status: inferred_complete
 related:
 - /docs/project_plans/reports/artifact-modal-architecture-analysis.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: modal-architecture-improvements-r2r3
+prd_ref: null
 ---
 # Implementation Plan: Modal Architecture Improvements (R2-R3)
 

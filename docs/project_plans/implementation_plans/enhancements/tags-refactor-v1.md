@@ -18,6 +18,10 @@ category: product-planning
 status: inferred_complete
 related:
 - /docs/project_plans/ideas/README.md
+schema_version: 2
+doc_type: implementation_plan
+feature_slug: tags-refactor
+prd_ref: null
 ---
 # Implementation Plan: Tags Refactor V1
 

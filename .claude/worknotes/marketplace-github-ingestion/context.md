@@ -1,24 +1,18 @@
 ---
-# === CONTEXT WORKNOTES ===
-# PRD-level sticky pad for agent notes and observations during development
-# This file grows as agents add notes during implementation
-
-# Metadata: Identification and Scope
 type: context
-prd: "marketplace-github-ingestion"
-title: "GitHub Marketplace Ingestion - Development Context"
-status: "active"
-created: "2025-12-03"
-updated: "2025-12-03"
-
-# Quick Reference (for fast agent queries)
+prd: marketplace-github-ingestion
+title: GitHub Marketplace Ingestion - Development Context
+status: active
+created: '2025-12-03'
+updated: '2025-12-03'
 critical_notes_count: 0
 implementation_decisions_count: 0
 active_gotchas_count: 0
 agent_contributors: []
-
-# Agent Communication Index
 agents: []
+schema_version: 2
+doc_type: context
+feature_slug: marketplace-github-ingestion
 ---
 
 # GitHub Marketplace Ingestion - Development Context

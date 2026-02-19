@@ -177,6 +177,9 @@ completed_tasks: 17
 in_progress_tasks: 0
 blocked_tasks: 0
 updated: '2026-01-21'
+schema_version: 2
+doc_type: progress
+feature_slug: collection-artifact-refresh-v1
 ---
 
 # Phase 3: API Endpoint Implementation

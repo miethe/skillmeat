@@ -4,7 +4,10 @@ source_req: REQ-20260110-skillmeat-01
 status: completed
 created: 2026-01-10
 files:
-  - .claude/skills/meatycapture-capture/scripts/mc-quick.sh
+- .claude/skills/meatycapture-capture/scripts/mc-quick.sh
+schema_version: 2
+doc_type: quick_feature
+feature_slug: mc-quick-script
 ---
 
 # Quick Feature: mc-quick.sh

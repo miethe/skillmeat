@@ -3,6 +3,9 @@ type: worknotes
 prd: versioning-merge-system-v1.5
 created: 2025-12-17
 updated: 2025-12-17
+schema_version: 2
+doc_type: context
+feature_slug: versioning-merge-system-v1-5
 ---
 
 # Versioning Merge System v1.5: Context Notes

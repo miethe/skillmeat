@@ -5,12 +5,15 @@ created: 2026-01-28
 priority: high
 complexity: medium
 files_affected:
-  - skillmeat/web/components/shared/unified-card-actions.tsx (NEW)
-  - skillmeat/web/components/collection/artifact-grid.tsx
-  - skillmeat/web/components/collection/artifact-list.tsx
-  - skillmeat/web/components/entity/entity-card.tsx
-  - skillmeat/web/components/entity/entity-row.tsx
-  - skillmeat/web/components/entity/entity-actions.tsx
+- skillmeat/web/components/shared/unified-card-actions.tsx (NEW)
+- skillmeat/web/components/collection/artifact-grid.tsx
+- skillmeat/web/components/collection/artifact-list.tsx
+- skillmeat/web/components/entity/entity-card.tsx
+- skillmeat/web/components/entity/entity-row.tsx
+- skillmeat/web/components/entity/entity-actions.tsx
+schema_version: 2
+doc_type: quick_feature
+feature_slug: artifact-card-menu-consolidation
 ---
 
 # Quick Feature: Artifact Card Menu Consolidation

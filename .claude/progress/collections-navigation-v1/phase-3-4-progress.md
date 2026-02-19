@@ -1,161 +1,206 @@
 ---
 prd: collections-navigation-v1
-phases: [3, 4]
-title: "Frontend Foundation & Collection Features"
+phases:
+- 3
+- 4
+title: Frontend Foundation & Collection Features
 status: completed
 last_updated: 2025-12-15
 completed_at: 2025-12-15
 completion: 100
 total_story_points: 25
-
 tasks:
-  # Phase 3: Frontend Foundation (10 story points)
-  - id: "TASK-3.1"
-    title: "Navigation Restructuring"
-    status: completed
-    story_points: 2
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    description: "Restructure navigation to support collections/groups/all artifacts views"
-    files: ["web/components/navigation.tsx", "web/components/nav-section.tsx"]
-    completed_at: "2025-12-12"
-
-  - id: "TASK-3.2"
-    title: "TypeScript Types"
-    status: completed
-    story_points: 1.5
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    description: "Define Collection, Group, and navigation types"
-    files: ["skillmeat/web/types/collections.ts", "skillmeat/web/types/groups.ts"]
-    completed_at: "2025-12-15"
-    validation: "Files verified to exist via codebase inspection"
-
-  - id: "TASK-3.3"
-    title: "useCollections Hook"
-    status: completed
-    story_points: 2
-    assigned_to: ["frontend-developer"]
-    dependencies: ["TASK-3.2"]
-    description: "Create React hook for collection state management"
-    files: ["skillmeat/web/hooks/use-collections.ts"]
-    completed_at: "2025-12-15"
-    validation: "File verified to exist (10KB) via codebase inspection"
-
-  - id: "TASK-3.4"
-    title: "useGroups Hook"
-    status: completed
-    story_points: 2
-    assigned_to: ["frontend-developer"]
-    dependencies: ["TASK-3.2"]
-    description: "Create React hook for group state management"
-    files: ["skillmeat/web/hooks/use-groups.ts"]
-    completed_at: "2025-12-15"
-    validation: "File verified to exist (17KB) via codebase inspection"
-
-  - id: "TASK-3.5"
-    title: "CollectionContext Provider"
-    status: completed
-    story_points: 1.5
-    assigned_to: ["frontend-developer"]
-    dependencies: ["TASK-3.3", "TASK-3.4"]
-    description: "Create context provider for collection/group state"
-    files: ["skillmeat/web/context/collection-context.tsx"]
-    completed_at: "2025-12-15"
-    validation: "File verified to exist (4.2KB) via codebase inspection"
-
-  - id: "TASK-3.6"
-    title: "API Client Integration"
-    status: completed
-    story_points: 1.5
-    assigned_to: ["frontend-developer"]
-    dependencies: ["TASK-3.2"]
-    description: "Add collection/group endpoints to API client"
-    files: ["skillmeat/web/lib/api/collections.ts"]
-    completed_at: "2025-12-15"
-    validation: "API client uses /user-collections endpoints consistently"
-
-  # Phase 4: Collection Features (15 story points)
-  - id: "TASK-4.1"
-    title: "Collection Page Redesign"
-    status: completed
-    story_points: 3
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.5", "TASK-3.6"]
-    description: "Redesign collection page with groups sidebar and artifact grid"
-    files: ["skillmeat/web/app/collection/page.tsx"]
-    completed_at: "2025-12-15"
-
-  - id: "TASK-4.2"
-    title: "Collection Switcher"
-    status: completed
-    story_points: 2
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-3.5"]
-    description: "Create collection switcher component for navigation"
-    files: ["skillmeat/web/components/collection/collection-switcher.tsx"]
-    completed_at: "2025-12-15"
-
-  - id: "TASK-4.3"
-    title: "All Collections View"
-    status: completed
-    story_points: 2
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-4.1"]
-    description: "Create all collections page with grid layout"
-    files: ["skillmeat/web/app/collection/page.tsx"]
-    completed_at: "2025-12-15"
-
-  - id: "TASK-4.4"
-    title: "Create/Edit Collection Dialogs"
-    status: completed
-    story_points: 2
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-4.2"]
-    description: "Create dialogs for creating and editing collections"
-    files: ["skillmeat/web/components/collection/"]
-    completed_at: "2025-12-15"
-
-  - id: "TASK-4.5"
-    title: "Move/Copy to Collections Dialog"
-    status: completed
-    story_points: 1.5
-    assigned_to: ["frontend-developer"]
-    dependencies: ["TASK-4.3"]
-    description: "Create dialog for moving/copying artifacts to collections"
-    files: ["skillmeat/web/components/collection/"]
-    completed_at: "2025-12-15"
-
-  - id: "TASK-4.6"
-    title: "Artifact Card Enhancement"
-    status: completed
-    story_points: 2
-    assigned_to: ["frontend-developer"]
-    dependencies: ["TASK-4.1"]
-    description: "Enhance artifact card with collection badges and actions"
-    files: ["skillmeat/web/components/artifact/"]
-    completed_at: "2025-12-15"
-
-  - id: "TASK-4.7"
-    title: "Unified Modal Collections Tab"
-    status: completed
-    story_points: 2
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-4.5", "TASK-4.6"]
-    description: "Add collections tab to unified artifact modal"
-    files: ["skillmeat/web/components/entity/"]
-    completed_at: "2025-12-15"
-
+- id: TASK-3.1
+  title: Navigation Restructuring
+  status: completed
+  story_points: 2
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  description: Restructure navigation to support collections/groups/all artifacts
+    views
+  files:
+  - web/components/navigation.tsx
+  - web/components/nav-section.tsx
+  completed_at: '2025-12-12'
+- id: TASK-3.2
+  title: TypeScript Types
+  status: completed
+  story_points: 1.5
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  description: Define Collection, Group, and navigation types
+  files:
+  - skillmeat/web/types/collections.ts
+  - skillmeat/web/types/groups.ts
+  completed_at: '2025-12-15'
+  validation: Files verified to exist via codebase inspection
+- id: TASK-3.3
+  title: useCollections Hook
+  status: completed
+  story_points: 2
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - TASK-3.2
+  description: Create React hook for collection state management
+  files:
+  - skillmeat/web/hooks/use-collections.ts
+  completed_at: '2025-12-15'
+  validation: File verified to exist (10KB) via codebase inspection
+- id: TASK-3.4
+  title: useGroups Hook
+  status: completed
+  story_points: 2
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - TASK-3.2
+  description: Create React hook for group state management
+  files:
+  - skillmeat/web/hooks/use-groups.ts
+  completed_at: '2025-12-15'
+  validation: File verified to exist (17KB) via codebase inspection
+- id: TASK-3.5
+  title: CollectionContext Provider
+  status: completed
+  story_points: 1.5
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - TASK-3.3
+  - TASK-3.4
+  description: Create context provider for collection/group state
+  files:
+  - skillmeat/web/context/collection-context.tsx
+  completed_at: '2025-12-15'
+  validation: File verified to exist (4.2KB) via codebase inspection
+- id: TASK-3.6
+  title: API Client Integration
+  status: completed
+  story_points: 1.5
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - TASK-3.2
+  description: Add collection/group endpoints to API client
+  files:
+  - skillmeat/web/lib/api/collections.ts
+  completed_at: '2025-12-15'
+  validation: API client uses /user-collections endpoints consistently
+- id: TASK-4.1
+  title: Collection Page Redesign
+  status: completed
+  story_points: 3
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.5
+  - TASK-3.6
+  description: Redesign collection page with groups sidebar and artifact grid
+  files:
+  - skillmeat/web/app/collection/page.tsx
+  completed_at: '2025-12-15'
+- id: TASK-4.2
+  title: Collection Switcher
+  status: completed
+  story_points: 2
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-3.5
+  description: Create collection switcher component for navigation
+  files:
+  - skillmeat/web/components/collection/collection-switcher.tsx
+  completed_at: '2025-12-15'
+- id: TASK-4.3
+  title: All Collections View
+  status: completed
+  story_points: 2
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-4.1
+  description: Create all collections page with grid layout
+  files:
+  - skillmeat/web/app/collection/page.tsx
+  completed_at: '2025-12-15'
+- id: TASK-4.4
+  title: Create/Edit Collection Dialogs
+  status: completed
+  story_points: 2
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-4.2
+  description: Create dialogs for creating and editing collections
+  files:
+  - skillmeat/web/components/collection/
+  completed_at: '2025-12-15'
+- id: TASK-4.5
+  title: Move/Copy to Collections Dialog
+  status: completed
+  story_points: 1.5
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - TASK-4.3
+  description: Create dialog for moving/copying artifacts to collections
+  files:
+  - skillmeat/web/components/collection/
+  completed_at: '2025-12-15'
+- id: TASK-4.6
+  title: Artifact Card Enhancement
+  status: completed
+  story_points: 2
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - TASK-4.1
+  description: Enhance artifact card with collection badges and actions
+  files:
+  - skillmeat/web/components/artifact/
+  completed_at: '2025-12-15'
+- id: TASK-4.7
+  title: Unified Modal Collections Tab
+  status: completed
+  story_points: 2
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - TASK-4.5
+  - TASK-4.6
+  description: Add collections tab to unified artifact modal
+  files:
+  - skillmeat/web/components/entity/
+  completed_at: '2025-12-15'
 parallelization:
-  batch_1: ["TASK-3.1", "TASK-3.2"]
-  batch_2: ["TASK-3.3", "TASK-3.4", "TASK-3.6"]
-  batch_3: ["TASK-3.5"]
-  batch_4: ["TASK-4.1", "TASK-4.2"]
-  batch_5: ["TASK-4.3", "TASK-4.4"]
-  batch_6: ["TASK-4.5", "TASK-4.6"]
-  batch_7: ["TASK-4.7"]
-
-estimated_completion: "2025-12-14"
+  batch_1:
+  - TASK-3.1
+  - TASK-3.2
+  batch_2:
+  - TASK-3.3
+  - TASK-3.4
+  - TASK-3.6
+  batch_3:
+  - TASK-3.5
+  batch_4:
+  - TASK-4.1
+  - TASK-4.2
+  batch_5:
+  - TASK-4.3
+  - TASK-4.4
+  batch_6:
+  - TASK-4.5
+  - TASK-4.6
+  batch_7:
+  - TASK-4.7
+estimated_completion: '2025-12-14'
+schema_version: 2
+doc_type: progress
+feature_slug: collections-navigation-v1
+type: progress
 ---
 
 # Phase 3-4 Progress: Frontend Foundation & Collection Features

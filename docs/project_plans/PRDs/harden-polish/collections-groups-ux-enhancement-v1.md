@@ -19,6 +19,9 @@ updated: 2026-01-19
 category: product-planning
 status: inferred_complete
 related: []
+schema_version: 2
+doc_type: prd
+feature_slug: collections-groups-ux-enhancement
 ---
 # PRD: Collections & Groups UX Enhancement
 
