@@ -43,6 +43,7 @@ import {
   Rocket,
   AlertCircle,
   Plus,
+  Blocks,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -74,6 +75,7 @@ import {
   useTags,
   useProjects,
   deploymentKeys,
+  useComposites,
 } from '@/hooks';
 import { TagSelectorPopover } from '@/components/collection/tag-selector-popover';
 import { getTagColor } from '@/lib/utils/tag-colors';
@@ -84,6 +86,11 @@ import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments'
 import type { ArtifactDeploymentInfo } from '@/types/deployments';
 import type { Deployment } from '@/components/deployments/deployment-card';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  CompositePreview,
+  type CompositePreview as CompositePreviewData,
+  type CompositeArtifactEntry,
+} from '@/components/import/composite-preview';
 
 // ============================================================================
 // Types
@@ -97,7 +104,8 @@ export type ArtifactDetailsTab =
   | 'collections'
   | 'sources'
   | 'history'
-  | 'deployments';
+  | 'deployments'
+  | 'plugin';
 
 export interface ArtifactDetailsModalProps {
   /** The artifact to display in the modal */
@@ -448,7 +456,7 @@ function getHistoryTypeLabel(type: HistoryEntry['type']): string {
 // Tab Configuration
 // ============================================================================
 
-const TABS: Tab[] = [
+const BASE_TABS: Tab[] = [
   { value: 'overview', label: 'Overview' },
   { value: 'contents', label: 'Contents' },
   { value: 'links', label: 'Links' },
@@ -457,6 +465,13 @@ const TABS: Tab[] = [
   { value: 'history', label: 'History' },
   { value: 'deployments', label: 'Deployments' },
 ];
+
+/** Plugin Members tab — only shown for composite artifacts */
+const PLUGIN_TAB: Tab = {
+  value: 'plugin',
+  label: 'Plugin Members',
+  icon: Blocks,
+};
 
 // ============================================================================
 // Main Component
@@ -472,6 +487,7 @@ const TABS: Tab[] = [
  * - Collections: Which collections this artifact belongs to
  * - Sources: Upstream source information
  * - History: General artifact timeline
+ * - Plugin Members: (composite only) Breakdown of member artifacts via CompositePreview
  */
 export function ArtifactDetailsModal({
   artifact,
@@ -507,6 +523,16 @@ export function ArtifactDetailsModal({
 
   // Get returnTo from props or URL
   const effectiveReturnTo = returnTo || searchParams.get('returnTo');
+
+  // Determine if this is a composite/plugin artifact
+  const isComposite = artifact?.type === 'composite';
+
+  // Build dynamic tab list — insert Plugin Members tab right after Overview for composites
+  const TABS: Tab[] = useMemo(() => {
+    if (!isComposite) return BASE_TABS;
+    // Insert plugin tab after overview (index 1)
+    return [BASE_TABS[0]!, PLUGIN_TAB, ...BASE_TABS.slice(1)];
+  }, [isComposite]);
 
   // Sync activeTab with initialTab when modal opens
   useEffect(() => {
@@ -626,6 +652,64 @@ export function ArtifactDetailsModal({
     if (!artifact) return [];
     return generateMockHistory(artifact);
   }, [artifact]);
+
+  // ==========================================================================
+  // Plugin Members Data (composite artifacts only)
+  // ==========================================================================
+
+  // Derive the collection ID from the artifact's first collection reference.
+  // Falls back to 'default' when no collection context is available.
+  const compositeCollectionId = artifact?.collections?.[0]?.id ?? artifact?.collection ?? 'default';
+
+  // Fetch composites for this collection when the plugin tab is active.
+  // Enabled only when the artifact is composite and the tab is shown.
+  const isPluginTabActive = isComposite && activeTab === 'plugin';
+  const {
+    data: compositesData,
+    isLoading: isLoadingComposites,
+  } = useComposites(isPluginTabActive ? compositeCollectionId : '');
+
+  // Find the composite record matching this artifact by name/id.
+  // The composite API returns composites by collection; we look for the one
+  // whose id or display_name matches the current artifact.
+  const compositeRecord = useMemo(() => {
+    if (!isComposite || !compositesData?.items) return null;
+    const items = compositesData.items;
+
+    // Match by composite_id (which is typically "composite:<name>")
+    const byId = items.find(
+      (c) =>
+        c.id === artifact?.id ||
+        c.id === `composite:${artifact?.name}` ||
+        c.display_name === artifact?.name
+    );
+    return byId ?? items[0] ?? null;
+  }, [isComposite, compositesData?.items, artifact?.id, artifact?.name]);
+
+  // Build CompositePreviewData from the composite record's memberships.
+  // All members of an already-imported composite are "existing" artifacts
+  // (they are in the collection) — no new/conflict buckets here.
+  const compositePreviewData = useMemo<CompositePreviewData | null>(() => {
+    if (!isComposite || !artifact) return null;
+    if (!compositeRecord) return null;
+
+    const existingArtifacts: (CompositeArtifactEntry & { hash: string })[] =
+      compositeRecord.memberships
+        .filter((m) => m.child_artifact != null)
+        .map((m) => ({
+          name: m.child_artifact!.name,
+          type: m.child_artifact!.type,
+          hash: m.pinned_version_hash ?? 'unknown',
+        }));
+
+    return {
+      pluginName: compositeRecord.display_name ?? artifact.name,
+      totalChildren: existingArtifacts.length,
+      newArtifacts: [],
+      existingArtifacts,
+      conflictArtifacts: [],
+    };
+  }, [isComposite, artifact, compositeRecord]);
 
   // ==========================================================================
   // Deployment Data Fetching
@@ -857,7 +941,7 @@ export function ArtifactDetailsModal({
           <ModalHeaderSkeleton />
           <div className="border-b px-6">
             <div className="flex gap-4 py-2">
-              {TABS.map((tab) => (
+              {BASE_TABS.map((tab) => (
                 <Skeleton key={tab.value} className="h-8 w-20 rounded-md" />
               ))}
             </div>
@@ -1128,6 +1212,66 @@ export function ArtifactDetailsModal({
                 </div>
               </div>
             </TabContentWrapper>
+
+            {/* Plugin Members Tab — only rendered for composite artifacts */}
+            {isComposite && (
+              <TabContentWrapper value="plugin">
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
+                      Plugin Members
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Child artifacts that make up this plugin, linked in your collection.
+                    </p>
+                  </div>
+
+                  {isLoadingComposites ? (
+                    <div
+                      className="flex items-center justify-center py-8"
+                      role="status"
+                      aria-label="Loading plugin members"
+                    >
+                      <Loader2
+                        className="h-6 w-6 animate-spin text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                      <span className="ml-2 text-sm text-muted-foreground">
+                        Loading plugin members...
+                      </span>
+                    </div>
+                  ) : compositePreviewData && compositePreviewData.totalChildren > 0 ? (
+                    <CompositePreview preview={compositePreviewData} />
+                  ) : compositePreviewData && compositePreviewData.totalChildren === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <Blocks
+                        className="mb-2 h-10 w-10 text-indigo-400/50 dark:text-indigo-500/50"
+                        aria-hidden="true"
+                      />
+                      <p className="text-sm font-medium text-muted-foreground">
+                        No member artifacts
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground/70">
+                        This plugin has no linked member artifacts in your collection.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <Blocks
+                        className="mb-2 h-10 w-10 text-muted-foreground/50"
+                        aria-hidden="true"
+                      />
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Plugin breakdown unavailable
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground/70">
+                        Re-import this plugin from the marketplace to populate its member list.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </TabContentWrapper>
+            )}
 
             {/* Contents Tab */}
             <TabsContent
