@@ -127,7 +127,11 @@ def init(
             "claude_code": {
                 "root_dir": ".claude",
                 "platform": "claude_code",
-                "config_filenames": ["CLAUDE.md", "AGENTS.md", ".skillmeat-project.toml"],
+                "config_filenames": [
+                    "CLAUDE.md",
+                    "AGENTS.md",
+                    ".skillmeat-project.toml",
+                ],
             },
             "codex": {
                 "root_dir": ".codex",
@@ -163,7 +167,14 @@ def init(
             for profile_id in selected_profiles:
                 spec = profile_specs[profile_id]
                 root_dir = target_project / spec["root_dir"]
-                for subdir in ["skills", "commands", "agents", "hooks", "mcp", "context"]:
+                for subdir in [
+                    "skills",
+                    "commands",
+                    "agents",
+                    "hooks",
+                    "mcp",
+                    "context",
+                ]:
                     (root_dir / subdir).mkdir(parents=True, exist_ok=True)
 
                 if not ProjectMetadataStorage.exists(
@@ -208,7 +219,9 @@ def init(
                 repo = DeploymentProfileRepository()
                 for profile_id in selected_profiles:
                     spec = profile_specs[profile_id]
-                    existing = repo.read_by_project_and_profile_id(project.id, profile_id)
+                    existing = repo.read_by_project_and_profile_id(
+                        project.id, profile_id
+                    )
                     if existing:
                         continue
                     repo.create(
@@ -1395,7 +1408,9 @@ def deploy(
                         "path": str(d.artifact_path),
                         "profile_id": d.deployment_profile_id,
                         "platform": (
-                            d.platform.value if hasattr(d.platform, "value") else d.platform
+                            d.platform.value
+                            if hasattr(d.platform, "value")
+                            else d.platform
                         ),
                         "profile_root_dir": d.profile_root_dir,
                     }
@@ -8683,6 +8698,92 @@ def bundle_import(
         sys.exit(1)
 
 
+@bundle.command(name="export-composite")
+@click.argument("composite_id")
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    help="Output path for the .skillmeat-pack file (default: ./<composite-name>.skillmeat-pack)",
+)
+@click.option(
+    "--collection",
+    "-c",
+    help="Collection name to resolve child artifact paths (default: active collection)",
+)
+def bundle_export_composite(composite_id, output, collection):
+    """Export a composite artifact and all its children as a bundle zip.
+
+    COMPOSITE_ID must be a 'type:name' identifier such as 'composite:my-plugin'.
+
+    The generated archive follows the standard .skillmeat-pack layout and
+    contains:
+      - manifest.json: bundle metadata and artifact listing
+      - composite.json: composite-specific metadata (type, members, etc.)
+      - artifacts/: child artifacts organised by type subdirectory
+
+    Examples:
+        skillmeat bundle export-composite composite:my-plugin
+        skillmeat bundle export-composite composite:my-plugin -o my-plugin.zip
+        skillmeat bundle export-composite composite:my-plugin --collection work
+    """
+    from skillmeat.core.sharing.bundle import (
+        CompositeBundleError,
+        export_composite_bundle,
+    )
+    from skillmeat.cache.models import create_db_engine, create_tables
+    from sqlalchemy.orm import sessionmaker
+
+    try:
+        # Resolve output path
+        if output:
+            output_path = Path(output)
+        else:
+            # Derive filename from composite name (after the ":" separator)
+            composite_name = (
+                composite_id.split(":", 1)[-1] if ":" in composite_id else composite_id
+            )
+            output_path = Path(f"{composite_name}.skillmeat-pack")
+
+        # Open a DB session
+        db_path = Path.home() / ".skillmeat" / "cache" / "cache.db"
+
+        from skillmeat.cache.migrations import run_migrations
+
+        run_migrations(db_path)
+        engine = create_db_engine(db_path)
+        create_tables(db_path)
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        session = SessionLocal()
+
+        console.print(f"\n[cyan]Exporting composite '{composite_id}'...[/cyan]\n")
+
+        try:
+            result_path = export_composite_bundle(
+                composite_id=composite_id,
+                output_path=str(output_path),
+                session=session,
+                collection_name=collection,
+            )
+        finally:
+            session.close()
+
+        console.print("[green]Composite bundle exported successfully![/green]")
+        console.print(f"  Composite: {composite_id}")
+        console.print(f"  Output:    {result_path}")
+
+    except CompositeBundleError as e:
+        console.print(f"[red]Export Error:[/red] {e}")
+        sys.exit(1)
+    except FileNotFoundError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Composite bundle export failed")
+        sys.exit(1)
+
+
 # ====================
 # Vault Commands (Team Vault Connectors)
 # ====================
@@ -11821,9 +11922,7 @@ def _memory_output(
 def _parse_anchor_option(raw: str) -> Dict[str, Any]:
     """Parse --anchor values as path:type or path:type:start-end."""
     if not raw or ":" not in raw:
-        raise ValueError(
-            "anchor must use format 'path:type' or 'path:type:start-end'"
-        )
+        raise ValueError("anchor must use format 'path:type' or 'path:type:start-end'")
 
     anchor_types = {"code", "plan", "doc", "config", "test"}
     line_start: Optional[int] = None
@@ -11854,9 +11953,7 @@ def _parse_anchor_option(raw: str) -> Dict[str, Any]:
         path = ":".join(parts[:-2]).strip()
         anchor_type = parts[-2]
     else:
-        raise ValueError(
-            "anchor type must be one of: code, plan, doc, config, test"
-        )
+        raise ValueError("anchor type must be one of: code, plan, doc, config, test")
 
     if not path:
         raise ValueError("anchor path cannot be empty")
@@ -12452,19 +12549,32 @@ def memory_extract():
 
 
 @memory_extract.command("preview")
-@click.option("--project", "project_id", required=True, help="Project ID for extraction scope")
-@click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True),
-              help="Path to JSONL session log from Claude Code")
+@click.option(
+    "--project", "project_id", required=True, help="Project ID for extraction scope"
+)
+@click.option(
+    "--run-log",
+    "run_log_path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to JSONL session log from Claude Code",
+)
 @click.option(
     "--profile",
     type=click.Choice(["strict", "balanced", "aggressive"]),
     default="balanced",
     help="Extraction profile (strict: fewer candidates, aggressive: more candidates)",
 )
-@click.option("--min-confidence", type=float, default=0.6,
-              help="Minimum confidence score to include candidate (0.0-1.0)")
 @click.option(
-    "--use-llm", is_flag=True, default=False,
+    "--min-confidence",
+    type=float,
+    default=0.6,
+    help="Minimum confidence score to include candidate (0.0-1.0)",
+)
+@click.option(
+    "--use-llm",
+    is_flag=True,
+    default=False,
     help="Enable LLM-based semantic classification (requires API key)",
 )
 @click.option(
@@ -12474,7 +12584,8 @@ def memory_extract():
     help="LLM provider (default: anthropic or SKILLMEAT_LLM_PROVIDER env var)",
 )
 @click.option(
-    "--llm-model", default=None,
+    "--llm-model",
+    default=None,
     help="LLM model name (e.g., 'haiku', 'gpt-4o-mini', provider-specific default)",
 )
 @click.option(
@@ -12482,7 +12593,9 @@ def memory_extract():
     default=None,
     help="Base URL for Ollama/OpenAI-compatible endpoints (default: http://localhost:11434 for Ollama)",
 )
-@click.option("--json", "as_json", is_flag=True, help="Output as JSON instead of formatted table")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Output as JSON instead of formatted table"
+)
 def memory_extract_preview(
     project_id,
     run_log_path,
@@ -12552,19 +12665,32 @@ def memory_extract_preview(
 
 
 @memory_extract.command("apply")
-@click.option("--project", "project_id", required=True, help="Project ID for extraction scope")
-@click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True),
-              help="Path to JSONL session log from Claude Code")
+@click.option(
+    "--project", "project_id", required=True, help="Project ID for extraction scope"
+)
+@click.option(
+    "--run-log",
+    "run_log_path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to JSONL session log from Claude Code",
+)
 @click.option(
     "--profile",
     type=click.Choice(["strict", "balanced", "aggressive"]),
     default="balanced",
     help="Extraction profile (strict: fewer candidates, aggressive: more candidates)",
 )
-@click.option("--min-confidence", type=float, default=0.6,
-              help="Minimum confidence score to include candidate (0.0-1.0)")
 @click.option(
-    "--use-llm", is_flag=True, default=False,
+    "--min-confidence",
+    type=float,
+    default=0.6,
+    help="Minimum confidence score to include candidate (0.0-1.0)",
+)
+@click.option(
+    "--use-llm",
+    is_flag=True,
+    default=False,
     help="Enable LLM-based semantic classification (requires API key)",
 )
 @click.option(
@@ -12574,7 +12700,8 @@ def memory_extract_preview(
     help="LLM provider (default: anthropic or SKILLMEAT_LLM_PROVIDER env var)",
 )
 @click.option(
-    "--llm-model", default=None,
+    "--llm-model",
+    default=None,
     help="LLM model name (e.g., 'haiku', 'gpt-4o-mini', provider-specific default)",
 )
 @click.option(
@@ -12582,7 +12709,9 @@ def memory_extract_preview(
     default=None,
     help="Base URL for Ollama/OpenAI-compatible endpoints (default: http://localhost:11434 for Ollama)",
 )
-@click.option("--json", "as_json", is_flag=True, help="Output as JSON instead of formatted table")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Output as JSON instead of formatted table"
+)
 def memory_extract_apply(
     project_id,
     run_log_path,
@@ -12655,19 +12784,32 @@ def memory_extract_apply(
 
 
 @memory_extract.command("run")
-@click.option("--project", "project_id", required=True, help="Project ID for extraction scope")
-@click.option("--run-log", "run_log_path", required=True, type=click.Path(exists=True),
-              help="Path to JSONL session log from Claude Code")
+@click.option(
+    "--project", "project_id", required=True, help="Project ID for extraction scope"
+)
+@click.option(
+    "--run-log",
+    "run_log_path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to JSONL session log from Claude Code",
+)
 @click.option(
     "--profile",
     type=click.Choice(["strict", "balanced", "aggressive"]),
     default="balanced",
     help="Extraction profile (strict: fewer candidates, aggressive: more candidates)",
 )
-@click.option("--min-confidence", type=float, default=0.6,
-              help="Minimum confidence score to include candidate (0.0-1.0)")
 @click.option(
-    "--use-llm", is_flag=True, default=False,
+    "--min-confidence",
+    type=float,
+    default=0.6,
+    help="Minimum confidence score to include candidate (0.0-1.0)",
+)
+@click.option(
+    "--use-llm",
+    is_flag=True,
+    default=False,
     help="Enable LLM-based semantic classification (requires API key)",
 )
 @click.option(
@@ -12677,7 +12819,8 @@ def memory_extract_apply(
     help="LLM provider (default: anthropic or SKILLMEAT_LLM_PROVIDER env var)",
 )
 @click.option(
-    "--llm-model", default=None,
+    "--llm-model",
+    default=None,
     help="LLM model name (e.g., 'haiku', 'gpt-4o-mini', provider-specific default)",
 )
 @click.option(
@@ -12685,7 +12828,9 @@ def memory_extract_apply(
     default=None,
     help="Base URL for Ollama/OpenAI-compatible endpoints (default: http://localhost:11434 for Ollama)",
 )
-@click.option("--json", "as_json", is_flag=True, help="Output as JSON instead of formatted table")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Output as JSON instead of formatted table"
+)
 def memory_extract_run(
     project_id,
     run_log_path,
