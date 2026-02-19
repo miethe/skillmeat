@@ -6,7 +6,7 @@ prd: composite-artifact-ux-v2
 feature_slug: composite-artifact-ux-v2
 phase: 3
 title: Import Flow Wiring
-status: pending
+status: completed
 created: '2026-02-19'
 updated: '2026-02-19'
 prd_ref: docs/project_plans/PRDs/features/composite-artifact-ux-v2.md
@@ -14,7 +14,7 @@ plan_ref: docs/project_plans/implementation_plans/features/composite-artifact-ux
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 7
-completed_tasks: 4
+completed_tasks: 7
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -38,7 +38,7 @@ tasks:
 - id: CUX-P3-02
   description: Wire CompositePreview into collection add flow; conditional on source
     type
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -78,7 +78,7 @@ tasks:
 - id: CUX-P3-06
   description: 'Playwright E2E test for marketplace plugin import flow: filter ->
     view -> preview -> confirm -> collection updated'
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -88,7 +88,7 @@ tasks:
 - id: CUX-P3-07
   description: 'Playwright E2E test for conflict resolution during import: detect
     -> dialog -> resolve -> import succeeds'
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -133,7 +133,7 @@ success_criteria:
   description: Conflict resolution E2E test passes
   status: pending
 files_modified: []
-progress: 57
+progress: 100
 ---
 # Phase 3: Import Flow Wiring
 

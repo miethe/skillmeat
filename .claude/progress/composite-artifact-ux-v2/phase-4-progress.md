@@ -14,7 +14,7 @@ plan_ref: docs/project_plans/implementation_plans/features/composite-artifact-ux
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 12
-completed_tasks: 3
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -35,7 +35,7 @@ tasks:
 - id: CUX-P4-02
   description: Plugin Card Variant — extend ArtifactBrowseCard for plugin display
     with icon, name, description, member icons, count badge, actions menu
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -55,7 +55,7 @@ tasks:
 - id: CUX-P4-04
   description: MemberList component — sortable list with drag-to-reorder, keyboard
     Up/Down support, remove actions, WCAG compliant
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -202,7 +202,7 @@ success_criteria:
   description: No regression in existing collection or artifact detail views
   status: pending
 files_modified: []
-progress: 25
+progress: 41
 ---
 # Phase 4: Collection Plugin Management UI
 
