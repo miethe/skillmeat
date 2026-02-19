@@ -28,6 +28,7 @@
  * - Groups (CRUD + artifacts)
  * - Deployments (CRUD + deploy/undeploy)
  * - Artifacts (list + bulk import)
+ * - Composites (import + conflict resolution + member management + CRUD)
  * - Projects (CRUD + discovery + caching)
  * - Bundles (CRUD + export/import + analytics)
  * - Cache (refresh + status)
@@ -140,6 +141,43 @@ export {
   associationKeys,
   useArtifactAssociations,
 } from './useArtifactAssociations';
+
+// ============================================================================
+// COMPOSITES (8 hooks)
+// ============================================================================
+// Composite import, conflict resolution, member management, and CRUD operations
+
+// Import + conflict resolution (legacy import flow)
+export {
+  compositeKeys,
+  useComposites,
+  useImportComposite,
+  useMutateCompositeMembers,
+  useResolveCompositeConflicts,
+  isVersionConflictError,
+  type CompositeImportRequest,
+  type CompositeImportResponse,
+  type MembershipResponse as CompositeMembershipResponse,
+  type CompositeMemberAddRequest,
+  type ImportVersionConflict,
+  type ImportConflictError,
+  type ConflictResolutionPayload,
+} from './useImportComposite';
+
+// Composite CRUD mutations (create, update, delete)
+export { useCreateComposite } from './useCreateComposite';
+export { useUpdateComposite, type UpdateCompositeVariables } from './useUpdateComposite';
+export { useDeleteComposite, type DeleteCompositeVariables } from './useDeleteComposite';
+
+// Composite member management (add, remove, reorder)
+export {
+  useAddCompositeMember,
+  useRemoveCompositeMember,
+  useReorderCompositeMembers,
+  type AddCompositeMemberVariables,
+  type RemoveCompositeMemberVariables,
+  type ReorderCompositeMembersVariables,
+} from './useManageCompositeMembers';
 
 // ============================================================================
 // PROJECTS (7 hooks)

@@ -556,6 +556,16 @@ class CompositeMembershipRepository:
         Raises:
             ConstraintError: When a composite with ``composite_id`` already
                 exists (UNIQUE/PK violation).
+
+        Note:
+            **Transaction boundary**: the ``CompositeArtifact`` row and ALL
+            ``CompositeMembership`` edges are created inside a single
+            ``self.transaction()`` block.  Any failure — including an FK
+            violation on a child UUID or a duplicate-composite constraint — will
+            roll back the entire unit of work, leaving no orphaned composite
+            rows or dangling membership edges.  UUID pre-validation in
+            ``CompositeService.create_composite()`` ensures unknown member
+            ``type:name`` ids are rejected before the transaction even opens.
         """
         with self.transaction() as session:
             composite = CompositeArtifact(

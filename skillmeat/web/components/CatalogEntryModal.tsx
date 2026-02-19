@@ -53,6 +53,7 @@ import {
   MoreVertical,
   FolderOpen,
   Rocket,
+  Blocks,
 } from 'lucide-react';
 import { HeuristicScoreBreakdown } from '@/components/HeuristicScoreBreakdown';
 import { FileTree, type FileNode } from '@/components/entity/file-tree';
@@ -63,6 +64,7 @@ import {
   useUpdateCatalogEntryName,
   useReimportCatalogEntry,
   useDeployments,
+  useSourceCatalog,
 } from '@/hooks';
 import { fetchArtifactsPaginated, type ArtifactsPaginatedResponse } from '@/lib/api/artifacts';
 import type { FileTreeEntry } from '@/lib/api/catalog';
@@ -71,6 +73,12 @@ import { PathTagReview } from '@/components/marketplace/path-tag-review';
 import { Input } from '@/components/ui/input';
 import { FrontmatterDisplay } from '@/components/entity/frontmatter-display';
 import { parseFrontmatter, detectFrontmatter } from '@/lib/frontmatter';
+import {
+  CompositePreview,
+  type CompositePreview as CompositePreviewData,
+  type CompositeArtifactEntry,
+  type CompositeConflictEntry,
+} from '@/components/import/composite-preview';
 
 interface CatalogEntryModalProps {
   entry: CatalogEntry | null;
@@ -339,7 +347,7 @@ export function CatalogEntryModal({
   onNavigateToDeployment,
 }: CatalogEntryModalProps) {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'contents' | 'tags' | 'collections' | 'deployments'
+    'overview' | 'contents' | 'tags' | 'collections' | 'deployments' | 'plugin'
   >('overview');
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -461,6 +469,82 @@ export function CatalogEntryModal({
   const { data: deploymentsData, isLoading: isLoadingDeployments } = useDeployments({
     // Only fetch when tab is active and entry is imported
   });
+
+  // Fetch catalog entries for composite plugin breakdown tab.
+  // Enabled only when the modal is open, the entry is composite, and the plugin tab is active.
+  const isComposite = entry?.artifact_type === 'composite';
+  const showPluginTab = isComposite && activeTab === 'plugin';
+  // Pass empty string when disabled — useSourceCatalog uses !!sourceId to guard the query
+  const pluginTabSourceId = showPluginTab && sourceId ? sourceId : '';
+  const { data: compositeCatalogData, isLoading: isLoadingCompositeCatalog } = useSourceCatalog(
+    pluginTabSourceId,
+    // Include below-threshold entries to catch all children; no type/status filter
+    { include_below_threshold: true },
+    // Fetch a generous page to get children; composites rarely have 500+ children
+    500
+  );
+
+  // Derive CompositePreviewData from catalog entries.
+  // Children are catalog entries whose paths start with the composite's path + '/'.
+  const compositePreviewData = useMemo<CompositePreviewData | null>(() => {
+    if (!entry || !isComposite) return null;
+
+    // Flatten all catalog pages
+    const allCatalogEntries: CatalogEntry[] =
+      compositeCatalogData?.pages?.flatMap((p) => p.items) ?? [];
+
+    const compositePath = entry.path;
+
+    // A child entry's path must be directly or transitively under the composite path.
+    // We exclude the composite entry itself and entries of type 'composite' (parent containers).
+    const children = allCatalogEntries.filter(
+      (e) =>
+        e.id !== entry.id &&
+        e.artifact_type !== 'composite' &&
+        e.path.startsWith(compositePath + '/')
+    );
+
+    // Bucket children by their import status:
+    //   - imported  → Existing (Will Link)
+    //   - in_collection (and not imported) → Conflict (same name, already in collection)
+    //   - new/updated/other → New (Will Import)
+    const newArtifacts: CompositeArtifactEntry[] = [];
+    const existingArtifacts: (CompositeArtifactEntry & { hash: string })[] = [];
+    const conflictArtifacts: CompositeConflictEntry[] = [];
+
+    for (const child of children) {
+      if (child.status === 'imported') {
+        // Already imported — will link to existing copy
+        existingArtifacts.push({
+          name: child.name,
+          type: child.artifact_type,
+          hash: child.detected_sha ?? 'unknown',
+        });
+      } else if (child.in_collection) {
+        // Same name/type exists in collection with potentially different content
+        conflictArtifacts.push({
+          name: child.name,
+          type: child.artifact_type,
+          currentHash: 'existing',
+          newHash: child.detected_sha ?? 'incoming',
+        });
+      } else {
+        // Net-new artifact
+        newArtifacts.push({
+          name: child.name,
+          type: child.artifact_type,
+        });
+      }
+    }
+
+    return {
+      pluginName: entry.name,
+      totalChildren: children.length,
+      newArtifacts,
+      existingArtifacts,
+      conflictArtifacts,
+    };
+  }, [entry, isComposite, compositeCatalogData]);
 
   // Filter deployments to match this artifact
   const artifactDeployments = useMemo(() => {
@@ -646,7 +730,7 @@ export function CatalogEntryModal({
             value={activeTab}
             onValueChange={(value) =>
               setActiveTab(
-                value as 'overview' | 'contents' | 'tags' | 'collections' | 'deployments'
+                value as 'overview' | 'contents' | 'tags' | 'collections' | 'deployments' | 'plugin'
               )
             }
             className="flex h-full min-h-0 flex-1 flex-col px-6"
@@ -673,6 +757,15 @@ export function CatalogEntryModal({
                 <Tag className="mr-2 h-4 w-4" aria-hidden="true" />
                 Suggested Tags
               </TabsTrigger>
+              {isComposite && (
+                <TabsTrigger
+                  value="plugin"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                >
+                  <Blocks className="mr-2 h-4 w-4 text-indigo-500" aria-hidden="true" />
+                  <span className="text-indigo-500 dark:text-indigo-400">Plugin Breakdown</span>
+                </TabsTrigger>
+              )}
               {entry.status === 'imported' && (
                 <>
                   <TabsTrigger
@@ -1032,6 +1125,57 @@ export function CatalogEntryModal({
                 <PathTagReview sourceId={entry.source_id} entryId={entry.id} />
               </div>
             </TabsContent>
+
+            {/* Plugin Breakdown Tab - only rendered for composite artifacts */}
+            {isComposite && (
+              <TabsContent value="plugin" className="mt-0 min-h-0 flex-1 overflow-y-auto py-4">
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
+                      Plugin Breakdown
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Child artifacts included in this plugin, categorised by import impact.
+                    </p>
+                  </div>
+
+                  {isLoadingCompositeCatalog ? (
+                    <div className="flex items-center justify-center py-8" role="status">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+                      <span className="ml-2 text-sm text-muted-foreground">
+                        Loading plugin breakdown...
+                      </span>
+                    </div>
+                  ) : compositePreviewData && compositePreviewData.totalChildren > 0 ? (
+                    <CompositePreview preview={compositePreviewData} />
+                  ) : compositePreviewData && compositePreviewData.totalChildren === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <Blocks
+                        className="mb-2 h-10 w-10 text-indigo-400/50 dark:text-indigo-500/50"
+                        aria-hidden="true"
+                      />
+                      <p className="text-sm font-medium text-muted-foreground">
+                        No child artifacts detected
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground/70">
+                        Open the Plugin Breakdown tab again after a source rescan to populate children.
+                      </p>
+                    </div>
+                  ) : (
+                    // compositePreviewData is null — tab not yet fetched (first render)
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <Blocks
+                        className="mb-2 h-10 w-10 text-muted-foreground/50"
+                        aria-hidden="true"
+                      />
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Select the Plugin Breakdown tab to load child artifacts
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            )}
 
             {/* Collections Tab - only rendered for imported artifacts */}
             {entry.status === 'imported' && (
