@@ -143,6 +143,9 @@ export interface GitHubSource {
   deep_indexing_enabled?: boolean | null; // Whether deep content indexing is enabled
   last_indexed_at?: string; // Timestamp of last successful indexing
   last_indexed_tree_sha?: string | null; // SHA of last indexed tree
+  // Composite/plugin aggregate fields (null when source has no composite artifacts)
+  composite_member_count?: number | null; // Total child-artifact membership edges across composites
+  composite_child_types?: string[] | null; // Deduplicated list of child artifact types
 }
 
 export interface GitHubSourceListResponse {

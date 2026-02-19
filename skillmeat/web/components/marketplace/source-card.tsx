@@ -27,6 +27,7 @@ import {
   Search,
   SearchCheck,
   SearchX,
+  Blocks,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -443,13 +444,43 @@ export function SourceCard({
         </div>
 
         {/* Content - Fixed-height rows for consistent card heights */}
-        <div className="flex min-h-[80px] flex-col">
+        <div className="flex min-h-[80px] flex-col gap-1.5">
           {/* Description - flex-grow to fill available space */}
           <div className="min-h-[40px] flex-grow">
             <p className="line-clamp-2 text-sm text-muted-foreground">
               {displayDescription || '\u00A0'}
             </p>
           </div>
+
+          {/* Plugin member count badge (CUX-P2-04) and member type breakdown (CUX-P2-05) */}
+          {source.composite_member_count != null && source.composite_member_count > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* Member count badge */}
+              <div
+                className="flex items-center gap-1 rounded-md border border-indigo-300 bg-indigo-50 px-1.5 py-0.5 text-xs font-medium text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                aria-label={`Plugin contains ${source.composite_member_count} artifacts`}
+              >
+                <Blocks className="h-3 w-3" aria-hidden="true" />
+                <span>{source.composite_member_count} artifact{source.composite_member_count !== 1 ? 's' : ''}</span>
+              </div>
+              {/* Member type breakdown - icons on mobile, text on desktop */}
+              {source.composite_child_types && source.composite_child_types.length > 0 && (
+                <div
+                  className="flex flex-wrap items-center gap-1"
+                  aria-label={`Plugin member types: ${source.composite_child_types.join(', ')}`}
+                >
+                  {source.composite_child_types.map((childType) => (
+                    <span
+                      key={childType}
+                      className="rounded bg-indigo-100 px-1 py-0.5 text-xs capitalize text-indigo-600 dark:bg-indigo-900 dark:text-indigo-300"
+                    >
+                      {childType}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Tags and artifact counts - fixed height */}
           <div className="flex h-6 items-center justify-between gap-2">
