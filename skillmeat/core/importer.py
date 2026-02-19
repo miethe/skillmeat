@@ -43,6 +43,63 @@ from skillmeat.core.discovery_metrics import (
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Optional OpenTelemetry integration (graceful no-op fallback)
+# ---------------------------------------------------------------------------
+
+try:
+    from opentelemetry import metrics as _otel_metrics
+    from opentelemetry import trace as _otel_trace
+
+    _tracer = _otel_trace.get_tracer(__name__)
+    _meter = _otel_metrics.get_meter(__name__)
+
+    # Counters
+    _plugin_import_total = _meter.create_counter(
+        name="plugin_import_total",
+        description="Total plugin (composite artifact) import operations",
+        unit="1",
+    )
+    _dedup_hit_total = _meter.create_counter(
+        name="dedup_hit_total",
+        description="Total artifacts reused via deduplication (LINK_EXISTING)",
+        unit="1",
+    )
+    _dedup_miss_total = _meter.create_counter(
+        name="dedup_miss_total",
+        description="Total new artifacts created (CREATE_NEW_ARTIFACT or CREATE_NEW_VERSION)",
+        unit="1",
+    )
+
+    # Histograms
+    _plugin_import_duration = _meter.create_histogram(
+        name="plugin_import_duration_seconds",
+        description="Duration of transactional plugin import operations in seconds",
+        unit="s",
+    )
+    _artifact_hash_compute_duration = _meter.create_histogram(
+        name="artifact_hash_compute_duration_seconds",
+        description="Duration of per-artifact hash computation in seconds",
+        unit="s",
+    )
+
+    _OTEL_AVAILABLE = True
+
+except ImportError:  # pragma: no cover
+    _tracer = None  # type: ignore[assignment]
+    _meter = None  # type: ignore[assignment]
+    _plugin_import_total = None  # type: ignore[assignment]
+    _dedup_hit_total = None  # type: ignore[assignment]
+    _dedup_miss_total = None  # type: ignore[assignment]
+    _plugin_import_duration = None  # type: ignore[assignment]
+    _artifact_hash_compute_duration = None  # type: ignore[assignment]
+    _OTEL_AVAILABLE = False
+
+
+def _get_tracer():
+    """Return the OTel tracer if available, else None."""
+    return _tracer if _OTEL_AVAILABLE else None
+
 
 @dataclass
 class BulkImportArtifactData:
@@ -1214,13 +1271,17 @@ def import_plugin_transactional(
     transaction_id = str(uuid.uuid4())
     plugin_name = discovered_graph.parent.name
     composite_id = f"composite:{plugin_name}"
+    child_count = len(discovered_graph.children)
 
     _log = logging.getLogger(__name__)
     _log.info(
-        "import_plugin_transactional started transaction_id=%s composite_id=%s children=%d",
-        transaction_id,
-        composite_id,
-        len(discovered_graph.children),
+        "import_plugin_transactional started",
+        extra={
+            "transaction_id": transaction_id,
+            "composite_id": composite_id,
+            "plugin_name": plugin_name,
+            "child_count": child_count,
+        },
     )
 
     children_imported = 0
@@ -1230,225 +1291,330 @@ def import_plugin_transactional(
     # Map child name → (artifact_uuid, content_hash) for membership creation
     child_records: List[Dict[str, Any]] = []
 
-    try:
-        # ------------------------------------------------------------------
-        # Step 1: Process each child artifact
-        # ------------------------------------------------------------------
-        for child in discovered_graph.children:
-            child_id = f"{child.type}:{child.name}"
+    tracer = _get_tracer()
+    import_start = time.perf_counter()
 
-            # (a) Compute content hash
-            try:
-                content_hash = compute_artifact_hash(child.path)
-            except (FileNotFoundError, ValueError) as exc:
-                _log.warning(
-                    "import_plugin_transactional: hash failed for child %s path=%s: %s",
-                    child_id,
-                    child.path,
-                    exc,
-                )
-                errors.append(
-                    f"Hash computation failed for '{child_id}' (path={child.path}): {exc}"
-                )
-                raise  # abort entire transaction
+    def _run_import() -> ImportResult:
+        nonlocal children_imported, children_reused
 
-            # (b) Run deduplication
-            dedup_result = resolve_artifact_for_import(
-                name=child.name,
-                artifact_type=child.type,
-                content_hash=content_hash,
-                session=session,
-            )
+        try:
+            # ------------------------------------------------------------------
+            # Step 1: Process each child artifact
+            # ------------------------------------------------------------------
+            for child in discovered_graph.children:
+                child_id = f"{child.type}:{child.name}"
 
-            # (c) Execute decision
-            if dedup_result.decision == DeduplicationDecision.LINK_EXISTING:
-                # Reuse existing artifact + version — no new rows needed
-                artifact_uuid_row = (
-                    session.query(Artifact)
-                    .filter(Artifact.id == dedup_result.artifact_id)
-                    .first()
-                )
-                if artifact_uuid_row is None:
-                    # Defensive: artifact disappeared between queries
-                    raise RuntimeError(
-                        f"Deduplication returned LINK_EXISTING for '{child_id}' "
-                        f"but artifact id={dedup_result.artifact_id!r} was not found."
+                # (a) Compute content hash
+                hash_start = time.perf_counter()
+                try:
+                    content_hash = compute_artifact_hash(child.path)
+                except (FileNotFoundError, ValueError) as exc:
+                    _log.warning(
+                        "import_plugin_transactional: hash failed for child %s path=%s: %s",
+                        child_id,
+                        child.path,
+                        exc,
                     )
-                child_artifact_uuid = artifact_uuid_row.uuid
-                children_reused += 1
-                _log.debug(
-                    "LINK_EXISTING: child=%s artifact_id=%s version_id=%s",
-                    child_id,
-                    dedup_result.artifact_id,
-                    dedup_result.artifact_version_id,
-                )
-
-            elif dedup_result.decision == DeduplicationDecision.CREATE_NEW_VERSION:
-                # Append a new ArtifactVersion to the existing Artifact row
-                existing_artifact = (
-                    session.query(Artifact)
-                    .filter(Artifact.id == dedup_result.artifact_id)
-                    .first()
-                )
-                if existing_artifact is None:
-                    raise RuntimeError(
-                        f"Deduplication returned CREATE_NEW_VERSION for '{child_id}' "
-                        f"but artifact id={dedup_result.artifact_id!r} was not found."
+                    errors.append(
+                        f"Hash computation failed for '{child_id}' (path={child.path}): {exc}"
                     )
-                new_version = ArtifactVersion(
-                    artifact_id=existing_artifact.id,
-                    content_hash=content_hash,
-                    change_origin="sync",
-                    parent_hash=None,
-                )
-                session.add(new_version)
-                session.flush()  # populate new_version.id
-                child_artifact_uuid = existing_artifact.uuid
-                children_imported += 1
-                _log.debug(
-                    "CREATE_NEW_VERSION: child=%s artifact_id=%s new_version_id=%s",
-                    child_id,
-                    existing_artifact.id,
-                    new_version.id,
-                )
+                    raise  # abort entire transaction
+                finally:
+                    hash_duration = time.perf_counter() - hash_start
+                    if _OTEL_AVAILABLE and _artifact_hash_compute_duration is not None:
+                        _artifact_hash_compute_duration.record(
+                            hash_duration,
+                            {"artifact_name": child.name},
+                        )
 
-            else:
-                # CREATE_NEW_ARTIFACT — new Artifact + initial ArtifactVersion
-                artifact_type_name_id = f"{child.type}:{child.name}"
-                new_artifact = Artifact(
-                    id=artifact_type_name_id,
-                    project_id=project_id,
+                # (b) Run deduplication
+                dedup_result = resolve_artifact_for_import(
                     name=child.name,
-                    type=child.type,
-                    source=source_url,
-                    description=child.description,
-                )
-                session.add(new_artifact)
-                session.flush()  # populate new_artifact.uuid
-
-                new_version = ArtifactVersion(
-                    artifact_id=new_artifact.id,
+                    artifact_type=child.type,
                     content_hash=content_hash,
-                    change_origin="sync",
-                    parent_hash=None,
+                    session=session,
                 )
-                session.add(new_version)
-                session.flush()
-                child_artifact_uuid = new_artifact.uuid
-                children_imported += 1
+
+                # Log dedup decision at DEBUG level with structured fields
                 _log.debug(
-                    "CREATE_NEW_ARTIFACT: child=%s artifact_uuid=%s version_id=%s",
-                    child_id,
-                    child_artifact_uuid,
-                    new_version.id,
+                    "Deduplication decision for child artifact",
+                    extra={
+                        "artifact_name": child.name,
+                        "decision": dedup_result.decision.value,
+                        "content_hash": content_hash[:16],
+                        "transaction_id": transaction_id,
+                    },
                 )
 
-            # Accumulate (uuid, content_hash) for membership creation in step 3
-            child_records.append(
-                {
-                    "child_artifact_uuid": child_artifact_uuid,
-                    "pinned_version_hash": content_hash,
-                }
-            )
+                # Update OTel dedup counters
+                if _OTEL_AVAILABLE:
+                    if dedup_result.decision == DeduplicationDecision.LINK_EXISTING:
+                        if _dedup_hit_total is not None:
+                            _dedup_hit_total.add(
+                                1,
+                                {
+                                    "plugin_name": plugin_name,
+                                    "artifact_name": child.name,
+                                },
+                            )
+                    else:
+                        if _dedup_miss_total is not None:
+                            _dedup_miss_total.add(
+                                1,
+                                {
+                                    "plugin_name": plugin_name,
+                                    "artifact_name": child.name,
+                                    "decision": dedup_result.decision.value,
+                                },
+                            )
 
-        # ------------------------------------------------------------------
-        # Step 2: Upsert CompositeArtifact row
-        # ------------------------------------------------------------------
-        existing_composite = (
-            session.query(CompositeArtifact)
-            .filter(CompositeArtifact.id == composite_id)
-            .first()
-        )
-        if existing_composite is None:
-            composite_row = CompositeArtifact(
-                id=composite_id,
-                collection_id=collection_id,
-                composite_type="plugin",
-                display_name=discovered_graph.parent.name,
-                description=discovered_graph.parent.description,
-                metadata_json=None,
-            )
-            session.add(composite_row)
-            session.flush()
-            _log.debug("Created CompositeArtifact: id=%s", composite_id)
-        else:
-            _log.debug("CompositeArtifact already exists: id=%s", composite_id)
+                # (c) Execute decision
+                if dedup_result.decision == DeduplicationDecision.LINK_EXISTING:
+                    # Reuse existing artifact + version — no new rows needed
+                    artifact_uuid_row = (
+                        session.query(Artifact)
+                        .filter(Artifact.id == dedup_result.artifact_id)
+                        .first()
+                    )
+                    if artifact_uuid_row is None:
+                        # Defensive: artifact disappeared between queries
+                        raise RuntimeError(
+                            f"Deduplication returned LINK_EXISTING for '{child_id}' "
+                            f"but artifact id={dedup_result.artifact_id!r} was not found."
+                        )
+                    child_artifact_uuid = artifact_uuid_row.uuid
+                    children_reused += 1
+                    _log.debug(
+                        "LINK_EXISTING: child=%s artifact_id=%s version_id=%s",
+                        child_id,
+                        dedup_result.artifact_id,
+                        dedup_result.artifact_version_id,
+                    )
 
-        # ------------------------------------------------------------------
-        # Step 3: Create CompositeMembership rows with pinned_version_hash
-        # ------------------------------------------------------------------
-        for record in child_records:
-            existing_membership = (
-                session.query(CompositeMembership)
-                .filter(
-                    CompositeMembership.collection_id == collection_id,
-                    CompositeMembership.composite_id == composite_id,
-                    CompositeMembership.child_artifact_uuid
-                    == record["child_artifact_uuid"],
+                elif dedup_result.decision == DeduplicationDecision.CREATE_NEW_VERSION:
+                    # Append a new ArtifactVersion to the existing Artifact row
+                    existing_artifact = (
+                        session.query(Artifact)
+                        .filter(Artifact.id == dedup_result.artifact_id)
+                        .first()
+                    )
+                    if existing_artifact is None:
+                        raise RuntimeError(
+                            f"Deduplication returned CREATE_NEW_VERSION for '{child_id}' "
+                            f"but artifact id={dedup_result.artifact_id!r} was not found."
+                        )
+                    new_version = ArtifactVersion(
+                        artifact_id=existing_artifact.id,
+                        content_hash=content_hash,
+                        change_origin="sync",
+                        parent_hash=None,
+                    )
+                    session.add(new_version)
+                    session.flush()  # populate new_version.id
+                    child_artifact_uuid = existing_artifact.uuid
+                    children_imported += 1
+                    _log.debug(
+                        "CREATE_NEW_VERSION: child=%s artifact_id=%s new_version_id=%s",
+                        child_id,
+                        existing_artifact.id,
+                        new_version.id,
+                    )
+
+                else:
+                    # CREATE_NEW_ARTIFACT — new Artifact + initial ArtifactVersion
+                    artifact_type_name_id = f"{child.type}:{child.name}"
+                    new_artifact = Artifact(
+                        id=artifact_type_name_id,
+                        project_id=project_id,
+                        name=child.name,
+                        type=child.type,
+                        source=source_url,
+                        description=child.description,
+                    )
+                    session.add(new_artifact)
+                    session.flush()  # populate new_artifact.uuid
+
+                    new_version = ArtifactVersion(
+                        artifact_id=new_artifact.id,
+                        content_hash=content_hash,
+                        change_origin="sync",
+                        parent_hash=None,
+                    )
+                    session.add(new_version)
+                    session.flush()
+                    child_artifact_uuid = new_artifact.uuid
+                    children_imported += 1
+                    _log.debug(
+                        "CREATE_NEW_ARTIFACT: child=%s artifact_uuid=%s version_id=%s",
+                        child_id,
+                        child_artifact_uuid,
+                        new_version.id,
+                    )
+
+                # Accumulate (uuid, content_hash) for membership creation in step 3
+                child_records.append(
+                    {
+                        "child_artifact_uuid": child_artifact_uuid,
+                        "pinned_version_hash": content_hash,
+                    }
                 )
+
+            # ------------------------------------------------------------------
+            # Step 2: Upsert CompositeArtifact row
+            # ------------------------------------------------------------------
+            existing_composite = (
+                session.query(CompositeArtifact)
+                .filter(CompositeArtifact.id == composite_id)
                 .first()
             )
-            if existing_membership is not None:
-                # Already linked — update the pin
-                existing_membership.pinned_version_hash = record["pinned_version_hash"]
-                _log.debug(
-                    "Updated pinned_version_hash on existing membership: "
-                    "composite=%s child_uuid=%s",
-                    composite_id,
-                    record["child_artifact_uuid"],
-                )
-            else:
-                membership = CompositeMembership(
+            if existing_composite is None:
+                composite_row = CompositeArtifact(
+                    id=composite_id,
                     collection_id=collection_id,
-                    composite_id=composite_id,
-                    child_artifact_uuid=record["child_artifact_uuid"],
-                    relationship_type="contains",
-                    pinned_version_hash=record["pinned_version_hash"],
+                    composite_type="plugin",
+                    display_name=discovered_graph.parent.name,
+                    description=discovered_graph.parent.description,
+                    metadata_json=None,
                 )
-                session.add(membership)
-                _log.debug(
-                    "Created CompositeMembership: composite=%s child_uuid=%s hash=%s",
-                    composite_id,
-                    record["child_artifact_uuid"],
-                    record["pinned_version_hash"][:8],
+                session.add(composite_row)
+                session.flush()
+                _log.debug("Created CompositeArtifact: id=%s", composite_id)
+            else:
+                _log.debug("CompositeArtifact already exists: id=%s", composite_id)
+
+            # ------------------------------------------------------------------
+            # Step 3: Create CompositeMembership rows with pinned_version_hash
+            # ------------------------------------------------------------------
+            for record in child_records:
+                existing_membership = (
+                    session.query(CompositeMembership)
+                    .filter(
+                        CompositeMembership.collection_id == collection_id,
+                        CompositeMembership.composite_id == composite_id,
+                        CompositeMembership.child_artifact_uuid
+                        == record["child_artifact_uuid"],
+                    )
+                    .first()
                 )
+                if existing_membership is not None:
+                    # Already linked — update the pin
+                    existing_membership.pinned_version_hash = record[
+                        "pinned_version_hash"
+                    ]
+                    _log.debug(
+                        "Updated pinned_version_hash on existing membership: "
+                        "composite=%s child_uuid=%s",
+                        composite_id,
+                        record["child_artifact_uuid"],
+                    )
+                else:
+                    membership = CompositeMembership(
+                        collection_id=collection_id,
+                        composite_id=composite_id,
+                        child_artifact_uuid=record["child_artifact_uuid"],
+                        relationship_type="contains",
+                        pinned_version_hash=record["pinned_version_hash"],
+                    )
+                    session.add(membership)
+                    _log.debug(
+                        "Created CompositeMembership: composite=%s child_uuid=%s hash=%s",
+                        composite_id,
+                        record["child_artifact_uuid"],
+                        record["pinned_version_hash"][:8],
+                    )
 
-        # ------------------------------------------------------------------
-        # Step 4: Commit the transaction
-        # ------------------------------------------------------------------
-        session.commit()
-        _log.info(
-            "import_plugin_transactional committed transaction_id=%s composite_id=%s "
-            "imported=%d reused=%d",
-            transaction_id,
-            composite_id,
-            children_imported,
-            children_reused,
-        )
-        return ImportResult(
-            success=True,
-            plugin_id=composite_id,
-            children_imported=children_imported,
-            children_reused=children_reused,
-            errors=[],
-            transaction_id=transaction_id,
-        )
+            # ------------------------------------------------------------------
+            # Step 4: Commit the transaction
+            # ------------------------------------------------------------------
+            session.commit()
+            duration_ms = (time.perf_counter() - import_start) * 1000
+            _log.info(
+                "import_plugin_transactional committed",
+                extra={
+                    "transaction_id": transaction_id,
+                    "composite_id": composite_id,
+                    "plugin_name": plugin_name,
+                    "child_count": child_count,
+                    "children_imported": children_imported,
+                    "children_reused": children_reused,
+                    "duration_ms": round(duration_ms, 2),
+                },
+            )
 
-    except Exception as exc:
-        session.rollback()
-        error_msg = str(exc)
-        _log.error(
-            "import_plugin_transactional rolled back transaction_id=%s error=%s",
-            transaction_id,
-            error_msg,
-            exc_info=True,
-        )
-        errors.append(error_msg)
-        return ImportResult(
-            success=False,
-            plugin_id=composite_id,
-            children_imported=0,
-            children_reused=0,
-            errors=errors,
-            transaction_id=transaction_id,
-        )
+            # Record OTel metrics on success
+            if _OTEL_AVAILABLE:
+                if _plugin_import_total is not None:
+                    _plugin_import_total.add(
+                        1, {"status": "success", "plugin_name": plugin_name}
+                    )
+                if _plugin_import_duration is not None:
+                    _plugin_import_duration.record(
+                        (time.perf_counter() - import_start),
+                        {"status": "success", "plugin_name": plugin_name},
+                    )
+
+            return ImportResult(
+                success=True,
+                plugin_id=composite_id,
+                children_imported=children_imported,
+                children_reused=children_reused,
+                errors=[],
+                transaction_id=transaction_id,
+            )
+
+        except Exception as exc:
+            session.rollback()
+            error_msg = str(exc)
+            duration_ms = (time.perf_counter() - import_start) * 1000
+            _log.error(
+                "import_plugin_transactional rolled back",
+                extra={
+                    "transaction_id": transaction_id,
+                    "composite_id": composite_id,
+                    "plugin_name": plugin_name,
+                    "child_count": child_count,
+                    "duration_ms": round(duration_ms, 2),
+                    "error": error_msg,
+                },
+                exc_info=True,
+            )
+            errors.append(error_msg)
+
+            # Record OTel metrics on failure
+            if _OTEL_AVAILABLE:
+                if _plugin_import_total is not None:
+                    _plugin_import_total.add(
+                        1, {"status": "failure", "plugin_name": plugin_name}
+                    )
+                if _plugin_import_duration is not None:
+                    _plugin_import_duration.record(
+                        (time.perf_counter() - import_start),
+                        {"status": "failure", "plugin_name": plugin_name},
+                    )
+
+            return ImportResult(
+                success=False,
+                plugin_id=composite_id,
+                children_imported=0,
+                children_reused=0,
+                errors=errors,
+                transaction_id=transaction_id,
+            )
+
+    # ------------------------------------------------------------------
+    # Wrap execution in an OTel parent span when available
+    # ------------------------------------------------------------------
+    if tracer is not None:
+        with tracer.start_as_current_span("plugin.import_transactional") as span:
+            span.set_attribute("plugin_name", plugin_name)
+            span.set_attribute("child_count", child_count)
+            span.set_attribute("transaction_id", transaction_id)
+            result = _run_import()
+            # Write association span after child processing
+            if result.success:
+                with tracer.start_as_current_span("association.write") as assoc_span:
+                    assoc_span.set_attribute("composite_id", composite_id)
+                    assoc_span.set_attribute("child_count", len(child_records))
+            return result
+    else:
+        return _run_import()

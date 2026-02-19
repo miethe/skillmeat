@@ -51,6 +51,24 @@ from skillmeat.cache.models import Artifact, ArtifactVersion
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Optional OpenTelemetry integration (graceful no-op fallback)
+# ---------------------------------------------------------------------------
+
+try:
+    from opentelemetry import trace as _otel_trace
+
+    _tracer = _otel_trace.get_tracer(__name__)
+    _OTEL_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _tracer = None  # type: ignore[assignment]
+    _OTEL_AVAILABLE = False
+
+
+def _get_tracer():
+    """Return the OTel tracer if available, else None."""
+    return _tracer if _OTEL_AVAILABLE else None
+
 
 # ---------------------------------------------------------------------------
 # Decision enum
@@ -154,6 +172,40 @@ def resolve_artifact_for_import(
         >>> result = resolve_artifact_for_import("canvas", "skill", "abc123", session)
         >>> result.decision
         <DeduplicationDecision.CREATE_NEW_ARTIFACT: 'create_new_artifact'>
+    """
+    tracer = _get_tracer()
+
+    if tracer is not None:
+        with tracer.start_as_current_span("artifact.dedup_resolve") as span:
+            span.set_attribute("artifact_name", name)
+            span.set_attribute("content_hash", content_hash)
+            result = _resolve_artifact_for_import_impl(
+                name, artifact_type, content_hash, session
+            )
+            span.set_attribute("decision", result.decision.value)
+            return result
+    else:
+        return _resolve_artifact_for_import_impl(
+            name, artifact_type, content_hash, session
+        )
+
+
+def _resolve_artifact_for_import_impl(
+    name: str,
+    artifact_type: str,
+    content_hash: str,
+    session: Session,
+) -> DeduplicationResult:
+    """Internal deduplication logic without instrumentation wrapper.
+
+    Args:
+        name: Artifact name.
+        artifact_type: Artifact type string.
+        content_hash: Content hash of the incoming artifact.
+        session: Active SQLAlchemy session.
+
+    Returns:
+        DeduplicationResult with the chosen decision.
     """
     # ------------------------------------------------------------------
     # Scenario A: exact content hash match on ArtifactVersion

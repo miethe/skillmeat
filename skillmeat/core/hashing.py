@@ -14,9 +14,32 @@ The resulting hashes are 64-character lowercase hex strings, compatible with the
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
+import time
 from pathlib import Path
 from typing import List
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Optional OpenTelemetry integration (graceful no-op fallback)
+# ---------------------------------------------------------------------------
+
+try:
+    from opentelemetry import trace as _otel_trace
+
+    _tracer = _otel_trace.get_tracer(__name__)
+    _OTEL_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _tracer = None  # type: ignore[assignment]
+    _OTEL_AVAILABLE = False
+
+
+def _get_tracer():
+    """Return the OTel tracer if available, else None."""
+    return _tracer if _OTEL_AVAILABLE else None
+
 
 # Files and directories excluded from hashing.
 _EXCLUDED_DIRS: frozenset[str] = frozenset(
@@ -163,6 +186,8 @@ def compute_artifact_hash(artifact_path: str) -> str:
       - ``.DS_Store``, ``Thumbs.db`` and other OS metadata files
       - Editor temporaries (``~$*``, ``*.tmp``, ``*.swp``, ``*~``, etc.)
 
+    Emits an ``artifact.hash_compute`` OpenTelemetry span when OTel is available.
+
     Args:
         artifact_path: Absolute or relative path to the artifact (file or directory).
 
@@ -171,10 +196,37 @@ def compute_artifact_hash(artifact_path: str) -> str:
 
     Raises:
         FileNotFoundError: If *artifact_path* does not exist.
-        ValueError: If *artifact_path* is neither a file nor a directory.
+        ValueError: If *artifact_path* is neither a regular file nor a directory.
     """
     path = Path(artifact_path)
+    artifact_name = path.name
 
+    tracer = _get_tracer()
+
+    if tracer is not None:
+        with tracer.start_as_current_span("artifact.hash_compute") as span:
+            span.set_attribute("artifact_name", artifact_name)
+            result = _compute_artifact_hash_impl(path, artifact_path)
+            span.set_attribute("content_hash", result)
+            return result
+    else:
+        return _compute_artifact_hash_impl(path, artifact_path)
+
+
+def _compute_artifact_hash_impl(path: Path, artifact_path: str) -> str:
+    """Internal hash computation logic (no instrumentation).
+
+    Args:
+        path: Resolved Path object.
+        artifact_path: Original string path for error messages.
+
+    Returns:
+        64-character lowercase hex string (SHA-256).
+
+    Raises:
+        FileNotFoundError: If *artifact_path* does not exist.
+        ValueError: If *artifact_path* is neither a regular file nor a directory.
+    """
     if not path.exists():
         raise FileNotFoundError(f"Artifact path does not exist: {artifact_path}")
 
