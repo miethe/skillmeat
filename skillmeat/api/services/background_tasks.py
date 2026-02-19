@@ -196,17 +196,24 @@ class CacheRefreshTask:
 
             for assoc in stale:
                 try:
+                    artifact_type_name = assoc.artifact_id
+                    if not artifact_type_name:
+                        logger.debug(
+                            f"Skipping stale artifact (uuid={assoc.artifact_uuid}): "
+                            "cannot resolve type:name"
+                        )
+                        continue
                     # Refresh this artifact's cache from filesystem
                     if refresh_single_artifact_cache(
                         session,
                         self.artifact_mgr,
-                        assoc.artifact_id,
+                        artifact_type_name,
                         assoc.collection_id,
                     ):
                         refreshed += 1
                     else:
                         errors += 1
-                        logger.debug(f"Failed to refresh artifact: {assoc.artifact_id}")
+                        logger.debug(f"Failed to refresh artifact: {artifact_type_name}")
                 except Exception as e:
                     errors += 1
                     logger.warning(f"Error refreshing {assoc.artifact_id}: {e}")
@@ -241,10 +248,17 @@ class CacheRefreshTask:
 
             for assoc in stale:
                 try:
+                    artifact_type_name = assoc.artifact_id
+                    if not artifact_type_name:
+                        logger.debug(
+                            f"Skipping stale artifact (uuid={assoc.artifact_uuid}): "
+                            "cannot resolve type:name"
+                        )
+                        continue
                     if refresh_single_artifact_cache(
                         session,
                         self.artifact_mgr,
-                        assoc.artifact_id,
+                        artifact_type_name,
                         assoc.collection_id,
                     ):
                         refreshed += 1
