@@ -3835,6 +3835,67 @@ def _import_composite_children(
         composite_entry.name,
         children_added,
     )
+
+    # ------------------------------------------------------------------
+    # Create CompositeMembership rows linking each child to the composite.
+    # This must run after all populate_fn calls so that Artifact rows exist.
+    # ------------------------------------------------------------------
+    composite_id = f"composite:{composite_entry.name}"
+    from skillmeat.cache.models import Artifact as _Artifact, CompositeMembership as _CompositeMembership  # noqa: E402
+
+    membership_count = 0
+    for idx, child_entry in enumerate(child_catalog_entries):
+        child_artifact_id = f"{child_entry.artifact_type}:{child_entry.name}"
+
+        artifact_row = (
+            session.query(_Artifact)
+            .filter(_Artifact.id == child_artifact_id)
+            .first()
+        )
+        if artifact_row is None:
+            logger.debug(
+                "CompositeMembership: artifact row not found for '%s', skipping",
+                child_artifact_id,
+            )
+            continue
+
+        existing = (
+            session.query(_CompositeMembership)
+            .filter(
+                _CompositeMembership.collection_id == DEFAULT_COLLECTION_ID,
+                _CompositeMembership.composite_id == composite_id,
+                _CompositeMembership.child_artifact_uuid == artifact_row.uuid,
+            )
+            .first()
+        )
+        if existing is None:
+            membership = _CompositeMembership(
+                collection_id=DEFAULT_COLLECTION_ID,
+                composite_id=composite_id,
+                child_artifact_uuid=artifact_row.uuid,
+                relationship_type="contains",
+                pinned_version_hash=None,
+                position=idx,
+            )
+            session.add(membership)
+            membership_count += 1
+        else:
+            existing.position = idx
+
+    try:
+        session.flush()
+        logger.info(
+            "Created %d CompositeMembership row(s) for composite '%s'",
+            membership_count,
+            composite_id,
+        )
+    except Exception as mem_err:
+        logger.warning(
+            "CompositeMembership creation failed for '%s': %s",
+            composite_id,
+            mem_err,
+        )
+
     return children_added
 
 

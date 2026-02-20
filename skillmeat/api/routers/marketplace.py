@@ -541,7 +541,7 @@ async def install_listing(
                 strategy=install_req.strategy,
             )
 
-            artifact_names = [artifact.name for artifact in result.imported_artifacts]
+            artifact_names = [artifact.name for artifact in result.artifacts]
 
             logger.info(
                 f"Imported {len(artifact_names)} artifacts from bundle: {artifact_names}"
@@ -571,7 +571,7 @@ async def install_listing(
                             self.upstream_url = upstream_url
                             self.tags = tags
 
-                    for artifact in result.imported_artifacts:
+                    for artifact in result.artifacts:
                         # Only sync successfully imported artifacts (not skipped)
                         if artifact.resolution in ("imported", "forked", "merged"):
                             artifact_name = artifact.new_name or artifact.name
@@ -623,7 +623,7 @@ async def install_listing(
 
                     composite_artifacts = [
                         a
-                        for a in result.imported_artifacts
+                        for a in result.artifacts
                         if a.type == "composite"
                         and a.resolution in ("imported", "forked", "merged")
                     ]
@@ -635,7 +635,7 @@ async def install_listing(
                         # Children = all other non-composite artifacts in the same import
                         children = [
                             a
-                            for a in result.imported_artifacts
+                            for a in result.artifacts
                             if a.type != "composite"
                             and a.resolution in ("imported", "forked", "merged")
                         ]
