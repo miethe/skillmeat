@@ -480,8 +480,8 @@ export function CatalogEntryModal({
     pluginTabSourceId,
     // Include below-threshold entries to catch all children; no type/status filter
     { include_below_threshold: true },
-    // Fetch a generous page to get children; composites rarely have 500+ children
-    500
+    // API enforces max 100 per page; infinite query handles pagination
+    100
   );
 
   // Derive CompositePreviewData from catalog entries.
