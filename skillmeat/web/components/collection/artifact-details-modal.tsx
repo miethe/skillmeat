@@ -87,7 +87,30 @@ import type { Deployment } from '@/components/deployments/deployment-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PluginMembersTab } from '@/components/entity/plugin-members-tab';
 import { MiniArtifactCard } from '@/components/collection/mini-artifact-card';
-import { useArtifactAssociations } from '@/hooks';
+import { useArtifactAssociations, useArtifact } from '@/hooks';
+
+// ============================================================================
+// EnrichedParentCard
+// ============================================================================
+
+/**
+ * Wrapper around MiniArtifactCard that fetches the full artifact data for a
+ * parent-composite stub so the card renders description, tags, and groups.
+ *
+ * Uses useArtifact which hits the React Query cache first (zero extra network
+ * request if already loaded), then falls back to a background fetch.  The
+ * stub is shown immediately so there is no loading flash.
+ */
+function EnrichedParentCard({
+  stub,
+  onClick,
+}: {
+  stub: ReturnType<typeof parentAssociationToArtifact>;
+  onClick: () => void;
+}) {
+  const { data: fullArtifact } = useArtifact(stub.id);
+  return <MiniArtifactCard artifact={fullArtifact ?? stub} onClick={onClick} />;
+}
 
 // ============================================================================
 // Helpers
@@ -1309,8 +1332,8 @@ export function ArtifactDetailsModal({
                       >
                         {associationsData!.parents.map((parent) => (
                           <div key={parent.artifact_id} role="listitem">
-                            <MiniArtifactCard
-                              artifact={parentAssociationToArtifact(parent)}
+                            <EnrichedParentCard
+                              stub={parentAssociationToArtifact(parent)}
                               onClick={() => {
                                 if (onNavigateToArtifact) {
                                   onNavigateToArtifact(parent.artifact_id);
