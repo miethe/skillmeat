@@ -11,13 +11,14 @@ the cache update fails.
 
 import json
 import logging
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from skillmeat.api.schemas.deployments import DeploymentSummary
-from skillmeat.cache.models import Artifact, CollectionArtifact
+from skillmeat.cache.models import Artifact, CollectionArtifact, CompositeArtifact
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,105 @@ def _get_collection_artifact(
         )
         .first()
     )
+
+
+# Sentinel project_id used for Artifact rows that represent collection-level
+# (non-deployed) artifacts.  Must match the constant in user_collections.py.
+_COLLECTION_ARTIFACTS_PROJECT_ID = "collection_artifacts_global"
+
+
+def _ensure_artifact_row(
+    session: Session,
+    artifact_id: str,
+    artifact_type: str,
+    artifact_name: str,
+    source: Optional[str] = None,
+) -> str:
+    """Ensure an Artifact row exists for the given type:name id and return its UUID.
+
+    Creates the row if it is absent.  This is needed for artifact types that
+    are not surfaced by ``ArtifactManager.list_artifacts()`` (e.g. composite)
+    so that ``create_or_update_collection_artifact()`` can resolve the UUID
+    required by the collection_artifacts FK.
+
+    Args:
+        session: Database session
+        artifact_id: Full artifact id in ``type:name`` format
+        artifact_type: Artifact type string (e.g. ``"composite"``)
+        artifact_name: Bare artifact name without type prefix
+        source: Optional upstream URL for the artifact
+
+    Returns:
+        UUID hex string for the existing or newly created Artifact row
+    """
+    existing_uuid = _resolve_artifact_uuid(session, artifact_id)
+    if existing_uuid:
+        return existing_uuid
+
+    new_uuid = uuid.uuid4().hex
+    artifact_row = Artifact(
+        id=artifact_id,
+        uuid=new_uuid,
+        project_id=_COLLECTION_ARTIFACTS_PROJECT_ID,
+        name=artifact_name,
+        type=artifact_type,
+        source=source,
+    )
+    session.add(artifact_row)
+    session.flush()  # Flush so FK resolution works in the same transaction
+    logger.debug(
+        "Created Artifact row for '%s' (uuid=%s) during import", artifact_id, new_uuid
+    )
+    return new_uuid
+
+
+def _upsert_composite_artifact_row(
+    session: Session,
+    composite_id: str,
+    collection_id: str,
+    description: Optional[str] = None,
+    display_name: Optional[str] = None,
+    composite_type: str = "plugin",
+) -> CompositeArtifact:
+    """Create or update a CompositeArtifact row for a freshly imported composite.
+
+    Args:
+        session: Database session
+        composite_id: Composite artifact id in ``composite:name`` format
+        collection_id: Owning collection id (e.g. ``"default"``)
+        description: Optional human-readable description
+        display_name: Optional display name (defaults to bare artifact name)
+        composite_type: Composite variant — ``"plugin"``, ``"stack"``, or ``"suite"``
+
+    Returns:
+        CompositeArtifact ORM instance (not yet committed — caller commits)
+    """
+    existing = (
+        session.query(CompositeArtifact)
+        .filter(CompositeArtifact.id == composite_id)
+        .first()
+    )
+
+    if existing:
+        existing.collection_id = collection_id
+        if description is not None:
+            existing.description = description
+        if display_name is not None:
+            existing.display_name = display_name
+        existing.updated_at = datetime.utcnow()
+        logger.debug("Updated CompositeArtifact row for '%s'", composite_id)
+        return existing
+
+    composite_row = CompositeArtifact(
+        id=composite_id,
+        collection_id=collection_id,
+        composite_type=composite_type,
+        description=description,
+        display_name=display_name,
+    )
+    session.add(composite_row)
+    logger.debug("Created CompositeArtifact row for '%s'", composite_id)
+    return composite_row
 
 
 def create_or_update_collection_artifact(
@@ -247,6 +347,12 @@ def populate_collection_artifact_from_import(
     artifact_mgr.show()) to create a fully populated DB cache row in a
     single operation.
 
+    For composite artifacts, ``artifact_mgr.show()`` is skipped entirely
+    because the ArtifactManager does not understand the composite type.
+    Metadata is built solely from the ImportEntry fields, the Artifact row
+    is created on-the-fly if absent, and a CompositeArtifact row is also
+    created/updated so that the composite is queryable via the DB.
+
     Args:
         session: DB session
         artifact_mgr: ArtifactManager instance with show() method
@@ -262,6 +368,62 @@ def populate_collection_artifact_from_import(
                    Callers should handle exceptions appropriately.
     """
     artifact_id = f"{entry.artifact_type}:{entry.name}"
+
+    # --- Composite branch -----------------------------------------------
+    # ArtifactManager.show() does not handle the "composite" type. For
+    # composites we build metadata purely from ImportEntry fields and
+    # ensure that the required Artifact row exists before delegating to the
+    # shared upsert helper.
+    if entry.artifact_type == "composite":
+        # Guarantee the Artifact row exists (collection FK requires it).
+        _ensure_artifact_row(
+            session,
+            artifact_id=artifact_id,
+            artifact_type="composite",
+            artifact_name=entry.name,
+            source=entry.upstream_url,
+        )
+
+        # Also create/update the CompositeArtifact record so that the
+        # composite is visible through the composite-specific endpoints.
+        _upsert_composite_artifact_row(
+            session,
+            composite_id=artifact_id,
+            collection_id=collection_id,
+            description=entry.description,
+            display_name=entry.name,
+            composite_type="plugin",  # Marketplace composites are plugins by default
+        )
+
+        metadata = {
+            "description": entry.description,
+            "source": entry.upstream_url,
+            "origin": "marketplace",
+            "origin_source": "github",
+            "tags_json": json.dumps(entry.tags) if entry.tags else None,
+            # Filesystem-only fields are unavailable for composites; leave as None
+            "author": None,
+            "license": None,
+            "tools_json": None,
+            "version": None,
+            "resolved_sha": None,
+            "resolved_version": None,
+        }
+
+        result = create_or_update_collection_artifact(
+            session, collection_id, artifact_id, metadata
+        )
+
+        if entry.tags:
+            try:
+                from skillmeat.core.services import TagService
+
+                TagService().sync_artifact_tags(result.artifact_uuid, entry.tags)
+            except Exception as e:
+                logger.warning(f"Tag ORM sync failed for {artifact_id}: {e}")
+
+        return result
+    # --- End composite branch -------------------------------------------
 
     # Read filesystem for fields not available in ImportEntry
     # (author, license, tools, version, resolved_sha, resolved_version)

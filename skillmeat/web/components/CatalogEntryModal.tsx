@@ -65,6 +65,7 @@ import {
   useReimportCatalogEntry,
   useDeployments,
   useSourceCatalog,
+  useImportArtifacts,
 } from '@/hooks';
 import { fetchArtifactsPaginated, type ArtifactsPaginatedResponse } from '@/lib/api/artifacts';
 import type { FileTreeEntry } from '@/lib/api/catalog';
@@ -75,9 +76,7 @@ import { FrontmatterDisplay } from '@/components/entity/frontmatter-display';
 import { parseFrontmatter, detectFrontmatter } from '@/lib/frontmatter';
 import {
   CompositePreview,
-  type CompositePreview as CompositePreviewData,
-  type CompositeArtifactEntry,
-  type CompositeConflictEntry,
+  type CompositePreviewData,
 } from '@/components/import/composite-preview';
 
 interface CatalogEntryModalProps {
@@ -364,6 +363,11 @@ export function CatalogEntryModal({
   const updateNameMutation = useUpdateCatalogEntryName(nameSourceId);
   const reimportMutation = useReimportCatalogEntry(nameSourceId);
 
+  // Import mutation for child artifact cards in the plugin breakdown tab
+  const importMutation = useImportArtifacts(nameSourceId);
+  // Track which child entry IDs are currently being imported (for card spinner state)
+  const [importingEntryIds, setImportingEntryIds] = useState<Set<string>>(new Set());
+
   // Fetch file tree when modal opens (needed for both Contents and Overview tabs)
   const {
     data: fileTreeData,
@@ -487,7 +491,10 @@ export function CatalogEntryModal({
     // Include below-threshold entries to catch all children; no type/status filter
     { include_below_threshold: true },
     // API enforces max 100 per page; infinite query handles pagination
-    100
+    100,
+    // 5-minute stale time: first open fetches all pages; subsequent opens get
+    // instant cache hits so we don't re-fetch the entire source catalog again.
+    5 * 60 * 1000,
   );
 
   // Auto-fetch all pages when the plugin tab is active for a composite entry.
@@ -539,32 +546,20 @@ export function CatalogEntryModal({
     //   - imported  → Existing (Will Link)
     //   - in_collection (and not imported) → Conflict (same name, already in collection)
     //   - new/updated/other → New (Will Import)
-    const newArtifacts: CompositeArtifactEntry[] = [];
-    const existingArtifacts: (CompositeArtifactEntry & { hash: string })[] = [];
-    const conflictArtifacts: CompositeConflictEntry[] = [];
+    const newArtifacts: CatalogEntry[] = [];
+    const existingArtifacts: CatalogEntry[] = [];
+    const conflictArtifacts: CatalogEntry[] = [];
 
     for (const child of children) {
       if (child.status === 'imported') {
         // Already imported — will link to existing copy
-        existingArtifacts.push({
-          name: child.name,
-          type: child.artifact_type,
-          hash: child.detected_sha ?? 'unknown',
-        });
+        existingArtifacts.push(child);
       } else if (child.in_collection) {
         // Same name/type exists in collection with potentially different content
-        conflictArtifacts.push({
-          name: child.name,
-          type: child.artifact_type,
-          currentHash: 'existing',
-          newHash: child.detected_sha ?? 'incoming',
-        });
+        conflictArtifacts.push(child);
       } else {
         // Net-new artifact
-        newArtifacts.push({
-          name: child.name,
-          type: child.artifact_type,
-        });
+        newArtifacts.push(child);
       }
     }
 
@@ -706,6 +701,38 @@ export function CatalogEntryModal({
       handleOpenChange(false);
     } catch {
       // Error is handled by the mutation's onError callback
+    }
+  };
+
+  // Handler: import a single child artifact from the plugin breakdown tab
+  const handleImportChild = async (childEntry: CatalogEntry) => {
+    setImportingEntryIds((prev) => new Set(prev).add(childEntry.id));
+    try {
+      await importMutation.mutateAsync({
+        entry_ids: [childEntry.id],
+        conflict_strategy: 'skip',
+      });
+    } finally {
+      setImportingEntryIds((prev) => {
+        const next = new Set(prev);
+        next.delete(childEntry.id);
+        return next;
+      });
+    }
+  };
+
+  // Handler: import all new artifacts from the plugin breakdown tab at once
+  const handleImportAllNew = async () => {
+    if (!compositePreviewData || compositePreviewData.newArtifacts.length === 0) return;
+    const ids = compositePreviewData.newArtifacts.map((e) => e.id);
+    setImportingEntryIds(new Set(ids));
+    try {
+      await importMutation.mutateAsync({
+        entry_ids: ids,
+        conflict_strategy: 'skip',
+      });
+    } finally {
+      setImportingEntryIds(new Set());
     }
   };
 
@@ -1178,7 +1205,13 @@ export function CatalogEntryModal({
                       </span>
                     </div>
                   ) : compositePreviewData && compositePreviewData.totalChildren > 0 ? (
-                    <CompositePreview preview={compositePreviewData} />
+                    <CompositePreview
+                      preview={compositePreviewData}
+                      sourceId={sourceId ?? ''}
+                      onImport={handleImportChild}
+                      onImportAll={handleImportAllNew}
+                      importingEntryIds={importingEntryIds}
+                    />
                   ) : compositePreviewData && compositePreviewData.totalChildren === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                       <Blocks

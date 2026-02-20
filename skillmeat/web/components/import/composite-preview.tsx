@@ -23,19 +23,40 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Download,
+  Loader2,
   PlusCircle,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ArtifactCompactCard } from '@/app/marketplace/sources/[id]/components/artifact-compact-card';
+import type { CatalogEntry } from '@/types/marketplace';
 
 // ---------------------------------------------------------------------------
 // Data shape
 // ---------------------------------------------------------------------------
 
+export interface CompositePreviewData {
+  pluginName: string;
+  totalChildren: number;
+  newArtifacts: CatalogEntry[];
+  existingArtifacts: CatalogEntry[];
+  conflictArtifacts: CatalogEntry[];
+}
+
+/**
+ * @deprecated Use CompositePreviewData instead.
+ * Kept for backward compatibility with CatalogEntryModal during migration.
+ */
 export interface CompositeArtifactEntry {
   name: string;
   type: string;
 }
 
+/**
+ * @deprecated Use CompositePreviewData instead.
+ * Kept for backward compatibility with CatalogEntryModal during migration.
+ */
 export interface CompositeConflictEntry {
   name: string;
   type: string;
@@ -43,6 +64,9 @@ export interface CompositeConflictEntry {
   newHash: string;
 }
 
+/**
+ * @deprecated Use CompositePreviewData instead.
+ */
 export interface CompositePreview {
   pluginName: string;
   totalChildren: number;
@@ -117,57 +141,30 @@ function BucketHeader({ label, count, isOpen, onToggle, intent }: BucketHeaderPr
 }
 
 // ---------------------------------------------------------------------------
-// Simple artifact row
-// ---------------------------------------------------------------------------
-
-function ArtifactRow({ name, type }: { name: string; type: string }) {
-  const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
-  return (
-    <li className="flex items-center justify-between py-1 pl-6 text-sm">
-      <span className="truncate font-medium">{name}</span>
-      <span className="ml-2 shrink-0 text-xs text-muted-foreground">{typeLabel}</span>
-    </li>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Conflict row — shows hash comparison
-// ---------------------------------------------------------------------------
-
-function ConflictRow({ entry }: { entry: CompositeConflictEntry }) {
-  const typeLabel = entry.type.charAt(0).toUpperCase() + entry.type.slice(1);
-  return (
-    <li className="space-y-0.5 py-1.5 pl-6">
-      <div className="flex items-center justify-between text-sm">
-        <span className="truncate font-medium">{entry.name}</span>
-        <span className="ml-2 shrink-0 text-xs text-muted-foreground">{typeLabel}</span>
-      </div>
-      <div className="grid grid-cols-2 gap-x-2 text-xs text-muted-foreground">
-        <span className="truncate font-mono">
-          <span className="text-muted-foreground/60">current: </span>
-          {entry.currentHash.slice(0, 8)}
-        </span>
-        <span className="truncate font-mono">
-          <span className="text-amber-600 dark:text-amber-400">incoming: </span>
-          {entry.newHash.slice(0, 8)}
-        </span>
-      </div>
-    </li>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Collapsible bucket section
+// Collapsible bucket section using ArtifactCompactCard
 // ---------------------------------------------------------------------------
 
 interface BucketSectionProps {
   intent: 'new' | 'existing' | 'conflict';
   label: string;
-  entries: CompositeArtifactEntry[] | (CompositeArtifactEntry & { hash: string })[] | CompositeConflictEntry[];
+  entries: CatalogEntry[];
   defaultOpen?: boolean;
+  sourceId: string;
+  onImport?: (entry: CatalogEntry) => void;
+  onEntryClick?: (entry: CatalogEntry) => void;
+  importingEntryIds?: Set<string>;
 }
 
-function BucketSection({ intent, label, entries, defaultOpen = false }: BucketSectionProps) {
+function BucketSection({
+  intent,
+  label,
+  entries,
+  defaultOpen = false,
+  sourceId,
+  onImport,
+  onEntryClick,
+  importingEntryIds,
+}: BucketSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   if (entries.length === 0) return null;
@@ -186,15 +183,19 @@ function BucketSection({ intent, label, entries, defaultOpen = false }: BucketSe
           id={`bucket-${intent}`}
           role="list"
           aria-label={`${label} artifacts`}
-          className="divide-y divide-border rounded-md border bg-muted/30"
+          className="grid grid-cols-1 gap-2 sm:grid-cols-2"
         >
-          {intent === 'conflict'
-            ? (entries as CompositeConflictEntry[]).map((e) => (
-                <ConflictRow key={e.name} entry={e} />
-              ))
-            : (entries as CompositeArtifactEntry[]).map((e) => (
-                <ArtifactRow key={e.name} name={e.name} type={e.type} />
-              ))}
+          {entries.map((entry) => (
+            <li key={entry.id} role="listitem">
+              <ArtifactCompactCard
+                entry={entry}
+                sourceId={sourceId}
+                onClick={onEntryClick ? () => onEntryClick(entry) : undefined}
+                onImport={() => onImport?.(entry)}
+                isImporting={importingEntryIds?.has(entry.id)}
+              />
+            </li>
+          ))}
         </ul>
       )}
     </div>
@@ -206,11 +207,29 @@ function BucketSection({ intent, label, entries, defaultOpen = false }: BucketSe
 // ---------------------------------------------------------------------------
 
 export interface CompositePreviewProps {
-  preview: CompositePreview;
+  preview: CompositePreviewData;
   className?: string;
+  /** Source ID passed through to ArtifactCompactCard for exclude mutations */
+  sourceId: string;
+  /** Called when the user clicks Import on an individual child artifact card */
+  onImport?: (entry: CatalogEntry) => void;
+  /** Called when the user wants to import all new artifacts at once */
+  onImportAll?: () => void;
+  /** Called when the user clicks a card to view the entry detail */
+  onEntryClick?: (entry: CatalogEntry) => void;
+  /** Set of entry IDs currently being imported (shows spinner on their cards) */
+  importingEntryIds?: Set<string>;
 }
 
-export function CompositePreview({ preview, className }: CompositePreviewProps) {
+export function CompositePreview({
+  preview,
+  className,
+  sourceId,
+  onImport,
+  onImportAll,
+  onEntryClick,
+  importingEntryIds,
+}: CompositePreviewProps) {
   const { pluginName, totalChildren, newArtifacts, existingArtifacts, conflictArtifacts } =
     preview;
 
@@ -223,6 +242,8 @@ export function CompositePreview({ preview, className }: CompositePreviewProps) 
   const summaryText = `Plugin "${pluginName}": ${totalChildren} ${
     totalChildren === 1 ? 'child' : 'children'
   } — ${summaryParts.join(', ') || 'none'}.`;
+
+  const isAnyImporting = importingEntryIds && importingEntryIds.size > 0;
 
   return (
     <div className={cn('space-y-4', className)} data-testid="composite-preview">
@@ -247,6 +268,31 @@ export function CompositePreview({ preview, className }: CompositePreviewProps) 
           {totalChildren} total {totalChildren === 1 ? 'child artifact' : 'child artifacts'}
         </p>
       </div>
+
+      {/* Import All New button — only when there are new artifacts and a handler */}
+      {newArtifacts.length > 0 && onImportAll && (
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant="default"
+            onClick={onImportAll}
+            disabled={isAnyImporting}
+            aria-label={`Import all ${newArtifacts.length} new artifact${newArtifacts.length !== 1 ? 's' : ''} from this plugin`}
+          >
+            {isAnyImporting ? (
+              <>
+                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                Importing...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                Import All New ({newArtifacts.length})
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* Conflict warning banner (only when there are conflicts) */}
       {conflictArtifacts.length > 0 && (
@@ -275,18 +321,30 @@ export function CompositePreview({ preview, className }: CompositePreviewProps) 
           label="New (Will Import)"
           entries={newArtifacts}
           defaultOpen={newArtifacts.length > 0}
+          sourceId={sourceId}
+          onImport={onImport}
+          onEntryClick={onEntryClick}
+          importingEntryIds={importingEntryIds}
         />
         <BucketSection
           intent="existing"
           label="Existing (Will Link)"
           entries={existingArtifacts}
           defaultOpen={false}
+          sourceId={sourceId}
+          onImport={onImport}
+          onEntryClick={onEntryClick}
+          importingEntryIds={importingEntryIds}
         />
         <BucketSection
           intent="conflict"
           label="Conflict (Needs Resolution)"
           entries={conflictArtifacts}
           defaultOpen={conflictArtifacts.length > 0}
+          sourceId={sourceId}
+          onImport={onImport}
+          onEntryClick={onEntryClick}
+          importingEntryIds={importingEntryIds}
         />
       </div>
     </div>

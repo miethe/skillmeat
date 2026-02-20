@@ -228,8 +228,18 @@ export function useRescanSource(sourceId: string) {
 
 /**
  * Fetch source catalog with filters and pagination
+ *
+ * @param staleTime - Optional override for query stale time in milliseconds.
+ *   Defaults to 30 seconds (30_000). Pass a longer value (e.g. 5 * 60 * 1000)
+ *   for read-heavy callers such as the plugin breakdown tab, so that subsequent
+ *   renders get an instant cache hit instead of re-fetching all pages.
  */
-export function useSourceCatalog(sourceId: string, filters?: CatalogFilters, limit = 50) {
+export function useSourceCatalog(
+  sourceId: string,
+  filters?: CatalogFilters,
+  limit = 50,
+  staleTime = 30000,
+) {
   return useInfiniteQuery({
     queryKey: sourceKeys.catalog(sourceId, filters, limit),
     queryFn: async ({ pageParam }) => {
@@ -262,7 +272,7 @@ export function useSourceCatalog(sourceId: string, filters?: CatalogFilters, lim
       lastPage.page_info.has_next_page ? lastPage.page_info.end_cursor : undefined,
     initialPageParam: undefined as string | undefined,
     enabled: !!sourceId,
-    staleTime: 30000, // 30 seconds
+    staleTime,
   });
 }
 

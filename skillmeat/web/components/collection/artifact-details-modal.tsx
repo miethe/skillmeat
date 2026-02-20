@@ -88,9 +88,9 @@ import type { Deployment } from '@/components/deployments/deployment-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   CompositePreview,
-  type CompositePreview as CompositePreviewData,
-  type CompositeArtifactEntry,
+  type CompositePreviewData,
 } from '@/components/import/composite-preview';
+import type { CatalogEntry } from '@/types/marketplace';
 
 // ============================================================================
 // Types
@@ -689,18 +689,30 @@ export function ArtifactDetailsModal({
   // Build CompositePreviewData from the composite record's memberships.
   // All members of an already-imported composite are "existing" artifacts
   // (they are in the collection) — no new/conflict buckets here.
+  // We construct minimal CatalogEntry stubs so the CompositePreview component
+  // (which now renders ArtifactCompactCard) receives the expected shape.
   const compositePreviewData = useMemo<CompositePreviewData | null>(() => {
     if (!isComposite || !artifact) return null;
     if (!compositeRecord) return null;
 
-    const existingArtifacts: (CompositeArtifactEntry & { hash: string })[] =
-      compositeRecord.memberships
-        .filter((m) => m.child_artifact != null)
-        .map((m) => ({
-          name: m.child_artifact!.name,
-          type: m.child_artifact!.type,
-          hash: m.pinned_version_hash ?? 'unknown',
-        }));
+    const existingArtifacts: CatalogEntry[] = compositeRecord.memberships
+      .filter((m) => m.child_artifact != null)
+      .map((m) => ({
+        // Synthetic CatalogEntry stub built from membership metadata.
+        // These are collection members, not live catalog entries, so some
+        // fields carry placeholder values (no source_id, no upstream URL, etc.).
+        id: m.child_artifact!.id ?? `${m.child_artifact!.type}:${m.child_artifact!.name}`,
+        source_id: '',
+        artifact_type: m.child_artifact!.type as CatalogEntry['artifact_type'],
+        name: m.child_artifact!.name,
+        path: '',
+        upstream_url: '',
+        detected_at: m.created_at ?? new Date().toISOString(),
+        confidence_score: 1,
+        status: 'imported' as const,
+        detected_sha: m.pinned_version_hash ?? undefined,
+        in_collection: true,
+      }));
 
     return {
       pluginName: compositeRecord.display_name ?? artifact.name,
@@ -1241,7 +1253,10 @@ export function ArtifactDetailsModal({
                       </span>
                     </div>
                   ) : compositePreviewData && compositePreviewData.totalChildren > 0 ? (
-                    <CompositePreview preview={compositePreviewData} />
+                    <CompositePreview
+                      preview={compositePreviewData}
+                      sourceId=""
+                    />
                   ) : compositePreviewData && compositePreviewData.totalChildren === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                       <Blocks

@@ -3670,6 +3670,175 @@ async def update_catalog_entry_name(
 
 
 # =============================================================================
+# Composite child-import helper
+# =============================================================================
+
+
+def _import_composite_children(
+    session,
+    artifact_mgr,
+    collection_mgr,
+    catalog_repo: "MarketplaceCatalogRepository",
+    transaction_handler: "MarketplaceTransactionHandler",
+    source_id: str,
+    source_ref: Optional[str],
+    composite_entry,
+    strategy: "ConflictStrategy",
+    populate_fn,
+) -> int:
+    """Import child artifacts belonging to a composite and populate the DB cache.
+
+    Scans the catalog for non-composite entries from the same source whose
+    ``path`` starts with the composite's ``path`` prefix (i.e. they live
+    inside the composite directory tree).  Each child is downloaded via the
+    :class:`ImportCoordinator` and its DB cache row is created via
+    ``populate_fn``.
+
+    Args:
+        session: Database session used for cache population.
+        artifact_mgr: ArtifactManager instance passed to ``populate_fn``.
+        collection_mgr: CollectionManager used by :class:`ImportCoordinator`.
+        catalog_repo: Repository for fetching catalog entries.
+        transaction_handler: Transaction handler for marking entries imported.
+        source_id: Source identifier.
+        source_ref: Git ref (branch/tag/SHA) for the source.
+        composite_entry: The successfully-imported composite :class:`ImportEntry`.
+        strategy: Conflict strategy to apply for child imports.
+        populate_fn: Callable matching the signature of
+            ``populate_collection_artifact_from_import``.
+
+    Returns:
+        Number of children successfully imported to the DB cache.
+    """
+    # The composite entry's catalog_entry_id maps to a row in
+    # marketplace_catalog_entries which has an ``upstream_url`` and ``path``.
+    # We use the path to find child catalog entries (prefix match).
+    composite_catalog = catalog_repo.get_by_id(composite_entry.catalog_entry_id)
+    if not composite_catalog:
+        logger.debug(
+            "Composite catalog entry not found for child import: %s",
+            composite_entry.catalog_entry_id,
+        )
+        return 0
+
+    composite_path_prefix = composite_catalog.path.rstrip("/") + "/"
+
+    # Fetch all non-composite catalog entries for this source and filter by
+    # path prefix.  We use list_by_source (already available) to avoid adding
+    # a new repository method just for this case.
+    all_entries = catalog_repo.list_by_source(source_id)
+    child_catalog_entries = [
+        e
+        for e in all_entries
+        if e.artifact_type != "composite"
+        and e.path.startswith(composite_path_prefix)
+    ]
+
+    if not child_catalog_entries:
+        logger.debug(
+            "No child catalog entries found for composite '%s' (prefix: %s)",
+            composite_entry.name,
+            composite_path_prefix,
+        )
+        return 0
+
+    logger.info(
+        "Importing %d child artifact(s) for composite '%s'",
+        len(child_catalog_entries),
+        composite_entry.name,
+    )
+
+    children_added = 0
+    coordinator = ImportCoordinator(
+        collection_name="default",
+        collection_mgr=collection_mgr,
+    )
+
+    for child_entry in child_catalog_entries:
+        # Build tags from path_segments as in the parent import endpoint.
+        child_tags = []
+        if child_entry.path_segments:
+            try:
+                seg_data = json.loads(child_entry.path_segments)
+                child_tags = [
+                    seg["normalized"]
+                    for seg in seg_data.get("extracted", [])
+                    if seg.get("status") == "approved"
+                ]
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+        child_entries_data = [
+            {
+                "id": child_entry.id,
+                "artifact_type": child_entry.artifact_type,
+                "name": child_entry.name,
+                "upstream_url": child_entry.upstream_url,
+                "path": child_entry.path,
+                "description": child_entry.description,
+                "tags": child_tags,
+            }
+        ]
+
+        try:
+            child_result = coordinator.import_entries(
+                entries=child_entries_data,
+                source_id=source_id,
+                strategy=strategy,
+                source_ref=source_ref,
+            )
+        except Exception as coord_err:
+            logger.warning(
+                "ImportCoordinator failed for child '%s': %s",
+                child_entry.name,
+                coord_err,
+            )
+            continue
+
+        for child_import_entry in child_result.entries:
+            if child_import_entry.status.value == "success":
+                try:
+                    populate_fn(
+                        session,
+                        artifact_mgr,
+                        DEFAULT_COLLECTION_ID,
+                        child_import_entry,
+                    )
+                    children_added += 1
+                except Exception as cache_err:
+                    logger.warning(
+                        "Cache population failed for child %s:%s: %s",
+                        child_import_entry.artifact_type,
+                        child_import_entry.name,
+                        cache_err,
+                    )
+
+        # Mark child catalog entries as imported.
+        child_imported_ids = [
+            e.catalog_entry_id
+            for e in child_result.entries
+            if e.status.value == "success"
+        ]
+        if child_imported_ids:
+            try:
+                with transaction_handler.import_transaction(source_id) as ctx:
+                    ctx.mark_imported(child_imported_ids, child_result.import_id)
+            except Exception as tx_err:
+                logger.warning(
+                    "Failed to mark child catalog entries imported for composite '%s': %s",
+                    composite_entry.name,
+                    tx_err,
+                )
+
+    logger.info(
+        "Composite '%s': %d child artifact(s) added to DB cache",
+        composite_entry.name,
+        children_added,
+    )
+    return children_added
+
+
+# =============================================================================
 # API-004: Import Endpoint
 # =============================================================================
 
@@ -3809,7 +3978,9 @@ async def import_artifacts(
             source_ref=source.ref,
         )
 
-        # Add imported artifacts to default database collection with full metadata
+        # Add imported artifacts to default database collection with full metadata.
+        # For composite artifacts, child artifacts are also imported automatically
+        # so that the complete plugin appears in the user's collection.
         try:
             ensure_default_collection(session)
             from skillmeat.api.services.artifact_cache_service import (
@@ -3818,17 +3989,43 @@ async def import_artifacts(
 
             db_added_count = 0
             for entry in import_result.entries:
-                if entry.status.value == "success":
+                if entry.status.value != "success":
+                    continue
+                try:
+                    populate_collection_artifact_from_import(
+                        session, artifact_mgr, DEFAULT_COLLECTION_ID, entry
+                    )
+                    db_added_count += 1
+                except Exception as cache_err:
+                    logger.warning(
+                        f"Cache population failed for "
+                        f"{entry.artifact_type}:{entry.name}: {cache_err}"
+                    )
+
+                # For composites, also import child artifacts automatically.
+                # Children are catalog entries from the same source whose path
+                # starts with the composite's path (i.e. they live inside the
+                # composite directory).
+                if entry.artifact_type == "composite":
                     try:
-                        populate_collection_artifact_from_import(
-                            session, artifact_mgr, DEFAULT_COLLECTION_ID, entry
+                        _import_composite_children(
+                            session=session,
+                            artifact_mgr=artifact_mgr,
+                            collection_mgr=collection_mgr,
+                            catalog_repo=catalog_repo,
+                            transaction_handler=transaction_handler,
+                            source_id=source_id,
+                            source_ref=source.ref,
+                            composite_entry=entry,
+                            strategy=strategy,
+                            populate_fn=populate_collection_artifact_from_import,
                         )
-                        db_added_count += 1
-                    except Exception as cache_err:
+                    except Exception as child_err:
                         logger.warning(
-                            f"Cache population failed for "
-                            f"{entry.artifact_type}:{entry.name}: {cache_err}"
+                            f"Child import failed for composite "
+                            f"{entry.name}: {child_err}"
                         )
+
             logger.info(
                 f"Added {db_added_count} artifacts to default database collection "
                 f"with full metadata"
@@ -4124,14 +4321,14 @@ async def reimport_catalog_entry(
         with transaction_handler.import_transaction(source_id) as ctx:
             ctx.mark_imported([entry_id], import_result.import_id)
 
-        # Add to default database collection with full metadata
+        # Add to default database collection with full metadata.
+        # For composite artifacts, child artifacts are also imported automatically.
         try:
             ensure_default_collection(session)
             from skillmeat.api.services.artifact_cache_service import (
                 populate_collection_artifact_from_import,
             )
 
-            # Build a lightweight entry-like object from the catalog entry data
             # import_result.entries[0] has the ImportEntry with full context
             import_entry = import_result.entries[0] if import_result.entries else None
             if import_entry and import_entry.status.value == "success":
@@ -4142,6 +4339,27 @@ async def reimport_catalog_entry(
                     f"Added artifact to database collection with full metadata: "
                     f"{artifact_id}"
                 )
+
+                # For composite reimports, also import child artifacts.
+                if import_entry.artifact_type == "composite":
+                    try:
+                        _import_composite_children(
+                            session=session,
+                            artifact_mgr=artifact_mgr,
+                            collection_mgr=collection_mgr,
+                            catalog_repo=catalog_repo,
+                            transaction_handler=transaction_handler,
+                            source_id=source_id,
+                            source_ref=source.ref,
+                            composite_entry=import_entry,
+                            strategy=ConflictStrategy.OVERWRITE,
+                            populate_fn=populate_collection_artifact_from_import,
+                        )
+                    except Exception as child_err:
+                        logger.warning(
+                            f"Child import failed for composite "
+                            f"{import_entry.name}: {child_err}"
+                        )
             else:
                 logger.warning(
                     f"No successful import entry to populate cache for: "
