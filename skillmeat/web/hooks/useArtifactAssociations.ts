@@ -18,17 +18,25 @@ import type { AssociationsDTO } from '@/types/associations';
 
 export const associationKeys = {
   all: ['associations'] as const,
-  detail: (artifactId: string) => [...associationKeys.all, artifactId] as const,
+  detail: (artifactId: string, collectionId?: string) =>
+    collectionId
+      ? ([...associationKeys.all, artifactId, collectionId] as const)
+      : ([...associationKeys.all, artifactId] as const),
 };
 
 // ---------------------------------------------------------------------------
 // Fetcher
 // ---------------------------------------------------------------------------
 
-async function fetchArtifactAssociations(artifactId: string): Promise<AssociationsDTO> {
-  return apiRequest<AssociationsDTO>(
-    `/artifacts/${encodeURIComponent(artifactId)}/associations`
-  );
+async function fetchArtifactAssociations(
+  artifactId: string,
+  collectionId?: string
+): Promise<AssociationsDTO> {
+  const base = `/artifacts/${encodeURIComponent(artifactId)}/associations`;
+  const url = collectionId
+    ? `${base}?collection=${encodeURIComponent(collectionId)}`
+    : base;
+  return apiRequest<AssociationsDTO>(url);
 }
 
 // ---------------------------------------------------------------------------
@@ -38,12 +46,15 @@ async function fetchArtifactAssociations(artifactId: string): Promise<Associatio
 /**
  * Fetch the parent and child associations for a single artifact.
  *
- * @param artifactId - Artifact ID in "type:name" format (e.g. "composite:my-plugin")
+ * @param artifactId  - Artifact ID in "type:name" format (e.g. "composite:my-plugin")
+ * @param collectionId - Optional collection ID. When provided, the API filters
+ *                       associations by that collection. When omitted, the API
+ *                       defaults to the active collection.
  * @returns React Query result exposing `{ data, isLoading, error, refetch }`
  *
  * @example
  * ```tsx
- * const { data, isLoading, error } = useArtifactAssociations('composite:my-plugin');
+ * const { data, isLoading, error } = useArtifactAssociations('composite:my-plugin', 'default');
  *
  * if (isLoading) return <Spinner />;
  * if (error) return <ErrorBanner error={error} />;
@@ -56,10 +67,10 @@ async function fetchArtifactAssociations(artifactId: string): Promise<Associatio
  * );
  * ```
  */
-export function useArtifactAssociations(artifactId: string) {
+export function useArtifactAssociations(artifactId: string, collectionId?: string) {
   return useQuery<AssociationsDTO, Error>({
-    queryKey: associationKeys.detail(artifactId),
-    queryFn: () => fetchArtifactAssociations(artifactId),
+    queryKey: associationKeys.detail(artifactId, collectionId),
+    queryFn: () => fetchArtifactAssociations(artifactId, collectionId),
     enabled: !!artifactId,
     staleTime: 5 * 60 * 1000, // 5 minutes — standard browsing stale time per data-flow-patterns.md
     gcTime: 10 * 60 * 1000, // 10 minutes

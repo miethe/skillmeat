@@ -211,7 +211,10 @@ export function ArtifactBrowseCard({
 
   // Composite / plugin: fetch member associations
   const isPlugin = artifact.type === 'composite';
-  const { data: associationsData } = useArtifactAssociations(isPlugin ? artifact.id : '');
+  const { data: associationsData } = useArtifactAssociations(
+    isPlugin ? artifact.id : '',
+    isPlugin ? artifact.collections?.[0]?.id : undefined
+  );
   const memberTypes = React.useMemo((): ArtifactType[] => {
     if (!isPlugin || !associationsData?.children) return [];
     return associationsData.children.map((child) => child.artifact_type as ArtifactType);

@@ -293,7 +293,7 @@ export function PluginMembersTab({
 
   // ── Data ──────────────────────────────────────────────────────────────────
 
-  const { data, isLoading, error, refetch } = useArtifactAssociations(compositeId);
+  const { data, isLoading, error, refetch } = useArtifactAssociations(compositeId, collectionId);
 
   // Derive a stable ordered member list from the association children.
   const members: Artifact[] = useMemo(() => {
