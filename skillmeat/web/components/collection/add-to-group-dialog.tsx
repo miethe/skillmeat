@@ -494,7 +494,7 @@ export function AddToGroupDialog({
                 )}
               </div>
             ) : (
-              <ScrollArea className="max-h-[60vh] min-h-[200px] rounded-md border">
+              <ScrollArea className="h-[min(60vh,400px)] rounded-md border">
                 {/* Create new group section */}
                 <div className="border-b p-2">
                   {isCreatingGroup ? (
