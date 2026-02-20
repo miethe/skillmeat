@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Layers, Plus, Loader2, ChevronLeft, FolderOpen, X } from 'lucide-react';
+import Link from 'next/link';
+import { Layers, Plus, Loader2, ChevronLeft, FolderOpen, X, Settings } from 'lucide-react';
 import { resolveColorHex, ICON_MAP, COLOR_HEX_BY_TOKEN } from '@/lib/group-constants';
 import type { GroupIcon } from '@/lib/group-constants';
 import {
@@ -412,6 +413,19 @@ export function AddToGroupDialog({
               </Button>
             )}
 
+            <div className="flex items-center justify-end mb-3">
+              <Link href="/groups">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Settings className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                  Manage Groups
+                </Button>
+              </Link>
+            </div>
+
             {isLoading ? (
               <div className="space-y-2">
                 <Skeleton className="h-12 w-full" />
@@ -480,7 +494,7 @@ export function AddToGroupDialog({
                 )}
               </div>
             ) : (
-              <ScrollArea className="max-h-[60vh] rounded-md border">
+              <ScrollArea className="h-[300px] rounded-md border">
                 {/* Create new group section */}
                 <div className="border-b p-2">
                   {isCreatingGroup ? (
