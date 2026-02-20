@@ -301,13 +301,14 @@ function ManagePageContent() {
   );
 
   const handleArtifactClickWithTab = useCallback(
-    (artifact: Artifact, tab: OperationsModalTab) => {
+    (artifact: Artifact, tab: string) => {
+      const typedTab = tab as OperationsModalTab;
       setSelectedArtifact(artifact);
       setDetailPanelOpen(true);
       // Update URL with artifact ID and specific tab
       updateUrlParams({
         artifact: artifact.id,
-        tab: tab === 'status' ? null : tab,
+        tab: typedTab === 'status' ? null : typedTab,
       });
     },
     [updateUrlParams]
@@ -340,6 +341,25 @@ function ManagePageContent() {
       setShowDeletionDialog(true);
     }
   }, [selectedArtifact, handleDetailClose]);
+
+  // Navigate to a related artifact from within the modal (member cards, parent composite cards).
+  // Looks up the artifact from the loaded entities list and switches the modal to it.
+  // Falls back to a URL update (which will trigger the auto-open effect) when the artifact
+  // is not yet in the loaded entity list.
+  const handleNavigateToArtifact = useCallback(
+    (artifactId: string) => {
+      const artifact = entities.find((e) => e.id === artifactId);
+      if (artifact) {
+        setSelectedArtifact(artifact);
+        setDetailPanelOpen(true);
+      }
+      // Always update URL — even when artifact is found in memory, the URL keeps
+      // deep-link state consistent and ensures the pending-artifact logic resolves
+      // on the next entity load if needed.
+      updateUrlParams({ artifact: artifactId, tab: null });
+    },
+    [entities, updateUrlParams]
+  );
 
   const handleDeploy = useCallback(
     (artifact: Artifact) => {
@@ -527,6 +547,7 @@ function ManagePageContent() {
         onTabChange={handleTabChange}
         returnTo={returnTo || undefined}
         onDelete={handleDeleteFromModal}
+        onNavigateToArtifact={handleNavigateToArtifact}
       />
 
       {/* Add Dialog */}

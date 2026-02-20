@@ -86,7 +86,45 @@ import type { ArtifactDeploymentInfo } from '@/types/deployments';
 import type { Deployment } from '@/components/deployments/deployment-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PluginMembersTab } from '@/components/entity/plugin-members-tab';
+import { MiniArtifactCard } from '@/components/collection/mini-artifact-card';
 import { useArtifactAssociations } from '@/hooks';
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/** Narrows an arbitrary string to a valid ArtifactType, defaulting to 'skill'. */
+function toArtifactType(raw: string): ArtifactType {
+  const valid: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook', 'composite'];
+  return valid.includes(raw as ArtifactType) ? (raw as ArtifactType) : 'skill';
+}
+
+/**
+ * Convert a parent association DTO into the minimal Artifact shape required
+ * by MiniArtifactCard.  Only the fields the card actually renders are populated.
+ */
+function parentAssociationToArtifact(parent: {
+  artifact_id: string;
+  artifact_name: string;
+  artifact_type: string;
+}): Artifact {
+  return {
+    id: parent.artifact_id,
+    name: parent.artifact_name,
+    type: toArtifactType(parent.artifact_type),
+    uuid: parent.artifact_id,
+    source: '',
+    version: '',
+    scope: 'user',
+    path: '',
+    collection: '',
+    status: 'synced',
+    deployments: [],
+    collections: [],
+    createdAt: '',
+    updatedAt: '',
+  } as unknown as Artifact;
+}
 
 // ============================================================================
 // Types
@@ -120,6 +158,13 @@ export interface ArtifactDetailsModalProps {
   isLoading?: boolean;
   /** Handler for delete action from modal header */
   onDelete?: () => void;
+  /**
+   * Callback invoked when the user clicks a related artifact card (member or
+   * parent composite) inside this modal.  The parent page should use this to
+   * switch the open artifact without a full URL navigation, avoiding the
+   * "modal stays open for the old artifact" issue.
+   */
+  onNavigateToArtifact?: (artifactId: string) => void;
 }
 
 // ============================================================================
@@ -494,6 +539,7 @@ export function ArtifactDetailsModal({
   returnTo,
   isLoading = false,
   onDelete,
+  onNavigateToArtifact,
 }: ArtifactDetailsModalProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -1179,6 +1225,7 @@ export function ArtifactDetailsModal({
                   compositeId={artifact.id}
                   collectionId={compositeCollectionId}
                   disabled={false}
+                  onArtifactClick={onNavigateToArtifact}
                 />
               </TabContentWrapper>
             )}
@@ -1234,55 +1281,46 @@ export function ArtifactDetailsModal({
 
                     {isAssociationsLoading ? (
                       <div
-                        className="grid gap-3 sm:grid-cols-2"
+                        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
                         aria-busy="true"
                         aria-label="Loading parent plugins"
                       >
                         {[1, 2].map((i) => (
                           <div
                             key={i}
-                            className="animate-pulse rounded-lg border p-4"
+                            className="min-h-[140px] rounded-lg border border-l-[3px] border-l-muted p-3"
                           >
-                            <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 rounded-md bg-muted" />
-                              <div className="flex-1 space-y-2">
-                                <div className="h-4 w-32 rounded bg-muted" />
-                                <div className="h-3 w-20 rounded bg-muted" />
-                              </div>
+                            <div className="flex items-center gap-1.5">
+                              <Skeleton className="h-4 w-4 shrink-0 rounded" />
+                              <Skeleton className="h-4 flex-1" />
+                            </div>
+                            <div className="mt-1 space-y-1">
+                              <Skeleton className="h-3 w-full" />
+                              <Skeleton className="h-3 w-3/4" />
                             </div>
                           </div>
                         ))}
                       </div>
                     ) : (
                       <div
-                        className="grid gap-3 sm:grid-cols-2"
+                        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
                         role="list"
                         aria-label="Parent plugin artifacts"
                       >
                         {associationsData!.parents.map((parent) => (
-                          <div
-                            key={parent.artifact_id}
-                            className="group rounded-lg border p-4 transition-colors hover:bg-muted/50"
-                            role="listitem"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-                                <Blocks className="h-4 w-4 text-primary" aria-hidden="true" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium">
-                                  {parent.artifact_name}
-                                </p>
-                                <div className="mt-0.5 flex items-center gap-1.5">
-                                  <Badge variant="secondary" className="text-xs">
-                                    {parent.artifact_type}
-                                  </Badge>
-                                  <Badge variant="outline" className="text-xs">
-                                    {parent.relationship_type}
-                                  </Badge>
-                                </div>
-                              </div>
-                            </div>
+                          <div key={parent.artifact_id} role="listitem">
+                            <MiniArtifactCard
+                              artifact={parentAssociationToArtifact(parent)}
+                              onClick={() => {
+                                if (onNavigateToArtifact) {
+                                  onNavigateToArtifact(parent.artifact_id);
+                                } else {
+                                  router.push(
+                                    `/collection?artifact=${encodeURIComponent(parent.artifact_id)}`
+                                  );
+                                }
+                              }}
+                            />
                           </div>
                         ))}
                       </div>

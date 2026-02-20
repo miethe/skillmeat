@@ -20,7 +20,7 @@ import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
 import { AddToGroupDialog } from '@/components/collection/add-to-group-dialog';
 import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
 import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
-import { ArtifactTypeTabs } from '@/components/shared/artifact-type-tabs';
+import { ArtifactTypeTabs, type ArtifactTypeTabValue } from '@/components/shared/artifact-type-tabs';
 import { ActiveFilterRow, type ActiveFilterItem } from '@/components/shared/active-filter-row';
 import { GroupedArtifactView } from '@/components/collection/grouped-artifact-view';
 import {
@@ -689,7 +689,7 @@ function CollectionPageContent() {
           if (p === 'universal') {
             return !artifact.targetPlatforms || artifact.targetPlatforms.length === 0;
           }
-          return artifact.targetPlatforms?.includes(p) ?? false;
+          return (artifact.targetPlatforms as string[] | undefined)?.includes(p) ?? false;
         };
         return selectedPlatforms[withinMode](matchesPlatform);
       });
@@ -1013,6 +1013,25 @@ function CollectionPageContent() {
     }
   }, [selectedArtifact, handleDetailClose]);
 
+  // Navigate to a related artifact from within the modal (member cards, parent composite cards).
+  // Looks up the artifact from the currently loaded artifact pool and switches the modal to it
+  // without a full page navigation, so the existing modal closes cleanly and the new one opens.
+  const handleNavigateToArtifact = useCallback(
+    (artifactId: string) => {
+      const artifact = filteredArtifacts.find(
+        (a) => a.id === artifactId || a.name === artifactId
+      );
+      if (artifact) {
+        setSelectedArtifact(artifact);
+        setIsDetailOpen(true);
+      }
+      // Always update URL for deep-link consistency. If artifact wasn't found in the
+      // filtered list the auto-open effect will resolve it once data is loaded.
+      updateUrlParams({ artifact: artifactId, tab: null });
+    },
+    [filteredArtifacts, updateUrlParams]
+  );
+
   const handleTabChange = (tab: ArtifactDetailsTab) => {
     // Update URL with new tab
     updateUrlParams({
@@ -1117,7 +1136,7 @@ function CollectionPageContent() {
       {/* Type tabs below filter bar and active-filters row */}
       <div className="border-b px-6 py-2">
         <ArtifactTypeTabs
-          value={urlType as 'all' | ArtifactFilters['type']}
+          value={(urlType as ArtifactTypeTabValue) ?? 'all'}
           onChange={handleTypeTabChange}
           compositeSubtype={urlSubtype}
           onCompositeSubtypeChange={handleCompositeSubtypeChange}
@@ -1308,6 +1327,7 @@ function CollectionPageContent() {
         onTabChange={handleTabChange}
         returnTo={returnTo || undefined}
         onDelete={handleDeleteFromModal}
+        onNavigateToArtifact={handleNavigateToArtifact}
       />
 
       {/* Edit Collection Dialog */}

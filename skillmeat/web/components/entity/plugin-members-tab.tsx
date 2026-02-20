@@ -25,7 +25,24 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Plus, X, Loader2, AlertCircle, Users, MoreHorizontal, Eye, Rocket, Trash2 } from 'lucide-react';
+import { Plus, X, Loader2, AlertCircle, Users } from 'lucide-react';
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -39,25 +56,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MemberList } from '@/components/shared/member-list';
+import { MiniArtifactCard, DraggableMiniArtifactCard } from '@/components/collection/mini-artifact-card';
 import { MemberSearchInput } from '@/components/shared/member-search-input';
-import { DeployDialog } from '@/components/collection/deploy-dialog';
 import {
   useArtifactAssociations,
+  useArtifact,
   useAddCompositeMember,
   useRemoveCompositeMember,
   useReorderCompositeMembers,
   useToast,
 } from '@/hooks';
-import { useRouter } from 'next/navigation';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 import { cn } from '@/lib/utils';
 
@@ -83,6 +92,13 @@ export interface PluginMembersTabProps {
    * Use when the composite is read-only or the user lacks write access.
    */
   disabled?: boolean;
+
+  /**
+   * Optional callback invoked when a member card is clicked.
+   * Receives the artifact ID of the clicked member.
+   * When provided, this replaces the default URL navigation behavior.
+   */
+  onArtifactClick?: (artifactId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -132,6 +148,69 @@ function associationChildToArtifact(child: {
 }
 
 // ---------------------------------------------------------------------------
+// EnrichedMiniArtifactCard — enriches a stub artifact with full data from cache
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrapper around MiniArtifactCard that attempts to fetch the full artifact
+ * data for a stub artifact so the card renders description, tags, and groups.
+ *
+ * Uses useArtifact which will hit the React Query cache first (zero extra
+ * network request if the artifact is already loaded on the page), and falls
+ * back to a background fetch otherwise. The stub is shown immediately as
+ * placeholderData so there is no loading flash.
+ */
+function EnrichedMiniArtifactCard({
+  stub,
+  onClick,
+  groupId,
+  className,
+}: {
+  stub: Artifact;
+  onClick: () => void;
+  groupId?: string;
+  className?: string;
+}) {
+  const { data: fullArtifact } = useArtifact(stub.id);
+  const artifact = fullArtifact ?? stub;
+  return (
+    <MiniArtifactCard
+      artifact={artifact}
+      onClick={onClick}
+      groupId={groupId}
+      className={className}
+    />
+  );
+}
+
+/**
+ * Draggable version of EnrichedMiniArtifactCard.
+ * Delegates to DraggableMiniArtifactCard with enriched artifact data.
+ */
+function DraggableEnrichedMiniArtifactCard({
+  stub,
+  onClick,
+  groupId,
+  className,
+}: {
+  stub: Artifact;
+  onClick: () => void;
+  groupId: string;
+  className?: string;
+}) {
+  const { data: fullArtifact } = useArtifact(stub.id);
+  const artifact = fullArtifact ?? stub;
+  return (
+    <DraggableMiniArtifactCard
+      artifact={artifact}
+      onClick={onClick}
+      groupId={groupId}
+      className={className}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Loading skeleton
 // ---------------------------------------------------------------------------
 
@@ -147,19 +226,25 @@ function MembersTabSkeleton() {
         <Skeleton className="h-9 w-32" />
       </div>
 
-      {/* Member rows skeleton */}
-      <div className="flex flex-col gap-1.5">
+      {/* Member card grid skeleton */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="flex items-center gap-2.5 rounded-md border border-border px-3 py-2"
+            className="min-h-[140px] rounded-lg border border-l-[3px] border-l-muted p-3"
           >
-            <Skeleton className="h-5 w-5 shrink-0 rounded" />
-            <Skeleton className="h-4 w-5 shrink-0" />
-            <Skeleton className="h-3.5 w-3.5 shrink-0 rounded-full" />
-            <Skeleton className="h-4 flex-1" />
-            <Skeleton className="h-5 w-12 rounded" />
-            <Skeleton className="h-5 w-5 rounded" />
+            <div className="flex items-center gap-1.5">
+              <Skeleton className="h-4 w-4 shrink-0 rounded" />
+              <Skeleton className="h-4 flex-1" />
+            </div>
+            <div className="mt-1 space-y-1">
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-4/5" />
+            </div>
+            <div className="mt-auto pt-3 flex gap-1">
+              <Skeleton className="h-4 w-12 rounded-full" />
+              <Skeleton className="h-4 w-10 rounded-full" />
+            </div>
           </div>
         ))}
       </div>
@@ -287,9 +372,9 @@ export function PluginMembersTab({
   compositeId,
   collectionId = 'default',
   disabled = false,
+  onArtifactClick,
 }: PluginMembersTabProps) {
   const { toast } = useToast();
-  const router = useRouter();
 
   // ── Data ──────────────────────────────────────────────────────────────────
 
@@ -319,9 +404,6 @@ export function PluginMembersTab({
     memberUuid: string;
     name: string;
   } | null>(null);
-
-  // Deploy dialog — triggered from member action menu
-  const [deployTargetArtifact, setDeployTargetArtifact] = useState<Artifact | null>(null);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -386,64 +468,40 @@ export function PluginMembersTab({
     setPendingRemove(null);
   }, []);
 
-  // Navigate to artifact detail view
+  // Navigate to artifact detail view (card click).
+  // Uses the onArtifactClick callback when provided by the parent modal,
+  // which allows the parent to switch to the clicked artifact without a
+  // full URL navigation that would leave the current modal open.
   const handleViewDetails = useCallback((artifact: Artifact) => {
-    router.push(`/collection?artifact=${encodeURIComponent(artifact.id)}`);
-  }, [router]);
+    onArtifactClick?.(artifact.id);
+  }, [onArtifactClick]);
 
-  // Open deploy dialog for a member
-  const handleDeployMember = useCallback((artifact: Artifact) => {
-    setDeployTargetArtifact(artifact);
-  }, []);
-
-  // Per-member action menu renderer passed to MemberList
-  const renderMemberActions = useCallback(
-    (artifact: Artifact) => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            aria-label={`Actions for ${artifact.name}`}
-            className={cn(
-              'flex h-5 w-5 shrink-0 items-center justify-center rounded',
-              'text-muted-foreground/40 opacity-0 transition-all duration-150',
-              'group-hover:opacity-100 group-focus-within:opacity-100',
-              'hover:bg-accent hover:text-foreground',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:opacity-100'
-            )}
-          >
-            <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem
-            onClick={() => handleViewDetails(artifact)}
-          >
-            <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
-            View Details
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => handleDeployMember(artifact)}
-          >
-            <Rocket className="mr-2 h-4 w-4" aria-hidden="true" />
-            Deploy
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onClick={() => handleRequestRemove(artifact.id)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
-            Remove from Plugin
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-    [handleViewDetails, handleDeployMember, handleRequestRemove]
+  // DnD sensors for the grid
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const handleReorder = useCallback(
-    async (reordered: Artifact[]) => {
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const activeDragArtifact = activeDragId
+    ? members.find((m) => m.id === activeDragId) ?? null
+    : null;
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveDragId(String(event.active.id));
+  }, []);
+
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      setActiveDragId(null);
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      const oldIndex = members.findIndex((m) => m.id === active.id);
+      const newIndex = members.findIndex((m) => m.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const reordered = arrayMove(members, oldIndex, newIndex);
       const payload = {
         members: reordered.map((a, idx) => ({ artifact_id: a.id, position: idx })),
       };
@@ -453,7 +511,7 @@ export function PluginMembersTab({
         // Error toast handled by hook; optimistic rollback handled by hook
       }
     },
-    [reorderMembers, compositeId]
+    [members, reorderMembers, compositeId]
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -532,32 +590,81 @@ export function PluginMembersTab({
         </div>
       )}
 
-      {/* ── Member List or Empty State ── */}
-      <ScrollArea
-        className={cn(
-          'rounded-md',
-          members.length > 6 ? 'h-[420px]' : undefined
-        )}
-        aria-label={members.length > 6 ? 'Scrollable member list' : undefined}
-      >
-        {members.length === 0 ? (
-          <MembersEmptyState
-            onAdd={() => setIsAddingMember(true)}
-            disabled={disabled}
-          />
-        ) : (
-          <MemberList
-            members={members}
-            onReorder={handleReorder}
-            onRemove={handleRequestRemove}
-            disabled={effectiveDisabled}
-            renderItemActions={renderMemberActions}
-            aria-labelledby="plugin-members-heading"
-          />
-        )}
-      </ScrollArea>
+      {/* ── Member Grid or Empty State ── */}
+      {members.length === 0 ? (
+        <MembersEmptyState
+          onAdd={() => setIsAddingMember(true)}
+          disabled={disabled}
+        />
+      ) : (
+        <ScrollArea
+          className={cn(members.length > 6 ? 'h-[480px]' : undefined)}
+          aria-label={members.length > 6 ? 'Scrollable member grid' : undefined}
+        >
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={(e) => void handleDragEnd(e)}
+          >
+            <SortableContext items={memberIds} strategy={rectSortingStrategy}>
+              <div
+                className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+                role="list"
+                aria-labelledby="plugin-members-heading"
+                aria-label="Plugin members"
+              >
+                {members.map((artifact) => (
+                  <div key={artifact.id} className="relative group/card" role="listitem">
+                    <DraggableEnrichedMiniArtifactCard
+                      stub={artifact}
+                      groupId={compositeId}
+                      onClick={() => handleViewDetails(artifact)}
+                      className={cn(effectiveDisabled && 'pointer-events-none opacity-60')}
+                    />
+                    {/* Remove button overlay — shown on hover when not disabled */}
+                    {!effectiveDisabled && (
+                      <button
+                        type="button"
+                        aria-label={`Remove ${artifact.name} from plugin`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRequestRemove(artifact.id);
+                        }}
+                        className={cn(
+                          'absolute right-2 top-2 z-10',
+                          'flex h-5 w-5 items-center justify-center rounded',
+                          'bg-background/80 text-muted-foreground/60',
+                          'opacity-0 transition-opacity duration-150',
+                          'group-hover/card:opacity-100 focus-visible:opacity-100',
+                          'hover:bg-destructive/10 hover:text-destructive',
+                          'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                        )}
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </SortableContext>
 
-      {/* ── Reorder hint ── */}
+            {/* Drag overlay — ghost while dragging */}
+            <DragOverlay>
+              {activeDragArtifact ? (
+                <EnrichedMiniArtifactCard
+                  stub={activeDragArtifact}
+                  onClick={() => {}}
+                  groupId={compositeId}
+                  className="rotate-1 shadow-lg opacity-90"
+                />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        </ScrollArea>
+      )}
+
+      {/* ── Save order status ── */}
       {reorderMembers.isPending && (
         <p
           className="flex items-center gap-1.5 text-xs text-muted-foreground"
@@ -578,13 +685,6 @@ export function PluginMembersTab({
         onCancel={handleCancelRemove}
       />
 
-      {/* ── Deploy dialog (triggered from member action menu) ── */}
-      <DeployDialog
-        artifact={deployTargetArtifact}
-        isOpen={deployTargetArtifact !== null}
-        onClose={() => setDeployTargetArtifact(null)}
-        onSuccess={() => setDeployTargetArtifact(null)}
-      />
     </div>
   );
 }
