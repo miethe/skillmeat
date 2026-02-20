@@ -476,13 +476,44 @@ export function CatalogEntryModal({
   const showPluginTab = isComposite && activeTab === 'plugin';
   // Pass empty string when disabled — useSourceCatalog uses !!sourceId to guard the query
   const pluginTabSourceId = showPluginTab && sourceId ? sourceId : '';
-  const { data: compositeCatalogData, isLoading: isLoadingCompositeCatalog } = useSourceCatalog(
+  const {
+    data: compositeCatalogData,
+    isLoading: isLoadingCompositeCatalog,
+    hasNextPage: compositeCatalogHasNextPage,
+    isFetchingNextPage: compositeCatalogIsFetchingNextPage,
+    fetchNextPage: compositeCatalogFetchNextPage,
+  } = useSourceCatalog(
     pluginTabSourceId,
     // Include below-threshold entries to catch all children; no type/status filter
     { include_below_threshold: true },
     // API enforces max 100 per page; infinite query handles pagination
     100
   );
+
+  // Auto-fetch all pages when the plugin tab is active for a composite entry.
+  // We keep calling fetchNextPage until hasNextPage is false so that children
+  // on later pages are not missed (catalog can span 45+ pages).
+  useEffect(() => {
+    if (
+      pluginTabSourceId &&
+      compositeCatalogHasNextPage &&
+      !compositeCatalogIsFetchingNextPage
+    ) {
+      compositeCatalogFetchNextPage();
+    }
+  }, [
+    pluginTabSourceId,
+    compositeCatalogHasNextPage,
+    compositeCatalogIsFetchingNextPage,
+    compositeCatalogFetchNextPage,
+  ]);
+
+  // True while the initial load or any subsequent page fetch is in flight, or
+  // while there are still more pages to retrieve.
+  const isLoadingAllCatalogPages =
+    isLoadingCompositeCatalog ||
+    compositeCatalogIsFetchingNextPage ||
+    !!(pluginTabSourceId && compositeCatalogHasNextPage);
 
   // Derive CompositePreviewData from catalog entries.
   // Children are catalog entries whose paths start with the composite's path + '/'.
@@ -1139,7 +1170,7 @@ export function CatalogEntryModal({
                     </p>
                   </div>
 
-                  {isLoadingCompositeCatalog ? (
+                  {isLoadingAllCatalogPages ? (
                     <div className="flex items-center justify-center py-8" role="status">
                       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
                       <span className="ml-2 text-sm text-muted-foreground">
