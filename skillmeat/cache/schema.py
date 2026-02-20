@@ -246,7 +246,7 @@ CREATE INDEX IF NOT EXISTS idx_marketplace_sources_owner_repo ON marketplace_sou
 CREATE TABLE IF NOT EXISTS marketplace_catalog_entries (
     id TEXT PRIMARY KEY,
     source_id TEXT NOT NULL,
-    artifact_type TEXT NOT NULL CHECK(artifact_type IN ('skill', 'command', 'agent', 'mcp', 'mcp_server', 'hook')),
+    artifact_type TEXT NOT NULL CHECK(artifact_type IN ('skill', 'command', 'agent', 'mcp', 'mcp_server', 'hook', 'composite', 'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')),
     name TEXT NOT NULL,
     path TEXT NOT NULL,
     upstream_url TEXT NOT NULL,
