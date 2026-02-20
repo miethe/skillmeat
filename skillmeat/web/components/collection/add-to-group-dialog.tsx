@@ -549,7 +549,10 @@ export function AddToGroupDialog({
                     </Button>
                   )}
                 </div>
-                <div className="space-y-1 p-2">
+                <div
+                  className="grid gap-y-1 p-2"
+                  style={{ gridTemplateColumns: 'auto auto 1fr auto' }}
+                >
                   {groups.map((group) => {
                     const isAlreadyInGroup =
                       existingGroups?.some((g) => g.id === group.id) ?? false;
@@ -559,11 +562,11 @@ export function AddToGroupDialog({
                       <div
                         key={group.id}
                         className={cn(
-                          'flex items-start gap-3 rounded-md px-2 py-2',
+                          'col-span-4 grid grid-cols-subgrid items-start gap-x-3 rounded-md px-2 py-2',
                           isAlreadyInGroup ? 'opacity-60' : 'hover:bg-accent'
                         )}
                       >
-                        {/* Zone 1: Checkbox */}
+                        {/* Col 1: Checkbox */}
                         <Checkbox
                           id={`group-${group.id}`}
                           checked={selectedGroupIds.has(group.id)}
@@ -574,8 +577,8 @@ export function AddToGroupDialog({
                           className="mt-0.5"
                         />
 
-                        {/* Zone 2: Name column - shrink-0 to fit content, won't truncate */}
-                        <div className="shrink-0">
+                        {/* Col 2: Name column - auto-sized to widest name across all rows */}
+                        <div>
                           <Label
                             htmlFor={`group-${group.id}`}
                             className={cn(
@@ -614,42 +617,44 @@ export function AddToGroupDialog({
                           </div>
                         </div>
 
-                        {/* Zone 3: Description column - fills remaining space */}
-                        {group.description && (
-                          <div className="min-w-0 flex-1 pt-0.5">
+                        {/* Col 3: Description - fills remaining width, aligned across all rows */}
+                        <div className="min-w-0 pt-0.5">
+                          {group.description && (
                             <p className="line-clamp-2 text-xs text-muted-foreground">
                               {group.description}
                             </p>
-                          </div>
-                        )}
+                          )}
+                        </div>
 
-                        {/* Zone 4: Remove button (only for already-in-group items) */}
-                        {isAlreadyInGroup && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 shrink-0"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRemoveFromGroup(group.id);
-                                  }}
-                                  disabled={isRemoving}
-                                  aria-label="Remove from group"
-                                >
-                                  {isRemoving ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-                                  ) : (
-                                    <X className="h-3 w-3" aria-hidden="true" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Remove from Group</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
+                        {/* Col 4: Remove button (only for already-in-group items) */}
+                        <div>
+                          {isAlreadyInGroup && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 shrink-0"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveFromGroup(group.id);
+                                    }}
+                                    disabled={isRemoving}
+                                    aria-label="Remove from group"
+                                  >
+                                    {isRemoving ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                                    ) : (
+                                      <X className="h-3 w-3" aria-hidden="true" />
+                                    )}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Remove from Group</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
