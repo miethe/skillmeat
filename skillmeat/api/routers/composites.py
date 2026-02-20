@@ -329,13 +329,13 @@ async def update_composite(
 @router.delete(
     "/{composite_id:path}",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Delete composite artifact",
     description=(
         "Delete a composite artifact and all its membership edges.  "
         "Set cascade_delete_children=true to also delete the child Artifact rows."
     ),
     responses={
-        204: {"description": "Composite deleted"},
         404: {"description": "Composite not found"},
         500: {"description": "Internal server error"},
     },
@@ -497,13 +497,13 @@ async def add_composite_member(
 @router.delete(
     "/{composite_id}/members/{member_uuid}",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Remove member from composite",
     description=(
         "Remove a child artifact membership by child artifact UUID.  "
         "The child Artifact row is NOT deleted — only the membership edge is removed."
     ),
     responses={
-        204: {"description": "Member removed successfully"},
         404: {"description": "Composite or membership not found"},
         500: {"description": "Internal server error"},
     },
