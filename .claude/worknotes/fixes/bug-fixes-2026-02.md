@@ -283,3 +283,46 @@ Working artifacts didn't have these data-level issues, explaining why the proble
 **Status**: RESOLVED
 
 ---
+
+## Marketplace Source Plugin Detection Missing
+
+**Date Fixed**: 2026-02-20
+**Severity**: high
+**Component**: marketplace, heuristic-detector
+
+**Issue**: Plugins/composites were not being identified from marketplace sources. Individual member artifacts were detected correctly, but their parent plugins were missing. Example: source `jeremylongshore/claude-code-plugins-plus-skills` has ~21 plugins containing 1545 artifacts - all artifacts found, but 0 plugins detected.
+
+**Root Cause**: The `_is_plugin_directory()` method existed at line 399 of `heuristic_detector.py` but was **never called** in the detection flow. The `detect_artifacts_in_tree()` function processed individual artifacts but skipped plugin/composite detection entirely.
+
+**Fix**: Added plugin detection to the heuristic detector:
+
+1. Created `_detect_plugin_directories()` method with 3 detection signals:
+   - `plugin.json` (confidence 95) - definitive manifest
+   - `COMPOSITE.md`/`PLUGIN.md`/`composite.json` (confidence 90) - strong manifest
+   - 2+ entity-type subdirectories via `_is_plugin_directory()` (confidence 70) - heuristic
+
+2. Modified `analyze_paths()` to:
+   - Call plugin detection **first**, before individual artifact detection
+   - Filter out member artifacts that fall inside plugin directories
+   - Skip individual directory scoring for plugin descendants
+   - Prevent double-counting of artifacts
+
+**Files Modified**:
+- `skillmeat/core/marketplace/heuristic_detector.py`: +196 lines
+  - Added `_detect_plugin_directories()` method
+  - Updated `analyze_paths()` to integrate plugin detection
+- `tests/core/marketplace/test_heuristic_detector.py`: +278 lines
+  - Added `TestPluginDetection` class with 13 comprehensive tests
+
+**Testing**:
+- All 223 heuristic detector tests pass
+- Tests cover all 3 detection signals
+- Tests verify no double-counting of member artifacts
+- Tests verify sibling standalone artifacts still detected
+- Tests cover multi-plugin repositories
+
+**Commits**: eebf6955
+
+**Status**: RESOLVED
+
+---
