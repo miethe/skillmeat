@@ -321,8 +321,10 @@ Working artifacts didn't have these data-level issues, explaining why the proble
 - Tests verify sibling standalone artifacts still detected
 - Tests cover multi-plugin repositories
 
-**Commits**: eebf6955
+**Commits**: eebf6955, 9da058cc
 
 **Status**: RESOLVED
+
+**Follow-up (9da058cc)**: Initial fix added `_detect_plugin_directories()` with 3 signals but missed the real-world `.claude-plugin/` directory pattern used by repos like `jeremylongshore/claude-code-plugins-plus-skills`. Plugins use a `.claude-plugin/plugin.json` structure where the plugin manifest lives inside a `.claude-plugin/` subdirectory, and the PARENT is the actual plugin root. Added Signal 0 (confidence 98, highest priority) that pre-scans for `.claude-plugin` directories, marks their parents as plugin roots, and excludes `.claude-plugin` dirs from all subsequent signals. Added 7 new tests for this pattern. Total: 230 tests, 30 plugin-specific.
 
 ---
