@@ -3064,15 +3064,18 @@ async def update_artifact_parameters(
             )
 
             if pending_tag_sync is not None:
-                try:
-                    from skillmeat.core.services import TagService
+                # Composites live in composite_artifacts table, not artifacts;
+                # sync_artifact_tags() expects an artifact UUID and would fail.
+                if not artifact_id.startswith("composite:"):
+                    try:
+                        from skillmeat.core.services import TagService
 
-                    TagService().sync_artifact_tags(artifact_id, pending_tag_sync)
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to sync tag associations for {artifact_id}: {e}",
-                        exc_info=True,
-                    )
+                        TagService().sync_artifact_tags(artifact_id, pending_tag_sync)
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to sync tag associations for {artifact_id}: {e}",
+                            exc_info=True,
+                        )
         else:
             logger.info(f"No parameter changes requested for artifact: {artifact_id}")
             message = "No parameters were updated"
