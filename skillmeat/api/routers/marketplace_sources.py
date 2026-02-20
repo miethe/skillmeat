@@ -3749,6 +3749,7 @@ def _import_composite_children(
     )
 
     children_added = 0
+    membership_child_ids: list[str] = []
     coordinator = ImportCoordinator(
         collection_name="default",
         collection_mgr=collection_mgr,
@@ -3796,6 +3797,10 @@ def _import_composite_children(
             continue
 
         for child_import_entry in child_result.entries:
+            child_artifact_id = (
+                f"{child_import_entry.artifact_type}:{child_import_entry.name}"
+            )
+
             if child_import_entry.status.value == "success":
                 try:
                     populate_fn(
@@ -3812,6 +3817,13 @@ def _import_composite_children(
                         child_import_entry.name,
                         cache_err,
                     )
+                    # Skip membership linkage when cache population failed.
+                    continue
+
+            # Link successful imports and skip-conflicts to the composite.
+            # For rename conflicts, use the resolved imported name.
+            if child_import_entry.status.value in {"success", "skipped"}:
+                membership_child_ids.append(child_artifact_id)
 
         # Mark child catalog entries as imported.
         child_imported_ids = [
@@ -3844,8 +3856,7 @@ def _import_composite_children(
     from skillmeat.cache.models import Artifact as _Artifact, CompositeMembership as _CompositeMembership  # noqa: E402
 
     membership_count = 0
-    for idx, child_entry in enumerate(child_catalog_entries):
-        child_artifact_id = f"{child_entry.artifact_type}:{child_entry.name}"
+    for idx, child_artifact_id in enumerate(membership_child_ids):
 
         artifact_row = (
             session.query(_Artifact)
@@ -3883,13 +3894,16 @@ def _import_composite_children(
             existing.position = idx
 
     try:
-        session.flush()
+        session.commit()
         logger.info(
-            "Created %d CompositeMembership row(s) for composite '%s'",
+            "Created %d CompositeMembership row(s) for composite '%s' "
+            "(%d child association target(s))",
             membership_count,
             composite_id,
+            len(membership_child_ids),
         )
     except Exception as mem_err:
+        session.rollback()
         logger.warning(
             "CompositeMembership creation failed for '%s': %s",
             composite_id,

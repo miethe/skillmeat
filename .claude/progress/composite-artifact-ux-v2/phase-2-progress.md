@@ -6,7 +6,7 @@ prd: composite-artifact-ux-v2
 feature_slug: composite-artifact-ux-v2
 phase: 2
 title: Marketplace Plugin Discovery
-status: completed
+status: in-progress
 created: '2026-02-19'
 updated: '2026-02-19'
 prd_ref: docs/project_plans/PRDs/features/composite-artifact-ux-v2.md

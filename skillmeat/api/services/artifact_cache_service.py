@@ -18,7 +18,12 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from skillmeat.api.schemas.deployments import DeploymentSummary
-from skillmeat.cache.models import Artifact, CollectionArtifact, CompositeArtifact
+from skillmeat.cache.models import (
+    Artifact,
+    CollectionArtifact,
+    CompositeArtifact,
+    Project,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +84,31 @@ def _get_collection_artifact(
 _COLLECTION_ARTIFACTS_PROJECT_ID = "collection_artifacts_global"
 
 
+def _ensure_collection_project_sentinel(session: Session) -> None:
+    """Ensure the sentinel Project row exists for collection-scoped artifacts."""
+    existing = (
+        session.query(Project.id)
+        .filter(Project.id == _COLLECTION_ARTIFACTS_PROJECT_ID)
+        .first()
+    )
+    if existing:
+        return
+
+    sentinel = Project(
+        id=_COLLECTION_ARTIFACTS_PROJECT_ID,
+        name="Collection Artifacts",
+        path="~/.skillmeat/collections",
+        description="Sentinel project for collection artifacts",
+        status="active",
+    )
+    session.add(sentinel)
+    session.flush()
+    logger.debug(
+        "Created sentinel Project row '%s' during import",
+        _COLLECTION_ARTIFACTS_PROJECT_ID,
+    )
+
+
 def _ensure_artifact_row(
     session: Session,
     artifact_id: str,
@@ -106,6 +136,8 @@ def _ensure_artifact_row(
     existing_uuid = _resolve_artifact_uuid(session, artifact_id)
     if existing_uuid:
         return existing_uuid
+
+    _ensure_collection_project_sentinel(session)
 
     new_uuid = uuid.uuid4().hex
     artifact_row = Artifact(
@@ -369,21 +401,21 @@ def populate_collection_artifact_from_import(
     """
     artifact_id = f"{entry.artifact_type}:{entry.name}"
 
+    # Ensure the Artifact FK target exists for all imported artifact types.
+    _ensure_artifact_row(
+        session,
+        artifact_id=artifact_id,
+        artifact_type=entry.artifact_type,
+        artifact_name=entry.name,
+        source=entry.upstream_url,
+    )
+
     # --- Composite branch -----------------------------------------------
     # ArtifactManager.show() does not handle the "composite" type. For
     # composites we build metadata purely from ImportEntry fields and
     # ensure that the required Artifact row exists before delegating to the
     # shared upsert helper.
     if entry.artifact_type == "composite":
-        # Guarantee the Artifact row exists (collection FK requires it).
-        _ensure_artifact_row(
-            session,
-            artifact_id=artifact_id,
-            artifact_type="composite",
-            artifact_name=entry.name,
-            source=entry.upstream_url,
-        )
-
         # Also create/update the CompositeArtifact record so that the
         # composite is visible through the composite-specific endpoints.
         _upsert_composite_artifact_row(

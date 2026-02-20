@@ -3064,18 +3064,30 @@ async def update_artifact_parameters(
             )
 
             if pending_tag_sync is not None:
-                # Composites live in composite_artifacts table, not artifacts;
-                # sync_artifact_tags() expects an artifact UUID and would fail.
-                if not artifact_id.startswith("composite:"):
-                    try:
-                        from skillmeat.core.services import TagService
+                try:
+                    from skillmeat.core.services import TagService
 
-                        TagService().sync_artifact_tags(artifact_id, pending_tag_sync)
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to sync tag associations for {artifact_id}: {e}",
-                            exc_info=True,
+                    session = get_session()
+                    try:
+                        row = (
+                            session.query(Artifact.uuid)
+                            .filter(Artifact.id == artifact_id)
+                            .first()
                         )
+                    finally:
+                        session.close()
+
+                    if row:
+                        TagService().sync_artifact_tags(row[0], pending_tag_sync)
+                    else:
+                        logger.warning(
+                            f"No artifact row found for {artifact_id}, skipping tag sync"
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to sync tag associations for {artifact_id}: {e}",
+                        exc_info=True,
+                    )
         else:
             logger.info(f"No parameter changes requested for artifact: {artifact_id}")
             message = "No parameters were updated"
@@ -8213,18 +8225,6 @@ async def get_artifact_associations(
                 detail="Invalid artifact ID format. Expected 'type:name'",
             )
 
-        # Resolve collection
-        collection_name = collection or collection_mgr.get_active_collection_name()
-
-        # Verify the artifact exists in the collection (filesystem check)
-        try:
-            coll = collection_mgr.load_collection(collection_name)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Collection '{collection_name}' not found",
-            )
-
         try:
             artifact_type_enum = ArtifactType(artifact_type_str)
         except ValueError:
@@ -8233,11 +8233,28 @@ async def get_artifact_associations(
                 detail=f"Unknown artifact type: '{artifact_type_str}'",
             )
 
-        artifact_obj = coll.find_artifact(artifact_name, artifact_type_enum)
-        if artifact_obj is None:
+        # Resolve collection name/UUID and find artifact on filesystem.
+        # Uses the shared fallback helper so UUIDs and stale collection hints
+        # don't incorrectly return 404.
+        preferred_collection = collection or collection_mgr.get_active_collection_name()
+        artifact_obj, resolved_collection_name = _find_artifact_in_collections(
+            artifact_name=artifact_name,
+            artifact_type=artifact_type_enum,
+            collection_mgr=collection_mgr,
+            preferred_collection=preferred_collection,
+        )
+        if artifact_obj is None or resolved_collection_name is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifact '{artifact_id}' not found in collection '{collection_name}'",
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+        if collection and preferred_collection != resolved_collection_name:
+            logger.warning(
+                "Associations collection fallback: requested '%s', resolved '%s' "
+                "for artifact '%s'",
+                preferred_collection,
+                resolved_collection_name,
+                artifact_id,
             )
 
         # Resolve the collection_id used in the DB (the collection UUID / name key)
@@ -8248,17 +8265,28 @@ async def get_artifact_associations(
         try:
             col_row = (
                 db_session.query(Collection)
-                .filter(Collection.name == collection_name)
+                .filter(Collection.name == resolved_collection_name)
                 .first()
             )
+            if col_row is None and collection is not None:
+                # Backward-compatible fallback when callers provide UUIDs or
+                # human-friendly collection names.
+                col_row = (
+                    db_session.query(Collection)
+                    .filter(
+                        (Collection.id == collection)
+                        | (Collection.name == collection)
+                    )
+                    .first()
+                )
             if col_row is not None:
                 collection_id = col_row.id
         finally:
             db_session.close()
 
-        # Fall back to using the collection name directly if not in DB yet
+        # Fall back to resolved filesystem name when DB row is unavailable.
         if collection_id is None:
-            collection_id = collection_name
+            collection_id = resolved_collection_name
 
         # Query associations via the repository
         repo = CompositeMembershipRepository()
