@@ -1141,24 +1141,12 @@ class HeuristicDetector:
                 sorted(plugin_dirs),
             )
 
-        # Detect single-file artifacts inside containers, then filter out any that
-        # live inside a detected plugin directory (they are plugin members, not
-        # standalone artifacts).
+        # Detect single-file artifacts inside containers.  Plugin member artifacts
+        # are kept so that the Plugin Breakdown UI can discover them via path prefix.
         single_file_matches = self._detect_single_file_artifacts(
             dir_to_files, container_types, root_hint
         )
-        for sfm in single_file_matches:
-            sfm_dir = str(PurePosixPath(sfm.path).parent)
-            if plugin_dirs and any(
-                sfm_dir == pd or sfm_dir.startswith(pd + "/")
-                for pd in plugin_dirs
-            ):
-                logger.debug(
-                    "Skipping single-file artifact %s: inside plugin directory",
-                    sfm.path,
-                )
-                continue
-            matches.append(sfm)
+        matches.extend(single_file_matches)
 
         # Analyze each directory
         for dir_path, files in dir_to_files.items():
@@ -1172,18 +1160,6 @@ class HeuristicDetector:
 
             # Skip if this directory IS a detected plugin (already added above)
             if dir_path in plugin_dirs:
-                continue
-
-            # Skip if this directory is INSIDE a detected plugin.
-            # Plugin member artifacts are expressed through the composite; emitting
-            # them separately would create duplicate entries and inflate counts.
-            if any(
-                dir_path == pd or dir_path.startswith(pd + "/")
-                for pd in plugin_dirs
-            ):
-                logger.debug(
-                    "Skipping %s: descendant of plugin directory", dir_path
-                )
                 continue
 
             # Skip if this is a "grouping directory" for single-file artifacts

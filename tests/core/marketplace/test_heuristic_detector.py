@@ -3197,8 +3197,12 @@ class TestPluginDetection:
     # No double-counting: member artifacts not emitted as individuals
     # ------------------------------------------------------------------
 
-    def test_plugin_members_not_emitted_as_individual_artifacts(self):
-        """Member artifacts inside a plugin are NOT emitted as standalone artifacts."""
+    def test_plugin_members_emitted_alongside_composite(self):
+        """Member artifacts inside a plugin are emitted alongside the composite.
+
+        Both the composite and its member artifacts appear in the catalog so the
+        Plugin Breakdown UI can discover children via path prefix matching.
+        """
         files = [
             "my-plugin/plugin.json",
             "my-plugin/skills/helper/SKILL.md",
@@ -3208,12 +3212,13 @@ class TestPluginDetection:
         ]
         artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
 
-        # Only the composite should appear; member artifacts are suppressed
-        assert len(artifacts) == 1, (
-            f"Expected 1 composite, got {len(artifacts)}: "
+        composites = [a for a in artifacts if a.artifact_type == "composite"]
+        members = [a for a in artifacts if a.artifact_type != "composite"]
+        assert len(composites) == 1
+        assert len(members) >= 1, (
+            f"Expected member artifacts alongside composite, got: "
             f"{[(a.artifact_type, a.path) for a in artifacts]}"
         )
-        assert artifacts[0].artifact_type == "composite"
 
     def test_non_plugin_siblings_still_detected(self):
         """Standalone artifacts next to a plugin are still detected independently."""
@@ -3235,8 +3240,11 @@ class TestPluginDetection:
         composites = [a for a in artifacts if a.artifact_type == "composite"]
         skills = [a for a in artifacts if a.artifact_type == "skill"]
         assert len(composites) == 1
-        assert len(skills) == 1
-        assert skills[0].name == "standalone-skill"
+        # 2 skills: the plugin member + the standalone
+        assert len(skills) == 2
+        skill_names = {s.name for s in skills}
+        assert "standalone-skill" in skill_names
+        assert "helper" in skill_names
 
     # ------------------------------------------------------------------
     # Multiple plugins in one repository
@@ -3334,10 +3342,10 @@ class TestPluginDetection:
             f"{[c.path for c in composites]}"
         )
 
-        # No individual member artifacts should leak through
+        # Member artifacts are emitted alongside composites for Plugin Breakdown UI
         non_composites = [a for a in artifacts if a.artifact_type != "composite"]
-        assert len(non_composites) == 0, (
-            f"Expected no member artifacts, got: "
+        assert len(non_composites) >= 5, (
+            f"Expected member artifacts alongside composites, got: "
             f"{[(a.artifact_type, a.path) for a in non_composites]}"
         )
 
@@ -3439,8 +3447,8 @@ class TestPluginDetection:
         assert composites[0].name == "discovery-questionnaire"
         assert composites[0].confidence_score == 98
 
-    def test_claude_plugin_dir_members_suppressed(self):
-        """Member artifacts inside a .claude-plugin-based plugin are NOT emitted."""
+    def test_claude_plugin_dir_members_emitted(self):
+        """Member artifacts inside a .claude-plugin-based plugin are emitted alongside composite."""
         files = [
             "my-plugin/.claude-plugin/plugin.json",
             "my-plugin/skills/helper/SKILL.md",
@@ -3450,12 +3458,13 @@ class TestPluginDetection:
         ]
         artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
 
-        # Only the composite should appear; member artifacts are suppressed
-        assert len(artifacts) == 1, (
-            f"Expected 1 composite, got {len(artifacts)}: "
+        composites = [a for a in artifacts if a.artifact_type == "composite"]
+        members = [a for a in artifacts if a.artifact_type != "composite"]
+        assert len(composites) == 1
+        assert len(members) >= 1, (
+            f"Expected member artifacts alongside composite, got: "
             f"{[(a.artifact_type, a.path) for a in artifacts]}"
         )
-        assert artifacts[0].artifact_type == "composite"
 
     def test_multiple_claude_plugin_dirs_in_category(self):
         """Multiple plugins in one category directory are each detected."""
