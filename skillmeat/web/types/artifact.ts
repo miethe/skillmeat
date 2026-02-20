@@ -166,6 +166,12 @@ export interface Artifact {
   /** Artifact type: skill, command, agent, mcp, hook, or composite */
   type: ArtifactType;
 
+  /**
+   * Sub-type for composite artifacts (plugin, stack, suite).
+   * Only present when type === 'composite'.
+   */
+  compositeType?: 'plugin' | 'stack' | 'suite';
+
   // ============================================================================
   // Context (supports collection OR project scope)
   // ============================================================================
@@ -357,6 +363,16 @@ export interface ArtifactFormSchema {
 }
 
 /**
+ * Sub-type option for composite artifact filtering.
+ */
+export interface ArtifactSubtype {
+  /** Sub-type value (e.g., 'plugin', 'stack', 'suite') or 'all' */
+  value: string;
+  /** Display label for this sub-type */
+  label: string;
+}
+
+/**
  * Configuration for a specific artifact type.
  * Defines UI presentation, form fields, and validation requirements.
  */
@@ -375,6 +391,8 @@ export interface ArtifactTypeConfig {
   requiredFile: string;
   /** Form field schema for creation/editing */
   formSchema: ArtifactFormSchema;
+  /** Optional sub-type options (only for types that support sub-type filtering, e.g., composite) */
+  subtypes?: ArtifactSubtype[];
 }
 
 /**
@@ -593,11 +611,17 @@ export const ARTIFACT_TYPES: Record<ArtifactType, ArtifactTypeConfig> = {
   },
   composite: {
     type: 'composite',
-    label: 'Plugin',
-    pluralLabel: 'Plugins',
+    label: 'Composite',
+    pluralLabel: 'Composites',
     icon: 'Blocks',
     color: 'text-indigo-500',
     requiredFile: 'PLUGIN.md',
+    subtypes: [
+      { value: 'all', label: 'All' },
+      { value: 'plugin', label: 'Plugins' },
+      { value: 'stack', label: 'Stacks' },
+      { value: 'suite', label: 'Suites' },
+    ],
     formSchema: {
       fields: [
         {
@@ -612,7 +636,7 @@ export const ARTIFACT_TYPES: Record<ArtifactType, ArtifactTypeConfig> = {
           label: 'Description',
           type: 'textarea',
           required: false,
-          placeholder: 'What does this plugin do?',
+          placeholder: 'What does this composite do?',
         },
         {
           name: 'tags',

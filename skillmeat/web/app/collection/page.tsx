@@ -143,6 +143,7 @@ function CollectionPageContent() {
   // Read filter state from URL params (single source of truth)
   const urlSearch = searchParams.get('search') || '';
   const urlType = searchParams.get('type') || 'all';
+  const urlSubtype = searchParams.get('subtype') || 'all';
   const urlSort = searchParams.get('sort') || 'confidence';
   const urlOrder = (searchParams.get('order') as 'asc' | 'desc') || 'desc';
   const filterMode: FilterMode = (searchParams.get('filterMode') as FilterMode) || 'and';
@@ -495,6 +496,18 @@ function CollectionPageContent() {
     (type: 'all' | ArtifactFilters['type']) => {
       updateUrlParams({
         type: type && type !== 'all' ? type : null,
+        // Clear subtype when switching away from composite
+        subtype: type === 'composite' ? urlSubtype !== 'all' ? urlSubtype : null : null,
+      });
+    },
+    [updateUrlParams, urlSubtype]
+  );
+
+  // Handle composite sub-type changes
+  const handleCompositeSubtypeChange = useCallback(
+    (subtype: string) => {
+      updateUrlParams({
+        subtype: subtype !== 'all' ? subtype : null,
       });
     },
     [updateUrlParams]
@@ -636,6 +649,11 @@ function CollectionPageContent() {
       artifacts = artifacts.filter((artifact) => artifact.type === filters.type);
     }
 
+    // Composite sub-type filter (only applies when type === 'composite' and subtype is not 'all')
+    if (filters.type === 'composite' && urlSubtype && urlSubtype !== 'all') {
+      artifacts = artifacts.filter((artifact) => artifact.compositeType === urlSubtype);
+    }
+
     // Search is always AND (narrows results regardless of filter mode)
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -697,6 +715,7 @@ function CollectionPageContent() {
     selectedPlatforms,
     selectedGroups,
     filterMode,
+    urlSubtype,
   ]);
 
   // Compute available tags from artifacts matching current filters (excluding tag filter)
@@ -1100,6 +1119,8 @@ function CollectionPageContent() {
         <ArtifactTypeTabs
           value={urlType as 'all' | ArtifactFilters['type']}
           onChange={handleTypeTabChange}
+          compositeSubtype={urlSubtype}
+          onCompositeSubtypeChange={handleCompositeSubtypeChange}
         />
       </div>
 
