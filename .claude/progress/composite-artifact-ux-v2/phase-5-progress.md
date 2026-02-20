@@ -6,7 +6,7 @@ prd: composite-artifact-ux-v2
 feature_slug: composite-artifact-ux-v2
 phase: 5
 title: CLI Integration + Polish
-status: pending
+status: completed
 created: '2026-02-19'
 updated: '2026-02-19'
 prd_ref: docs/project_plans/PRDs/features/composite-artifact-ux-v2.md
@@ -14,7 +14,7 @@ plan_ref: docs/project_plans/implementation_plans/features/composite-artifact-ux
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 3
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -45,7 +45,7 @@ tasks:
 - id: CUX-P5-03
   description: Write CLI integration tests for list and composite create commands
     (happy path + error cases)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -55,7 +55,7 @@ tasks:
 - id: CUX-P5-04
   description: Update skillmeat --help to document composite command group and create
     subcommand
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -106,7 +106,7 @@ success_criteria:
   description: CHANGELOG updated and accurate
   status: pending
 files_modified: []
-progress: 60
+progress: 100
 ---
 # Phase 5: CLI Integration + Polish
 
