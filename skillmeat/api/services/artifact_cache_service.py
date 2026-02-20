@@ -1012,3 +1012,302 @@ def remove_deployment_from_cache(
         except Exception:
             pass
         return False
+
+
+# =============================================================================
+# FS → DB Recovery (MP-3.x) — restore tags and groups from collection.toml
+# after a DB reset / cold start.
+# =============================================================================
+
+
+def recover_collection_metadata(
+    session: Session,
+    collection_id: str,
+    collection_path: "Path",  # type: ignore[name-defined]  # noqa: F821
+) -> dict:
+    """Recover tag definitions and groups from collection.toml into the DB.
+
+    This function implements the FS → DB recovery flow described in MP-3.x.
+    It should be called after artifact rows have been populated in the DB so
+    that group member name → artifact UUID resolution can succeed.
+
+    Conflict resolution (DB-authoritative during normal operation):
+    - **Tag definitions**: only imported from TOML when the ``tags`` table
+      contains zero rows that have a non-null color.  If any colored tag exists
+      in the DB the DB is considered authoritative and tags are left unchanged.
+    - **Groups**: only imported from TOML when the ``groups`` table contains
+      zero rows for this ``collection_id``.  If any group already exists the DB
+      is considered authoritative and groups are left unchanged.
+
+    Member resolution failures for groups are logged as warnings but do NOT
+    block the rest of recovery (MP-3.3).
+
+    Args:
+        session: Active SQLAlchemy session (commits performed internally).
+        collection_id: DB primary key of the target collection.
+        collection_path: Filesystem ``Path`` to the collection directory
+            (the directory that contains ``collection.toml``).
+
+    Returns:
+        Dict with recovery statistics:
+        - ``tags_recovered`` (int): number of Tag rows created/updated
+        - ``groups_recovered`` (int): number of Group rows created
+        - ``members_recovered`` (int): number of GroupArtifact rows created
+        - ``members_skipped`` (int): member names that could not be resolved
+        - ``skipped_reason`` (str | None): short human-readable reason if a
+          section was skipped entirely (e.g. "db_authoritative")
+    """
+    # Lazy imports to avoid circular dependencies at module load time.
+    from pathlib import Path as _Path
+
+    from skillmeat.storage.manifest import ManifestManager
+
+    stats: dict = {
+        "tags_recovered": 0,
+        "groups_recovered": 0,
+        "members_recovered": 0,
+        "members_skipped": 0,
+        "skipped_reason": None,
+    }
+
+    collection_path = _Path(collection_path)
+    toml_path = collection_path / "collection.toml"
+
+    if not toml_path.exists():
+        logger.debug(
+            "recover_collection_metadata: collection.toml not found at %s; skipping",
+            toml_path,
+        )
+        stats["skipped_reason"] = "no_collection_toml"
+        return stats
+
+    # Read the manifest.
+    try:
+        manifest_mgr = ManifestManager()
+        core_collection = manifest_mgr.read(collection_path)
+    except Exception as exc:
+        logger.warning(
+            "recover_collection_metadata: failed to read collection.toml at %s: %s",
+            toml_path,
+            exc,
+        )
+        stats["skipped_reason"] = "toml_read_error"
+        return stats
+
+    # ------------------------------------------------------------------
+    # MP-3.1: Recover tag definitions
+    # ------------------------------------------------------------------
+    _recover_tag_definitions(session, core_collection, stats)
+
+    # ------------------------------------------------------------------
+    # MP-3.2 + MP-3.3: Recover groups (with member resolution)
+    # ------------------------------------------------------------------
+    _recover_groups(session, collection_id, core_collection, stats)
+
+    return stats
+
+
+def _recover_tag_definitions(
+    session: Session,
+    core_collection,
+    stats: dict,
+) -> None:
+    """Import tag definitions from collection TOML into the Tag table.
+
+    Only runs when the tags table has no rows with a non-null color (i.e. after
+    a DB reset before any tag has been colored via the UI).
+    """
+    from skillmeat.cache.models import Tag
+
+    if not core_collection.tag_definitions:
+        return
+
+    # Guard: DB-authoritative if any colored tag already exists.
+    colored_tag_count = (
+        session.query(Tag).filter(Tag.color.isnot(None)).count()
+    )
+    if colored_tag_count > 0:
+        logger.debug(
+            "recover_collection_metadata: %d colored tag(s) exist in DB; "
+            "skipping tag recovery (DB authoritative)",
+            colored_tag_count,
+        )
+        return
+
+    for tag_def in core_collection.tag_definitions:
+        if not tag_def.name or not tag_def.slug:
+            logger.warning(
+                "recover_collection_metadata: tag definition missing name or slug "
+                "(name=%r, slug=%r); skipping",
+                tag_def.name,
+                tag_def.slug,
+            )
+            continue
+
+        # Normalise the color: only store 7-char hex strings.
+        color: Optional[str] = None
+        if tag_def.color and tag_def.color.startswith("#") and len(tag_def.color) == 7:
+            color = tag_def.color
+        elif tag_def.color:
+            logger.warning(
+                "recover_collection_metadata: tag '%s' has invalid color %r; "
+                "storing as NULL",
+                tag_def.name,
+                tag_def.color,
+            )
+
+        try:
+            existing = (
+                session.query(Tag).filter(Tag.slug == tag_def.slug).first()
+            )
+            if existing is None:
+                new_tag = Tag(
+                    name=tag_def.name,
+                    slug=tag_def.slug,
+                    color=color,
+                )
+                session.add(new_tag)
+                stats["tags_recovered"] += 1
+            else:
+                # Update color if TOML has one and DB row lacks it.
+                if color is not None and existing.color is None:
+                    existing.color = color
+                    stats["tags_recovered"] += 1
+        except Exception as exc:
+            logger.warning(
+                "recover_collection_metadata: failed to upsert tag '%s': %s",
+                tag_def.name,
+                exc,
+            )
+            continue
+
+    if stats["tags_recovered"] > 0:
+        try:
+            session.commit()
+            logger.info(
+                "recover_collection_metadata: recovered %d tag definition(s) from TOML",
+                stats["tags_recovered"],
+            )
+        except Exception as exc:
+            logger.warning(
+                "recover_collection_metadata: failed to commit tag recovery: %s", exc
+            )
+            session.rollback()
+            stats["tags_recovered"] = 0
+
+
+def _recover_groups(
+    session: Session,
+    collection_id: str,
+    core_collection,
+    stats: dict,
+) -> None:
+    """Import group definitions (and memberships) from TOML into the DB.
+
+    Only runs when the ``groups`` table has zero rows for this collection_id.
+    Member resolution failures are warned but do not block other members or
+    groups (MP-3.3).
+    """
+    from skillmeat.cache.models import Artifact, Group, GroupArtifact
+
+    if not core_collection.groups:
+        return
+
+    # Guard: DB-authoritative if any group already exists for this collection.
+    existing_group_count = (
+        session.query(Group).filter_by(collection_id=collection_id).count()
+    )
+    if existing_group_count > 0:
+        logger.debug(
+            "recover_collection_metadata: %d group(s) already exist in DB for "
+            "collection %s; skipping group recovery (DB authoritative)",
+            existing_group_count,
+            collection_id,
+        )
+        return
+
+    # Build a name→uuid lookup to resolve member names efficiently.
+    # Members in the TOML are stored as type:name strings (Artifact.id).
+    artifact_uuid_map: dict = {
+        row[0]: row[1]
+        for row in session.query(Artifact.id, Artifact.uuid).all()
+    }
+
+    for group_def in core_collection.groups:
+        if not group_def.name:
+            logger.warning(
+                "recover_collection_metadata: group definition missing name; skipping"
+            )
+            continue
+
+        try:
+            new_group = Group(
+                collection_id=collection_id,
+                name=group_def.name,
+                description=group_def.description or None,
+                color=group_def.color or "slate",
+                icon=group_def.icon or "layers",
+                position=group_def.position,
+            )
+            session.add(new_group)
+            session.flush()  # obtain new_group.id before creating GroupArtifact rows
+            stats["groups_recovered"] += 1
+        except Exception as exc:
+            logger.warning(
+                "recover_collection_metadata: failed to create group '%s': %s",
+                group_def.name,
+                exc,
+            )
+            session.rollback()
+            continue
+
+        # Resolve and create GroupArtifact memberships.
+        for position, member_name in enumerate(group_def.members):
+            artifact_uuid = artifact_uuid_map.get(member_name)
+            if artifact_uuid is None:
+                logger.warning(
+                    "recover_collection_metadata: group '%s' references artifact "
+                    "'%s' which was not found in the DB; skipping member (MP-3.3)",
+                    group_def.name,
+                    member_name,
+                )
+                stats["members_skipped"] += 1
+                continue
+
+            try:
+                ga = GroupArtifact(
+                    group_id=new_group.id,
+                    artifact_uuid=artifact_uuid,
+                    position=position,
+                )
+                session.add(ga)
+                stats["members_recovered"] += 1
+            except Exception as exc:
+                logger.warning(
+                    "recover_collection_metadata: failed to add member '%s' to "
+                    "group '%s': %s",
+                    member_name,
+                    group_def.name,
+                    exc,
+                )
+                stats["members_skipped"] += 1
+                continue
+
+    if stats["groups_recovered"] > 0:
+        try:
+            session.commit()
+            logger.info(
+                "recover_collection_metadata: recovered %d group(s) with "
+                "%d member(s) from TOML (%d member(s) skipped)",
+                stats["groups_recovered"],
+                stats["members_recovered"],
+                stats["members_skipped"],
+            )
+        except Exception as exc:
+            logger.warning(
+                "recover_collection_metadata: failed to commit group recovery: %s",
+                exc,
+            )
+            session.rollback()
+            stats["groups_recovered"] = 0
+            stats["members_recovered"] = 0
