@@ -29,7 +29,7 @@ from skillmeat.api.services.artifact_cache_service import (
     populate_collection_artifact_from_import,
 )
 from skillmeat.api.utils.cache import get_cache_manager
-from skillmeat.cache.models import get_session
+from skillmeat.cache.models import Artifact as ArtifactModel, CompositeMembership, get_session
 from skillmeat.core.sharing.bundle import Bundle
 from skillmeat.core.sharing.importer import BundleImporter
 from skillmeat.marketplace.broker import (
@@ -613,6 +613,90 @@ async def install_listing(
                     logger.info(
                         f"Synced {synced_count}/{len(artifact_names)} artifacts to DB cache"
                     )
+
+                    # ------------------------------------------------------------------
+                    # Create CompositeMembership rows for composite/plugin bundles.
+                    # All Artifact rows must exist before this block runs (populated
+                    # above via populate_collection_artifact_from_import).
+                    # ------------------------------------------------------------------
+                    collection_id = "default"
+
+                    composite_artifacts = [
+                        a
+                        for a in result.imported_artifacts
+                        if a.type == "composite"
+                        and a.resolution in ("imported", "forked", "merged")
+                    ]
+
+                    for composite_art in composite_artifacts:
+                        composite_name = composite_art.new_name or composite_art.name
+                        composite_id = f"composite:{composite_name}"
+
+                        # Children = all other non-composite artifacts in the same import
+                        children = [
+                            a
+                            for a in result.imported_artifacts
+                            if a.type != "composite"
+                            and a.resolution in ("imported", "forked", "merged")
+                        ]
+
+                        membership_count = 0
+                        for idx, child in enumerate(children):
+                            child_name = child.new_name or child.name
+                            child_artifact_id = f"{child.type}:{child_name}"
+
+                            # Resolve stable UUID from the Artifact table
+                            artifact_row = (
+                                db_session.query(ArtifactModel)
+                                .filter(ArtifactModel.id == child_artifact_id)
+                                .first()
+                            )
+
+                            if artifact_row is None:
+                                logger.warning(
+                                    f"CompositeMembership: artifact row not found for "
+                                    f"'{child_artifact_id}', skipping"
+                                )
+                                continue
+
+                            # Upsert membership row
+                            existing = (
+                                db_session.query(CompositeMembership)
+                                .filter(
+                                    CompositeMembership.collection_id == collection_id,
+                                    CompositeMembership.composite_id == composite_id,
+                                    CompositeMembership.child_artifact_uuid
+                                    == artifact_row.uuid,
+                                )
+                                .first()
+                            )
+
+                            if existing is None:
+                                membership = CompositeMembership(
+                                    collection_id=collection_id,
+                                    composite_id=composite_id,
+                                    child_artifact_uuid=artifact_row.uuid,
+                                    relationship_type="contains",
+                                    pinned_version_hash=None,
+                                    position=idx,
+                                )
+                                db_session.add(membership)
+                                membership_count += 1
+                            else:
+                                # Already linked; update position in case ordering changed
+                                existing.position = idx
+
+                        try:
+                            db_session.flush()
+                            logger.info(
+                                f"Created {membership_count} CompositeMembership rows "
+                                f"for composite '{composite_id}'"
+                            )
+                        except Exception as mem_err:
+                            logger.warning(
+                                f"CompositeMembership flush failed for '{composite_id}': "
+                                f"{mem_err}"
+                            )
                 finally:
                     db_session.close()
             except Exception as e:

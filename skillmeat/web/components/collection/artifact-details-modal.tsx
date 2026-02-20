@@ -86,6 +86,7 @@ import type { ArtifactDeploymentInfo } from '@/types/deployments';
 import type { Deployment } from '@/components/deployments/deployment-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PluginMembersTab } from '@/components/entity/plugin-members-tab';
+import { useArtifactAssociations } from '@/hooks';
 
 // ============================================================================
 // Types
@@ -657,6 +658,19 @@ export function ArtifactDetailsModal({
   const compositeCollectionId = artifact?.collections?.[0]?.id ?? artifact?.collection ?? 'default';
 
   // ==========================================================================
+  // Associations Data (parent composite lookup for the Links tab)
+  // ==========================================================================
+
+  // Only fetch associations when the Links tab is active to avoid unnecessary requests.
+  const {
+    data: associationsData,
+    isLoading: isAssociationsLoading,
+  } = useArtifactAssociations(
+    artifact?.id ?? '',
+    compositeCollectionId
+  );
+
+  // ==========================================================================
   // Deployment Data Fetching
   // ==========================================================================
 
@@ -1202,23 +1216,99 @@ export function ArtifactDetailsModal({
 
             {/* Links Tab */}
             <TabContentWrapper value="links">
-              <LinkedArtifactsSection
-                artifactId={artifact.id}
-                linkedArtifacts={linkedArtifactsData?.linked_artifacts || []}
-                unlinkedReferences={linkedArtifactsData?.unlinked_references || []}
-                onLinkCreated={handleLinkChange}
-                onLinkDeleted={handleLinkChange}
-                onAddLinkClick={() => setShowLinkingDialog(true)}
-                isLoading={isLinkedArtifactsLoading}
-                error={
-                  linkedArtifactsError instanceof Error
-                    ? linkedArtifactsError.message
-                    : linkedArtifactsError
-                      ? 'Failed to load linked artifacts'
-                      : null
-                }
-                onRetry={() => refetchLinkedArtifacts()}
-              />
+              <div className="space-y-8">
+                {/* Parent Composites Section — shown when artifact belongs to one or more plugins */}
+                {(isAssociationsLoading || (associationsData?.parents && associationsData.parents.length > 0)) && (
+                  <section aria-labelledby="parent-composites-heading">
+                    <div className="mb-3 flex items-center gap-2">
+                      <Blocks className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      <h3 id="parent-composites-heading" className="text-sm font-medium">
+                        Member of Plugin
+                        {!isAssociationsLoading && associationsData?.parents && associationsData.parents.length > 0 && (
+                          <span className="ml-2 text-sm font-normal text-muted-foreground">
+                            ({associationsData.parents.length})
+                          </span>
+                        )}
+                      </h3>
+                    </div>
+
+                    {isAssociationsLoading ? (
+                      <div
+                        className="grid gap-3 sm:grid-cols-2"
+                        aria-busy="true"
+                        aria-label="Loading parent plugins"
+                      >
+                        {[1, 2].map((i) => (
+                          <div
+                            key={i}
+                            className="animate-pulse rounded-lg border p-4"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="h-8 w-8 rounded-md bg-muted" />
+                              <div className="flex-1 space-y-2">
+                                <div className="h-4 w-32 rounded bg-muted" />
+                                <div className="h-3 w-20 rounded bg-muted" />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div
+                        className="grid gap-3 sm:grid-cols-2"
+                        role="list"
+                        aria-label="Parent plugin artifacts"
+                      >
+                        {associationsData!.parents.map((parent) => (
+                          <div
+                            key={parent.artifact_id}
+                            className="group rounded-lg border p-4 transition-colors hover:bg-muted/50"
+                            role="listitem"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+                                <Blocks className="h-4 w-4 text-primary" aria-hidden="true" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium">
+                                  {parent.artifact_name}
+                                </p>
+                                <div className="mt-0.5 flex items-center gap-1.5">
+                                  <Badge variant="secondary" className="text-xs">
+                                    {parent.artifact_type}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-xs">
+                                    {parent.relationship_type}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                )}
+
+                {/* Existing Linked Artifacts Section */}
+                <LinkedArtifactsSection
+                  artifactId={artifact.id}
+                  linkedArtifacts={linkedArtifactsData?.linked_artifacts || []}
+                  unlinkedReferences={linkedArtifactsData?.unlinked_references || []}
+                  onLinkCreated={handleLinkChange}
+                  onLinkDeleted={handleLinkChange}
+                  onAddLinkClick={() => setShowLinkingDialog(true)}
+                  isLoading={isLinkedArtifactsLoading}
+                  error={
+                    linkedArtifactsError instanceof Error
+                      ? linkedArtifactsError.message
+                      : linkedArtifactsError
+                        ? 'Failed to load linked artifacts'
+                        : null
+                  }
+                  onRetry={() => refetchLinkedArtifacts()}
+                />
+              </div>
             </TabContentWrapper>
 
             {/* Collections Tab */}
