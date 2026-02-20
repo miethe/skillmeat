@@ -25,7 +25,19 @@ research_questions:
 
 ## Executive Summary
 
-Composite artifacts (plugins, stacks, suites) currently live in a separate `composite_artifacts` table with `composite:name` IDs and **no row in the main `artifacts` table** at import time. This means relational features that join on `artifacts.uuid` (tags, groups, ratings, deployments, collection membership) do not work for composites without special-casing. We already have one such patch (tag sync skip in `artifacts.py:3066-3075`). This SPIKE recommends giving every composite a first-class row in the `artifacts` table (with `type = "composite"`) and retaining `composite_artifacts` as a detail/extension table, connected via a foreign key to the artifact's UUID. This is conceptually "joined table inheritance" though we recommend implementing it as a **manual FK join** rather than SQLAlchemy's built-in `__mapper_args__` inheritance, to avoid complexity and maintain backward compatibility.
+Composite artifacts (plugins, stacks, suites) currently live in a separate `composite_artifacts` table with `composite:name` IDs. **Imported composites DO get rows in the main `artifacts` table** via `_ensure_artifact_row()`, but **locally-created composites** (via `CompositeMembershipRepository.create_composite()`) do not. This means relational features that join on `artifacts.uuid` (tags, groups, ratings, deployments, collection membership) do not work for locally-created composites without special-casing. Additionally, the tag sync failure was caused by an independent bug: `update_artifact_parameters` was passing `artifact_id` (type:name format like `composite:git-commit-smart`) instead of `artifact_uuid` (32-char hex) to `sync_artifact_tags()`, affecting ALL artifacts, not just composites.
+
+This SPIKE recommends:
+1. Ensuring all composites (both imported and locally-created) have first-class rows in the `artifacts` table (with `type = "composite"`)
+2. Retaining `composite_artifacts` as a detail/extension table, connected via FK to the artifact's UUID
+3. Implementing this as a **manual FK join** rather than SQLAlchemy's built-in `__mapper_args__` inheritance, to avoid complexity and maintain backward compatibility
+
+## Scope Clarification: Smaller Than Originally Estimated
+
+The actual scope is smaller than initially estimated (9-13 hours → 6-9 hours) because:
+- **Tag sync bug was independent**: The root cause was ID format mismatch (`artifact_id` vs `artifact_uuid`), already fixed in commit 9b5657b — not related to composites lacking Artifact rows
+- **Imported composites already have Artifact rows**: Commit 9b5657b moved `_ensure_artifact_row()` before the composite branch in `populate_collection_artifact_from_import()`, ensuring all imported artifact types get an Artifact row and properly linking child memberships
+- **Remaining work is focused**: (a) locally-created composites need Artifact rows, (b) add `artifact_uuid` FK on `composite_artifacts` for data integrity, (c) establish model relationships
 
 ## Research Scope and Objectives
 
@@ -52,7 +64,9 @@ Composite artifacts (plugins, stacks, suites) currently live in a separate `comp
 | **Relational features** | Tags, groups, ratings, collections, versions, deployments | Memberships only |
 | **Collection join** | `collection_artifacts.artifact_uuid` -> `artifacts.uuid` | Direct `collection_id` field |
 
-**Key observation**: The `_ensure_artifact_row()` function in `artifact_cache_service.py:82-124` **already creates an `Artifact` row** for composites during marketplace import. This means imported composites DO have an `artifacts` row (with `type="composite"`, a UUID, and `project_id="__collection_artifacts__"`). However, locally-created composites via `CompositeMembershipRepository.create_composite()` do NOT create an `Artifact` row -- they only create a `composite_artifacts` row.
+**Key observation**: The `_ensure_artifact_row()` function in `artifact_cache_service.py:82-124` **already creates an `Artifact` row** for all imported artifacts during marketplace import. Commit `9b5657beb31e` ("Fix composite artifact linking") moved this function call before the composite branch in `populate_collection_artifact_from_import()`, ensuring all imported artifact types (including composites) get an Artifact row with a proper UUID. The same commit also fixed child membership linking to only associate successfully imported children.
+
+This means **imported composites DO have an `artifacts` row** (with `type="composite"`, a UUID, and `project_id="__collection_artifacts__"`). However, **locally-created composites** via `CompositeMembershipRepository.create_composite()` do NOT create an `Artifact` row -- they only create a `composite_artifacts` row.
 
 ### What Currently Works
 
@@ -65,7 +79,7 @@ Composite artifacts (plugins, stacks, suites) currently live in a separate `comp
 
 | Feature | Broken For | Root Cause | Current Workaround |
 |---------|-----------|------------|-------------------|
-| **Tag sync** | All composites via parameter editor | `sync_artifact_tags()` needs `artifacts.uuid`; composites may not have one | Skip tag sync for `composite:*` IDs (`artifacts.py:3067-3069`) |
+| **Tag sync** | All artifacts via parameter editor | `update_artifact_parameters` passed `artifact_id` (type:name format like `composite:git-commit-smart`) instead of `artifact_uuid` (32-char hex) to `sync_artifact_tags()` — ID format mismatch affected ALL artifacts, not just composites | Resolved in commit 9b5657b: `artifact_id` is now resolved to `artifact_uuid` via DB lookup before calling `sync_artifact_tags()` |
 | **Group membership** | Locally-created composites | `group_artifacts.artifact_uuid` -> `artifacts.uuid` FK; no artifact row exists | None (silently fails) |
 | **Ratings** | Composites | `user_ratings.artifact_id` uses string ID (not FK, but queries expect artifact existence) | None |
 | **Deployments** | Composites | Deployment tracking references artifact identity | Manual path-based workaround |
@@ -74,7 +88,7 @@ Composite artifacts (plugins, stacks, suites) currently live in a separate `comp
 
 ### Existing Workarounds Identified
 
-1. **Tag sync skip** (`skillmeat/api/routers/artifacts.py:3066-3075`): `if not artifact_id.startswith("composite:")` guards tag sync.
+1. **Tag sync UUID resolution** (`skillmeat/api/routers/artifacts.py:3066-3075`): Properly resolves `artifact_id` to `artifact_uuid` via DB lookup before calling `sync_artifact_tags()` — this is the correct permanent fix, not a skip.
 2. **ArtifactManager skip** (`skillmeat/api/services/artifact_cache_service.py:350-351`): "For composite artifacts, `artifact_mgr.show()` is skipped entirely because the ArtifactManager does not understand the composite type."
 3. **CLI composite filter** (`skillmeat/cli.py:325-326`): `skip_regular = composite_filter` -- composites are queried separately from regular artifacts.
 4. **Sharing bundle skip** (`skillmeat/core/sharing/bundle.py:515`): Composite children with no files are skipped.
@@ -297,10 +311,10 @@ Frontend changes are minimal because composites already show up in the collectio
 
 #### API Layer (Low Impact)
 
-- **Remove workaround**: `artifacts.py:3066-3075` tag sync skip can be deleted
+- **Tag sync**: Already properly fixed in commit 9b5657b via UUID resolution — no removal action needed
 - **Composite endpoints** (`/api/v1/composites`): No change needed (still query `composite_artifacts`)
-- **Artifact endpoints** (`/api/v1/artifacts`): Composites already appear (they have `Artifact` rows); no change
-- **Association endpoint** (`/api/v1/artifacts/{id}/associations`): Will work for composites once they have proper UUID
+- **Artifact endpoints** (`/api/v1/artifacts`): Composites already appear (they have `Artifact` rows for imported ones); will be universal after locally-created composites get Artifact rows
+- **Association endpoint** (`/api/v1/artifacts/{id}/associations`): Will work for all composites once all have proper UUID FKs
 
 #### Frontend (Minimal Impact)
 
@@ -313,11 +327,11 @@ Frontend changes are minimal because composites already show up in the collectio
 
 ### Patch Cleanup Inventory
 
-After this refactor, the following workarounds can be removed:
+After this refactor, the following workarounds can be reviewed:
 
 | Location | Lines | Description | Action |
 |----------|-------|-------------|--------|
-| `skillmeat/api/routers/artifacts.py` | 3067-3069 | `if not artifact_id.startswith("composite:")` tag sync skip | **Remove** |
+| `skillmeat/api/routers/artifacts.py` | 3066-3075 | UUID resolution for `sync_artifact_tags()` | **Already fixed properly** — no action needed. This resolves `artifact_id` to `artifact_uuid` before calling the sync function, which is the correct permanent fix (not a skip). |
 | `skillmeat/api/services/artifact_cache_service.py` | 350-426 | Entire composite branch in `populate_collection_artifact_from_import()` | **Simplify** (still needs special handling for ArtifactManager.show(), but FK linking should be cleaner) |
 | `skillmeat/cli.py` | 325-326 | `skip_regular = composite_filter` | **Review** (may still be needed for CLI listing behavior) |
 
@@ -335,8 +349,8 @@ After this refactor, the following workarounds can be removed:
 
 - [ ] Every `CompositeArtifact` row has a corresponding `Artifact` row with valid UUID
 - [ ] `composite_artifacts.artifact_uuid` FK is NOT NULL and UNIQUE with CASCADE
-- [ ] Tag sync works for composites without any `startsWith("composite:")` guard
-- [ ] Group assignment works for composites
+- [ ] Tag sync continues to work for all artifacts (already fixed via UUID resolution in commit 9b5657b)
+- [ ] Group assignment works for locally-created composites
 - [ ] Locally-created plugins via `CreatePluginDialog` produce both `Artifact` and `CompositeArtifact` rows
 - [ ] Marketplace-imported composites continue to work identically
 - [ ] All existing E2E tests pass (`composite-artifacts.spec.ts`, `marketplace-composite-import.spec.ts`, `plugin-management.spec.ts`)
@@ -346,15 +360,15 @@ After this refactor, the following workarounds can be removed:
 
 | Phase | Tasks | Estimated Effort | Assigned To |
 |-------|-------|-----------------|-------------|
-| **Phase 1: Migration** | Alembic migration with data backfill | 2-3 hours | `data-layer-expert` |
+| **Phase 1: Migration** | Alembic migration with data backfill | 1.5-2 hours | `data-layer-expert` |
 | **Phase 2: Model Updates** | Add `artifact_uuid` to `CompositeArtifact`, relationships | 1 hour | `python-backend-engineer` |
-| **Phase 3: Repository Updates** | Update `create_composite()`, extract shared `_ensure_artifact_row` | 2 hours | `python-backend-engineer` |
-| **Phase 4: Workaround Cleanup** | Remove tag sync skip, simplify cache service | 1 hour | `python-backend-engineer` |
-| **Phase 5: Testing** | Migration test, integration tests for tag/group/composite flow | 2-3 hours | `python-backend-engineer` |
-| **Phase 6: Frontend Validation** | Verify collection page, tag editor, group assignment | 1 hour | `ui-engineer-enhanced` |
-| **Total** | | **9-13 hours** | |
+| **Phase 3: Repository Updates** | Update `create_composite()`, extract shared `_ensure_artifact_row` | 1.5-2 hours | `python-backend-engineer` |
+| **Phase 4: Service Cleanup** | Update cache service to set `artifact_uuid` on composite rows (tag sync already fixed) | 0.5 hour | `python-backend-engineer` |
+| **Phase 5: Testing** | Migration test, integration tests for group/composite flow | 1.5-2 hours | `python-backend-engineer` |
+| **Phase 6: Frontend Validation** | Verify collection page, group assignment for locally-created composites | 0.5 hour | `ui-engineer-enhanced` |
+| **Total** | | **6-9 hours** | |
 
-**Confidence level**: High (builds on existing patterns; most infrastructure already exists).
+**Confidence level**: High (builds on existing patterns; most infrastructure already exists; tag sync bug was independent and already fixed).
 
 ## Dependencies and Prerequisites
 
@@ -397,7 +411,7 @@ After this refactor, the following workarounds can be removed:
 - [ ] Update `artifact_cache_service._upsert_composite_artifact_row()` to set `artifact_uuid`
 
 ### API Layer
-- [ ] Remove tag sync skip in `artifacts.py:3066-3075`
+- [ ] Verify tag sync still works for all artifacts (UUID resolution is properly implemented)
 - [ ] Simplify composite branch in `populate_collection_artifact_from_import()`
 - [ ] Verify `/api/v1/composites` endpoints still work
 
