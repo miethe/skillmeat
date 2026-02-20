@@ -553,7 +553,7 @@ class CreateSourceRequest(BaseModel):
         description="Treat the entire repository (or root_hint directory) as a single artifact, bypassing automatic detection",
     )
     single_artifact_type: Optional[
-        Literal["skill", "command", "agent", "mcp_server", "hook"]
+        Literal["skill", "command", "agent", "mcp_server", "hook", "composite"]
     ] = Field(
         default=None,
         description="Artifact type when single_artifact_mode is enabled (required when mode is True)",
@@ -1102,7 +1102,7 @@ class SourceResponse(BaseModel):
         description="Whether the source treats the entire repository (or root_hint directory) as a single artifact",
     )
     single_artifact_type: Optional[
-        Literal["skill", "command", "agent", "mcp_server", "hook"]
+        Literal["skill", "command", "agent", "mcp_server", "hook", "composite"]
     ] = Field(
         default=None,
         description="Artifact type when single_artifact_mode is enabled",
@@ -1284,7 +1284,7 @@ class CatalogEntryResponse(BaseModel):
         description="ID of the source this artifact was detected in",
         examples=["src_anthropics_quickstarts"],
     )
-    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = (
+    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook", "composite"] = (
         Field(
             description="Type of artifact detected",
             examples=["skill"],
@@ -2632,7 +2632,7 @@ class ManualMapEntry(BaseModel):
         description="Unix-style path like 'skills/python' (no leading/trailing slashes)",
         examples=["skills/python", "commands/dev", "agents/research"],
     )
-    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = (
+    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook", "composite"] = (
         Field(
             description="Artifact type for this directory",
             examples=["skill"],
@@ -2826,7 +2826,7 @@ class CatalogSearchResult(BaseModel):
         description="Artifact name",
         examples=["canvas-design"],
     )
-    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = (
+    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook", "composite"] = (
         Field(
             description="Type of artifact",
             examples=["skill"],
