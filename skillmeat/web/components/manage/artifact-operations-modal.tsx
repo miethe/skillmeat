@@ -61,6 +61,7 @@ import {
   MoreVertical,
   Trash2,
   Plus,
+  Blocks,
 } from 'lucide-react';
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -87,6 +88,7 @@ import { DeploymentBadgeStack } from '@/components/shared/deployment-badge-stack
 import type { Tab } from '@/components/shared/tab-navigation';
 
 // Entity components (reused)
+import { PluginMembersTab } from '@/components/entity/plugin-members-tab';
 import { FileTree } from '@/components/entity/file-tree';
 import { ContentPane } from '@/components/entity/content-pane';
 import { SyncStatusTab } from '@/components/sync-status';
@@ -124,6 +126,7 @@ import { hasValidUpstreamSource } from '@/lib/sync-utils';
 export type OperationsModalTab =
   | 'status'
   | 'overview'
+  | 'plugin'
   | 'contents'
   | 'sync'
   | 'deployments'
@@ -245,11 +248,18 @@ interface HistoryEntry {
 // Tab Configuration
 // ============================================================================
 
+const PLUGIN_TAB: Tab = {
+  value: 'plugin',
+  label: 'Plugin Members',
+  icon: Blocks,
+};
+
 function getTabs(artifact: Artifact | null): Tab[] {
   const deploymentCount = artifact?.deployments?.length || 0;
   const collectionsCount = artifact?.collections?.length || 0;
+  const isComposite = artifact?.type === 'composite';
 
-  return [
+  const baseTabs: Tab[] = [
     { value: 'status', label: 'Status', icon: Activity },
     { value: 'overview', label: 'Overview', icon: Info },
     { value: 'contents', label: 'Contents', icon: FileText },
@@ -269,6 +279,11 @@ function getTabs(artifact: Artifact | null): Tab[] {
     { value: 'sources', label: 'Sources', icon: Github },
     { value: 'history', label: 'Version History', icon: History },
   ];
+
+  if (!isComposite) return baseTabs;
+
+  // Insert Plugin Members tab after Overview (index 2, after status and overview)
+  return [baseTabs[0]!, baseTabs[1]!, PLUGIN_TAB, ...baseTabs.slice(2)];
 }
 
 // ============================================================================
@@ -1006,6 +1021,17 @@ export function ArtifactOperationsModal({
           </div>
         </div>
       </TabContentWrapper>
+
+      {/* Plugin Members Tab — only rendered for composite artifacts */}
+      {artifact.type === 'composite' && (
+        <TabContentWrapper value="plugin">
+          <PluginMembersTab
+            compositeId={artifact.id}
+            collectionId={artifact.collections?.[0]?.id ?? artifact.collection ?? 'default'}
+            disabled={false}
+          />
+        </TabContentWrapper>
+      )}
 
       {/* Contents Tab */}
       <TabContentWrapper value="contents" scrollable={false}>

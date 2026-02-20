@@ -75,7 +75,6 @@ import {
   useTags,
   useProjects,
   deploymentKeys,
-  useComposites,
 } from '@/hooks';
 import { TagSelectorPopover } from '@/components/collection/tag-selector-popover';
 import { getTagColor } from '@/lib/utils/tag-colors';
@@ -86,11 +85,7 @@ import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments'
 import type { ArtifactDeploymentInfo } from '@/types/deployments';
 import type { Deployment } from '@/components/deployments/deployment-card';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  CompositePreview,
-  type CompositePreviewData,
-} from '@/components/import/composite-preview';
-import type { CatalogEntry } from '@/types/marketplace';
+import { PluginMembersTab } from '@/components/entity/plugin-members-tab';
 
 // ============================================================================
 // Types
@@ -487,7 +482,7 @@ const PLUGIN_TAB: Tab = {
  * - Collections: Which collections this artifact belongs to
  * - Sources: Upstream source information
  * - History: General artifact timeline
- * - Plugin Members: (composite only) Breakdown of member artifacts via CompositePreview
+ * - Plugin Members: (composite only) Manage member artifacts via PluginMembersTab
  */
 export function ArtifactDetailsModal({
   artifact,
@@ -660,68 +655,6 @@ export function ArtifactDetailsModal({
   // Derive the collection ID from the artifact's first collection reference.
   // Falls back to 'default' when no collection context is available.
   const compositeCollectionId = artifact?.collections?.[0]?.id ?? artifact?.collection ?? 'default';
-
-  // Fetch composites for this collection when the plugin tab is active.
-  // Enabled only when the artifact is composite and the tab is shown.
-  const isPluginTabActive = isComposite && activeTab === 'plugin';
-  const {
-    data: compositesData,
-    isLoading: isLoadingComposites,
-  } = useComposites(isPluginTabActive ? compositeCollectionId : '');
-
-  // Find the composite record matching this artifact by name/id.
-  // The composite API returns composites by collection; we look for the one
-  // whose id or display_name matches the current artifact.
-  const compositeRecord = useMemo(() => {
-    if (!isComposite || !compositesData?.items) return null;
-    const items = compositesData.items;
-
-    // Match by composite_id (which is typically "composite:<name>")
-    const byId = items.find(
-      (c) =>
-        c.id === artifact?.id ||
-        c.id === `composite:${artifact?.name}` ||
-        c.display_name === artifact?.name
-    );
-    return byId ?? items[0] ?? null;
-  }, [isComposite, compositesData?.items, artifact?.id, artifact?.name]);
-
-  // Build CompositePreviewData from the composite record's memberships.
-  // All members of an already-imported composite are "existing" artifacts
-  // (they are in the collection) — no new/conflict buckets here.
-  // We construct minimal CatalogEntry stubs so the CompositePreview component
-  // (which now renders ArtifactCompactCard) receives the expected shape.
-  const compositePreviewData = useMemo<CompositePreviewData | null>(() => {
-    if (!isComposite || !artifact) return null;
-    if (!compositeRecord) return null;
-
-    const existingArtifacts: CatalogEntry[] = compositeRecord.memberships
-      .filter((m) => m.child_artifact != null)
-      .map((m) => ({
-        // Synthetic CatalogEntry stub built from membership metadata.
-        // These are collection members, not live catalog entries, so some
-        // fields carry placeholder values (no source_id, no upstream URL, etc.).
-        id: m.child_artifact!.id ?? `${m.child_artifact!.type}:${m.child_artifact!.name}`,
-        source_id: '',
-        artifact_type: m.child_artifact!.type as CatalogEntry['artifact_type'],
-        name: m.child_artifact!.name,
-        path: '',
-        upstream_url: '',
-        detected_at: m.created_at ?? new Date().toISOString(),
-        confidence_score: 1,
-        status: 'imported' as const,
-        detected_sha: m.pinned_version_hash ?? undefined,
-        in_collection: true,
-      }));
-
-    return {
-      pluginName: compositeRecord.display_name ?? artifact.name,
-      totalChildren: existingArtifacts.length,
-      newArtifacts: [],
-      existingArtifacts,
-      conflictArtifacts: [],
-    };
-  }, [isComposite, artifact, compositeRecord]);
 
   // ==========================================================================
   // Deployment Data Fetching
@@ -1228,63 +1161,11 @@ export function ArtifactDetailsModal({
             {/* Plugin Members Tab — only rendered for composite artifacts */}
             {isComposite && (
               <TabContentWrapper value="plugin">
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
-                      Plugin Members
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Child artifacts that make up this plugin, linked in your collection.
-                    </p>
-                  </div>
-
-                  {isLoadingComposites ? (
-                    <div
-                      className="flex items-center justify-center py-8"
-                      role="status"
-                      aria-label="Loading plugin members"
-                    >
-                      <Loader2
-                        className="h-6 w-6 animate-spin text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                      <span className="ml-2 text-sm text-muted-foreground">
-                        Loading plugin members...
-                      </span>
-                    </div>
-                  ) : compositePreviewData && compositePreviewData.totalChildren > 0 ? (
-                    <CompositePreview
-                      preview={compositePreviewData}
-                      sourceId=""
-                    />
-                  ) : compositePreviewData && compositePreviewData.totalChildren === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <Blocks
-                        className="mb-2 h-10 w-10 text-indigo-400/50 dark:text-indigo-500/50"
-                        aria-hidden="true"
-                      />
-                      <p className="text-sm font-medium text-muted-foreground">
-                        No member artifacts
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground/70">
-                        This plugin has no linked member artifacts in your collection.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <Blocks
-                        className="mb-2 h-10 w-10 text-muted-foreground/50"
-                        aria-hidden="true"
-                      />
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Plugin breakdown unavailable
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground/70">
-                        Re-import this plugin from the marketplace to populate its member list.
-                      </p>
-                    </div>
-                  )}
-                </div>
+                <PluginMembersTab
+                  compositeId={artifact.id}
+                  collectionId={compositeCollectionId}
+                  disabled={false}
+                />
               </TabContentWrapper>
             )}
 
