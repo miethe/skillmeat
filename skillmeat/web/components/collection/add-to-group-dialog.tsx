@@ -325,7 +325,7 @@ export function AddToGroupDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[460px]">
+      <DialogContent className="sm:max-w-[640px]">
         <DialogHeader>
           <DialogTitle>Add to Group</DialogTitle>
           <DialogDescription>
@@ -494,7 +494,7 @@ export function AddToGroupDialog({
                 )}
               </div>
             ) : (
-              <ScrollArea className="h-[300px] rounded-md border">
+              <ScrollArea className="max-h-[60vh] min-h-[200px] rounded-md border">
                 {/* Create new group section */}
                 <div className="border-b p-2">
                   {isCreatingGroup ? (
@@ -559,10 +559,11 @@ export function AddToGroupDialog({
                       <div
                         key={group.id}
                         className={cn(
-                          'flex items-start space-x-3 rounded-md px-2 py-2',
+                          'flex items-start gap-3 rounded-md px-2 py-2',
                           isAlreadyInGroup ? 'opacity-60' : 'hover:bg-accent'
                         )}
                       >
+                        {/* Zone 1: Checkbox */}
                         <Checkbox
                           id={`group-${group.id}`}
                           checked={selectedGroupIds.has(group.id)}
@@ -572,7 +573,9 @@ export function AddToGroupDialog({
                           disabled={isPending || isAlreadyInGroup}
                           className="mt-0.5"
                         />
-                        <div className="min-w-0 flex-1">
+
+                        {/* Zone 2: Name column - shrink-0 to fit content, won't truncate */}
+                        <div className="shrink-0">
                           <Label
                             htmlFor={`group-${group.id}`}
                             className={cn(
@@ -599,23 +602,28 @@ export function AddToGroupDialog({
                                 </span>
                               );
                             })()}
-                            <span className="truncate">{group.name}</span>
+                            <span className="whitespace-nowrap">{group.name}</span>
                           </Label>
-                          <div className="mt-0.5 flex items-center gap-2">
-                            {isAlreadyInGroup ? (
+                          <div className="mt-0.5 flex items-center gap-2 pl-7">
+                            {isAlreadyInGroup && (
                               <span className="text-xs text-amber-600">Already in Group</span>
-                            ) : (
-                              group.description && (
-                                <span className="max-w-[200px] truncate text-xs text-muted-foreground">
-                                  {group.description}
-                                </span>
-                              )
                             )}
                             <span className="shrink-0 text-xs text-muted-foreground">
                               {group.artifact_count} artifact{group.artifact_count !== 1 ? 's' : ''}
                             </span>
                           </div>
                         </div>
+
+                        {/* Zone 3: Description column - fills remaining space */}
+                        {group.description && (
+                          <div className="min-w-0 flex-1 pt-0.5">
+                            <p className="line-clamp-2 text-xs text-muted-foreground">
+                              {group.description}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Zone 4: Remove button (only for already-in-group items) */}
                         {isAlreadyInGroup && (
                           <TooltipProvider>
                             <Tooltip>
