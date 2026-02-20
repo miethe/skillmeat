@@ -441,6 +441,10 @@ class HeuristicDetector:
 
         Detection signals, in priority order:
 
+        0. ``.claude-plugin/plugin.json`` in a child directory — authoritative composite
+           signal (confidence 98).  The *parent* of the ``.claude-plugin/`` directory is
+           recorded as the plugin root.  ``.claude-plugin`` directories are excluded from
+           all subsequent signals.
         1. ``plugin.json`` at directory root — definitive composite signal (confidence 95)
         2. ``COMPOSITE.md`` or ``PLUGIN.md`` at directory root — strong composite
            signal (confidence 90)
@@ -466,9 +470,90 @@ class HeuristicDetector:
         matches: List[HeuristicMatch] = []
         plugin_dirs: Set[str] = set()
 
+        # Signal 0 (highest priority): pre-scan for `.claude-plugin/` subdirectories
+        # that contain plugin.json.  The PARENT of such a directory is the plugin root.
+        # Real-world marketplace repos use:
+        #   category/plugin-name/.claude-plugin/plugin.json
+        claude_plugin_parents: Set[str] = set()
+        for dir_path, files in dir_to_files.items():
+            basename = PurePosixPath(dir_path).name
+            if basename != ".claude-plugin":
+                continue
+            lower_files_pre = {f.lower() for f in files}
+            if "plugin.json" not in lower_files_pre:
+                continue
+            parent = str(PurePosixPath(dir_path).parent)
+            if parent == ".":
+                # .claude-plugin at repo root — treat root itself as plugin root only
+                # when there is an actual parent segment; skip degenerate case.
+                continue
+            # Apply root hint filtering to the parent
+            if root_hint and not parent.startswith(root_hint):
+                continue
+            claude_plugin_parents.add(parent)
+
+        for parent in claude_plugin_parents:
+            raw_score = MAX_RAW_SCORE
+            confidence = 98
+            signal = "claude_plugin_dir"
+            primary_reason = (
+                ".claude-plugin/plugin.json found in child directory"
+                " \u2014 authoritative composite signal (98)"
+            )
+            score_breakdown = {
+                "dir_name_score": 0,
+                "manifest_score": confidence,
+                "skill_manifest_bonus": 0,
+                "extensions_score": 0,
+                "parent_hint_score": 0,
+                "frontmatter_score": 0,
+                "container_hint_score": 0,
+                "depth_penalty": 0,
+                "raw_total": raw_score,
+                "normalized_score": confidence,
+            }
+            match = HeuristicMatch(
+                path=parent,
+                artifact_type=ArtifactType.COMPOSITE.value,
+                confidence_score=confidence,
+                organization_path=None,
+                match_reasons=[primary_reason],
+                dir_name_score=0,
+                manifest_score=confidence,
+                extension_score=0,
+                depth_penalty=0,
+                raw_score=raw_score,
+                breakdown=score_breakdown,
+                metadata={
+                    "is_plugin": True,
+                    "plugin_signal": signal,
+                    "has_plugin_json": False,
+                    "has_composite_manifest": False,
+                    "is_heuristic_plugin": False,
+                    "claude_plugin_dir": True,
+                },
+            )
+            matches.append(match)
+            plugin_dirs.add(parent)
+            logger.debug(
+                "Plugin detected (Signal 0) at %s: signal=%s, confidence=%d",
+                parent,
+                signal,
+                confidence,
+            )
+
         for dir_path, files in dir_to_files.items():
             # Skip root
             if dir_path == ".":
+                continue
+
+            # Skip .claude-plugin directories — they are metadata containers, not
+            # composite artifacts themselves.
+            if PurePosixPath(dir_path).name == ".claude-plugin":
+                continue
+
+            # Skip directories already identified as plugin roots via Signal 0.
+            if dir_path in claude_plugin_parents:
                 continue
 
             # Apply root hint filtering

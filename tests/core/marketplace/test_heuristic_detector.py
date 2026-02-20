@@ -3364,3 +3364,135 @@ class TestPluginDetection:
         composites = [a for a in artifacts if a.artifact_type == "composite"]
         assert len(composites) == 1
         assert composites[0].path == "section-a/plugin-1"
+
+    # ------------------------------------------------------------------
+    # Signal 0: .claude-plugin/plugin.json subdirectory pattern
+    # ------------------------------------------------------------------
+
+    def test_claude_plugin_dir_detected_as_composite(self):
+        """.claude-plugin/plugin.json inside a directory marks that directory as composite."""
+        files = [
+            "my-plugin/.claude-plugin/plugin.json",
+            "my-plugin/README.md",
+            "my-plugin/LICENSE",
+            "my-plugin/skills/helper/SKILL.md",
+            "my-plugin/commands/run/COMMAND.md",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        composites = [a for a in artifacts if a.artifact_type == "composite"]
+        assert len(composites) == 1, (
+            f"Expected 1 composite, got {len(composites)}: "
+            f"{[(a.artifact_type, a.path) for a in artifacts]}"
+        )
+        assert composites[0].name == "my-plugin"
+        assert composites[0].path == "my-plugin"
+        assert composites[0].confidence_score == 98
+
+    def test_claude_plugin_dir_confidence_higher_than_plugin_json(self):
+        """.claude-plugin/plugin.json (98) outranks plugin.json at root (95)."""
+        files = [
+            "my-plugin/.claude-plugin/plugin.json",
+            "my-plugin/skills/helper/SKILL.md",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        composites = [a for a in artifacts if a.artifact_type == "composite"]
+        assert len(composites) == 1
+        assert composites[0].confidence_score == 98
+
+    def test_claude_plugin_dir_itself_not_treated_as_composite(self):
+        """.claude-plugin directory is a metadata container, not itself a composite."""
+        files = [
+            "my-plugin/.claude-plugin/plugin.json",
+            "my-plugin/skills/helper/SKILL.md",
+            "my-plugin/commands/run/COMMAND.md",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        paths = {a.path for a in artifacts}
+        assert "my-plugin/.claude-plugin" not in paths, (
+            ".claude-plugin directory should not appear as an artifact"
+        )
+
+    def test_claude_plugin_dir_real_world_structure(self):
+        """Simulate the real-world category/plugin-name/.claude-plugin/plugin.json layout."""
+        files = [
+            "plugins/ai-agency/discovery-questionnaire/.claude-plugin/plugin.json",
+            "plugins/ai-agency/discovery-questionnaire/README.md",
+            "plugins/ai-agency/discovery-questionnaire/LICENSE",
+            "plugins/ai-agency/discovery-questionnaire/skills/research/SKILL.md",
+            "plugins/ai-agency/discovery-questionnaire/skills/research/index.ts",
+            "plugins/ai-agency/discovery-questionnaire/commands/start/COMMAND.md",
+            "plugins/ai-agency/discovery-questionnaire/agents/coordinator/AGENT.md",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        composites = [a for a in artifacts if a.artifact_type == "composite"]
+        assert len(composites) == 1, (
+            f"Expected 1 composite, got {len(composites)}: "
+            f"{[(a.artifact_type, a.path) for a in artifacts]}"
+        )
+        assert composites[0].path == (
+            "plugins/ai-agency/discovery-questionnaire"
+        )
+        assert composites[0].name == "discovery-questionnaire"
+        assert composites[0].confidence_score == 98
+
+    def test_claude_plugin_dir_members_suppressed(self):
+        """Member artifacts inside a .claude-plugin-based plugin are NOT emitted."""
+        files = [
+            "my-plugin/.claude-plugin/plugin.json",
+            "my-plugin/skills/helper/SKILL.md",
+            "my-plugin/skills/helper/index.ts",
+            "my-plugin/commands/deploy/COMMAND.md",
+            "my-plugin/agents/runner/AGENT.md",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        # Only the composite should appear; member artifacts are suppressed
+        assert len(artifacts) == 1, (
+            f"Expected 1 composite, got {len(artifacts)}: "
+            f"{[(a.artifact_type, a.path) for a in artifacts]}"
+        )
+        assert artifacts[0].artifact_type == "composite"
+
+    def test_multiple_claude_plugin_dirs_in_category(self):
+        """Multiple plugins in one category directory are each detected."""
+        files = [
+            "plugins/plugin-a/.claude-plugin/plugin.json",
+            "plugins/plugin-a/skills/foo/SKILL.md",
+            "plugins/plugin-a/commands/bar/COMMAND.md",
+            "plugins/plugin-b/.claude-plugin/plugin.json",
+            "plugins/plugin-b/agents/runner/AGENT.md",
+            "plugins/plugin-b/commands/run/COMMAND.md",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        composites = [a for a in artifacts if a.artifact_type == "composite"]
+        assert len(composites) == 2, (
+            f"Expected 2 composites, got {len(composites)}: "
+            f"{[c.path for c in composites]}"
+        )
+        paths = {c.path for c in composites}
+        assert "plugins/plugin-a" in paths
+        assert "plugins/plugin-b" in paths
+
+    def test_claude_plugin_dir_signal_in_metadata(self):
+        """.claude-plugin/plugin.json match has correct metadata fields."""
+        files = [
+            "my-plugin/.claude-plugin/plugin.json",
+            "my-plugin/skills/helper/SKILL.md",
+            "my-plugin/commands/deploy/COMMAND.md",
+        ]
+        detector = HeuristicDetector()
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        plugin_match = next(
+            (m for m in matches if m.artifact_type == "composite"), None
+        )
+        assert plugin_match is not None
+        assert plugin_match.metadata is not None
+        assert plugin_match.metadata.get("is_plugin") is True
+        assert plugin_match.metadata.get("plugin_signal") == "claude_plugin_dir"
+        assert plugin_match.metadata.get("claude_plugin_dir") is True
