@@ -233,6 +233,18 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   const [showMergeWorkflow, setShowMergeWorkflow] = useState(false);
   const [mergeDirection, setMergeDirection] = useState<'upstream' | 'downstream'>('downstream');
 
+  // Track whether user has manually changed the comparison scope.
+  // Prevents the smart-default effect from overriding an intentional selection.
+  const userHasChangedScope = useRef(false);
+
+  // Smart default: when projectPath becomes available, switch to the faster local
+  // comparison (collection-vs-project) if the user hasn't manually chosen a scope yet.
+  useEffect(() => {
+    if (projectPath && !userHasChangedScope.current && comparisonScope === 'source-vs-collection') {
+      setComparisonScope('collection-vs-project');
+    }
+  }, [projectPath, comparisonScope]);
+
   // ============================================================================
   // Queries
   // ============================================================================
@@ -650,6 +662,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   }, [comparisonScope]);
 
   const handleComparisonChange = (scope: ComparisonScope) => {
+    userHasChangedScope.current = true;
     markStart(`sync-tab.scope.${scope}`);
     setComparisonScope(scope);
   };
@@ -905,7 +918,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     );
   }
 
-  if (isLoading) {
+  if (!entity) {
     return <SyncStatusTabSkeleton />;
   }
 
