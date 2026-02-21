@@ -75,7 +75,8 @@ export function useDeploymentList(
   return useQuery({
     queryKey: deploymentKeys.list(projectPath),
     queryFn: () => listDeployments(projectPath),
-    staleTime: options?.staleTime ?? 2 * 60 * 1000, // 2 minutes (deployments change frequently)
+    staleTime: options?.staleTime ?? 120_000, // 2 min: deployment domain standard
+    gcTime: 300_000,                          // 5 min: keep in cache after unmount
     refetchOnWindowFocus: true, // Refetch when user returns to window
     enabled: options?.enabled ?? true,
   });
@@ -102,7 +103,8 @@ export function useDeployments(
   return useQuery({
     queryKey: deploymentKeys.filtered(params),
     queryFn: () => getDeployments(params),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 120_000, // 2 min: deployment domain standard
+    gcTime: 300_000,    // 5 min: keep in cache after unmount
     enabled: true,
   });
 }
@@ -129,7 +131,8 @@ export function useDeploymentSummary(
   return useQuery({
     queryKey: deploymentKeys.summary(projectPath),
     queryFn: () => getDeploymentSummary(projectPath),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 120_000, // 2 min: deployment domain standard
+    gcTime: 300_000,    // 5 min: keep in cache after unmount
   });
 }
 

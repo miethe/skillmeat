@@ -275,6 +275,8 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       // Enable immediately when this scope or source-vs-project is active (both require upstream);
       // defer only when collection-vs-project is active (equivalent to: !isProjectPrimary)
       (isUpstreamPrimary || isSourceProjectPrimary),
+    staleTime: 30_000, // 30 sec interactive: diff data is expensive; reuse within TTL on reopen/switch
+    gcTime: 300_000,   // 5 min: keep in cache after unmount so reopen flows hit cache
     retry: false,
   });
 
@@ -301,6 +303,8 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       entity.collection !== 'discovered' &&
       // Enable immediately for primary scope; defer for upstream-based scopes (secondary)
       (isProjectPrimary || upstreamSuccess),
+    staleTime: 30_000, // 30 sec interactive: diff data is expensive; reuse within TTL on reopen/switch
+    gcTime: 300_000,   // 5 min: keep in cache after unmount so reopen flows hit cache
   });
 
   // Source-project diff (source vs project, bypassing collection).
@@ -329,7 +333,8 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       hasValidUpstreamSource(entity) &&
       // Active scope loads immediately; otherwise background-prefetch after primary data lands
       (isSourceProjectPrimary || primaryScopeLoaded),
-    staleTime: 30_000,
+    staleTime: 30_000, // 30 sec interactive: most expensive diff query; reuse within TTL on reopen/switch
+    gcTime: 300_000,   // 5 min: keep in cache after unmount so reopen flows hit cache
     retry: false,
   });
 

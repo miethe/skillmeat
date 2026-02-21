@@ -517,9 +517,10 @@ export function ArtifactOperationsModal({
   } | null>(null);
   const [isLoadingSource, setIsLoadingSource] = useState(false);
 
-  // Gate deployment fanout queries: only fire when the sync or deployments tab is active.
-  // This prevents N project-level deployment fetches on every modal open.
-  const isDeploymentTab = activeTab === 'sync' || activeTab === 'deployments';
+  // Gate deployment fanout queries: only fire when the deployments tab is active.
+  // The sync tab uses ProjectSelectorForDiff (include_deployments=true) as its canonical
+  // deployment source — no need to also fire the N per-project fanout queries there.
+  const isDeploymentTab = activeTab === 'deployments';
 
   // Sync activeTab with initialTab when modal opens
   useEffect(() => {
@@ -622,12 +623,12 @@ export function ArtifactOperationsModal({
     staleTime: 5 * 60 * 1000,
   });
 
-  // Fetch projects for use in deployment-aware tabs (sync, deployments).
+  // Fetch projects for use in the deployments tab.
   // useProjects does not accept an enabled option; the fanout deployment queries
   // are gated by isDeploymentTab instead, which is where the N-call fanout occurs.
   const { data: projects, isLoading: isProjectsLoading } = useProjects();
 
-  // Fetch deployments for all registered projects — only when sync/deployments tab is active.
+  // Fetch deployments for all registered projects — only when the deployments tab is active.
   // Each per-project query is also individually gated so that newly-resolved projects
   // from a stale cache don't trigger fetches while on an unrelated tab.
   const deploymentQueries = useQueries({
@@ -931,7 +932,7 @@ export function ArtifactOperationsModal({
 
   // The status tab uses the embedded deployment summary from the artifact object
   // (artifact.deployments) for its count and badge display. This avoids depending
-  // on the fanout queries which are only loaded when sync/deployments tab is active.
+  // on the fanout queries which are only loaded when the deployments tab is active.
   const statusTabDeploymentCount = artifact.deployments?.length ?? 0;
 
   return (
@@ -1011,7 +1012,7 @@ export function ArtifactOperationsModal({
           </Card>
 
           {/* Deployments Summary Card — uses embedded artifact.deployments for count/badges.
-              The full fanout query (artifactDeployments) is only loaded on the sync/deployments tab. */}
+              The full fanout query (artifactDeployments) is only loaded on the deployments tab. */}
           <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
