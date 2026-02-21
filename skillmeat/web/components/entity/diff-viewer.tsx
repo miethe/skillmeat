@@ -244,6 +244,22 @@ function parseDiff(unifiedDiff: string): ParsedDiffLine[] {
   return parsed;
 }
 
+/**
+ * Compute sidebar stats (additions + deletions count) from a raw unified diff string
+ * without allocating full ParsedDiffLine objects. O(n) line scan with minimal allocations.
+ */
+function computeDiffStats(unifiedDiff: string): { additions: number; deletions: number } {
+  let additions = 0;
+  let deletions = 0;
+  const lines = unifiedDiff.split('\n');
+  for (const line of lines) {
+    if (line.startsWith('---') || line.startsWith('+++') || line.startsWith('@@')) continue;
+    if (line.startsWith('+')) additions++;
+    else if (line.startsWith('-')) deletions++;
+  }
+  return { additions, deletions };
+}
+
 function FileStatusBadge({ status }: { status: FileDiff['status'] }) {
   const variants: Record<
     FileDiff['status'],
@@ -323,15 +339,73 @@ export function DiffViewer({
 
   const selectedFile = files[selectedFileIndex];
 
+  /**
+   * On-demand parse cache keyed by file_path.
+   *
+   * Previously, a `parsedDiffs` useMemo iterated ALL files and called parseDiff() on every
+   * unified_diff string at mount time, regardless of whether the user ever expanded those files.
+   * For large diffs (50+ files) this blocked the main thread unnecessarily on mount.
+   *
+   * Now we parse lazily: only when a file is first selected or first expanded in the sidebar.
+   * The cache persists across renders via useRef so each file is parsed at most once per
+   * component lifetime. If the `files` prop identity changes (new data arrives) we clear
+   * the cache so stale results are never served.
+   */
+  const parseCacheRef = useRef<Map<string, ParsedDiffLine[]>>(new Map());
+  const filesCacheKeyRef = useRef<string>('');
+
+  // Invalidate the parse cache when the files array changes (new diff data received)
+  const filesKey = files.map((f) => f.file_path).join(',');
+  if (filesKey !== filesCacheKeyRef.current) {
+    filesCacheKeyRef.current = filesKey;
+    parseCacheRef.current = new Map();
+  }
+
+  /**
+   * Get parsed lines for a given file path, parsing on first access and caching the result.
+   * Only call this for files the user has actually expanded/selected.
+   */
+  const getParsedLines = (filePath: string, unifiedDiff: string): ParsedDiffLine[] => {
+    const cache = parseCacheRef.current;
+    if (!cache.has(filePath)) {
+      cache.set(filePath, parseDiff(unifiedDiff));
+    }
+    return cache.get(filePath)!;
+  };
+
+  /**
+   * Sidebar stat cache: stores pre-computed {additions, deletions} per file_path.
+   * Uses the lightweight computeDiffStats scanner (no object allocation per line)
+   * instead of the full parseDiff. Keyed separately from parseCacheRef because
+   * sidebar stats are shown without needing full ParsedDiffLine arrays.
+   */
+  const statsCacheRef = useRef<Map<string, { additions: number; deletions: number }>>(new Map());
+  const statsCacheKeyRef = useRef<string>('');
+  if (filesKey !== statsCacheKeyRef.current) {
+    statsCacheKeyRef.current = filesKey;
+    statsCacheRef.current = new Map();
+  }
+
+  const getFileStats = (filePath: string, unifiedDiff: string) => {
+    const cache = statsCacheRef.current;
+    if (!cache.has(filePath)) {
+      cache.set(filePath, computeDiffStats(unifiedDiff));
+    }
+    return cache.get(filePath)!;
+  };
+
+  // Parsed diff for the currently selected file -- computed on demand, cached in parseCacheRef
+  const parsedDiff = useMemo(() => {
+    return selectedFile?.unified_diff
+      ? getParsedLines(selectedFile.file_path, selectedFile.unified_diff)
+      : [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFile?.file_path, selectedFile?.unified_diff]);
+
   // Performance instrumentation: start timing diff summary and render on mount
   useEffect(() => {
     markStart('diff-viewer.summary-ready');
   }, []);
-
-  // Memoize parsed diff to avoid re-parsing on every render
-  const parsedDiff = useMemo(() => {
-    return selectedFile?.unified_diff ? parseDiff(selectedFile.unified_diff) : [];
-  }, [selectedFile?.unified_diff]);
 
   // Refs for synchronized scrolling between left and right panels
   const leftScrollRef = useRef<HTMLDivElement>(null);
@@ -379,7 +453,6 @@ export function DiffViewer({
   // (fires after paint for the current selected file's unified diff)
   const prevFilesKey = useRef('');
   useEffect(() => {
-    const filesKey = files.map((f) => f.file_path).join(',');
     if (files.length > 0 && filesKey !== prevFilesKey.current) {
       prevFilesKey.current = filesKey;
       markStart('diff-viewer.render');
@@ -389,9 +462,9 @@ export function DiffViewer({
       });
       return () => cancelAnimationFrame(id);
     }
-  }, [files]);
+  }, [files, filesKey]);
 
-  // Memoize summary calculation
+  // Memoize summary calculation (reads only file.status, no diff parsing needed)
   const summary = useMemo(() => {
     return files.reduce(
       (acc, file) => {
@@ -403,17 +476,6 @@ export function DiffViewer({
       },
       { added: 0, modified: 0, deleted: 0, unchanged: 0 }
     );
-  }, [files]);
-
-  // Memoize parsed diffs for all files (for stats in sidebar)
-  const parsedDiffs = useMemo(() => {
-    const cache = new Map<string, ParsedDiffLine[]>();
-    files.forEach((file) => {
-      if (file.unified_diff) {
-        cache.set(file.file_path, parseDiff(file.unified_diff));
-      }
-    });
-    return cache;
   }, [files]);
 
   const toggleFileExpansion = (index: number) => {
@@ -504,25 +566,19 @@ export function DiffViewer({
                     <FileStatusBadge status={file.status} />
                   </button>
 
-                  {isExpanded && (
-                    <div className="ml-6 mt-1 space-y-0.5 text-xs text-muted-foreground">
-                      {file.status === 'modified' &&
-                        file.unified_diff &&
-                        (() => {
-                          const cached = parsedDiffs.get(file.file_path);
-                          if (cached) {
-                            const additions = cached.filter((l) => l.type === 'addition').length;
-                            const deletions = cached.filter((l) => l.type === 'deletion').length;
-                            return (
-                              <div className="font-mono">
-                                {additions} additions, {deletions} deletions
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-                    </div>
-                  )}
+                  {/* Sidebar stats: computed on demand only when the file row is expanded.
+                      Uses lightweight computeDiffStats (no ParsedDiffLine allocation)
+                      rather than the full parseDiff result. */}
+                  {isExpanded && file.status === 'modified' && file.unified_diff && (() => {
+                    const stats = getFileStats(file.file_path, file.unified_diff);
+                    return (
+                      <div className="ml-6 mt-1 space-y-0.5 text-xs text-muted-foreground">
+                        <div className="font-mono">
+                          {stats.additions} additions, {stats.deletions} deletions
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
