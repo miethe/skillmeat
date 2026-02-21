@@ -515,16 +515,17 @@ async def list_deployments(
                 profile_id=profile_id,
             )
 
-        # Get sync status for each deployment — this calls detect_modifications
-        # per artifact and is the dominant cost of this endpoint
+        # Compute sync status in a single pass, reusing the already-fetched
+        # deployment list to avoid a redundant read_deployments() call.
         with PerfTimer(
             "router.list_deployments.check_status",
             project_path=str(resolved_path),
             deployment_count=len(deployments),
         ):
-            status_map = deployment_mgr.check_deployment_status(
+            status_map = deployment_mgr.compute_deployment_statuses_batch(
                 project_path=resolved_path,
                 profile_id=profile_id,
+                deployments=deployments,
             )
 
         # Convert to response format

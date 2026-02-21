@@ -640,8 +640,6 @@ class DeploymentManager:
         Returns:
             Dict mapping artifact key to status: "synced", "modified", "outdated"
         """
-        from skillmeat.storage.deployment import DeploymentTracker
-
         if project_path is None:
             project_path = Path.cwd()
         else:
@@ -652,9 +650,67 @@ class DeploymentManager:
             project_path=str(project_path),
             profile_id=profile_id,
         ):
-            deployments = DeploymentTracker.read_deployments(
-                project_path, profile_root_dir=None
+            return self.compute_deployment_statuses_batch(
+                project_path=project_path,
+                profile_id=profile_id,
             )
+
+    def compute_deployment_statuses_batch(
+        self,
+        project_path: Optional[Path] = None,
+        profile_id: Optional[str] = None,
+        deployments: Optional[List["Deployment"]] = None,
+    ) -> Dict[str, str]:
+        """Compute sync status for all deployments in a single pass.
+
+        Avoids the N+1 file-read problem of calling detect_modifications() per
+        deployment.  Instead it:
+
+        1. Reads all deployment records once (or reuses the ``deployments`` list
+           if the caller already has it).
+        2. Resolves every artifact's on-disk path and hashes it in a single loop.
+        3. Compares each hash against the stored ``content_hash`` / ``collection_sha``
+           in bulk, with no additional TOML reads.
+
+        Args:
+            project_path: Project directory (uses CWD if None).
+            profile_id: Optional profile filter — only deployments whose
+                ``deployment_profile_id`` matches this value are included.
+            deployments: Pre-loaded deployment list.  When provided the function
+                skips the ``read_deployments`` call entirely, saving one TOML
+                read per invocation.
+
+        Returns:
+            Dict mapping artifact key to status string: ``"synced"`` or
+            ``"modified"``.  Keys use the format
+            ``"{name}::{type}"`` when the artifact is deployed to a single
+            profile, or ``"{name}::{type}::{profile_id}"`` when the same
+            artifact is deployed to multiple profiles.
+        """
+        from skillmeat.core.path_resolver import (
+            DEFAULT_PROFILE_ROOT_DIR,
+            DeploymentPathProfile,
+            resolve_deployment_path,
+        )
+        from skillmeat.storage.deployment import DeploymentTracker
+        from skillmeat.utils.filesystem import compute_content_hash
+
+        if project_path is None:
+            project_path = Path.cwd()
+        else:
+            project_path = Path(project_path).resolve()
+
+        with PerfTimer(
+            "deployment.compute_statuses_batch",
+            project_path=str(project_path),
+            profile_id=profile_id,
+        ):
+            # -- Step 1: load deployments once (reuse if caller already has them) --
+            if deployments is None:
+                deployments = DeploymentTracker.read_deployments(
+                    project_path, profile_root_dir=None
+                )
+
             if profile_id:
                 deployments = [
                     d
@@ -662,36 +718,50 @@ class DeploymentManager:
                     if (d.deployment_profile_id or "claude_code") == profile_id
                 ]
 
+            # -- Step 2: determine key format (disambiguate multi-profile) --
             base_key_counts: Dict[str, int] = {}
             for deployment in deployments:
                 base_key = f"{deployment.artifact_name}::{deployment.artifact_type}"
                 base_key_counts[base_key] = base_key_counts.get(base_key, 0) + 1
 
-            status: Dict[str, str] = {}
-
+            # -- Step 3: single-pass hash + compare (no additional TOML reads) --
+            result: Dict[str, str] = {}
             for deployment in deployments:
                 base_key = f"{deployment.artifact_name}::{deployment.artifact_type}"
                 if base_key_counts[base_key] > 1:
-                    profile_key = deployment.deployment_profile_id or "claude_code"
-                    key = f"{base_key}::{profile_key}"
+                    key = f"{base_key}::{deployment.deployment_profile_id or 'claude_code'}"
                 else:
                     key = base_key
 
-                # Check for local modifications
-                if DeploymentTracker.detect_modifications(
-                    project_path,
-                    deployment.artifact_name,
-                    deployment.artifact_type,
-                    profile_id=deployment.deployment_profile_id,
-                ):
-                    status[key] = "modified"
+                # Resolve the on-disk path using stored profile metadata —
+                # identical logic to detect_modifications() but without the
+                # extra get_deployment() / read_deployments() calls.
+                artifact_full_path = resolve_deployment_path(
+                    deployment_relative_path=deployment.artifact_path,
+                    project_path=project_path,
+                    profile=DeploymentPathProfile(
+                        profile_id=deployment.deployment_profile_id or "claude_code",
+                        root_dir=deployment.profile_root_dir or DEFAULT_PROFILE_ROOT_DIR,
+                    ),
+                )
+
+                if not artifact_full_path.exists():
+                    # File absent — treat as unmodified (matches detect_modifications behaviour)
+                    result[key] = "synced"
+                    continue
+
+                current_hash = compute_content_hash(artifact_full_path)
+                stored_hash = deployment.collection_sha or deployment.content_hash
+
+                if current_hash != stored_hash:
+                    result[key] = "modified"
                 else:
-                    status[key] = "synced"
+                    result[key] = "synced"
 
                 # TODO: Check for upstream updates (requires collection loading)
                 # This will be expanded in later phases
 
-            return status
+            return result
 
     def _record_deployment_version(
         self,
