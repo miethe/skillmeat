@@ -15,6 +15,41 @@ import { markStart, markEnd } from '@/lib/perf-marks';
 export type ResolutionType = 'keep_local' | 'keep_remote' | 'merge';
 
 /**
+ * Maximum number of files to render in the sidebar by default.
+ * When the diff contains more files than this, only the first N are shown
+ * and a "Show all N files" banner appears at the bottom of the sidebar.
+ */
+const LARGE_DIFF_FILE_THRESHOLD = 50;
+
+/**
+ * Maximum number of lines in a unified diff before the file is considered
+ * "large" and collapsed by default in the diff panel. The user must click
+ * "Load diff" to expand and parse the content.
+ */
+const LARGE_DIFF_LINE_THRESHOLD = 1000;
+
+/**
+ * Maximum size in bytes for a unified diff string before it is treated as
+ * "large" and collapsed by default (whichever threshold is hit first).
+ */
+const LARGE_DIFF_BYTES_THRESHOLD = 50 * 1024; // 50 KB
+
+/**
+ * Returns true when a unified diff string exceeds either the line or byte threshold.
+ */
+function isLargeFileDiff(unifiedDiff: string): boolean {
+  if (unifiedDiff.length > LARGE_DIFF_BYTES_THRESHOLD) return true;
+  let lineCount = 0;
+  for (let i = 0; i < unifiedDiff.length; i++) {
+    if (unifiedDiff[i] === '\n') {
+      lineCount++;
+      if (lineCount >= LARGE_DIFF_LINE_THRESHOLD) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Props for DiffViewer component
  *
  * Configuration for displaying unified diffs with side-by-side view.
@@ -337,6 +372,19 @@ export function DiffViewer({
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set([0]));
 
+  /**
+   * When the diff has more than LARGE_DIFF_FILE_THRESHOLD files, the sidebar
+   * initially renders only the first N. This flag lifts that cap.
+   */
+  const [showAllFiles, setShowAllFiles] = useState(false);
+
+  /**
+   * Set of file indices for which the user has explicitly requested to load
+   * the full diff content. Files whose unified_diff is "large" (exceeds line/
+   * byte thresholds) start collapsed; clicking "Load diff" adds them here.
+   */
+  const [loadedLargeFiles, setLoadedLargeFiles] = useState<Set<number>>(new Set());
+
   const selectedFile = files[selectedFileIndex];
 
   /**
@@ -359,6 +407,9 @@ export function DiffViewer({
   if (filesKey !== filesCacheKeyRef.current) {
     filesCacheKeyRef.current = filesKey;
     parseCacheRef.current = new Map();
+    // Reset large-diff UX state so new data starts fresh
+    setShowAllFiles(false);
+    setLoadedLargeFiles(new Set());
   }
 
   /**
@@ -529,7 +580,10 @@ export function DiffViewer({
         {/* File list sidebar */}
         <div className="min-h-0 w-64 flex-shrink-0 overflow-y-auto border-r bg-muted/20">
           <div className="space-y-1 p-2">
-            {files.map((file, index) => {
+            {/* Large-file-count guard: only render up to LARGE_DIFF_FILE_THRESHOLD rows
+                unless the user has opted in to "show all". This keeps the sidebar
+                responsive when a diff contains hundreds of files. */}
+            {(showAllFiles ? files : files.slice(0, LARGE_DIFF_FILE_THRESHOLD)).map((file, index) => {
               const isExpanded = expandedFiles.has(index);
               const isSelected = index === selectedFileIndex;
 
@@ -582,6 +636,24 @@ export function DiffViewer({
                 </div>
               );
             })}
+
+            {/* "Show all files" banner — only visible when file count exceeds the threshold
+                and the user has not yet opted in. */}
+            {!showAllFiles && files.length > LARGE_DIFF_FILE_THRESHOLD && (
+              <div className="mt-2 rounded border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                <p className="mb-1.5">
+                  Showing {LARGE_DIFF_FILE_THRESHOLD} of {files.length} files
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 w-full text-xs"
+                  onClick={() => setShowAllFiles(true)}
+                >
+                  Load all {files.length} files
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -597,6 +669,27 @@ export function DiffViewer({
 
           {/* Side-by-side diff with synchronized scrolling and line alignment */}
           {selectedFile?.status === 'modified' && selectedFile.unified_diff ? (
+            // Large-file guard: if the diff exceeds the line/byte threshold AND the user
+            // has not explicitly loaded it, show a collapsed placeholder instead of
+            // parsing and rendering potentially thousands of DOM nodes.
+            isLargeFileDiff(selectedFile.unified_diff) &&
+            !loadedLargeFiles.has(selectedFileIndex) ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
+                <p className="max-w-xs">
+                  This file diff is large ({Math.round(selectedFile.unified_diff.length / 1024)} KB).
+                  Loading it may slow down the browser.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setLoadedLargeFiles((prev) => new Set([...prev, selectedFileIndex]))
+                  }
+                >
+                  Load diff
+                </Button>
+              </div>
+            ) : (
             <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
               {/* Left panel */}
               <div className="flex min-h-0 min-w-0 flex-1 flex-col border-r">
@@ -654,6 +747,7 @@ export function DiffViewer({
                 </div>
               </div>
             </div>
+            )
           ) : selectedFile?.status === 'added' ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               <div className="flex-shrink-0 bg-green-500/10 px-4 py-2 text-sm text-green-700 dark:text-green-400">
