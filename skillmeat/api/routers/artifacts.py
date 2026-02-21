@@ -2827,6 +2827,12 @@ async def update_artifact(
                     db_session.close()
             except Exception as cache_err:
                 logger.warning(f"Cache refresh failed for {artifact_id}: {cache_err}")
+
+            # Invalidate upstream fetch cache — cached diff results are now stale
+            try:
+                get_upstream_cache().invalidate_artifact(artifact_id)
+            except Exception:
+                pass  # Cache invalidation failure is non-critical
         else:
             logger.info(f"No changes made to artifact: {artifact_id}")
 
@@ -3256,6 +3262,12 @@ async def delete_artifact(
         except Exception as cache_err:
             logger.warning(f"Cache deletion failed for {artifact_id}: {cache_err}")
 
+        # Invalidate upstream fetch cache — artifact no longer exists
+        try:
+            get_upstream_cache().invalidate_artifact(artifact_id)
+        except Exception:
+            pass  # Cache invalidation failure is non-critical
+
         # Return 204 No Content (no body)
         return None
 
@@ -3446,6 +3458,12 @@ async def deploy_artifact(
                 collection_name,
                 deployment_profile_id=request.deployment_profile_id,
             )
+
+            # Invalidate upstream fetch cache — project version has changed
+            try:
+                get_upstream_cache().invalidate_artifact(artifact_id)
+            except Exception:
+                pass  # Cache invalidation failure is non-critical
 
             return ArtifactDeployResponse(
                 success=True,
@@ -3976,6 +3994,12 @@ async def sync_artifact(
                     logger.warning(
                         f"Cache refresh failed for {artifact_id}: {cache_err}"
                     )
+
+                # Invalidate upstream fetch cache — collection version has changed
+                try:
+                    get_upstream_cache().invalidate_artifact(artifact_id)
+                except Exception:
+                    pass  # Cache invalidation failure is non-critical
 
             return ArtifactSyncResponse(
                 success=success,
@@ -4798,11 +4822,16 @@ async def get_artifact_upstream_diff(
         # Fetch latest upstream version — check short-lived cache first to
         # avoid redundant GitHub API calls when the sync modal fires both
         # upstream-diff and source-project-diff for the same artifact.
-        _upstream_cache = get_upstream_cache()
         _cache_key = f"{artifact_id}:{collection_name or 'default'}"
-        cached_fetch = _upstream_cache.get(_cache_key)
-        if cached_fetch is not None:
-            fetch_result = cached_fetch
+        _cached_fetch = None
+        try:
+            _cached_fetch = get_upstream_cache().get(_cache_key)
+        except Exception:
+            logger.warning(
+                f"Upstream cache get failed for {_cache_key}, falling through to fetch"
+            )
+        if _cached_fetch is not None:
+            fetch_result = _cached_fetch
         else:
             logger.info(f"Fetching upstream update for {artifact_id}")
             fetch_result = artifact_mgr.fetch_update(
@@ -4811,7 +4840,12 @@ async def get_artifact_upstream_diff(
                 collection_name=collection_name,
             )
             if not fetch_result.error:
-                _upstream_cache.put(_cache_key, fetch_result)
+                try:
+                    get_upstream_cache().put(_cache_key, fetch_result)
+                except Exception:
+                    logger.warning(
+                        f"Upstream cache put failed for {_cache_key}"
+                    )
 
         # Check for fetch errors
         if fetch_result.error:
@@ -5241,14 +5275,19 @@ async def get_artifact_source_project_diff(
         # Check the short-lived cache first to avoid a redundant GitHub API call when
         # the sync modal has already fetched upstream data for this artifact (e.g. via
         # the upstream-diff endpoint moments earlier in the same modal session).
-        _upstream_cache = get_upstream_cache()
         _cache_key = f"{artifact_id}:{collection_name or 'default'}"
-        cached_fetch = _upstream_cache.get(_cache_key)
-        if cached_fetch is not None:
+        _cached_fetch = None
+        try:
+            _cached_fetch = get_upstream_cache().get(_cache_key)
+        except Exception:
+            logger.warning(
+                f"Upstream cache get failed for {_cache_key}, falling through to fetch"
+            )
+        if _cached_fetch is not None:
             logger.info(
                 f"Using cached upstream fetch for source-project diff: {artifact_id}"
             )
-            fetch_result = cached_fetch
+            fetch_result = _cached_fetch
         else:
             logger.info(
                 f"Fetching upstream for source-project diff: {artifact_id}"
@@ -5264,7 +5303,12 @@ async def get_artifact_source_project_diff(
                     collection_name=collection_name,
                 )
             if not fetch_result.error:
-                _upstream_cache.put(_cache_key, fetch_result)
+                try:
+                    get_upstream_cache().put(_cache_key, fetch_result)
+                except Exception:
+                    logger.warning(
+                        f"Upstream cache put failed for {_cache_key}"
+                    )
 
         try:
             if fetch_result.error:
