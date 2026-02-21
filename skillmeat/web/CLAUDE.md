@@ -93,6 +93,28 @@ The `Artifact` type is the canonical representation for skills, commands, agents
 
 **Component Examples**: See actual component patterns in `components/entity/` and `components/collection/`
 
+### Artifact Identifiers (ADR-007)
+
+The `Artifact` type has two identifier fields that serve different purposes:
+
+| Field | Format | Example | Use For |
+|-------|--------|---------|---------|
+| `id` | `type:name` | `skill:frontend-design` | Display, CLI commands, deploy dialog |
+| `uuid` | Hex UUID | `a1b2c3d4...` | **All API calls** (tags, groups, associations) |
+
+**API Rule**: When calling endpoints that associate artifacts with other entities (tags, groups, collection memberships), always pass `artifact.uuid`, not `artifact.id`.
+
+```typescript
+// ✓ Correct - use uuid for API calls
+addTagToArtifact(artifact.uuid, tagId);
+addToGroup({ artifactId: artifact.uuid, groupId });
+
+// ✗ Wrong - will cause 404 errors
+addTagToArtifact(artifact.id, tagId);
+```
+
+**Why**: The backend expects the stable UUID (ADR-007 identity) for foreign key lookups. The `type:name` composite is only for human-readable display and filesystem paths.
+
 ---
 
 ## Context Files (Load When Needed)
