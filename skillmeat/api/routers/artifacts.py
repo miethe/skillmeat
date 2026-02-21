@@ -4279,6 +4279,10 @@ async def get_artifact_diff(
         default=True,
         description="Include unified diff content in file results. Set to False for summary view.",
     ),
+    file_paths: Optional[str] = Query(
+        default=None,
+        description="Comma-separated file paths to include unified diffs for. When set, only these files get full diff content; others get status/hash only.",
+    ),
 ) -> ArtifactDiffResponse:
     """Get diff between collection version and deployed project version.
 
@@ -4334,6 +4338,9 @@ async def get_artifact_diff(
         logger.info(
             f"Getting diff for artifact: {artifact_id} (project={project_path}, collection={collection})"
         )
+
+        # Parse optional file-path filter for lazy per-file diff loading
+        requested_files = set(file_paths.split(",")) if file_paths else None
 
         # Parse artifact ID
         try:
@@ -4526,11 +4533,14 @@ async def get_artifact_diff(
                         file_status = "modified"
                         summary["modified"] += 1
 
-                        # Generate unified diff if text file
+                        # Generate unified diff if text file and not summary-only mode
                         unified_diff = None
-                        if not is_binary_file(coll_file_path) and not is_binary_file(
-                            proj_file_path
-                        ):
+                        skip_diff = summary_only or not include_unified_diff
+                        if not skip_diff and requested_files is not None and file_rel_path not in requested_files:
+                            skip_diff = True
+                        if not skip_diff and not is_binary_file(
+                            coll_file_path
+                        ) and not is_binary_file(proj_file_path):
                             try:
                                 with open(coll_file_path, "r", encoding="utf-8") as f:
                                     coll_lines = f.readlines()
@@ -4677,6 +4687,10 @@ async def get_artifact_upstream_diff(
         default=True,
         description="Include unified diff content in file results. Set to False for summary view.",
     ),
+    file_paths: Optional[str] = Query(
+        default=None,
+        description="Comma-separated file paths to include unified diffs for. When set, only these files get full diff content; others get status/hash only.",
+    ),
 ) -> ArtifactUpstreamDiffResponse:
     """Get diff between collection version and GitHub upstream source.
 
@@ -4739,6 +4753,9 @@ async def get_artifact_upstream_diff(
         logger.info(
             f"Getting upstream diff for artifact: {artifact_id} (collection={collection})"
         )
+
+        # Parse optional file-path filter for lazy per-file diff loading
+        requested_files = set(file_paths.split(",")) if file_paths else None
 
         # Parse artifact ID
         try:
@@ -4927,11 +4944,14 @@ async def get_artifact_upstream_diff(
                     file_status = "modified"
                     summary["modified"] += 1
 
-                    # Generate unified diff if text file
+                    # Generate unified diff if text file and not summary-only mode
                     unified_diff = None
-                    if not is_binary_file(coll_file_path) and not is_binary_file(
-                        upstream_file_path
-                    ):
+                    skip_diff = summary_only or not include_unified_diff
+                    if not skip_diff and requested_files is not None and file_rel_path not in requested_files:
+                        skip_diff = True
+                    if not skip_diff and not is_binary_file(
+                        coll_file_path
+                    ) and not is_binary_file(upstream_file_path):
                         try:
                             with open(coll_file_path, "r", encoding="utf-8") as f:
                                 coll_lines = f.readlines()
@@ -5099,6 +5119,10 @@ async def get_artifact_source_project_diff(
         default=True,
         description="Include unified diff content in file results. Set to False for summary view.",
     ),
+    file_paths: Optional[str] = Query(
+        default=None,
+        description="Comma-separated file paths to include unified diffs for. When set, only these files get full diff content; others get status/hash only.",
+    ),
 ) -> ArtifactDiffResponse:
     """Get diff between upstream source and project deployment, skipping collection.
 
@@ -5124,6 +5148,9 @@ async def get_artifact_source_project_diff(
             f"Getting source-project diff for artifact: {artifact_id} "
             f"(project={project_path}, collection={collection})"
         )
+
+        # Parse optional file-path filter for lazy per-file diff loading
+        requested_files = set(file_paths.split(",")) if file_paths else None
 
         # Parse artifact ID
         try:
@@ -5351,9 +5378,12 @@ async def get_artifact_source_project_diff(
                             file_status = "modified"
                             summary["modified"] += 1
                             unified_diff = None
-                            if not is_binary_file(src_file) and not is_binary_file(
-                                proj_file
-                            ):
+                            skip_diff = summary_only or not include_unified_diff
+                            if not skip_diff and requested_files is not None and file_rel_path not in requested_files:
+                                skip_diff = True
+                            if not skip_diff and not is_binary_file(
+                                src_file
+                            ) and not is_binary_file(proj_file):
                                 try:
                                     with open(src_file, "r", encoding="utf-8") as f:
                                         src_lines = f.readlines()
