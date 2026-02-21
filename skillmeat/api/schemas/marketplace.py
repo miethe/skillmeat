@@ -1997,6 +1997,14 @@ class DetectedArtifact(BaseModel):
         default=None,
         description="Concatenated searchable text (title + description + tags)",
     )
+    # Embedded child artifacts (populated for Skills that contain Commands/Agents/etc.)
+    embedded_artifacts: List["DetectedArtifact"] = Field(
+        default_factory=list,
+        description=(
+            "Child artifacts embedded within this artifact's directory tree "
+            "(e.g., Commands inside a Skill). These are NOT promoted as top-level artifacts."
+        ),
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -2011,6 +2019,7 @@ class DetectedArtifact(BaseModel):
                 "detected_sha": "abc123def456",
                 "detected_version": "1.2.0",
                 "metadata": {"description": "Canvas design skill"},
+                "embedded_artifacts": [],
             }
         }
 
@@ -3173,4 +3182,7 @@ class BulkAutoTagRefreshResponse(BaseModel):
 
 
 # Rebuild models to resolve forward references
+# DetectedArtifact.embedded_artifacts is a self-referential list; rebuild so
+# Pydantic resolves the forward reference before any instantiation.
+DetectedArtifact.model_rebuild()
 ScanResultDTO.model_rebuild()

@@ -1,20 +1,20 @@
 ---
-schema_version: "1.1"
+schema_version: '1.1'
 doc_type: implementation_plan
-title: "Fix Marketplace Embedded Artifacts Detection and File Loading"
-status: draft
-created: "2026-02-21"
-updated: "2026-02-21"
+title: Fix Marketplace Embedded Artifacts Detection and File Loading
+status: in-progress
+created: '2026-02-21'
+updated: '2026-02-21'
 feature_slug: marketplace-embedded-artifacts
 priority: high
 risk_level: medium
 prd_ref: null
 plan_ref: null
-scope: "Marketplace artifact detection and file serving"
-effort_estimate: "2 phases, ~8-12 story points"
+scope: Marketplace artifact detection and file serving
+effort_estimate: 2 phases, ~8-12 story points
 related_documents:
-  - docs/project_plans/PRDs/features/marketplace-source-detection-improvements-v1.md
-  - docs/project_plans/bugs/marketplace-sources-non_skills-v1.md
+- docs/project_plans/PRDs/features/marketplace-source-detection-improvements-v1.md
+- docs/project_plans/bugs/marketplace-sources-non_skills-v1.md
 ---
 
 # Implementation Plan: Fix Marketplace Embedded Artifacts Detection and File Loading
