@@ -1,6 +1,7 @@
 """Deployment tracking and management for SkillMeat."""
 
 import logging
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -26,6 +27,39 @@ from skillmeat.utils.filesystem import FilesystemManager, compute_content_hash
 
 console = Console()
 logger = logging.getLogger(__name__)
+
+
+def _count_files_recursive(directory: Path) -> int:
+    """Count all regular files under ``directory`` without reading their contents.
+
+    Uses :func:`os.scandir` for a fast directory walk that only inspects
+    inode metadata, avoiding any file-content I/O.  This is substantially
+    cheaper than a full :func:`compute_content_hash` traversal and is used as
+    a fast pre-check in :meth:`DeploymentManager.compute_deployment_statuses_batch`
+    to short-circuit the hash comparison when the file count has changed.
+
+    Args:
+        directory: Root directory to count under.
+
+    Returns:
+        Total number of regular (non-directory) files found recursively.
+    """
+    count = 0
+    stack = [str(directory)]
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as entries:
+                for entry in entries:
+                    if entry.is_file(follow_symlinks=False):
+                        count += 1
+                    elif entry.is_dir(follow_symlinks=False):
+                        stack.append(entry.path)
+        except OSError:
+            # Swallow permission errors or vanished directories gracefully;
+            # the subsequent hash computation will surface any real problems.
+            pass
+    return count
 
 
 @dataclass
@@ -334,14 +368,19 @@ class DeploymentManager:
         else:
             project_path = Path(project_path).resolve()
 
-        # Backward compatibility: ensure default profile metadata exists.
-        self._resolve_target_profiles(project_path=project_path)
-
+        # Resolve profiles in a single call — this also handles backward-compat
+        # profile creation (previously required a separate no-arg call first).
         deployments: List[Deployment] = []
         profiles = self._resolve_target_profiles(
             project_path=project_path,
             profile_id=profile_id,
             all_profiles=all_profiles,
+        )
+
+        # Load existing deployment records once; passed to record_deployment() so it
+        # does not re-read the TOML file on every artifact/profile iteration.
+        existing_records = DeploymentTracker.read_deployments(
+            project_path, profile_root_dir=None
         )
 
         for artifact_name in artifact_names:
@@ -431,6 +470,12 @@ class DeploymentManager:
                     artifact_path=artifact_path,
                     artifact_path_map=dict(profile.artifact_path_map),
                     artifact_uuid=artifact_uuid,
+                    existing_deployments=existing_records,
+                )
+                # Re-read after the write so subsequent iterations in this loop
+                # see the updated state (write_deployments persisted the change).
+                existing_records = DeploymentTracker.read_deployments(
+                    project_path, profile_root_dir=None
                 )
 
                 self._record_deployment_version(
@@ -668,7 +713,22 @@ class DeploymentManager:
 
         1. Reads all deployment records once (or reuses the ``deployments`` list
            if the caller already has it).
-        2. Resolves every artifact's on-disk path and hashes it in a single loop.
+        2. Resolves every artifact's on-disk path and applies a three-tier
+           early-exit strategy per artifact to minimise I/O:
+
+           a. **Missing path** — if the deployed path does not exist, the status
+              is ``"synced"`` immediately (mirrors ``detect_modifications()``
+              semantics).
+           b. **File-count fast check** — for directory artifacts that carry a
+              ``file_count`` field (set by the sync-status precomputation layer),
+              a cheap ``os.scandir`` walk compares the on-disk count against the
+              stored value.  A mismatch short-circuits to ``"modified"`` without
+              reading any file content.
+           c. **Path-level hash cache** — within a single batch call, if two
+              deployment records resolve to the same on-disk path, the SHA-256
+              hash is computed only once and the result is reused for every
+              duplicate, eliminating redundant content I/O.
+
         3. Compares each hash against the stored ``content_hash`` / ``collection_sha``
            in bulk, with no additional TOML reads.
 
@@ -725,6 +785,13 @@ class DeploymentManager:
                 base_key_counts[base_key] = base_key_counts.get(base_key, 0) + 1
 
             # -- Step 3: single-pass hash + compare (no additional TOML reads) --
+            #
+            # Path-level hash cache: maps resolved absolute path -> computed hash.
+            # When two deployment records reference the same on-disk location (e.g.,
+            # the same artifact deployed to multiple profiles with coincident roots),
+            # the full content traversal is performed only once per unique path.
+            _path_hash_cache: Dict[Path, str] = {}
+
             result: Dict[str, str] = {}
             for deployment in deployments:
                 base_key = f"{deployment.artifact_name}::{deployment.artifact_type}"
@@ -745,13 +812,66 @@ class DeploymentManager:
                     ),
                 )
 
+                # Early-exit tier (a): deployed path absent.
+                # Status is known immediately with zero I/O — mirrors
+                # detect_modifications() semantics (returns False when absent).
                 if not artifact_full_path.exists():
-                    # File absent — treat as unmodified (matches detect_modifications behaviour)
                     result[key] = "synced"
                     continue
 
-                current_hash = compute_content_hash(artifact_full_path)
                 stored_hash = deployment.collection_sha or deployment.content_hash
+
+                # Early-exit tier (b): directory file-count fast check.
+                # os.scandir-based counting reads only inode metadata, not file
+                # contents.  When the on-disk file count differs from the count
+                # recorded at deploy time, the artifact is conclusively modified
+                # and we skip the full SHA-256 traversal.
+                # NOTE: ``file_count`` is set on the Deployment object by the
+                # batch sync-status precomputation layer when that data is
+                # available; it is absent (None) on records loaded from legacy
+                # TOML files that predate this field, in which case we fall
+                # through to the full hash comparison.
+                if artifact_full_path.is_dir():
+                    stored_file_count: Optional[int] = getattr(
+                        deployment, "file_count", None
+                    )
+                    if stored_file_count is not None:
+                        with PerfTimer(
+                            "deployment.file_count_check",
+                            artifact_name=deployment.artifact_name,
+                            artifact_path=str(artifact_full_path),
+                        ):
+                            deployed_file_count = _count_files_recursive(artifact_full_path)
+                        if deployed_file_count != stored_file_count:
+                            logger.debug(
+                                "File count mismatch for %s (%s): on-disk=%d stored=%d"
+                                " — skipping full hash",
+                                deployment.artifact_name,
+                                artifact_full_path,
+                                deployed_file_count,
+                                stored_file_count,
+                            )
+                            result[key] = "modified"
+                            continue
+
+                # Early-exit tier (c): path-level hash cache.
+                # Reuse a hash computed earlier in this batch for the same physical
+                # path rather than re-reading every file byte.
+                if artifact_full_path in _path_hash_cache:
+                    current_hash = _path_hash_cache[artifact_full_path]
+                    logger.debug(
+                        "Hash cache hit for %s — reusing cached hash",
+                        artifact_full_path,
+                    )
+                else:
+                    with PerfTimer(
+                        "deployment.content_hash",
+                        artifact_name=deployment.artifact_name,
+                        artifact_path=str(artifact_full_path),
+                        is_dir=artifact_full_path.is_dir(),
+                    ):
+                        current_hash = compute_content_hash(artifact_full_path)
+                    _path_hash_cache[artifact_full_path] = current_hash
 
                 if current_hash != stored_hash:
                     result[key] = "modified"

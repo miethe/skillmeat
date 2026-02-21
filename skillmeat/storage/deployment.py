@@ -183,6 +183,7 @@ class DeploymentTracker:
         artifact_path: Optional[Path] = None,
         artifact_path_map: Optional[Dict[str, str]] = None,
         artifact_uuid: Optional[str] = None,
+        existing_deployments: Optional[List["Deployment"]] = None,
     ) -> None:
         """Record new deployment or update existing.
 
@@ -193,10 +194,16 @@ class DeploymentTracker:
             collection_sha: SHA of artifact content
             artifact_uuid: Stable UUID from DB cache (ADR-007); optional, omitted when
                 artifact not yet cached
+            existing_deployments: Pre-loaded deployment list from the caller.  When
+                provided the function skips the ``read_deployments`` call, saving one
+                TOML read per deploy operation.
         """
         from datetime import datetime
 
-        deployments = DeploymentTracker.read_deployments(project_path, profile_root_dir=None)
+        if existing_deployments is not None:
+            deployments = list(existing_deployments)
+        else:
+            deployments = DeploymentTracker.read_deployments(project_path, profile_root_dir=None)
 
         if artifact_path is None:
             path_map = DEFAULT_ARTIFACT_PATH_MAP.copy()
