@@ -99,6 +99,7 @@ from skillmeat.api.utils.error_handlers import (
     create_validation_error,
     validate_artifact_request,
 )
+from skillmeat.api.utils.upstream_cache import get_upstream_cache
 from skillmeat.core.artifact import ArtifactType, LinkedArtifactReference
 from skillmeat.core.cache import MetadataCache
 from skillmeat.core.deployment import Deployment, DeploymentManager
@@ -4794,13 +4795,23 @@ async def get_artifact_upstream_diff(
                 detail="Artifact does not have upstream tracking configured",
             )
 
-        # Fetch latest upstream version
-        logger.info(f"Fetching upstream update for {artifact_id}")
-        fetch_result = artifact_mgr.fetch_update(
-            artifact_name=artifact_name,
-            artifact_type=artifact_type,
-            collection_name=collection_name,
-        )
+        # Fetch latest upstream version — check short-lived cache first to
+        # avoid redundant GitHub API calls when the sync modal fires both
+        # upstream-diff and source-project-diff for the same artifact.
+        _upstream_cache = get_upstream_cache()
+        _cache_key = f"{artifact_id}:{collection_name or 'default'}"
+        cached_fetch = _upstream_cache.get(_cache_key)
+        if cached_fetch is not None:
+            fetch_result = cached_fetch
+        else:
+            logger.info(f"Fetching upstream update for {artifact_id}")
+            fetch_result = artifact_mgr.fetch_update(
+                artifact_name=artifact_name,
+                artifact_type=artifact_type,
+                collection_name=collection_name,
+            )
+            if not fetch_result.error:
+                _upstream_cache.put(_cache_key, fetch_result)
 
         # Check for fetch errors
         if fetch_result.error:
@@ -5226,18 +5237,34 @@ async def get_artifact_source_project_diff(
                 detail="Artifact does not have upstream tracking configured",
             )
 
-        # Fetch latest upstream version — primary network cost for source-project diff
-        logger.info(f"Fetching upstream for source-project diff: {artifact_id}")
-        with PerfTimer(
-            "router.get_artifact_source_project_diff.fetch_upstream",
-            artifact_id=artifact_id,
-            collection=collection_name,
-        ):
-            fetch_result = artifact_mgr.fetch_update(
-                artifact_name=artifact_name,
-                artifact_type=artifact_type,
-                collection_name=collection_name,
+        # Fetch latest upstream version — primary network cost for source-project diff.
+        # Check the short-lived cache first to avoid a redundant GitHub API call when
+        # the sync modal has already fetched upstream data for this artifact (e.g. via
+        # the upstream-diff endpoint moments earlier in the same modal session).
+        _upstream_cache = get_upstream_cache()
+        _cache_key = f"{artifact_id}:{collection_name or 'default'}"
+        cached_fetch = _upstream_cache.get(_cache_key)
+        if cached_fetch is not None:
+            logger.info(
+                f"Using cached upstream fetch for source-project diff: {artifact_id}"
             )
+            fetch_result = cached_fetch
+        else:
+            logger.info(
+                f"Fetching upstream for source-project diff: {artifact_id}"
+            )
+            with PerfTimer(
+                "router.get_artifact_source_project_diff.fetch_upstream",
+                artifact_id=artifact_id,
+                collection=collection_name,
+            ):
+                fetch_result = artifact_mgr.fetch_update(
+                    artifact_name=artifact_name,
+                    artifact_type=artifact_type,
+                    collection_name=collection_name,
+                )
+            if not fetch_result.error:
+                _upstream_cache.put(_cache_key, fetch_result)
 
         try:
             if fetch_result.error:
