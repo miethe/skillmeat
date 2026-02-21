@@ -886,12 +886,14 @@ class SyncManager:
                 f"Filtered to {len(drift_results)} artifacts matching filter: {artifact_names}"
             )
 
-        # Filter to pullable drift (modified artifacts only)
+        # Filter to pullable drift (modified or conflict artifacts)
         # Don't pull "added" (new in collection) or "removed" (deleted from collection)
-        # For "modified" drift, check if project has local modifications
+        # Both "modified" (local-only changes) and "conflict" (both sides changed) are
+        # pullable — we want to capture local project changes regardless of whether the
+        # collection also changed.
         pullable_drift = []
         for drift in drift_results:
-            if drift.drift_type == "modified":
+            if drift.drift_type in ("modified", "conflict"):
                 # Get project artifact path
                 project_artifact_path = self._get_project_artifact_path(
                     project_path, drift.artifact_name, drift.artifact_type
@@ -908,11 +910,14 @@ class SyncManager:
                         pullable_drift.append(drift)
                         logger.debug(
                             f"Artifact {drift.artifact_name} has local modifications "
-                            f"(baseline: {baseline[:12] if baseline else 'unknown'}..., "
+                            f"(drift_type: {drift.drift_type}, "
+                            f"baseline: {baseline[:12] if baseline else 'unknown'}..., "
                             f"current: {current_project_sha[:12]}...)"
                         )
 
-        logger.info(f"Found {len(pullable_drift)} artifacts with pullable changes")
+        logger.info(
+            f"Found {len(pullable_drift)} artifacts with pullable local changes"
+        )
 
         if not pullable_drift:
             logger.info("No artifacts to pull from project")
