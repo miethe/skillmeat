@@ -29,6 +29,7 @@ from fastapi.testclient import TestClient
 
 from skillmeat.api.config import APISettings
 from skillmeat.api.server import create_app
+from skillmeat.api.utils.upstream_cache import UpstreamFetchCache
 from skillmeat.core.artifact import Artifact, ArtifactMetadata, ArtifactType
 
 
@@ -500,6 +501,10 @@ class TestUpstreamDiff:
                 "skillmeat.api.routers.artifacts._find_artifact_in_collections",
                 return_value=(sample_artifact, "default"),
             ),
+            patch(
+                "skillmeat.api.routers.artifacts.get_upstream_cache",
+                return_value=UpstreamFetchCache(),
+            ),
         ):
             return client.get(self.ENDPOINT, params=query_params)
 
@@ -686,6 +691,10 @@ class TestSourceProjectDiff:
                     artifact_path=f"skills/{ARTIFACT_NAME}",
                 ),
             ),
+            patch(
+                "skillmeat.api.routers.artifacts.get_upstream_cache",
+                return_value=UpstreamFetchCache(),
+            ),
         ):
             params = {"project_path": str(proj_path), **query_params}
             return client.get(self.ENDPOINT, params=params)
@@ -806,6 +815,10 @@ class TestSourceProjectDiff:
                     from_collection="default",
                     artifact_path=f"skills/{ARTIFACT_NAME}",
                 ),
+            ),
+            patch(
+                "skillmeat.api.routers.artifacts.get_upstream_cache",
+                return_value=UpstreamFetchCache(),
             ),
         ):
             resp = client.get(
