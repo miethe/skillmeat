@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Sync Status Performance Refactor (2026-02-21)
+
+**Performance**
+- Modal open no longer triggers deployment queries — deployment stats only load when Deployments tab is opened
+- DiffViewer now parses files on-demand instead of all at once — large files (>50KB) show load button instead of inline diff
+- Large diffs (50+ files) automatically paginate to prevent rendering slowdown
+- Backend summary-first diff mode (`?mode=summary`) reduces payload by 80-95% for initial diff loads
+
+**Changed**
+- Deployment query fanout on Sync tab has been moved to Deployments tab only — reduces unnecessary API calls when users don't view deployments
+- DiffViewer large file handling now defers parse until user explicitly clicks "Load Diff" for files >50KB or with >1000 lines of changes
+
 #### Platform Defaults Auto-Population (2026-02-09)
 
 **Profile Form Auto-Population**
