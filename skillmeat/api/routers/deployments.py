@@ -31,6 +31,7 @@ from skillmeat.cache.deployment_stats_cache import get_deployment_stats_cache
 from skillmeat.cache.models import get_session
 from skillmeat.core.artifact import ArtifactType
 from skillmeat.core.deployment import DeploymentManager
+from skillmeat.observability.timing import PerfTimer
 
 logger = logging.getLogger(__name__)
 
@@ -209,17 +210,23 @@ async def deploy_artifact(
                             profile_id=existing_deployment.deployment_profile_id,
                         )
 
-            # Perform deployment
-            deployments = deployment_mgr.deploy_artifacts(
-                artifact_names=[request.artifact_name],
-                collection_name=request.collection_name,
-                project_path=project_path,
-                artifact_type=artifact_type,
-                overwrite=request.overwrite,
-                dest_path=validated_dest_path,
-                profile_id=request.deployment_profile_id,
-                all_profiles=request.all_profiles,
-            )
+            # Perform deployment — timed as the primary expensive operation
+            with PerfTimer(
+                "router.deploy_artifact.execute",
+                artifact_name=request.artifact_name,
+                artifact_type=request.artifact_type,
+                project_path=str(project_path),
+            ):
+                deployments = deployment_mgr.deploy_artifacts(
+                    artifact_names=[request.artifact_name],
+                    collection_name=request.collection_name,
+                    project_path=project_path,
+                    artifact_type=artifact_type,
+                    overwrite=request.overwrite,
+                    dest_path=validated_dest_path,
+                    profile_id=request.deployment_profile_id,
+                    all_profiles=request.all_profiles,
+                )
 
             if not deployments:
                 raise HTTPException(
@@ -258,37 +265,42 @@ async def deploy_artifact(
             )
 
             # Update DB cache with deployment info (write-through pattern)
-            session = get_session()
-            try:
-                for deployed in deployments:
-                    artifact_id = f"{deployed.artifact_type}:{deployed.artifact_name}"
-                    try:
-                        add_deployment_to_cache(
-                            session=session,
-                            artifact_id=artifact_id,
-                            project_path=str(project_path),
-                            project_name=project_path.name,
-                            deployed_at=deployed.deployed_at,
-                            content_hash=deployed.content_hash,
-                            deployment_profile_id=deployed.deployment_profile_id,
-                            local_modifications=deployed.local_modifications,
-                            platform=(
-                                deployed.platform.value if deployed.platform else None
-                            ),
-                        )
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to update deployment cache for {artifact_id}: {e}"
-                        )
-                session.commit()
-            except Exception as e:
-                logger.warning(f"Failed to update deployment cache: {e}")
+            with PerfTimer(
+                "router.deploy_artifact.cache_write",
+                artifact_name=request.artifact_name,
+                project_path=str(project_path),
+            ):
+                session = get_session()
                 try:
-                    session.rollback()
-                except Exception:
-                    pass  # Ignore rollback errors
-            finally:
-                session.close()
+                    for deployed in deployments:
+                        artifact_id = f"{deployed.artifact_type}:{deployed.artifact_name}"
+                        try:
+                            add_deployment_to_cache(
+                                session=session,
+                                artifact_id=artifact_id,
+                                project_path=str(project_path),
+                                project_name=project_path.name,
+                                deployed_at=deployed.deployed_at,
+                                content_hash=deployed.content_hash,
+                                deployment_profile_id=deployed.deployment_profile_id,
+                                local_modifications=deployed.local_modifications,
+                                platform=(
+                                    deployed.platform.value if deployed.platform else None
+                                ),
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to update deployment cache for {artifact_id}: {e}"
+                            )
+                    session.commit()
+                except Exception as e:
+                    logger.warning(f"Failed to update deployment cache: {e}")
+                    try:
+                        session.rollback()
+                    except Exception:
+                        pass  # Ignore rollback errors
+                finally:
+                    session.close()
 
             # Invalidate deployment stats cache
             get_deployment_stats_cache().invalidate_all()
@@ -370,32 +382,43 @@ async def undeploy_artifact(
         )
         project_path = project_path.resolve()
 
-        # Undeploy artifact
+        # Undeploy artifact — timed as the expensive filesystem operation
         try:
-            deployment_mgr.undeploy(
+            with PerfTimer(
+                "router.undeploy_artifact.execute",
                 artifact_name=request.artifact_name,
-                artifact_type=artifact_type,
-                project_path=project_path,
-                profile_id=request.profile_id,
-            )
+                artifact_type=request.artifact_type,
+                project_path=str(project_path),
+            ):
+                deployment_mgr.undeploy(
+                    artifact_name=request.artifact_name,
+                    artifact_type=artifact_type,
+                    project_path=project_path,
+                    profile_id=request.profile_id,
+                )
 
             # Write through to DB cache after successful undeploy
-            session = get_session()
-            try:
-                artifact_id = f"{request.artifact_type}:{request.artifact_name}"
+            with PerfTimer(
+                "router.undeploy_artifact.cache_write",
+                artifact_name=request.artifact_name,
+                project_path=str(project_path),
+            ):
+                session = get_session()
                 try:
-                    remove_deployment_from_cache(
-                        session=session,
-                        artifact_id=artifact_id,
-                        project_path=str(project_path),
-                        profile_id=request.profile_id,
-                    )
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to update deployment cache after undeploy: {e}"
-                    )
-            finally:
-                session.close()
+                    artifact_id = f"{request.artifact_type}:{request.artifact_name}"
+                    try:
+                        remove_deployment_from_cache(
+                            session=session,
+                            artifact_id=artifact_id,
+                            project_path=str(project_path),
+                            profile_id=request.profile_id,
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to update deployment cache after undeploy: {e}"
+                        )
+                finally:
+                    session.close()
 
             response = UndeployResponse(
                 success=True,
@@ -481,17 +504,28 @@ async def list_deployments(
 
         logger.info(f"Listing deployments for project: {resolved_path}")
 
-        # Get deployments
-        deployments = deployment_mgr.list_deployments(
-            project_path=resolved_path,
+        # Get deployments — timed separately from status check to isolate costs
+        with PerfTimer(
+            "router.list_deployments.fetch",
+            project_path=str(resolved_path),
             profile_id=profile_id,
-        )
+        ):
+            deployments = deployment_mgr.list_deployments(
+                project_path=resolved_path,
+                profile_id=profile_id,
+            )
 
-        # Get sync status for each deployment
-        status_map = deployment_mgr.check_deployment_status(
-            project_path=resolved_path,
-            profile_id=profile_id,
-        )
+        # Get sync status for each deployment — this calls detect_modifications
+        # per artifact and is the dominant cost of this endpoint
+        with PerfTimer(
+            "router.list_deployments.check_status",
+            project_path=str(resolved_path),
+            deployment_count=len(deployments),
+        ):
+            status_map = deployment_mgr.check_deployment_status(
+                project_path=resolved_path,
+                profile_id=profile_id,
+            )
 
         # Convert to response format
         deployment_infos = []

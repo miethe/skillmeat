@@ -21,6 +21,7 @@ from skillmeat.core.path_resolver import (
     resolve_deployment_path,
     resolve_profile_root,
 )
+from skillmeat.observability.timing import PerfTimer
 from skillmeat.utils.filesystem import FilesystemManager, compute_content_hash
 
 console = Console()
@@ -610,16 +611,21 @@ class DeploymentManager:
         else:
             project_path = Path(project_path).resolve()
 
-        deployments = DeploymentTracker.read_deployments(
-            project_path, profile_root_dir=None
-        )
-        if profile_id is None:
-            return deployments
-        return [
-            deployment
-            for deployment in deployments
-            if (deployment.deployment_profile_id or "claude_code") == profile_id
-        ]
+        with PerfTimer(
+            "deployment.list_deployments",
+            project_path=str(project_path),
+            profile_id=profile_id,
+        ):
+            deployments = DeploymentTracker.read_deployments(
+                project_path, profile_root_dir=None
+            )
+            if profile_id is None:
+                return deployments
+            return [
+                deployment
+                for deployment in deployments
+                if (deployment.deployment_profile_id or "claude_code") == profile_id
+            ]
 
     def check_deployment_status(
         self,
@@ -641,46 +647,51 @@ class DeploymentManager:
         else:
             project_path = Path(project_path).resolve()
 
-        deployments = DeploymentTracker.read_deployments(
-            project_path, profile_root_dir=None
-        )
-        if profile_id:
-            deployments = [
-                d
-                for d in deployments
-                if (d.deployment_profile_id or "claude_code") == profile_id
-            ]
+        with PerfTimer(
+            "deployment.check_deployment_status",
+            project_path=str(project_path),
+            profile_id=profile_id,
+        ):
+            deployments = DeploymentTracker.read_deployments(
+                project_path, profile_root_dir=None
+            )
+            if profile_id:
+                deployments = [
+                    d
+                    for d in deployments
+                    if (d.deployment_profile_id or "claude_code") == profile_id
+                ]
 
-        base_key_counts: Dict[str, int] = {}
-        for deployment in deployments:
-            base_key = f"{deployment.artifact_name}::{deployment.artifact_type}"
-            base_key_counts[base_key] = base_key_counts.get(base_key, 0) + 1
+            base_key_counts: Dict[str, int] = {}
+            for deployment in deployments:
+                base_key = f"{deployment.artifact_name}::{deployment.artifact_type}"
+                base_key_counts[base_key] = base_key_counts.get(base_key, 0) + 1
 
-        status: Dict[str, str] = {}
+            status: Dict[str, str] = {}
 
-        for deployment in deployments:
-            base_key = f"{deployment.artifact_name}::{deployment.artifact_type}"
-            if base_key_counts[base_key] > 1:
-                profile_key = deployment.deployment_profile_id or "claude_code"
-                key = f"{base_key}::{profile_key}"
-            else:
-                key = base_key
+            for deployment in deployments:
+                base_key = f"{deployment.artifact_name}::{deployment.artifact_type}"
+                if base_key_counts[base_key] > 1:
+                    profile_key = deployment.deployment_profile_id or "claude_code"
+                    key = f"{base_key}::{profile_key}"
+                else:
+                    key = base_key
 
-            # Check for local modifications
-            if DeploymentTracker.detect_modifications(
-                project_path,
-                deployment.artifact_name,
-                deployment.artifact_type,
-                profile_id=deployment.deployment_profile_id,
-            ):
-                status[key] = "modified"
-            else:
-                status[key] = "synced"
+                # Check for local modifications
+                if DeploymentTracker.detect_modifications(
+                    project_path,
+                    deployment.artifact_name,
+                    deployment.artifact_type,
+                    profile_id=deployment.deployment_profile_id,
+                ):
+                    status[key] = "modified"
+                else:
+                    status[key] = "synced"
 
-            # TODO: Check for upstream updates (requires collection loading)
-            # This will be expanded in later phases
+                # TODO: Check for upstream updates (requires collection loading)
+                # This will be expanded in later phases
 
-        return status
+            return status
 
     def _record_deployment_version(
         self,

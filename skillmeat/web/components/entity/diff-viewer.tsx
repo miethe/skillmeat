@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { markStart, markEnd } from '@/lib/perf-marks';
 
 /**
  * Resolution type for sync conflict resolution
@@ -322,6 +323,11 @@ export function DiffViewer({
 
   const selectedFile = files[selectedFileIndex];
 
+  // Performance instrumentation: start timing diff summary and render on mount
+  useEffect(() => {
+    markStart('diff-viewer.summary-ready');
+  }, []);
+
   // Memoize parsed diff to avoid re-parsing on every render
   const parsedDiff = useMemo(() => {
     return selectedFile?.unified_diff ? parseDiff(selectedFile.unified_diff) : [];
@@ -359,6 +365,31 @@ export function DiffViewer({
       rightScroll.removeEventListener('scroll', onRightScroll);
     };
   }, [selectedFile]);
+
+  // Performance instrumentation: mark when diff summary data arrives (files prop populated)
+  const diffSummaryMarked = useRef(false);
+  useEffect(() => {
+    if (files.length > 0 && !diffSummaryMarked.current) {
+      diffSummaryMarked.current = true;
+      markEnd('diff-viewer.summary-ready');
+    }
+  }, [files]);
+
+  // Performance instrumentation: mark when the full diff content finishes rendering
+  // (fires after paint for the current selected file's unified diff)
+  const prevFilesKey = useRef('');
+  useEffect(() => {
+    const filesKey = files.map((f) => f.file_path).join(',');
+    if (files.length > 0 && filesKey !== prevFilesKey.current) {
+      prevFilesKey.current = filesKey;
+      markStart('diff-viewer.render');
+      // Defer end mark until after browser has painted the diff content
+      const id = requestAnimationFrame(() => {
+        markEnd('diff-viewer.render');
+      });
+      return () => cancelAnimationFrame(id);
+    }
+  }, [files]);
 
   // Memoize summary calculation
   const summary = useMemo(() => {

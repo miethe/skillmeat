@@ -132,6 +132,7 @@ from skillmeat.cache.models import (
     get_session,
 )
 from skillmeat.cache.repositories import MarketplaceCatalogRepository
+from skillmeat.observability.timing import PerfTimer
 
 logger = logging.getLogger(__name__)
 
@@ -2582,12 +2583,17 @@ async def check_artifact_upstream(
                 detail="Artifact does not have upstream tracking configured",
             )
 
-        # Fetch update information
-        fetch_result = artifact_mgr.fetch_update(
-            artifact_name=artifact_name,
-            artifact_type=artifact_type,
-            collection_name=collection_name,
-        )
+        # Fetch update information — primary network cost for this endpoint
+        with PerfTimer(
+            "router.check_artifact_upstream.fetch",
+            artifact_id=artifact_id,
+            collection=collection_name,
+        ):
+            fetch_result = artifact_mgr.fetch_update(
+                artifact_name=artifact_name,
+                artifact_type=artifact_type,
+                collection_name=collection_name,
+            )
 
         # Check for errors
         if fetch_result.error:
@@ -4419,28 +4425,33 @@ async def get_artifact_diff(
                 "Returning diff with all collection files marked as 'added'."
             )
 
-        # Collect all files from both locations
-        collection_files = set()
-        project_files = set()
-        exclude_dirs = set(settings.diff_exclude_dirs)
+        # Collect all files from both locations — timed to measure filesystem enumeration
+        with PerfTimer(
+            "router.get_artifact_diff.enumerate_files",
+            artifact_id=artifact_id,
+            project_path=project_path,
+        ):
+            collection_files = set()
+            project_files = set()
+            exclude_dirs = set(settings.diff_exclude_dirs)
 
-        if collection_exists:
-            if collection_artifact_path.is_dir():
-                collection_files = {
-                    str(f.relative_to(collection_artifact_path))
-                    for f in iter_artifact_files(collection_artifact_path, exclude_dirs)
-                }
-            else:
-                collection_files = {collection_artifact_path.name}
+            if collection_exists:
+                if collection_artifact_path.is_dir():
+                    collection_files = {
+                        str(f.relative_to(collection_artifact_path))
+                        for f in iter_artifact_files(collection_artifact_path, exclude_dirs)
+                    }
+                else:
+                    collection_files = {collection_artifact_path.name}
 
-        if project_exists:
-            if project_artifact_path.is_dir():
-                project_files = {
-                    str(f.relative_to(project_artifact_path))
-                    for f in iter_artifact_files(project_artifact_path, exclude_dirs)
-                }
-            else:
-                project_files = {project_artifact_path.name}
+            if project_exists:
+                if project_artifact_path.is_dir():
+                    project_files = {
+                        str(f.relative_to(project_artifact_path))
+                        for f in iter_artifact_files(project_artifact_path, exclude_dirs)
+                    }
+                else:
+                    project_files = {project_artifact_path.name}
 
         # Get all unique files
         all_files = sorted(collection_files | project_files)
@@ -4468,125 +4479,130 @@ async def get_artifact_diff(
             except Exception:
                 return True  # Treat as binary if can't read
 
-        # Build file diffs
+        # Build file diffs — timed to measure hashing + diff generation cost
         file_diffs: List[FileDiff] = []
         summary = {"added": 0, "modified": 0, "deleted": 0, "unchanged": 0}
 
-        for file_rel_path in all_files:
-            in_collection = file_rel_path in collection_files
-            in_project = file_rel_path in project_files
+        with PerfTimer(
+            "router.get_artifact_diff.compute",
+            artifact_id=artifact_id,
+            file_count=len(all_files),
+        ):
+            for file_rel_path in all_files:
+                in_collection = file_rel_path in collection_files
+                in_project = file_rel_path in project_files
 
-            # Determine status
-            if in_collection and in_project:
-                # File exists in both - check if modified
-                if collection_artifact_path.is_dir():
-                    coll_file_path = collection_artifact_path / file_rel_path
-                else:
-                    coll_file_path = collection_artifact_path
-
-                if project_artifact_path.is_dir():
-                    proj_file_path = project_artifact_path / file_rel_path
-                else:
-                    proj_file_path = project_artifact_path
-
-                coll_hash = compute_file_hash(coll_file_path)
-                proj_hash = compute_file_hash(proj_file_path)
-
-                if coll_hash == proj_hash:
-                    # Unchanged
-                    file_status = "unchanged"
-                    unified_diff = None
-                    summary["unchanged"] += 1
-                else:
-                    # Modified
-                    file_status = "modified"
-                    summary["modified"] += 1
-
-                    # Generate unified diff if text file
-                    unified_diff = None
-                    if not is_binary_file(coll_file_path) and not is_binary_file(
-                        proj_file_path
-                    ):
-                        try:
-                            with open(coll_file_path, "r", encoding="utf-8") as f:
-                                coll_lines = f.readlines()
-                            with open(proj_file_path, "r", encoding="utf-8") as f:
-                                proj_lines = f.readlines()
-
-                            diff_lines = difflib.unified_diff(
-                                coll_lines,
-                                proj_lines,
-                                fromfile=f"collection/{file_rel_path}",
-                                tofile=f"project/{file_rel_path}",
-                                lineterm="",
-                            )
-                            unified_diff = "\n".join(diff_lines)
-                        except Exception as e:
-                            logger.warning(
-                                f"Failed to generate diff for {file_rel_path}: {e}"
-                            )
-                            unified_diff = f"[Error generating diff: {str(e)}]"
-
-                file_diffs.append(
-                    FileDiff(
-                        file_path=file_rel_path,
-                        status=file_status,
-                        collection_hash=coll_hash,
-                        project_hash=proj_hash,
-                        unified_diff=unified_diff,
-                    )
-                )
-
-            elif in_collection and not in_project:
-                # File only in collection (treat as "added" if comparing from project perspective,
-                # or "deleted" if project artifact doesn't exist at all)
-                # For collection-vs-project diff: files in collection but not project are "added"
-                # (because deploying from collection would add them to project)
-                file_status = "added"
-                summary["added"] += 1
-
-                if collection_exists:
+                # Determine status
+                if in_collection and in_project:
+                    # File exists in both - check if modified
                     if collection_artifact_path.is_dir():
                         coll_file_path = collection_artifact_path / file_rel_path
                     else:
                         coll_file_path = collection_artifact_path
-                    coll_hash = compute_file_hash(coll_file_path)
-                else:
-                    coll_hash = None
 
-                file_diffs.append(
-                    FileDiff(
-                        file_path=file_rel_path,
-                        status=file_status,
-                        collection_hash=coll_hash,
-                        project_hash=None,
-                        unified_diff=None,
-                    )
-                )
-
-            elif not in_collection and in_project:
-                # File only in project (treat as "deleted" if comparing from collection perspective)
-                file_status = "deleted"
-                summary["deleted"] += 1
-
-                if project_exists:
                     if project_artifact_path.is_dir():
                         proj_file_path = project_artifact_path / file_rel_path
                     else:
                         proj_file_path = project_artifact_path
-                    proj_hash = compute_file_hash(proj_file_path)
-                else:
-                    proj_hash = None
 
-                file_diffs.append(
-                    FileDiff(
-                        file_path=file_rel_path,
-                        status=file_status,
-                        collection_hash=None,
-                        project_hash=proj_hash,
-                        unified_diff=None,
+                    coll_hash = compute_file_hash(coll_file_path)
+                    proj_hash = compute_file_hash(proj_file_path)
+
+                    if coll_hash == proj_hash:
+                        # Unchanged
+                        file_status = "unchanged"
+                        unified_diff = None
+                        summary["unchanged"] += 1
+                    else:
+                        # Modified
+                        file_status = "modified"
+                        summary["modified"] += 1
+
+                        # Generate unified diff if text file
+                        unified_diff = None
+                        if not is_binary_file(coll_file_path) and not is_binary_file(
+                            proj_file_path
+                        ):
+                            try:
+                                with open(coll_file_path, "r", encoding="utf-8") as f:
+                                    coll_lines = f.readlines()
+                                with open(proj_file_path, "r", encoding="utf-8") as f:
+                                    proj_lines = f.readlines()
+
+                                diff_lines = difflib.unified_diff(
+                                    coll_lines,
+                                    proj_lines,
+                                    fromfile=f"collection/{file_rel_path}",
+                                    tofile=f"project/{file_rel_path}",
+                                    lineterm="",
+                                )
+                                unified_diff = "\n".join(diff_lines)
+                            except Exception as e:
+                                logger.warning(
+                                    f"Failed to generate diff for {file_rel_path}: {e}"
+                                )
+                                unified_diff = f"[Error generating diff: {str(e)}]"
+
+                    file_diffs.append(
+                        FileDiff(
+                            file_path=file_rel_path,
+                            status=file_status,
+                            collection_hash=coll_hash,
+                            project_hash=proj_hash,
+                            unified_diff=unified_diff,
+                        )
                     )
-                )
+
+                elif in_collection and not in_project:
+                    # File only in collection (treat as "added" if comparing from project perspective,
+                    # or "deleted" if project artifact doesn't exist at all)
+                    # For collection-vs-project diff: files in collection but not project are "added"
+                    # (because deploying from collection would add them to project)
+                    file_status = "added"
+                    summary["added"] += 1
+
+                    if collection_exists:
+                        if collection_artifact_path.is_dir():
+                            coll_file_path = collection_artifact_path / file_rel_path
+                        else:
+                            coll_file_path = collection_artifact_path
+                        coll_hash = compute_file_hash(coll_file_path)
+                    else:
+                        coll_hash = None
+
+                    file_diffs.append(
+                        FileDiff(
+                            file_path=file_rel_path,
+                            status=file_status,
+                            collection_hash=coll_hash,
+                            project_hash=None,
+                            unified_diff=None,
+                        )
+                    )
+
+                elif not in_collection and in_project:
+                    # File only in project (treat as "deleted" if comparing from collection perspective)
+                    file_status = "deleted"
+                    summary["deleted"] += 1
+
+                    if project_exists:
+                        if project_artifact_path.is_dir():
+                            proj_file_path = project_artifact_path / file_rel_path
+                        else:
+                            proj_file_path = project_artifact_path
+                        proj_hash = compute_file_hash(proj_file_path)
+                    else:
+                        proj_hash = None
+
+                    file_diffs.append(
+                        FileDiff(
+                            file_path=file_rel_path,
+                            status=file_status,
+                            collection_hash=None,
+                            project_hash=proj_hash,
+                            unified_diff=None,
+                        )
+                    )
 
         # Determine if there are changes
         has_changes = (
@@ -5159,13 +5175,18 @@ async def get_artifact_source_project_diff(
                 detail="Artifact does not have upstream tracking configured",
             )
 
-        # Fetch latest upstream version
+        # Fetch latest upstream version — primary network cost for source-project diff
         logger.info(f"Fetching upstream for source-project diff: {artifact_id}")
-        fetch_result = artifact_mgr.fetch_update(
-            artifact_name=artifact_name,
-            artifact_type=artifact_type,
-            collection_name=collection_name,
-        )
+        with PerfTimer(
+            "router.get_artifact_source_project_diff.fetch_upstream",
+            artifact_id=artifact_id,
+            collection=collection_name,
+        ):
+            fetch_result = artifact_mgr.fetch_update(
+                artifact_name=artifact_name,
+                artifact_type=artifact_type,
+                collection_name=collection_name,
+            )
 
         try:
             if fetch_result.error:
@@ -5218,32 +5239,37 @@ async def get_artifact_source_project_diff(
                     "Returning diff with all upstream files marked as 'added'."
                 )
 
-            # Collect files from both locations
-            source_files = set()
-            project_files = set()
-            exclude_dirs = set(settings.diff_exclude_dirs)
+            # Collect files from both locations — timed to measure filesystem enumeration
+            with PerfTimer(
+                "router.get_artifact_source_project_diff.enumerate_files",
+                artifact_id=artifact_id,
+                project_path=project_path,
+            ):
+                source_files = set()
+                project_files = set()
+                exclude_dirs = set(settings.diff_exclude_dirs)
 
-            if upstream_exists:
-                if upstream_artifact_path.is_dir():
-                    source_files = {
-                        str(f.relative_to(upstream_artifact_path))
-                        for f in iter_artifact_files(
-                            upstream_artifact_path, exclude_dirs
-                        )
-                    }
-                else:
-                    source_files = {upstream_artifact_path.name}
+                if upstream_exists:
+                    if upstream_artifact_path.is_dir():
+                        source_files = {
+                            str(f.relative_to(upstream_artifact_path))
+                            for f in iter_artifact_files(
+                                upstream_artifact_path, exclude_dirs
+                            )
+                        }
+                    else:
+                        source_files = {upstream_artifact_path.name}
 
-            if project_exists:
-                if project_artifact_path.is_dir():
-                    project_files = {
-                        str(f.relative_to(project_artifact_path))
-                        for f in iter_artifact_files(
-                            project_artifact_path, exclude_dirs
-                        )
-                    }
-                else:
-                    project_files = {project_artifact_path.name}
+                if project_exists:
+                    if project_artifact_path.is_dir():
+                        project_files = {
+                            str(f.relative_to(project_artifact_path))
+                            for f in iter_artifact_files(
+                                project_artifact_path, exclude_dirs
+                            )
+                        }
+                    else:
+                        project_files = {project_artifact_path.name}
 
             all_files = sorted(source_files | project_files)
 
@@ -5268,110 +5294,116 @@ async def get_artifact_source_project_diff(
             file_diffs: List[FileDiff] = []
             summary = {"added": 0, "modified": 0, "deleted": 0, "unchanged": 0}
 
-            for file_rel_path in all_files:
-                in_source = file_rel_path in source_files
-                in_project = file_rel_path in project_files
+            # Diff computation — timed to measure hashing + diff generation cost
+            with PerfTimer(
+                "router.get_artifact_source_project_diff.compute",
+                artifact_id=artifact_id,
+                file_count=len(all_files),
+            ):
+                for file_rel_path in all_files:
+                    in_source = file_rel_path in source_files
+                    in_project = file_rel_path in project_files
 
-                if in_source and in_project:
-                    src_file = (
-                        upstream_artifact_path / file_rel_path
-                        if upstream_artifact_path.is_dir()
-                        else upstream_artifact_path
-                    )
-                    proj_file = (
-                        project_artifact_path / file_rel_path
-                        if project_artifact_path.is_dir()
-                        else project_artifact_path
-                    )
-
-                    src_hash = compute_file_hash(src_file)
-                    proj_hash = compute_file_hash(proj_file)
-
-                    if src_hash == proj_hash:
-                        file_status = "unchanged"
-                        unified_diff = None
-                        summary["unchanged"] += 1
-                    else:
-                        file_status = "modified"
-                        summary["modified"] += 1
-                        unified_diff = None
-                        if not is_binary_file(src_file) and not is_binary_file(
-                            proj_file
-                        ):
-                            try:
-                                with open(src_file, "r", encoding="utf-8") as f:
-                                    src_lines = f.readlines()
-                                with open(proj_file, "r", encoding="utf-8") as f:
-                                    proj_lines = f.readlines()
-                                diff_lines = difflib.unified_diff(
-                                    src_lines,
-                                    proj_lines,
-                                    fromfile=f"source/{file_rel_path}",
-                                    tofile=f"project/{file_rel_path}",
-                                    lineterm="",
-                                )
-                                unified_diff = "\n".join(diff_lines)
-                            except Exception as e:
-                                logger.warning(
-                                    f"Failed to generate diff for {file_rel_path}: {e}"
-                                )
-                                unified_diff = f"[Error generating diff: {str(e)}]"
-
-                    file_diffs.append(
-                        FileDiff(
-                            file_path=file_rel_path,
-                            status=file_status,
-                            collection_hash=src_hash,
-                            project_hash=proj_hash,
-                            unified_diff=unified_diff,
-                        )
-                    )
-
-                elif in_source and not in_project:
-                    # File only in source (would be added when deploying)
-                    file_status = "added"
-                    summary["added"] += 1
-                    if upstream_exists:
+                    if in_source and in_project:
                         src_file = (
                             upstream_artifact_path / file_rel_path
                             if upstream_artifact_path.is_dir()
                             else upstream_artifact_path
                         )
-                        src_hash = compute_file_hash(src_file)
-                    else:
-                        src_hash = None
-                    file_diffs.append(
-                        FileDiff(
-                            file_path=file_rel_path,
-                            status=file_status,
-                            collection_hash=src_hash,
-                            project_hash=None,
-                            unified_diff=None,
-                        )
-                    )
-
-                elif not in_source and in_project:
-                    # File only in project (would be deleted when syncing from source)
-                    file_status = "deleted"
-                    summary["deleted"] += 1
-                    if project_exists:
                         proj_file = (
                             project_artifact_path / file_rel_path
                             if project_artifact_path.is_dir()
                             else project_artifact_path
                         )
+
+                        src_hash = compute_file_hash(src_file)
                         proj_hash = compute_file_hash(proj_file)
-                    else:
-                        proj_hash = None
-                    file_diffs.append(
-                        FileDiff(
-                            file_path=file_rel_path,
-                            status=file_status,
-                            collection_hash=None,
-                            project_hash=proj_hash,
-                            unified_diff=None,
+
+                        if src_hash == proj_hash:
+                            file_status = "unchanged"
+                            unified_diff = None
+                            summary["unchanged"] += 1
+                        else:
+                            file_status = "modified"
+                            summary["modified"] += 1
+                            unified_diff = None
+                            if not is_binary_file(src_file) and not is_binary_file(
+                                proj_file
+                            ):
+                                try:
+                                    with open(src_file, "r", encoding="utf-8") as f:
+                                        src_lines = f.readlines()
+                                    with open(proj_file, "r", encoding="utf-8") as f:
+                                        proj_lines = f.readlines()
+                                    diff_lines = difflib.unified_diff(
+                                        src_lines,
+                                        proj_lines,
+                                        fromfile=f"source/{file_rel_path}",
+                                        tofile=f"project/{file_rel_path}",
+                                        lineterm="",
+                                    )
+                                    unified_diff = "\n".join(diff_lines)
+                                except Exception as e:
+                                    logger.warning(
+                                        f"Failed to generate diff for {file_rel_path}: {e}"
+                                    )
+                                    unified_diff = f"[Error generating diff: {str(e)}]"
+
+                        file_diffs.append(
+                            FileDiff(
+                                file_path=file_rel_path,
+                                status=file_status,
+                                collection_hash=src_hash,
+                                project_hash=proj_hash,
+                                unified_diff=unified_diff,
+                            )
                         )
-                    )
+
+                    elif in_source and not in_project:
+                        # File only in source (would be added when deploying)
+                        file_status = "added"
+                        summary["added"] += 1
+                        if upstream_exists:
+                            src_file = (
+                                upstream_artifact_path / file_rel_path
+                                if upstream_artifact_path.is_dir()
+                                else upstream_artifact_path
+                            )
+                            src_hash = compute_file_hash(src_file)
+                        else:
+                            src_hash = None
+                        file_diffs.append(
+                            FileDiff(
+                                file_path=file_rel_path,
+                                status=file_status,
+                                collection_hash=src_hash,
+                                project_hash=None,
+                                unified_diff=None,
+                            )
+                        )
+
+                    elif not in_source and in_project:
+                        # File only in project (would be deleted when syncing from source)
+                        file_status = "deleted"
+                        summary["deleted"] += 1
+                        if project_exists:
+                            proj_file = (
+                                project_artifact_path / file_rel_path
+                                if project_artifact_path.is_dir()
+                                else project_artifact_path
+                            )
+                            proj_hash = compute_file_hash(proj_file)
+                        else:
+                            proj_hash = None
+                        file_diffs.append(
+                            FileDiff(
+                                file_path=file_rel_path,
+                                status=file_status,
+                                collection_hash=None,
+                                project_hash=proj_hash,
+                                unified_diff=None,
+                            )
+                        )
 
             has_changes = (
                 summary["added"] > 0

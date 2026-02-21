@@ -127,6 +127,7 @@ import {
 import { apiRequest } from '@/lib/api';
 import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments';
 import { hasValidUpstreamSource } from '@/lib/sync-utils';
+import { markStart, markEnd } from '@/lib/perf-marks';
 
 // ============================================================================
 // Helpers
@@ -523,6 +524,15 @@ export function ArtifactOperationsModal({
     }
   }, [open, initialTab]);
 
+  // Performance instrumentation: track modal open lifecycle
+  useEffect(() => {
+    if (open) {
+      markStart('modal.open');
+    } else {
+      markEnd('modal.open');
+    }
+  }, [open]);
+
   // Reset selectedPath when artifact changes or modal closes
   useEffect(() => {
     setSelectedPath(null);
@@ -532,6 +542,20 @@ export function ArtifactOperationsModal({
   useEffect(() => {
     setSelectedProjectForDiff(null);
   }, [artifact?.id, open]);
+
+  // Performance instrumentation: mark when modal content is ready (artifact loaded)
+  useEffect(() => {
+    if (open && artifact) {
+      markEnd('modal.open');
+    }
+  }, [open, artifact]);
+
+  // Performance instrumentation: mark when sync tab becomes active
+  useEffect(() => {
+    if (open && artifact && activeTab === 'sync') {
+      markStart('sync-tab.activate');
+    }
+  }, [open, artifact, activeTab]);
 
   // Auto-detect project for diff when artifact has deployments
   const deployments = artifact?.deployments;

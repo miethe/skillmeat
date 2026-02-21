@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, GitMerge } from 'lucide-react';
 import type { Artifact } from '@/types/artifact';
@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api';
 import type { ArtifactSyncResponse } from '@/sdk/models/ArtifactSyncResponse';
 import { hasValidUpstreamSource } from '@/lib/sync-utils';
+import { markStart, markEnd } from '@/lib/perf-marks';
 
 // Phase 1 components
 import { ArtifactFlowBanner } from './artifact-flow-banner';
@@ -581,7 +582,37 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   const [showPullConfirm, setShowPullConfirm] = useState(false);
   const [showDeployConfirm, setShowDeployConfirm] = useState(false);
 
+  // Performance instrumentation: track SyncStatusTab mount and time-to-first-data
+  useEffect(() => {
+    markStart('sync-tab.mount');
+    markStart('sync-tab.first-data');
+    return () => {
+      markEnd('sync-tab.mount');
+    };
+  }, []);
+
+  // Performance instrumentation: track when first comparison data arrives and renders
+  const firstDataRendered = useRef(false);
+  useEffect(() => {
+    if (!firstDataRendered.current && (upstreamDiff || projectDiff || sourceProjectDiff)) {
+      firstDataRendered.current = true;
+      markEnd('sync-tab.activate');
+      markEnd('sync-tab.first-data');
+    }
+  }, [upstreamDiff, projectDiff, sourceProjectDiff]);
+
+  // Performance instrumentation: track comparison scope switches
+  const prevScope = useRef(comparisonScope);
+  useEffect(() => {
+    if (prevScope.current !== comparisonScope) {
+      markEnd(`sync-tab.scope.${prevScope.current}`);
+      markStart(`sync-tab.scope.${comparisonScope}`);
+      prevScope.current = comparisonScope;
+    }
+  }, [comparisonScope]);
+
   const handleComparisonChange = (scope: ComparisonScope) => {
+    markStart(`sync-tab.scope.${scope}`);
     setComparisonScope(scope);
   };
 
