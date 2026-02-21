@@ -125,12 +125,18 @@ All hooks must comply with the canonical data flow principles. See root `CLAUDE.
 
 ### Quick Stale Time Guide
 
-| Category               | Stale Time | Domains                                                                     |
-| ---------------------- | ---------- | --------------------------------------------------------------------------- |
-| Standard browsing      | 5 min      | Artifacts, Collections, Tags, Groups, Projects, Snapshots, Context Entities |
-| Interactive/monitoring | 30 sec     | Tag search, Artifact search, Analytics summary, Cache/Sync status           |
-| Deployments            | 2 min      | All deployment hooks                                                        |
-| Marketplace listings   | 1 min      | Listing list only; detail uses 5min                                         |
+| Category               | Stale Time | Domains                                                                               |
+| ---------------------- | ---------- | -------------------------------------------------------------------------------------- |
+| Standard browsing      | 5 min      | Artifacts, Collections, Tags, Groups, Projects, Snapshots, Context Entities           |
+| Interactive/monitoring | 30 sec     | Tag search, Artifact search, Analytics summary, Cache/Sync status, Diff queries       |
+| Deployments            | 2 min      | All deployment hooks                                                                  |
+| Marketplace listings   | 1 min      | Listing list only; detail uses 5min                                                   |
+
+**Diff Query Details** (staleTime 30s, gcTime 5min):
+- Upstream diff queries (`upstream-diff`) reuse data for 30 sec within modal scope switches
+- Project diff queries (`project-diff`) reuse data for 30 sec within modal scope switches
+- Source-project diff queries (`source-project-diff`) cache for 30 sec to support instant scope switching
+- GC time set to 5 min to preserve cache across modal reopen flows
 
 **Full stale time table + invalidation graph**:
 **Read**: `.claude/context/key-context/data-flow-patterns.md`
@@ -248,11 +254,23 @@ Props:
 | `projectPath` | `string`                    | Optional project path (required when mode='project')   |
 | `onClose`     | `() => void`                | Handler called after successful sync                   |
 
-**Query Logic**:
+**Query Logic** (Phase 5: Scope-Aware Diff Loading):
 
-- Upstream diff query **ONLY enabled** if `hasValidUpstreamSource(entity) === true`
-- `ComparisonSelector` enables scope options based on: `hasSource` (from validation) + `hasProject` (artifact has deployments)
-- Marketplace/local artifacts show read-only status (no diff queries, no sync actions)
+- **Primary scope** (active tab) loads immediately: enables its diff query unconditionally
+- **Secondary scopes** (inactive tabs) load on-demand: enabled only after primary scope data arrives
+- **Upstream query** (source-vs-collection): enabled immediately if active OR if source-vs-project is active (both need upstream)
+- **Project query** (collection-vs-project): enabled immediately if active OR after upstream data loads (background prefetch)
+- **Source-project query** (source-vs-project): enabled immediately if active OR after either upstream or project loads (background prefetch)
+- **Stale times**: All diff queries use 30 sec staleTime for interactive freshness, 5 min gcTime to cache across reopen/switch flows
+- **Upstream validation**: Upstream diff query ONLY enabled if `hasValidUpstreamSource(entity) === true`
+- **Scope selector**: Enables scope options based on: `hasValidUpstreamSource(entity)` (from validation) + `hasProject` (artifact has deployments)
+- **Marketplace/local artifacts**: Show read-only status (no diff queries, no sync actions)
+
+**Performance Notes** (Phase 6: DiffViewer Optimization):
+- Each diff query supports `?mode=summary` param (returns file list without unified diffs)
+- `DiffViewer` defers expensive unified diff parsing until user scrolls into view (on-demand parse)
+- Large diff guardrails prevent parsing >500KB diffs without explicit user action
+- Parse and stats caches (parseCacheRef, statsCacheRef) live for modal session, cleared on scope switch
 
 ---
 

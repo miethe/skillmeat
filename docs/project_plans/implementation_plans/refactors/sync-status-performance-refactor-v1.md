@@ -6,7 +6,7 @@ doc_subtype: implementation_plan
 root_kind: project_plans
 id: DOC-sync-status-performance-refactor-v1
 title: Sync Status Performance Refactor v1
-status: in-progress
+status: completed
 category: refactors
 feature_slug: sync-status-performance-refactor-v1
 feature_version: v1
