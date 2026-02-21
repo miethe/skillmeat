@@ -12,6 +12,7 @@ import type { Artifact } from '@/types/artifact';
 export const mockArtifacts: Artifact[] = [
   {
     id: 'artifact-1',
+    uuid: '00000000000000000000000000000001',
     name: 'canvas-design',
     type: 'skill',
     scope: 'user',
@@ -45,6 +46,7 @@ export const mockArtifacts: Artifact[] = [
   },
   {
     id: 'artifact-2',
+    uuid: '00000000000000000000000000000002',
     name: 'data-analysis',
     type: 'skill',
     scope: 'user',
@@ -77,6 +79,7 @@ export const mockArtifacts: Artifact[] = [
   },
   {
     id: 'artifact-3',
+    uuid: '00000000000000000000000000000003',
     name: 'code-review',
     type: 'command',
     scope: 'local',

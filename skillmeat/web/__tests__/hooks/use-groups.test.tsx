@@ -71,9 +71,9 @@ const mockGroups: Group[] = [
 ];
 
 const mockGroupArtifacts: GroupArtifact[] = [
-  { artifact_id: 'artifact-1', position: 0, added_at: '2024-01-01T00:00:00Z' },
-  { artifact_id: 'artifact-2', position: 1, added_at: '2024-01-02T00:00:00Z' },
-  { artifact_id: 'artifact-3', position: 2, added_at: '2024-01-03T00:00:00Z' },
+  { artifact_uuid: '00000000000000000000000000000001', artifact_id: 'artifact-1', position: 0, added_at: '2024-01-01T00:00:00Z' },
+  { artifact_uuid: '00000000000000000000000000000002', artifact_id: 'artifact-2', position: 1, added_at: '2024-01-02T00:00:00Z' },
+  { artifact_uuid: '00000000000000000000000000000003', artifact_id: 'artifact-3', position: 2, added_at: '2024-01-03T00:00:00Z' },
 ];
 
 const mockGroupWithArtifacts: GroupWithArtifacts = {
@@ -306,9 +306,9 @@ describe('useGroupArtifacts', () => {
     const groupWithUnsortedArtifacts: GroupWithArtifacts = {
       ...mockGroups[0],
       artifacts: [
-        { artifact_id: 'artifact-3', position: 2, added_at: '2024-01-03T00:00:00Z' },
-        { artifact_id: 'artifact-1', position: 0, added_at: '2024-01-01T00:00:00Z' },
-        { artifact_id: 'artifact-2', position: 1, added_at: '2024-01-02T00:00:00Z' },
+        { artifact_uuid: '00000000000000000000000000000003', artifact_id: 'artifact-3', position: 2, added_at: '2024-01-03T00:00:00Z' },
+        { artifact_uuid: '00000000000000000000000000000001', artifact_id: 'artifact-1', position: 0, added_at: '2024-01-01T00:00:00Z' },
+        { artifact_uuid: '00000000000000000000000000000002', artifact_id: 'artifact-2', position: 1, added_at: '2024-01-02T00:00:00Z' },
       ],
     };
 

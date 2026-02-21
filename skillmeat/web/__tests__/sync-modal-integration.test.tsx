@@ -121,6 +121,7 @@ const renderWithProviders = (component: React.ReactNode) => {
 
 const baseArtifact: Artifact = {
   id: 'skill:test-artifact',
+  uuid: '00000000000000000000000000000001',
   name: 'test-artifact',
   type: 'skill',
   scope: 'user',

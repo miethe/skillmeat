@@ -14,6 +14,7 @@ import type { Artifact, SyncStatus } from '@/types/artifact';
 function createTestArtifact(overrides: Partial<Artifact> = {}): Artifact {
   return {
     id: 'skill:test-artifact',
+    uuid: '00000000000000000000000000000001',
     name: 'test-artifact',
     type: 'skill',
     scope: 'user',

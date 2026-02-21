@@ -767,6 +767,7 @@ def artifact_to_response(
     collections_data: Optional[List[ArtifactCollectionInfo]] = None,
     db_source: Optional[str] = None,
     deployments: Optional[List[DeploymentSummary]] = None,
+    db_uuid: Optional[str] = None,
 ) -> ArtifactResponse:
     """Convert Artifact model to API response schema.
 
@@ -776,6 +777,7 @@ def artifact_to_response(
         has_local_modifications: Optional flag indicating local modifications
         collections_data: Optional list of ArtifactCollectionInfo from CollectionService
         db_source: Optional source from DB cache (overrides filesystem source)
+        db_uuid: Optional UUID from DB cache (used when artifact.uuid is None)
 
     Returns:
         ArtifactResponse schema
@@ -822,8 +824,16 @@ def artifact_to_response(
     # Convert collections from passed data (from CollectionService)
     collections_response = collections_data or []
 
+    # Resolve UUID: prefer artifact.uuid, then db_uuid, then generate deterministic fallback
+    artifact_uuid = artifact.uuid or db_uuid
+    if not artifact_uuid:
+        # Deterministic fallback based on type:name (should rarely happen)
+        fallback_input = f"{artifact.type.value}:{artifact.name}"
+        artifact_uuid = hashlib.md5(fallback_input.encode()).hexdigest()
+
     return ArtifactResponse(
         id=f"{artifact.type.value}:{artifact.name}",
+        uuid=artifact_uuid,
         name=artifact.name,
         type=artifact.type.value,
         source=db_source or (artifact.upstream if artifact.upstream else "local"),
@@ -2279,6 +2289,23 @@ async def list_artifacts(
             except Exception as e:
                 logger.warning(f"Failed to query collection memberships: {e}")
 
+        # Build uuid lookup from DB cache
+        uuid_lookup: dict = {}
+        try:
+            db_session = get_session()
+            db_artifacts = (
+                db_session.query(Artifact.type, Artifact.name, Artifact.uuid)
+                .filter(
+                    Artifact.type.in_([a.type.value for a in page_artifacts]),
+                )
+                .all()
+            )
+            for db_art in db_artifacts:
+                uuid_lookup[f"{db_art.type}:{db_art.name}"] = db_art.uuid
+            db_session.close()
+        except Exception as e:
+            logger.warning(f"Failed to query uuids from DB: {e}")
+
         # Convert to response format
         items: List[ArtifactResponse] = []
         for artifact in page_artifacts:
@@ -2297,6 +2324,7 @@ async def list_artifacts(
                     collections_data=collections_map.get(artifact_key, []),
                     db_source=source_lookup.get(artifact_key),
                     deployments=deployments_lookup.get(artifact_key),
+                    db_uuid=uuid_lookup.get(artifact_key),
                 )
             )
 
@@ -2453,8 +2481,17 @@ async def get_artifact(
             artifact_id
         )
 
+        # Get UUID from DB cache (filesystem artifacts may have uuid=None)
+        db_artifact = db_session.query(Artifact).filter(
+            Artifact.type == artifact_type.value,
+            Artifact.name == artifact_name,
+        ).first()
+        db_uuid = db_artifact.uuid if db_artifact else None
+
         # Build base response with collections
-        response = artifact_to_response(artifact, collections_data=collections_data)
+        response = artifact_to_response(
+            artifact, collections_data=collections_data, db_uuid=db_uuid
+        )
 
         # Add deployment statistics if requested
         if include_deployments:

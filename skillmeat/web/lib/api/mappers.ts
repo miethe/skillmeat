@@ -87,6 +87,7 @@ export interface ApiConflictState {
 export interface ArtifactResponse {
   // Identity (required)
   id: string;
+  uuid?: string;
   name: string;
   type: string;
 
@@ -346,6 +347,7 @@ export function mapApiResponseToArtifact(
   const artifact: Artifact = {
     // Identity (required)
     id: response.id,
+    uuid: response.uuid ?? '',
     name: response.name,
     type: response.type as ArtifactType,
 
@@ -515,6 +517,7 @@ export function createMinimalArtifact(overrides: Partial<Artifact> = {}): Artifa
   const now = new Date().toISOString();
   return {
     id: 'skill:placeholder',
+    uuid: '',
     name: 'placeholder',
     type: 'skill',
     scope: 'user',

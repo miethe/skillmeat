@@ -648,6 +648,7 @@ async function fetchProjectEntities(
     const now = new Date().toISOString();
     const entities: Entity[] = deployments.map((deployment) => ({
       id: `${deployment.artifact_type}:${deployment.artifact_name}`,
+      uuid: (deployment as any).uuid ?? '',
       name: deployment.artifact_name,
       type: deployment.artifact_type as EntityType,
       scope: 'local' as const,
@@ -701,6 +702,7 @@ function generateMockCollectionEntities(
   const mockEntities: Entity[] = [
     {
       id: 'skill:canvas-design',
+      uuid: '00000000000000000000000000000001',
       name: 'canvas-design',
       type: 'skill',
       scope: 'user',
@@ -717,6 +719,7 @@ function generateMockCollectionEntities(
     },
     {
       id: 'skill:docx-processor',
+      uuid: '00000000000000000000000000000002',
       name: 'docx-processor',
       type: 'skill',
       scope: 'user',
@@ -733,6 +736,7 @@ function generateMockCollectionEntities(
     },
     {
       id: 'command:git-helper',
+      uuid: '00000000000000000000000000000003',
       name: 'git-helper',
       type: 'command',
       scope: 'user',
@@ -773,6 +777,7 @@ function generateMockProjectEntities(
   const mockEntities: Entity[] = [
     {
       id: 'skill:canvas-design',
+      uuid: '00000000000000000000000000000004',
       name: 'canvas-design',
       type: 'skill',
       scope: 'local',
@@ -787,6 +792,7 @@ function generateMockProjectEntities(
     },
     {
       id: 'skill:docx-processor',
+      uuid: '00000000000000000000000000000005',
       name: 'docx-processor',
       type: 'skill',
       scope: 'local',

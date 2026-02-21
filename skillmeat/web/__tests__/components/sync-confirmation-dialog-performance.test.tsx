@@ -84,6 +84,7 @@ function buildDiffResponse(fileCount: number): ArtifactDiffResponse {
 
 const mockArtifact: Artifact = {
   id: 'perf-test-artifact',
+  uuid: '00000000000000000000000000000001',
   name: 'perf-skill',
   type: 'skill',
   scope: 'user',

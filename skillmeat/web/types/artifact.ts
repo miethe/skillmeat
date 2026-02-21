@@ -160,6 +160,9 @@ export interface Artifact {
   /** Unique identifier in "type:name" format (e.g., "skill:canvas-design") */
   id: string;
 
+  /** Globally unique identifier (32-char hex, stable across renames) */
+  uuid: string;
+
   /** Human-readable artifact name */
   name: string;
 

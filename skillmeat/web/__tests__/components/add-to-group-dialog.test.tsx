@@ -45,6 +45,7 @@ describe('AddToGroupDialog', () => {
   // Mock artifact with multiple collections
   const mockArtifact: Artifact = {
     id: 'artifact-1',
+    uuid: '00000000000000000000000000000001',
     name: 'Test Artifact',
     type: 'skill',
     scope: 'user',

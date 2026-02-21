@@ -269,6 +269,10 @@ class ArtifactResponse(BaseModel):
         description="Artifact composite key (type:name)",
         examples=["skill:pdf"],
     )
+    uuid: str = Field(
+        description="Globally unique identifier (32-char hex)",
+        examples=["a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"],
+    )
     name: str = Field(
         description="Artifact name",
         examples=["pdf"],
@@ -345,6 +349,7 @@ class ArtifactResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "id": "skill:pdf",
+                "uuid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
                 "name": "pdf",
                 "type": "skill",
                 "source": "anthropics/skills/pdf",

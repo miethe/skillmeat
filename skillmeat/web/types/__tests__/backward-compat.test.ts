@@ -52,6 +52,7 @@ function testEntityArtifactInterchangeability() {
   // Create a mock artifact
   const artifact: Artifact = {
     id: 'skill:test-skill',
+    uuid: '00000000000000000000000000000001',
     name: 'test-skill',
     type: 'skill',
     scope: 'user',
@@ -66,6 +67,7 @@ function testEntityArtifactInterchangeability() {
   // Artifact should accept Entity
   const entity: Entity = {
     id: 'command:test-command',
+    uuid: '00000000000000000000000000000002',
     name: 'test-command',
     type: 'command',
     scope: 'local',

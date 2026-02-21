@@ -24,6 +24,7 @@ const CHILD_DISPLAY_ID = 'skill:canvas-design';
 
 const mockPlugin = {
   id: PLUGIN_DISPLAY_ID,
+  uuid: '00000000000000000000000000000001',
   name: 'my-plugin',
   type: 'composite',
   scope: 'user',
@@ -42,6 +43,7 @@ const mockPlugin = {
 
 const mockChildArtifact = {
   id: CHILD_DISPLAY_ID,
+  uuid: '00000000000000000000000000000002',
   name: 'canvas-design',
   type: 'skill',
   scope: 'user',

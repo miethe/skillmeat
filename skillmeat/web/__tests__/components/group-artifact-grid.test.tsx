@@ -88,14 +88,15 @@ describe('GroupArtifactGrid', () => {
   let queryClient: QueryClient;
 
   const mockGroupArtifacts: GroupArtifact[] = [
-    { artifact_id: 'art-1', position: 0, added_at: '2024-01-01T00:00:00Z' },
-    { artifact_id: 'art-2', position: 1, added_at: '2024-01-02T00:00:00Z' },
-    { artifact_id: 'art-3', position: 2, added_at: '2024-01-03T00:00:00Z' },
+    { artifact_uuid: '00000000000000000000000000000001', artifact_id: 'art-1', position: 0, added_at: '2024-01-01T00:00:00Z' },
+    { artifact_uuid: '00000000000000000000000000000002', artifact_id: 'art-2', position: 1, added_at: '2024-01-02T00:00:00Z' },
+    { artifact_uuid: '00000000000000000000000000000003', artifact_id: 'art-3', position: 2, added_at: '2024-01-03T00:00:00Z' },
   ];
 
   const mockArtifacts: Record<string, Artifact> = {
     'art-1': {
       id: 'art-1',
+      uuid: '00000000000000000000000000000001',
       name: 'Test Skill 1',
       type: 'skill',
       scope: 'user',
@@ -117,6 +118,7 @@ describe('GroupArtifactGrid', () => {
     },
     'art-2': {
       id: 'art-2',
+      uuid: '00000000000000000000000000000002',
       name: 'Test Command',
       type: 'command',
       scope: 'user',
@@ -138,6 +140,7 @@ describe('GroupArtifactGrid', () => {
     },
     'art-3': {
       id: 'art-3',
+      uuid: '00000000000000000000000000000003',
       name: 'Test Agent',
       type: 'agent',
       scope: 'local',

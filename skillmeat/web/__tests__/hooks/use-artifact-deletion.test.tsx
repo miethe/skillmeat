@@ -39,6 +39,7 @@ function createWrapper() {
 // Mock artifact for testing
 const mockArtifact: Artifact = {
   id: 'artifact-123',
+  uuid: '00000000000000000000000000000001',
   name: 'test-skill',
   type: 'skill',
   scope: 'user',

@@ -118,6 +118,7 @@ const mockImportSuccessResponse = {
 
 const mockPlugin = {
   id: PLUGIN_DISPLAY_ID,
+  uuid: '00000000000000000000000000000001',
   name: 'conflict-plugin',
   type: 'composite',
   scope: 'user',

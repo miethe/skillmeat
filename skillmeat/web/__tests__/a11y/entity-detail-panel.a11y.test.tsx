@@ -47,6 +47,7 @@ import type { Entity } from '@/types/entity';
 
 const mockEntity: Entity = {
   id: 'skill:test',
+  uuid: '00000000000000000000000000000001',
   name: 'test-skill',
   type: 'skill',
   scope: 'user',
@@ -126,6 +127,7 @@ describe('EntityDetailPanel Accessibility', () => {
   it('should handle entity without optional fields', () => {
     const minimalEntity: Entity = {
       id: 'skill:minimal',
+      uuid: '00000000000000000000000000000002',
       name: 'minimal-skill',
       type: 'skill',
       scope: 'user',

@@ -99,6 +99,7 @@ import { useSensor, useSensors } from '@dnd-kit/core';
 // ---------------------------------------------------------------------------
 
 const makeArtifact = (overrides: Partial<Artifact> & { id: string; name: string }): Artifact => ({
+  uuid: '00000000000000000000000000000001',
   type: 'skill',
   scope: 'user',
   syncStatus: 'synced',
