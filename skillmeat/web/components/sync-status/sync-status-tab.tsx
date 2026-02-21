@@ -237,10 +237,24 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   // Queries
   // ============================================================================
 
-  // Upstream diff (source vs collection)
+  // Scope-aware diff loading (TASK-5.3):
+  // The active (primary) comparison scope query loads immediately.
+  // Secondary scope queries are deferred — they only become enabled after the
+  // primary scope's query has successfully returned data. This ensures the user
+  // sees meaningful content for their selected scope as fast as possible, while
+  // background-prefetching the other scopes so switching feels instant.
+  const isUpstreamPrimary = comparisonScope === 'source-vs-collection';
+  const isProjectPrimary = comparisonScope === 'collection-vs-project';
+  const isSourceProjectPrimary = comparisonScope === 'source-vs-project';
+
+  // Upstream diff (source vs collection).
+  // Fires immediately when it is the active scope.
+  // Also fires immediately when source-vs-project is active (both require upstream data).
+  // Deferred when collection-vs-project is active — enabled after project diff loads.
   const {
     data: upstreamDiff,
     isLoading: upstreamLoading,
+    isSuccess: upstreamSuccess,
     error: upstreamError,
   } = useQuery<ArtifactUpstreamDiffResponse>({
     queryKey: ['upstream-diff', entity.id, entity.collection],
@@ -254,14 +268,24 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
         `/artifacts/${encodeURIComponent(entity.id)}/upstream-diff${queryString ? `?${queryString}` : ''}`
       );
     },
-    enabled: !!entity.id && entity.collection !== 'discovered' && hasValidUpstreamSource(entity),
+    enabled:
+      !!entity.id &&
+      entity.collection !== 'discovered' &&
+      hasValidUpstreamSource(entity) &&
+      // Enable immediately when this scope or source-vs-project is active (both require upstream);
+      // defer only when collection-vs-project is active (equivalent to: !isProjectPrimary)
+      (isUpstreamPrimary || isSourceProjectPrimary),
     retry: false,
   });
 
-  // Project diff (collection vs project)
+  // Project diff (collection vs project).
+  // Fires immediately when it is the active scope.
+  // Deferred when source-vs-collection or source-vs-project is active — enabled after
+  // upstream diff loads (background prefetch once primary content is rendered).
   const {
     data: projectDiff,
     isLoading: projectLoading,
+    isSuccess: projectSuccess,
     error: projectError,
   } = useQuery<ArtifactDiffResponse>({
     queryKey: ['project-diff', entity.id, projectPath],
@@ -271,10 +295,18 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
         `/artifacts/${encodeURIComponent(entity.id)}/diff?${params}`
       );
     },
-    enabled: !!entity.id && !!projectPath && entity.collection !== 'discovered',
+    enabled:
+      !!entity.id &&
+      !!projectPath &&
+      entity.collection !== 'discovered' &&
+      // Enable immediately for primary scope; defer for upstream-based scopes (secondary)
+      (isProjectPrimary || upstreamSuccess),
   });
 
-  // Source-project diff (source vs project, bypassing collection)
+  // Source-project diff (source vs project, bypassing collection).
+  // This is the most expensive query. Load immediately when it is the active scope;
+  // background-prefetch after EITHER upstream or project scope has successfully loaded.
+  const primaryScopeLoaded = upstreamSuccess || projectSuccess;
   const {
     data: sourceProjectDiff,
     isLoading: sourceProjectLoading,
@@ -295,7 +327,8 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       !!projectPath &&
       entity.collection !== 'discovered' &&
       hasValidUpstreamSource(entity) &&
-      comparisonScope === 'source-vs-project',
+      // Active scope loads immediately; otherwise background-prefetch after primary data lands
+      (isSourceProjectPrimary || primaryScopeLoaded),
     staleTime: 30_000,
     retry: false,
   });
