@@ -10,8 +10,8 @@ Where artifact_id is the "type:name" format and collection_name is the
 collection identifier (or 'default' when not specified).
 
 Default TTL:
-    60 seconds — long enough to cover modal interaction sequences
-    (upstream-diff + source-project-diff for the same artifact).
+    300 seconds (5 minutes) — matches frontend gcTime so backend cache
+    stays warm for the full lifecycle of a frontend query cache entry.
 
 Thread Safety:
     Uses threading.Lock (not asyncio.Lock) because the cache is shared
@@ -82,25 +82,26 @@ class UpstreamFetchCache:
     cached. Failed fetches are never stored so they are always retried.
 
     Attributes:
-        DEFAULT_TTL: Default time-to-live in seconds (60s).
+        DEFAULT_TTL: Default time-to-live in seconds (300s / 5 minutes).
 
     Example:
-        >>> cache = UpstreamFetchCache(ttl_seconds=60)
+        >>> cache = UpstreamFetchCache(ttl_seconds=300)
         >>> cache.put("skill:canvas:default", fetch_result)
         >>> cached = cache.get("skill:canvas:default")
         >>> if cached:
         ...     print("Cache hit — skipping GitHub API call")
     """
 
-    DEFAULT_TTL: float = 60.0  # 60 seconds
+    DEFAULT_TTL: float = 300.0  # 300 seconds (5 minutes)
 
     def __init__(self, ttl_seconds: float = DEFAULT_TTL) -> None:
         """Initialize the upstream fetch cache.
 
         Args:
             ttl_seconds: How long to keep entries before they expire.
-                Default is 60 seconds, which comfortably covers modal
-                interaction patterns.
+                Default is 300 seconds (5 minutes), matching the frontend
+                gcTime so the backend stays warm for the full frontend
+                query cache lifecycle.
         """
         self._cache: Dict[str, UpstreamCacheEntry] = {}
         self._ttl = ttl_seconds
