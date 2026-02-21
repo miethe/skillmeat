@@ -622,6 +622,18 @@ export default function SourceDetailPage() {
     }
   }, [viewMode, hasNextPage, isFetchingNextPage, catalogFetching, fetchNextPage]);
 
+  // Keep selectedEntry in sync with latest catalog data
+  // This ensures the modal updates (e.g., shows Collections/Deployments tabs)
+  // after an import without requiring close+reopen
+  useEffect(() => {
+    if (selectedEntry && allEntries.length > 0) {
+      const updated = allEntries.find(e => e.id === selectedEntry.id);
+      if (updated && updated.status !== selectedEntry.status) {
+        setSelectedEntry(updated);
+      }
+    }
+  }, [allEntries, selectedEntry]);
+
   // Show loading state for folder view while fetching all pages
   const isFolderViewLoading = viewMode === 'folder' && (catalogLoading || hasNextPage);
 

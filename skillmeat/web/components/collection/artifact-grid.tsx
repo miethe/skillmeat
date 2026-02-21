@@ -35,6 +35,8 @@ interface ArtifactGridProps {
   onTagClick?: (tagName: string) => void;
   /** Handler when a group badge is clicked (for filtering) */
   onGroupClick?: (groupId: string) => void;
+  /** Handler for navigating to the Manage page for this artifact */
+  onManage?: (artifact: Artifact) => void;
   /** Set of selected artifact IDs for bulk operations */
   selectedArtifactIds?: Set<string>;
   /** Called when user toggles artifact selection */
@@ -66,6 +68,7 @@ export function ArtifactGrid({
   onDelete,
   onTagClick,
   onGroupClick,
+  onManage,
   selectedArtifactIds,
   onToggleArtifactSelect,
 }: ArtifactGridProps) {
@@ -124,6 +127,7 @@ export function ArtifactGrid({
             onCollectionClick={onCollectionClick}
             onTagClick={onTagClick}
             onGroupClick={onGroupClick}
+            onManage={onManage}
             isSelected={selectedArtifactIds?.has(artifact.id) ?? false}
             onToggleSelect={onToggleArtifactSelect}
           />
