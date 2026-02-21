@@ -7431,12 +7431,13 @@ async def get_artifact_tags(artifact_id: str) -> List[TagResponse]:
     """Get all tags assigned to a specific artifact.
 
     Args:
-        artifact_id: Unique identifier of the artifact
+        artifact_id: Unique identifier of the artifact (type:name format)
 
     Returns:
         List of tags assigned to the artifact
 
     Raises:
+        HTTPException: 404 if artifact not found
         HTTPException: 500 if operation fails
     """
     from skillmeat.core.services import TagService
@@ -7444,7 +7445,21 @@ async def get_artifact_tags(artifact_id: str) -> List[TagResponse]:
     service = TagService()
 
     try:
-        return service.get_artifact_tags(artifact_id)
+        # Resolve type:name artifact_id → artifacts.uuid (ADR-007 stable identity)
+        db_session = get_session()
+        try:
+            db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
+        finally:
+            db_session.close()
+
+        if not db_art:
+            raise HTTPException(
+                status_code=404, detail=f"Artifact '{artifact_id}' not found"
+            )
+
+        return service.get_artifact_tags(db_art.uuid)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get tags for artifact {artifact_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -7619,26 +7634,37 @@ async def add_tag_to_artifact(
 
     service = TagService()
 
+    # Resolve type:name artifact_id → artifacts.uuid (ADR-007 stable identity)
+    db_session = get_session()
     try:
-        service.add_tag_to_artifact(artifact_id, tag_id)
+        db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
+    finally:
+        db_session.close()
+
+    if not db_art:
+        raise HTTPException(
+            status_code=404, detail=f"Artifact '{artifact_id}' not found"
+        )
+
+    artifact_uuid = db_art.uuid
+
+    try:
+        service.add_tag_to_artifact(artifact_uuid, tag_id)
 
         # Write-through: sync tags to CollectionArtifact.tags_json and filesystem
-        updated_tags = [t.name for t in service.get_artifact_tags(artifact_id)]
+        updated_tags = [t.name for t in service.get_artifact_tags(artifact_uuid)]
 
         # Update CollectionArtifact.tags_json in DB cache
         try:
             db_session = get_session()
-            # Resolve type:name artifact_id → artifacts.uuid for the FK lookup
-            db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
-            if db_art:
-                cas = (
-                    db_session.query(CollectionArtifact)
-                    .filter_by(artifact_uuid=db_art.uuid)
-                    .all()
-                )
-                for ca in cas:
-                    ca.tags_json = json.dumps(updated_tags) if updated_tags else None
-                db_session.commit()
+            cas = (
+                db_session.query(CollectionArtifact)
+                .filter_by(artifact_uuid=artifact_uuid)
+                .all()
+            )
+            for ca in cas:
+                ca.tags_json = json.dumps(updated_tags) if updated_tags else None
+            db_session.commit()
             db_session.close()
         except Exception as cache_err:
             logger.warning(
@@ -7699,27 +7725,38 @@ async def remove_tag_from_artifact(
 
     service = TagService()
 
+    # Resolve type:name artifact_id → artifacts.uuid (ADR-007 stable identity)
+    db_session = get_session()
     try:
-        if not service.remove_tag_from_artifact(artifact_id, tag_id):
+        db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
+    finally:
+        db_session.close()
+
+    if not db_art:
+        raise HTTPException(
+            status_code=404, detail=f"Artifact '{artifact_id}' not found"
+        )
+
+    artifact_uuid = db_art.uuid
+
+    try:
+        if not service.remove_tag_from_artifact(artifact_uuid, tag_id):
             raise HTTPException(status_code=404, detail="Tag association not found")
 
         # Write-through: sync tags to CollectionArtifact.tags_json and filesystem
-        updated_tags = [t.name for t in service.get_artifact_tags(artifact_id)]
+        updated_tags = [t.name for t in service.get_artifact_tags(artifact_uuid)]
 
         # Update CollectionArtifact.tags_json in DB cache
         try:
             db_session = get_session()
-            # Resolve type:name artifact_id → artifacts.uuid for the FK lookup
-            db_art = db_session.query(Artifact).filter_by(id=artifact_id).first()
-            if db_art:
-                cas = (
-                    db_session.query(CollectionArtifact)
-                    .filter_by(artifact_uuid=db_art.uuid)
-                    .all()
-                )
-                for ca in cas:
-                    ca.tags_json = json.dumps(updated_tags) if updated_tags else None
-                db_session.commit()
+            cas = (
+                db_session.query(CollectionArtifact)
+                .filter_by(artifact_uuid=artifact_uuid)
+                .all()
+            )
+            for ca in cas:
+                ca.tags_json = json.dumps(updated_tags) if updated_tags else None
+            db_session.commit()
             db_session.close()
         except Exception as cache_err:
             logger.warning(
