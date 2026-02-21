@@ -4271,6 +4271,14 @@ async def get_artifact_diff(
         default=None,
         description="Collection name (searches all if not specified)",
     ),
+    summary_only: bool = Query(
+        default=False,
+        description="Return only summary counts and file metadata without unified diffs",
+    ),
+    include_unified_diff: bool = Query(
+        default=True,
+        description="Include unified diff content in file results. Set to False for summary view.",
+    ),
 ) -> ArtifactDiffResponse:
     """Get diff between collection version and deployed project version.
 
@@ -4660,6 +4668,14 @@ async def get_artifact_upstream_diff(
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (searches all if not specified)",
+    ),
+    summary_only: bool = Query(
+        default=False,
+        description="Return only summary counts and file metadata without unified diffs",
+    ),
+    include_unified_diff: bool = Query(
+        default=True,
+        description="Include unified diff content in file results. Set to False for summary view.",
     ),
 ) -> ArtifactUpstreamDiffResponse:
     """Get diff between collection version and GitHub upstream source.
@@ -5074,6 +5090,14 @@ async def get_artifact_source_project_diff(
     collection: Optional[str] = Query(
         default=None,
         description="Collection name (searches all if not specified)",
+    ),
+    summary_only: bool = Query(
+        default=False,
+        description="Return only summary counts and file metadata without unified diffs",
+    ),
+    include_unified_diff: bool = Query(
+        default=True,
+        description="Include unified diff content in file results. Set to False for summary view.",
     ),
 ) -> ArtifactDiffResponse:
     """Get diff between upstream source and project deployment, skipping collection.
