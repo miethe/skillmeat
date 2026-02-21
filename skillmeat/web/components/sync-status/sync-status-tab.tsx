@@ -217,12 +217,18 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   // ============================================================================
 
   // Determine if we have a real source (not 'local' or 'unknown')
+  // Used only for the no-data empty state message (line ~940).
   const hasRealSource = !!entity.source && entity.source !== 'local' && entity.source !== 'unknown';
+
+  // Strict upstream check — must satisfy hasValidUpstreamSource() conditions (github origin,
+  // tracking enabled, valid remote source). Aligns scope availability with query gate so
+  // tabs never appear available when the upstream query will never fire.
+  const hasValidUpstream = hasValidUpstreamSource(entity);
 
   const [comparisonScope, setComparisonScope] = useState<ComparisonScope>(
     mode === 'project'
       ? 'collection-vs-project'
-      : hasRealSource
+      : hasValidUpstream && !projectPath
         ? 'source-vs-collection'
         : 'collection-vs-project'
   );
@@ -802,7 +808,14 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
           hasUpdate: upstreamDiff.has_changes,
           source: upstreamDiff.upstream_source,
         }
-      : null,
+      : hasValidUpstream
+        ? {
+            version: entity.source || 'unknown',
+            sha: '...',
+            hasUpdate: false,
+            source: entity.source || '',
+          }
+        : null,
     collectionInfo: {
       version: entity.version || 'unknown',
       sha: entity.version?.slice(0, 7) || 'unknown',
@@ -826,7 +839,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   const comparisonProps = {
     value: comparisonScope,
     onChange: handleComparisonChange,
-    hasSource: !!entity.source && entity.source !== 'local' && entity.source !== 'unknown',
+    hasSource: hasValidUpstream,
     hasProject: !!projectPath,
   };
 
@@ -936,9 +949,12 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
           <Alert className="max-w-md">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              No comparison data available for this scope.
-              {!hasRealSource && ' This artifact has no remote source.'}
-              {!projectPath && ' No project deployment found.'}
+              {comparisonScope === 'source-vs-collection' && !hasValidUpstream
+                ? 'No upstream source configured for this artifact.'
+                : comparisonScope.includes('project') && !projectPath
+                  ? 'No project deployment found. Deploy this artifact to a project to enable comparison.'
+                  : 'No comparison data available for this scope.'}
+              {!hasValidUpstream && !projectPath && ' This artifact has no upstream source or project deployment.'}
             </AlertDescription>
           </Alert>
         </div>

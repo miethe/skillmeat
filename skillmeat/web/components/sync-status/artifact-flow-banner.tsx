@@ -106,9 +106,15 @@ export function ArtifactFlowBanner({
         >
           <Github className="h-3.5 w-3.5 text-muted-foreground" />
           {sourceInfo ? (
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
-              {truncateSha(sourceInfo.sha)}
-            </code>
+            sourceInfo.sha !== '...' ? (
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
+                {truncateSha(sourceInfo.sha)}
+              </code>
+            ) : (
+              <span className="text-[10px] text-muted-foreground">
+                {sourceInfo.source.split('/').pop() || 'Configured'}
+              </span>
+            )
           ) : (
             <span className="text-[10px] italic text-muted-foreground/50">Not configured</span>
           )}
@@ -187,10 +193,19 @@ export function ArtifactFlowBanner({
           </div>
           {sourceInfo ? (
             <div className="flex flex-col items-center gap-1 text-center">
-              <span className="text-xs font-medium">{sourceInfo.version}</span>
-              <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                {truncateSha(sourceInfo.sha)}
-              </code>
+              <span
+                className="max-w-[120px] truncate text-xs font-medium"
+                title={sourceInfo.version}
+              >
+                {sourceInfo.sha !== '...'
+                  ? sourceInfo.version
+                  : sourceInfo.source.split('/').pop() || 'Configured'}
+              </span>
+              {sourceInfo.sha !== '...' && (
+                <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  {truncateSha(sourceInfo.sha)}
+                </code>
+              )}
               {sourceInfo.hasUpdate && (
                 <Badge variant="default" className="mt-1 bg-blue-500 text-xs">
                   New Update
