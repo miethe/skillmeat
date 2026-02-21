@@ -1679,6 +1679,13 @@ class ScanResultDTO(BaseModel):
         ge=0,
         examples=[5],
     )
+    actual_ref: Optional[str] = Field(
+        default=None,
+        description="Actual git ref used during the scan. May differ from the "
+        "source's configured ref when the scanner fell back to the repository's "
+        "default branch (e.g. source configured as 'main' but repo uses 'master').",
+        examples=["master"],
+    )
 
     @model_validator(mode="after")
     def validate_dedup_counts(self) -> "ScanResultDTO":

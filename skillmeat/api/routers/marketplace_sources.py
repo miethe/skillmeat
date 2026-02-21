@@ -1735,11 +1735,12 @@ async def _perform_scan(
         ) as span:
             with transaction_handler.scan_update_transaction(source_id) as ctx:
 
-                # Update source status
+                # Update source status, persisting branch fallback if detected
                 ctx.update_source_status(
                     status="success",
                     artifact_count=scan_result.artifacts_found,
                     error_message=None,
+                    ref=scan_result.actual_ref,  # None when no fallback occurred
                 )
 
                 # Update counts_by_type and clone_target on source
