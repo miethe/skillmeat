@@ -106,6 +106,9 @@ export interface ArtifactOperationsCardProps {
   /** Handler for delete action */
   onDelete?: (artifact: Artifact) => void;
 
+  /** Handler for adding artifact to a group */
+  onAddToGroup?: () => void;
+
   /** Whether card is selected (for bulk operations) */
   selected?: boolean;
 
@@ -242,6 +245,7 @@ export function ArtifactOperationsCard({
   onViewDiff,
   onManage,
   onDelete,
+  onAddToGroup,
   selected = false,
   onSelect,
   selectable = false,
@@ -573,6 +577,18 @@ export function ArtifactOperationsCard({
               <LucideIcons.Info className="mr-2 h-4 w-4" aria-hidden="true" />
               View Details
             </DropdownMenuItem>
+            {onDeploy && (
+              <DropdownMenuItem onClick={() => onDeploy()}>
+                <LucideIcons.Rocket className="mr-2 h-4 w-4" aria-hidden="true" />
+                Quick Deploy
+              </DropdownMenuItem>
+            )}
+            {onAddToGroup && (
+              <DropdownMenuItem onClick={() => onAddToGroup()}>
+                <LucideIcons.FolderPlus className="mr-2 h-4 w-4" aria-hidden="true" />
+                Add to Group
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {
