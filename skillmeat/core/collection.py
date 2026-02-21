@@ -15,6 +15,71 @@ logger = logging.getLogger(__name__)
 
 from .mcp.metadata import MCPServerMetadata
 
+
+@dataclass
+class TagDefinition:
+    """Definition of a user-defined tag for organizing artifacts in a collection."""
+
+    name: str
+    slug: str
+    color: str = ""
+    description: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for TOML serialization."""
+        return {
+            "name": self.name,
+            "slug": self.slug,
+            "color": self.color,
+            "description": self.description,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TagDefinition":
+        """Create from dictionary (TOML deserialization)."""
+        return cls(
+            name=data["name"],
+            slug=data["slug"],
+            color=data.get("color", ""),
+            description=data.get("description", ""),
+        )
+
+
+@dataclass
+class GroupDefinition:
+    """Definition of a named group of artifacts within a collection."""
+
+    name: str
+    description: str = ""
+    color: str = ""
+    icon: str = ""
+    position: int = 0
+    members: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for TOML serialization."""
+        return {
+            "name": self.name,
+            "description": self.description,
+            "color": self.color,
+            "icon": self.icon,
+            "position": self.position,
+            "members": list(self.members),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "GroupDefinition":
+        """Create from dictionary (TOML deserialization)."""
+        return cls(
+            name=data["name"],
+            description=data.get("description", ""),
+            color=data.get("color", ""),
+            icon=data.get("icon", ""),
+            position=data.get("position", 0),
+            members=list(data.get("members", [])),
+        )
+
+
 # Extensions to strip when normalizing artifact names.
 # Matches behavior of parse_artifact_id in artifacts.py router.
 _ARTIFACT_EXTENSIONS = (".md", ".txt", ".json", ".yaml", ".yml")
@@ -53,6 +118,8 @@ class Collection:
     created: datetime
     updated: datetime
     mcp_servers: List[MCPServerMetadata] = field(default_factory=list)
+    tag_definitions: List[TagDefinition] = field(default_factory=list)
+    groups: List[GroupDefinition] = field(default_factory=list)
 
     def __post_init__(self):
         """Validate collection configuration."""
@@ -211,6 +278,14 @@ class Collection:
         if self.mcp_servers:
             result["mcp_servers"] = [server.to_dict() for server in self.mcp_servers]
 
+        # Add tag definitions if present
+        if self.tag_definitions:
+            result["tag_definitions"] = [t.to_dict() for t in self.tag_definitions]
+
+        # Add groups if present
+        if self.groups:
+            result["groups"] = [g.to_dict() for g in self.groups]
+
         return result
 
     @classmethod
@@ -219,6 +294,8 @@ class Collection:
         collection_data = data.get("collection", {})
         artifacts_data = data.get("artifacts", [])
         mcp_servers_data = data.get("mcp_servers", [])
+        tag_definitions_data = data.get("tag_definitions", [])
+        groups_data = data.get("groups", [])
 
         # Parse datetimes
         created = datetime.fromisoformat(collection_data["created"])
@@ -234,6 +311,16 @@ class Collection:
             MCPServerMetadata.from_dict(server_data) for server_data in mcp_servers_data
         ]
 
+        # Parse tag definitions (defaults to [] for old manifests)
+        tag_definitions = [
+            TagDefinition.from_dict(td) for td in tag_definitions_data
+        ]
+
+        # Parse groups (defaults to [] for old manifests)
+        groups = [
+            GroupDefinition.from_dict(gd) for gd in groups_data
+        ]
+
         return cls(
             name=collection_data["name"],
             version=collection_data["version"],
@@ -241,6 +328,8 @@ class Collection:
             updated=updated,
             artifacts=artifacts,
             mcp_servers=mcp_servers,
+            tag_definitions=tag_definitions,
+            groups=groups,
         )
 
 

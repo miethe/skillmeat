@@ -5152,6 +5152,9 @@
         "security": [
           {
             "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -5212,6 +5215,9 @@
         "security": [
           {
             "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -5664,6 +5670,158 @@
                     }
                   },
                   "title": "Response Get Unlinked References Api V1 Artifacts  Artifact Id  Unlinked References Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts/{artifact_id}/associations": {
+      "get": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Get artifact associations",
+        "description": "Return the composite-artifact associations for a given artifact. ``parents`` lists composites that contain this artifact as a child; ``children`` lists the child artifacts when this artifact is itself a composite.",
+        "operationId": "get_artifact_associations_api_v1_artifacts__artifact_id__associations_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "include_parents",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include composites that contain this artifact as a child",
+              "default": true,
+              "title": "Include Parents"
+            },
+            "description": "Include composites that contain this artifact as a child"
+          },
+          {
+            "name": "include_children",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include child artifacts of this composite",
+              "default": true,
+              "title": "Include Children"
+            },
+            "description": "Include child artifacts of this composite"
+          },
+          {
+            "name": "relationship_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by relationship type (e.g. 'contains')",
+              "title": "Relationship Type"
+            },
+            "description": "Filter by relationship type (e.g. 'contains')"
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name or UUID (uses active collection if omitted)",
+              "title": "Collection"
+            },
+            "description": "Collection name or UUID (uses active collection if omitted)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved associations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssociationsDTO"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid artifact ID format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -10076,6 +10234,466 @@
         }
       }
     },
+    "/api/v1/composites": {
+      "get": {
+        "tags": [
+          "composites",
+          "composites"
+        ],
+        "summary": "List composite artifacts",
+        "description": "Return all composite artifacts in a collection.",
+        "operationId": "list_composites_api_v1_composites_get",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "ID of the collection to list composites for.",
+              "examples": [
+                "default"
+              ],
+              "title": "Collection Id"
+            },
+            "description": "ID of the collection to list composites for."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Composite list retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompositeListResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "composites",
+          "composites"
+        ],
+        "summary": "Create composite artifact",
+        "description": "Create a new composite artifact, optionally with initial child members.",
+        "operationId": "create_composite_api_v1_composites_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompositeCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Composite created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompositeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or child artifact not found"
+          },
+          "409": {
+            "description": "Composite with that ID already exists"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/composites/{composite_id}": {
+      "get": {
+        "tags": [
+          "composites",
+          "composites"
+        ],
+        "summary": "Get composite artifact",
+        "description": "Retrieve a single composite artifact with its member list.",
+        "operationId": "get_composite_api_v1_composites__composite_id__get",
+        "parameters": [
+          {
+            "name": "composite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Composite Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Composite retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompositeResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Composite not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "composites",
+          "composites"
+        ],
+        "summary": "Update composite artifact",
+        "description": "Update mutable fields (display_name, description, composite_type).",
+        "operationId": "update_composite_api_v1_composites__composite_id__put",
+        "parameters": [
+          {
+            "name": "composite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Composite Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompositeUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Composite updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompositeResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Composite not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "composites",
+          "composites"
+        ],
+        "summary": "Delete composite artifact",
+        "description": "Delete a composite artifact and all its membership edges.  Set cascade_delete_children=true to also delete the child Artifact rows.",
+        "operationId": "delete_composite_api_v1_composites__composite_id__delete",
+        "parameters": [
+          {
+            "name": "composite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Composite Id"
+            }
+          },
+          {
+            "name": "cascade_delete_children",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "When true, also delete the child Artifact rows referenced by this composite.  Defaults to false (only membership edges are removed).",
+              "default": false,
+              "title": "Cascade Delete Children"
+            },
+            "description": "When true, also delete the child Artifact rows referenced by this composite.  Defaults to false (only membership edges are removed)."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Composite deleted"
+          },
+          "404": {
+            "description": "Composite not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/composites/{composite_id}/members": {
+      "post": {
+        "tags": [
+          "composites",
+          "composites"
+        ],
+        "summary": "Add member to composite",
+        "description": "Add a child artifact (by type:name) as a member of the composite.",
+        "operationId": "add_composite_member_api_v1_composites__composite_id__members_post",
+        "parameters": [
+          {
+            "name": "composite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Composite Id"
+            }
+          },
+          {
+            "name": "collection_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Owning collection ID.  Must match the composite's collection.",
+              "examples": [
+                "default"
+              ],
+              "title": "Collection Id"
+            },
+            "description": "Owning collection ID.  Must match the composite's collection."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Member added successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Child artifact not found in cache"
+          },
+          "404": {
+            "description": "Composite not found"
+          },
+          "409": {
+            "description": "Membership already exists"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "composites",
+          "composites"
+        ],
+        "summary": "Reorder composite members",
+        "description": "Bulk-update the position of child artifacts within a composite.  Positions are 0-based integers.  Artifacts not listed keep their current positions.",
+        "operationId": "reorder_composite_members_api_v1_composites__composite_id__members_patch",
+        "parameters": [
+          {
+            "name": "composite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Composite Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipReorderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Members reordered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MembershipResponse"
+                  },
+                  "title": "Response Reorder Composite Members Api V1 Composites  Composite Id  Members Patch"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Child artifact not found in cache"
+          },
+          "404": {
+            "description": "Composite not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/composites/{composite_id}/members/{member_uuid}": {
+      "delete": {
+        "tags": [
+          "composites",
+          "composites"
+        ],
+        "summary": "Remove member from composite",
+        "description": "Remove a child artifact membership by child artifact UUID.  The child Artifact row is NOT deleted \u2014 only the membership edge is removed.",
+        "operationId": "remove_composite_member_api_v1_composites__composite_id__members__member_uuid__delete",
+        "parameters": [
+          {
+            "name": "composite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Composite Id"
+            }
+          },
+          {
+            "name": "member_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Member Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Member removed successfully"
+          },
+          "404": {
+            "description": "Composite or membership not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/mcp/servers": {
       "get": {
         "tags": [
@@ -12164,7 +12782,7 @@
           "marketplace-sources"
         ],
         "summary": "List all GitHub sources",
-        "description": "List all GitHub repository sources with cursor-based pagination and optional filtering.\n\n    Returns sources ordered by ID for stable pagination. Use the `cursor`\n    parameter from the previous response to fetch the next page.\n\n    **Filters** (all use AND logic - source must match all provided filters):\n    - `artifact_type`: Filter sources containing artifacts of this type\n    - `tags`: Filter by tags (repeated param, e.g., `?tags=ui&tags=ux`)\n    - `trust_level`: Filter by trust level\n    - `search`: Search in repo name, description, and tags\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
+        "description": "List all GitHub repository sources with cursor-based pagination and optional filtering.\n\n    Returns sources ordered by ID for stable pagination. Use the `cursor`\n    parameter from the previous response to fetch the next page.\n\n    **Filters** (all use AND logic - source must match all provided filters):\n    - `artifact_type`: Filter sources containing artifacts of this type\n      (skill, command, agent, hook, mcp-server, composite)\n    - `tags`: Filter by tags (repeated param, e.g., `?tags=ui&tags=ux`)\n    - `trust_level`: Filter by trust level\n    - `search`: Search in repo name, description, and tags\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
         "operationId": "list_sources_api_v1_marketplace_sources_get",
         "parameters": [
           {
@@ -12212,10 +12830,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Filter by artifact type (skill, command, agent, hook, mcp-server)",
+              "description": "Filter by artifact type (skill, command, agent, hook, mcp-server, composite)",
               "title": "Artifact Type"
             },
-            "description": "Filter by artifact type (skill, command, agent, hook, mcp-server)"
+            "description": "Filter by artifact type (skill, command, agent, hook, mcp-server, composite)"
           },
           {
             "name": "tags",
@@ -19703,12 +20321,12 @@
       },
       "ArtifactPositionUpdate": {
         "properties": {
-          "artifact_id": {
+          "artifact_uuid": {
             "type": "string",
-            "title": "Artifact Id",
-            "description": "Artifact ID",
+            "title": "Artifact Uuid",
+            "description": "Artifact UUID (ADR-007 stable identity)",
             "examples": [
-              "artifact1"
+              "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
             ]
           },
           "position": {
@@ -19725,7 +20343,7 @@
         },
         "type": "object",
         "required": [
-          "artifact_id",
+          "artifact_uuid",
           "position"
         ],
         "title": "ArtifactPositionUpdate",
@@ -20765,6 +21383,91 @@
             "collection_name": "default"
           }
         }
+      },
+      "AssociationItemDTO": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id",
+            "description": "type:name identifier of the related artifact"
+          },
+          "artifact_name": {
+            "type": "string",
+            "title": "Artifact Name",
+            "description": "Name component extracted from artifact_id"
+          },
+          "artifact_type": {
+            "type": "string",
+            "title": "Artifact Type",
+            "description": "Type component extracted from artifact_id"
+          },
+          "relationship_type": {
+            "type": "string",
+            "title": "Relationship Type",
+            "description": "Semantic edge label (e.g. \"contains\")"
+          },
+          "pinned_version_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned Version Hash",
+            "description": "Content hash pinning the child to a specific snapshot"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "UTC timestamp when this membership was created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "artifact_name",
+          "artifact_type",
+          "relationship_type",
+          "created_at"
+        ],
+        "title": "AssociationItemDTO",
+        "description": "Single association edge between two artifacts.\n\nRepresents one row from the ``composite_memberships`` table, enriched\nwith basic metadata about the related artifact so callers don't need a\nsecond round-trip.\n\nAttributes:\n    artifact_id: ``type:name`` identifier of the related artifact\n        (the parent composite for items in ``parents``, or the child\n        artifact for items in ``children``).\n    artifact_name: Human-readable name component extracted from\n        ``artifact_id`` (e.g. ``\"my-plugin\"`` from\n        ``\"composite:my-plugin\"``).\n    artifact_type: Type component extracted from ``artifact_id``\n        (e.g. ``\"composite\"``, ``\"skill\"``).\n    relationship_type: Semantic label for the membership edge\n        (default ``\"contains\"``; reserved for future graph queries).\n    pinned_version_hash: Optional content hash locking the child to a\n        specific snapshot; ``None`` means track latest.\n    created_at: UTC timestamp when this membership was created."
+      },
+      "AssociationsDTO": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id",
+            "description": "type:name identifier of the queried artifact"
+          },
+          "parents": {
+            "items": {
+              "$ref": "#/components/schemas/AssociationItemDTO"
+            },
+            "type": "array",
+            "title": "Parents",
+            "description": "Composites that contain this artifact as a child"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/AssociationItemDTO"
+            },
+            "type": "array",
+            "title": "Children",
+            "description": "Child artifacts that this composite contains"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "parents",
+          "children"
+        ],
+        "title": "AssociationsDTO",
+        "description": "All parent and child associations for a single artifact.\n\nAttributes:\n    artifact_id: The ``type:name`` identifier of the queried artifact.\n    parents: Composite artifacts that contain this artifact as a child\n        (reverse lookup).  Empty when the artifact belongs to no\n        composite.\n    children: Child artifacts that this composite contains.  Empty when\n        ``artifact_id`` is not a composite or has no members."
       },
       "AutoTagRefreshResponse": {
         "properties": {
@@ -24563,6 +25266,316 @@
           "updated": "2024-11-16T15:30:00Z",
           "version": "1.0.0"
         }
+      },
+      "CompositeCreateRequest": {
+        "properties": {
+          "composite_id": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Composite Id",
+            "description": "Primary key for the new composite in 'type:name' format (e.g. 'composite:my-plugin').",
+            "examples": [
+              "composite:my-plugin"
+            ]
+          },
+          "collection_id": {
+            "type": "string",
+            "title": "Collection Id",
+            "description": "ID of the owning collection.",
+            "examples": [
+              "default"
+            ]
+          },
+          "composite_type": {
+            "type": "string",
+            "enum": [
+              "plugin",
+              "stack",
+              "suite"
+            ],
+            "title": "Composite Type",
+            "description": "Composite variant classifier.",
+            "default": "plugin",
+            "examples": [
+              "plugin",
+              "stack",
+              "suite"
+            ]
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name",
+            "description": "Human-readable label shown in UI.",
+            "examples": [
+              "My Awesome Plugin"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Free-text description of the composite.",
+            "examples": [
+              "Bundles canvas design and code-review skills."
+            ]
+          },
+          "initial_members": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Initial Members",
+            "description": "Optional list of child artifact IDs in 'type:name' format to add immediately.  Each must already exist in the collection cache.",
+            "examples": [
+              [
+                "skill:canvas-design",
+                "skill:code-review"
+              ]
+            ]
+          },
+          "pinned_version_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned Version Hash",
+            "description": "Optional content hash applied to all initial members.  Pass null to track latest.",
+            "examples": [
+              "abc123def456"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "composite_id",
+          "collection_id"
+        ],
+        "title": "CompositeCreateRequest",
+        "description": "Request schema for creating a new composite artifact.\n\nThe ``composite_id`` must follow the ``type:name`` convention already used\nthroughout the collection layer (e.g. ``\"composite:my-plugin\"``)."
+      },
+      "CompositeListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CompositeResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Composite artifacts for this collection."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of composites in the collection.",
+            "examples": [
+              3
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "CompositeListResponse",
+        "description": "Paginated response schema for listing composite artifacts."
+      },
+      "CompositeResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Composite ID in 'type:name' format.",
+            "examples": [
+              "composite:my-plugin"
+            ]
+          },
+          "collection_id": {
+            "type": "string",
+            "title": "Collection Id",
+            "description": "Owning collection ID.",
+            "examples": [
+              "default"
+            ]
+          },
+          "composite_type": {
+            "type": "string",
+            "title": "Composite Type",
+            "description": "Composite variant: plugin, stack, or suite.",
+            "examples": [
+              "plugin"
+            ]
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name",
+            "description": "Human-readable label.",
+            "examples": [
+              "My Awesome Plugin"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Free-text description."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation timestamp (UTC)."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "Last updated timestamp (UTC)."
+          },
+          "memberships": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipResponse"
+            },
+            "type": "array",
+            "title": "Memberships",
+            "description": "List of child membership edges, ordered by position (nulls last)."
+          },
+          "member_count": {
+            "type": "integer",
+            "title": "Member Count",
+            "description": "Number of child members.",
+            "examples": [
+              2
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "collection_id",
+          "composite_type",
+          "created_at",
+          "updated_at",
+          "member_count"
+        ],
+        "title": "CompositeResponse",
+        "description": "Response schema for a single composite artifact.",
+        "example": {
+          "collection_id": "default",
+          "composite_type": "plugin",
+          "created_at": "2026-02-19T12:00:00Z",
+          "description": "Bundles canvas design and code-review skills.",
+          "display_name": "My Awesome Plugin",
+          "id": "composite:my-plugin",
+          "member_count": 1,
+          "memberships": [
+            {
+              "child_artifact": {
+                "id": "skill:canvas-design",
+                "name": "canvas-design",
+                "type": "skill",
+                "uuid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+              },
+              "child_artifact_uuid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+              "collection_id": "default",
+              "composite_id": "composite:my-plugin",
+              "created_at": "2026-02-19T12:00:00Z",
+              "position": 0,
+              "relationship_type": "contains"
+            }
+          ],
+          "updated_at": "2026-02-19T12:00:00Z"
+        }
+      },
+      "CompositeUpdateRequest": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name",
+            "description": "New human-readable label.",
+            "examples": [
+              "Updated Plugin Name"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "New description.",
+            "examples": [
+              "Updated description of this composite."
+            ]
+          },
+          "composite_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "plugin",
+                  "stack",
+                  "suite"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Type",
+            "description": "New composite variant classifier.",
+            "examples": [
+              "stack"
+            ]
+          }
+        },
+        "type": "object",
+        "title": "CompositeUpdateRequest",
+        "description": "Request schema for updating a composite artifact.\n\nAll fields are optional \u2014 only provided fields are updated."
       },
       "ConfirmDuplicatesRequest": {
         "properties": {
@@ -29795,12 +30808,27 @@
       },
       "GroupArtifactResponse": {
         "properties": {
-          "artifact_id": {
+          "artifact_uuid": {
             "type": "string",
-            "title": "Artifact Id",
-            "description": "Artifact ID",
+            "title": "Artifact Uuid",
+            "description": "Artifact UUID (ADR-007 stable identity)",
             "examples": [
-              "artifact1"
+              "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+            ]
+          },
+          "artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Id",
+            "description": "Resolved artifact ID (type:name format) for API lookups. Populated when the artifact exists in the local cache; None for orphaned UUIDs.",
+            "examples": [
+              "skill:canvas-design"
             ]
           },
           "position": {
@@ -29822,7 +30850,7 @@
         },
         "type": "object",
         "required": [
-          "artifact_id",
+          "artifact_uuid",
           "position",
           "added_at"
         ],
@@ -29830,7 +30858,8 @@
         "description": "Response schema for an artifact in a group.",
         "example": {
           "added_at": "2024-11-16T12:00:00Z",
-          "artifact_id": "artifact1",
+          "artifact_id": "skill:canvas-design",
+          "artifact_uuid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
           "position": 0
         }
       },
@@ -29868,6 +30897,42 @@
             "description": "Optional detailed description of the group",
             "examples": [
               "Skills and tools for frontend development"
+            ]
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Group-local tags used for categorization and filtering",
+            "examples": [
+              [
+                "frontend",
+                "critical"
+              ]
+            ]
+          },
+          "color": {
+            "type": "string",
+            "title": "Color",
+            "description": "Visual color token or custom HEX color for group card accents",
+            "default": "slate",
+            "examples": [
+              "slate",
+              "blue",
+              "#22c55e"
+            ]
+          },
+          "icon": {
+            "type": "string",
+            "title": "Icon",
+            "description": "Icon token used for group display",
+            "default": "layers",
+            "examples": [
+              "layers",
+              "folder",
+              "tag"
             ]
           },
           "position": {
@@ -29921,11 +30986,17 @@
             {
               "artifact_count": 5,
               "collection_id": "default",
+              "color": "blue",
               "created_at": "2024-11-16T12:00:00Z",
               "description": "Skills and tools for frontend development",
+              "icon": "layers",
               "id": "abc123",
               "name": "Frontend Development",
               "position": 0,
+              "tags": [
+                "frontend",
+                "critical"
+              ],
               "updated_at": "2024-11-16T15:30:00Z"
             }
           ],
@@ -30022,6 +31093,39 @@
               "Skills and tools for frontend development"
             ]
           },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Group-local tags",
+            "examples": [
+              [
+                "frontend",
+                "critical"
+              ]
+            ]
+          },
+          "color": {
+            "type": "string",
+            "title": "Color",
+            "description": "Visual color token or custom HEX color for group card accents",
+            "examples": [
+              "slate",
+              "blue",
+              "#22c55e"
+            ]
+          },
+          "icon": {
+            "type": "string",
+            "title": "Icon",
+            "description": "Icon token for group display",
+            "examples": [
+              "layers",
+              "folder"
+            ]
+          },
           "position": {
             "type": "integer",
             "title": "Position",
@@ -30059,6 +31163,8 @@
           "id",
           "collection_id",
           "name",
+          "color",
+          "icon",
           "position",
           "created_at",
           "updated_at",
@@ -30069,11 +31175,17 @@
         "example": {
           "artifact_count": 5,
           "collection_id": "default",
+          "color": "blue",
           "created_at": "2024-11-16T12:00:00Z",
           "description": "Skills and tools for frontend development",
+          "icon": "layers",
           "id": "abc123",
           "name": "Frontend Development",
           "position": 0,
+          "tags": [
+            "frontend",
+            "critical"
+          ],
           "updated_at": "2024-11-16T15:30:00Z"
         }
       },
@@ -30171,6 +31283,61 @@
               "Updated description"
             ]
           },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags",
+            "description": "Updated group-local tags",
+            "examples": [
+              [
+                "frontend",
+                "critical"
+              ]
+            ]
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color",
+            "description": "Updated visual color token or custom HEX color",
+            "examples": [
+              "slate",
+              "blue",
+              "#22c55e"
+            ]
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon",
+            "description": "Updated icon token",
+            "examples": [
+              "layers",
+              "folder",
+              "tag"
+            ]
+          },
           "position": {
             "anyOf": [
               {
@@ -30235,6 +31402,39 @@
               "Skills and tools for frontend development"
             ]
           },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Group-local tags",
+            "examples": [
+              [
+                "frontend",
+                "critical"
+              ]
+            ]
+          },
+          "color": {
+            "type": "string",
+            "title": "Color",
+            "description": "Visual color token or custom HEX color for group card accents",
+            "examples": [
+              "slate",
+              "blue",
+              "#22c55e"
+            ]
+          },
+          "icon": {
+            "type": "string",
+            "title": "Icon",
+            "description": "Icon token for group display",
+            "examples": [
+              "layers",
+              "folder"
+            ]
+          },
           "position": {
             "type": "integer",
             "title": "Position",
@@ -30280,6 +31480,8 @@
           "id",
           "collection_id",
           "name",
+          "color",
+          "icon",
           "position",
           "created_at",
           "updated_at",
@@ -30292,21 +31494,27 @@
           "artifacts": [
             {
               "added_at": "2024-11-16T12:00:00Z",
-              "artifact_id": "artifact1",
+              "artifact_uuid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
               "position": 0
             },
             {
               "added_at": "2024-11-16T13:00:00Z",
-              "artifact_id": "artifact2",
+              "artifact_uuid": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
               "position": 1
             }
           ],
           "collection_id": "default",
+          "color": "blue",
           "created_at": "2024-11-16T12:00:00Z",
           "description": "Skills and tools for frontend development",
+          "icon": "layers",
           "id": "abc123",
           "name": "Frontend Development",
           "position": 0,
+          "tags": [
+            "frontend",
+            "critical"
+          ],
           "updated_at": "2024-11-16T15:30:00Z"
         }
       },
@@ -32187,6 +33395,207 @@
           "description": "Extract and manipulate PDF documents",
           "name": "pdf-processor",
           "title": "PDF Processing Tool"
+        }
+      },
+      "MemberPositionUpdate": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id",
+            "description": "Child artifact ID in 'type:name' format.",
+            "examples": [
+              "skill:canvas-design"
+            ]
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Position",
+            "description": "New 0-based position within the composite.",
+            "examples": [
+              0,
+              1,
+              2
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "position"
+        ],
+        "title": "MemberPositionUpdate",
+        "description": "A single artifact \u2192 position entry for bulk reorder requests."
+      },
+      "MembershipCreateRequest": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Artifact Id",
+            "description": "Child artifact ID in 'type:name' format (e.g. 'skill:canvas-design').  Must exist in the collection cache.",
+            "examples": [
+              "skill:canvas-design"
+            ]
+          },
+          "relationship_type": {
+            "type": "string",
+            "title": "Relationship Type",
+            "description": "Semantic edge label for the membership.",
+            "default": "contains",
+            "examples": [
+              "contains"
+            ]
+          },
+          "pinned_version_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned Version Hash",
+            "description": "Optional content hash to pin this member to a specific version.",
+            "examples": [
+              "abc123def456"
+            ]
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position",
+            "description": "Display order within the composite (0-based).  Null means unordered.",
+            "examples": [
+              0,
+              1,
+              2
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id"
+        ],
+        "title": "MembershipCreateRequest",
+        "description": "Request schema for adding a child artifact to a composite."
+      },
+      "MembershipReorderRequest": {
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/MemberPositionUpdate"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Members",
+            "description": "List of artifact_id \u2192 position mappings."
+          }
+        },
+        "type": "object",
+        "required": [
+          "members"
+        ],
+        "title": "MembershipReorderRequest",
+        "description": "Request schema for bulk reordering members within a composite."
+      },
+      "MembershipResponse": {
+        "properties": {
+          "collection_id": {
+            "type": "string",
+            "title": "Collection Id",
+            "description": "Owning collection ID."
+          },
+          "composite_id": {
+            "type": "string",
+            "title": "Composite Id",
+            "description": "Parent composite ID (type:name)."
+          },
+          "child_artifact_uuid": {
+            "type": "string",
+            "title": "Child Artifact Uuid",
+            "description": "Stable UUID (ADR-007) of the child artifact."
+          },
+          "relationship_type": {
+            "type": "string",
+            "title": "Relationship Type",
+            "description": "Semantic edge label."
+          },
+          "pinned_version_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned Version Hash",
+            "description": "Version pin hash, or null for 'track latest'."
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position",
+            "description": "Display order (0-based), or null if unordered."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When this membership was created."
+          },
+          "child_artifact": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Child Artifact",
+            "description": "Lightweight child artifact summary (id, uuid, name, type) when the artifact row is available in the cache."
+          }
+        },
+        "type": "object",
+        "required": [
+          "collection_id",
+          "composite_id",
+          "child_artifact_uuid",
+          "relationship_type",
+          "created_at"
+        ],
+        "title": "MembershipResponse",
+        "description": "Response schema for a single composite membership edge.",
+        "example": {
+          "child_artifact": {
+            "id": "skill:canvas-design",
+            "name": "canvas-design",
+            "type": "skill",
+            "uuid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+          },
+          "child_artifact_uuid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+          "collection_id": "default",
+          "composite_id": "composite:my-plugin",
+          "created_at": "2026-02-19T12:00:00Z",
+          "position": 0,
+          "relationship_type": "contains"
         }
       },
       "MemoryExtractionApplyRequest": {
@@ -37236,6 +38645,45 @@
             "description": "Timestamp of last successful indexing run. None if source has never been indexed.",
             "examples": [
               "2025-12-06T10:30:00Z",
+              null
+            ]
+          },
+          "composite_member_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Member Count",
+            "description": "Total number of child-artifact membership edges across all composite artifacts associated with this source.  Null when the source contains no composite-type artifacts.",
+            "examples": [
+              4,
+              null
+            ]
+          },
+          "composite_child_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Child Types",
+            "description": "Deduplicated list of child artifact types (e.g. 'skill', 'command') found across all composites associated with this source.  Null when the source contains no composite-type artifacts.",
+            "examples": [
+              [
+                "skill",
+                "command"
+              ],
               null
             ]
           }

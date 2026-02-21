@@ -29,6 +29,7 @@ import {
   ArrowRight,
   MoreVertical,
   Plus,
+  Users,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
@@ -66,6 +67,7 @@ import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModa
 import {
   LinkedArtifactsSection,
   ArtifactLinkingDialog,
+  PluginMembersTab,
   type LinkedArtifactReference,
 } from '@/components/entity';
 import {
@@ -105,7 +107,8 @@ export type ArtifactModalTab =
   | 'history'
   | 'collections'
   | 'sources'
-  | 'deployments';
+  | 'deployments'
+  | 'members';
 
 interface UnifiedEntityModalProps {
   /**
@@ -1827,6 +1830,15 @@ export function UnifiedEntityModal({
                 <FolderOpen className="mr-2 h-4 w-4" />
                 Collections
               </TabsTrigger>
+              {entity.type === 'composite' && (
+                <TabsTrigger
+                  value="members"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                >
+                  <Users className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Members
+                </TabsTrigger>
+              )}
               {entity.source && hasValidUpstreamSource(entity.source) && (
                 <TabsTrigger
                   value="sources"
@@ -2451,6 +2463,20 @@ export function UnifiedEntityModal({
                 </div>
               </ScrollArea>
             </TabsContent>
+
+            {/* Members Tab — composite artifacts only */}
+            {entity.type === 'composite' && (
+              <TabsContent value="members" className="mt-0 flex-1">
+                <ScrollArea className="h-[calc(90vh-12rem)]">
+                  <div className="py-4">
+                    <PluginMembersTab
+                      compositeId={entity.id}
+                      collectionId={entity.collection || 'default'}
+                    />
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+            )}
           </Tabs>
 
           {/* Collapsible Action Bar - hidden on Contents and Sync Status tabs */}

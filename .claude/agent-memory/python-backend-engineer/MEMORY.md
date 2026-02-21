@@ -59,3 +59,13 @@ session.query(Artifact.id, CollectionArtifact.source, ...)
 - Raises `RuntimeError` if `artifacts` count == 0; logs WARNING if count < 10
 - Uses `op.get_bind()` to get the live migration connection (no separate session needed)
 - Pattern: empty artifacts table causes JOIN to silently produce zero rows → data loss in association tables
+
+### Composite Import DB Population Pattern
+- `ArtifactManager.show()` does NOT handle `composite` type — calling it for a composite entry returns None/fails
+- `create_or_update_collection_artifact()` requires an `Artifact` row to exist; `_ensure_artifact_row()` creates it if absent
+- `_ensure_artifacts_in_cache()` in `user_collections.py` only lists filesystem types (skill/command/agent/etc.) — composites are never listed there
+- Fix: in `populate_collection_artifact_from_import()`, composite branch skips `artifact_mgr.show()`, calls `_ensure_artifact_row()` + `_upsert_composite_artifact_row()` first
+- `_COLLECTION_ARTIFACTS_PROJECT_ID = "collection_artifacts_global"` sentinel must match user_collections.py constant
+- Child artifacts of a composite are found via catalog path prefix: `child.path.startswith(composite_path + "/")`
+- `_import_composite_children()` in `marketplace_sources.py` handles auto-importing children after composite import
+- Files: `skillmeat/api/services/artifact_cache_service.py`, `skillmeat/api/routers/marketplace_sources.py`

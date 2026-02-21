@@ -78,6 +78,33 @@ def decode_cursor(cursor: str) -> str:
 # =============================================================================
 
 
+def _sync_tag_definitions_to_manifest() -> None:
+    """Write-through helper: sync all tag definitions to collection.toml.
+
+    Opens a fresh session (tags are workspace-scoped so any collection
+    works), resolves the first available collection, and delegates to
+    ManifestSyncService.  Failures are logged but never propagate so that
+    the API request always succeeds even if the TOML write fails.
+    """
+    try:
+        from skillmeat.cache.models import Collection as DBCollection, get_session
+        from skillmeat.core.services.manifest_sync_service import ManifestSyncService
+
+        session = get_session()
+        try:
+            collection = session.query(DBCollection).first()
+            if collection is None:
+                logger.debug(
+                    "manifest_sync: no collections in DB; skipping tag definition sync"
+                )
+                return
+            ManifestSyncService().sync_tag_definitions(session, collection.id)
+        finally:
+            session.close()
+    except Exception as e:
+        logger.warning(f"Failed to sync tag definitions to manifest: {e}")
+
+
 @router.post(
     "",
     response_model=TagResponse,
@@ -121,6 +148,8 @@ async def create_tag(request: TagCreateRequest) -> TagResponse:
         tag = service.create_tag(request)
 
         logger.info(f"Created tag: {tag.id} ('{tag.name}')")
+
+        _sync_tag_definitions_to_manifest()
 
         return tag
 
@@ -407,6 +436,8 @@ async def update_tag(
 
         logger.info(f"Updated tag: {tag.id} ('{tag.name}')")
 
+        _sync_tag_definitions_to_manifest()
+
         return tag
 
     except ValueError as e:
@@ -507,6 +538,8 @@ async def delete_tag(tag_id: str, collection_mgr: CollectionManagerDep) -> None:
             write_service.update_tags_json_cache(result["affected_artifacts"])
 
         logger.info(f"Deleted tag: {tag_id}")
+
+        _sync_tag_definitions_to_manifest()
 
     except HTTPException:
         raise

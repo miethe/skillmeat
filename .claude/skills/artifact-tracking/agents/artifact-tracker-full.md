@@ -34,12 +34,18 @@ Use this agent for:
 **When**: Starting a new phase of implementation from a PRD
 
 **Process**:
-1. Verify phase doesn't already have progress file (ONE per phase rule)
-2. Load template from skill's templates directory
-3. Populate phase metadata (phase number, PRD reference, date)
-4. Initialize task list from implementation plan
-5. Set up metrics tracking (0% complete, 0 completed tasks)
-6. Create file at `.claude/progress/[prd-name]/phase-[N]-progress.md`
+1. **Discover existing directory** (version-suffix tolerant):
+   - Strip version suffix (`-v1`, `-v2`, etc.) from `[prd-name]` to get `[base-slug]`
+   - Search: `ls -d .claude/progress/[base-slug]*/ 2>/dev/null`
+   - If match found, use that directory (regardless of version suffix presence)
+   - If multiple matches, prefer exact `[prd-name]` match
+   - If no match, create new directory using `[prd-name]` as-is
+2. Verify phase doesn't already have progress file in resolved directory (ONE per phase rule)
+3. Load template from skill's templates directory
+4. Populate phase metadata (phase number, PRD reference, date)
+5. Initialize task list from implementation plan
+6. Set up metrics tracking (0% complete, 0 completed tasks)
+7. Create file at `.claude/progress/[resolved-dir]/phase-[N]-progress.md`
 
 **Template Structure**:
 ```yaml

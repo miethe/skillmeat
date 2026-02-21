@@ -33,9 +33,22 @@ Reference: [.claude/skills/dev-execution/modes/phase-execution.md]
 
 Extract `{PRD_NAME}` and `{PHASE_NUM}` from `$ARGUMENTS`.
 
-Validate tracking at: `.claude/progress/${PRD_NAME}/phase-${PHASE_NUM}-progress.md`
+**Resolve progress directory (discovery-first):**
 
-If missing: `Task("artifact-tracker", "Create Phase ${PHASE_NUM} progress for ${PRD_NAME}")`
+The progress directory may or may not include a version suffix (e.g., `-v1`). Always search for existing directories before constructing a path:
+
+1. Derive `{BASE_SLUG}` by stripping any version suffix (`-v1`, `-v2`, etc.) from `{PRD_NAME}`
+2. Search for existing progress directories matching either variant:
+   ```bash
+   ls -d .claude/progress/${BASE_SLUG}*/ 2>/dev/null
+   ```
+3. **If exactly one match**: Use that directory as `{PROGRESS_DIR}`
+4. **If multiple matches** (e.g., both `foo/` and `foo-v1/`): Filter to the one matching the version in `{PRD_NAME}`. If `{PRD_NAME}` has no version, prefer the versionless directory.
+5. **If no match**: Create new directory using `{PRD_NAME}` as-is
+
+Set `progress_file="${PROGRESS_DIR}/phase-${PHASE_NUM}-progress.md"`
+
+If progress file is missing: `Task("artifact-tracker", "Create Phase ${PHASE_NUM} progress for ${PRD_NAME}")`
 
 ### 2. Read Progress YAML (Token-Efficient)
 

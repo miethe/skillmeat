@@ -427,13 +427,18 @@ def migrate_artifacts_to_default_collection(
     # 8. Sync tags from CollectionArtifact cache to Tag ORM tables
     tag_sync_count = _sync_all_tags_to_orm(session)
 
-    # 9. Return combined stats including metadata cache results
+    # 9. FS → DB Recovery: restore tag definitions and groups from collection.toml
+    # This runs AFTER artifacts are populated so that group member resolution works.
+    recovery_stats = _recover_default_collection_metadata(session, collection_mgr)
+
+    # 10. Return combined stats including metadata cache results
     return {
         "migrated_count": migrated_count,
         "already_present_count": len(existing_artifact_ids),
         "total_artifacts": len(all_artifact_ids),
         "metadata_cache": metadata_stats,
         "tag_sync_count": tag_sync_count,
+        "recovery": recovery_stats,
     }
 
 
@@ -473,6 +478,63 @@ def _sync_all_tags_to_orm(session: Session) -> int:
 
     logger.info(f"Synced tags for {synced}/{len(all_cas)} artifacts to Tag ORM")
     return synced
+
+
+def _recover_default_collection_metadata(
+    session: Session,
+    collection_mgr,
+) -> dict:
+    """Trigger FS → DB recovery for the default (active) collection.
+
+    Resolves the filesystem path for the active collection and calls
+    ``recover_collection_metadata()`` from ``artifact_cache_service``.
+
+    Non-fatal: any errors are logged and an empty stats dict returned.
+
+    Args:
+        session: Active SQLAlchemy session.
+        collection_mgr: CollectionManager used to resolve the collection path.
+
+    Returns:
+        Recovery statistics dict (see ``recover_collection_metadata`` docstring).
+    """
+    try:
+        from skillmeat.api.services.artifact_cache_service import (
+            recover_collection_metadata,
+        )
+
+        active_name = collection_mgr.get_active_collection_name()
+        collection_path = collection_mgr.config.get_collection_path(active_name)
+
+        stats = recover_collection_metadata(
+            session=session,
+            collection_id=DEFAULT_COLLECTION_ID,
+            collection_path=collection_path,
+        )
+
+        if stats.get("tags_recovered", 0) > 0 or stats.get("groups_recovered", 0) > 0:
+            logger.info(
+                "_recover_default_collection_metadata: recovery complete — "
+                "tags=%d groups=%d members=%d skipped=%d",
+                stats["tags_recovered"],
+                stats["groups_recovered"],
+                stats["members_recovered"],
+                stats["members_skipped"],
+            )
+        else:
+            logger.debug(
+                "_recover_default_collection_metadata: nothing to recover "
+                "(reason=%r, tags=%d, groups=%d)",
+                stats.get("skipped_reason"),
+                stats.get("tags_recovered", 0),
+                stats.get("groups_recovered", 0),
+            )
+        return stats
+    except Exception as exc:
+        logger.warning(
+            "_recover_default_collection_metadata: recovery failed: %s", exc
+        )
+        return {}
 
 
 def populate_collection_artifact_metadata(

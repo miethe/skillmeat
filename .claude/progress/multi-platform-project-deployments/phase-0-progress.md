@@ -3,7 +3,7 @@ type: progress
 prd: multi-platform-project-deployments-v1
 phase: 0
 title: Adapter Baseline
-status: planning
+status: deferred
 started: null
 completed: null
 overall_progress: 0
@@ -91,7 +91,6 @@ schema_version: 2
 doc_type: progress
 feature_slug: multi-platform-project-deployments-v1
 ---
-
 # Phase 0: Adapter Baseline
 
 **YAML frontmatter is the source of truth for tasks, status, and assignments.** Do not duplicate in markdown.

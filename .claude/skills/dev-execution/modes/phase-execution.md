@@ -14,13 +14,35 @@ Detailed guidance for multi-phase YAML-driven development with batch delegation.
 ### 1.1 Extract Phase Information
 
 From `$ARGUMENTS`, extract:
-- `{PRD_NAME}`: From plan or PRD filename
+- `{PRD_NAME}`: From plan or PRD filename (e.g., `metadata-persistence-v1`)
 - `{PHASE_NUM}`: Phase number to execute
 
-### 1.2 Validate Tracking Infrastructure
+### 1.2 Resolve Progress Directory (Discovery-First)
+
+Progress directories may or may not include version suffixes (e.g., `-v1`). The naming is inconsistent across features. **Always discover existing directories before constructing paths.**
 
 ```bash
-progress_file=".claude/progress/${PRD_NAME}/phase-${PHASE_NUM}-progress.md"
+# Step 1: Strip version suffix to get base slug
+BASE_SLUG=$(echo "${PRD_NAME}" | sed 's/-v[0-9]\+\(\.[0-9]\+\)*$//')
+
+# Step 2: Find existing progress directories matching either variant
+matches=$(ls -d .claude/progress/${BASE_SLUG}*/ 2>/dev/null)
+
+# Step 3: Resolve to single directory
+# - Exactly one match → use it
+# - Multiple matches → filter by version (prefer exact PRD_NAME match)
+# - No match → will create using PRD_NAME as-is
+```
+
+**Resolution rules:**
+1. If exactly one directory matches the `${BASE_SLUG}*` glob, use it regardless of version suffix
+2. If multiple directories match (e.g., `foo/` and `foo-v1/`), prefer the one matching `${PRD_NAME}` exactly
+3. If no directory exists, create new using `${PRD_NAME}` as-is
+
+### 1.3 Validate Tracking Infrastructure
+
+```bash
+progress_file="${PROGRESS_DIR}/phase-${PHASE_NUM}-progress.md"
 
 # Check if progress file exists
 if [ ! -f "$progress_file" ]; then
@@ -29,7 +51,7 @@ fi
 ```
 
 When creating or initializing a progress file, populate linkage fields immediately:
-- `feature_slug`: match `${PRD_NAME}`
+- `feature_slug`: match the resolved directory name (not necessarily `${PRD_NAME}`)
 - `prd_ref`: path to parent PRD
 - `plan_ref`: path to parent implementation plan
 

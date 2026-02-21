@@ -36,6 +36,7 @@ import {
   FolderTree,
   BookOpen,
   Sparkles,
+  Blocks,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -160,6 +161,7 @@ function CatalogCard({
       color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
     },
     hook: { label: 'Hook', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' },
+    composite: { label: 'Plugin', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' },
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -917,9 +919,21 @@ export default function SourceDetailPage() {
           <div className="flex items-center gap-3">
             <Github className="h-8 w-8" />
             <div>
-              <h1 className="text-2xl font-bold">
-                {source.owner}/{source.repo_name}
-              </h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-bold">
+                  {source.owner}/{source.repo_name}
+                </h1>
+                {/* Plugin classification badge (CUX-P2-06): shown when source has composite artifacts */}
+                {source.composite_member_count != null && source.composite_member_count > 0 && (
+                  <div
+                    className="flex items-center gap-1.5 rounded-md border border-indigo-400 bg-indigo-100 px-2 py-0.5 text-sm font-medium text-indigo-700 dark:border-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"
+                    aria-label="This source contains plugin (composite) artifacts"
+                  >
+                    <Blocks className="h-4 w-4" aria-hidden="true" />
+                    Plugin
+                  </div>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground">
                 {source.ref}
                 {source.root_hint && ` • ${source.root_hint}`}

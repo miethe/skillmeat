@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Grid3x3, List, Layers, Search, RefreshCw, Filter, X, ArrowUpDown, Check } from 'lucide-react';
+import { Grid3x3, List, Layers, Search, RefreshCw, Filter, X, ArrowUpDown, Check, Blocks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -91,6 +91,8 @@ interface CollectionToolbarProps {
   onFilterModeChange?: (mode: FilterMode) => void;
   /** Handler to clear all filters in a single URL update (avoids stale searchParams race) */
   onClearAllFilters?: () => void;
+  /** Handler to open the Create Plugin dialog */
+  onNewPlugin?: () => void;
 }
 
 /**
@@ -159,6 +161,7 @@ export function CollectionToolbar({
   filterMode = 'and',
   onFilterModeChange,
   onClearAllFilters,
+  onNewPlugin,
 }: CollectionToolbarProps) {
   // Local search state for immediate UI feedback
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -222,7 +225,7 @@ export function CollectionToolbar({
         <div className="flex flex-1 items-center gap-2">
           {/* Search Input */}
           <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input
               type="search"
               placeholder="Search artifacts..."
@@ -246,7 +249,7 @@ export function CollectionToolbar({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
-                <Filter className="h-4 w-4" />
+                <Filter className="h-4 w-4" aria-hidden="true" />
                 Filters
                 {activeFilterCount > 0 && (
                   <Badge variant="secondary" className="ml-1 h-5 min-w-[1.25rem] px-1">
@@ -676,38 +679,70 @@ export function CollectionToolbar({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
-                <ArrowUpDown className="h-4 w-4" />
+                <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
                 Sort
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuLabel>Sort By</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onSortChange('confidence', sortOrder)}>
-                Confidence {sortField === 'confidence' && (sortOrder === 'asc' ? '↑' : '↓')}
+              <DropdownMenuItem
+                onClick={() => onSortChange('confidence', sortOrder)}
+                aria-current={sortField === 'confidence' ? 'true' : undefined}
+              >
+                Confidence
+                {sortField === 'confidence' && (
+                  <span className="ml-1" aria-hidden="true">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                )}
+                <span className="sr-only">{sortField === 'confidence' ? `, sorted ${sortOrder === 'asc' ? 'ascending' : 'descending'}` : ''}</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onSortChange('name', sortOrder)}>
-                Name {sortField === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+              <DropdownMenuItem
+                onClick={() => onSortChange('name', sortOrder)}
+                aria-current={sortField === 'name' ? 'true' : undefined}
+              >
+                Name
+                {sortField === 'name' && (
+                  <span className="ml-1" aria-hidden="true">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                )}
+                <span className="sr-only">{sortField === 'name' ? `, sorted ${sortOrder === 'asc' ? 'ascending' : 'descending'}` : ''}</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onSortChange('updatedAt', sortOrder)}>
-                Last Updated {sortField === 'updatedAt' && (sortOrder === 'asc' ? '↑' : '↓')}
+              <DropdownMenuItem
+                onClick={() => onSortChange('updatedAt', sortOrder)}
+                aria-current={sortField === 'updatedAt' ? 'true' : undefined}
+              >
+                Last Updated
+                {sortField === 'updatedAt' && (
+                  <span className="ml-1" aria-hidden="true">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                )}
+                <span className="sr-only">{sortField === 'updatedAt' ? `, sorted ${sortOrder === 'asc' ? 'ascending' : 'descending'}` : ''}</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onSortChange('usageCount', sortOrder)}>
-                Usage Count {sortField === 'usageCount' && (sortOrder === 'asc' ? '↑' : '↓')}
+              <DropdownMenuItem
+                onClick={() => onSortChange('usageCount', sortOrder)}
+                aria-current={sortField === 'usageCount' ? 'true' : undefined}
+              >
+                Usage Count
+                {sortField === 'usageCount' && (
+                  <span className="ml-1" aria-hidden="true">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                )}
+                <span className="sr-only">{sortField === 'usageCount' ? `, sorted ${sortOrder === 'asc' ? 'ascending' : 'descending'}` : ''}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => onSortChange(sortField, sortOrder === 'asc' ? 'desc' : 'asc')}
               >
-                {sortOrder === 'asc' ? 'Ascending ↑' : 'Descending ↓'}
+                {sortOrder === 'asc' ? (
+                  <>Ascending <span aria-hidden="true">↑</span><span className="sr-only">(click to switch to descending)</span></>
+                ) : (
+                  <>Descending <span aria-hidden="true">↓</span><span className="sr-only">(click to switch to ascending)</span></>
+                )}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
           {/* Clear Filters */}
           {hasActiveFilters && (
-            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="gap-2">
-              <X className="h-4 w-4" />
+            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="gap-2" aria-label="Clear all filters">
+              <X className="h-4 w-4" aria-hidden="true" />
               Clear
             </Button>
           )}
@@ -729,7 +764,7 @@ export function CollectionToolbar({
               aria-pressed={viewMode === 'grid'}
               className="h-8 w-8 p-0"
             >
-              <Grid3x3 className="h-4 w-4" />
+              <Grid3x3 className="h-4 w-4" aria-hidden="true" />
             </Button>
             <Button
               variant={viewMode === 'list' ? 'secondary' : 'ghost'}
@@ -739,7 +774,7 @@ export function CollectionToolbar({
               aria-pressed={viewMode === 'list'}
               className="h-8 w-8 p-0"
             >
-              <List className="h-4 w-4" />
+              <List className="h-4 w-4" aria-hidden="true" />
             </Button>
             <Button
               variant={viewMode === 'grouped' ? 'secondary' : 'ghost'}
@@ -750,9 +785,22 @@ export function CollectionToolbar({
               className="h-8 w-8 p-0"
               disabled={!allowGroupedView}
             >
-              <Layers className="h-4 w-4" />
+              <Layers className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
+
+          {/* New Plugin Button */}
+          {onNewPlugin && (
+            <Button
+              size="sm"
+              onClick={onNewPlugin}
+              className="gap-2 bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+              aria-label="Create new plugin"
+            >
+              <Blocks className="h-4 w-4" aria-hidden="true" />
+              New Plugin
+            </Button>
+          )}
 
           {/* Refresh Button with timestamp */}
           <div className="flex items-center gap-2">
@@ -766,9 +814,9 @@ export function CollectionToolbar({
               size="sm"
               onClick={onRefresh}
               disabled={isRefreshing}
-              aria-label="Refresh"
+              aria-label={isRefreshing ? 'Refreshing…' : 'Refresh'}
             >
-              <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
+              <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} aria-hidden="true" />
             </Button>
           </div>
         </div>

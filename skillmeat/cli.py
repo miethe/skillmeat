@@ -272,9 +272,9 @@ def init(
     "--type",
     "-t",
     "artifact_type",
-    type=click.Choice(["skill", "command", "agent"]),
+    type=click.Choice(["skill", "command", "agent", "composite", "plugin"]),
     default=None,
-    help="Filter by artifact type",
+    help="Filter by artifact type ('composite' and 'plugin' are aliases for composite artifacts)",
 )
 @click.option(
     "--collection",
@@ -306,11 +306,13 @@ def cmd_list(
 ):
     """List artifacts in collection.
 
-    Shows all artifacts or filtered by type.
+    Shows all artifacts or filtered by type. Composite artifacts (plugins) are
+    fetched from the DB cache and displayed with the type label 'plugin'.
 
     Examples:
-      skillmeat list                    # List all artifacts
+      skillmeat list                    # List all artifacts (including plugins)
       skillmeat list --type skill       # List only skills
+      skillmeat list --type plugin      # List only composite/plugin artifacts
       skillmeat list --tags             # Show tags
       skillmeat list --no-cache         # Force fresh read from filesystem
       skillmeat list --cache-status     # Show cache freshness
@@ -318,8 +320,17 @@ def cmd_list(
     try:
         artifact_mgr = ArtifactManager()
 
-        # Convert type string to enum
-        type_filter = ArtifactType(artifact_type) if artifact_type else None
+        # Composite/plugin are aliases — treat both as a composite filter
+        composite_filter = artifact_type in ("composite", "plugin")
+        # When filtering for composites only, skip the regular artifact query
+        skip_regular = composite_filter
+
+        # Convert type string to ArtifactType enum for regular artifacts.
+        # composite/plugin are not valid ArtifactType values so we leave them None.
+        if artifact_type in (None, "composite", "plugin"):
+            type_filter = None
+        else:
+            type_filter = ArtifactType(artifact_type)
 
         # Try to use cache first, unless --no-cache is set
         artifacts = None
@@ -366,36 +377,64 @@ def cmd_list(
                     f"Cache read failed, falling back to filesystem: {cache_error}"
                 )
 
-        # Fallback to filesystem if cache not used or failed
-        if not used_cache or no_cache:
-            artifacts = artifact_mgr.list_artifacts(
-                collection_name=collection,
-                artifact_type=type_filter,
-            )
-            if cache_status:
-                console.print(
-                    "[dim]Reading from filesystem (cache bypassed or unavailable)[/dim]"
+        # Fetch regular artifacts unless we are only showing composites
+        if not skip_regular:
+            if not used_cache or no_cache:
+                artifacts = artifact_mgr.list_artifacts(
+                    collection_name=collection,
+                    artifact_type=type_filter,
                 )
-        else:
-            # Use cached data (fallback for now until full integration)
-            artifacts = artifact_mgr.list_artifacts(
-                collection_name=collection,
-                artifact_type=type_filter,
-            )
+                if cache_status:
+                    console.print(
+                        "[dim]Reading from filesystem (cache bypassed or unavailable)[/dim]"
+                    )
+            else:
+                # Use cached data (fallback for now until full integration)
+                artifacts = artifact_mgr.list_artifacts(
+                    collection_name=collection,
+                    artifact_type=type_filter,
+                )
 
-        if not artifacts:
+        # ------------------------------------------------------------------
+        # Fetch composite artifacts from the DB cache
+        # ------------------------------------------------------------------
+        composite_rows: List[Dict[str, Any]] = []
+        # Show composites when: no type filter (all), or explicitly requesting plugin/composite
+        show_composites = not no_cache and (type_filter is None or composite_filter)
+
+        if show_composites:
+            try:
+                from skillmeat.cache.composite_repository import (
+                    CompositeMembershipRepository,
+                )
+
+                composite_repo = CompositeMembershipRepository()
+
+                # Resolve collection id — composites use the collection name as collection_id
+                resolved_collection = collection
+                if resolved_collection is None:
+                    collection_mgr = CollectionManager()
+                    resolved_collection = collection_mgr.get_active_collection_name()
+
+                composite_rows = composite_repo.list_composites(resolved_collection)
+            except Exception as comp_err:
+                logger.debug("Could not fetch composite artifacts: %s", comp_err)
+
+        if not artifacts and not composite_rows:
             console.print("[yellow]No artifacts found[/yellow]")
             return
 
+        total = len(artifacts or []) + len(composite_rows)
+
         # Create table
-        table = Table(title=f"Artifacts ({len(artifacts)})")
+        table = Table(title=f"Artifacts ({total})")
         table.add_column("Name", style="cyan")
         table.add_column("Type", style="blue")
-        table.add_column("Origin", style="green")
+        table.add_column("Origin / Description", style="green")
         if tags:
             table.add_column("Tags", style="yellow")
 
-        for artifact in artifacts:
+        for artifact in (artifacts or []):
             row = [
                 artifact.name,
                 artifact.type.value,
@@ -404,6 +443,17 @@ def cmd_list(
             if tags:
                 tag_str = ", ".join(artifact.tags) if artifact.tags else ""
                 row.append(tag_str)
+            table.add_row(*row)
+
+        for comp in composite_rows:
+            # id format is "composite:name" — extract the human-readable name part
+            comp_id: str = comp.get("id", "")
+            comp_name = comp_id.split(":", 1)[1] if ":" in comp_id else comp_id
+            display_name = comp.get("display_name") or comp_name
+            description = comp.get("description") or ""
+            row = [display_name, "plugin", description]
+            if tags:
+                row.append("")
             table.add_row(*row)
 
         console.print(table)
@@ -8781,6 +8831,129 @@ def bundle_export_composite(composite_id, output, collection):
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
         logger.exception("Composite bundle export failed")
+        sys.exit(1)
+
+
+# ====================
+# Composite Commands
+# ====================
+
+
+@main.group()
+def composite():
+    """Create and manage composite artifacts (plugins, stacks, suites).
+
+    Composites group multiple artifacts into a single named unit that can be
+    deployed, shared, or exported together.
+
+    Examples:
+        skillmeat composite create my-plugin skill:canvas command:git-commit
+        skillmeat composite create my-stack agent:review-ai skill:docx --type stack
+    """
+    pass
+
+
+@composite.command(name="create")
+@click.argument("name")
+@click.argument("members", nargs=-1, required=False)
+@click.option(
+    "--type",
+    "-t",
+    "composite_type",
+    type=click.Choice(["plugin", "stack", "suite"]),
+    default="plugin",
+    help="Composite type (default: plugin)",
+)
+@click.option(
+    "--display-name",
+    "-n",
+    help="Human-readable display name (defaults to NAME)",
+)
+@click.option(
+    "--description",
+    "-d",
+    help="Optional description for this composite",
+)
+@click.option(
+    "--collection",
+    "-c",
+    default="default",
+    help="Collection to create the composite in (default: default)",
+)
+def composite_create(name, members, composite_type, display_name, description, collection):
+    """Create a new composite artifact with optional initial members.
+
+    NAME is the identifier for the composite (used as composite:<name>).
+
+    MEMBERS is an optional list of artifacts in type:name format to include
+    as initial members of the composite.
+
+    Examples:
+        skillmeat composite create my-plugin skill:canvas command:git-commit agent:review-ai
+        skillmeat composite create my-stack --type stack --description "Dev stack"
+        skillmeat composite create my-suite skill:canvas --collection work
+    """
+    from skillmeat.core.services.composite_service import (
+        ArtifactNotFoundError,
+        CompositeService,
+    )
+    from skillmeat.cache.repositories import ConstraintError
+
+    try:
+        # Validate members format — each must be "type:name"
+        member_list = list(members) if members else []
+        invalid = [m for m in member_list if ":" not in m]
+        if invalid:
+            console.print(
+                f"[red]Invalid member format (expected type:name):[/red] "
+                + ", ".join(invalid)
+            )
+            sys.exit(1)
+
+        # Build the composite id from the name
+        composite_id = f"composite:{name}"
+
+        svc = CompositeService()
+
+        console.print(f"\n[cyan]Creating composite '{composite_id}'...[/cyan]")
+
+        record = svc.create_composite(
+            collection_id=collection,
+            composite_id=composite_id,
+            composite_type=composite_type,
+            display_name=display_name or name,
+            description=description,
+            initial_members=member_list if member_list else None,
+        )
+
+        console.print(f"[green]Composite created successfully![/green]")
+        console.print(f"  ID:         {record.get('id', composite_id)}")
+        console.print(f"  Type:       {composite_type}")
+        console.print(f"  Collection: {collection}")
+        if member_list:
+            console.print(f"  Members:    {len(member_list)}")
+            for m in member_list:
+                console.print(f"    - {m}")
+
+    except ArtifactNotFoundError as e:
+        console.print(f"[red]Artifact not found:[/red] {e.artifact_id}")
+        console.print(
+            "[yellow]Ensure the artifact is imported into the collection before "
+            "adding it as a composite member.[/yellow]"
+        )
+        sys.exit(1)
+    except ConstraintError as e:
+        console.print(
+            f"[red]A composite named '{name}' already exists in collection '{collection}'.[/red]"
+        )
+        console.print(f"[yellow]Details:[/yellow] {e}")
+        sys.exit(1)
+    except ValueError as e:
+        console.print(f"[yellow]{e}[/yellow]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("composite create failed")
         sys.exit(1)
 
 

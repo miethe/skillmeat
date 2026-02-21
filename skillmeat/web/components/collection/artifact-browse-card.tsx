@@ -19,6 +19,7 @@ import * as LucideIcons from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,8 +37,9 @@ import { ScoreBadge } from '@/components/ScoreBadge';
 import { PlatformBadge } from '@/components/platform-badge';
 import { ArtifactGroupBadges } from '@/components/collection/artifact-group-badges';
 import { TagSelectorPopover } from '@/components/collection/tag-selector-popover';
-import { useTags } from '@/hooks';
+import { useTags, useArtifactAssociations } from '@/hooks';
 import { getTagColor } from '@/lib/utils/tag-colors';
+import { PluginMemberIcons } from '@/components/collection/plugin-member-icons';
 
 /**
  * Props for ArtifactBrowseCard component
@@ -75,6 +77,12 @@ export interface ArtifactBrowseCardProps {
 
   /** Additional CSS classes */
   className?: string;
+
+  /** Whether the card is in selected state (bulk selection mode) */
+  isSelected?: boolean;
+
+  /** Called when user toggles selection checkbox */
+  onToggleSelect?: (artifact: Artifact) => void;
 }
 
 // Type-specific border accent colors for visual differentiation
@@ -84,6 +92,7 @@ const artifactTypeBorderAccents: Record<ArtifactType, string> = {
   agent: 'border-l-green-500',
   mcp: 'border-l-orange-500',
   hook: 'border-l-pink-500',
+  composite: 'border-l-indigo-500',
 };
 
 // Subtle background tints per artifact type
@@ -93,6 +102,7 @@ const artifactTypeCardTints: Record<ArtifactType, string> = {
   agent: 'bg-green-500/[0.02] dark:bg-green-500/[0.03]',
   mcp: 'bg-orange-500/[0.02] dark:bg-orange-500/[0.03]',
   hook: 'bg-pink-500/[0.02] dark:bg-pink-500/[0.03]',
+  composite: 'bg-indigo-500/[0.02] dark:bg-indigo-500/[0.03]',
 };
 
 // Known tool names from the Tool enum for matching against tags
@@ -150,6 +160,8 @@ export function ArtifactBrowseCard({
   showCollectionBadge = false,
   onCollectionClick,
   className,
+  isSelected = false,
+  onToggleSelect,
 }: ArtifactBrowseCardProps) {
   const config = getArtifactTypeConfig(artifact.type);
 
@@ -197,6 +209,20 @@ export function ArtifactBrowseCard({
   const deploymentCount = artifact.deployments?.length ?? 0;
   const hasDeployments = deploymentCount > 0;
 
+  // Composite / plugin: fetch member associations
+  const isPlugin = artifact.type === 'composite';
+  const { data: associationsData } = useArtifactAssociations(
+    isPlugin ? artifact.id : '',
+    isPlugin ? artifact.collections?.[0]?.id : undefined
+  );
+  const memberTypes = React.useMemo((): ArtifactType[] => {
+    if (!isPlugin || !associationsData?.children) return [];
+    return associationsData.children.map((child) => child.artifact_type as ArtifactType);
+  }, [isPlugin, associationsData?.children]);
+  const memberCount = isPlugin
+    ? (associationsData?.children?.length ?? 0)
+    : 0;
+
   // Handle card click, avoiding trigger when clicking action buttons
   const handleCardClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -228,11 +254,12 @@ export function ArtifactBrowseCard({
   return (
     <Card
       className={cn(
-        'cursor-pointer border-l-4 transition-all',
+        'relative cursor-pointer border-l-4 transition-all',
         'hover:border-primary/50 hover:shadow-md',
         'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
         artifactTypeBorderAccents[artifact.type],
         artifactTypeCardTints[artifact.type],
+        isSelected && 'ring-2 ring-indigo-500 ring-offset-1',
         className
       )}
       onClick={handleCardClick}
@@ -240,9 +267,25 @@ export function ArtifactBrowseCard({
       role="button"
       tabIndex={0}
       aria-label={`View details for ${artifact.name}, ${artifact.type} artifact by ${authorDisplay}`}
+      data-selected={onToggleSelect ? isSelected : undefined}
     >
+      {/* Selection checkbox — shown when onToggleSelect is provided */}
+      {onToggleSelect && (
+        <div
+          className="absolute left-2 top-2 z-10"
+          onClick={(e) => { e.stopPropagation(); onToggleSelect(artifact); }}
+        >
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect(artifact)}
+            aria-label={`Select ${artifact.name}`}
+            className="border-muted-foreground/40 bg-background/80 backdrop-blur-sm"
+          />
+        </div>
+      )}
+
       {/* Header: Icon, Name, Author, Quick Actions */}
-      <div className="p-4 pb-3">
+      <div className={cn('p-4 pb-3', onToggleSelect && 'pl-8')}>
         <div className="flex items-start justify-between gap-2">
           {/* Left: Icon and Name */}
           <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -266,10 +309,11 @@ export function ArtifactBrowseCard({
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 truncate text-sm text-blue-600 hover:underline dark:text-blue-400"
                   title={sourceDisplay.displayName}
+                  aria-label={`${sourceDisplay.displayName} (opens in new tab)`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <LucideIcons.Github className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-                  <span className="truncate">{sourceDisplay.displayName}</span>
+                  <span className="truncate" aria-hidden="true">{sourceDisplay.displayName}</span>
                 </a>
               ) : (
                 <p className="truncate text-sm text-muted-foreground" title={authorDisplay}>
@@ -389,122 +433,263 @@ export function ArtifactBrowseCard({
         </p>
       </div>
 
-      {/* Tags */}
-      <div
-        className="flex min-h-[28px] flex-wrap items-center gap-1 px-4 pb-3"
-        role="list"
-        aria-label="Tags"
-      >
-        {visibleTags.map((tag) => (
-          <Badge
-            key={tag}
-            colorStyle={resolveTagColor(tag)}
-            className={cn(
-              'text-xs',
-              onTagClick && 'cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all'
-            )}
-            role="listitem"
-            onClick={onTagClick ? (e) => {
-              e.stopPropagation();
-              onTagClick(tag);
-            } : undefined}
-          >
-            {tag}
-          </Badge>
-        ))}
-        {remainingTagsCount > 0 && (
-          <Badge
-            variant="secondary"
-            className="text-xs"
-            aria-label={`${remainingTagsCount} more tags`}
-          >
-            +{remainingTagsCount} more
-          </Badge>
-        )}
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span>
-                <TagSelectorPopover
-                  artifactId={artifact.id}
-                  trigger={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 rounded-full"
-                      aria-label="Add tags"
-                    >
-                      <LucideIcons.Plus className="h-3 w-3" />
-                    </Button>
-                  }
+      {isPlugin ? (
+        /* ------------------------------------------------------------------ */
+        /* Plugin (composite) body — replaces tags/platforms with member info  */
+        /* ------------------------------------------------------------------ */
+        <>
+          {/* Plugin member type icons */}
+          <div className="px-4 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-indigo-500">Contains</span>
+              {memberTypes.length > 0 ? (
+                <PluginMemberIcons
+                  memberTypes={memberTypes}
+                  size="sm"
+                  maxVisible={5}
+                  showTooltip={true}
                 />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Add Tags</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+              ) : (
+                <span className="text-xs text-muted-foreground">No members yet</span>
+              )}
+            </div>
+          </div>
 
-      {/* Target Platforms */}
-      <div className="flex flex-wrap items-center gap-1 px-4 pb-3" aria-label="Target platforms">
-        {artifact.targetPlatforms && artifact.targetPlatforms.length > 0 ? (
-          artifact.targetPlatforms.map((platform) => (
-            <PlatformBadge key={`${artifact.id}-${platform}`} platform={platform} compact />
-          ))
-        ) : (
-          <Badge variant="outline" className="text-xs text-muted-foreground">
-            Universal
-          </Badge>
-        )}
-      </div>
+          {/* Tags (same as atomic — plugins can also have tags) */}
+          <div
+            className="flex min-h-[28px] flex-wrap items-center gap-1 px-4 pb-3"
+            role="list"
+            aria-label="Tags"
+          >
+            {visibleTags.map((tag) => (
+              <Badge
+                key={tag}
+                colorStyle={resolveTagColor(tag)}
+                className={cn(
+                  'text-xs',
+                  onTagClick && 'cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all'
+                )}
+                role={onTagClick ? 'button' : 'listitem'}
+                tabIndex={onTagClick ? 0 : undefined}
+                aria-label={onTagClick ? `Filter by tag: ${tag}` : undefined}
+                onClick={onTagClick ? (e) => {
+                  e.stopPropagation();
+                  onTagClick(tag);
+                } : undefined}
+                onKeyDown={onTagClick ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onTagClick(tag);
+                  }
+                } : undefined}
+              >
+                {tag}
+              </Badge>
+            ))}
+            {remainingTagsCount > 0 && (
+              <Badge
+                variant="secondary"
+                className="text-xs"
+                aria-label={`${remainingTagsCount} more tags`}
+              >
+                +{remainingTagsCount} more
+              </Badge>
+            )}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <TagSelectorPopover
+                      artifactId={artifact.id}
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 rounded-full"
+                          aria-label="Add tags"
+                        >
+                          <LucideIcons.Plus className="h-3 w-3" aria-hidden="true" />
+                        </Button>
+                      }
+                    />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Add Tags</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
 
-      {/* Group badges */}
-      <ArtifactGroupBadges
-        artifactId={artifact.id}
-        collectionId={artifact.collections?.[0]?.id}
-        maxVisible={3}
-        onAddToGroup={onAddToGroup}
-        onGroupClick={onGroupClick}
-        className="mt-auto px-3 pb-1"
-      />
+          {/* Group badges */}
+          <ArtifactGroupBadges
+            artifactId={artifact.id}
+            collectionId={artifact.collections?.[0]?.id}
+            maxVisible={3}
+            onAddToGroup={onAddToGroup}
+            onGroupClick={onGroupClick}
+            className="mt-auto px-3 pb-1"
+          />
 
-      {/* Footer: Tools, Deployed Badge, Score */}
-      <div className="flex items-center justify-between border-t px-4 py-3">
-        {/* Left: Tools */}
-        <div className="flex flex-wrap items-center gap-1" role="list" aria-label="Tools">
-          {tools.slice(0, 3).map((tool) => (
-            <Badge key={tool} variant="outline" className="text-xs font-normal" role="listitem">
-              <LucideIcons.Wrench className="mr-1 h-3 w-3" aria-hidden="true" />
-              {tool}
-            </Badge>
-          ))}
-          {tools.length > 3 && (
+          {/* Plugin footer: member count + deployed + score */}
+          <div className="flex items-center justify-between border-t border-indigo-500/20 px-4 py-3">
+            {/* Left: member count badge */}
             <Badge
               variant="outline"
-              className="text-xs font-normal"
-              aria-label={`${tools.length - 3} more tools`}
+              className="border-indigo-500/30 text-xs font-normal text-indigo-600 dark:text-indigo-400"
+              aria-label={`${memberCount} member artifact${memberCount !== 1 ? 's' : ''}`}
             >
-              +{tools.length - 3}
+              <LucideIcons.Blocks className="mr-1 h-3 w-3" aria-hidden="true" />
+              {memberCount} artifact{memberCount !== 1 ? 's' : ''}
             </Badge>
-          )}
-        </div>
 
-        {/* Right: Deployed Badge + Score */}
-        <div className="flex items-center gap-2">
-          {hasDeployments && (
-            <Badge variant="secondary" className="text-xs">
-              <LucideIcons.CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
-              <span>Deployed ({deploymentCount})</span>
-            </Badge>
-          )}
+            {/* Right: Deployed Badge + Score */}
+            <div className="flex items-center gap-2">
+              {hasDeployments && (
+                <Badge variant="secondary" className="text-xs">
+                  <LucideIcons.CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
+                  <span>Deployed ({deploymentCount})</span>
+                </Badge>
+              )}
+              {artifact.score?.confidence !== undefined && (
+                <ScoreBadge confidence={artifact.score.confidence * 100} size="sm" />
+              )}
+            </div>
+          </div>
+        </>
+      ) : (
+        /* ------------------------------------------------------------------ */
+        /* Atomic artifact body (skill / command / agent / mcp / hook)         */
+        /* ------------------------------------------------------------------ */
+        <>
+          {/* Tags */}
+          <div
+            className="flex min-h-[28px] flex-wrap items-center gap-1 px-4 pb-3"
+            role="list"
+            aria-label="Tags"
+          >
+            {visibleTags.map((tag) => (
+              <Badge
+                key={tag}
+                colorStyle={resolveTagColor(tag)}
+                className={cn(
+                  'text-xs',
+                  onTagClick && 'cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all'
+                )}
+                role={onTagClick ? 'button' : 'listitem'}
+                tabIndex={onTagClick ? 0 : undefined}
+                aria-label={onTagClick ? `Filter by tag: ${tag}` : undefined}
+                onClick={onTagClick ? (e) => {
+                  e.stopPropagation();
+                  onTagClick(tag);
+                } : undefined}
+                onKeyDown={onTagClick ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onTagClick(tag);
+                  }
+                } : undefined}
+              >
+                {tag}
+              </Badge>
+            ))}
+            {remainingTagsCount > 0 && (
+              <Badge
+                variant="secondary"
+                className="text-xs"
+                aria-label={`${remainingTagsCount} more tags`}
+              >
+                +{remainingTagsCount} more
+              </Badge>
+            )}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <TagSelectorPopover
+                      artifactId={artifact.id}
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 rounded-full"
+                          aria-label="Add tags"
+                        >
+                          <LucideIcons.Plus className="h-3 w-3" aria-hidden="true" />
+                        </Button>
+                      }
+                    />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Add Tags</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
 
-          {artifact.score?.confidence !== undefined && (
-            <ScoreBadge confidence={artifact.score.confidence * 100} size="sm" />
-          )}
-        </div>
-      </div>
+          {/* Target Platforms */}
+          <div className="flex flex-wrap items-center gap-1 px-4 pb-3" aria-label="Target platforms">
+            {artifact.targetPlatforms && artifact.targetPlatforms.length > 0 ? (
+              artifact.targetPlatforms.map((platform) => (
+                <PlatformBadge key={`${artifact.id}-${platform}`} platform={platform} compact />
+              ))
+            ) : (
+              <Badge variant="outline" className="text-xs text-muted-foreground">
+                Universal
+              </Badge>
+            )}
+          </div>
+
+          {/* Group badges */}
+          <ArtifactGroupBadges
+            artifactId={artifact.id}
+            collectionId={artifact.collections?.[0]?.id}
+            maxVisible={3}
+            onAddToGroup={onAddToGroup}
+            onGroupClick={onGroupClick}
+            className="mt-auto px-3 pb-1"
+          />
+
+          {/* Footer: Tools, Deployed Badge, Score */}
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            {/* Left: Tools */}
+            <div className="flex flex-wrap items-center gap-1" role="list" aria-label="Tools">
+              {tools.slice(0, 3).map((tool) => (
+                <Badge key={tool} variant="outline" className="text-xs font-normal" role="listitem">
+                  <LucideIcons.Wrench className="mr-1 h-3 w-3" aria-hidden="true" />
+                  {tool}
+                </Badge>
+              ))}
+              {tools.length > 3 && (
+                <Badge
+                  variant="outline"
+                  className="text-xs font-normal"
+                  aria-label={`${tools.length - 3} more tools`}
+                >
+                  +{tools.length - 3}
+                </Badge>
+              )}
+            </div>
+
+            {/* Right: Deployed Badge + Score */}
+            <div className="flex items-center gap-2">
+              {hasDeployments && (
+                <Badge variant="secondary" className="text-xs">
+                  <LucideIcons.CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
+                  <span>Deployed ({deploymentCount})</span>
+                </Badge>
+              )}
+
+              {artifact.score?.confidence !== undefined && (
+                <ScoreBadge confidence={artifact.score.confidence * 100} size="sm" />
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </Card>
   );
 }

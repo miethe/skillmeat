@@ -110,6 +110,9 @@ export interface ArtifactResponse {
   error?: string | null;
   conflictState?: ApiConflictState;
 
+  // Composite sub-type (only present when type === 'composite')
+  composite_type?: 'plugin' | 'stack' | 'suite';
+
   // Metadata (nested or flattened)
   metadata?: ApiMetadata;
   description?: string;
@@ -282,7 +285,7 @@ export function mapApiResponseToArtifact(
   }
 
   // Validate type is a known artifact type
-  const validTypes: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook'];
+  const validTypes: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook', 'composite'];
   if (!validTypes.includes(response.type as ArtifactType)) {
     throw new Error(`Artifact mapping error: unknown type "${response.type}"`);
   }
@@ -362,6 +365,9 @@ export function mapApiResponseToArtifact(
     ...(license && { license }),
     ...(version && { version }),
     ...(response.dependencies && { dependencies: response.dependencies }),
+
+    // Composite sub-type
+    ...(response.composite_type && { compositeType: response.composite_type }),
 
     // Source & Origin
     ...(response.source && { source: response.source }),

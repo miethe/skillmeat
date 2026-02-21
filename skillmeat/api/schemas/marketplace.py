@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from .common import PageInfo
 
 # Allowed artifact types for validation
-ALLOWED_ARTIFACT_TYPES = {"skill", "command", "agent", "mcp_server", "hook"}
+ALLOWED_ARTIFACT_TYPES = {"skill", "command", "agent", "mcp_server", "hook", "composite"}
 
 
 class ListingResponse(BaseModel):
@@ -553,7 +553,7 @@ class CreateSourceRequest(BaseModel):
         description="Treat the entire repository (or root_hint directory) as a single artifact, bypassing automatic detection",
     )
     single_artifact_type: Optional[
-        Literal["skill", "command", "agent", "mcp_server", "hook"]
+        Literal["skill", "command", "agent", "mcp_server", "hook", "composite"]
     ] = Field(
         default=None,
         description="Artifact type when single_artifact_mode is enabled (required when mode is True)",
@@ -1102,7 +1102,7 @@ class SourceResponse(BaseModel):
         description="Whether the source treats the entire repository (or root_hint directory) as a single artifact",
     )
     single_artifact_type: Optional[
-        Literal["skill", "command", "agent", "mcp_server", "hook"]
+        Literal["skill", "command", "agent", "mcp_server", "hook", "composite"]
     ] = Field(
         default=None,
         description="Artifact type when single_artifact_mode is enabled",
@@ -1157,6 +1157,28 @@ class SourceResponse(BaseModel):
         description="Timestamp of last successful indexing run. "
         "None if source has never been indexed.",
         examples=["2025-12-06T10:30:00Z", None],
+    )
+
+    # Composite-specific aggregate fields (only populated when the source has
+    # composite-type artifacts; null otherwise to avoid breaking existing clients)
+    composite_member_count: Optional[int] = Field(
+        default=None,
+        description=(
+            "Total number of child-artifact membership edges across all composite "
+            "artifacts associated with this source.  Null when the source contains "
+            "no composite-type artifacts."
+        ),
+        ge=0,
+        examples=[4, None],
+    )
+    composite_child_types: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Deduplicated list of child artifact types (e.g. 'skill', 'command') "
+            "found across all composites associated with this source.  Null when "
+            "the source contains no composite-type artifacts."
+        ),
+        examples=[["skill", "command"], None],
     )
 
     class Config:
@@ -1262,7 +1284,7 @@ class CatalogEntryResponse(BaseModel):
         description="ID of the source this artifact was detected in",
         examples=["src_anthropics_quickstarts"],
     )
-    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = (
+    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook", "composite"] = (
         Field(
             description="Type of artifact detected",
             examples=["skill"],
@@ -2610,7 +2632,7 @@ class ManualMapEntry(BaseModel):
         description="Unix-style path like 'skills/python' (no leading/trailing slashes)",
         examples=["skills/python", "commands/dev", "agents/research"],
     )
-    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = (
+    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook", "composite"] = (
         Field(
             description="Artifact type for this directory",
             examples=["skill"],
@@ -2804,7 +2826,7 @@ class CatalogSearchResult(BaseModel):
         description="Artifact name",
         examples=["canvas-design"],
     )
-    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = (
+    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook", "composite"] = (
         Field(
             description="Type of artifact",
             examples=["skill"],

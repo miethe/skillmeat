@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Package, Terminal, Bot, Server, Webhook, AlertCircle, HelpCircle } from 'lucide-react';
+import { Package, Terminal, Bot, Server, Webhook, AlertCircle, HelpCircle, Blocks } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -47,6 +47,7 @@ const artifactTypeIcons: Record<ArtifactType, React.ComponentType<{ className?: 
   agent: Bot,
   mcp: Server,
   hook: Webhook,
+  composite: Blocks,
 };
 
 const artifactTypeLabels: Record<ArtifactType, string> = {
@@ -55,6 +56,7 @@ const artifactTypeLabels: Record<ArtifactType, string> = {
   agent: 'Agent',
   mcp: 'MCP Server',
   hook: 'Hook',
+  composite: 'Plugin',
 };
 
 // Icon colors for type differentiation (matches grid view badge colors)
@@ -64,6 +66,7 @@ const artifactTypeIconColors: Record<ArtifactType, string> = {
   agent: 'text-green-700 dark:text-green-400',
   mcp: 'text-orange-700 dark:text-orange-400',
   hook: 'text-pink-700 dark:text-pink-400',
+  composite: 'text-indigo-700 dark:text-indigo-400',
 };
 
 // Subtle row background tints for visual differentiation
@@ -73,6 +76,7 @@ const artifactTypeRowTints: Record<ArtifactType, string> = {
   agent: 'bg-green-500/[0.02] dark:bg-green-500/[0.03]',
   mcp: 'bg-orange-500/[0.02] dark:bg-orange-500/[0.03]',
   hook: 'bg-pink-500/[0.02] dark:bg-pink-500/[0.03]',
+  composite: 'bg-indigo-500/[0.02] dark:bg-indigo-500/[0.03]',
 };
 
 // Left border accent colors for each artifact type
@@ -82,6 +86,7 @@ const artifactTypeBorderAccents: Record<ArtifactType, string> = {
   agent: 'border-l-green-500',
   mcp: 'border-l-orange-500',
   hook: 'border-l-pink-500',
+  composite: 'border-l-indigo-500',
 };
 
 const statusColors: Record<string, string> = {

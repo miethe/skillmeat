@@ -441,9 +441,10 @@ class CacheManager:
                 existing = self.repository.get_project(data["id"])
 
                 if existing:
-                    # Update existing project
+                    # Update existing project - ALWAYS refresh last_fetched to prevent staleness
                     self.repository.update_project(
                         data["id"],
+                        last_fetched=datetime.utcnow(),
                         **{k: v for k, v in data.items() if k not in ["id"]},
                     )
                     logger.debug(f"Updated project in cache: {data['id']}")
@@ -518,9 +519,10 @@ class CacheManager:
                     existing = self.repository.get_project(project_data["id"])
 
                     if existing:
-                        # Update existing project
+                        # Update existing project - ALWAYS refresh last_fetched to prevent staleness
                         self.repository.update_project(
                             project_data["id"],
+                            last_fetched=datetime.utcnow(),
                             **{
                                 k: v for k, v in project_data.items() if k not in ["id"]
                             },

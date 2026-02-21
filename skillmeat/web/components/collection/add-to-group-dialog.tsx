@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Layers, Plus, Loader2, ChevronLeft, FolderOpen, X } from 'lucide-react';
+import Link from 'next/link';
+import { Layers, Plus, Loader2, ChevronLeft, FolderOpen, X, Settings } from 'lucide-react';
 import { resolveColorHex, ICON_MAP, COLOR_HEX_BY_TOKEN } from '@/lib/group-constants';
 import type { GroupIcon } from '@/lib/group-constants';
 import {
@@ -324,7 +325,7 @@ export function AddToGroupDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[460px]">
+      <DialogContent className="sm:max-w-[640px]">
         <DialogHeader>
           <DialogTitle>Add to Group</DialogTitle>
           <DialogDescription>
@@ -412,6 +413,19 @@ export function AddToGroupDialog({
               </Button>
             )}
 
+            <div className="flex items-center justify-end mb-3">
+              <Link href="/groups">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Settings className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                  Manage Groups
+                </Button>
+              </Link>
+            </div>
+
             {isLoading ? (
               <div className="space-y-2">
                 <Skeleton className="h-12 w-full" />
@@ -480,7 +494,7 @@ export function AddToGroupDialog({
                 )}
               </div>
             ) : (
-              <ScrollArea className="max-h-[60vh] rounded-md border">
+              <ScrollArea className="h-[min(60vh,400px)] rounded-md border">
                 {/* Create new group section */}
                 <div className="border-b p-2">
                   {isCreatingGroup ? (
@@ -535,7 +549,10 @@ export function AddToGroupDialog({
                     </Button>
                   )}
                 </div>
-                <div className="space-y-1 p-2">
+                <div
+                  className="grid gap-y-1 p-2"
+                  style={{ gridTemplateColumns: 'auto auto 1fr auto' }}
+                >
                   {groups.map((group) => {
                     const isAlreadyInGroup =
                       existingGroups?.some((g) => g.id === group.id) ?? false;
@@ -545,10 +562,11 @@ export function AddToGroupDialog({
                       <div
                         key={group.id}
                         className={cn(
-                          'flex items-start space-x-3 rounded-md px-2 py-2',
+                          'col-span-4 grid grid-cols-subgrid items-start gap-x-3 rounded-md px-2 py-2',
                           isAlreadyInGroup ? 'opacity-60' : 'hover:bg-accent'
                         )}
                       >
+                        {/* Col 1: Checkbox */}
                         <Checkbox
                           id={`group-${group.id}`}
                           checked={selectedGroupIds.has(group.id)}
@@ -558,7 +576,9 @@ export function AddToGroupDialog({
                           disabled={isPending || isAlreadyInGroup}
                           className="mt-0.5"
                         />
-                        <div className="min-w-0 flex-1">
+
+                        {/* Col 2: Name column - auto-sized to widest name across all rows */}
+                        <div>
                           <Label
                             htmlFor={`group-${group.id}`}
                             className={cn(
@@ -585,49 +605,56 @@ export function AddToGroupDialog({
                                 </span>
                               );
                             })()}
-                            <span className="truncate">{group.name}</span>
+                            <span className="whitespace-nowrap">{group.name}</span>
                           </Label>
-                          <div className="mt-0.5 flex items-center gap-2">
-                            {isAlreadyInGroup ? (
+                          <div className="mt-0.5 flex items-center gap-2 pl-7">
+                            {isAlreadyInGroup && (
                               <span className="text-xs text-amber-600">Already in Group</span>
-                            ) : (
-                              group.description && (
-                                <span className="max-w-[200px] truncate text-xs text-muted-foreground">
-                                  {group.description}
-                                </span>
-                              )
                             )}
                             <span className="shrink-0 text-xs text-muted-foreground">
                               {group.artifact_count} artifact{group.artifact_count !== 1 ? 's' : ''}
                             </span>
                           </div>
                         </div>
-                        {isAlreadyInGroup && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 shrink-0"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRemoveFromGroup(group.id);
-                                  }}
-                                  disabled={isRemoving}
-                                  aria-label="Remove from group"
-                                >
-                                  {isRemoving ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-                                  ) : (
-                                    <X className="h-3 w-3" aria-hidden="true" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Remove from Group</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
+
+                        {/* Col 3: Description - fills remaining width, aligned across all rows */}
+                        <div className="min-w-0 pt-0.5">
+                          {group.description && (
+                            <p className="line-clamp-2 text-xs text-muted-foreground">
+                              {group.description}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Col 4: Remove button (only for already-in-group items) */}
+                        <div>
+                          {isAlreadyInGroup && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 shrink-0"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveFromGroup(group.id);
+                                    }}
+                                    disabled={isRemoving}
+                                    aria-label="Remove from group"
+                                  >
+                                    {isRemoving ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                                    ) : (
+                                      <X className="h-3 w-3" aria-hidden="true" />
+                                    )}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Remove from Group</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

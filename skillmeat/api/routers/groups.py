@@ -201,6 +201,12 @@ async def create_group(request: GroupCreateRequest) -> GroupResponse:
             f"Created group: {group.id} ('{group.name}') in collection {group.collection_id}"
         )
 
+        try:
+            from skillmeat.core.services.manifest_sync_service import ManifestSyncService
+            ManifestSyncService().sync_groups(session, request.collection_id)
+        except Exception as e:
+            logger.warning(f"Failed to sync groups to manifest: {e}")
+
         return _build_group_response(session, group, artifact_count=0)
 
     except HTTPException:
@@ -472,10 +478,17 @@ async def update_group(group_id: str, request: GroupUpdateRequest) -> GroupRespo
         if request.position is not None:
             group.position = request.position
 
+        collection_id = group.collection_id
         session.commit()
         session.refresh(group)
 
         logger.info(f"Updated group {group_id}")
+
+        try:
+            from skillmeat.core.services.manifest_sync_service import ManifestSyncService
+            ManifestSyncService().sync_groups(session, collection_id)
+        except Exception as e:
+            logger.warning(f"Failed to sync groups to manifest: {e}")
 
         return _build_group_response(session, group)
 
@@ -530,11 +543,19 @@ async def delete_group(group_id: str) -> None:
                 detail=f"Group '{group_id}' not found",
             )
 
+        collection_id = group.collection_id
+
         # Delete group (cascade will remove group_artifacts)
         session.delete(group)
         session.commit()
 
         logger.info(f"Deleted group {group_id}")
+
+        try:
+            from skillmeat.core.services.manifest_sync_service import ManifestSyncService
+            ManifestSyncService().sync_groups(session, collection_id)
+        except Exception as e:
+            logger.warning(f"Failed to sync groups to manifest: {e}")
 
     except HTTPException:
         session.rollback()
@@ -680,6 +701,7 @@ async def copy_group(
             )
             session.add(new_group_artifact)
 
+        source_collection_id = source_group.collection_id
         session.commit()
         session.refresh(new_group)
 
@@ -688,6 +710,15 @@ async def copy_group(
             f"'{request.target_collection_id}' as '{new_group_name}' ({new_group.id}) "
             f"with {len(source_artifacts)} artifacts"
         )
+
+        try:
+            from skillmeat.core.services.manifest_sync_service import ManifestSyncService
+            svc = ManifestSyncService()
+            svc.sync_groups(session, request.target_collection_id)
+            if source_collection_id != request.target_collection_id:
+                svc.sync_groups(session, source_collection_id)
+        except Exception as e:
+            logger.warning(f"Failed to sync groups to manifest: {e}")
 
         return _build_group_response(session, new_group, artifact_count=len(source_artifacts))
 
@@ -765,9 +796,19 @@ async def reorder_groups(request: GroupReorderRequest) -> GroupListResponse:
             if new_position is not None:
                 group.position = new_position
 
+        # Capture collection_id before commit (all groups share the same collection)
+        collection_id = groups[0].collection_id if groups else None
+
         session.commit()
 
         logger.info(f"Reordered {len(groups)} groups")
+
+        if collection_id:
+            try:
+                from skillmeat.core.services.manifest_sync_service import ManifestSyncService
+                ManifestSyncService().sync_groups(session, collection_id)
+            except Exception as e:
+                logger.warning(f"Failed to sync groups to manifest: {e}")
 
         # Refresh and build response
         group_responses = []
@@ -906,6 +947,12 @@ async def add_artifacts_to_group(
             session.commit()
             logger.info(f"Added {len(new_artifact_ids)} artifacts to group {group_id}")
 
+            try:
+                from skillmeat.core.services.manifest_sync_service import ManifestSyncService
+                ManifestSyncService().sync_groups(session, group.collection_id)
+            except Exception as e:
+                logger.warning(f"Failed to sync groups to manifest: {e}")
+
         # Get updated artifacts
         group_artifacts = (
             session.query(GroupArtifact)
@@ -1002,6 +1049,9 @@ async def remove_artifact_from_group(group_id: str, artifact_id: str) -> None:
             )
 
         removed_position = group_artifact.position
+        # Capture group's collection_id before deletion
+        group = session.query(Group).filter_by(id=group_id).first()
+        collection_id = group.collection_id if group else None
 
         # Delete association
         session.delete(group_artifact)
@@ -1015,6 +1065,13 @@ async def remove_artifact_from_group(group_id: str, artifact_id: str) -> None:
         session.commit()
 
         logger.info(f"Removed artifact {artifact_id} from group {group_id}")
+
+        if collection_id:
+            try:
+                from skillmeat.core.services.manifest_sync_service import ManifestSyncService
+                ManifestSyncService().sync_groups(session, collection_id)
+            except Exception as e:
+                logger.warning(f"Failed to sync groups to manifest: {e}")
 
     except HTTPException:
         session.rollback()
@@ -1115,6 +1172,14 @@ async def update_artifact_position(
                 f"Updated artifact {artifact_id} position in group {group_id}: {old_position} -> {new_position}"
             )
 
+            try:
+                from skillmeat.core.services.manifest_sync_service import ManifestSyncService
+                grp = session.query(Group).filter_by(id=group_id).first()
+                if grp:
+                    ManifestSyncService().sync_groups(session, grp.collection_id)
+            except Exception as e:
+                logger.warning(f"Failed to sync groups to manifest: {e}")
+
         return GroupArtifactResponse(
             artifact_uuid=group_artifact.artifact_uuid,
             artifact_id=artifact_id,
@@ -1211,6 +1276,12 @@ async def reorder_artifacts_in_group(
         session.commit()
 
         logger.info(f"Reordered {len(group_artifacts)} artifacts in group {group_id}")
+
+        try:
+            from skillmeat.core.services.manifest_sync_service import ManifestSyncService
+            ManifestSyncService().sync_groups(session, group.collection_id)
+        except Exception as e:
+            logger.warning(f"Failed to sync groups to manifest: {e}")
 
         # Get all artifacts ordered by position
         all_group_artifacts = (

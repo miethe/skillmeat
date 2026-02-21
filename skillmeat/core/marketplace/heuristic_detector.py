@@ -432,6 +432,238 @@ class HeuristicDetector:
 
         return len(child_dirs) >= 2
 
+    def _detect_plugin_directories(
+        self,
+        dir_to_files: Dict[str, Set[str]],
+        root_hint: Optional[str],
+    ) -> Tuple[List[HeuristicMatch], Set[str]]:
+        """Detect composite/plugin directories from the file tree.
+
+        Detection signals, in priority order:
+
+        0. ``.claude-plugin/plugin.json`` in a child directory — authoritative composite
+           signal (confidence 98).  The *parent* of the ``.claude-plugin/`` directory is
+           recorded as the plugin root.  ``.claude-plugin`` directories are excluded from
+           all subsequent signals.
+        1. ``plugin.json`` at directory root — definitive composite signal (confidence 95)
+        2. ``COMPOSITE.md`` or ``PLUGIN.md`` at directory root — strong composite
+           signal (confidence 90)
+        3. Two or more entity-type subdirectories (skills/, commands/, agents/, hooks/,
+           mcp/) — heuristic composite signal (confidence 70)
+
+        Detected plugin directories are returned alongside a set of their paths so
+        that ``analyze_paths()`` can exclude descendant paths from individual-artifact
+        detection (avoiding double-counting).
+
+        Args:
+            dir_to_files: Mapping of directory paths to the set of filenames in each.
+            root_hint: Optional path prefix filter; directories outside this prefix
+                are skipped.
+
+        Returns:
+            A 2-tuple of:
+            - ``matches``: ``HeuristicMatch`` objects for each detected plugin
+              directory, with ``artifact_type == "composite"``.
+            - ``plugin_dirs``: Set of plugin directory paths detected, used by the
+              caller to suppress individual-artifact detection of descendants.
+        """
+        matches: List[HeuristicMatch] = []
+        plugin_dirs: Set[str] = set()
+
+        # Signal 0 (highest priority): pre-scan for `.claude-plugin/` subdirectories
+        # that contain plugin.json.  The PARENT of such a directory is the plugin root.
+        # Real-world marketplace repos use:
+        #   category/plugin-name/.claude-plugin/plugin.json
+        claude_plugin_parents: Set[str] = set()
+        for dir_path, files in dir_to_files.items():
+            basename = PurePosixPath(dir_path).name
+            if basename != ".claude-plugin":
+                continue
+            lower_files_pre = {f.lower() for f in files}
+            if "plugin.json" not in lower_files_pre:
+                continue
+            parent = str(PurePosixPath(dir_path).parent)
+            if parent == ".":
+                # .claude-plugin at repo root — treat root itself as plugin root only
+                # when there is an actual parent segment; skip degenerate case.
+                continue
+            # Apply root hint filtering to the parent
+            if root_hint and not parent.startswith(root_hint):
+                continue
+            claude_plugin_parents.add(parent)
+
+        for parent in claude_plugin_parents:
+            raw_score = MAX_RAW_SCORE
+            confidence = 98
+            signal = "claude_plugin_dir"
+            primary_reason = (
+                ".claude-plugin/plugin.json found in child directory"
+                " \u2014 authoritative composite signal (98)"
+            )
+            score_breakdown = {
+                "dir_name_score": 0,
+                "manifest_score": confidence,
+                "skill_manifest_bonus": 0,
+                "extensions_score": 0,
+                "parent_hint_score": 0,
+                "frontmatter_score": 0,
+                "container_hint_score": 0,
+                "depth_penalty": 0,
+                "raw_total": raw_score,
+                "normalized_score": confidence,
+            }
+            match = HeuristicMatch(
+                path=parent,
+                artifact_type=ArtifactType.COMPOSITE.value,
+                confidence_score=confidence,
+                organization_path=None,
+                match_reasons=[primary_reason],
+                dir_name_score=0,
+                manifest_score=confidence,
+                extension_score=0,
+                depth_penalty=0,
+                raw_score=raw_score,
+                breakdown=score_breakdown,
+                metadata={
+                    "is_plugin": True,
+                    "plugin_signal": signal,
+                    "has_plugin_json": False,
+                    "has_composite_manifest": False,
+                    "is_heuristic_plugin": False,
+                    "claude_plugin_dir": True,
+                },
+            )
+            matches.append(match)
+            plugin_dirs.add(parent)
+            logger.debug(
+                "Plugin detected (Signal 0) at %s: signal=%s, confidence=%d",
+                parent,
+                signal,
+                confidence,
+            )
+
+        for dir_path, files in dir_to_files.items():
+            # Skip root
+            if dir_path == ".":
+                continue
+
+            # Skip .claude-plugin directories — they are metadata containers, not
+            # composite artifacts themselves.
+            if PurePosixPath(dir_path).name == ".claude-plugin":
+                continue
+
+            # Skip directories already identified as plugin roots via Signal 0.
+            if dir_path in claude_plugin_parents:
+                continue
+
+            # Apply root hint filtering
+            if root_hint and not dir_path.startswith(root_hint):
+                continue
+
+            # Skip deep paths
+            depth = len(PurePosixPath(dir_path).parts)
+            if depth > self.config.max_depth:
+                continue
+
+            # Check the file names in this directory (lower-cased for comparison)
+            lower_files = {f.lower() for f in files}
+
+            # Signal 1: plugin.json — definitive manifest
+            has_plugin_json = "plugin.json" in lower_files
+
+            # Signal 2: COMPOSITE.md or PLUGIN.md — strong manifest signal
+            has_composite_manifest = bool(
+                lower_files & {"composite.md", "plugin.md", "composite.json"}
+            )
+
+            # Signal 3: Multiple entity-type subdirectories
+            is_heuristic_plugin = self._is_plugin_directory(dir_path, dir_to_files)
+
+            if not (has_plugin_json or has_composite_manifest or is_heuristic_plugin):
+                continue
+
+            # Determine confidence and match reasons
+            if has_plugin_json:
+                confidence = 95
+                primary_reason = "plugin.json manifest found at directory root (95)"
+                signal = "plugin_json"
+            elif has_composite_manifest:
+                manifest_name = next(
+                    f for f in files if f.lower() in {"composite.md", "plugin.md", "composite.json"}
+                )
+                confidence = 90
+                primary_reason = (
+                    f"{manifest_name} manifest found at directory root (90)"
+                )
+                signal = "composite_manifest"
+            else:
+                confidence = 70
+                primary_reason = (
+                    "Multiple entity-type subdirectories detected (skills/, commands/, "
+                    "agents/, hooks/, mcp/) — heuristic composite signal (70)"
+                )
+                signal = "multi_type_dirs"
+
+            match_reasons = [primary_reason]
+            if has_plugin_json and has_composite_manifest:
+                match_reasons.append(
+                    "Additional composite manifest file also present"
+                )
+
+            logger.debug(
+                "Plugin detected at %s: signal=%s, confidence=%d",
+                dir_path,
+                signal,
+                confidence,
+            )
+
+            # raw_score stores the unnormalized total (0-MAX_RAW_SCORE scale).
+            # manifest_score, dir_name_score, extension_score are individual signal
+            # contributions constrained to 0-100 by the HeuristicMatch schema.
+            # For composites we represent the composite manifest contribution as the
+            # normalized confidence value, which fits within the le=100 bound.
+            raw_score = MAX_RAW_SCORE if confidence >= 90 else round(
+                (confidence / 100) * MAX_RAW_SCORE
+            )
+            score_breakdown = {
+                "dir_name_score": 0,
+                "manifest_score": confidence,  # normalized representation
+                "skill_manifest_bonus": 0,
+                "extensions_score": 0,
+                "parent_hint_score": 0,
+                "frontmatter_score": 0,
+                "container_hint_score": 0,
+                "depth_penalty": 0,
+                "raw_total": raw_score,
+                "normalized_score": confidence,
+            }
+
+            match = HeuristicMatch(
+                path=dir_path,
+                artifact_type=ArtifactType.COMPOSITE.value,
+                confidence_score=confidence,
+                organization_path=None,
+                match_reasons=match_reasons,
+                dir_name_score=0,
+                manifest_score=confidence,  # individual signal score (le=100)
+                extension_score=0,
+                depth_penalty=0,
+                raw_score=raw_score,
+                breakdown=score_breakdown,
+                metadata={
+                    "is_plugin": True,
+                    "plugin_signal": signal,
+                    "has_plugin_json": has_plugin_json,
+                    "has_composite_manifest": has_composite_manifest,
+                    "is_heuristic_plugin": is_heuristic_plugin,
+                },
+            )
+            matches.append(match)
+            plugin_dirs.add(dir_path)
+
+        matches.sort(key=lambda m: m.confidence_score, reverse=True)
+        return matches, plugin_dirs
+
     def _get_container_type(
         self, dir_path: str, dir_to_files: Dict[str, Set[str]]  # noqa: ARG002
     ) -> Optional[ArtifactType]:
@@ -893,7 +1125,24 @@ class HeuristicDetector:
 
         matches: List[HeuristicMatch] = []
 
-        # Detect single-file artifacts inside containers
+        # Detect composite/plugin directories FIRST.
+        # This establishes which directories are plugins so their descendant paths can
+        # be excluded from individual-artifact detection (avoids double-counting members
+        # as standalone artifacts while the plugin itself is also returned).
+        plugin_matches, plugin_dirs = self._detect_plugin_directories(
+            dir_to_files, root_hint
+        )
+        matches.extend(plugin_matches)
+
+        if plugin_dirs:
+            logger.debug(
+                "Plugin detection found %d composite(s): %s",
+                len(plugin_dirs),
+                sorted(plugin_dirs),
+            )
+
+        # Detect single-file artifacts inside containers.  Plugin member artifacts
+        # are kept so that the Plugin Breakdown UI can discover them via path prefix.
         single_file_matches = self._detect_single_file_artifacts(
             dir_to_files, container_types, root_hint
         )
@@ -907,6 +1156,10 @@ class HeuristicDetector:
 
             # Skip if container directory (containers themselves are not artifacts)
             if self._is_container_directory(dir_path, dir_to_files):
+                continue
+
+            # Skip if this directory IS a detected plugin (already added above)
+            if dir_path in plugin_dirs:
                 continue
 
             # Skip if this is a "grouping directory" for single-file artifacts

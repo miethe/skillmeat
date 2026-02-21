@@ -3094,6 +3094,9 @@ class CompositeMembership(Base):
     # Optional version pin — None means "track latest"
     pinned_version_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
+    # Display order within the composite (0-based, nullable for backward compat)
+    position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
+
     # Extensibility — raw JSON string for future per-membership metadata
     membership_metadata: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
@@ -3143,6 +3146,7 @@ class CompositeMembership(Base):
             "child_artifact_uuid": self.child_artifact_uuid,
             "relationship_type": self.relationship_type,
             "pinned_version_hash": self.pinned_version_hash,
+            "position": self.position,
             "membership_metadata": self.membership_metadata,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

@@ -23,6 +23,7 @@ import {
   Server,
   Webhook,
   HelpCircle,
+  Blocks,
 } from 'lucide-react';
 import {
   Table,
@@ -68,6 +69,7 @@ const artifactTypeIcons: Record<ArtifactType, React.ComponentType<{ className?: 
   mcp: Server,
   mcp_server: Server,
   hook: Webhook,
+  composite: Blocks,
 };
 
 const artifactTypeLabels: Record<ArtifactType, string> = {
@@ -77,6 +79,7 @@ const artifactTypeLabels: Record<ArtifactType, string> = {
   mcp: 'MCP',
   mcp_server: 'MCP Server',
   hook: 'Hook',
+  composite: 'Plugin',
 };
 
 const artifactTypeIconColors: Record<ArtifactType, string> = {
@@ -86,6 +89,7 @@ const artifactTypeIconColors: Record<ArtifactType, string> = {
   mcp: 'text-orange-700 dark:text-orange-400',
   mcp_server: 'text-orange-700 dark:text-orange-400',
   hook: 'text-pink-700 dark:text-pink-400',
+  composite: 'text-indigo-700 dark:text-indigo-400',
 };
 
 const artifactTypeRowTints: Record<ArtifactType, string> = {
@@ -95,6 +99,7 @@ const artifactTypeRowTints: Record<ArtifactType, string> = {
   mcp: 'bg-orange-500/[0.02] dark:bg-orange-500/[0.03]',
   mcp_server: 'bg-orange-500/[0.02] dark:bg-orange-500/[0.03]',
   hook: 'bg-pink-500/[0.02] dark:bg-pink-500/[0.03]',
+  composite: 'bg-indigo-500/[0.02] dark:bg-indigo-500/[0.03]',
 };
 
 const artifactTypeBorderAccents: Record<ArtifactType, string> = {
@@ -104,6 +109,7 @@ const artifactTypeBorderAccents: Record<ArtifactType, string> = {
   mcp: 'border-l-orange-500',
   mcp_server: 'border-l-orange-500',
   hook: 'border-l-pink-500',
+  composite: 'border-l-indigo-500',
 };
 
 const statusConfig: Record<string, { label: string; className: string }> = {

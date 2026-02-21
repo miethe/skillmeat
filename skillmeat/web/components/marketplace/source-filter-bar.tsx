@@ -11,7 +11,7 @@
  */
 
 import * as React from 'react';
-import { X, Sparkles, Bot, Terminal, Server, Webhook, Filter, Check, Search } from 'lucide-react';
+import { X, Sparkles, Bot, Terminal, Server, Webhook, Blocks, Filter, Check, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -120,6 +120,7 @@ const ARTIFACT_TYPES: Array<{
   { value: 'command', label: 'Commands', Icon: Terminal },
   { value: 'mcp', label: 'MCP', Icon: Server },
   { value: 'hook', label: 'Hooks', Icon: Webhook },
+  { value: 'composite', label: 'Plugins', Icon: Blocks },
 ];
 
 const DEFAULT_TRUST_LEVELS: Array<{ value: TrustLevel; label: string }> = [

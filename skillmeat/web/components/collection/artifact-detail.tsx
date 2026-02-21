@@ -20,6 +20,7 @@ import {
   Trash2,
   RefreshCw,
   Upload,
+  Blocks,
 } from 'lucide-react';
 import {
   Dialog,
@@ -53,6 +54,7 @@ const artifactTypeIcons: Record<ArtifactType, React.ComponentType<{ className?: 
   agent: Bot,
   mcp: Server,
   hook: Webhook,
+  composite: Blocks,
 };
 
 const artifactTypeLabels: Record<ArtifactType, string> = {
@@ -61,6 +63,7 @@ const artifactTypeLabels: Record<ArtifactType, string> = {
   agent: 'Agent',
   mcp: 'MCP Server',
   hook: 'Hook',
+  composite: 'Plugin',
 };
 
 const statusIcons: Record<string, React.ComponentType<{ className?: string }>> = {

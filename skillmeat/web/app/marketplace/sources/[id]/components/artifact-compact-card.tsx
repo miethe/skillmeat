@@ -77,6 +77,10 @@ const typeConfig: Record<ArtifactType, { label: string; color: string }> = {
     label: 'Hook',
     color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200',
   },
+  composite: {
+    label: 'Plugin',
+    color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
+  },
 };
 
 /**

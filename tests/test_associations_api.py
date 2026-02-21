@@ -323,6 +323,42 @@ class TestGetArtifactAssociations:
         assert "skill:canvas" in child_ids
         assert "command:build" in child_ids
 
+    def test_collection_uuid_param_resolves_to_collection_name(self, app, seeded_db):
+        """Collection UUID query params should resolve to filesystem names."""
+        from skillmeat.api.dependencies import get_collection_manager
+
+        mock_artifact = MagicMock()
+        mock_artifact.name = "my-plugin"
+        mock_artifact.type = "composite"
+
+        mock_collection = MagicMock()
+        mock_collection.find_artifact.return_value = mock_artifact
+
+        def _load_collection(name: str):
+            # Real CollectionManager expects filesystem collection names.
+            if name != "default":
+                raise ValueError(f"Collection '{name}' not found")
+            return mock_collection
+
+        mock_mgr = MagicMock()
+        mock_mgr.get_active_collection_name.return_value = "default"
+        mock_mgr.list_collections.return_value = ["default"]
+        mock_mgr.load_collection.side_effect = _load_collection
+        app.dependency_overrides[get_collection_manager] = lambda: mock_mgr
+
+        resp = self._run_request(
+            app,
+            "composite:my-plugin",
+            params={"collection": seeded_db["col_id"]},
+        )
+
+        assert resp.status_code == status.HTTP_200_OK
+        body = resp.json()
+        assert len(body["children"]) == 2
+        child_ids = {c["artifact_id"] for c in body["children"]}
+        assert "skill:canvas" in child_ids
+        assert "command:build" in child_ids
+
     # ------------------------------------------------------------------
     # 200 — child artifact (has parents)
     # ------------------------------------------------------------------

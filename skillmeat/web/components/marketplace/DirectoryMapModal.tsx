@@ -44,7 +44,7 @@ import { useToast } from '@/hooks';
 import type { ArtifactType } from '@/types/marketplace';
 
 // Available artifact types for directory mapping
-const ARTIFACT_TYPES: ArtifactType[] = ['skill', 'command', 'agent', 'mcp_server', 'hook'];
+const ARTIFACT_TYPES: ArtifactType[] = ['skill', 'command', 'agent', 'mcp_server', 'hook', 'composite'];
 
 // Human-readable labels for artifact types
 const ARTIFACT_TYPE_LABELS: Record<ArtifactType, string> = {
@@ -52,7 +52,9 @@ const ARTIFACT_TYPE_LABELS: Record<ArtifactType, string> = {
   command: 'Command',
   agent: 'Agent',
   mcp_server: 'MCP Server',
+  mcp: 'MCP Server',
   hook: 'Hook',
+  composite: 'Plugin',
 };
 
 // ============================================================================

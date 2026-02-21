@@ -351,6 +351,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tags display with overflow handling and color consistency
 - Rescan button and last sync time visibility improved
 
+#### Composite Artifact UX v2 (Phases 1-5, 2026-02-19)
+
+**Phase 1: Type System Integration**
+- Added `'composite'` to the `ArtifactType` enum across frontend type system and backend API schemas
+- 6 new CRUD API endpoints at `/api/v1/composites/*`: create, read, update, delete, list, and member management
+- `CompositeService` and `CompositeRepository` implementing business logic and data access for composite artifacts
+- Pydantic schemas for composite request/response DTOs with full OpenAPI documentation
+- Integration tests for all 6 composites CRUD endpoints
+
+**Phase 2: Marketplace Discovery**
+- Marketplace type filter now includes "Plugin" option alongside existing artifact types
+- Member count badges displayed on composite/plugin artifact cards in marketplace view
+- Composite artifact preview in marketplace import flow showing member artifacts
+- Backend: composite filter parameter and member data added to marketplace catalog endpoints
+- Unit tests for marketplace plugin discovery UI components
+
+**Phase 3: Import Flow**
+- `CompositePreview` component for visualizing plugin structure before import
+- Conflict resolution dialogs for handling member artifact conflicts during plugin import
+- Smart import with deduplication — detects and skips already-imported member artifacts
+- `ConflictResolutionDialog` wired into the full import flow with per-artifact resolution options
+- E2E tests covering complete composite import workflow
+
+**Phase 4: Collection Management**
+- Plugin card variant for the collection grid alongside atomic artifact cards
+- `CreatePluginDialog` for composing new plugin artifacts from existing collection members
+- `PluginMembersTab` with drag-to-reorder member list and inline member management actions
+- Plugin detail modal with full relationship visualization, member list, and edit capability
+- Toolbar plugin button for quick plugin creation from the collection view
+- WCAG 2.1 AA accessibility audit across all new plugin UI components
+- E2E tests for plugin detail modal and member management workflows
+
+**Phase 5: CLI Integration**
+- `skillmeat list` output now shows composite artifacts labeled as "plugin" type
+- New `skillmeat composite create` command for creating plugin artifacts from the CLI
+- CLI displays plugin member count and composition summary in list and show commands
+
 #### Composite Artifact Infrastructure (Phases 1-5, 2026-02-18 to 2026-02-19)
 
 **Phase 1: Data Models & UUID Identity (ADR-007)**

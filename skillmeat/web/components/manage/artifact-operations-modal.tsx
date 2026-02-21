@@ -61,6 +61,8 @@ import {
   MoreVertical,
   Trash2,
   Plus,
+  Blocks,
+  Link2,
 } from 'lucide-react';
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -87,6 +89,13 @@ import { DeploymentBadgeStack } from '@/components/shared/deployment-badge-stack
 import type { Tab } from '@/components/shared/tab-navigation';
 
 // Entity components (reused)
+import { PluginMembersTab } from '@/components/entity/plugin-members-tab';
+import { MiniArtifactCard } from '@/components/collection/mini-artifact-card';
+import {
+  LinkedArtifactsSection,
+  type LinkedArtifactReference,
+} from '@/components/entity/linked-artifacts-section';
+import { ArtifactLinkingDialog } from '@/components/entity';
 import { FileTree } from '@/components/entity/file-tree';
 import { ContentPane } from '@/components/entity/content-pane';
 import { SyncStatusTab } from '@/components/sync-status';
@@ -112,19 +121,88 @@ import {
   useEntityLifecycle,
   useSources,
   useTags,
+  useArtifactAssociations,
+  useArtifact,
 } from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments';
 import { hasValidUpstreamSource } from '@/lib/sync-utils';
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+/** Narrows an arbitrary string to a valid ArtifactType, defaulting to 'skill'. */
+function toArtifactType(raw: string): ArtifactType {
+  const valid: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook', 'composite'];
+  return valid.includes(raw as ArtifactType) ? (raw as ArtifactType) : 'skill';
+}
+
+/**
+ * Convert a parent association DTO into the minimal Artifact shape required
+ * by MiniArtifactCard.  Only the fields the card actually renders are populated.
+ */
+function parentAssociationToArtifact(parent: {
+  artifact_id: string;
+  artifact_name: string;
+  artifact_type: string;
+}): Artifact {
+  return {
+    id: parent.artifact_id,
+    name: parent.artifact_name,
+    type: toArtifactType(parent.artifact_type),
+    uuid: parent.artifact_id,
+    source: '',
+    version: '',
+    scope: 'user',
+    path: '',
+    collection: '',
+    status: 'synced',
+    deployments: [],
+    collections: [],
+    createdAt: '',
+    updatedAt: '',
+  } as unknown as Artifact;
+}
+
+// ============================================================================
+// EnrichedParentCard
+// ============================================================================
+
+/**
+ * Wrapper around MiniArtifactCard that fetches the full artifact data for a
+ * parent-composite stub so the card renders description, tags, and groups.
+ *
+ * Uses useArtifact which hits the React Query cache first (zero extra network
+ * request if already loaded), then falls back to a background fetch.  The
+ * stub is shown immediately so there is no loading flash.
+ */
+function EnrichedParentCard({
+  stub,
+  onClick,
+}: {
+  stub: ReturnType<typeof parentAssociationToArtifact>;
+  onClick: () => void;
+}) {
+  const { data: fullArtifact } = useArtifact(stub.id);
+  return <MiniArtifactCard artifact={fullArtifact ?? stub} onClick={onClick} />;
+}
+
+// ============================================================================
 // Types
 // ============================================================================
+
+interface OperationsLinkedArtifactsResponse {
+  linked_artifacts: LinkedArtifactReference[];
+  unlinked_references: string[];
+}
 
 export type OperationsModalTab =
   | 'status'
   | 'overview'
+  | 'plugin'
   | 'contents'
+  | 'links'
   | 'sync'
   | 'deployments'
   | 'collections'
@@ -148,6 +226,12 @@ export interface ArtifactOperationsModalProps {
   isLoading?: boolean;
   /** Handler for delete action from modal header */
   onDelete?: () => void;
+  /**
+   * Callback invoked when the user clicks a related artifact card (member or
+   * parent composite) inside this modal.  The parent page should use this to
+   * switch the open artifact without a full URL navigation.
+   */
+  onNavigateToArtifact?: (artifactId: string) => void;
 }
 
 // ============================================================================
@@ -245,14 +329,22 @@ interface HistoryEntry {
 // Tab Configuration
 // ============================================================================
 
+const PLUGIN_TAB: Tab = {
+  value: 'plugin',
+  label: 'Plugin Members',
+  icon: Blocks,
+};
+
 function getTabs(artifact: Artifact | null): Tab[] {
   const deploymentCount = artifact?.deployments?.length || 0;
   const collectionsCount = artifact?.collections?.length || 0;
+  const isComposite = artifact?.type === 'composite';
 
-  return [
+  const baseTabs: Tab[] = [
     { value: 'status', label: 'Status', icon: Activity },
     { value: 'overview', label: 'Overview', icon: Info },
     { value: 'contents', label: 'Contents', icon: FileText },
+    { value: 'links', label: 'Links', icon: Link2 },
     { value: 'sync', label: 'Sync Status', icon: RefreshCcw },
     {
       value: 'deployments',
@@ -269,6 +361,11 @@ function getTabs(artifact: Artifact | null): Tab[] {
     { value: 'sources', label: 'Sources', icon: Github },
     { value: 'history', label: 'Version History', icon: History },
   ];
+
+  if (!isComposite) return baseTabs;
+
+  // Insert Plugin Members tab after Overview (index 2, after status and overview)
+  return [baseTabs[0]!, baseTabs[1]!, PLUGIN_TAB, ...baseTabs.slice(2)];
 }
 
 // ============================================================================
@@ -399,6 +496,7 @@ export function ArtifactOperationsModal({
   returnTo,
   isLoading = false,
   onDelete,
+  onNavigateToArtifact,
 }: ArtifactOperationsModalProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -410,6 +508,7 @@ export function ArtifactOperationsModal({
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedProjectForDiff, setSelectedProjectForDiff] = useState<string | null>(null);
+  const [showLinkingDialog, setShowLinkingDialog] = useState(false);
   const [sourceEntry, setSourceEntry] = useState<{
     sourceId: string;
     entryPath: string;
@@ -545,6 +644,41 @@ export function ArtifactOperationsModal({
     if (!artifact) return [];
     return generateMockHistory(artifact);
   }, [artifact]);
+
+  // Derive collection ID for association queries (mirrors pattern from ArtifactDetailsModal)
+  const collectionId = artifact?.collections?.[0]?.id ?? artifact?.collection ?? 'default';
+
+  // Fetch linked artifacts (manual links)
+  const {
+    data: linkedArtifactsData,
+    isLoading: isLinkedArtifactsLoading,
+    error: linkedArtifactsError,
+    refetch: refetchLinkedArtifacts,
+  } = useQuery({
+    queryKey: ['linked-artifacts', artifact?.id],
+    queryFn: async () => {
+      if (!artifact?.id) throw new Error('Missing artifact ID');
+      const params = new URLSearchParams();
+      if (artifact.collection) params.set('collection', artifact.collection);
+      return await apiRequest<OperationsLinkedArtifactsResponse>(
+        `/artifacts/${encodeURIComponent(artifact.id)}/linked-artifacts?${params.toString()}`
+      );
+    },
+    enabled: !!artifact?.id && activeTab === 'links',
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  // Fetch parent composite associations
+  const {
+    data: associationsData,
+    isLoading: isAssociationsLoading,
+  } = useArtifactAssociations(artifact?.id ?? '', collectionId);
+
+  const handleLinkChange = () => {
+    void refetchLinkedArtifacts();
+    queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+  };
 
   // Fetch marketplace sources for Sources tab
   const { data: sourcesData } = useSources(100);
@@ -764,6 +898,7 @@ export function ArtifactOperationsModal({
   );
 
   return (
+    <>
     <BaseArtifactModal
       artifact={artifact}
       open={open}
@@ -1007,6 +1142,18 @@ export function ArtifactOperationsModal({
         </div>
       </TabContentWrapper>
 
+      {/* Plugin Members Tab — only rendered for composite artifacts */}
+      {artifact.type === 'composite' && (
+        <TabContentWrapper value="plugin">
+          <PluginMembersTab
+            compositeId={artifact.id}
+            collectionId={artifact.collections?.[0]?.id ?? artifact.collection ?? 'default'}
+            disabled={false}
+            onArtifactClick={onNavigateToArtifact}
+          />
+        </TabContentWrapper>
+      )}
+
       {/* Contents Tab */}
       <TabContentWrapper value="contents" scrollable={false}>
         <div className="flex h-[calc(90vh-16rem)] min-h-0 gap-4">
@@ -1044,6 +1191,94 @@ export function ArtifactOperationsModal({
               readOnly
             />
           </div>
+        </div>
+      </TabContentWrapper>
+
+      {/* Links Tab */}
+      <TabContentWrapper value="links">
+        <div className="space-y-8">
+          {/* Parent Composites Section — shown when artifact belongs to one or more plugins */}
+          {(isAssociationsLoading || (associationsData?.parents && associationsData.parents.length > 0)) && (
+            <section aria-labelledby="ops-parent-composites-heading">
+              <div className="mb-3 flex items-center gap-2">
+                <Blocks className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <h3 id="ops-parent-composites-heading" className="text-sm font-medium">
+                  Member of Plugin
+                  {!isAssociationsLoading && associationsData?.parents && associationsData.parents.length > 0 && (
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      ({associationsData.parents.length})
+                    </span>
+                  )}
+                </h3>
+              </div>
+
+              {isAssociationsLoading ? (
+                <div
+                  className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+                  aria-busy="true"
+                  aria-label="Loading parent plugins"
+                >
+                  {[1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className="min-h-[140px] rounded-lg border border-l-[3px] border-l-muted p-3"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Skeleton className="h-4 w-4 shrink-0 rounded" />
+                        <Skeleton className="h-4 flex-1" />
+                      </div>
+                      <div className="mt-1 space-y-1">
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-3/4" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div
+                  className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+                  role="list"
+                  aria-label="Parent plugin artifacts"
+                >
+                  {associationsData!.parents.map((parent) => (
+                    <div key={parent.artifact_id} role="listitem">
+                      <EnrichedParentCard
+                        stub={parentAssociationToArtifact(parent)}
+                        onClick={() => {
+                          if (onNavigateToArtifact) {
+                            onNavigateToArtifact(parent.artifact_id);
+                          } else {
+                            router.push(
+                              `/manage?artifact=${encodeURIComponent(parent.artifact_id)}`
+                            );
+                          }
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Linked Artifacts Section */}
+          <LinkedArtifactsSection
+            artifactId={artifact.id}
+            linkedArtifacts={linkedArtifactsData?.linked_artifacts || []}
+            unlinkedReferences={linkedArtifactsData?.unlinked_references || []}
+            onLinkCreated={handleLinkChange}
+            onLinkDeleted={handleLinkChange}
+            onAddLinkClick={() => setShowLinkingDialog(true)}
+            isLoading={isLinkedArtifactsLoading}
+            error={
+              linkedArtifactsError instanceof Error
+                ? linkedArtifactsError.message
+                : linkedArtifactsError
+                  ? 'Failed to load linked artifacts'
+                  : null
+            }
+            onRetry={() => void refetchLinkedArtifacts()}
+          />
         </div>
       </TabContentWrapper>
 
@@ -1292,5 +1527,14 @@ export function ArtifactOperationsModal({
         </div>
       </TabContentWrapper>
     </BaseArtifactModal>
+
+    {/* Artifact Linking Dialog */}
+    <ArtifactLinkingDialog
+      open={showLinkingDialog}
+      onOpenChange={setShowLinkingDialog}
+      artifactId={artifact.id}
+      onSuccess={handleLinkChange}
+    />
+    </>
   );
 }

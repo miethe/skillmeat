@@ -31,6 +31,7 @@ from .routers import (
     bundles,
     cache,
     collections,
+    composites,
     config,
     context_entities,
     context_modules,
@@ -359,6 +360,9 @@ def create_app(settings: APISettings = None) -> FastAPI:
         deployments.router, prefix=settings.api_prefix, tags=["deployments"]
     )
     app.include_router(groups.router, prefix=settings.api_prefix, tags=["groups"])
+    app.include_router(
+        composites.router, prefix=settings.api_prefix, tags=["composites"]
+    )
     app.include_router(mcp.router, prefix=settings.api_prefix, tags=["mcp"])
     app.include_router(
         marketplace.router, prefix=settings.api_prefix, tags=["marketplace"]

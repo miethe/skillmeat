@@ -26,6 +26,7 @@ import {
   Terminal,
   Server,
   Webhook,
+  Blocks,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -140,6 +141,7 @@ const ARTIFACT_TYPES: Array<{
   { value: 'command', label: 'Commands', Icon: Terminal },
   { value: 'mcp_server', label: 'MCP', Icon: Server },
   { value: 'hook', label: 'Hooks', Icon: Webhook },
+  { value: 'composite', label: 'Plugins', Icon: Blocks },
 ];
 
 const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [

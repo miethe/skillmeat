@@ -36,7 +36,7 @@ type ViewMode = 'flat' | 'grouped';
 type StatusFilter = 'all' | ArtifactSyncStatus;
 
 // Artifact types for filtering
-const ARTIFACT_TYPES: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook'];
+const ARTIFACT_TYPES: ArtifactType[] = ['skill', 'command', 'agent', 'mcp', 'hook', 'composite'];
 
 /**
  * Deployments Dashboard Page
