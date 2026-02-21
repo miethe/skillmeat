@@ -35,9 +35,10 @@ Task("artifact-tracker", "Create context worknotes for [PRD_NAME] PRD")
 ## Best Practices
 
 1. **ONE progress file per phase** - Never create duplicates
-2. **Annotate immediately** - Use lead-architect to add assigned_to and dependencies
-3. **Include all tasks** - Extract complete task list from implementation plan
-4. **Use consistent IDs** - Pattern: TASK-[PHASE].[SEQUENCE] (e.g., TASK-2.1)
+2. **Discovery-first directory resolution** - Before creating, search `.claude/progress/` for existing directories matching the base slug (with or without version suffix like `-v1`). Use `ls -d .claude/progress/${BASE_SLUG}*/ 2>/dev/null` where `BASE_SLUG` strips version suffixes. Use whatever exists on disk.
+3. **Annotate immediately** - Use lead-architect to add assigned_to and dependencies
+4. **Include all tasks** - Extract complete task list from implementation plan
+5. **Use consistent IDs** - Pattern: TASK-[PHASE].[SEQUENCE] (e.g., TASK-2.1)
 
 ## Example: Full Progress Creation Flow
 
