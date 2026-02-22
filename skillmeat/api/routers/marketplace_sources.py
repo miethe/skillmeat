@@ -5490,15 +5490,54 @@ async def get_artifact_file_content(
                 detail=f"Source with ID '{source_id}' not found",
             )
 
-        # Build full file path within repository
-        # Check if this is a single-file artifact (artifact_path ends with file_path)
-        # For single-file artifacts like Commands (.claude/commands/use-mcp.md),
-        # artifact_path IS the file, so we shouldn't concatenate
+        # Build full file path within repository.
+        #
+        # Three cases handled in priority order:
+        #
+        # 1. artifact_path ends with the file_path component — already the full path.
+        #    Covers single-file artifacts like Commands stored as "commands/foo.md"
+        #    where the frontend re-passes file_path="foo.md".
+        #
+        # 2. artifact_path ends with a recognised file extension (defensive fallback) —
+        #    the path IS the file, not a directory.  This handles embedded artifacts
+        #    (e.g. Commands/Agents nested inside a Skill directory) where the stored
+        #    path is "skills/my-skill/commands/foo.md".  Appending file_path would
+        #    produce a non-existent "skills/my-skill/commands/foo.md/foo.md" double
+        #    path.  When this fallback fires we ignore file_path entirely and log a
+        #    debug message for observability.
+        #
+        # 3. Directory-based artifact — concatenate artifact_path + "/" + file_path
+        #    (existing behaviour, unchanged).
+        _FILE_EXTENSIONS = (
+            ".md",
+            ".py",
+            ".yaml",
+            ".yml",
+            ".json",
+            ".toml",
+            ".txt",
+            ".sh",
+            ".ts",
+            ".tsx",
+            ".jsx",
+            ".js",
+            ".css",
+        )
         if artifact_path.endswith(f"/{file_path}") or artifact_path == file_path:
-            # Single-file artifact: artifact_path IS the file
+            # Case 1: artifact_path already IS the full file path.
+            full_file_path = artifact_path
+        elif any(artifact_path.endswith(ext) for ext in _FILE_EXTENSIONS):
+            # Case 2: Defensive fallback — artifact_path is a file, not a directory.
+            logger.debug(
+                "artifact_path '%s' ends with a file extension; treating it as the "
+                "resolved file path and ignoring file_path='%s' (embedded-artifact "
+                "defensive fallback)",
+                artifact_path,
+                file_path,
+            )
             full_file_path = artifact_path
         else:
-            # Directory-based artifact: concatenate paths
+            # Case 3: Directory-based artifact — standard concatenation.
             full_file_path = f"{artifact_path}/{file_path}"
 
         # Get cache and build cache key
