@@ -4110,10 +4110,10 @@ async def import_artifacts(
         HTTPException 404: If source not found or entry IDs invalid
         HTTPException 500: If import operation fails
     """
-    if not request.entry_ids:
+    if not request.entry_ids and not request.artifact_paths:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="entry_ids cannot be empty",
+            detail="At least one of entry_ids or artifact_paths must be provided",
         )
 
     source_repo = MarketplaceSourceRepository()
@@ -4184,6 +4184,56 @@ async def import_artifacts(
                     "tags": tags,
                 }
             )
+
+        # Resolve embedded artifact paths to import data.
+        # Embedded artifacts live in parent entries' metadata_json rather than
+        # having their own top-level catalog entries.  We iterate source entries
+        # and match requested paths against embedded_artifacts records.
+        if request.artifact_paths:
+            unresolved_paths = set(request.artifact_paths)
+            all_source_entries = catalog_repo.list_by_source(source_id)
+            for parent_entry in all_source_entries:
+                if not unresolved_paths:
+                    break
+                if not parent_entry.metadata_json:
+                    continue
+                try:
+                    meta = json.loads(parent_entry.metadata_json)
+                    embedded_list = meta.get("embedded_artifacts", [])
+                except (json.JSONDecodeError, AttributeError):
+                    continue
+                for emb in embedded_list:
+                    emb_path = emb.get("path", "")
+                    if emb_path not in unresolved_paths:
+                        continue
+                    # Build a synthetic import entry dict from the embedded metadata
+                    synthetic_id = f"embedded::{parent_entry.id}::{emb_path}"
+                    entries_data.append(
+                        {
+                            "id": synthetic_id,
+                            "artifact_type": emb.get("artifact_type", "skill"),
+                            "name": emb.get("name") or emb_path.split("/")[-1],
+                            "upstream_url": emb.get("upstream_url", ""),
+                            "path": emb_path,
+                            "description": None,
+                            "tags": [],
+                        }
+                    )
+                    unresolved_paths.discard(emb_path)
+
+            if unresolved_paths:
+                logger.warning(
+                    "Could not resolve embedded artifact paths for source %s: %s",
+                    source_id,
+                    unresolved_paths,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=(
+                        f"Embedded artifact path(s) not found in source '{source_id}': "
+                        + ", ".join(sorted(unresolved_paths))
+                    ),
+                )
 
         # Perform import using ImportCoordinator
         # Always import to "default" collection - other collections not supported yet

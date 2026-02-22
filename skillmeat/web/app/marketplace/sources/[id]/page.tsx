@@ -69,6 +69,7 @@ import {
   useSourceCatalog,
   useRescanSource,
   useImportArtifacts,
+  useImportEmbeddedArtifact,
   useExcludeCatalogEntry,
   useUpdateSource,
   sourceKeys,
@@ -187,13 +188,17 @@ function EmbeddedArtifactRow({ artifact }: EmbeddedArtifactRowProps) {
 
 /**
  * EmbeddedTopLevelCard renders an embedded artifact promoted to a top-level
- * position in the grid, with a "part of: [Skill Name]" indicator badge.
+ * position in the grid, with a "part of: [Skill Name]" indicator badge and
+ * a standalone Import button (TASK-4.3).
  */
 interface EmbeddedTopLevelCardProps {
   entry: EmbeddedTopLevelEntry;
+  sourceId: string;
+  onImport: (path: string) => void;
+  isImporting: boolean;
 }
 
-function EmbeddedTopLevelCard({ entry }: EmbeddedTopLevelCardProps) {
+function EmbeddedTopLevelCard({ entry, sourceId: _sourceId, onImport, isImporting }: EmbeddedTopLevelCardProps) {
   const { artifact, parentName } = entry;
   const type = artifact.artifact_type as ArtifactType;
   const config = typeConfig[type] ?? { label: type, color: 'bg-gray-100 text-gray-800' };
@@ -220,7 +225,7 @@ function EmbeddedTopLevelCard({ entry }: EmbeddedTopLevelCardProps) {
           <p className="truncate text-xs text-muted-foreground">{artifact.path}</p>
         </div>
 
-        {/* Actions */}
+        {/* Confidence + GitHub link */}
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span className="tabular-nums">{Math.round(artifact.confidence_score)}% confidence</span>
           <a
@@ -234,6 +239,28 @@ function EmbeddedTopLevelCard({ entry }: EmbeddedTopLevelCardProps) {
             View on GitHub
           </a>
         </div>
+
+        {/* Standalone import action (TASK-4.3) */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={() => onImport(artifact.path)}
+          disabled={isImporting}
+          aria-label={`Import ${artifact.name} as a standalone artifact`}
+        >
+          {isImporting ? (
+            <>
+              <Loader2 className="mr-2 h-3 w-3 animate-spin" aria-hidden="true" />
+              Importing...
+            </>
+          ) : (
+            <>
+              <Download className="mr-2 h-3 w-3" aria-hidden="true" />
+              Import
+            </>
+          )}
+        </Button>
       </div>
     </Card>
   );
@@ -390,6 +417,11 @@ function CatalogCard({
                   onImport();
                 }}
                 disabled={isImporting}
+                title={
+                  entry.embedded_artifacts && entry.embedded_artifacts.length > 0
+                    ? 'Import this skill and all its embedded sub-artifacts'
+                    : undefined
+                }
               >
                 {isImporting ? (
                   <>
@@ -399,7 +431,9 @@ function CatalogCard({
                 ) : (
                   <>
                     <Download className="mr-2 h-3 w-3" aria-hidden="true" />
-                    Import
+                    {entry.embedded_artifacts && entry.embedded_artifacts.length > 0
+                      ? 'Import skill'
+                      : 'Import'}
                   </>
                 )}
               </Button>
@@ -704,6 +738,7 @@ export default function SourceDetailPage() {
   } = useSourceCatalog(sourceId, mergedFilters, itemsPerPage);
   const rescanMutation = useRescanSource(sourceId);
   const importMutation = useImportArtifacts(sourceId);
+  const importEmbeddedMutation = useImportEmbeddedArtifact(sourceId);
   const updateSourceMutation = useUpdateSource(sourceId);
 
   // Flatten catalog pages with deduplication to prevent duplicate React keys
@@ -978,6 +1013,11 @@ export default function SourceDetailPage() {
       entry_ids: [entryId],
       conflict_strategy: 'skip',
     });
+  };
+
+  // Handler for importing an embedded artifact standalone by path (TASK-4.3)
+  const handleImportEmbedded = async (artifactPath: string) => {
+    await importEmbeddedMutation.mutateAsync(artifactPath);
   };
 
   // Directory mapping handlers
@@ -1603,11 +1643,13 @@ export default function SourceDetailPage() {
             selectedEntries={selectedEntries}
             onSelectEntry={handleSelectEntry}
             onImportSingle={handleImportSingle}
+            onImportEmbedded={handleImportEmbedded}
             onEntryClick={(entry) => {
               setSelectedEntry(entry);
               setModalOpen(true);
             }}
             isImporting={importMutation.isPending}
+            isImportingEmbedded={importEmbeddedMutation.isPending}
             isLoading={true}
           />
         )
@@ -1661,7 +1703,15 @@ export default function SourceDetailPage() {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {paginatedEntries.map((entry) => {
                   if ('_kind' in entry && entry._kind === 'embedded') {
-                    return <EmbeddedTopLevelCard key={entry._key} entry={entry} />;
+                    return (
+                      <EmbeddedTopLevelCard
+                        key={entry._key}
+                        entry={entry}
+                        sourceId={sourceId}
+                        onImport={handleImportEmbedded}
+                        isImporting={importEmbeddedMutation.isPending}
+                      />
+                    );
                   }
                   const catalogEntry = entry as CatalogEntry;
                   return (
@@ -1689,11 +1739,13 @@ export default function SourceDetailPage() {
                 selectedEntries={selectedEntries}
                 onSelectEntry={handleSelectEntry}
                 onImportSingle={handleImportSingle}
+                onImportEmbedded={handleImportEmbedded}
                 onEntryClick={(entry) => {
                   setSelectedEntry(entry);
                   setModalOpen(true);
                 }}
                 isImporting={importMutation.isPending}
+                isImportingEmbedded={importEmbeddedMutation.isPending}
               />
             )}
           </div>

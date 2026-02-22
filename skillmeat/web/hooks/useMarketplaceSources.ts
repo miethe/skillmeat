@@ -323,6 +323,58 @@ export function useImportArtifacts(sourceId: string) {
 }
 
 /**
+ * Import a single embedded artifact (Command, Agent, etc. nested inside a Skill)
+ * as a standalone artifact — no CompositeMembership is created.
+ *
+ * Calls POST /marketplace/sources/{sourceId}/import with artifact_paths set to
+ * the embedded artifact's repository-relative path.
+ *
+ * @param sourceId - The marketplace source containing the embedded artifact
+ */
+export function useImportEmbeddedArtifact(sourceId: string) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (artifactPath: string) =>
+      apiRequest<ImportResult>(`/marketplace/sources/${sourceId}/import`, {
+        method: 'POST',
+        body: JSON.stringify({
+          entry_ids: [],
+          artifact_paths: [artifactPath],
+          conflict_strategy: 'skip',
+        } satisfies ImportRequest),
+      }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: [...sourceKeys.catalogs(), sourceId] });
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+
+      const message = [
+        result.imported_count > 0 && `${result.imported_count} imported`,
+        result.skipped_count > 0 && `${result.skipped_count} skipped`,
+        result.error_count > 0 && `${result.error_count} failed`,
+      ]
+        .filter(Boolean)
+        .join(', ');
+
+      toast({
+        title: 'Artifact imported',
+        description: message || 'No artifacts were processed',
+        variant: result.error_count > 0 ? 'destructive' : 'default',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Import failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
  * Bulk select helper - import all matching entries
  */
 export function useImportAllMatching(sourceId: string) {

@@ -301,6 +301,8 @@ export interface ScanResult {
 
 export interface ImportRequest {
   entry_ids: string[];
+  /** Paths of embedded artifacts to import standalone (no CompositeMembership created). */
+  artifact_paths?: string[];
   conflict_strategy: 'skip' | 'overwrite' | 'rename';
 }
 

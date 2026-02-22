@@ -276,6 +276,7 @@ export {
   useRescanSource,
   useSourceCatalog,
   useImportArtifacts,
+  useImportEmbeddedArtifact,
   useImportAllMatching,
   useUpdateCatalogEntryName,
   useExcludeCatalogEntry,

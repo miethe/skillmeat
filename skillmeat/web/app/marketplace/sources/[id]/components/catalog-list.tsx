@@ -56,8 +56,12 @@ interface CatalogListProps {
   selectedEntries: Set<string>;
   onSelectEntry: (entryId: string, selected: boolean) => void;
   onImportSingle: (entryId: string) => void;
+  /** Import an embedded artifact standalone by its repository-relative path (TASK-4.3) */
+  onImportEmbedded?: (artifactPath: string) => void;
   onEntryClick: (entry: CatalogEntry) => void;
   isImporting: boolean;
+  /** Loading state for embedded artifact import (TASK-4.3) */
+  isImportingEmbedded?: boolean;
   isLoading?: boolean;
 }
 
@@ -345,13 +349,20 @@ function CatalogRow({
                   onClick={onImport}
                   disabled={isImporting}
                   className="h-7 px-2"
+                  title={
+                    entry.embedded_artifacts && entry.embedded_artifacts.length > 0
+                      ? 'Import this skill and all its embedded sub-artifacts'
+                      : undefined
+                  }
                 >
                   {isImporting ? (
                     <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
                   ) : (
                     <>
                       <Download className="mr-1 h-3 w-3" aria-hidden="true" />
-                      Import
+                      {entry.embedded_artifacts && entry.embedded_artifacts.length > 0
+                        ? 'Import skill'
+                        : 'Import'}
                     </>
                   )}
                 </Button>
@@ -395,9 +406,11 @@ function CatalogRow({
 
 interface EmbeddedTopLevelRowProps {
   entry: EmbeddedTopLevelEntry;
+  onImport?: (artifactPath: string) => void;
+  isImporting?: boolean;
 }
 
-function EmbeddedTopLevelRow({ entry }: EmbeddedTopLevelRowProps) {
+function EmbeddedTopLevelRow({ entry, onImport, isImporting }: EmbeddedTopLevelRowProps) {
   const { artifact, parentName } = entry;
   const type = artifact.artifact_type as ArtifactType;
   const Icon = artifactTypeIcons[type] || HelpCircle;
@@ -457,8 +470,8 @@ function EmbeddedTopLevelRow({ entry }: EmbeddedTopLevelRowProps) {
         </Badge>
       </TableCell>
 
-      {/* Actions */}
-      <TableCell>
+      {/* Actions (TASK-4.3: import button for standalone import) */}
+      <TableCell onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-2">
           <a
             href={artifact.upstream_url}
@@ -470,6 +483,26 @@ function EmbeddedTopLevelRow({ entry }: EmbeddedTopLevelRowProps) {
             <ExternalLink className="h-3 w-3" />
             <span className="hidden sm:inline">GitHub</span>
           </a>
+
+          {onImport && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onImport(artifact.path)}
+              disabled={isImporting}
+              className="h-7 px-2"
+              aria-label={`Import ${artifact.name} as a standalone artifact`}
+            >
+              {isImporting ? (
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+              ) : (
+                <>
+                  <Download className="mr-1 h-3 w-3" aria-hidden="true" />
+                  Import
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </TableCell>
     </TableRow>
@@ -487,8 +520,10 @@ export function CatalogList({
   selectedEntries,
   onSelectEntry,
   onImportSingle,
+  onImportEmbedded,
   onEntryClick,
   isImporting,
+  isImportingEmbedded,
   isLoading,
 }: CatalogListProps) {
   if (isLoading) {
@@ -534,7 +569,12 @@ export function CatalogList({
               />
               {/* Render any embedded entries belonging to this parent skill immediately after */}
               {(embeddedByParent.get(entry.name) ?? []).map((ve) => (
-                <EmbeddedTopLevelRow key={ve._key} entry={ve} />
+                <EmbeddedTopLevelRow
+                  key={ve._key}
+                  entry={ve}
+                  onImport={onImportEmbedded}
+                  isImporting={isImportingEmbedded}
+                />
               ))}
             </React.Fragment>
           ))}
