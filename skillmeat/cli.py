@@ -1401,6 +1401,15 @@ def quick_add(
     default=False,
     help="Deploy to all configured project profiles",
 )
+@click.option(
+    "--members/--no-members",
+    "include_members",
+    default=True,
+    help=(
+        "Deploy skill's embedded member artifacts (commands, agents, hooks, MCP servers) "
+        "alongside the skill. Use --no-members to deploy only the primary skill file."
+    ),
+)
 @click.pass_context
 def deploy(
     ctx,
@@ -1412,6 +1421,7 @@ def deploy(
     output_format: Optional[str],
     profile_id: Optional[str],
     all_profiles: bool,
+    include_members: bool,
 ):
     """Deploy artifacts to a project's .claude/ directory.
 
@@ -1476,6 +1486,7 @@ def deploy(
                     overwrite=overwrite,
                     profile_id=resolved_profile_id,
                     all_profiles=resolved_all_profiles,
+                    include_members=include_members,
                 )
         else:
             deployments = deployment_mgr.deploy_artifacts(
@@ -1486,6 +1497,7 @@ def deploy(
                 overwrite=overwrite,
                 profile_id=resolved_profile_id,
                 all_profiles=resolved_all_profiles,
+                include_members=include_members,
             )
 
         # Output based on format
