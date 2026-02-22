@@ -1,60 +1,61 @@
 ---
 title: 'Implementation Plan: Skill-Contained Artifacts'
-description: >
-  Phased implementation plan to extend the existing CompositeArtifact /
-  CompositeMembership infrastructure to model Skills with embedded sub-artifacts,
-  enabling atomic import with deduplication, member visibility in the UI,
-  coordinated deployment, and three-layer version tracking.
+description: 'Phased implementation plan to extend the existing CompositeArtifact
+  / CompositeMembership infrastructure to model Skills with embedded sub-artifacts,
+  enabling atomic import with deduplication, member visibility in the UI, coordinated
+  deployment, and three-layer version tracking.
+
+  '
 schema_version: 2
 doc_type: implementation_plan
-status: draft
+status: in-progress
 created: 2026-02-21
-updated: 2026-02-21
+updated: '2026-02-22'
 feature_slug: skill-contained-artifacts-v1
 feature_version: v1
 prd_ref: /docs/project_plans/PRDs/features/skill-contained-artifacts-v1.md
 plan_ref: null
-scope: >
-  Extend composite_type to include "skill", wire the import pipeline to create
-  CompositeArtifact rows for skills with embedded artifacts, surface membership
-  in the UI, and add coordinated deployment and version tracking.
-effort_estimate: "32 story points / ~17 days"
-architecture_summary: >
-  Schema migration → import pipeline extension → associations API fix →
-  marketplace UI generalization → collection UI generalization →
-  deployment extension → version tracking → testing & validation.
+scope: 'Extend composite_type to include "skill", wire the import pipeline to create
+  CompositeArtifact rows for skills with embedded artifacts, surface membership in
+  the UI, and add coordinated deployment and version tracking.
+
+  '
+effort_estimate: 32 story points / ~17 days
+architecture_summary: "Schema migration \u2192 import pipeline extension \u2192 associations\
+  \ API fix \u2192 marketplace UI generalization \u2192 collection UI generalization\
+  \ \u2192 deployment extension \u2192 version tracking \u2192 testing & validation.\n"
 related_documents:
-  - /docs/project_plans/PRDs/features/skill-contained-artifacts-v1.md
-  - /docs/project_plans/PRDs/features/composite-artifact-infrastructure-v1.md
-  - /docs/project_plans/PRDs/features/composite-artifact-ux-v2.md
-  - /docs/project_plans/implementation_plans/features/composite-artifact-infrastructure-v1.md
+- /docs/project_plans/PRDs/features/skill-contained-artifacts-v1.md
+- /docs/project_plans/PRDs/features/composite-artifact-infrastructure-v1.md
+- /docs/project_plans/PRDs/features/composite-artifact-ux-v2.md
+- /docs/project_plans/implementation_plans/features/composite-artifact-infrastructure-v1.md
 owner: null
 contributors: []
 priority: high
 risk_level: medium
 category: product-planning
 tags:
-  - implementation
-  - planning
-  - phases
-  - skills
-  - composite-artifacts
-  - embedded-artifacts
-  - import
-  - deployment
+- implementation
+- planning
+- phases
+- skills
+- composite-artifacts
+- embedded-artifacts
+- import
+- deployment
 milestone: null
 commit_refs: []
 pr_refs: []
 files_affected:
-  - skillmeat/cache/models.py
-  - skillmeat/cache/composite_repository.py
-  - skillmeat/core/services/composite_service.py
-  - skillmeat/core/importer.py
-  - skillmeat/core/deployment.py
-  - skillmeat/api/routers/artifacts.py
-  - skillmeat/web/components/artifact/artifact-contains-tab.tsx
-  - skillmeat/web/components/artifact/artifact-part-of-section.tsx
-  - skillmeat/web/components/marketplace/source-artifact-modal.tsx
+- skillmeat/cache/models.py
+- skillmeat/cache/composite_repository.py
+- skillmeat/core/services/composite_service.py
+- skillmeat/core/importer.py
+- skillmeat/core/deployment.py
+- skillmeat/api/routers/artifacts.py
+- skillmeat/web/components/artifact/artifact-contains-tab.tsx
+- skillmeat/web/components/artifact/artifact-part-of-section.tsx
+- skillmeat/web/components/marketplace/source-artifact-modal.tsx
 ---
 
 # Implementation Plan: Skill-Contained Artifacts
