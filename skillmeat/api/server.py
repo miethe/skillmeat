@@ -27,6 +27,7 @@ from .config import APISettings, get_settings
 from .dependencies import app_state
 from .routers import (
     analytics,
+    artifact_history,
     artifacts,
     bundles,
     cache,
@@ -335,6 +336,9 @@ def create_app(settings: APISettings = None) -> FastAPI:
         user_collections.router, prefix=settings.api_prefix, tags=["user-collections"]
     )
     app.include_router(artifacts.router, prefix=settings.api_prefix, tags=["artifacts"])
+    app.include_router(
+        artifact_history.router, prefix=settings.api_prefix, tags=["artifacts"]
+    )
     app.include_router(analytics.router, prefix=settings.api_prefix, tags=["analytics"])
     app.include_router(bundles.router, prefix=settings.api_prefix, tags=["bundles"])
     app.include_router(cache.router, prefix=settings.api_prefix, tags=["cache"])

@@ -12,7 +12,7 @@ export default function Dashboard() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">
-          Welcome to SkillMeat - Your personal collection manager for Claude Code artifacts
+          Enterprise analytics for artifact delivery, reliability, provenance, and agent operations
         </p>
       </div>
 

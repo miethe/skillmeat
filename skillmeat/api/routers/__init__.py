@@ -5,6 +5,7 @@ This package contains all API route handlers organized by domain.
 
 from . import (
     analytics,
+    artifact_history,
     artifacts,
     bundles,
     cache,
@@ -37,6 +38,7 @@ from . import (
 
 __all__ = [
     "analytics",
+    "artifact_history",
     "artifacts",
     "bundles",
     "cache",

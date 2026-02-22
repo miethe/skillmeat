@@ -11,6 +11,7 @@ import { StatsCards } from './stats-cards';
 import { TopArtifactsWidget } from './top-artifacts-widget';
 import { UsageTrendsWidget } from './usage-trends-widget';
 import { TagMetricsWidget } from './tag-metrics-widget';
+import { EnterpriseInsightsWidget } from './enterprise-insights-widget';
 import { useAnalyticsStream } from '@/hooks';
 import { Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -61,6 +62,9 @@ export function AnalyticsGrid({ enableLiveUpdates = true }: AnalyticsGridProps) 
 
       {/* Quick Stats Cards */}
       <StatsCards />
+
+      {/* Enterprise Metrics + Exports */}
+      <EnterpriseInsightsWidget />
 
       {/* Main Analytics Widgets */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" data-testid="widgets-grid">

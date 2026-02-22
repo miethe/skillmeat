@@ -868,6 +868,75 @@ class VersionGraphResponse(BaseModel):
         }
 
 
+class ArtifactHistoryEventResponse(BaseModel):
+    """Single artifact history/provenance event."""
+
+    id: str = Field(
+        description="Unique event identifier",
+        examples=["version:abc123", "analytics:42", "deployment:/Users/me/proj:abc123"],
+    )
+    timestamp: datetime = Field(description="Event timestamp")
+    event_category: Literal["version", "analytics", "deployment", "snapshot"] = Field(
+        description="High-level event category",
+    )
+    event_type: str = Field(
+        description="Specific event type",
+        examples=["deployment", "sync", "local_modification", "remove", "merge_base_snapshot"],
+    )
+    source: Literal["artifact_versions", "analytics_events", "deployment_tracker"] = Field(
+        description="Underlying data source used to build this event",
+    )
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    collection_name: Optional[str] = Field(
+        default=None,
+        description="Collection name when known",
+    )
+    project_path: Optional[str] = Field(
+        default=None,
+        description="Project path when known",
+    )
+    content_sha: Optional[str] = Field(
+        default=None,
+        description="Content hash associated with this event",
+    )
+    parent_sha: Optional[str] = Field(
+        default=None,
+        description="Parent content hash when applicable",
+    )
+    version_lineage: Optional[List[str]] = Field(
+        default=None,
+        description="Version lineage chain (root -> current) when available",
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional event metadata",
+    )
+
+
+class ArtifactHistoryResponse(BaseModel):
+    """Complete provenance/history timeline for an artifact."""
+
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    timeline: List[ArtifactHistoryEventResponse] = Field(
+        description="Chronological history events (newest first)",
+    )
+    statistics: Dict[str, Any] = Field(
+        description="Aggregated history/provenance metrics",
+        examples=[
+            {
+                "total_events": 42,
+                "version_events": 11,
+                "analytics_events": 26,
+                "deployment_events": 5,
+                "lineage_depth_max": 4,
+            }
+        ],
+    )
+    last_updated: datetime = Field(description="Timestamp when history was computed")
+
+
 class DeploymentModificationStatus(BaseModel):
     """Modification status for a single deployment.
 
