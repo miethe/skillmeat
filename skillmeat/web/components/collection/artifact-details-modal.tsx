@@ -87,7 +87,12 @@ import type { Deployment } from '@/components/deployments/deployment-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PluginMembersTab } from '@/components/entity/plugin-members-tab';
 import { MiniArtifactCard } from '@/components/collection/mini-artifact-card';
-import { useArtifactAssociations, useArtifact } from '@/hooks';
+import {
+  useArtifactAssociations,
+  useArtifact,
+  useArtifactHistory,
+  getArtifactHistoryId,
+} from '@/hooks';
 
 // ============================================================================
 // EnrichedParentCard
@@ -356,11 +361,14 @@ function HistoryTabSkeleton() {
 
 interface HistoryEntry {
   id: string;
-  type: 'deploy' | 'sync' | 'rollback';
+  type: 'deploy' | 'sync' | 'rollback' | 'update';
   direction: 'upstream' | 'downstream';
   timestamp: string;
   filesChanged?: number;
   user?: string;
+  eventType?: string;
+  projectPath?: string | null;
+  collectionName?: string | null;
 }
 
 interface LinkedArtifactsResponse {
@@ -429,62 +437,6 @@ function formatRelativeTime(date: Date): string {
 }
 
 /**
- * Generate mock history entries based on artifact metadata
- */
-function generateMockHistory(artifact: Artifact): HistoryEntry[] {
-  const history: HistoryEntry[] = [];
-
-  if (artifact.deployedAt) {
-    const deployedDate = new Date(artifact.deployedAt);
-    history.push({
-      id: `deploy-${artifact.deployedAt}`,
-      type: 'deploy',
-      direction: 'downstream',
-      timestamp: artifact.deployedAt,
-      filesChanged: Math.floor(Math.random() * 5) + 1,
-      user: 'You',
-    });
-
-    if (artifact.syncStatus === 'modified' || artifact.syncStatus === 'outdated') {
-      const syncDate = new Date(deployedDate.getTime() - 2 * 60 * 60 * 1000);
-      history.push({
-        id: `sync-${syncDate.toISOString()}`,
-        type: 'sync',
-        direction: 'upstream',
-        timestamp: syncDate.toISOString(),
-        filesChanged: Math.floor(Math.random() * 3) + 1,
-        user: 'You',
-      });
-    }
-  }
-
-  if (artifact.modifiedAt && artifact.modifiedAt !== artifact.deployedAt) {
-    history.push({
-      id: `sync-${artifact.modifiedAt}`,
-      type: 'sync',
-      direction: 'upstream',
-      timestamp: artifact.modifiedAt,
-      filesChanged: Math.floor(Math.random() * 4) + 1,
-      user: 'You',
-    });
-  }
-
-  if (artifact.syncStatus === 'conflict' && artifact.modifiedAt) {
-    const rollbackDate = new Date(new Date(artifact.modifiedAt).getTime() + 1 * 60 * 60 * 1000);
-    history.push({
-      id: `rollback-${rollbackDate.toISOString()}`,
-      type: 'rollback',
-      direction: 'downstream',
-      timestamp: rollbackDate.toISOString(),
-      filesChanged: Math.floor(Math.random() * 3) + 1,
-      user: 'You',
-    });
-  }
-
-  return history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-}
-
-/**
  * Get color for history entry type
  */
 function getHistoryTypeColor(type: HistoryEntry['type']): string {
@@ -495,6 +447,8 @@ function getHistoryTypeColor(type: HistoryEntry['type']): string {
       return 'text-blue-600 dark:text-blue-400';
     case 'rollback':
       return 'text-orange-600 dark:text-orange-400';
+    case 'update':
+      return 'text-purple-600 dark:text-purple-400';
     default:
       return 'text-muted-foreground';
   }
@@ -511,6 +465,8 @@ function getHistoryTypeLabel(type: HistoryEntry['type']): string {
       return 'Synced';
     case 'rollback':
       return 'Rolled Back';
+    case 'update':
+      return 'Updated';
     default:
       return type;
   }
@@ -712,11 +668,17 @@ export function ArtifactDetailsModal({
     findSourceEntry();
   }, [artifact, open, activeTab, sourcesData]);
 
-  // Generate history entries
-  const historyEntries = useMemo(() => {
-    if (!artifact) return [];
-    return generateMockHistory(artifact);
-  }, [artifact]);
+  const historyArtifactId = getArtifactHistoryId(artifact);
+  const {
+    data: artifactHistory,
+    isLoading: isHistoryLoading,
+    isError: isHistoryError,
+    error: historyError,
+  } = useArtifactHistory(historyArtifactId, {
+    enabled: !!artifact && open && activeTab === 'history',
+    limit: 500,
+  });
+  const historyEntries: HistoryEntry[] = artifactHistory?.timelineEntries ?? [];
 
   // ==========================================================================
   // Plugin Members Data (composite artifacts only)
@@ -1440,7 +1402,16 @@ export function ArtifactDetailsModal({
             {/* History Tab */}
             <TabContentWrapper value="history">
               <div className="space-y-4">
-                {historyEntries.length > 0 ? (
+                {isHistoryLoading ? (
+                  <HistoryTabSkeleton />
+                ) : isHistoryError ? (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+                    <p className="text-sm text-destructive">
+                      Failed to load history
+                      {historyError instanceof Error ? `: ${historyError.message}` : '.'}
+                    </p>
+                  </div>
+                ) : historyEntries.length > 0 ? (
                   <div>
                     <h3 className="mb-4 text-sm font-medium">Activity Timeline</h3>
                     <div className="relative space-y-0">
@@ -1460,7 +1431,9 @@ export function ArtifactDetailsModal({
                                 ? 'border-green-500'
                                 : entry.type === 'sync'
                                   ? 'border-blue-500'
-                                  : 'border-orange-500'
+                                  : entry.type === 'rollback'
+                                    ? 'border-orange-500'
+                                    : 'border-purple-500'
                             )}
                           >
                             {entry.direction === 'downstream' ? (
@@ -1500,6 +1473,15 @@ export function ArtifactDetailsModal({
                                     <span>{entry.user}</span>
                                   </>
                                 )}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {entry.collectionName && (
+                                  <span className="mr-2">{entry.collectionName}</span>
+                                )}
+                                {entry.eventType && (
+                                  <span className="mr-2">{entry.eventType.replace(/_/g, ' ')}</span>
+                                )}
+                                {entry.projectPath && <span className="truncate">{entry.projectPath}</span>}
                               </div>
                             </div>
                             <div className="text-xs text-muted-foreground">

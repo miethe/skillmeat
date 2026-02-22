@@ -24,6 +24,8 @@ from skillmeat.utils.filesystem import compute_content_hash
 
 import logging
 
+from skillmeat.observability.timing import PerfTimer
+
 logger = logging.getLogger(__name__)
 
 # Extensions to strip when normalizing artifact names.
@@ -108,13 +110,18 @@ class DeploymentTracker:
                     deployment_files.append(deployment_file)
 
         deployments: List[Deployment] = []
-        for deployment_file in deployment_files:
-            if not deployment_file.exists():
-                continue
-            with open(deployment_file, "rb") as f:
-                data = tomllib.load(f)
-            for deployment_data in data.get("deployed", []):
-                deployments.append(Deployment.from_dict(deployment_data))
+        with PerfTimer(
+            "storage.read_deployments",
+            project_path=str(project_path),
+            file_count=len(deployment_files),
+        ):
+            for deployment_file in deployment_files:
+                if not deployment_file.exists():
+                    continue
+                with open(deployment_file, "rb") as f:
+                    data = tomllib.load(f)
+                for deployment_data in data.get("deployed", []):
+                    deployments.append(Deployment.from_dict(deployment_data))
         return deployments
 
     @staticmethod
@@ -176,6 +183,7 @@ class DeploymentTracker:
         artifact_path: Optional[Path] = None,
         artifact_path_map: Optional[Dict[str, str]] = None,
         artifact_uuid: Optional[str] = None,
+        existing_deployments: Optional[List["Deployment"]] = None,
     ) -> None:
         """Record new deployment or update existing.
 
@@ -186,10 +194,16 @@ class DeploymentTracker:
             collection_sha: SHA of artifact content
             artifact_uuid: Stable UUID from DB cache (ADR-007); optional, omitted when
                 artifact not yet cached
+            existing_deployments: Pre-loaded deployment list from the caller.  When
+                provided the function skips the ``read_deployments`` call, saving one
+                TOML read per deploy operation.
         """
         from datetime import datetime
 
-        deployments = DeploymentTracker.read_deployments(project_path, profile_root_dir=None)
+        if existing_deployments is not None:
+            deployments = list(existing_deployments)
+        else:
+            deployments = DeploymentTracker.read_deployments(project_path, profile_root_dir=None)
 
         if artifact_path is None:
             path_map = DEFAULT_ARTIFACT_PATH_MAP.copy()
@@ -327,29 +341,35 @@ class DeploymentTracker:
         Returns:
             True if modified, False otherwise
         """
-        deployment = DeploymentTracker.get_deployment(
-            project_path,
-            artifact_name,
-            artifact_type,
-            profile_id=profile_id,
-        )
+        with PerfTimer(
+            "storage.detect_modifications",
+            artifact_name=artifact_name,
+            artifact_type=artifact_type,
+            project_path=str(project_path),
+        ):
+            deployment = DeploymentTracker.get_deployment(
+                project_path,
+                artifact_name,
+                artifact_type,
+                profile_id=profile_id,
+            )
 
-        if not deployment:
-            return False
+            if not deployment:
+                return False
 
-        # Get current content hash
-        artifact_full_path = resolve_deployment_path(
-            deployment_relative_path=deployment.artifact_path,
-            project_path=project_path,
-            profile=DeploymentPathProfile(
-                profile_id=deployment.deployment_profile_id or "claude_code",
-                root_dir=deployment.profile_root_dir or DEFAULT_PROFILE_ROOT_DIR,
-            ),
-        )
-        if not artifact_full_path.exists():
-            return False
+            # Get current content hash
+            artifact_full_path = resolve_deployment_path(
+                deployment_relative_path=deployment.artifact_path,
+                project_path=project_path,
+                profile=DeploymentPathProfile(
+                    profile_id=deployment.deployment_profile_id or "claude_code",
+                    root_dir=deployment.profile_root_dir or DEFAULT_PROFILE_ROOT_DIR,
+                ),
+            )
+            if not artifact_full_path.exists():
+                return False
 
-        current_hash = compute_content_hash(artifact_full_path)
+            current_hash = compute_content_hash(artifact_full_path)
 
-        # Compare with deployment SHA
-        return current_hash != deployment.collection_sha
+            # Compare with deployment SHA
+            return current_hash != deployment.collection_sha

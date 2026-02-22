@@ -212,6 +212,7 @@ export function useAddTagToArtifact() {
       queryClient.invalidateQueries({ queryKey: tagKeys.artifact(artifactId) });
       queryClient.invalidateQueries({ queryKey: ['artifacts'] }); // Artifact list embeds tags
       queryClient.invalidateQueries({ queryKey: ['collections'] }); // Collection page cards embed tags
+      queryClient.invalidateQueries({ queryKey: ['entities'] }); // Manage page (EntityLifecycle) uses entities queries
     },
   });
 }
@@ -242,6 +243,7 @@ export function useRemoveTagFromArtifact() {
       queryClient.invalidateQueries({ queryKey: tagKeys.artifact(artifactId) });
       queryClient.invalidateQueries({ queryKey: ['artifacts'] }); // Artifact list embeds tags
       queryClient.invalidateQueries({ queryKey: ['collections'] }); // Collection page cards embed tags
+      queryClient.invalidateQueries({ queryKey: ['entities'] }); // Manage page (EntityLifecycle) uses entities queries
     },
   });
 }

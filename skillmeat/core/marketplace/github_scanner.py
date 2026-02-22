@@ -404,6 +404,7 @@ class GitHubScanner:
                     scan_duration_ms=duration_ms,
                     errors=errors,
                     scanned_at=datetime.utcnow(),
+                    actual_ref=actual_ref if actual_ref != ref else None,
                 )
 
             except Exception as e:

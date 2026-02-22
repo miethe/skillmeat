@@ -61,6 +61,7 @@ const createMockArtifactDiffResponse = (
 describe('SyncConfirmationDialog', () => {
   const mockArtifact: Artifact = {
     id: 'test-artifact-1',
+    uuid: '00000000000000000000000000000001',
     name: 'test-skill',
     type: 'skill',
     scope: 'user',

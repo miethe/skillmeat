@@ -114,6 +114,7 @@ const renderWithProviders = (component: React.ReactNode) => {
 // Mock Entity (for EntityActions and UnifiedEntityModal)
 const mockEntity: Entity = {
   id: 'skill:test-skill',
+  uuid: '00000000000000000000000000000001',
   name: 'test-skill',
   type: 'skill',
   scope: 'user',
@@ -131,6 +132,7 @@ const mockEntity: Entity = {
 // Mock Artifact (for ArtifactDeletionDialog)
 const mockArtifact: Artifact = {
   id: 'skill:test-skill',
+  uuid: '00000000000000000000000000000002',
   name: 'test-skill',
   type: 'skill',
   scope: 'user',

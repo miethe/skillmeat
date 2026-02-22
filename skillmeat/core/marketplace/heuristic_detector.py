@@ -772,7 +772,8 @@ class HeuristicDetector:
         dir_to_files: Dict[str, Set[str]],
         container_types: Dict[str, ArtifactType],
         root_hint: Optional[str],
-    ) -> List[HeuristicMatch]:
+        skill_dirs: Optional[Set[str]] = None,
+    ) -> Tuple[List[HeuristicMatch], Dict[str, List[HeuristicMatch]]]:
         """Detect single-file artifacts (.md files) directly in or nested under containers.
 
         Claude Code conventions:
@@ -784,11 +785,23 @@ class HeuristicDetector:
             dir_to_files: Mapping of directories to their files
             container_types: Mapping of container paths to their artifact types
             root_hint: Optional path filter
+            skill_dirs: Set of detected Skill artifact directory paths. Any file
+                nested inside a skill directory tree (even under a sub-container like
+                ``commands/``) will NOT be promoted as a top-level artifact.
 
         Returns:
-            List of HeuristicMatch for detected single-file artifacts
+            A 2-tuple of:
+            - ``matches``: top-level ``HeuristicMatch`` objects for standalone
+              single-file artifacts (not inside any Skill subtree).
+            - ``embedded_by_skill``: mapping of skill directory path →
+              list of ``HeuristicMatch`` for child artifacts embedded within that
+              skill's directory tree (P1-T4).  These are NOT in ``matches``; callers
+              attach them to the parent ``DetectedArtifact.embedded_artifacts``.
         """
         matches: List[HeuristicMatch] = []
+        # P1-T4: collect embedded child matches keyed by their parent skill dir
+        embedded_by_skill: Dict[str, List[HeuristicMatch]] = {}
+        _skill_dirs: Set[str] = skill_dirs if skill_dirs is not None else set()
 
         # Build effective container types including manual mappings
         # This allows .md files under manually-mapped directories to be detected
@@ -826,10 +839,112 @@ class HeuristicDetector:
             if any(f.lower() in manifest_files for f in files):
                 artifact_dirs.add(dir_path)
 
+        # P1-T1: Build the set of Skill artifact directories from two sources:
+        # (a) directories with SKILL.md (detected from dir_to_files), and
+        # (b) any explicitly-provided skill_dirs passed by the caller (post-analysis).
+        # This set is used to suppress top-level promotion of any nested file artifacts.
+        inferred_skill_dirs: Set[str] = set()
+        for dir_path, files in dir_to_files.items():
+            if any(f.lower() == "skill.md" for f in files):
+                inferred_skill_dirs.add(dir_path)
+        # Merge with caller-provided set (P1-T1 full integration)
+        all_skill_dirs: Set[str] = inferred_skill_dirs | _skill_dirs
+
+        if all_skill_dirs:
+            logger.debug(
+                "Skill subtree guard active for %d skill dir(s): %s",
+                len(all_skill_dirs),
+                sorted(all_skill_dirs),
+            )
+
         # Process all directories to find single-file artifacts
         for dir_path, files in dir_to_files.items():
             # Apply root hint filtering
             if root_hint and not dir_path.startswith(root_hint):
+                continue
+
+            # Skill subtree guard (P1-T2): any directory nested inside a detected Skill
+            # directory is excluded from top-level single-file promotion.  Unlike the
+            # general artifact_dirs check below, Skills NEVER expose their embedded
+            # children as independent top-level artifacts regardless of whether a
+            # container sub-directory (e.g. ``commands/``) sits between them.
+            # This prevents paths like ``skills/my-skill/commands/cmd.md`` from being
+            # promoted as a top-level command artifact (which causes 404 on resolution).
+            # P1-T4: instead of silently skipping, identify the parent skill dir and
+            # record embedded child matches for attachment to the parent artifact.
+            parent_skill_dir: Optional[str] = None
+            for sd in all_skill_dirs:
+                if dir_path.startswith(sd + "/"):
+                    # Pick the longest (most specific) matching skill dir
+                    if parent_skill_dir is None or len(sd) > len(parent_skill_dir):
+                        parent_skill_dir = sd
+
+            if parent_skill_dir is not None:
+                # Determine the container type for this sub-directory so we can
+                # classify embedded child artifacts correctly (command, agent, etc.).
+                # Use the MOST SPECIFIC (longest) matching container to avoid
+                # a broad parent container (e.g. "skills") overriding a narrow one
+                # (e.g. "skills/my-skill/commands").
+                embedded_container_type: Optional[ArtifactType] = None
+                best_container_match_len = -1
+                for c_path, c_type in effective_container_types.items():
+                    if dir_path == c_path or dir_path.startswith(c_path + "/"):
+                        if len(c_path) > best_container_match_len:
+                            best_container_match_len = len(c_path)
+                            embedded_container_type = c_type
+
+                if embedded_container_type is not None:
+                    # Build HeuristicMatch objects for eligible .md files in this dir
+                    sub_excluded = excluded_files | {"skill.md"}
+                    for filename in files:
+                        if not filename.lower().endswith(".md"):
+                            continue
+                        if filename.lower() in sub_excluded:
+                            continue
+                        artifact_path = f"{dir_path}/{filename}"
+                        em = HeuristicMatch(
+                            path=artifact_path,
+                            artifact_type=embedded_container_type.value,
+                            confidence_score=70,
+                            organization_path=None,
+                            match_reasons=[
+                                f"Embedded {embedded_container_type.value} inside "
+                                f"Skill '{parent_skill_dir}'",
+                                f"Container: {dir_path}/",
+                                f"File: {filename}",
+                            ],
+                            dir_name_score=0,
+                            manifest_score=0,
+                            extension_score=5,
+                            depth_penalty=0,
+                            raw_score=0,
+                            # breakdown requires Dict[str, int]; put string metadata
+                            # in the metadata field instead
+                            breakdown={
+                                "dir_name_score": 0,
+                                "manifest_score": 0,
+                                "extensions_score": 5,
+                                "parent_hint_score": 0,
+                                "frontmatter_score": 0,
+                                "container_hint_score": 0,
+                                "depth_penalty": 0,
+                                "raw_total": 5,
+                                "normalized_score": 70,
+                            },
+                            metadata={
+                                "is_embedded": True,
+                                "parent_skill_dir": parent_skill_dir,
+                            },
+                        )
+                        embedded_by_skill.setdefault(parent_skill_dir, []).append(em)
+
+                logger.debug(
+                    "Skipping top-level promotion for '%s': inside Skill subtree '%s' "
+                    "(%d embedded child(ren) recorded)",
+                    dir_path,
+                    parent_skill_dir,
+                    len(embedded_by_skill.get(parent_skill_dir, [])),
+                )
                 continue
 
             # Bug Fix 1: Skip if this directory is INSIDE an artifact directory
@@ -1005,7 +1120,7 @@ class HeuristicDetector:
                 )
                 matches.append(match)
 
-        return matches
+        return matches, embedded_by_skill
 
     def _is_single_file_grouping_directory(
         self,
@@ -1141,12 +1256,41 @@ class HeuristicDetector:
                 sorted(plugin_dirs),
             )
 
+        # P1-T1: Build the set of Skill directory paths before single-file detection.
+        # Any directory containing SKILL.md is a Skill artifact root; files nested
+        # inside these directories (even under a sub-container like ``commands/``)
+        # must NOT be promoted as independent top-level artifacts.
+        skill_dirs: Set[str] = {
+            dp
+            for dp, fs in dir_to_files.items()
+            if any(f.lower() == "skill.md" for f in fs)
+        }
+        if skill_dirs:
+            logger.debug(
+                "Pre-detected %d skill dir(s) for subtree exclusion: %s",
+                len(skill_dirs),
+                sorted(skill_dirs),
+            )
+
         # Detect single-file artifacts inside containers.  Plugin member artifacts
         # are kept so that the Plugin Breakdown UI can discover them via path prefix.
-        single_file_matches = self._detect_single_file_artifacts(
-            dir_to_files, container_types, root_hint
+        # P1-T4: also receives embedded_by_skill mapping for parent attachment.
+        single_file_matches, embedded_by_skill = self._detect_single_file_artifacts(
+            dir_to_files, container_types, root_hint, skill_dirs=skill_dirs
         )
         matches.extend(single_file_matches)
+
+        # Store embedded_by_skill on the instance so matches_to_artifacts() can attach
+        # embedded children to their parent DetectedArtifact (P1-T4).
+        # Reset first to avoid stale data across multiple analyze_paths() calls.
+        self._embedded_by_skill: Dict[str, List[HeuristicMatch]] = embedded_by_skill
+        if embedded_by_skill:
+            total_embedded = sum(len(v) for v in embedded_by_skill.values())
+            logger.debug(
+                "Collected %d embedded child artifact(s) across %d skill dir(s)",
+                total_embedded,
+                len(embedded_by_skill),
+            )
 
         # Analyze each directory
         for dir_path, files in dir_to_files.items():
@@ -2406,7 +2550,10 @@ class HeuristicDetector:
     ) -> List[DetectedArtifact]:
         """Convert heuristic matches to detected artifact objects.
 
-        Filters out low-confidence matches and deduplicates.
+        Filters out low-confidence matches and deduplicates.  For Skill artifacts,
+        any embedded child matches (Commands, Agents, etc. nested inside the Skill
+        directory tree) collected during ``analyze_paths()`` are attached to the
+        parent ``DetectedArtifact.embedded_artifacts`` field (P1-T4).
 
         Args:
             matches: List of heuristic matches
@@ -2420,39 +2567,43 @@ class HeuristicDetector:
         artifacts: List[DetectedArtifact] = []
         seen_paths: Set[str] = set()
 
-        for match in matches:
-            # Skip if below confidence threshold
-            if match.confidence_score < self.config.min_confidence:
-                continue
+        # Retrieve embedded children collected during analyze_paths() (P1-T4).
+        # Defaults to empty dict if analyze_paths() was not called or had no embeds.
+        embedded_by_skill: Dict[str, List[HeuristicMatch]] = getattr(
+            self, "_embedded_by_skill", {}
+        )
 
-            # Skip if no artifact type detected
-            if not match.artifact_type:
-                continue
+        # Recursion guard: only allow skill-within-skill up to depth 2 (P1-T5 note).
+        # This dict is flat (not recursive), so recursion is not possible here,
+        # but we document the invariant for clarity.
+        MAX_EMBED_DEPTH = 2  # noqa: N806 (local constant)
 
-            # Skip duplicates
-            if match.path in seen_paths:
-                continue
+        single_file_types = (
+            ArtifactType.COMMAND,
+            ArtifactType.AGENT,
+            ArtifactType.HOOK,
+        )
 
-            seen_paths.add(match.path)
-
-            # Extract artifact name from path
+        def _make_artifact(match: HeuristicMatch, *, depth: int = 0) -> DetectedArtifact:
+            """Build a DetectedArtifact from a HeuristicMatch."""
             posix_path = PurePosixPath(match.path)
             name = posix_path.name
-
-            # Strip .md extension for single-file artifact types (Commands, Agents, Hooks)
-            # These are often single .md files and should not include the extension in the name
-            single_file_types = (
-                ArtifactType.COMMAND,
-                ArtifactType.AGENT,
-                ArtifactType.HOOK,
-            )
+            # Strip .md extension for single-file artifact types
             if match.artifact_type in single_file_types and name.endswith(".md"):
                 name = name[:-3]
-
-            # Construct upstream URL
             upstream_url = f"{base_url.rstrip('/')}/tree/{ref}/{match.path}"
-
-            artifact = DetectedArtifact(
+            # Attach embedded children for Skill-type artifacts (depth guard)
+            embedded: List[DetectedArtifact] = []
+            if match.artifact_type == ArtifactType.SKILL.value and depth < MAX_EMBED_DEPTH:
+                for child_match in embedded_by_skill.get(match.path, []):
+                    embedded.append(_make_artifact(child_match, depth=depth + 1))
+                if embedded:
+                    logger.debug(
+                        "Attached %d embedded child artifact(s) to Skill '%s'",
+                        len(embedded),
+                        match.path,
+                    )
+            return DetectedArtifact(
                 artifact_type=match.artifact_type,
                 name=name,
                 path=match.path,
@@ -2469,9 +2620,24 @@ class HeuristicDetector:
                     "extension_score": match.extension_score,
                     "depth_penalty": match.depth_penalty,
                 },
+                embedded_artifacts=embedded,
             )
 
-            artifacts.append(artifact)
+        for match in matches:
+            # Skip if below confidence threshold
+            if match.confidence_score < self.config.min_confidence:
+                continue
+
+            # Skip if no artifact type detected
+            if not match.artifact_type:
+                continue
+
+            # Skip duplicates
+            if match.path in seen_paths:
+                continue
+
+            seen_paths.add(match.path)
+            artifacts.append(_make_artifact(match))
 
         return artifacts
 

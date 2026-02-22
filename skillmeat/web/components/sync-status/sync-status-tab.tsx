@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, GitMerge } from 'lucide-react';
 import type { Artifact } from '@/types/artifact';
@@ -12,7 +12,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api';
 import type { ArtifactSyncResponse } from '@/sdk/models/ArtifactSyncResponse';
-import { hasValidUpstreamSource } from '@/lib/sync-utils';
+import { hasValidUpstreamSource, hasSourceLink } from '@/lib/sync-utils';
+import { markStart, markEnd } from '@/lib/perf-marks';
 
 // Phase 1 components
 import { ArtifactFlowBanner } from './artifact-flow-banner';
@@ -215,13 +216,19 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   // State
   // ============================================================================
 
-  // Determine if we have a real source (not 'local' or 'unknown')
-  const hasRealSource = !!entity.source && entity.source !== 'local' && entity.source !== 'unknown';
+  // Strict upstream check — must satisfy hasValidUpstreamSource() conditions (github origin,
+  // tracking enabled, valid remote source). Aligns scope availability with query gate so
+  // tabs never appear available when the upstream query will never fire.
+  const hasValidUpstream = hasValidUpstreamSource(entity);
+
+  // Display-only source check — less strict than hasValidUpstream.
+  // Used for banner sourceInfo and scope tab visibility; does NOT gate query execution.
+  const hasSource = hasSourceLink(entity);
 
   const [comparisonScope, setComparisonScope] = useState<ComparisonScope>(
     mode === 'project'
       ? 'collection-vs-project'
-      : hasRealSource
+      : hasSource && !projectPath
         ? 'source-vs-collection'
         : 'collection-vs-project'
   );
@@ -232,14 +239,40 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   const [showMergeWorkflow, setShowMergeWorkflow] = useState(false);
   const [mergeDirection, setMergeDirection] = useState<'upstream' | 'downstream'>('downstream');
 
+  // Track whether user has manually changed the comparison scope.
+  // Prevents the smart-default effect from overriding an intentional selection.
+  const userHasChangedScope = useRef(false);
+
+  // Smart default: when projectPath becomes available, switch to the faster local
+  // comparison (collection-vs-project) if the user hasn't manually chosen a scope yet.
+  useEffect(() => {
+    if (projectPath && !userHasChangedScope.current && comparisonScope === 'source-vs-collection') {
+      setComparisonScope('collection-vs-project');
+    }
+  }, [projectPath, comparisonScope]);
+
   // ============================================================================
   // Queries
   // ============================================================================
 
-  // Upstream diff (source vs collection)
+  // Scope-aware diff loading (TASK-5.3):
+  // The active (primary) comparison scope query loads immediately.
+  // Secondary scope queries are deferred — they only become enabled after the
+  // primary scope's query has successfully returned data. This ensures the user
+  // sees meaningful content for their selected scope as fast as possible, while
+  // background-prefetching the other scopes so switching feels instant.
+  const isUpstreamPrimary = comparisonScope === 'source-vs-collection';
+  const isProjectPrimary = comparisonScope === 'collection-vs-project';
+  const isSourceProjectPrimary = comparisonScope === 'source-vs-project';
+
+  // Upstream diff (source vs collection).
+  // Fires immediately when it is the active scope.
+  // Also fires immediately when source-vs-project is active (both require upstream data).
+  // Deferred when collection-vs-project is active — enabled after project diff loads.
   const {
     data: upstreamDiff,
     isLoading: upstreamLoading,
+    isSuccess: upstreamSuccess,
     error: upstreamError,
   } = useQuery<ArtifactUpstreamDiffResponse>({
     queryKey: ['upstream-diff', entity.id, entity.collection],
@@ -253,14 +286,26 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
         `/artifacts/${encodeURIComponent(entity.id)}/upstream-diff${queryString ? `?${queryString}` : ''}`
       );
     },
-    enabled: !!entity.id && entity.collection !== 'discovered' && hasValidUpstreamSource(entity),
+    enabled:
+      !!entity.id &&
+      entity.collection !== 'discovered' &&
+      hasValidUpstreamSource(entity) &&
+      // Enable immediately when this scope or source-vs-project is active (both require upstream);
+      // defer only when collection-vs-project is active (equivalent to: !isProjectPrimary)
+      (isUpstreamPrimary || isSourceProjectPrimary),
+    staleTime: 30_000, // 30 sec interactive: diff data is expensive; reuse within TTL on reopen/switch
+    gcTime: 300_000,   // 5 min: keep in cache after unmount so reopen flows hit cache
     retry: false,
   });
 
-  // Project diff (collection vs project)
+  // Project diff (collection vs project).
+  // Fires immediately when it is the active scope.
+  // Deferred when source-vs-collection or source-vs-project is active — enabled after
+  // upstream diff loads (background prefetch once primary content is rendered).
   const {
     data: projectDiff,
     isLoading: projectLoading,
+    isSuccess: projectSuccess,
     error: projectError,
   } = useQuery<ArtifactDiffResponse>({
     queryKey: ['project-diff', entity.id, projectPath],
@@ -270,10 +315,20 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
         `/artifacts/${encodeURIComponent(entity.id)}/diff?${params}`
       );
     },
-    enabled: !!entity.id && !!projectPath && entity.collection !== 'discovered',
+    enabled:
+      !!entity.id &&
+      !!projectPath &&
+      entity.collection !== 'discovered' &&
+      // Enable immediately for primary scope; defer for upstream-based scopes (secondary)
+      (isProjectPrimary || upstreamSuccess),
+    staleTime: 30_000, // 30 sec interactive: diff data is expensive; reuse within TTL on reopen/switch
+    gcTime: 300_000,   // 5 min: keep in cache after unmount so reopen flows hit cache
   });
 
-  // Source-project diff (source vs project, bypassing collection)
+  // Source-project diff (source vs project, bypassing collection).
+  // This is the most expensive query. Load immediately when it is the active scope;
+  // background-prefetch after EITHER upstream or project scope has successfully loaded.
+  const primaryScopeLoaded = upstreamSuccess || projectSuccess;
   const {
     data: sourceProjectDiff,
     isLoading: sourceProjectLoading,
@@ -294,8 +349,10 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
       !!projectPath &&
       entity.collection !== 'discovered' &&
       hasValidUpstreamSource(entity) &&
-      comparisonScope === 'source-vs-project',
-    staleTime: 30_000,
+      // Active scope loads immediately; otherwise background-prefetch after primary data lands
+      (isSourceProjectPrimary || primaryScopeLoaded),
+    staleTime: 30_000, // 30 sec interactive: most expensive diff query; reuse within TTL on reopen/switch
+    gcTime: 300_000,   // 5 min: keep in cache after unmount so reopen flows hit cache
     retry: false,
   });
 
@@ -581,7 +638,38 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   const [showPullConfirm, setShowPullConfirm] = useState(false);
   const [showDeployConfirm, setShowDeployConfirm] = useState(false);
 
+  // Performance instrumentation: track SyncStatusTab mount and time-to-first-data
+  useEffect(() => {
+    markStart('sync-tab.mount');
+    markStart('sync-tab.first-data');
+    return () => {
+      markEnd('sync-tab.mount');
+    };
+  }, []);
+
+  // Performance instrumentation: track when first comparison data arrives and renders
+  const firstDataRendered = useRef(false);
+  useEffect(() => {
+    if (!firstDataRendered.current && (upstreamDiff || projectDiff || sourceProjectDiff)) {
+      firstDataRendered.current = true;
+      markEnd('sync-tab.activate');
+      markEnd('sync-tab.first-data');
+    }
+  }, [upstreamDiff, projectDiff, sourceProjectDiff]);
+
+  // Performance instrumentation: track comparison scope switches
+  const prevScope = useRef(comparisonScope);
+  useEffect(() => {
+    if (prevScope.current !== comparisonScope) {
+      markEnd(`sync-tab.scope.${prevScope.current}`);
+      markStart(`sync-tab.scope.${comparisonScope}`);
+      prevScope.current = comparisonScope;
+    }
+  }, [comparisonScope]);
+
   const handleComparisonChange = (scope: ComparisonScope) => {
+    userHasChangedScope.current = true;
+    markStart(`sync-tab.scope.${scope}`);
     setComparisonScope(scope);
   };
 
@@ -720,7 +808,14 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
           hasUpdate: upstreamDiff.has_changes,
           source: upstreamDiff.upstream_source,
         }
-      : null,
+      : hasSource
+        ? {
+            version: entity.source || 'unknown',
+            sha: '...',
+            hasUpdate: false,
+            source: entity.source || '',
+          }
+        : null,
     collectionInfo: {
       version: entity.version || 'unknown',
       sha: entity.version?.slice(0, 7) || 'unknown',
@@ -744,7 +839,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   const comparisonProps = {
     value: comparisonScope,
     onChange: handleComparisonChange,
-    hasSource: !!entity.source && entity.source !== 'local' && entity.source !== 'unknown',
+    hasSource: hasSource,
     hasProject: !!projectPath,
   };
 
@@ -836,7 +931,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     );
   }
 
-  if (isLoading) {
+  if (!entity) {
     return <SyncStatusTabSkeleton />;
   }
 
@@ -854,9 +949,15 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
           <Alert className="max-w-md">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              No comparison data available for this scope.
-              {!hasRealSource && ' This artifact has no remote source.'}
-              {!projectPath && ' No project deployment found.'}
+              {comparisonScope === 'source-vs-collection' || comparisonScope === 'source-vs-project'
+                ? hasSource && !hasValidUpstream
+                  ? 'Upstream tracking is not enabled for this artifact. Enable upstream tracking to compare with the source.'
+                  : !hasSource
+                    ? 'No upstream source configured for this artifact.'
+                    : 'No comparison data available for this scope.'
+                : !projectPath
+                  ? 'No project deployment found. Deploy this artifact to a project to enable comparison.'
+                  : 'No comparison data available for this scope.'}
             </AlertDescription>
           </Alert>
         </div>

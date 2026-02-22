@@ -145,6 +145,7 @@ const mockCollectionAfterImport = {
   artifacts: [
     {
       id: 'composite:my-plugin',
+      uuid: '00000000000000000000000000000001',
       name: 'my-plugin',
       type: 'composite',
       scope: 'user',

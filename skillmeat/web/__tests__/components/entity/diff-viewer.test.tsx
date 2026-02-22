@@ -38,8 +38,10 @@ describe('DiffViewer', () => {
     const files = [mockFileDiffModified, mockFileDiffAdded];
     render(<DiffViewer files={files} />);
 
-    expect(screen.getByText('src/example.ts')).toBeInTheDocument();
-    expect(screen.getByText('src/new-file.ts')).toBeInTheDocument();
+    // The file path appears in both sidebar and the diff file header for the selected file,
+    // so we assert at least one instance is present using queryAllByText.
+    expect(screen.queryAllByText('src/example.ts').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryAllByText('src/new-file.ts').length).toBeGreaterThanOrEqual(1);
   });
 
   it('displays summary statistics in header', () => {
@@ -63,18 +65,23 @@ describe('DiffViewer', () => {
   });
 
   it('shows file status badges correctly', () => {
-    const files = [
-      mockFileDiffModified,
-      mockFileDiffAdded,
-      mockFileDiffDeleted,
-      mockFileDiffUnchanged,
-    ];
-    render(<DiffViewer files={files} />);
+    // Use a single-file list per render so each status badge is unambiguous.
+    // The refactored diff header now also renders a FileStatusBadge for the selected
+    // file, so with 4 different files the selected file's status appears twice.
+    const { unmount } = render(<DiffViewer files={[mockFileDiffModified]} />);
+    expect(screen.queryAllByText('Modified').length).toBeGreaterThanOrEqual(1);
+    unmount();
 
-    expect(screen.getByText('Modified')).toBeInTheDocument();
-    expect(screen.getByText('Added')).toBeInTheDocument();
-    expect(screen.getByText('Deleted')).toBeInTheDocument();
-    expect(screen.getByText('Unchanged')).toBeInTheDocument();
+    const { unmount: u2 } = render(<DiffViewer files={[mockFileDiffAdded]} />);
+    expect(screen.queryAllByText('Added').length).toBeGreaterThanOrEqual(1);
+    u2();
+
+    const { unmount: u3 } = render(<DiffViewer files={[mockFileDiffDeleted]} />);
+    expect(screen.queryAllByText('Deleted').length).toBeGreaterThanOrEqual(1);
+    u3();
+
+    render(<DiffViewer files={[mockFileDiffUnchanged]} />);
+    expect(screen.queryAllByText('Unchanged').length).toBeGreaterThanOrEqual(1);
   });
 
   it('parses unified diff format and displays diff lines', () => {
@@ -123,10 +130,12 @@ describe('DiffViewer', () => {
     const files = [mockFileDiffModified, mockFileDiffAdded];
     render(<DiffViewer files={files} />);
 
-    const secondFile = screen.getByText('src/new-file.ts');
-    fireEvent.click(secondFile);
+    // The second file appears in the sidebar; click the sidebar entry
+    const sidebarEntries = screen.queryAllByText('src/new-file.ts');
+    // Click the first occurrence (sidebar entry)
+    fireEvent.click(sidebarEntries[0]);
 
-    // Should display the selected file
+    // Should display the selected file message
     expect(screen.getByText(/Content preview not available for added files/)).toBeInTheDocument();
   });
 
@@ -134,8 +143,18 @@ describe('DiffViewer', () => {
     const handleClose = jest.fn();
     render(<DiffViewer files={[mockFileDiffModified]} onClose={handleClose} />);
 
-    const closeButton = screen.getByRole('button', { name: '' });
-    fireEvent.click(closeButton);
+    // The header close button has an X icon. Use getAllByRole to find all unnamed
+    // buttons and click the first one (the header X button). The refactored component
+    // may have multiple unnamed icon buttons (e.g. close + sidebar chevrons with role=button).
+    // We target the ghost/icon button in the header by its containing div position.
+    // Fallback: filter by the button that triggers onClose via icon-only ghost variant.
+    const allButtons = screen.getAllByRole('button');
+    // The close button is the only ghost icon-sized button with the X svg inside it.
+    const closeButton = allButtons.find(
+      (btn) => btn.querySelector('svg.lucide-x') !== null
+    );
+    expect(closeButton).toBeDefined();
+    fireEvent.click(closeButton!);
 
     expect(handleClose).toHaveBeenCalled();
   });
@@ -143,16 +162,22 @@ describe('DiffViewer', () => {
   it('expands and collapses file details', () => {
     render(<DiffViewer files={[mockFileDiffModified]} />);
 
-    const fileButton = screen.getByText('src/example.ts');
-
-    // Initially should be expanded (first file)
+    // First file is selected and expanded by default: stats visible
     expect(screen.getByText(/1 additions, 1 deletions/)).toBeInTheDocument();
 
-    // Click to collapse
-    const chevronButton = fileButton.parentElement?.querySelector('button');
-    if (chevronButton) {
-      fireEvent.click(chevronButton);
-    }
+    // The sidebar entry for src/example.ts appears at least once.
+    // The expand/collapse chevron is a span with role="button" inside the sidebar row.
+    const fileChevrons = screen.getAllByRole('button').filter(
+      (btn) => btn.querySelector('svg.lucide-chevron-down') !== null ||
+               btn.querySelector('svg.lucide-chevron-right') !== null
+    );
+    // Alternatively target the span[role=button] chevron inside the sidebar
+    const chevronSpans = document.querySelectorAll('span[role="button"]');
+    expect(chevronSpans.length).toBeGreaterThan(0);
+    // Click the chevron to collapse the first file
+    fireEvent.click(chevronSpans[0]);
+    // After collapse, stats should disappear
+    expect(screen.queryByText(/1 additions, 1 deletions/)).not.toBeInTheDocument();
   });
 
   it('handles empty diff gracefully', () => {
@@ -163,7 +188,8 @@ describe('DiffViewer', () => {
     };
     render(<DiffViewer files={[emptyDiff]} />);
 
-    expect(screen.getByText('empty.ts')).toBeInTheDocument();
+    // file path appears in sidebar and diff file header; assert at least 1 occurrence
+    expect(screen.queryAllByText('empty.ts').length).toBeGreaterThanOrEqual(1);
   });
 
   it('handles complex unified diff with multiple hunks', () => {
@@ -186,13 +212,183 @@ describe('DiffViewer', () => {
     };
     render(<DiffViewer files={[complexDiff]} />);
 
-    expect(screen.getByText('complex.ts')).toBeInTheDocument();
+    // File path appears in sidebar and diff file header
+    expect(screen.queryAllByText('complex.ts').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders Diff Viewer title', () => {
     render(<DiffViewer files={[mockFileDiffModified]} />);
 
     expect(screen.getByText('Diff Viewer')).toBeInTheDocument();
+  });
+
+  // ===========================================================================
+  // Large-diff guardrail tests (TASK-7.1 - Performance refactor validation)
+  // ===========================================================================
+
+  describe('Large file count guardrails (>50 files)', () => {
+    /**
+     * Generate N distinct file diffs to simulate a large diff.
+     * Only the first file gets a unified_diff so it renders diff content.
+     */
+    function makeFileDiffs(count: number): FileDiff[] {
+      return Array.from({ length: count }, (_, i) => ({
+        file_path: `src/file-${String(i).padStart(3, '0')}.ts`,
+        status: 'modified' as const,
+        unified_diff: i === 0
+          ? `@@ -1,2 +1,2 @@\n line\n-old\n+new`
+          : `@@ -1 +1 @@\n-old\n+new`,
+      }));
+    }
+
+    it('renders only 50 files when count exceeds threshold', () => {
+      const files = makeFileDiffs(75);
+      render(<DiffViewer files={files} />);
+
+      // First 50 files should appear in sidebar
+      expect(screen.queryAllByText('src/file-000.ts').length).toBeGreaterThanOrEqual(1);
+      expect(screen.queryAllByText('src/file-049.ts').length).toBeGreaterThanOrEqual(1);
+
+      // Files beyond threshold should NOT appear in sidebar
+      expect(screen.queryByText('src/file-050.ts')).not.toBeInTheDocument();
+      expect(screen.queryByText('src/file-074.ts')).not.toBeInTheDocument();
+    });
+
+    it('shows "Load all N files" button when count exceeds threshold', () => {
+      const files = makeFileDiffs(75);
+      render(<DiffViewer files={files} />);
+
+      // The banner shows how many files are shown and a load-all button
+      expect(screen.getByText(/Showing 50 of 75 files/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Load all 75 files/i })).toBeInTheDocument();
+    });
+
+    it('reveals all files after clicking "Load all" button', () => {
+      const files = makeFileDiffs(75);
+      render(<DiffViewer files={files} />);
+
+      // Initially file-074 is not in the sidebar
+      expect(screen.queryByText('src/file-074.ts')).not.toBeInTheDocument();
+
+      // Click "Load all" button
+      fireEvent.click(screen.getByRole('button', { name: /Load all 75 files/i }));
+
+      // Now all files should be in the sidebar
+      expect(screen.queryAllByText('src/file-074.ts').length).toBeGreaterThanOrEqual(1);
+      // The banner is gone
+      expect(screen.queryByText(/Showing 50 of 75 files/)).not.toBeInTheDocument();
+    });
+
+    it('does NOT show "Load all" banner when file count is at or below threshold', () => {
+      const files = makeFileDiffs(50);
+      render(<DiffViewer files={files} />);
+
+      // Exactly 50 files — no banner
+      expect(screen.queryByText(/Showing 50 of/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Load all/i })).not.toBeInTheDocument();
+    });
+
+    it('does NOT show "Load all" banner for small diffs', () => {
+      render(<DiffViewer files={[mockFileDiffModified, mockFileDiffAdded]} />);
+
+      expect(screen.queryByText(/Showing 50 of/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Load all/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Large file diff guardrails (on-demand parse)', () => {
+    /**
+     * Generate a unified diff string that exceeds the 1000-line threshold.
+     * The LARGE_DIFF_LINE_THRESHOLD in diff-viewer.tsx is 1000 lines.
+     */
+    function makeLargeDiffString(lines = 1100): string {
+      const hunkLines = Array.from({ length: lines }, (_, i) =>
+        i % 3 === 0 ? `-old line ${i}` : i % 3 === 1 ? `+new line ${i}` : ` context ${i}`
+      );
+      return `@@ -1,${lines} +1,${lines} @@\n${hunkLines.join('\n')}`;
+    }
+
+    it('shows "Load diff" button for large unified diffs instead of rendering them', () => {
+      const largeDiff: FileDiff = {
+        file_path: 'big-file.ts',
+        status: 'modified',
+        unified_diff: makeLargeDiffString(1100),
+      };
+
+      render(<DiffViewer files={[largeDiff]} />);
+
+      // Should NOT render the raw diff content (too large)
+      expect(screen.queryByText(/old line 0/)).not.toBeInTheDocument();
+
+      // Should show the placeholder with size info and a "Load diff" button
+      expect(screen.getByText(/This file diff is large/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Load diff/i })).toBeInTheDocument();
+    });
+
+    it('renders diff content after clicking "Load diff"', () => {
+      const largeDiff: FileDiff = {
+        file_path: 'big-file.ts',
+        status: 'modified',
+        unified_diff: makeLargeDiffString(1100),
+      };
+
+      render(<DiffViewer files={[largeDiff]} />);
+
+      // Click "Load diff" to expand
+      fireEvent.click(screen.getByRole('button', { name: /Load diff/i }));
+
+      // After loading, the placeholder should be gone
+      expect(screen.queryByText(/This file diff is large/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Load diff/i })).not.toBeInTheDocument();
+    });
+
+    it('renders small diffs immediately without a "Load diff" button', () => {
+      render(<DiffViewer files={[mockFileDiffModified]} />);
+
+      // Small diff: no load button, content rendered directly
+      expect(screen.queryByRole('button', { name: /Load diff/i })).not.toBeInTheDocument();
+      expect(screen.getByText(/console\.log\('old'\)/)).toBeInTheDocument();
+    });
+
+    it('shows stats for large files in the sidebar without loading full diff', () => {
+      const largeDiff: FileDiff = {
+        file_path: 'big-file.ts',
+        status: 'modified',
+        unified_diff: makeLargeDiffString(1100),
+      };
+
+      render(<DiffViewer files={[largeDiff]} />);
+
+      // Sidebar stats are computed by the lightweight computeDiffStats scanner,
+      // not by the full parseDiff that is blocked for large files.
+      // The file is expanded by default (index 0), so stats should be visible.
+      expect(screen.getByText(/additions, \d+ deletions/)).toBeInTheDocument();
+    });
+
+    it('large-diff state resets when files prop changes', () => {
+      const largeDiff: FileDiff = {
+        file_path: 'big-file.ts',
+        status: 'modified',
+        unified_diff: makeLargeDiffString(1100),
+      };
+
+      const { rerender } = render(<DiffViewer files={[largeDiff]} />);
+
+      // Load the large diff
+      fireEvent.click(screen.getByRole('button', { name: /Load diff/i }));
+      expect(screen.queryByRole('button', { name: /Load diff/i })).not.toBeInTheDocument();
+
+      // Rerender with the same large diff but a different file_path — cache should reset
+      const differentLargeDiff: FileDiff = {
+        file_path: 'other-big-file.ts',
+        status: 'modified',
+        unified_diff: makeLargeDiffString(1100),
+      };
+      rerender(<DiffViewer files={[differentLargeDiff]} />);
+
+      // New file starts in collapsed/load-button state
+      expect(screen.getByRole('button', { name: /Load diff/i })).toBeInTheDocument();
+    });
   });
 
   // New tests for sync resolution actions

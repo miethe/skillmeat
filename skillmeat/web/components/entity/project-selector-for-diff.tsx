@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { apiRequest } from '@/lib/api';
+import { markStart, markEnd } from '@/lib/perf-marks';
 import type { ArtifactType, SyncStatus } from '@/types/artifact';
 import type { ArtifactResponse, DeploymentStatistics } from '@/sdk';
 
@@ -152,6 +153,15 @@ export function ProjectSelectorForDiff({
   const [isEmptyCollapsed, setIsEmptyCollapsed] = useState(false);
   const emptyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Performance instrumentation: track project selector mount and time-to-interactive
+  useEffect(() => {
+    markStart('project-selector.mount');
+    markStart('project-selector.ready');
+    return () => {
+      markEnd('project-selector.mount');
+    };
+  }, []);
+
   // Fetch artifact details with deployment statistics
   const {
     data: artifactData,
@@ -183,6 +193,16 @@ export function ProjectSelectorForDiff({
         isModified: project.is_modified,
       };
     }) ?? [];
+
+  // Performance instrumentation: mark when project list is loaded and selector is interactive
+  const selectorReadyMarked = useRef(false);
+  useEffect(() => {
+    if (!isLoading && !error && !selectorReadyMarked.current) {
+      selectorReadyMarked.current = true;
+      markEnd('project-selector.mount');
+      markEnd('project-selector.ready');
+    }
+  }, [isLoading, error]);
 
   // Auto-collapse empty state after 3 seconds; reset when artifact data changes
   // Use artifactData reference (stable from React Query) instead of deployments

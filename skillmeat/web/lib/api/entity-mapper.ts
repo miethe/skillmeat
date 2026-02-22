@@ -66,6 +66,7 @@ export interface ApiDeploymentSummary {
 export interface ApiArtifactResponse {
   // Identity (required in most responses)
   id: string;
+  uuid?: string;
   name: string;
   type: string;
 
@@ -483,6 +484,7 @@ export function mapArtifactToEntity(
   const entity: Entity = {
     // Identity (required)
     id: artifact.id,
+    uuid: artifact.uuid ?? '',
     name: artifact.name,
     type: artifact.type as ArtifactType,
 

@@ -1,6 +1,6 @@
 # Using Analytics & Insights Guide
 
-Learn how to track artifact usage, identify trends, find cleanup opportunities, and export comprehensive reports.
+Learn how to track artifact usage, identify trends, find cleanup opportunities, and export analytics to observability platforms.
 
 ## Overview
 
@@ -11,7 +11,9 @@ SkillMeat provides comprehensive analytics to help you understand how artifacts 
 - **Top Artifacts**: Identify your most-used artifacts
 - **Cleanup Suggestions**: Find unused or low-value artifacts
 - **Trend Analysis**: See how usage has changed over time
-- **Report Export**: Generate comprehensive reports in JSON or CSV
+- **Enterprise Dashboard Metrics**: Track delivery, reliability, adoption, and project activity
+- **Report Export**: Export analytics as JSON, Prometheus, or OTel (plus CLI report export)
+- **Artifact Provenance History**: View unified history timelines in artifact modals
 
 ## Important: Analytics and Privacy
 
@@ -473,6 +475,33 @@ Spike in usage:        ░▓▓▓▓▓░░░░░  Temporary need
 
 ## Exporting Reports
 
+### Web Dashboard Exports (Enterprise)
+
+From the dashboard Enterprise Insights card, you can export analytics for external observability systems:
+
+- **JSON**: Structured analytics payload for data pipelines
+- **Prometheus**: Text exposition format for Prometheus/Grafana ingestion
+- **OTel**: OTLP-style JSON for OpenTelemetry collectors and downstream pipelines
+
+These exports are backed by the API endpoint:
+
+```bash
+GET /api/v1/analytics/export?format=json
+GET /api/v1/analytics/export?format=prometheus
+GET /api/v1/analytics/export?format=otel
+```
+
+### Enterprise Summary API
+
+The dashboard now uses enterprise-grade analytics from:
+
+```bash
+GET /api/v1/analytics/enterprise-summary
+```
+
+This response includes rolling windows (1d/7d/30d/90d), delivery metrics, reliability metrics,
+adoption metrics, top projects, and provenance summary counts.
+
 ### Export as JSON
 
 ```bash
@@ -487,7 +516,7 @@ skillmeat analytics export report.json
 #   Format: JSON
 ```
 
-### Export as CSV
+### Export as CSV (CLI)
 
 ```bash
 # Export as CSV for spreadsheets
@@ -555,6 +584,23 @@ cp report.json ~/shared-reports/
 ```
 
 ## Database Maintenance
+
+## Artifact Provenance History
+
+Artifact History tabs in modal views now use the unified provenance API instead of generated mock entries:
+
+```bash
+GET /api/v1/artifacts/{artifact_id}/history
+```
+
+This timeline merges:
+
+- `artifact_versions` lineage records
+- Analytics events (deploy/sync/update/remove/search context)
+- Deployment tracker records (including merge-base snapshot anchors)
+
+The UI renders these as deploy/sync/rollback/update timeline entries with source, timestamp,
+project/collection context, and SHA lineage metadata when available.
 
 ### View Database Statistics
 

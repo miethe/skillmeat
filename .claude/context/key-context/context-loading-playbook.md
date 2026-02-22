@@ -16,6 +16,7 @@ Use this ladder to minimize tokens and stale-context risk.
 |---|---|---|
 | API contract mismatch | `skillmeat/api/openapi.json`, `ai/symbols-api.json` | `api-contract-source-of-truth.md`, `router-patterns.md` |
 | Hook/component changes | `skillmeat/web/hooks/index.ts`, `ai/symbols-web.json` | `hook-selection-and-deprecations.md`, `component-patterns.md` |
+| Sync/diff component changes | diff-viewer, sync-status-tab, artifact-operations-modal files | `sync-diff-patterns.md` |
 | FE/BE payload drift | OpenAPI + SDK/types in use | `fe-be-type-sync-playbook.md` |
 | Debugging unknown area | symbols + stack trace files | `debugging-patterns.md`, `symbols-query-playbook.md` |
 | Planning/migration work | runtime truth artifacts | latest plan/report after verification |

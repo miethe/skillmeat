@@ -63,6 +63,7 @@ function createWrapper(queryClient: QueryClient) {
 
 const mockArtifact: Artifact = {
   id: 'skill:test-skill',
+  uuid: '00000000000000000000000000000001',
   name: 'test-skill',
   type: 'skill',
   scope: 'user',

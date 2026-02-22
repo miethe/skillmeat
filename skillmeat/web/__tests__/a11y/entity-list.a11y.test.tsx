@@ -12,6 +12,7 @@ import type { Entity } from '@/types/entity';
 const mockEntities: Entity[] = [
   {
     id: 'skill:1',
+    uuid: '00000000000000000000000000000001',
     name: 'skill-one',
     type: 'skill',
     scope: 'user',
@@ -24,6 +25,7 @@ const mockEntities: Entity[] = [
   },
   {
     id: 'skill:2',
+    uuid: '00000000000000000000000000000002',
     name: 'skill-two',
     type: 'skill',
     scope: 'user',

@@ -93,6 +93,28 @@ The `Artifact` type is the canonical representation for skills, commands, agents
 
 **Component Examples**: See actual component patterns in `components/entity/` and `components/collection/`
 
+### Artifact Identifiers (ADR-007)
+
+The `Artifact` type has two identifier fields that serve different purposes:
+
+| Field | Format | Example | Use For |
+|-------|--------|---------|---------|
+| `id` | `type:name` | `skill:frontend-design` | Display, CLI commands, deploy dialog |
+| `uuid` | Hex UUID | `a1b2c3d4...` | **All API calls** (tags, groups, associations) |
+
+**API Rule**: When calling endpoints that associate artifacts with other entities (tags, groups, collection memberships), always pass `artifact.uuid`, not `artifact.id`.
+
+```typescript
+// ✓ Correct - use uuid for API calls
+addTagToArtifact(artifact.uuid, tagId);
+addToGroup({ artifactId: artifact.uuid, groupId });
+
+// ✗ Wrong - will cause 404 errors
+addTagToArtifact(artifact.id, tagId);
+```
+
+**Why**: The backend expects the stable UUID (ADR-007 identity) for foreign key lookups. The `type:name` composite is only for human-readable display and filesystem paths.
+
 ---
 
 ## Context Files (Load When Needed)
@@ -125,15 +147,17 @@ All hooks must comply with the canonical data flow principles. See root `CLAUDE.
 
 ### Quick Stale Time Guide
 
-| Category               | Stale Time | Domains                                                                     |
-| ---------------------- | ---------- | --------------------------------------------------------------------------- |
-| Standard browsing      | 5 min      | Artifacts, Collections, Tags, Groups, Projects, Snapshots, Context Entities |
-| Interactive/monitoring | 30 sec     | Tag search, Artifact search, Analytics summary, Cache/Sync status           |
-| Deployments            | 2 min      | All deployment hooks                                                        |
-| Marketplace listings   | 1 min      | Listing list only; detail uses 5min                                         |
+| Category               | Stale Time | Domains                                                                               |
+| ---------------------- | ---------- | -------------------------------------------------------------------------------------- |
+| Standard browsing      | 5 min      | Artifacts, Collections, Tags, Groups, Projects, Snapshots, Context Entities           |
+| Interactive/monitoring | 30 sec     | Tag search, Artifact search, Analytics summary, Cache/Sync status, Diff queries       |
+| Deployments            | 2 min      | All deployment hooks                                                                  |
+| Marketplace listings   | 1 min      | Listing list only; detail uses 5min                                                   |
 
 **Full stale time table + invalidation graph**:
 **Read**: `.claude/context/key-context/data-flow-patterns.md`
+
+**Sync/diff patterns**: `.claude/context/key-context/sync-diff-patterns.md`
 
 ---
 
@@ -250,9 +274,9 @@ Props:
 
 **Query Logic**:
 
-- Upstream diff query **ONLY enabled** if `hasValidUpstreamSource(entity) === true`
-- `ComparisonSelector` enables scope options based on: `hasSource` (from validation) + `hasProject` (artifact has deployments)
-- Marketplace/local artifacts show read-only status (no diff queries, no sync actions)
+Diff queries load with scope awareness: primary (active) tab loads immediately, secondary tabs prefetch after primary data arrives. Upstream query gates on `hasValidUpstreamSource()` check. Stale times follow the interactive/monitoring standard (30s).
+
+**Implementation patterns**: `.claude/context/key-context/sync-diff-patterns.md`
 
 ---
 

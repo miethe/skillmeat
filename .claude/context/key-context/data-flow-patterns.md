@@ -46,6 +46,7 @@ Web mutations on filesystem-backed data:
 | Tags (search) | 30 sec | Interactive, needs freshness |
 | Groups (all hooks) | 5 min | Low-frequency changes |
 | Deployments | 2 min | More dynamic, filesystem-backed |
+| Diff queries (sync) | 30 sec | Interactive, expensive queries; reuse on scope switches |
 | Projects | 5 min | Low-frequency changes |
 | Marketplace listings | 1 min | External, moderately dynamic |
 | Marketplace detail | 5 min | Slow-changing |
@@ -56,7 +57,7 @@ Web mutations on filesystem-backed data:
 | Cache status | 30 sec | Monitoring |
 | Context Sync status | 30 sec | Active sync monitoring |
 
-**Rule**: Interactive/monitoring queries use 30sec. Standard browsing uses 5min. Deployments use 2min (FS-backed, more dynamic).
+**Rule**: Interactive/monitoring queries use 30sec (includes diff queries for sync). Standard browsing uses 5min. Deployments use 2min (FS-backed, more dynamic). Diff GC time is 5min to cache across reopen/scope-switch flows.
 
 ---
 

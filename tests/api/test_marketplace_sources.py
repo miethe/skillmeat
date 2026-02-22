@@ -3241,3 +3241,231 @@ class TestListArtifactsExclusionFiltering:
         assert active_entry is not None
         assert active_entry["excluded_at"] is None
         assert active_entry["excluded_reason"] is None
+
+
+# =============================================================================
+# P2-T5: File serving endpoint — path resolution regression and defensive tests
+# Tests the GET /api/v1/marketplace/sources/{id}/artifacts/{path}/files/{file}
+# endpoint for both directory-based (existing) and file-path (embedded) cases.
+# Depends on P2-T1 (defensive path resolution) being implemented.
+# =============================================================================
+
+
+class TestFileServingPathResolution:
+    """Regression and defensive tests for file serving path resolution (P2-T5).
+
+    Two scenarios are verified:
+
+    1. **Directory-based artifact** (existing behaviour):
+       ``artifact_path = "skills/my-skill"`` + ``file_path = "SKILL.md"``
+       → scanner receives ``"skills/my-skill/SKILL.md"``
+
+    2. **File-path artifact** (embedded-artifact defensive fallback, P2-T1):
+       ``artifact_path = "skills/my-skill/commands/foo.md"`` + ``file_path = "foo.md"``
+       → scanner must receive ``"skills/my-skill/commands/foo.md"`` (NOT
+         ``"skills/my-skill/commands/foo.md/foo.md"``)
+    """
+
+    # ------------------------------------------------------------------
+    # Shared fixtures
+    # ------------------------------------------------------------------
+
+    @pytest.fixture
+    def mock_source(self):
+        """Minimal mock MarketplaceSource for path-resolution tests."""
+        src = MagicMock()
+        src.owner = "anthropics"
+        src.repo_name = "quickstarts"
+        src.ref = "main"
+        return src
+
+    @pytest.fixture
+    def mock_source_repo(self, mock_source):
+        """Mock repository returning the test source."""
+        repo = MagicMock()
+        repo.get_by_id.return_value = mock_source
+        return repo
+
+    @pytest.fixture
+    def mock_text_file_response(self):
+        """Minimal file content dict returned by GitHubScanner."""
+        return {
+            "content": "# My Skill\n\nContent here.",
+            "encoding": "none",
+            "size": 512,
+            "sha": "deadbeef1234",
+            "name": "SKILL.md",
+            "path": "skills/my-skill/SKILL.md",
+            "is_binary": False,
+        }
+
+    @pytest.fixture
+    def fresh_file_cache(self):
+        """Fresh (empty) GitHubFileCache instance for each test."""
+        from skillmeat.api.utils.github_cache import GitHubFileCache
+
+        return GitHubFileCache(max_entries=50)
+
+    # ------------------------------------------------------------------
+    # Test 1 — Directory-based artifact (regression)
+    # ------------------------------------------------------------------
+
+    def test_directory_artifact_path_correct_resolution(
+        self, client, mock_source_repo, mock_text_file_response, fresh_file_cache
+    ):
+        """Directory-based artifact_path is correctly concatenated with file_path.
+
+        ``artifact_path = "skills/my-skill"`` + ``file_path = "SKILL.md"``
+        must produce ``scanner.get_file_content(path="skills/my-skill/SKILL.md")``.
+        """
+        mock_scanner = MagicMock()
+        mock_text_file_response["path"] = "skills/my-skill/SKILL.md"
+        mock_text_file_response["name"] = "SKILL.md"
+        mock_scanner.get_file_content.return_value = mock_text_file_response
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=fresh_file_cache,
+        ):
+            # Use a source ID with no underscores — validate_source_id only allows
+            # alphanumeric characters and hyphens (^[a-zA-Z0-9\-]+$).
+            response = client.get(
+                "/api/v1/marketplace/sources/src-test-abc"
+                "/artifacts/skills/my-skill/files/SKILL.md"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+
+        # Verify the scanner received the concatenated path, not artifact_path alone
+        mock_scanner.get_file_content.assert_called_once()
+        call_kwargs = mock_scanner.get_file_content.call_args
+        resolved_path = call_kwargs.kwargs.get("path") or call_kwargs.args[2]
+        assert resolved_path == "skills/my-skill/SKILL.md", (
+            f"Expected 'skills/my-skill/SKILL.md', got '{resolved_path}'"
+        )
+
+        data = response.json()
+        assert data["artifact_path"] == "skills/my-skill"
+
+    # ------------------------------------------------------------------
+    # Test 2 — File-path artifact (defensive fallback, P2-T1)
+    # ------------------------------------------------------------------
+
+    def test_embedded_artifact_path_defensive_fallback(
+        self, client, mock_source_repo, mock_text_file_response, fresh_file_cache
+    ):
+        """Embedded artifact with file-extension path must NOT 404.
+
+        When ``artifact_path = "skills/my-skill/commands/foo.md"`` (ends with
+        a recognised file extension), the endpoint must use ``artifact_path``
+        as the resolved file path and IGNORE ``file_path``.  This prevents the
+        double-path bug where the scanner would receive the non-existent path
+        ``"skills/my-skill/commands/foo.md/foo.md"``.
+        """
+        mock_scanner = MagicMock()
+        embedded_content = {
+            "content": "# Foo Command\n\nDoes foo things.",
+            "encoding": "none",
+            "size": 256,
+            "sha": "cafe1234abcd",
+            "name": "foo.md",
+            "path": "skills/my-skill/commands/foo.md",
+            "is_binary": False,
+        }
+        mock_scanner.get_file_content.return_value = embedded_content
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=fresh_file_cache,
+        ):
+            # artifact_path ends with ".md" → defensive fallback must fire.
+            # Use a source ID without underscores (validate_source_id rejects them).
+            response = client.get(
+                "/api/v1/marketplace/sources/src-test-abc"
+                "/artifacts/skills/my-skill/commands/foo.md"
+                "/files/foo.md"
+            )
+
+        assert response.status_code == status.HTTP_200_OK, (
+            f"Expected 200 for embedded artifact path; got {response.status_code}: "
+            f"{response.json()}"
+        )
+
+        # Verify the scanner received the artifact_path unchanged (no duplication)
+        mock_scanner.get_file_content.assert_called_once()
+        call_kwargs = mock_scanner.get_file_content.call_args
+        resolved_path = call_kwargs.kwargs.get("path") or call_kwargs.args[2]
+        assert resolved_path == "skills/my-skill/commands/foo.md", (
+            f"Expected 'skills/my-skill/commands/foo.md' (no duplication), "
+            f"got '{resolved_path}'"
+        )
+
+        data = response.json()
+        assert data["artifact_path"] == "skills/my-skill/commands/foo.md"
+
+    def test_embedded_artifact_path_various_extensions(
+        self, client, mock_source_repo, fresh_file_cache
+    ):
+        """All recognised file extensions trigger the defensive fallback."""
+        # Each tuple: (artifact_path_suffix, file_path, expected_resolved_path)
+        cases = [
+            ("agents/helper.md", "helper.md", "skills/s/agents/helper.md"),
+            ("config/settings.yaml", "settings.yaml", "skills/s/config/settings.yaml"),
+            ("config/settings.yml", "settings.yml", "skills/s/config/settings.yml"),
+            ("config/pyproject.toml", "pyproject.toml", "skills/s/config/pyproject.toml"),
+            ("scripts/run.sh", "run.sh", "skills/s/scripts/run.sh"),
+            ("src/component.ts", "component.ts", "skills/s/src/component.ts"),
+        ]
+
+        for suffix, file_path_param, expected_path in cases:
+            artifact_path_param = f"skills/s/{suffix}"
+            content = {
+                "content": "data",
+                "encoding": "none",
+                "size": 4,
+                "sha": "abc",
+                "name": file_path_param,
+                "path": expected_path,
+                "is_binary": False,
+            }
+            mock_scanner = MagicMock()
+            mock_scanner.get_file_content.return_value = content
+
+            with patch(
+                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+                return_value=mock_source_repo,
+            ), patch(
+                "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+                return_value=mock_scanner,
+            ), patch(
+                "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+                return_value=fresh_file_cache,
+            ):
+                response = client.get(
+                    f"/api/v1/marketplace/sources/src-test-abc"
+                    f"/artifacts/{artifact_path_param}"
+                    f"/files/{file_path_param}"
+                )
+
+            assert response.status_code == status.HTTP_200_OK, (
+                f"Expected 200 for artifact_path='{artifact_path_param}'; "
+                f"got {response.status_code}"
+            )
+            call_kwargs = mock_scanner.get_file_content.call_args
+            resolved = call_kwargs.kwargs.get("path") or call_kwargs.args[2]
+            assert resolved == expected_path, (
+                f"artifact_path='{artifact_path_param}': expected '{expected_path}', "
+                f"got '{resolved}'"
+            )

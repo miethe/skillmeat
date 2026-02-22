@@ -7,11 +7,47 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { markStart, markEnd } from '@/lib/perf-marks';
 
 /**
  * Resolution type for sync conflict resolution
  */
 export type ResolutionType = 'keep_local' | 'keep_remote' | 'merge';
+
+/**
+ * Maximum number of files to render in the sidebar by default.
+ * When the diff contains more files than this, only the first N are shown
+ * and a "Show all N files" banner appears at the bottom of the sidebar.
+ */
+const LARGE_DIFF_FILE_THRESHOLD = 50;
+
+/**
+ * Maximum number of lines in a unified diff before the file is considered
+ * "large" and collapsed by default in the diff panel. The user must click
+ * "Load diff" to expand and parse the content.
+ */
+const LARGE_DIFF_LINE_THRESHOLD = 1000;
+
+/**
+ * Maximum size in bytes for a unified diff string before it is treated as
+ * "large" and collapsed by default (whichever threshold is hit first).
+ */
+const LARGE_DIFF_BYTES_THRESHOLD = 50 * 1024; // 50 KB
+
+/**
+ * Returns true when a unified diff string exceeds either the line or byte threshold.
+ */
+function isLargeFileDiff(unifiedDiff: string): boolean {
+  if (unifiedDiff.length > LARGE_DIFF_BYTES_THRESHOLD) return true;
+  let lineCount = 0;
+  for (let i = 0; i < unifiedDiff.length; i++) {
+    if (unifiedDiff[i] === '\n') {
+      lineCount++;
+      if (lineCount >= LARGE_DIFF_LINE_THRESHOLD) return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Props for DiffViewer component
@@ -243,6 +279,22 @@ function parseDiff(unifiedDiff: string): ParsedDiffLine[] {
   return parsed;
 }
 
+/**
+ * Compute sidebar stats (additions + deletions count) from a raw unified diff string
+ * without allocating full ParsedDiffLine objects. O(n) line scan with minimal allocations.
+ */
+function computeDiffStats(unifiedDiff: string): { additions: number; deletions: number } {
+  let additions = 0;
+  let deletions = 0;
+  const lines = unifiedDiff.split('\n');
+  for (const line of lines) {
+    if (line.startsWith('---') || line.startsWith('+++') || line.startsWith('@@')) continue;
+    if (line.startsWith('+')) additions++;
+    else if (line.startsWith('-')) deletions++;
+  }
+  return { additions, deletions };
+}
+
 function FileStatusBadge({ status }: { status: FileDiff['status'] }) {
   const variants: Record<
     FileDiff['status'],
@@ -320,12 +372,91 @@ export function DiffViewer({
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set([0]));
 
+  /**
+   * When the diff has more than LARGE_DIFF_FILE_THRESHOLD files, the sidebar
+   * initially renders only the first N. This flag lifts that cap.
+   */
+  const [showAllFiles, setShowAllFiles] = useState(false);
+
+  /**
+   * Set of file indices for which the user has explicitly requested to load
+   * the full diff content. Files whose unified_diff is "large" (exceeds line/
+   * byte thresholds) start collapsed; clicking "Load diff" adds them here.
+   */
+  const [loadedLargeFiles, setLoadedLargeFiles] = useState<Set<number>>(new Set());
+
   const selectedFile = files[selectedFileIndex];
 
-  // Memoize parsed diff to avoid re-parsing on every render
+  /**
+   * On-demand parse cache keyed by file_path.
+   *
+   * Previously, a `parsedDiffs` useMemo iterated ALL files and called parseDiff() on every
+   * unified_diff string at mount time, regardless of whether the user ever expanded those files.
+   * For large diffs (50+ files) this blocked the main thread unnecessarily on mount.
+   *
+   * Now we parse lazily: only when a file is first selected or first expanded in the sidebar.
+   * The cache persists across renders via useRef so each file is parsed at most once per
+   * component lifetime. If the `files` prop identity changes (new data arrives) we clear
+   * the cache so stale results are never served.
+   */
+  const parseCacheRef = useRef<Map<string, ParsedDiffLine[]>>(new Map());
+  const filesCacheKeyRef = useRef<string>('');
+
+  // Invalidate the parse cache when the files array changes (new diff data received)
+  const filesKey = files.map((f) => f.file_path).join(',');
+  if (filesKey !== filesCacheKeyRef.current) {
+    filesCacheKeyRef.current = filesKey;
+    parseCacheRef.current = new Map();
+    // Reset large-diff UX state so new data starts fresh
+    setShowAllFiles(false);
+    setLoadedLargeFiles(new Set());
+  }
+
+  /**
+   * Get parsed lines for a given file path, parsing on first access and caching the result.
+   * Only call this for files the user has actually expanded/selected.
+   */
+  const getParsedLines = (filePath: string, unifiedDiff: string): ParsedDiffLine[] => {
+    const cache = parseCacheRef.current;
+    if (!cache.has(filePath)) {
+      cache.set(filePath, parseDiff(unifiedDiff));
+    }
+    return cache.get(filePath)!;
+  };
+
+  /**
+   * Sidebar stat cache: stores pre-computed {additions, deletions} per file_path.
+   * Uses the lightweight computeDiffStats scanner (no object allocation per line)
+   * instead of the full parseDiff. Keyed separately from parseCacheRef because
+   * sidebar stats are shown without needing full ParsedDiffLine arrays.
+   */
+  const statsCacheRef = useRef<Map<string, { additions: number; deletions: number }>>(new Map());
+  const statsCacheKeyRef = useRef<string>('');
+  if (filesKey !== statsCacheKeyRef.current) {
+    statsCacheKeyRef.current = filesKey;
+    statsCacheRef.current = new Map();
+  }
+
+  const getFileStats = (filePath: string, unifiedDiff: string) => {
+    const cache = statsCacheRef.current;
+    if (!cache.has(filePath)) {
+      cache.set(filePath, computeDiffStats(unifiedDiff));
+    }
+    return cache.get(filePath)!;
+  };
+
+  // Parsed diff for the currently selected file -- computed on demand, cached in parseCacheRef
   const parsedDiff = useMemo(() => {
-    return selectedFile?.unified_diff ? parseDiff(selectedFile.unified_diff) : [];
-  }, [selectedFile?.unified_diff]);
+    return selectedFile?.unified_diff
+      ? getParsedLines(selectedFile.file_path, selectedFile.unified_diff)
+      : [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFile?.file_path, selectedFile?.unified_diff]);
+
+  // Performance instrumentation: start timing diff summary and render on mount
+  useEffect(() => {
+    markStart('diff-viewer.summary-ready');
+  }, []);
 
   // Refs for synchronized scrolling between left and right panels
   const leftScrollRef = useRef<HTMLDivElement>(null);
@@ -360,7 +491,31 @@ export function DiffViewer({
     };
   }, [selectedFile]);
 
-  // Memoize summary calculation
+  // Performance instrumentation: mark when diff summary data arrives (files prop populated)
+  const diffSummaryMarked = useRef(false);
+  useEffect(() => {
+    if (files.length > 0 && !diffSummaryMarked.current) {
+      diffSummaryMarked.current = true;
+      markEnd('diff-viewer.summary-ready');
+    }
+  }, [files]);
+
+  // Performance instrumentation: mark when the full diff content finishes rendering
+  // (fires after paint for the current selected file's unified diff)
+  const prevFilesKey = useRef('');
+  useEffect(() => {
+    if (files.length > 0 && filesKey !== prevFilesKey.current) {
+      prevFilesKey.current = filesKey;
+      markStart('diff-viewer.render');
+      // Defer end mark until after browser has painted the diff content
+      const id = requestAnimationFrame(() => {
+        markEnd('diff-viewer.render');
+      });
+      return () => cancelAnimationFrame(id);
+    }
+  }, [files, filesKey]);
+
+  // Memoize summary calculation (reads only file.status, no diff parsing needed)
   const summary = useMemo(() => {
     return files.reduce(
       (acc, file) => {
@@ -372,17 +527,6 @@ export function DiffViewer({
       },
       { added: 0, modified: 0, deleted: 0, unchanged: 0 }
     );
-  }, [files]);
-
-  // Memoize parsed diffs for all files (for stats in sidebar)
-  const parsedDiffs = useMemo(() => {
-    const cache = new Map<string, ParsedDiffLine[]>();
-    files.forEach((file) => {
-      if (file.unified_diff) {
-        cache.set(file.file_path, parseDiff(file.unified_diff));
-      }
-    });
-    return cache;
   }, [files]);
 
   const toggleFileExpansion = (index: number) => {
@@ -436,7 +580,10 @@ export function DiffViewer({
         {/* File list sidebar */}
         <div className="min-h-0 w-64 flex-shrink-0 overflow-y-auto border-r bg-muted/20">
           <div className="space-y-1 p-2">
-            {files.map((file, index) => {
+            {/* Large-file-count guard: only render up to LARGE_DIFF_FILE_THRESHOLD rows
+                unless the user has opted in to "show all". This keeps the sidebar
+                responsive when a diff contains hundreds of files. */}
+            {(showAllFiles ? files : files.slice(0, LARGE_DIFF_FILE_THRESHOLD)).map((file, index) => {
               const isExpanded = expandedFiles.has(index);
               const isSelected = index === selectedFileIndex;
 
@@ -473,28 +620,40 @@ export function DiffViewer({
                     <FileStatusBadge status={file.status} />
                   </button>
 
-                  {isExpanded && (
-                    <div className="ml-6 mt-1 space-y-0.5 text-xs text-muted-foreground">
-                      {file.status === 'modified' &&
-                        file.unified_diff &&
-                        (() => {
-                          const cached = parsedDiffs.get(file.file_path);
-                          if (cached) {
-                            const additions = cached.filter((l) => l.type === 'addition').length;
-                            const deletions = cached.filter((l) => l.type === 'deletion').length;
-                            return (
-                              <div className="font-mono">
-                                {additions} additions, {deletions} deletions
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-                    </div>
-                  )}
+                  {/* Sidebar stats: computed on demand only when the file row is expanded.
+                      Uses lightweight computeDiffStats (no ParsedDiffLine allocation)
+                      rather than the full parseDiff result. */}
+                  {isExpanded && file.status === 'modified' && file.unified_diff && (() => {
+                    const stats = getFileStats(file.file_path, file.unified_diff);
+                    return (
+                      <div className="ml-6 mt-1 space-y-0.5 text-xs text-muted-foreground">
+                        <div className="font-mono">
+                          {stats.additions} additions, {stats.deletions} deletions
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
+
+            {/* "Show all files" banner — only visible when file count exceeds the threshold
+                and the user has not yet opted in. */}
+            {!showAllFiles && files.length > LARGE_DIFF_FILE_THRESHOLD && (
+              <div className="mt-2 rounded border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                <p className="mb-1.5">
+                  Showing {LARGE_DIFF_FILE_THRESHOLD} of {files.length} files
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 w-full text-xs"
+                  onClick={() => setShowAllFiles(true)}
+                >
+                  Load all {files.length} files
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -510,6 +669,27 @@ export function DiffViewer({
 
           {/* Side-by-side diff with synchronized scrolling and line alignment */}
           {selectedFile?.status === 'modified' && selectedFile.unified_diff ? (
+            // Large-file guard: if the diff exceeds the line/byte threshold AND the user
+            // has not explicitly loaded it, show a collapsed placeholder instead of
+            // parsing and rendering potentially thousands of DOM nodes.
+            isLargeFileDiff(selectedFile.unified_diff) &&
+            !loadedLargeFiles.has(selectedFileIndex) ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
+                <p className="max-w-xs">
+                  This file diff is large ({Math.round(selectedFile.unified_diff.length / 1024)} KB).
+                  Loading it may slow down the browser.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setLoadedLargeFiles((prev) => new Set([...prev, selectedFileIndex]))
+                  }
+                >
+                  Load diff
+                </Button>
+              </div>
+            ) : (
             <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
               {/* Left panel */}
               <div className="flex min-h-0 min-w-0 flex-1 flex-col border-r">
@@ -567,6 +747,7 @@ export function DiffViewer({
                 </div>
               </div>
             </div>
+            )
           ) : selectedFile?.status === 'added' ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               <div className="flex-shrink-0 bg-green-500/10 px-4 py-2 text-sm text-green-700 dark:text-green-400">

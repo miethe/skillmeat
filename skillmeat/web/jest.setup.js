@@ -52,6 +52,28 @@ global.ResizeObserver = class ResizeObserver {
   observe() {}
   unobserve() {}
 };
+// Polyfill Performance User Timing API for jsdom
+// jsdom partially implements the Performance interface but omits the User Timing API
+// (mark/measure), which perf-marks.ts uses for instrumentation. Stub them so tests
+// don't crash — the values produced are irrelevant for functional test correctness.
+if (typeof performance !== 'undefined') {
+  if (typeof performance.mark !== 'function') {
+    performance.mark = () => {};
+  }
+  if (typeof performance.measure !== 'function') {
+    performance.measure = () => {};
+  }
+  if (typeof performance.clearMarks !== 'function') {
+    performance.clearMarks = () => {};
+  }
+  if (typeof performance.clearMeasures !== 'function') {
+    performance.clearMeasures = () => {};
+  }
+  if (typeof performance.getEntriesByName !== 'function') {
+    performance.getEntriesByName = () => [];
+  }
+}
+
 
 // Mock next/navigation
 jest.mock('next/navigation', () => ({

@@ -78,6 +78,8 @@ import {
   usePendingContextChanges,
   useTags,
   useSources,
+  useArtifactHistory,
+  getArtifactHistoryId,
 } from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import { getCollectionColor } from '@/lib/utils/collection-colors';
@@ -137,11 +139,14 @@ interface UnifiedEntityModalProps {
 
 interface HistoryEntry {
   id: string;
-  type: 'deploy' | 'sync' | 'rollback';
+  type: 'deploy' | 'sync' | 'rollback' | 'update';
   direction: 'upstream' | 'downstream';
   timestamp: string;
   filesChanged?: number;
   user?: string;
+  eventType?: string;
+  projectPath?: string | null;
+  collectionName?: string | null;
 }
 
 interface LinkedArtifactsResponse {
@@ -227,67 +232,6 @@ function formatRelativeTime(date: Date): string {
   } else {
     return date.toLocaleDateString();
   }
-}
-
-/**
- * Generate mock history entries based on entity metadata
- */
-function generateMockHistory(entity: Artifact): HistoryEntry[] {
-  const history: HistoryEntry[] = [];
-
-  // Create history entries from available timestamps
-  if (entity.deployedAt) {
-    const deployedDate = new Date(entity.deployedAt);
-    history.push({
-      id: `deploy-${entity.deployedAt}`,
-      type: 'deploy',
-      direction: 'downstream',
-      timestamp: entity.deployedAt,
-      filesChanged: Math.floor(Math.random() * 5) + 1,
-      user: 'You',
-    });
-
-    // Add a sync entry a bit before deployment if entity is modified
-    if (entity.syncStatus === 'modified' || entity.syncStatus === 'outdated') {
-      const syncDate = new Date(deployedDate.getTime() - 2 * 60 * 60 * 1000); // 2 hours before
-      history.push({
-        id: `sync-${syncDate.toISOString()}`,
-        type: 'sync',
-        direction: 'upstream',
-        timestamp: syncDate.toISOString(),
-        filesChanged: Math.floor(Math.random() * 3) + 1,
-        user: 'You',
-      });
-    }
-  }
-
-  if (entity.modifiedAt && entity.modifiedAt !== entity.deployedAt) {
-    // Add sync entry for modifications
-    history.push({
-      id: `sync-${entity.modifiedAt}`,
-      type: 'sync',
-      direction: 'upstream',
-      timestamp: entity.modifiedAt,
-      filesChanged: Math.floor(Math.random() * 4) + 1,
-      user: 'You',
-    });
-  }
-
-  // Add a rollback entry for conflict status
-  if (entity.syncStatus === 'conflict' && entity.modifiedAt) {
-    const rollbackDate = new Date(new Date(entity.modifiedAt).getTime() + 1 * 60 * 60 * 1000); // 1 hour after modification
-    history.push({
-      id: `rollback-${rollbackDate.toISOString()}`,
-      type: 'rollback',
-      direction: 'downstream',
-      timestamp: rollbackDate.toISOString(),
-      filesChanged: Math.floor(Math.random() * 3) + 1,
-      user: 'You',
-    });
-  }
-
-  // Sort by timestamp (most recent first)
-  return history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }
 
 // Mock data generator functions removed - using real API calls now
@@ -540,11 +484,17 @@ export function UnifiedEntityModal({
     findSourceEntry();
   }, [entity, open, activeTab, sourcesData]);
 
-  // Generate mock history entries
-  const historyEntries = useMemo(() => {
-    if (!entity) return [];
-    return generateMockHistory(entity);
-  }, [entity]);
+  const historyArtifactId = getArtifactHistoryId(entity);
+  const {
+    data: artifactHistory,
+    isLoading: isHistoryLoading,
+    isError: isHistoryError,
+    error: historyError,
+  } = useArtifactHistory(historyArtifactId, {
+    enabled: !!entity && open && activeTab === 'history',
+    limit: 500,
+  });
+  const historyEntries: HistoryEntry[] = artifactHistory?.timelineEntries ?? [];
 
   // Fetch file list from API
   const {
@@ -691,8 +641,7 @@ export function UnifiedEntityModal({
     enabled: shouldFetchDiff,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
-    retry: 2, // Retry failed requests up to 2 times
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    retry: false, // Don't retry 400 errors (missing deployments/project path)
   });
 
   // Fetch upstream diff data when sync tab is active
@@ -1399,6 +1348,8 @@ export function UnifiedEntityModal({
         return 'Synced';
       case 'rollback':
         return 'Rolled back';
+      case 'update':
+        return 'Updated';
       default:
         return type;
     }
@@ -1412,6 +1363,8 @@ export function UnifiedEntityModal({
         return 'text-blue-600 dark:text-blue-400';
       case 'rollback':
         return 'text-orange-600 dark:text-orange-400';
+      case 'update':
+        return 'text-purple-600 dark:text-purple-400';
       default:
         return 'text-gray-600 dark:text-gray-400';
     }
@@ -2204,7 +2157,21 @@ export function UnifiedEntityModal({
                     )}
 
                   {/* History Timeline */}
-                  {historyEntries.length > 0 ? (
+                  {isHistoryLoading ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-5 w-40" />
+                      <Skeleton className="h-20 w-full" />
+                      <Skeleton className="h-20 w-full" />
+                    </div>
+                  ) : isHistoryError ? (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Failed to load history
+                        {historyError instanceof Error ? `: ${historyError.message}` : '.'}
+                      </AlertDescription>
+                    </Alert>
+                  ) : historyEntries.length > 0 ? (
                     <div>
                       <h3 className="mb-4 text-sm font-medium">Sync History</h3>
                       <div className="relative space-y-0">
@@ -2223,7 +2190,9 @@ export function UnifiedEntityModal({
                                   ? 'border-green-500'
                                   : entry.type === 'sync'
                                     ? 'border-blue-500'
-                                    : 'border-orange-500'
+                                    : entry.type === 'rollback'
+                                      ? 'border-orange-500'
+                                      : 'border-purple-500'
                               }`}
                             >
                               {entry.direction === 'downstream' ? (
@@ -2257,11 +2226,20 @@ export function UnifiedEntityModal({
                                     <>
                                       <span>•</span>
                                       <User className="h-3 w-3" />
-                                      <span>{entry.user}</span>
-                                    </>
-                                  )}
-                                </div>
+                                    <span>{entry.user}</span>
+                                  </>
+                                )}
                               </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {entry.collectionName && (
+                                  <span className="mr-2">{entry.collectionName}</span>
+                                )}
+                                {entry.eventType && (
+                                  <span className="mr-2">{entry.eventType.replace(/_/g, ' ')}</span>
+                                )}
+                                {entry.projectPath && <span className="truncate">{entry.projectPath}</span>}
+                              </div>
+                            </div>
                               <div className="text-xs text-muted-foreground">
                                 {new Date(entry.timestamp).toLocaleTimeString([], {
                                   hour: '2-digit',

@@ -1,7 +1,7 @@
 """Analytics API schemas for statistics and usage data."""
 
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -207,3 +207,251 @@ class TrendsResponse(BaseModel):
                 "total_periods": 30,
             }
         }
+
+
+class EnterpriseMetricWindow(BaseModel):
+    """Aggregated analytics metrics for a rolling time window."""
+
+    window_days: int = Field(
+        description="Window size in days",
+        examples=[7],
+    )
+    total_events: int = Field(
+        description="Total events observed in the window",
+        examples=[185],
+    )
+    deploy_events: int = Field(
+        description="Deploy events in the window",
+        examples=[42],
+    )
+    sync_events: int = Field(
+        description="Sync events in the window",
+        examples=[64],
+    )
+    update_events: int = Field(
+        description="Update events in the window",
+        examples=[31],
+    )
+    remove_events: int = Field(
+        description="Remove events in the window",
+        examples=[9],
+    )
+    search_events: int = Field(
+        description="Search events in the window",
+        examples=[39],
+    )
+    success_count: int = Field(
+        description="Events with explicit success outcome",
+        examples=[120],
+    )
+    failure_count: int = Field(
+        description="Events with explicit failure outcome",
+        examples=[11],
+    )
+    success_rate: float = Field(
+        description="Success ratio across events with explicit outcomes (0-1)",
+        examples=[0.916],
+    )
+    unique_artifacts: int = Field(
+        description="Unique artifact keys observed in the window",
+        examples=[27],
+    )
+    unique_projects: int = Field(
+        description="Unique projects observed in the window",
+        examples=[8],
+    )
+    unique_collections: int = Field(
+        description="Unique collections observed in the window",
+        examples=[3],
+    )
+    deploy_frequency_per_day: float = Field(
+        description="Average deploy events per day in the window",
+        examples=[6.0],
+    )
+
+
+class ProjectActivityItem(BaseModel):
+    """Per-project activity summary for analytics reporting."""
+
+    project_path: str = Field(
+        description="Project path as reported in analytics events",
+        examples=["~/workspace/my-project"],
+    )
+    event_count: int = Field(
+        description="Total events for this project",
+        examples=[54],
+    )
+    deploy_count: int = Field(
+        description="Deploy events for this project",
+        examples=[12],
+    )
+    sync_count: int = Field(
+        description="Sync events for this project",
+        examples=[21],
+    )
+    last_activity: datetime = Field(
+        description="Most recent activity timestamp",
+    )
+
+
+class ArtifactHistorySummary(BaseModel):
+    """Lightweight artifact history/provenance summary for dashboard analytics."""
+
+    version_events: int = Field(
+        description="Number of version provenance events observed",
+        examples=[133],
+    )
+    merge_events: int = Field(
+        description="Number of merge or rollback-related events observed",
+        examples=[7],
+    )
+    deployment_events: int = Field(
+        description="Number of deployment-related events observed",
+        examples=[42],
+    )
+
+
+class EnterpriseDeliveryMetrics(BaseModel):
+    """Delivery metrics useful for SDLC analytics."""
+
+    deployment_frequency_7d: float = Field(
+        description="Average deploys/day over the last 7 days",
+        examples=[4.71],
+    )
+    deployment_frequency_30d: float = Field(
+        description="Average deploys/day over the last 30 days",
+        examples=[3.26],
+    )
+    median_deploy_interval_minutes_30d: Optional[float] = Field(
+        default=None,
+        description="Median minutes between deploy events in the last 30 days",
+        examples=[92.5],
+    )
+    unique_artifacts_deployed_30d: int = Field(
+        description="Number of unique artifacts deployed in the last 30 days",
+        examples=[19],
+    )
+
+
+class EnterpriseReliabilityMetrics(BaseModel):
+    """Reliability metrics derived from sync/deploy/update outcomes."""
+
+    change_failure_rate_30d: float = Field(
+        description=(
+            "Fraction of failed change events (deploy/sync/update) in the last 30 days (0-1)"
+        ),
+        examples=[0.12],
+    )
+    sync_success_rate_7d: float = Field(
+        description="Sync success rate over the last 7 days (0-1)",
+        examples=[0.94],
+    )
+    rollback_rate_30d: float = Field(
+        description="Ratio of rollback-marked updates to change events in last 30 days (0-1)",
+        examples=[0.04],
+    )
+    mean_time_to_recovery_hours_30d: Optional[float] = Field(
+        default=None,
+        description=(
+            "Average hours from failed change event to next successful change on same artifact"
+        ),
+        examples=[3.5],
+    )
+
+
+class EnterpriseAdoptionMetrics(BaseModel):
+    """Adoption and usage analytics for enterprises and teams."""
+
+    active_projects_7d: int = Field(
+        description="Distinct projects with activity in the last 7 days",
+        examples=[6],
+    )
+    active_projects_30d: int = Field(
+        description="Distinct projects with activity in the last 30 days",
+        examples=[14],
+    )
+    active_collections_30d: int = Field(
+        description="Distinct collections with activity in the last 30 days",
+        examples=[4],
+    )
+    search_to_deploy_conversion_30d: float = Field(
+        description="Deploy event count divided by search event count in the last 30 days",
+        examples=[0.56],
+    )
+
+
+class EnterpriseAnalyticsSummaryResponse(BaseModel):
+    """Enterprise-grade analytics summary for dashboards and reporting pipelines."""
+
+    generated_at: datetime = Field(description="Generation timestamp")
+    total_events: int = Field(description="Total analytics events stored", examples=[1337])
+    total_artifacts: int = Field(
+        description="Total unique artifacts observed in analytics",
+        examples=[56],
+    )
+    total_projects: int = Field(
+        description="Total distinct projects observed in analytics",
+        examples=[18],
+    )
+    total_collections: int = Field(
+        description="Total distinct collections observed in analytics",
+        examples=[5],
+    )
+    event_type_counts: Dict[str, int] = Field(
+        description="Raw event totals by type",
+        examples=[{"deploy": 411, "sync": 298, "update": 222, "search": 406}],
+    )
+    windows: List[EnterpriseMetricWindow] = Field(
+        description="Rolling-window aggregates (1d, 7d, 30d, 90d)",
+    )
+    delivery: EnterpriseDeliveryMetrics = Field(
+        description="Delivery and throughput metrics",
+    )
+    reliability: EnterpriseReliabilityMetrics = Field(
+        description="Reliability and incident posture metrics",
+    )
+    adoption: EnterpriseAdoptionMetrics = Field(
+        description="Adoption/engagement metrics",
+    )
+    top_projects: List[ProjectActivityItem] = Field(
+        description="Most active projects in the last 30 days",
+    )
+    top_artifacts: List[TopArtifactItem] = Field(
+        description="Most active artifacts by usage",
+    )
+    history_summary: ArtifactHistorySummary = Field(
+        description="Cross-artifact provenance and history summary",
+    )
+
+
+class AnalyticsEventItem(BaseModel):
+    """Normalized analytics event for API consumers and export pipelines."""
+
+    id: int = Field(description="Event identifier")
+    event_type: str = Field(description="Event type")
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    collection_name: Optional[str] = Field(
+        default=None,
+        description="Collection name if present",
+    )
+    project_path: Optional[str] = Field(
+        default=None,
+        description="Project path if present",
+    )
+    timestamp: datetime = Field(description="Event timestamp")
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Parsed metadata payload",
+    )
+    outcome: Optional[str] = Field(
+        default=None,
+        description="Normalized outcome (success, failure, unknown)",
+        examples=["success"],
+    )
+
+
+class AnalyticsEventsResponse(PaginatedResponse[AnalyticsEventItem]):
+    """Paginated analytics event stream response."""
+
+    pass

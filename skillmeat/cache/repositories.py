@@ -391,16 +391,21 @@ class ScanUpdateContext:
         status: str,
         artifact_count: Optional[int] = None,
         error_message: Optional[str] = None,
+        ref: Optional[str] = None,
     ) -> None:
         """Update source scan status and metadata.
 
         Updates scan_status, last_sync_at, artifact_count, and optionally
-        last_error for a marketplace source.
+        last_error and ref for a marketplace source.
 
         Args:
             status: New scan status ("pending", "scanning", "success", "error")
             artifact_count: Number of artifacts discovered (None to leave unchanged)
             error_message: Error message if status is "error" (None clears error)
+            ref: Actual git ref used during scan (None to leave unchanged). When
+                the scanner falls back to a different default branch (e.g. the
+                source stores "main" but the repo uses "master"), pass the
+                resolved ref here so subsequent imports use the correct branch.
 
         Raises:
             NotFoundError: If source does not exist
@@ -411,6 +416,9 @@ class ScanUpdateContext:
             >>>
             >>> # Mark scan as failed
             >>> ctx.update_source_status("error", error_message="API rate limit")
+            >>>
+            >>> # Mark scan as successful and persist branch fallback
+            >>> ctx.update_source_status("success", artifact_count=10, ref="master")
         """
         source = (
             self.session.query(MarketplaceSource).filter_by(id=self.source_id).first()
@@ -428,6 +436,13 @@ class ScanUpdateContext:
 
         # Update error message (None clears it)
         source.last_error = error_message
+
+        # Update ref if provided (branch fallback detected during scan)
+        if ref is not None:
+            source.ref = ref
+            logger.info(
+                f"Updated source {self.source_id} ref to '{ref}'"
+            )
 
         logger.info(
             f"Updated source {self.source_id}: status={status}, "

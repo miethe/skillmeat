@@ -1247,6 +1247,9 @@ function CollectionPageContent() {
                 onDelete={handleDeleteFromDropdown}
                 onTagClick={handleTagClick}
                 onGroupClick={handleGroupClick}
+                onManage={(artifact) => {
+                  router.push(`/manage?artifact=${encodeURIComponent(artifact.id)}`);
+                }}
                 selectedArtifactIds={selectedArtifactIds}
                 onToggleArtifactSelect={handleToggleArtifactSelect}
               />
@@ -1285,6 +1288,9 @@ function CollectionPageContent() {
                 onDelete={handleDeleteFromDropdown}
                 onTagClick={handleTagClick}
                 onGroupClick={handleGroupClick}
+                onManage={(artifact) => {
+                  router.push(`/manage?artifact=${encodeURIComponent(artifact.id)}`);
+                }}
                 selectedArtifactIds={selectedArtifactIds}
                 onToggleArtifactSelect={handleToggleArtifactSelect}
               />

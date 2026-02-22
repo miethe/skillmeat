@@ -53,6 +53,7 @@ export function useExportBundle({
             artifacts: request.artifactIds.map((id) => ({
               artifact: {
                 id,
+                uuid: '',
                 name: `artifact-${id}`,
                 type: 'skill',
                 scope: 'user',

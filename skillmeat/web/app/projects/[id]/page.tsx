@@ -170,6 +170,7 @@ function ProjectDetailPageContent() {
       // Convert Artifact to Entity with project context
       const entity: Entity = {
         id: `${matchingArtifact.type}:${matchingArtifact.name}`,
+        uuid: matchingArtifact.uuid,
         name: matchingArtifact.name,
         type: matchingArtifact.type,
         description: matchingArtifact.description,
@@ -263,6 +264,7 @@ function ProjectDetailPageContent() {
     // Convert DiscoveredArtifact to Entity for modal
     const entity: Entity = {
       id: `${artifact.type}:${artifact.name}`,
+      uuid: '',
       name: artifact.name,
       type: artifact.type as EntityType,
       description: artifact.description,

@@ -127,6 +127,7 @@ export function useArtifactDeletion() {
     onSuccess: () => {
       // Invalidate all relevant query caches
       queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      queryClient.invalidateQueries({ queryKey: ['entities'] });
       queryClient.invalidateQueries({ queryKey: ['deployments'] });
       queryClient.invalidateQueries({ queryKey: ['collections'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });

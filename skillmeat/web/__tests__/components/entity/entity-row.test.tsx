@@ -7,6 +7,7 @@ import type { Entity } from '@/types/entity';
 
 const mockEntity: Entity = {
   id: 'skill:test',
+  uuid: '00000000000000000000000000000001',
   name: 'test-skill',
   type: 'skill',
   scope: 'user',

@@ -123,10 +123,13 @@ import {
   useTags,
   useArtifactAssociations,
   useArtifact,
+  useArtifactHistory,
+  getArtifactHistoryId,
 } from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments';
 import { hasValidUpstreamSource } from '@/lib/sync-utils';
+import { markStart, markEnd } from '@/lib/perf-marks';
 
 // ============================================================================
 // Helpers
@@ -323,6 +326,9 @@ interface HistoryEntry {
   version?: string;
   filesChanged?: number;
   user?: string;
+  eventType?: string;
+  projectPath?: string | null;
+  collectionName?: string | null;
 }
 
 // ============================================================================
@@ -371,50 +377,6 @@ function getTabs(artifact: Artifact | null): Tab[] {
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/**
- * Generate mock history entries based on artifact metadata
- */
-function generateMockHistory(artifact: Artifact): HistoryEntry[] {
-  const history: HistoryEntry[] = [];
-
-  if (artifact.deployedAt) {
-    history.push({
-      id: `deploy-${artifact.deployedAt}`,
-      type: 'deploy',
-      direction: 'downstream',
-      timestamp: artifact.deployedAt,
-      version: artifact.version,
-      filesChanged: Math.floor(Math.random() * 5) + 1,
-      user: 'You',
-    });
-  }
-
-  if (artifact.modifiedAt && artifact.modifiedAt !== artifact.deployedAt) {
-    history.push({
-      id: `sync-${artifact.modifiedAt}`,
-      type: 'sync',
-      direction: 'upstream',
-      timestamp: artifact.modifiedAt,
-      version: artifact.version,
-      filesChanged: Math.floor(Math.random() * 4) + 1,
-      user: 'You',
-    });
-  }
-
-  if (artifact.upstream?.lastChecked) {
-    history.push({
-      id: `update-${artifact.upstream.lastChecked}`,
-      type: 'update',
-      direction: 'upstream',
-      timestamp: artifact.upstream.lastChecked,
-      version: artifact.upstream.version,
-      user: 'System',
-    });
-  }
-
-  return history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-}
 
 /**
  * Format relative time for display
@@ -516,12 +478,26 @@ export function ArtifactOperationsModal({
   } | null>(null);
   const [isLoadingSource, setIsLoadingSource] = useState(false);
 
+  // Gate deployment fanout queries: only fire when the deployments tab is active.
+  // The sync tab uses ProjectSelectorForDiff (include_deployments=true) as its canonical
+  // deployment source — no need to also fire the N per-project fanout queries there.
+  const isDeploymentTab = activeTab === 'deployments';
+
   // Sync activeTab with initialTab when modal opens
   useEffect(() => {
     if (open && initialTab) {
       setActiveTab(initialTab);
     }
   }, [open, initialTab]);
+
+  // Performance instrumentation: track modal open lifecycle
+  useEffect(() => {
+    if (open) {
+      markStart('modal.open');
+    } else {
+      markEnd('modal.open');
+    }
+  }, [open]);
 
   // Reset selectedPath when artifact changes or modal closes
   useEffect(() => {
@@ -532,6 +508,20 @@ export function ArtifactOperationsModal({
   useEffect(() => {
     setSelectedProjectForDiff(null);
   }, [artifact?.id, open]);
+
+  // Performance instrumentation: mark when modal content is ready (artifact loaded)
+  useEffect(() => {
+    if (open && artifact) {
+      markEnd('modal.open');
+    }
+  }, [open, artifact]);
+
+  // Performance instrumentation: mark when sync tab becomes active
+  useEffect(() => {
+    if (open && artifact && activeTab === 'sync') {
+      markStart('sync-tab.activate');
+    }
+  }, [open, artifact, activeTab]);
 
   // Auto-detect project for diff when artifact has deployments
   const deployments = artifact?.deployments;
@@ -594,16 +584,20 @@ export function ArtifactOperationsModal({
     staleTime: 5 * 60 * 1000,
   });
 
-  // Fetch projects for deployments
+  // Fetch projects for use in the deployments tab.
+  // useProjects does not accept an enabled option; the fanout deployment queries
+  // are gated by isDeploymentTab instead, which is where the N-call fanout occurs.
   const { data: projects, isLoading: isProjectsLoading } = useProjects();
 
-  // Fetch deployments for all registered projects
+  // Fetch deployments for all registered projects — only when the deployments tab is active.
+  // Each per-project query is also individually gated so that newly-resolved projects
+  // from a stale cache don't trigger fetches while on an unrelated tab.
   const deploymentQueries = useQueries({
     queries: (projects || []).map((project) => ({
       queryKey: deploymentKeys.list(project.path),
       queryFn: () => listDeployments(project.path),
       staleTime: 2 * 60 * 1000,
-      enabled: !!projects && projects.length > 0,
+      enabled: isDeploymentTab && !!projects && projects.length > 0,
     })),
   });
 
@@ -640,10 +634,17 @@ export function ArtifactOperationsModal({
     });
   }, [allDeployments, artifact]);
 
-  const historyEntries = useMemo(() => {
-    if (!artifact) return [];
-    return generateMockHistory(artifact);
-  }, [artifact]);
+  const historyArtifactId = getArtifactHistoryId(artifact);
+  const {
+    data: artifactHistory,
+    isLoading: isHistoryLoading,
+    isError: isHistoryError,
+    error: historyError,
+  } = useArtifactHistory(historyArtifactId, {
+    enabled: !!artifact && open && activeTab === 'history',
+    limit: 500,
+  });
+  const historyEntries: HistoryEntry[] = artifactHistory?.timelineEntries ?? [];
 
   // Derive collection ID for association queries (mirrors pattern from ArtifactDetailsModal)
   const collectionId = artifact?.collections?.[0]?.id ?? artifact?.collection ?? 'default';
@@ -897,6 +898,11 @@ export function ArtifactOperationsModal({
     </div>
   );
 
+  // The status tab uses the embedded deployment summary from the artifact object
+  // (artifact.deployments) for its count and badge display. This avoids depending
+  // on the fanout queries which are only loaded when the deployments tab is active.
+  const statusTabDeploymentCount = artifact.deployments?.length ?? 0;
+
   return (
     <>
     <BaseArtifactModal
@@ -973,16 +979,17 @@ export function ArtifactOperationsModal({
             </CardContent>
           </Card>
 
-          {/* Deployments Summary Card */}
+          {/* Deployments Summary Card — uses embedded artifact.deployments for count/badges.
+              The full fanout query (artifactDeployments) is only loaded on the deployments tab. */}
           <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Rocket className="h-4 w-4" aria-hidden="true" />
-                Deployments ({artifactDeployments.length})
+                Deployments ({statusTabDeploymentCount})
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {artifactDeployments.length > 0 ? (
+              {statusTabDeploymentCount > 0 ? (
                 <DeploymentBadgeStack deployments={artifact.deployments || []} maxBadges={5} />
               ) : (
                 <p className="text-sm text-muted-foreground">Not deployed to any projects yet.</p>
@@ -1450,7 +1457,22 @@ export function ArtifactOperationsModal({
             <h3 className="text-sm font-medium">Version History</h3>
           </div>
 
-          {historyEntries.length === 0 ? (
+          {isHistoryLoading ? (
+            <Card>
+              <CardContent className="space-y-3 py-6">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </CardContent>
+            </Card>
+          ) : isHistoryError ? (
+            <Alert variant="destructive">
+              <AlertDescription>
+                Failed to load provenance history
+                {historyError instanceof Error ? `: ${historyError.message}` : '.'}
+              </AlertDescription>
+            </Alert>
+          ) : historyEntries.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-8">
                 <History className="mb-4 h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
@@ -1490,9 +1512,14 @@ export function ArtifactOperationsModal({
                               {entry.type === 'update' && 'Update checked'}
                             </p>
                             <p className="mt-1 text-sm text-muted-foreground">
-                              {entry.user && `By ${entry.user}`}
+                              {entry.user ? `By ${entry.user}` : 'Automated event'}
                               {entry.filesChanged && ` - ${entry.filesChanged} files changed`}
+                              {entry.collectionName && ` - ${entry.collectionName}`}
+                              {entry.eventType && ` - ${entry.eventType.replace(/_/g, ' ')}`}
                             </p>
+                            {entry.projectPath && (
+                              <p className="mt-1 text-xs text-muted-foreground">{entry.projectPath}</p>
+                            )}
                           </div>
                           <div className="text-right text-sm text-muted-foreground">
                             <p>{formatRelativeTime(new Date(entry.timestamp))}</p>

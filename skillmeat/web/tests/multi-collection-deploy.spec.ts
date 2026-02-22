@@ -53,6 +53,7 @@ const mockCollectionArtifacts = {
   'collection-a': [
     {
       id: 'artifact-skill-1',
+      uuid: '00000000000000000000000000000001',
       name: 'test-artifact',
       type: 'skill',
       scope: 'user',
@@ -72,6 +73,7 @@ const mockCollectionArtifacts = {
     },
     {
       id: 'artifact-command-1',
+      uuid: '00000000000000000000000000000002',
       name: 'test-artifact',
       type: 'command',
       scope: 'user',
@@ -91,6 +93,7 @@ const mockCollectionArtifacts = {
     },
     {
       id: 'artifact-unique-1',
+      uuid: '00000000000000000000000000000003',
       name: 'unique-skill',
       type: 'skill',
       scope: 'user',
@@ -112,6 +115,7 @@ const mockCollectionArtifacts = {
   'collection-b': [
     {
       id: 'artifact-skill-2',
+      uuid: '00000000000000000000000000000004',
       name: 'test-artifact',
       type: 'skill',
       scope: 'user',
@@ -131,6 +135,7 @@ const mockCollectionArtifacts = {
     },
     {
       id: 'artifact-agent-1',
+      uuid: '00000000000000000000000000000005',
       name: 'test-artifact',
       type: 'agent',
       scope: 'user',
@@ -152,6 +157,7 @@ const mockCollectionArtifacts = {
   default: [
     {
       id: 'artifact-default-1',
+      uuid: '00000000000000000000000000000006',
       name: 'default-skill',
       type: 'skill',
       scope: 'user',

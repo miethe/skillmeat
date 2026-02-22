@@ -132,6 +132,7 @@ export function DeployFromCollectionDialog({
       const collectionId = collection_id || 'default';
       const mappedEntities: Artifact[] = response.items.map((item) => ({
         id: item.id,
+        uuid: (item as any).uuid ?? '',
         name: item.name,
         type: item.type as ArtifactType,
         collection: collectionId,

@@ -223,6 +223,32 @@ export interface CatalogEntry {
   duplicate_of?: string; // Path of original artifact
   // Collection match field
   in_collection?: boolean;
+  // Embedded artifacts (Phase 2): artifacts nested inside this artifact's directory
+  // e.g., Commands or Agents found inside a Skill directory
+  embedded_artifacts?: EmbeddedArtifact[];
+}
+
+/**
+ * A lightweight artifact record embedded within a parent CatalogEntry.
+ * These are artifacts (Commands, Agents, etc.) that live inside a parent
+ * Skill's directory tree and are surfaced as metadata rather than
+ * promoted to top-level catalog entries.
+ */
+export interface EmbeddedArtifact {
+  /** Type of the embedded artifact */
+  artifact_type: ArtifactType;
+  /** Display name */
+  name: string;
+  /** Repository-relative path to the artifact file */
+  path: string;
+  /** Full URL to the artifact in the source repository */
+  upstream_url: string;
+  /** Detection confidence score (0-100) */
+  confidence_score: number;
+  /** Git commit SHA at time of detection */
+  detected_sha?: string | null;
+  /** Version extracted from manifest */
+  detected_version?: string | null;
 }
 
 export interface UpdateCatalogEntryNameRequest {

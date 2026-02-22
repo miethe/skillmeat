@@ -26,6 +26,7 @@ const MEMBER_COMMAND_ID = 'command:export-pdf';
 
 const mockPlugin = {
   id: PLUGIN_DISPLAY_ID,
+  uuid: '00000000000000000000000000000001',
   name: 'my-design-suite',
   type: 'composite',
   scope: 'user',
@@ -44,6 +45,7 @@ const mockPlugin = {
 
 const mockSkillArtifact = {
   id: MEMBER_SKILL_ID,
+  uuid: '00000000000000000000000000000002',
   name: 'canvas-design',
   type: 'skill',
   scope: 'user',
@@ -62,6 +64,7 @@ const mockSkillArtifact = {
 
 const mockCommandArtifact = {
   id: MEMBER_COMMAND_ID,
+  uuid: '00000000000000000000000000000003',
   name: 'export-pdf',
   type: 'command',
   scope: 'user',

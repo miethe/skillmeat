@@ -64,6 +64,8 @@ export interface EntityListProps {
   onManage?: (artifact: Artifact) => void;
   /** Handler when a tag badge is clicked (for filtering) */
   onTagClick?: (tagName: string) => void;
+  /** Callback for add to group action on artifact */
+  onAddToGroup?: (artifact: Artifact) => void;
 }
 
 /**
@@ -117,6 +119,7 @@ export function EntityList({
   onRollback,
   onManage,
   onTagClick,
+  onAddToGroup,
 }: EntityListProps) {
   // Use entities from context if not provided
   const context = useEntityLifecycle();
@@ -157,7 +160,7 @@ export function EntityList({
     (artifact: Artifact, index: number) => {
       return (
         <EntityCard
-          key={artifact.id}
+          key={artifact.uuid}
           entity={artifact}
           selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}
@@ -193,7 +196,7 @@ export function EntityList({
     (artifact: Artifact, index: number) => {
       return (
         <ArtifactOperationsCard
-          key={artifact.id}
+          key={artifact.uuid}
           artifact={artifact}
           selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}
@@ -205,6 +208,7 @@ export function EntityList({
           onViewDiff={onViewDiff ? () => onViewDiff(artifact) : undefined}
           onManage={onManage ? () => onManage(artifact) : undefined}
           onDelete={onDelete ? () => onDelete(artifact) : undefined}
+          onAddToGroup={onAddToGroup ? () => onAddToGroup(artifact) : undefined}
           onTagClick={onTagClick}
         />
       );
@@ -220,6 +224,7 @@ export function EntityList({
       onViewDiff,
       onManage,
       onDelete,
+      onAddToGroup,
       onTagClick,
     ]
   );
@@ -228,7 +233,7 @@ export function EntityList({
     (artifact: Artifact, index: number) => {
       return (
         <EntityRow
-          key={artifact.id}
+          key={artifact.uuid}
           entity={artifact}
           selected={selectedEntities.includes(artifact.id)}
           selectable={selectable}

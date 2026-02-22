@@ -35,6 +35,7 @@ const mockedUseDeploymentList = useDeploymentList as jest.MockedFunction<typeof 
 // Mock artifact
 const mockArtifact: Artifact = {
   id: 'artifact-123',
+  uuid: '00000000000000000000000000000001',
   name: 'test-skill',
   type: 'skill',
   description: 'A test skill',

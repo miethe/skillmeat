@@ -15,12 +15,14 @@ Components:
 
 from .context import LogContext
 from .logging_config import setup_logging, StructuredFormatter
+from .timing import PerfTimer
 from .tracing import trace_operation, Span
 
 __all__ = [
     "LogContext",
     "setup_logging",
     "StructuredFormatter",
+    "PerfTimer",
     "trace_operation",
     "Span",
 ]

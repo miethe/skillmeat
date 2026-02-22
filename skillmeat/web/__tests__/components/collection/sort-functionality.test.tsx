@@ -8,6 +8,7 @@ describe('Confidence Sorting', () => {
   const mockArtifacts: Artifact[] = [
     {
       id: '1',
+      uuid: '00000000000000000000000000000001',
       name: 'artifact-a',
       type: 'skill',
       scope: 'user',
@@ -22,6 +23,7 @@ describe('Confidence Sorting', () => {
     },
     {
       id: '2',
+      uuid: '00000000000000000000000000000002',
       name: 'artifact-b',
       type: 'skill',
       scope: 'user',
@@ -36,6 +38,7 @@ describe('Confidence Sorting', () => {
     },
     {
       id: '3',
+      uuid: '00000000000000000000000000000003',
       name: 'artifact-c',
       type: 'skill',
       scope: 'user',
@@ -50,6 +53,7 @@ describe('Confidence Sorting', () => {
     },
     {
       id: '4',
+      uuid: '00000000000000000000000000000004',
       name: 'artifact-d',
       type: 'skill',
       scope: 'user',

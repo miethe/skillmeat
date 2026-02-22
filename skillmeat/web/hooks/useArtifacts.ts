@@ -31,6 +31,7 @@ const generateMockArtifacts = (): Artifact[] => {
   return [
     {
       id: 'skill:canvas-design',
+      uuid: '00000000000000000000000000000001',
       name: 'canvas-design',
       type: 'skill',
       scope: 'user',
@@ -68,6 +69,7 @@ const generateMockArtifacts = (): Artifact[] => {
     },
     {
       id: 'skill:docx-processor',
+      uuid: '00000000000000000000000000000002',
       name: 'docx-processor',
       type: 'skill',
       scope: 'user',
@@ -100,6 +102,7 @@ const generateMockArtifacts = (): Artifact[] => {
     },
     {
       id: 'command:git-helper',
+      uuid: '00000000000000000000000000000003',
       name: 'git-helper',
       type: 'command',
       scope: 'user',
@@ -123,6 +126,7 @@ const generateMockArtifacts = (): Artifact[] => {
     },
     {
       id: 'agent:code-reviewer',
+      uuid: '00000000000000000000000000000004',
       name: 'code-reviewer',
       type: 'agent',
       scope: 'local',
@@ -155,6 +159,7 @@ const generateMockArtifacts = (): Artifact[] => {
     },
     {
       id: 'mcp:database-mcp',
+      uuid: '00000000000000000000000000000005',
       name: 'database-mcp',
       type: 'mcp',
       scope: 'user',

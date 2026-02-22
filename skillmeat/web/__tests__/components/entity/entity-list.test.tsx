@@ -18,6 +18,7 @@ jest.mock('@/hooks/useEntityLifecycle', () => ({
 const mockEntities: Entity[] = [
   {
     id: 'skill:test1',
+    uuid: '00000000000000000000000000000001',
     name: 'test-skill-1',
     type: 'skill',
     scope: 'user',
@@ -30,6 +31,7 @@ const mockEntities: Entity[] = [
   },
   {
     id: 'skill:test2',
+    uuid: '00000000000000000000000000000002',
     name: 'test-skill-2',
     type: 'skill',
     scope: 'user',
@@ -42,6 +44,7 @@ const mockEntities: Entity[] = [
   },
   {
     id: 'command:test',
+    uuid: '00000000000000000000000000000003',
     name: 'test-command',
     type: 'command',
     scope: 'user',
@@ -258,6 +261,7 @@ describe('EntityList', () => {
       const customEntities: Entity[] = [
         {
           id: 'custom:1',
+          uuid: '00000000000000000000000000000004',
           name: 'custom-entity',
           type: 'skill',
           scope: 'user',

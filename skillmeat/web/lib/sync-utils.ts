@@ -26,3 +26,17 @@ export function hasValidUpstreamSource(entity: Artifact): boolean {
 
   return source.includes('/') && !source.startsWith('local');
 }
+
+/**
+ * Check if an artifact has a displayable source link.
+ * Less strict than hasValidUpstreamSource — used for UI display
+ * (flow banner, scope tab availability) rather than query gating.
+ */
+export function hasSourceLink(entity: Artifact): boolean {
+  const source = entity.source;
+  if (!source) return false;
+  if (source === 'local' || source === 'unknown') return false;
+  if (source.startsWith('local:')) return false;
+  // Has a remote source path (GitHub URL or owner/repo format)
+  return source.includes('/');
+}
