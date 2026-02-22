@@ -89,6 +89,10 @@ export interface SourceToolbarProps {
   showOnlyDuplicates: boolean;
   onShowOnlyDuplicatesChange: (value: boolean) => void;
 
+  // Embedded artifacts toggle (TASK-4.1)
+  showEmbeddedArtifacts: boolean;
+  onShowEmbeddedArtifactsChange: (value: boolean) => void;
+
   // Selection
   selectedCount: number;
   totalSelectableCount: number;
@@ -174,6 +178,8 @@ export function SourceToolbar({
   onIncludeBelowThresholdChange,
   showOnlyDuplicates,
   onShowOnlyDuplicatesChange,
+  showEmbeddedArtifacts,
+  onShowEmbeddedArtifactsChange,
   selectedCount,
   totalSelectableCount,
   allSelected,
@@ -375,6 +381,22 @@ export function SourceToolbar({
               className="cursor-pointer whitespace-nowrap text-sm font-medium"
             >
               Only duplicates
+            </Label>
+          </div>
+
+          {/* Show Embedded Artifacts Toggle (TASK-4.1) */}
+          <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-1.5">
+            <Switch
+              id="show-embedded-artifacts"
+              checked={showEmbeddedArtifacts}
+              onCheckedChange={onShowEmbeddedArtifactsChange}
+              aria-describedby="embedded-artifacts-help"
+            />
+            <Label
+              htmlFor="show-embedded-artifacts"
+              className="cursor-pointer whitespace-nowrap text-sm font-medium"
+            >
+              Show embedded
             </Label>
           </div>
 

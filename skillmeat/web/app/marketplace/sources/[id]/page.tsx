@@ -93,6 +93,26 @@ import type {
 } from '@/types/marketplace';
 
 // ============================================================================
+// Embedded Artifact Display Types (TASK-4.2)
+// ============================================================================
+
+/**
+ * A virtual top-level display entry derived from an EmbeddedArtifact.
+ * Used when "Show embedded artifacts" is ON to surface embedded sub-artifacts
+ * as first-class items in the catalog list with a parent indicator.
+ */
+export interface EmbeddedTopLevelEntry {
+  /** Discriminant to distinguish from CatalogEntry */
+  _kind: 'embedded';
+  /** Unique key: parentId + path */
+  _key: string;
+  /** Name of the parent skill that contains this artifact */
+  parentName: string;
+  /** The underlying embedded artifact data */
+  artifact: EmbeddedArtifact;
+}
+
+// ============================================================================
 // Sub-components
 // ============================================================================
 
@@ -162,6 +182,60 @@ function EmbeddedArtifactRow({ artifact }: EmbeddedArtifactRowProps) {
         <ExternalLink className="h-3 w-3" aria-hidden="true" />
       </a>
     </div>
+  );
+}
+
+/**
+ * EmbeddedTopLevelCard renders an embedded artifact promoted to a top-level
+ * position in the grid, with a "part of: [Skill Name]" indicator badge.
+ */
+interface EmbeddedTopLevelCardProps {
+  entry: EmbeddedTopLevelEntry;
+}
+
+function EmbeddedTopLevelCard({ entry }: EmbeddedTopLevelCardProps) {
+  const { artifact, parentName } = entry;
+  const type = artifact.artifact_type as ArtifactType;
+  const config = typeConfig[type] ?? { label: type, color: 'bg-gray-100 text-gray-800' };
+
+  return (
+    <Card className="relative border-dashed opacity-90 transition-shadow hover:shadow-md">
+      <div className="space-y-3 p-4">
+        {/* Header */}
+        <div className="pr-2">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className={config.color}>
+              {config.label}
+            </Badge>
+            {/* Part-of indicator (TASK-4.2) */}
+            <Badge
+              variant="outline"
+              className="border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+              title={`This artifact is embedded inside the skill: ${parentName}`}
+            >
+              part of: {parentName}
+            </Badge>
+          </div>
+          <h3 className="truncate font-semibold">{artifact.name}</h3>
+          <p className="truncate text-xs text-muted-foreground">{artifact.path}</p>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span className="tabular-nums">{Math.round(artifact.confidence_score)}% confidence</span>
+          <a
+            href={artifact.upstream_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 hover:text-foreground"
+            aria-label={`View ${artifact.name} on GitHub`}
+          >
+            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+            View on GitHub
+          </a>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -436,6 +510,11 @@ export default function SourceDetailPage() {
     () => searchParams.get('showOnlyDuplicates') === 'true'
   );
 
+  // Embedded artifacts toggle (TASK-4.1): default ON, persist via URL param
+  const [showEmbeddedArtifacts, setShowEmbeddedArtifacts] = useState(
+    () => searchParams.get('showEmbedded') !== 'false'
+  );
+
   // Ref to prevent duplicate fetch requests during state transitions
   // Tracks the target endIndex we're fetching for; reset when data arrives
   const fetchTargetRef = useRef<number | null>(null);
@@ -510,7 +589,8 @@ export default function SourceDetailPage() {
       newSortOption: SortOption,
       newShowOnlyDuplicates: boolean,
       newPage: number,
-      newLimit: number
+      newLimit: number,
+      newShowEmbedded: boolean
     ) => {
       const params = new URLSearchParams();
 
@@ -536,6 +616,11 @@ export default function SourceDetailPage() {
       // Add duplicate filter (P4.4b)
       if (newShowOnlyDuplicates) {
         params.set('showOnlyDuplicates', 'true');
+      }
+
+      // Add embedded artifacts toggle (TASK-4.1): only store when OFF (default is ON)
+      if (!newShowEmbedded) {
+        params.set('showEmbedded', 'false');
       }
 
       // Add type and status filters
@@ -573,7 +658,8 @@ export default function SourceDetailPage() {
       sortOption,
       showOnlyDuplicates,
       currentPage,
-      itemsPerPage
+      itemsPerPage,
+      showEmbeddedArtifacts
     );
   }, [
     updateURLParams,
@@ -583,13 +669,14 @@ export default function SourceDetailPage() {
     showOnlyDuplicates,
     currentPage,
     itemsPerPage,
+    showEmbeddedArtifacts,
   ]);
 
   // Reset to page 1 and clear fetch target when filters change (but not when page/limit change)
   useEffect(() => {
     setCurrentPage(1);
     fetchTargetRef.current = null; // Clear stale fetch target on filter change
-  }, [confidenceFilters, filters, sortOption, showOnlyDuplicates, searchQuery]);
+  }, [confidenceFilters, filters, sortOption, showOnlyDuplicates, showEmbeddedArtifacts, searchQuery]);
 
   // Clear fetch target when itemsPerPage changes (triggers query key change)
   useEffect(() => {
@@ -663,6 +750,59 @@ export default function SourceDetailPage() {
     return entries;
   }, [allEntries, searchQuery]);
 
+  // Derive flattened display entries with embedded artifacts surfaced as top-level items (TASK-4.2)
+  // When showEmbeddedArtifacts is ON:
+  //   - For each skill with embedded_artifacts, promote each embedded artifact as a virtual entry
+  //   - Display-level dedup: if an embedded artifact's path matches an existing top-level entry path, skip it
+  //     and annotate the standalone entry with "also in: [Skill Name]" instead
+  type DisplayEntry = CatalogEntry | EmbeddedTopLevelEntry;
+  const displayEntries = useMemo((): DisplayEntry[] => {
+    if (!showEmbeddedArtifacts) return filteredEntries;
+
+    // Build a set of paths already present as top-level catalog entries
+    const topLevelPaths = new Set(filteredEntries.map((e) => e.path));
+
+    // Collect virtual embedded entries, skipping duplicates of top-level entries
+    const virtualEntries: EmbeddedTopLevelEntry[] = [];
+    for (const entry of filteredEntries) {
+      if (!entry.embedded_artifacts || entry.embedded_artifacts.length === 0) continue;
+      for (const embedded of entry.embedded_artifacts) {
+        if (topLevelPaths.has(embedded.path)) {
+          // Already surfaced as standalone; skip (parent indicator handled via entry.embedded_artifacts display)
+          continue;
+        }
+        virtualEntries.push({
+          _kind: 'embedded',
+          _key: `${entry.id}::${embedded.path}`,
+          parentName: entry.name,
+          artifact: embedded,
+        });
+      }
+    }
+
+    // Interleave: after each parent skill entry, insert its promoted embedded entries
+    const result: DisplayEntry[] = [];
+    for (const entry of filteredEntries) {
+      result.push(entry);
+      if (entry.embedded_artifacts && entry.embedded_artifacts.length > 0) {
+        const owned = virtualEntries.filter((ve) => ve.parentName === entry.name && ve.artifact.path.startsWith(entry.path.split('/').slice(0, -1).join('/')));
+        result.push(...owned);
+      }
+    }
+
+    // Also append any virtual entries not yet inserted (edge case: unmatched parent path prefix)
+    const insertedKeys = new Set(
+      result.filter((e): e is EmbeddedTopLevelEntry => '_kind' in e).map((e) => e._key)
+    );
+    for (const ve of virtualEntries) {
+      if (!insertedKeys.has(ve._key)) {
+        result.push(ve);
+      }
+    }
+
+    return result;
+  }, [filteredEntries, showEmbeddedArtifacts]);
+
   // Separate excluded entries for the excluded list (P4.4b: filter duplicates)
   const excludedEntries = useMemo(() => {
     const excluded = allEntries.filter((entry) => entry.status === 'excluded');
@@ -729,16 +869,17 @@ export default function SourceDetailPage() {
 
   // Pagination calculations
   // Use server totalCount for total pages, fallback to loaded data count
+  // Note: displayEntries includes virtual embedded entries; use filteredEntries for server counts
   const totalFilteredCount = filteredEntries.length;
   const effectiveTotalCount = totalCount ?? totalFilteredCount;
   const totalPages = Math.ceil(effectiveTotalCount / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, effectiveTotalCount);
 
-  // Paginated entries for display
+  // Paginated entries for display (uses displayEntries which may include virtual embedded entries)
   const paginatedEntries = useMemo(() => {
-    return filteredEntries.slice(startIndex, endIndex);
-  }, [filteredEntries, startIndex, endIndex]);
+    return displayEntries.slice(startIndex, endIndex);
+  }, [displayEntries, startIndex, endIndex]);
 
   // Determine if we need more data for the current page view
   const needsMoreDataForPage =
@@ -1319,6 +1460,8 @@ export default function SourceDetailPage() {
         }
         showOnlyDuplicates={showOnlyDuplicates}
         onShowOnlyDuplicatesChange={setShowOnlyDuplicates}
+        showEmbeddedArtifacts={showEmbeddedArtifacts}
+        onShowEmbeddedArtifactsChange={setShowEmbeddedArtifacts}
         selectedCount={selectedEntries.size}
         totalSelectableCount={importableCount}
         allSelected={selectedEntries.size === importableCount && importableCount > 0}
@@ -1332,6 +1475,7 @@ export default function SourceDetailPage() {
           confidenceFilters.maxConfidence !== 100 ||
           confidenceFilters.includeBelowThreshold ||
           showOnlyDuplicates ||
+          !showEmbeddedArtifacts ||
           sortOption !== 'confidence-desc' ||
           searchQuery.trim() !== ''
         }
@@ -1343,6 +1487,7 @@ export default function SourceDetailPage() {
             includeBelowThreshold: false,
           });
           setShowOnlyDuplicates(false);
+          setShowEmbeddedArtifacts(true);
           setSortOption('confidence-desc');
           setSearchQuery('');
         }}
@@ -1514,25 +1659,32 @@ export default function SourceDetailPage() {
               />
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {paginatedEntries.map((entry) => (
-                  <CatalogCard
-                    key={entry.id}
-                    entry={entry}
-                    sourceId={sourceId}
-                    selected={selectedEntries.has(entry.id)}
-                    onSelect={(selected) => handleSelectEntry(entry.id, selected)}
-                    onImport={() => handleImportSingle(entry.id)}
-                    isImporting={importMutation.isPending}
-                    onClick={() => {
-                      setSelectedEntry(entry);
-                      setModalOpen(true);
-                    }}
-                  />
-                ))}
+                {paginatedEntries.map((entry) => {
+                  if ('_kind' in entry && entry._kind === 'embedded') {
+                    return <EmbeddedTopLevelCard key={entry._key} entry={entry} />;
+                  }
+                  const catalogEntry = entry as CatalogEntry;
+                  return (
+                    <CatalogCard
+                      key={catalogEntry.id}
+                      entry={catalogEntry}
+                      sourceId={sourceId}
+                      selected={selectedEntries.has(catalogEntry.id)}
+                      onSelect={(selected) => handleSelectEntry(catalogEntry.id, selected)}
+                      onImport={() => handleImportSingle(catalogEntry.id)}
+                      isImporting={importMutation.isPending}
+                      onClick={() => {
+                        setSelectedEntry(catalogEntry);
+                        setModalOpen(true);
+                      }}
+                    />
+                  );
+                })}
               </div>
             ) : (
               <CatalogList
-                entries={paginatedEntries}
+                entries={paginatedEntries.filter((e): e is CatalogEntry => !('_kind' in e))}
+                embeddedTopLevel={paginatedEntries.filter((e): e is EmbeddedTopLevelEntry => '_kind' in e && e._kind === 'embedded')}
                 sourceId={sourceId}
                 selectedEntries={selectedEntries}
                 onSelectEntry={handleSelectEntry}
