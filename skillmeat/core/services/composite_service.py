@@ -41,6 +41,7 @@ Usage
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -374,6 +375,112 @@ class CompositeService:
             initial_member_uuids=resolved_uuids,
             pinned_version_hash=pinned_version_hash,
         )
+
+    def create_skill_composite(
+        self,
+        skill_artifact: Any,
+        embedded_list: List[Any],
+        collection_id: str = "default",
+        display_name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> "CompositeRecord":
+        """Create a CompositeArtifact of type 'skill' wrapping a skill artifact.
+
+        Registers the given skill as a skill-type composite in the DB cache.
+        Member creation (dedup logic) is deferred to Phase 2 (TASK-2.1) and
+        is intentionally not implemented here.
+
+        The ``metadata_json`` field carries the originating skill's stable UUID
+        so that callers can correlate the composite back to the source artifact
+        without a separate join:
+
+        .. code-block:: json
+
+            {"artifact_uuid": "<skill-artifact-uuid>"}
+
+        Args:
+            skill_artifact: Artifact ORM instance (or any object exposing
+                ``.id`` and ``.uuid`` attributes) for the skill being
+                wrapped as a composite.
+            embedded_list: List of embedded child artifact objects discovered
+                inside the skill directory.  **Not used in Phase 1** — member
+                rows will be created in Phase 2 (TASK-2.1).  Accepted here so
+                the call-site signature is stable across both phases.
+            collection_id: Owning collection identifier.  Defaults to
+                ``"default"`` when not specified.
+            display_name: Optional human-readable label for the composite.
+                When ``None``, the skill's ``id`` is used as a fallback label
+                by callers.
+            description: Optional free-text description.
+
+        Returns:
+            ``CompositeRecord`` dict for the newly created composite.
+
+        Raises:
+            ConstraintError: When a composite with the derived ``composite_id``
+                already exists in the collection.
+
+        Note:
+            **Phase 2 (TASK-2.1)**: Member creation with dedup logic is
+            intentionally omitted here.  Once TASK-2.1 is complete, call
+            ``add_composite_member()`` for each entry in ``embedded_list``
+            after creating the composite.
+
+        Example:
+            >>> svc = CompositeService()
+            >>> record = svc.create_skill_composite(
+            ...     skill_artifact=my_skill,
+            ...     embedded_list=[cmd_artifact, agent_artifact],
+            ...     collection_id="my-collection",
+            ... )
+            >>> record["composite_type"]
+            'skill'
+        """
+        composite_id = f"composite:{skill_artifact.id.split(':', 1)[-1]}"
+        artifact_uuid = str(skill_artifact.uuid)
+        metadata = json.dumps({"artifact_uuid": artifact_uuid})
+
+        logger.info(
+            "create_skill_composite: skill=%r composite_id=%s uuid=%s "
+            "embedded_count=%d collection=%s",
+            skill_artifact.id,
+            composite_id,
+            artifact_uuid,
+            len(embedded_list),
+            collection_id,
+        )
+
+        # TODO (TASK-2.1): iterate over embedded_list and call
+        #   add_composite_member() for each entry after applying dedup logic.
+        logger.debug(
+            "create_skill_composite: member creation deferred to Phase 2 "
+            "(TASK-2.1) — %d embedded artifact(s) will be added later",
+            len(embedded_list),
+        )
+
+        with self._repo.transaction() as session:
+            from skillmeat.cache.models import CompositeArtifact
+
+            composite = CompositeArtifact(
+                id=composite_id,
+                collection_id=collection_id,
+                composite_type="skill",
+                display_name=display_name,
+                description=description,
+                metadata_json=metadata,
+            )
+            session.add(composite)
+            session.flush()
+            session.refresh(composite)
+            result = self._repo._composite_to_dict(composite)
+
+        logger.info(
+            "create_skill_composite: created CompositeArtifact id=%s type=skill "
+            "collection=%s",
+            composite_id,
+            collection_id,
+        )
+        return result
 
     def update_composite(
         self,
