@@ -69,3 +69,21 @@ session.query(Artifact.id, CollectionArtifact.source, ...)
 - Child artifacts of a composite are found via catalog path prefix: `child.path.startswith(composite_path + "/")`
 - `_import_composite_children()` in `marketplace_sources.py` handles auto-importing children after composite import
 - Files: `skillmeat/api/services/artifact_cache_service.py`, `skillmeat/api/routers/marketplace_sources.py`
+
+### validate_source_id — Underscores Not Allowed
+- `validate_source_id()` in `marketplace_sources.py` rejects underscores: pattern is `^[a-zA-Z0-9\-]+$`
+- API tests using `src_test_123` will get 400; use `src-test-abc` style instead
+- Pre-existing tests in `TestGetFileContent` use `src_test_123` and fail with 400 — pre-existing issue
+
+### Embedded Artifacts in Heuristic Detector (P1-T4)
+- `_embedded_by_skill` dict on `HeuristicDetector` instance captures single-file artifacts inside Skill dirs
+- `matches_to_artifacts()` only attaches embedded children when `artifact_type == "skill"` (not composite)
+- When a Skill dir has BOTH commands/ AND agents/, detector promotes it to `composite` — embedded_artifacts stays empty for composites
+- Directory-based child Skills (with own SKILL.md inside a parent Skill dir) surface as top-level; MAX_EMBED_DEPTH only guards recursive attachment depth
+- Test file: `tests/core/marketplace/test_heuristic_detector.py` → `TestEmbeddedArtifactHandling`
+
+### File Serving Endpoint Defensive Path Resolution (P2-T1)
+- Endpoint: `GET /{source_id}/artifacts/{artifact_path:path}/files/{file_path:path}` in `marketplace_sources.py`
+- Three cases: (1) artifact_path ends with file_path → use artifact_path; (2) artifact_path ends with known extension → defensive fallback, use artifact_path, log debug; (3) directory → concatenate
+- File extension list: `.md .py .yaml .yml .json .toml .txt .sh .ts .tsx .jsx .js .css`
+- Test file: `tests/api/test_marketplace_sources.py` → `TestFileServingPathResolution`

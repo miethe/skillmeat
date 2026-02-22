@@ -1679,6 +1679,13 @@ class ScanResultDTO(BaseModel):
         ge=0,
         examples=[5],
     )
+    actual_ref: Optional[str] = Field(
+        default=None,
+        description="Actual git ref used during the scan. May differ from the "
+        "source's configured ref when the scanner fell back to the repository's "
+        "default branch (e.g. source configured as 'main' but repo uses 'master').",
+        examples=["master"],
+    )
 
     @model_validator(mode="after")
     def validate_dedup_counts(self) -> "ScanResultDTO":
@@ -1990,6 +1997,14 @@ class DetectedArtifact(BaseModel):
         default=None,
         description="Concatenated searchable text (title + description + tags)",
     )
+    # Embedded child artifacts (populated for Skills that contain Commands/Agents/etc.)
+    embedded_artifacts: List["DetectedArtifact"] = Field(
+        default_factory=list,
+        description=(
+            "Child artifacts embedded within this artifact's directory tree "
+            "(e.g., Commands inside a Skill). These are NOT promoted as top-level artifacts."
+        ),
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -2004,6 +2019,7 @@ class DetectedArtifact(BaseModel):
                 "detected_sha": "abc123def456",
                 "detected_version": "1.2.0",
                 "metadata": {"description": "Canvas design skill"},
+                "embedded_artifacts": [],
             }
         }
 
@@ -3166,4 +3182,7 @@ class BulkAutoTagRefreshResponse(BaseModel):
 
 
 # Rebuild models to resolve forward references
+# DetectedArtifact.embedded_artifacts is a self-referential list; rebuild so
+# Pydantic resolves the forward reference before any instantiation.
+DetectedArtifact.model_rebuild()
 ScanResultDTO.model_rebuild()

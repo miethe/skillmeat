@@ -69,6 +69,9 @@ export interface ArtifactBrowseCardProps {
   /** Handler when a group badge is clicked (for filtering) */
   onGroupClick?: (groupId: string) => void;
 
+  /** Handler for navigating to the Manage page for this artifact */
+  onManage?: (artifact: Artifact) => void;
+
   /** Whether to show collection badge (All Collections view) */
   showCollectionBadge?: boolean;
 
@@ -157,6 +160,7 @@ export function ArtifactBrowseCard({
   onDelete,
   onTagClick,
   onGroupClick,
+  onManage,
   showCollectionBadge = false,
   onCollectionClick,
   className,
@@ -690,6 +694,41 @@ export function ArtifactBrowseCard({
           </div>
         </>
       )}
+
+      {/* Card action buttons: Collection (opens detail modal) + Manage (navigates to /manage) */}
+      <div
+        className="flex items-center gap-1 border-t px-4 py-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+          aria-label={`Open collection details for ${artifact.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+        >
+          <LucideIcons.Library className="h-3.5 w-3.5" aria-hidden="true" />
+          Collection
+        </Button>
+        {onManage && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+            aria-label={`Manage ${artifact.name}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onManage(artifact);
+            }}
+          >
+            <LucideIcons.Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+            Manage
+          </Button>
+        )}
+      </div>
     </Card>
   );
 }

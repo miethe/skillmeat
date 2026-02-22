@@ -691,8 +691,7 @@ export function UnifiedEntityModal({
     enabled: shouldFetchDiff,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
-    retry: 2, // Retry failed requests up to 2 times
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    retry: false, // Don't retry 400 errors (missing deployments/project path)
   });
 
   // Fetch upstream diff data when sync tab is active

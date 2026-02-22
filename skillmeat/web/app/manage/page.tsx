@@ -426,6 +426,18 @@ function ManagePageContent() {
     [updateUrlParams]
   );
 
+  const handleAddToGroup = useCallback(
+    (artifact: Artifact) => {
+      setSelectedArtifact(artifact);
+      setDetailPanelOpen(true);
+      updateUrlParams({
+        artifact: artifact.id,
+        tab: 'collections',
+      });
+    },
+    [updateUrlParams]
+  );
+
   return (
     <div className="flex h-screen flex-col">
       {/* Header */}
@@ -533,6 +545,7 @@ function ManagePageContent() {
             onViewDiff={handleViewDiff}
             onRollback={handleRollback}
             onManage={handleManage}
+            onAddToGroup={handleAddToGroup}
             onTagClick={handleTagClick}
           />
         </div>

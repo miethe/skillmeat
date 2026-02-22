@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api';
 import type { ArtifactSyncResponse } from '@/sdk/models/ArtifactSyncResponse';
-import { hasValidUpstreamSource } from '@/lib/sync-utils';
+import { hasValidUpstreamSource, hasSourceLink } from '@/lib/sync-utils';
 import { markStart, markEnd } from '@/lib/perf-marks';
 
 // Phase 1 components
@@ -216,13 +216,19 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   // State
   // ============================================================================
 
-  // Determine if we have a real source (not 'local' or 'unknown')
-  const hasRealSource = !!entity.source && entity.source !== 'local' && entity.source !== 'unknown';
+  // Strict upstream check — must satisfy hasValidUpstreamSource() conditions (github origin,
+  // tracking enabled, valid remote source). Aligns scope availability with query gate so
+  // tabs never appear available when the upstream query will never fire.
+  const hasValidUpstream = hasValidUpstreamSource(entity);
+
+  // Display-only source check — less strict than hasValidUpstream.
+  // Used for banner sourceInfo and scope tab visibility; does NOT gate query execution.
+  const hasSource = hasSourceLink(entity);
 
   const [comparisonScope, setComparisonScope] = useState<ComparisonScope>(
     mode === 'project'
       ? 'collection-vs-project'
-      : hasRealSource
+      : hasSource && !projectPath
         ? 'source-vs-collection'
         : 'collection-vs-project'
   );
@@ -232,6 +238,18 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   // Merge workflow state (Phase 3: SYNC-A03)
   const [showMergeWorkflow, setShowMergeWorkflow] = useState(false);
   const [mergeDirection, setMergeDirection] = useState<'upstream' | 'downstream'>('downstream');
+
+  // Track whether user has manually changed the comparison scope.
+  // Prevents the smart-default effect from overriding an intentional selection.
+  const userHasChangedScope = useRef(false);
+
+  // Smart default: when projectPath becomes available, switch to the faster local
+  // comparison (collection-vs-project) if the user hasn't manually chosen a scope yet.
+  useEffect(() => {
+    if (projectPath && !userHasChangedScope.current && comparisonScope === 'source-vs-collection') {
+      setComparisonScope('collection-vs-project');
+    }
+  }, [projectPath, comparisonScope]);
 
   // ============================================================================
   // Queries
@@ -650,6 +668,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   }, [comparisonScope]);
 
   const handleComparisonChange = (scope: ComparisonScope) => {
+    userHasChangedScope.current = true;
     markStart(`sync-tab.scope.${scope}`);
     setComparisonScope(scope);
   };
@@ -789,7 +808,14 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
           hasUpdate: upstreamDiff.has_changes,
           source: upstreamDiff.upstream_source,
         }
-      : null,
+      : hasSource
+        ? {
+            version: entity.source || 'unknown',
+            sha: '...',
+            hasUpdate: false,
+            source: entity.source || '',
+          }
+        : null,
     collectionInfo: {
       version: entity.version || 'unknown',
       sha: entity.version?.slice(0, 7) || 'unknown',
@@ -813,7 +839,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
   const comparisonProps = {
     value: comparisonScope,
     onChange: handleComparisonChange,
-    hasSource: !!entity.source && entity.source !== 'local' && entity.source !== 'unknown',
+    hasSource: hasSource,
     hasProject: !!projectPath,
   };
 
@@ -905,7 +931,7 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
     );
   }
 
-  if (isLoading) {
+  if (!entity) {
     return <SyncStatusTabSkeleton />;
   }
 
@@ -923,9 +949,15 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
           <Alert className="max-w-md">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              No comparison data available for this scope.
-              {!hasRealSource && ' This artifact has no remote source.'}
-              {!projectPath && ' No project deployment found.'}
+              {comparisonScope === 'source-vs-collection' || comparisonScope === 'source-vs-project'
+                ? hasSource && !hasValidUpstream
+                  ? 'Upstream tracking is not enabled for this artifact. Enable upstream tracking to compare with the source.'
+                  : !hasSource
+                    ? 'No upstream source configured for this artifact.'
+                    : 'No comparison data available for this scope.'
+                : !projectPath
+                  ? 'No project deployment found. Deploy this artifact to a project to enable comparison.'
+                  : 'No comparison data available for this scope.'}
             </AlertDescription>
           </Alert>
         </div>

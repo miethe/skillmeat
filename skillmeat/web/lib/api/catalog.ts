@@ -16,6 +16,53 @@ function buildUrl(path: string): string {
 }
 
 /**
+ * File extensions that indicate a path is a single-file artifact (not a directory).
+ * Used for defensive URL construction when artifact.path is already a file path.
+ */
+const FILE_EXTENSIONS = ['.md', '.py', '.yaml', '.yml', '.json', '.toml', '.txt'];
+
+/**
+ * Detect whether a given artifact path is a file path rather than a directory.
+ * Returns true if the path ends with a known file extension.
+ */
+function isFilePath(artifactPath: string): boolean {
+  const lower = artifactPath.toLowerCase();
+  return FILE_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
+/**
+ * Derive the effective artifact directory and file path from an artifact path.
+ *
+ * For directory-based artifacts (e.g., "skills/canvas-design"), returns the
+ * path as-is with null filePath — callers supply their own filePath.
+ *
+ * For file-path artifacts (e.g., "skills/my-skill/commands/add-animation.md"),
+ * splits the path into:
+ *   - artifactDir: the parent directory ("skills/my-skill/commands")
+ *   - derivedFilePath: the filename ("add-animation.md")
+ *
+ * This prevents double-path URLs like:
+ *   .../artifacts/skills/my-skill/commands/add-animation.md/files/add-animation.md
+ */
+function resolveArtifactPaths(artifactPath: string): {
+  artifactDir: string;
+  derivedFilePath: string | null;
+} {
+  if (!isFilePath(artifactPath)) {
+    return { artifactDir: artifactPath, derivedFilePath: null };
+  }
+  const lastSlash = artifactPath.lastIndexOf('/');
+  if (lastSlash < 0) {
+    // Root-level file: use empty dir and the file as derived path
+    return { artifactDir: '', derivedFilePath: artifactPath };
+  }
+  return {
+    artifactDir: artifactPath.substring(0, lastSlash),
+    derivedFilePath: artifactPath.substring(lastSlash + 1),
+  };
+}
+
+/**
  * File entry in the file tree
  */
 export interface FileTreeEntry {
@@ -83,10 +130,14 @@ export async function fetchCatalogFileTree(
   // Normalize "." (repository root) to empty string to prevent URL issues
   // "." gets normalized away in URLs: "/artifacts/./files" -> "/artifacts/files"
   // which would match the wrong route
-  const normalizedPath = artifactPath === '.' ? '' : artifactPath;
+  const rawPath = artifactPath === '.' ? '' : artifactPath;
+
+  // Defensive: when artifactPath is already a file path (e.g., "skills/foo/commands/bar.md"),
+  // derive the parent directory so the /files listing is for the containing directory.
+  const { artifactDir } = resolveArtifactPaths(rawPath);
 
   // Encode the artifact path for URL safety
-  const encodedPath = encodeURIComponent(normalizedPath);
+  const encodedPath = encodeURIComponent(artifactDir);
   const response = await fetch(
     buildUrl(`/marketplace/sources/${sourceId}/artifacts/${encodedPath}/files`)
   );
@@ -121,11 +172,18 @@ export async function fetchCatalogFileContent(
   // Normalize "." (repository root) to empty string to prevent URL issues
   // "." gets normalized away in URLs: "/artifacts/./files" -> "/artifacts/files"
   // which would match the wrong route
-  const normalizedArtifactPath = artifactPath === '.' ? '' : artifactPath;
+  const rawPath = artifactPath === '.' ? '' : artifactPath;
+
+  // Defensive: when artifactPath is already a file path (e.g., "skills/foo/commands/bar.md"),
+  // use the parent directory as the artifact path and the filename as the file path.
+  // This prevents double-path URLs like:
+  //   .../artifacts/skills/.../bar.md/files/bar.md
+  const { artifactDir, derivedFilePath } = resolveArtifactPaths(rawPath);
+  const effectiveFilePath = derivedFilePath ?? filePath;
 
   // Encode both paths for URL safety
-  const encodedArtifactPath = encodeURIComponent(normalizedArtifactPath);
-  const encodedFilePath = encodeURIComponent(filePath);
+  const encodedArtifactPath = encodeURIComponent(artifactDir);
+  const encodedFilePath = encodeURIComponent(effectiveFilePath);
   const response = await fetch(
     buildUrl(
       `/marketplace/sources/${sourceId}/artifacts/${encodedArtifactPath}/files/${encodedFilePath}`
