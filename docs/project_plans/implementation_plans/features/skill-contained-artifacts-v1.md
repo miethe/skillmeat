@@ -18,7 +18,7 @@ scope: >
   Extend composite_type to include "skill", wire the import pipeline to create
   CompositeArtifact rows for skills with embedded artifacts, surface membership
   in the UI, and add coordinated deployment and version tracking.
-effort_estimate: "30 story points / ~16 days"
+effort_estimate: "32 story points / ~17 days"
 architecture_summary: >
   Schema migration → import pipeline extension → associations API fix →
   marketplace UI generalization → collection UI generalization →
@@ -68,7 +68,7 @@ files_affected:
 - **Predecessor plan**: `/docs/project_plans/implementation_plans/features/composite-artifact-ux-v2.md`
 
 **Complexity**: Large (L)
-**Total Estimated Effort**: 30 story points across 8 phases (~16 days)
+**Total Estimated Effort**: 32 story points across 8 phases (~17 days)
 **Target Timeline**: ~4 weeks at 1 FTE backend + 0.5 FTE frontend (phases overlap)
 
 ---
@@ -90,7 +90,7 @@ Following the SkillMeat layered architecture:
 1. **Schema Layer** (Phase 1) — Alembic migration to extend `composite_type` CHECK; ORM model + `CompositeService` update
 2. **Import Pipeline** (Phase 2) — Extend `importer.py` to call `create_skill_composite()` atomically
 3. **API Layer** (Phase 3) — Fix `GET /associations` to resolve skill UUID → `CompositeArtifact`
-4. **Marketplace UI** (Phase 4) — Generalize source modal "Plugin Breakdown" tab for skills
+4. **Marketplace UI** (Phase 4) — Surface embedded artifacts as top-level items with toggle, individual import, and generalized "Skill Members" tab
 5. **Collection UI** (Phase 5) — Generalize `artifact-contains-tab.tsx` and verify "Part of" section
 6. **Deployment** (Phase 6) — Member-aware `DeploymentManager.deploy()` + CLI flags
 7. **Version Tracking** (Phase 7) — Per-member drift in sync tab + `skillmeat list` indicator
@@ -106,7 +106,23 @@ Following the SkillMeat layered architecture:
 
 Phase 1 (schema) → Phase 2 (import) → Phase 3 (API) → Phase 5 (collection UI) → Phase 8 (E2E)
 
-Phase 4 (marketplace UI) and Phase 6 (deployment) are off the critical path and can run concurrently with Phase 5.
+Phase 4 (marketplace UI) runs in parallel with Phase 5 (collection UI) and is NOT on the critical path. Phase 6 (deployment) is also off the critical path and can run concurrently with Phases 4 and 5.
+
+---
+
+## Phase Overview
+
+| Phase | Name | Duration | Story Points | Critical Path | Dependencies |
+|-------|------|----------|--------------|---------------|--------------|
+| 1 | Schema Extension | 2 days | 3.5 pts | Yes | None |
+| 2 | Import Pipeline Extension | 3 days | 6 pts | Yes | Phase 1 |
+| 3 | API Wiring | 1 day | 2 pts | Yes | Phase 2 |
+| 4 | Marketplace UI | 3 days | 5 pts | No (parallel with Phase 5) | Phase 3 |
+| 5 | Collection UI | 2 days | 4 pts | Yes | Phase 3 |
+| 6 | Deployment | 2 days | 5 pts | No (parallel with Phases 4-5) | Phase 3 |
+| 7 | Version Tracking & Sync | 2 days | 5 pts | No (parallel with Phase 5 UI) | Phase 2 |
+| 8 | Testing & Validation | 2 days | 4 pts | Yes | Phases 1-7 |
+| **Total** | | **~17 days** | **~32 pts** | | |
 
 ---
 
@@ -181,22 +197,29 @@ Phase 4 (marketplace UI) and Phase 6 (deployment) are off the critical path and 
 
 ### Phase 4: Marketplace UI
 
-**Duration**: 2 days
+**Duration**: 3 days
 **Dependencies**: Phase 3 complete (API contract stable)
-**Entry criteria**: `GET /associations` returns members for skills; existing "Plugin Breakdown" tab renders correctly
-**Exit criteria**: Source modal renders "Skill Members" tab for skills with embedded artifacts; member count badge appears on skill source cards
-**Parallelization**: Can run concurrently with Phase 6 (deployment backend) once Phase 3 is done
+**Entry criteria**: `GET /associations` returns members for skills; existing "Plugin Breakdown" tab renders correctly; source artifact list renders skills
+**Exit criteria**: Embedded artifacts appear as top-level items in the source list (toggle ON by default); source modal renders "Skill Members" tab for skills; individual embedded artifact import available
+**Parallelization**: SCA-P4-01 and SCA-P4-04 can run in parallel. SCA-P4-02 depends on SCA-P4-01. SCA-P4-03 depends on SCA-P4-02. Entire phase can run concurrently with Phase 6 (deployment backend) once Phase 3 is done.
 
 | Task ID | Task Name | Description | Acceptance Criteria | Est. | Assigned Agent | Dependencies |
 |---------|-----------|-------------|---------------------|------|----------------|--------------|
-| SCA-P4-01 | Generalize source modal tab label | In `skillmeat/web/components/marketplace/source-artifact-modal.tsx`, drive the breakdown tab label from `composite_type`: `"Plugin Members"` for `plugin`, `"Skill Members"` for `skill`. No structural component changes; label substitution only. | Snapshot test: plugin modal still shows "Plugin Members"; skill modal shows "Skill Members"; tab content renders member list | 1 pt | ui-engineer-enhanced | SCA-P3-02 |
-| SCA-P4-02 | Member count badge on skill source cards | Surface member count on skill source cards in the marketplace listing (reuse existing badge pattern used for plugin member counts). Query: `embedded_artifacts` count from detection data or `CompositeMembership` count from associations endpoint. | E2E: skill card with 3 members shows `[3]` badge; skill with no members shows no badge; plugin card behavior unchanged | 2 pts | ui-engineer-enhanced | SCA-P4-01 |
+| SCA-P4-01 | Add "Show embedded artifacts" toggle to marketplace source artifact list | Add a toggle control to the marketplace source artifact list view that controls whether embedded artifacts within skills are shown as top-level items. Default: ON. Toggle state persisted in URL query params or local storage. | Toggle renders, defaults to ON, persists state across navigation | 0.5 days | ui-engineer-enhanced | SCA-P3-02 |
+| SCA-P4-02 | Render embedded artifacts as top-level items with parent indicator | When toggle is ON, embedded artifacts appear in the main source artifact list as top-level items. Each shows a small "part of: [Skill Name]" badge/indicator. Display-level deduplication: if an artifact exists both independently and embedded in a skill, show it only once with an "also in: [Skill Name]" indicator. | Embedded artifacts render as top-level; dedup prevents duplicates; parent indicator shows | 1 day | ui-engineer-enhanced | SCA-P4-01 |
+| SCA-P4-03 | Individual import for embedded artifacts | Add import action on embedded artifacts in the source list that imports them as standalone artifacts (no CompositeMembership created). Whole-skill import still creates memberships. Import button on embedded artifact says "Import" (standalone); import button on skill says "Import with members" or "Import skill". | Individual import creates Artifact row only; skill import creates Artifact + CompositeArtifact + CompositeMembership rows | 1 day | ui-engineer-enhanced, python-backend-engineer | SCA-P4-02 |
+| SCA-P4-04 | Generalize "Plugin Breakdown" tab to "Skill Members" | In `skillmeat/web/components/marketplace/source-artifact-modal.tsx`, render "Skill Members" tab when source type is skill (genericized from "Plugin Breakdown"). Tab label driven by `composite_type`. | Tab renders with correct label and member list for skills; plugin modal still shows "Plugin Members" | 0.5 days | ui-engineer-enhanced | SCA-P3-02 |
 
 **Phase 4 Quality Gates:**
+- [ ] Toggle renders in source artifact list, defaults ON, persists across navigation
+- [ ] Embedded artifacts surface as top-level items when toggle is ON
+- [ ] Display-level deduplication prevents duplicate entries
+- [ ] "part of: [Skill Name]" indicator present on each embedded artifact row
+- [ ] Individual import creates Artifact row only (no CompositeMembership)
+- [ ] Skill import creates Artifact + CompositeArtifact + CompositeMembership rows
 - [ ] Snapshot test: "Plugin Members" label still correct for plugin composites
 - [ ] Snapshot test: "Skill Members" label shown for skill composites
-- [ ] E2E: member count badge renders on skill cards with members
-- [ ] Accessibility: tab has `aria-label`, member list uses role-appropriate semantics
+- [ ] Accessibility: toggle has accessible label; member list uses role-appropriate semantics
 - [ ] No console errors or TypeScript errors introduced
 
 ---
@@ -335,7 +358,8 @@ Phase 4 (marketplace UI) and Phase 6 (deployment) are off the critical path and 
 | `skillmeat/core/services/composite_service.py` | 1-2 | New method `create_skill_composite()` |
 | `skillmeat/core/importer.py` | 2 | Call `create_skill_composite()` in import transaction |
 | `skillmeat/api/routers/artifacts.py` | 3 | Skill UUID → CompositeArtifact lookup |
-| `skillmeat/web/components/marketplace/source-artifact-modal.tsx` | 4 | Tab label generalization |
+| `skillmeat/web/components/marketplace/source-artifact-modal.tsx` | 4 | Tab label generalization; embedded artifact list rendering |
+| `skillmeat/web/components/marketplace/source-artifact-list.tsx` | 4 | "Show embedded artifacts" toggle; top-level embedded artifact rows with parent indicator |
 | `skillmeat/web/components/artifact/artifact-contains-tab.tsx` | 5 | Tab label generalization |
 | `skillmeat/web/components/artifact/artifact-part-of-section.tsx` | 5 | Verify (likely no change) |
 | `skillmeat/core/deployment.py` | 6 | Member-aware deploy + `include_members` param |
@@ -373,5 +397,5 @@ See `.claude/progress/skill-contained-artifacts-v1/all-phases-progress.md` (crea
 
 ---
 
-**Implementation Plan Version**: 1.0
+**Implementation Plan Version**: 1.1
 **Last Updated**: 2026-02-21

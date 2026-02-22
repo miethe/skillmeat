@@ -58,7 +58,15 @@ tasks:
   - id: "TASK-4.2"
     status: "pending"
     assigned_to: ["ui-engineer-enhanced"]
+    dependencies: ["TASK-3.1"]
+  - id: "TASK-4.3"
+    status: "pending"
+    assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["TASK-4.1"]
+  - id: "TASK-4.4"
+    status: "pending"
+    assigned_to: ["ui-engineer-enhanced", "python-backend-engineer"]
+    dependencies: ["TASK-4.3"]
   - id: "TASK-5.1"
     status: "pending"
     assigned_to: ["ui-engineer-enhanced"]
@@ -98,7 +106,7 @@ tasks:
   - id: "TASK-8.1"
     status: "pending"
     assigned_to: ["task-completion-validator"]
-    dependencies: ["TASK-5.3", "TASK-4.2", "TASK-6.3", "TASK-7.2"]
+    dependencies: ["TASK-5.3", "TASK-4.4", "TASK-6.3", "TASK-7.2"]
   - id: "TASK-8.2"
     status: "pending"
     assigned_to: ["python-backend-engineer"]
@@ -115,9 +123,9 @@ parallelization:
   batch_4: ["TASK-2.2", "TASK-2.3"]
   batch_5: ["TASK-3.1"]
   batch_6: ["TASK-3.2"]
-  batch_7: ["TASK-4.1", "TASK-5.1", "TASK-6.1", "TASK-7.3"]
-  batch_8: ["TASK-4.2", "TASK-5.2", "TASK-6.2", "TASK-7.1"]
-  batch_9: ["TASK-5.3", "TASK-6.3", "TASK-7.2"]
+  batch_7: ["TASK-4.1", "TASK-4.2", "TASK-5.1", "TASK-6.1", "TASK-7.3"]
+  batch_8: ["TASK-4.3", "TASK-5.2", "TASK-6.2", "TASK-7.1"]
+  batch_9: ["TASK-4.4", "TASK-5.3", "TASK-6.3", "TASK-7.2"]
   batch_10: ["TASK-8.1"]
   batch_11: ["TASK-8.2"]
   batch_12: ["TASK-8.3"]
@@ -132,7 +140,7 @@ parallelization:
 | 1 | Schema Extension | pending | TASK-1.1 through TASK-1.3 |
 | 2 | Import Pipeline | pending | TASK-2.1 through TASK-2.3 |
 | 3 | API Wiring | pending | TASK-3.1, TASK-3.2 |
-| 4 | Marketplace UI | pending | TASK-4.1, TASK-4.2 |
+| 4 | Marketplace UI | pending | TASK-4.1 through TASK-4.4 |
 | 5 | Collection UI | pending | TASK-5.1 through TASK-5.3 |
 | 6 | Deployment | pending | TASK-6.1 through TASK-6.3 |
 | 7 | Version Tracking | pending | TASK-7.1 through TASK-7.3 |
@@ -189,12 +197,18 @@ parallelization:
 
 | ID | Task | Status | Agent | Dependencies |
 |----|------|--------|-------|-------------|
-| TASK-4.1 | Generalize source modal tab label | pending | ui-engineer-enhanced | TASK-3.1 |
-| TASK-4.2 | Member count badge on skill source cards | pending | ui-engineer-enhanced | TASK-4.1 |
+| TASK-4.1 | Add "Show embedded artifacts" toggle | pending | ui-engineer-enhanced | TASK-3.1 |
+| TASK-4.2 | Generalize Plugin Breakdown to Skill Members tab | pending | ui-engineer-enhanced | TASK-3.1 |
+| TASK-4.3 | Render embedded artifacts as top-level with parent indicator + dedup | pending | ui-engineer-enhanced | TASK-4.1 |
+| TASK-4.4 | Individual import for embedded artifacts | pending | ui-engineer-enhanced, python-backend-engineer | TASK-4.3 |
 
-**TASK-4.1 (Generalize source modal tab label)**: In `source-artifact-modal.tsx`, drive breakdown tab label from `composite_type`: `"Plugin Members"` for plugin, `"Skill Members"` for skill. Label substitution only — no structural changes. Snapshot test verifies both. (1 pt)
+**TASK-4.1 (Add "Show embedded artifacts" toggle)**: Add toggle to marketplace source view controlling whether embedded artifacts appear as top-level items. Default: ON. Toggle is display-only — detection always runs. When ON: embedded artifacts shown in main list + Skill Members tab (dedup ensures shown once). When OFF: embedded artifacts only in Skill Members tab. (1 pt)
 
-**TASK-4.2 (Member count badge on skill source cards)**: Surface member count on skill source cards in marketplace listing. Reuse existing badge pattern from plugin member counts. E2E: skill card with 3 members shows `[3]` badge; skill with no members shows no badge; plugin behavior unchanged. (2 pts)
+**TASK-4.2 (Generalize Plugin Breakdown to Skill Members tab)**: In `source-artifact-modal.tsx`, drive breakdown tab label from `composite_type`: `"Plugin Members"` for plugin, `"Skill Members"` for skill. Label substitution only — no structural changes. Snapshot test verifies both. (1 pt)
+
+**TASK-4.3 (Render embedded artifacts as top-level with parent indicator + dedup)**: When toggle is ON, render embedded artifacts in the main artifact list with a parent indicator (e.g. "contained in [Skill Name]"). Dedup logic ensures an embedded artifact appearing in multiple skills is shown once. (2 pts)
+
+**TASK-4.4 (Individual import for embedded artifacts)**: Support importing an embedded artifact individually (standalone, no membership) directly from the marketplace list. Backend: endpoint or parameter to import single embedded artifact. Frontend: import button/action on embedded artifact row. (2 pts)
 
 ---
 
@@ -250,7 +264,7 @@ parallelization:
 
 | ID | Task | Status | Agent | Dependencies |
 |----|------|--------|-------|-------------|
-| TASK-8.1 | Full E2E test flow | pending | task-completion-validator | TASK-5.3, TASK-4.2, TASK-6.3, TASK-7.2 |
+| TASK-8.1 | Full E2E test flow | pending | task-completion-validator | TASK-5.3, TASK-4.4, TASK-6.3, TASK-7.2 |
 | TASK-8.2 | Plugin regression suite | pending | python-backend-engineer | TASK-8.1 |
 | TASK-8.3 | Performance benchmarks | pending | python-backend-engineer | TASK-8.2 |
 
@@ -325,7 +339,13 @@ Task("python-backend-engineer", "TASK-3.2: API integration tests for association
      model="sonnet", mode="acceptEdits")
 
 # Batch 7 — Cross-phase parallel (after TASK-3.2 — Phases 4/5/6/7 can start)
-Task("ui-engineer-enhanced", "TASK-4.1: Generalize source modal tab label.
+Task("ui-engineer-enhanced", "TASK-4.1: Add 'Show embedded artifacts' toggle.
+     Add toggle to marketplace source view (default ON) controlling whether embedded artifacts
+     appear as top-level items. Display-only — detection always runs.
+     ON: embedded artifacts in main list + Skill Members tab (dedup). OFF: Skill Members tab only.",
+     model="sonnet", mode="acceptEdits")
+
+Task("ui-engineer-enhanced", "TASK-4.2: Generalize Plugin Breakdown to Skill Members tab.
      File: skillmeat/web/components/marketplace/source-artifact-modal.tsx
      Drive breakdown tab label from composite_type: 'Plugin Members' for plugin,
      'Skill Members' for skill. Label substitution only. Snapshot test verifies both.",
@@ -349,10 +369,10 @@ Task("python-backend-engineer", "TASK-7.3: CLI list member count indicator.
      model="sonnet", mode="acceptEdits")
 
 # Batch 8 — (after Batch 7)
-Task("ui-engineer-enhanced", "TASK-4.2: Member count badge on skill source cards.
-     Surface member count badge on skill source cards in marketplace listing.
-     Reuse existing badge pattern from plugin member counts.
-     E2E: skill with 3 members shows [3] badge; no badge for skills without members.",
+Task("ui-engineer-enhanced", "TASK-4.3: Render embedded artifacts as top-level with parent indicator + dedup.
+     When toggle is ON, render embedded artifacts in main artifact list with parent indicator
+     ('contained in [Skill Name]'). Dedup: embedded artifact in multiple skills shown once.
+     Depends on TASK-4.1 toggle being in place.",
      model="sonnet", mode="acceptEdits")
 
 Task("ui-engineer-enhanced", "TASK-5.2: Verify 'Part of' section for skills.
@@ -373,6 +393,12 @@ Task("python-backend-engineer", "TASK-7.1: Sync diff logic for skill members.
      model="sonnet", mode="acceptEdits")
 
 # Batch 9 — (after Batch 8)
+Task("ui-engineer-enhanced", "TASK-4.4: Individual import for embedded artifacts.
+     Support importing an embedded artifact individually (standalone, no membership) from marketplace list.
+     Backend: endpoint or parameter to import single embedded artifact without skill membership.
+     Frontend: import button/action on embedded artifact row. Depends on TASK-4.3.",
+     model="sonnet", mode="acceptEdits")
+
 Task("ui-engineer-enhanced", "TASK-5.3: Collection UI E2E tests.
      Playwright/Jest E2E: (1) skill modal shows Members tab with correct member count;
      (2) member artifact shows 'Part of' section; (3) plugin modal behavior unchanged. All pass in CI.",
@@ -390,7 +416,7 @@ Task("ui-engineer-enhanced", "TASK-7.2: Surface member drift in sync status tab.
      E2E: skill with drift shows expandable member rows with version info.",
      model="sonnet", mode="acceptEdits")
 
-# Batch 10 — Phase 8 validation (after TASK-5.3, TASK-4.2, TASK-6.3, TASK-7.2)
+# Batch 10 — Phase 8 validation (after TASK-5.3, TASK-4.4, TASK-6.3, TASK-7.2)
 Task("task-completion-validator", "TASK-8.1: Full E2E test flow.
      End-to-end: marketplace browse skill → view 'Skill Members' tab → import skill →
      verify collection Members tab → deploy skill + members → verify file placement.
@@ -448,17 +474,17 @@ python /Users/miethe/dev/homelab/development/skillmeat/.claude/skills/artifact-t
 # After Batch 7
 python /Users/miethe/dev/homelab/development/skillmeat/.claude/skills/artifact-tracking/scripts/update-batch.py \
   -f /Users/miethe/dev/homelab/development/skillmeat/.claude/progress/skill-contained-artifacts-v1/all-phases-progress.md \
-  --updates "TASK-4.1:completed,TASK-5.1:completed,TASK-6.1:completed,TASK-7.3:completed"
+  --updates "TASK-4.1:completed,TASK-4.2:completed,TASK-5.1:completed,TASK-6.1:completed,TASK-7.3:completed"
 
 # After Batch 8
 python /Users/miethe/dev/homelab/development/skillmeat/.claude/skills/artifact-tracking/scripts/update-batch.py \
   -f /Users/miethe/dev/homelab/development/skillmeat/.claude/progress/skill-contained-artifacts-v1/all-phases-progress.md \
-  --updates "TASK-4.2:completed,TASK-5.2:completed,TASK-6.2:completed,TASK-7.1:completed"
+  --updates "TASK-4.3:completed,TASK-5.2:completed,TASK-6.2:completed,TASK-7.1:completed"
 
 # After Batch 9
 python /Users/miethe/dev/homelab/development/skillmeat/.claude/skills/artifact-tracking/scripts/update-batch.py \
   -f /Users/miethe/dev/homelab/development/skillmeat/.claude/progress/skill-contained-artifacts-v1/all-phases-progress.md \
-  --updates "TASK-5.3:completed,TASK-6.3:completed,TASK-7.2:completed"
+  --updates "TASK-4.4:completed,TASK-5.3:completed,TASK-6.3:completed,TASK-7.2:completed"
 
 # After Batch 10
 python /Users/miethe/dev/homelab/development/skillmeat/.claude/skills/artifact-tracking/scripts/update-batch.py \

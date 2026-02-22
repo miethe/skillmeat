@@ -128,6 +128,7 @@ Skills in SkillMeat can contain embedded sub-artifacts (commands, agents, hooks,
 - `deployment.py` deploys skill files only; no awareness of member artifacts.
 - UI "Members" tab label is plugin-specific; no genericized label for skills.
 - No three-layer version tracking for skill members.
+- The `marketplace-embedded-artifacts-v1` fix is too aggressive: embedded artifacts are completely hidden from top-level display, preventing users from discovering and importing them individually. A display toggle is needed.
 
 ### Problem space
 
@@ -138,6 +139,7 @@ A skill such as `anthropics/skills/git-workflow-pro` may contain a `commands/` s
 3. The collection UI shows the skill card with no indication that it contains 2 artifacts. Clicking into it shows no Members tab.
 4. Deploying the skill copies the skill markdown file but ignores the embedded command and agent. The user must deploy each sub-artifact manually.
 5. When the upstream skill version bumps (new command added), there is no diff to show which members changed.
+6. The v1 embedded artifacts fix over-corrected: embedded artifacts are now invisible as top-level items in the marketplace source, preventing individual discovery and import. Users should see embedded artifacts as top-level items by default, with the option to collapse them under their parent skill.
 
 ### Current alternatives / workarounds
 
@@ -258,7 +260,8 @@ flowchart TD
 | FR-2 | When importing a skill whose `DetectedArtifact.embedded_artifacts` is non-empty, the importer creates a `CompositeArtifact` row (type `"skill"`) and `CompositeMembership` rows for each embedded artifact | Must | Atomic transaction; skill `Artifact.uuid` stored in `CompositeArtifact.metadata_json` as `{"artifact_uuid": "..."}` for back-reference |
 | FR-3 | Deduplication: before creating a child `Artifact` row during skill import, check collection for matching content hash; if found, reuse the existing UUID | Must | Use same hash-based dedup as plugin import in `importer.py` |
 | FR-4 | `GET /api/v1/artifacts/{artifact_id}/associations` must return member artifacts when `artifact_id` resolves to a skill with a companion `CompositeArtifact` row | Must | Router must perform the skill UUID → CompositeArtifact.id lookup before querying memberships |
-| FR-5 | Marketplace source modal: when a source artifact is a skill with `embedded_artifacts`, show a "Skill Members" tab (genericized from existing "Plugin Breakdown" tab) | Must | Tab label driven by parent type: `"Plugin Members"` for `composite_type=plugin`, `"Skill Members"` for `composite_type=skill` |
+| FR-5 | Marketplace source view: embedded artifacts within skills are shown as top-level items by default, with a toggle to hide/show them. When toggle is ON (default), embedded artifacts appear in the main artifact list AND in the Skill Members tab. When toggle is OFF, they appear only in the Skill Members tab. Deduplication ensures each artifact is shown only once in the main list regardless of how many skills contain it. | Must | Reverses the v1 suppression behavior; toggle is a display filter, not a detection filter. Detection always discovers all artifacts. |
+| FR-5a | Individual import: users can import an embedded artifact individually (as a standalone artifact) OR import the entire skill with all members (like Composite import). When importing individually, no CompositeMembership is created. When importing the whole skill, memberships are created for all embedded artifacts. | Must | Mirrors Composite import behavior: individual member import vs. whole-package import |
 | FR-6 | Collection detail/operations modal: when viewing a skill with `CompositeMembership` rows, show a "Members" tab listing child artifacts with type icon, name, version, and sync status | Must | Reuse `artifact-contains-tab.tsx`; label generalization only |
 | FR-7 | Collection detail/operations modal: for artifacts that are members of a skill, show a "Part of" section in the Links tab naming the parent skill | Must | Reuse `artifact-part-of-section.tsx`; no code change expected if associations API is wired correctly |
 | FR-8 | `skillmeat deploy <skill>` deploys the skill and its member artifacts by default | Must | Members are deployed to their type-specific paths (e.g., `commands/` → `.claude/commands/`, `agents/` → `.claude/agents/`) |
@@ -360,7 +363,7 @@ flowchart TD
 
 ### User experience
 
-- **Marketplace**: A skill card with embedded artifacts displays a member count badge. Clicking "View Details" opens the source modal with a "Skill Members" tab listing each embedded artifact with type icon, name, and description.
+- **Marketplace**: A skill card with embedded artifacts displays a member count badge. The source artifact list shows embedded artifacts as top-level items by default (toggle ON). Clicking "View Details" on a skill opens the source modal with a "Skill Members" tab. Users can toggle embedded artifact visibility in the main list via a "Show embedded artifacts" toggle. Individual embedded artifacts can be imported standalone, or the whole skill can be imported with all members linked.
 - **Import**: Clicking "Add to Collection" on a skill with members triggers the import dialog. Progress shows "Importing skill + N members". On completion, the collection shows the skill; each member is also accessible individually.
 - **Collection**: The skill detail card shows a "Members" tab listing N artifacts with type icons, names, version, and sync status indicators. Clicking a member opens its own detail view.
 - **Member artifact view**: The "Links" tab of a member artifact shows "Part of: [Skill Name]" with a link back to the parent skill.
@@ -510,9 +513,13 @@ Deployment:
   - [ ] Update `GET /api/v1/artifacts/{artifact_id}/associations` router logic: when `artifact_id` refers to a skill, look up companion `CompositeArtifact` by `metadata_json`->`artifact_uuid`, then query memberships
   - [ ] Add integration test asserting associations are returned for a skill with members
 
-**Phase 4: Marketplace UI (2 days)**
+**Phase 4: Marketplace UI (3 days)**
 - Tasks:
-  - [ ] Generalize "Plugin Breakdown" tab in source modal to render as "Skill Members" when source type is `skill`; tab label driven by `composite_type`
+  - [ ] Add "Show embedded artifacts" toggle to marketplace source artifact list (default: ON)
+  - [ ] When toggle ON: render embedded artifacts as top-level items in the source list with parent skill indicator badge
+  - [ ] Implement display-level deduplication: if artifact exists both independently and embedded, show once with "also in: [Skill Name]" indicator
+  - [ ] Generalize "Plugin Breakdown" tab in source modal to render as "Skill Members" when type is skill
+  - [ ] Individual import action on embedded artifacts (import as standalone, no membership)
   - [ ] Verify member count badge renders on skill source cards
 
 **Phase 5: Collection UI (2 days)**
@@ -550,7 +557,7 @@ Deployment:
 | SCA-003 | Import pipeline extension | `importer.py` calls `create_skill_composite()` for skills with embedded artifacts | Integration test: import fixture skill, verify DB rows | 3 pts |
 | SCA-004 | Import deduplication | Embedded artifact hash checked against collection; reuse existing UUID if match | Integration test: import two skills sharing a command; verify 1 command artifact row | 3 pts |
 | SCA-005 | Associations API wiring | `GET /associations` resolves skill UUID → CompositeArtifact → members | API test: returns member list for skill with 3 members | 2 pts |
-| SCA-006 | Marketplace Skill Members tab | Source modal "Skill Members" tab for skills with embedded artifacts | E2E: tab renders with correct member count and names | 3 pts |
+| SCA-006 | Marketplace embedded display | Source artifact list shows embedded artifacts as top-level with toggle (default ON), display dedup, parent skill indicator, individual import support | E2E: toggle ON shows embedded as top-level; toggle OFF hides; dedup works; individual import creates standalone artifact | 5 pts |
 | SCA-007 | Collection Members tab | `artifact-contains-tab.tsx` label generalized; renders for skills | E2E: skill detail modal shows Members tab | 2 pts |
 | SCA-008 | Part of section | `artifact-part-of-section.tsx` renders for member artifacts once associations API is wired | E2E: member artifact links tab shows parent skill | 1 pt |
 | SCA-009 | Coordinated deployment | `skillmeat deploy` deploys skill + members atomically; `--no-members` skips members | Integration test: deploy skill, verify all member file paths | 4 pts |
@@ -558,7 +565,7 @@ Deployment:
 | SCA-011 | CLI list member count | `skillmeat list` shows `[+N members]` for skills with members | Unit test on list output | 1 pt |
 | SCA-012 | Feature flag & E2E suite | Enable feature flag; full E2E flow test; performance benchmark | All E2E tests pass; P95 import < 5s, associations < 200ms | 3 pts |
 
-**Total estimate:** 30 points
+**Total estimate:** 32 points
 
 ---
 

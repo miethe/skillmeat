@@ -37,6 +37,14 @@ If embedded command already exists in collection, create CompositeMembership lin
 `SKILL_CONTAINED_ARTIFACTS_ENABLED` guards import-time membership creation and coordinated deployment.
 Default: false until Phase 8 testing passes.
 
+### D6: Embedded Artifact Display Toggle
+Marketplace source view shows embedded artifacts as top-level items by default (toggle ON).
+Toggle controls display only — detection always discovers all artifacts.
+When ON: embedded artifacts in main list + Skill Members tab. Dedup ensures shown once.
+When OFF: embedded artifacts only in Skill Members tab.
+Users can import embedded artifacts individually (standalone, no membership) or import whole skill (with memberships).
+This reverses the v1 `marketplace-embedded-artifacts-v1` suppression behavior.
+
 ## Key Files
 
 | File | Purpose |
