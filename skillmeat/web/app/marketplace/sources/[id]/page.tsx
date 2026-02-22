@@ -86,6 +86,7 @@ import { filterSemanticTree } from '@/lib/tree-filter-utils';
 import { useFolderSelection } from '@/lib/hooks/use-folder-selection';
 import type {
   CatalogEntry,
+  EmbeddedArtifact,
   CatalogFilters,
   ArtifactType,
   CatalogStatus,
@@ -94,6 +95,75 @@ import type {
 // ============================================================================
 // Sub-components
 // ============================================================================
+
+// Type badge config shared between CatalogCard and EmbeddedArtifactRow
+const typeConfig: Record<ArtifactType, { label: string; color: string }> = {
+  skill: {
+    label: 'Skill',
+    color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  },
+  command: {
+    label: 'Command',
+    color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+  },
+  agent: {
+    label: 'Agent',
+    color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  },
+  mcp: {
+    label: 'MCP',
+    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  },
+  mcp_server: {
+    label: 'MCP',
+    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  },
+  hook: { label: 'Hook', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' },
+  composite: { label: 'Plugin', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' },
+};
+
+/**
+ * EmbeddedArtifactRow renders a single embedded artifact (Command, Agent, etc.)
+ * nested visually inside its parent Skill card with left-border indentation.
+ */
+interface EmbeddedArtifactRowProps {
+  artifact: EmbeddedArtifact;
+}
+
+function EmbeddedArtifactRow({ artifact }: EmbeddedArtifactRowProps) {
+  const type = artifact.artifact_type as ArtifactType;
+  const config = typeConfig[type] ?? { label: type, color: 'bg-gray-100 text-gray-800' };
+  const fileName = artifact.path.split('/').pop() ?? artifact.path;
+
+  return (
+    <div
+      className="flex items-center justify-between gap-2 border-l-2 border-muted-foreground/20 pl-3 py-1.5"
+      role="listitem"
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <Badge variant="outline" className={cn('shrink-0 text-xs', config.color)}>
+          {config.label}
+        </Badge>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium">{artifact.name}</p>
+          <p className="truncate text-xs text-muted-foreground" title={artifact.path}>
+            {fileName}
+          </p>
+        </div>
+      </div>
+      <a
+        href={artifact.upstream_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        aria-label={`View ${artifact.name} on GitHub`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <ExternalLink className="h-3 w-3" aria-hidden="true" />
+      </a>
+    </div>
+  );
+}
 
 interface CatalogCardProps {
   entry: CatalogEntry;
@@ -139,30 +209,7 @@ function CatalogCard({
     },
   }[entry.status];
 
-  const typeConfig: Record<ArtifactType, { label: string; color: string }> = {
-    skill: {
-      label: 'Skill',
-      color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-    },
-    command: {
-      label: 'Command',
-      color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-    },
-    agent: {
-      label: 'Agent',
-      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-    },
-    mcp: {
-      label: 'MCP',
-      color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-    },
-    mcp_server: {
-      label: 'MCP',
-      color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-    },
-    hook: { label: 'Hook', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' },
-    composite: { label: 'Plugin', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' },
-  };
+  // typeConfig is defined at module level above and shared with EmbeddedArtifactRow
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -300,6 +347,20 @@ function CatalogCard({
           <p className="text-center text-xs text-muted-foreground">
             Imported {new Date(entry.import_date).toLocaleDateString()}
           </p>
+        )}
+
+        {/* Embedded artifacts: Commands/Agents nested inside this Skill's directory */}
+        {entry.embedded_artifacts && entry.embedded_artifacts.length > 0 && (
+          <div className="border-t pt-3" role="list" aria-label={`Embedded artifacts in ${entry.name}`}>
+            <p className="mb-2 text-xs font-medium text-muted-foreground">
+              Contains ({entry.embedded_artifacts.length})
+            </p>
+            <div className="space-y-1">
+              {entry.embedded_artifacts.map((embedded) => (
+                <EmbeddedArtifactRow key={embedded.path} artifact={embedded} />
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
