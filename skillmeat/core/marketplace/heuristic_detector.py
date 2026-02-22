@@ -2592,15 +2592,16 @@ class HeuristicDetector:
             if match.artifact_type in single_file_types and name.endswith(".md"):
                 name = name[:-3]
             upstream_url = f"{base_url.rstrip('/')}/tree/{ref}/{match.path}"
-            # Attach embedded children for Skill-type artifacts (depth guard)
+            # Attach embedded children for Skill-type and Composite-type artifacts (depth guard)
             embedded: List[DetectedArtifact] = []
-            if match.artifact_type == ArtifactType.SKILL.value and depth < MAX_EMBED_DEPTH:
+            if match.artifact_type in (ArtifactType.SKILL.value, ArtifactType.COMPOSITE.value) and depth < MAX_EMBED_DEPTH:
                 for child_match in embedded_by_skill.get(match.path, []):
                     embedded.append(_make_artifact(child_match, depth=depth + 1))
                 if embedded:
                     logger.debug(
-                        "Attached %d embedded child artifact(s) to Skill '%s'",
+                        "Attached %d embedded child artifact(s) to %s '%s'",
                         len(embedded),
+                        match.artifact_type,
                         match.path,
                     )
             return DetectedArtifact(

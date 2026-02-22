@@ -1840,7 +1840,7 @@ async def _perform_scan(
                     # (SCA-P2-03: atomic transaction wiring).
                     catalog_metadata_json = None
                     if (
-                        artifact.artifact_type == "skill"
+                        artifact.artifact_type in ("skill", "composite")
                         and getattr(artifact, "embedded_artifacts", None)
                     ):
                         try:
