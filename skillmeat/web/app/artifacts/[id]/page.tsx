@@ -320,6 +320,7 @@ export default function ArtifactDetailPage({ params }: ArtifactDetailPageProps) 
                       isLoading={isAssocLoading}
                       error={assocError}
                       onRetry={refetchAssociations}
+                      compositeType={artifact.compositeType}
                     />
                   </div>
                 </ScrollArea>

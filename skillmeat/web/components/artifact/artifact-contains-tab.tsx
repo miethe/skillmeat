@@ -18,6 +18,30 @@ import { AlertCircle, Box, ChevronRight, Layers, RefreshCcw, Zap } from 'lucide-
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { AssociationItemDTO } from '@/types/associations';
+import type { Artifact } from '@/types/artifact';
+
+// ---------------------------------------------------------------------------
+// Display name helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps a composite_type value to a human-readable display name.
+ * Falls back to "Composite" for unknown subtypes and "Artifact" for non-composite types.
+ */
+function getContainerDisplayName(compositeType: Artifact['compositeType']): string {
+  switch (compositeType) {
+    case 'plugin':
+      return 'Plugin';
+    case 'stack':
+      return 'Stack';
+    case 'suite':
+      return 'Suite';
+    case 'skill':
+      return 'Skill';
+    default:
+      return 'Composite';
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Type icon mapping — maps artifact_type string to a Lucide icon component
@@ -73,7 +97,7 @@ function ContainsTabSkeleton() {
 // Empty state
 // ---------------------------------------------------------------------------
 
-function ContainsTabEmpty() {
+function ContainsTabEmpty({ displayName }: { displayName: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
       <Layers
@@ -81,10 +105,10 @@ function ContainsTabEmpty() {
         aria-hidden="true"
       />
       <p className="text-sm font-medium text-muted-foreground">
-        This plugin contains no artifacts
+        This {displayName.toLowerCase()} contains no artifacts
       </p>
       <p className="mt-1 text-xs text-muted-foreground/70">
-        Add child artifacts to this composite plugin to see them listed here.
+        Add child artifacts to this {displayName.toLowerCase()} to see them listed here.
       </p>
     </div>
   );
@@ -179,6 +203,12 @@ export interface ArtifactContainsTabProps {
   error: Error | null;
   /** Callback to trigger a refetch on error */
   onRetry: () => void;
+  /**
+   * The composite sub-type of the parent artifact (e.g. 'plugin', 'stack', 'suite').
+   * Used to derive the section heading label.
+   * Falls back to a generic label when absent or unrecognised.
+   */
+  compositeType?: Artifact['compositeType'];
 }
 
 export function ArtifactContainsTab({
@@ -186,7 +216,11 @@ export function ArtifactContainsTab({
   isLoading,
   error,
   onRetry,
+  compositeType,
 }: ArtifactContainsTabProps) {
+  const displayName = getContainerDisplayName(compositeType);
+  const membersLabel = `${displayName} Members`;
+
   if (isLoading) {
     return <ContainsTabSkeleton />;
   }
@@ -196,14 +230,16 @@ export function ArtifactContainsTab({
   }
 
   if (children.length === 0) {
-    return <ContainsTabEmpty />;
+    return <ContainsTabEmpty displayName={displayName} />;
   }
 
   return (
-    <section aria-label="Child artifacts contained in this plugin" data-testid="contains-tab-content">
-      <p className="mb-3 text-xs text-muted-foreground">
-        {children.length} {children.length === 1 ? 'artifact' : 'artifacts'} in
-        this plugin
+    <section aria-label={`Child artifacts contained in this ${displayName.toLowerCase()}`} data-testid="contains-tab-content">
+      <p className="mb-3 text-xs font-medium text-muted-foreground">
+        {membersLabel}
+        <span className="ml-1.5 font-normal">
+          ({children.length} {children.length === 1 ? 'artifact' : 'artifacts'})
+        </span>
       </p>
       <ul
         className="space-y-2"
