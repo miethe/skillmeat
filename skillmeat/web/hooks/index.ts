@@ -442,9 +442,20 @@ export { useDiscovery, useGitHubMetadata, useEditArtifactParameters } from './us
 // ANALYTICS (5 hooks)
 // ============================================================================
 // Usage analytics, trends, and streaming analytics
-export { useAnalyticsSummary, useTopArtifacts, useUsageTrends } from './useAnalytics';
+export {
+  useAnalyticsSummary,
+  useTopArtifacts,
+  useUsageTrends,
+  useEnterpriseAnalyticsSummary,
+  useAnalyticsEvents,
+  downloadAnalyticsExport,
+  type AnalyticsExportFormat,
+} from './useAnalytics';
 
 export { useAnalyticsStream } from './useAnalyticsStream';
+
+// Artifact provenance/history timeline
+export { useArtifactHistory, getArtifactHistoryId, artifactHistoryKeys } from './useArtifactHistory';
 
 // ============================================================================
 // SSE (1 hook)

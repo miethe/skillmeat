@@ -51,6 +51,7 @@ export * from './project';
 
 // Version types
 export * from './version';
+export * from './history';
 
 // Drift detection types
 export * from './drift';

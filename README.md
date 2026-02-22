@@ -222,6 +222,8 @@ _Track usage, identify patterns_
 | Top Artifacts | Most used (`skillmeat analytics top`) |
 | Cleanup Suggestions | Cleanup help (`skillmeat analytics cleanup`) |
 | Trend Analysis | Usage trends (`skillmeat analytics trends`) |
+| Enterprise Metrics | Delivery, reliability, and adoption dashboard metrics |
+| Observability Export | Export analytics as JSON, Prometheus, or OTel |
 
 ### Search &amp; Discovery
 
@@ -242,6 +244,7 @@ _Snapshots and rollback_
 | Collection Snapshots | Backup collection (`skillmeat snapshot`) |
 | Rollback Support | Easy restore (`skillmeat rollback`) |
 | Version History | View history (`skillmeat history`) |
+| Provenance Timelines | Unified artifact history across versions, deployments, and analytics events |
 
 ### MCP Server Management
 

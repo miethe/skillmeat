@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
   Calendar,
   Tag,
@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Artifact, ARTIFACT_TYPES } from '@/types/artifact';
-import { useEntityLifecycle, useToast } from '@/hooks';
+import { useEntityLifecycle, useToast, useArtifactHistory, getArtifactHistoryId } from '@/hooks';
 import { DiffViewer } from '@/components/entity/diff-viewer';
 import { RollbackDialog } from '@/components/entity/rollback-dialog';
 import { apiRequest } from '@/lib/api';
@@ -38,11 +38,14 @@ interface EntityDetailPanelProps {
 
 interface HistoryEntry {
   id: string;
-  type: 'deploy' | 'sync' | 'rollback';
+  type: 'deploy' | 'sync' | 'rollback' | 'update';
   direction: 'upstream' | 'downstream';
   timestamp: string;
   filesChanged?: number;
   user?: string;
+  eventType?: string;
+  projectPath?: string | null;
+  collectionName?: string | null;
 }
 
 // Helper function to format relative time
@@ -67,65 +70,6 @@ function formatRelativeTime(date: Date): string {
   }
 }
 
-// Generate mock history entries based on entity metadata
-function generateMockHistory(entity: Artifact): HistoryEntry[] {
-  const history: HistoryEntry[] = [];
-
-  // Create history entries from available timestamps
-  if (entity.deployedAt) {
-    const deployedDate = new Date(entity.deployedAt);
-    history.push({
-      id: `deploy-${entity.deployedAt}`,
-      type: 'deploy',
-      direction: 'downstream',
-      timestamp: entity.deployedAt,
-      filesChanged: Math.floor(Math.random() * 5) + 1,
-      user: 'You',
-    });
-
-    // Add a sync entry a bit before deployment if entity is modified
-    if (entity.syncStatus === 'modified' || entity.syncStatus === 'outdated') {
-      const syncDate = new Date(deployedDate.getTime() - 2 * 60 * 60 * 1000); // 2 hours before
-      history.push({
-        id: `sync-${syncDate.toISOString()}`,
-        type: 'sync',
-        direction: 'upstream',
-        timestamp: syncDate.toISOString(),
-        filesChanged: Math.floor(Math.random() * 3) + 1,
-        user: 'You',
-      });
-    }
-  }
-
-  if (entity.modifiedAt && entity.modifiedAt !== entity.deployedAt) {
-    // Add sync entry for modifications
-    history.push({
-      id: `sync-${entity.modifiedAt}`,
-      type: 'sync',
-      direction: 'upstream',
-      timestamp: entity.modifiedAt,
-      filesChanged: Math.floor(Math.random() * 4) + 1,
-      user: 'You',
-    });
-  }
-
-  // Add a rollback entry for conflict status
-  if (entity.syncStatus === 'conflict' && entity.modifiedAt) {
-    const rollbackDate = new Date(new Date(entity.modifiedAt).getTime() + 1 * 60 * 60 * 1000); // 1 hour after modification
-    history.push({
-      id: `rollback-${rollbackDate.toISOString()}`,
-      type: 'rollback',
-      direction: 'downstream',
-      timestamp: rollbackDate.toISOString(),
-      filesChanged: Math.floor(Math.random() * 3) + 1,
-      user: 'You',
-    });
-  }
-
-  // Sort by timestamp (most recent first)
-  return history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-}
-
 export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const { deployEntity, syncEntity, refetch } = useEntityLifecycle();
@@ -135,11 +79,17 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
   const [isRollingBack, setIsRollingBack] = useState(false);
   const { toast } = useToast();
 
-  // Generate mock history entries
-  const historyEntries = useMemo(() => {
-    if (!entity) return [];
-    return generateMockHistory(entity);
-  }, [entity]);
+  const historyArtifactId = getArtifactHistoryId(entity);
+  const {
+    data: artifactHistory,
+    isLoading: isHistoryLoading,
+    isError: isHistoryError,
+    error: historyError,
+  } = useArtifactHistory(historyArtifactId, {
+    enabled: !!entity && open && activeTab === 'history',
+    limit: 500,
+  });
+  const historyEntries: HistoryEntry[] = artifactHistory?.timelineEntries ?? [];
 
   // Fetch diff data when sync tab is active and entity has changes
   const shouldFetchDiff = !!(
@@ -301,6 +251,8 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
         return 'Synced';
       case 'rollback':
         return 'Rolled back';
+      case 'update':
+        return 'Updated';
       default:
         return type;
     }
@@ -314,6 +266,8 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
         return 'text-blue-600 dark:text-blue-400';
       case 'rollback':
         return 'text-orange-600 dark:text-orange-400';
+      case 'update':
+        return 'text-purple-600 dark:text-purple-400';
       default:
         return 'text-gray-600 dark:text-gray-400';
     }
@@ -584,7 +538,20 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
                   )}
 
                 {/* History Timeline */}
-                {historyEntries.length > 0 ? (
+                {isHistoryLoading ? (
+                  <div className="space-y-3">
+                    <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+                    <div className="h-20 w-full animate-pulse rounded bg-muted" />
+                    <div className="h-20 w-full animate-pulse rounded bg-muted" />
+                  </div>
+                ) : isHistoryError ? (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+                    <p className="text-sm text-destructive">
+                      Failed to load history
+                      {historyError instanceof Error ? `: ${historyError.message}` : '.'}
+                    </p>
+                  </div>
+                ) : historyEntries.length > 0 ? (
                   <div>
                     <h3 className="mb-4 text-sm font-medium">Sync History</h3>
                     <div className="relative space-y-0">
@@ -603,7 +570,9 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
                                 ? 'border-green-500'
                                 : entry.type === 'sync'
                                   ? 'border-blue-500'
-                                  : 'border-orange-500'
+                                  : entry.type === 'rollback'
+                                    ? 'border-orange-500'
+                                    : 'border-purple-500'
                             }`}
                           >
                             {entry.direction === 'downstream' ? (
@@ -640,6 +609,15 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
                                     <span>{entry.user}</span>
                                   </>
                                 )}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {entry.collectionName && (
+                                  <span className="mr-2">{entry.collectionName}</span>
+                                )}
+                                {entry.eventType && (
+                                  <span className="mr-2">{entry.eventType.replace(/_/g, ' ')}</span>
+                                )}
+                                {entry.projectPath && <span className="truncate">{entry.projectPath}</span>}
                               </div>
                             </div>
                             <div className="text-xs text-muted-foreground">

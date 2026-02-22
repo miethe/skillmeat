@@ -2,7 +2,7 @@
 title: "User Documentation Index"
 description: "Start here for user-facing guides, CLI references, and release notes."
 created: 2025-12-20
-updated: 2026-02-09
+updated: 2026-02-21
 status: published
 priority: high
 audience: users,developers
@@ -27,6 +27,7 @@ tags:
 ## Guides and Reference
 
 - Guides: `docs/user/guides/`
+- Analytics & Insights guide: `docs/user/guides/using-analytics.md`
 - Memory & Context overview: `docs/user/guides/memory-context-system.md`
 - Memory Inbox guide: `docs/user/guides/memory-inbox.md`
 - Context Modules guide: `docs/user/guides/context-modules.md`
