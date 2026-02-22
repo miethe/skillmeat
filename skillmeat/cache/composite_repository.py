@@ -50,7 +50,7 @@ import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Sequence
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -550,6 +550,92 @@ class CompositeMembershipRepository:
             if composite is None:
                 return None
             return self._composite_to_dict(composite)
+        finally:
+            session.close()
+
+    def get_skill_member_counts(
+        self,
+        skill_uuids: Sequence[str],
+        collection_id: str,
+    ) -> Dict[str, int]:
+        """Return member counts for skill-type composites mapped by skill UUID.
+
+        Skill artifacts can be wrapped as a ``CompositeArtifact`` of
+        ``composite_type='skill'`` whose ``metadata_json`` stores the
+        originating skill's UUID as ``{"artifact_uuid": "<skill-uuid>"}``.
+        This method performs a single batch query across all provided UUIDs
+        and returns a dict mapping ``skill_uuid -> member_count``.
+
+        Skills with no companion composite (or with zero members) are omitted
+        from the returned dict.
+
+        Args:
+            skill_uuids: Iterable of stable artifact UUIDs to look up.
+            collection_id: Owning collection identifier.
+
+        Returns:
+            ``{skill_uuid: count}`` for every skill that has at least one
+            ``CompositeMembership`` row via its companion composite.  Skills
+            with no members are absent.
+
+        Example:
+            >>> counts = repo.get_skill_member_counts(["uuid-a", "uuid-b"], "col-abc")
+            >>> counts
+            {"uuid-a": 3, "uuid-b": 1}
+        """
+        import json as _json  # noqa: PLC0415
+
+        if not skill_uuids:
+            return {}
+
+        from sqlalchemy import func  # noqa: PLC0415
+
+        session = self._get_session()
+        try:
+            # Build the set of JSON strings we are looking for so the filter
+            # can use an IN clause instead of N separate queries.
+            target_jsons = [
+                _json.dumps({"artifact_uuid": uid}) for uid in skill_uuids
+            ]
+
+            # Single query: join CompositeArtifact → CompositeMembership and
+            # aggregate per composite, then map back through metadata_json.
+            rows = (
+                session.query(
+                    CompositeArtifact.metadata_json,
+                    func.count(CompositeMembership.child_artifact_uuid).label(
+                        "member_count"
+                    ),
+                )
+                .join(
+                    CompositeMembership,
+                    (CompositeMembership.composite_id == CompositeArtifact.id)
+                    & (
+                        CompositeMembership.collection_id
+                        == CompositeArtifact.collection_id
+                    ),
+                )
+                .filter(
+                    CompositeArtifact.composite_type == "skill",
+                    CompositeArtifact.collection_id == collection_id,
+                    CompositeArtifact.metadata_json.in_(target_jsons),
+                )
+                .group_by(CompositeArtifact.metadata_json)
+                .all()
+            )
+
+            result: Dict[str, int] = {}
+            for metadata_json, count in rows:
+                if not metadata_json or not count:
+                    continue
+                try:
+                    meta = _json.loads(metadata_json)
+                    skill_uuid = meta.get("artifact_uuid")
+                    if skill_uuid and count > 0:
+                        result[skill_uuid] = int(count)
+                except (ValueError, KeyError):
+                    continue
+            return result
         finally:
             session.close()
 
