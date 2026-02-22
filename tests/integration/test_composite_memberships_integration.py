@@ -727,16 +727,22 @@ class TestMigrationRoundTrip:
         Steps:
         1. Create all ORM tables via ``create_tables`` (full schema including
            composite tables — Base.metadata.create_all is schema-complete).
-        2. Drop the composite tables that Alembic will re-create, so that the
+        2. Replace the three join tables (collection_artifacts, group_artifacts,
+           artifact_tags) with their pre-UUID schemas so that the UUID migration
+           chain (20260219_1000 through 20260219_1300) can run against them as
+           intended.  The current ORM schema already has artifact_uuid as the
+           PK column; those migrations expect artifact_id instead.
+        3. Drop the composite tables that Alembic will re-create, so that the
            migration's ``CREATE TABLE`` statements do not conflict with
            pre-existing tables.
-        3. Stamp Alembic at ``20260218_1000_add_artifact_uuid_column`` — the
+        4. Stamp Alembic at ``20260218_1000_add_artifact_uuid_column`` — the
            revision immediately before the composite tables migration — so that
-           a subsequent ``upgrade("head")`` applies only
-           ``20260218_1100_add_composite_artifact_tables``.
+           a subsequent ``upgrade("head")`` applies the full migration chain
+           starting with ``20260218_1100_add_composite_artifact_tables``.
 
-        This simulates a production DB that has all base tables but is missing
-        the composite tables, waiting for the migration to add them.
+        This simulates a production DB that has all base tables with the
+        pre-UUID join-table schema, waiting for the migration chain to add
+        composite tables and migrate join tables to UUID-keyed PKs.
         """
         from alembic import command
         from sqlalchemy import create_engine
@@ -745,15 +751,156 @@ class TestMigrationRoundTrip:
         # Step 1: create the full ORM schema
         create_tables(db_path)
 
-        # Step 2: drop the composite tables so the migration can re-create them
         eng = create_engine(f"sqlite:///{db_path}")
         with eng.connect() as conn:
-            # Drop child table first (FK dependency)
+            # ------------------------------------------------------------------
+            # Step 2: Replace join tables with pre-UUID schemas.
+            #
+            # The ORM (Base.metadata.create_all) creates these tables with
+            # artifact_uuid as the PK component.  The migration chain starting
+            # at 20260219_1000 expects artifact_id (the old string PK) to be
+            # present so it can rename the table, join against artifacts.id, and
+            # backfill the new artifact_uuid column.  We drop and recreate each
+            # table using the legacy schema that the migrations expect.
+            #
+            # All three tables are empty at this point (no data was inserted),
+            # so no rows are lost by the drop-and-recreate.
+            # ------------------------------------------------------------------
+
+            # collection_artifacts: old schema uses artifact_id (not artifact_uuid)
+            conn.execute(text("DROP INDEX IF EXISTS idx_collection_artifacts_collection_id"))
+            conn.execute(text("DROP INDEX IF EXISTS idx_collection_artifacts_artifact_uuid"))
+            conn.execute(text("DROP INDEX IF EXISTS idx_collection_artifacts_added_at"))
+            conn.execute(text("DROP INDEX IF EXISTS idx_collection_artifacts_synced_at"))
+            conn.execute(text("DROP INDEX IF EXISTS idx_collection_artifacts_tools_json"))
+            conn.execute(text("DROP TABLE IF EXISTS collection_artifacts"))
+            conn.execute(text(
+                """
+                CREATE TABLE collection_artifacts (
+                    collection_id    VARCHAR NOT NULL,
+                    artifact_id      VARCHAR NOT NULL,
+                    added_at         DATETIME NOT NULL,
+                    description      TEXT,
+                    author           VARCHAR,
+                    license          VARCHAR,
+                    tags_json        TEXT,
+                    version          VARCHAR,
+                    source           VARCHAR,
+                    origin           VARCHAR,
+                    origin_source    VARCHAR,
+                    resolved_sha     VARCHAR(64),
+                    resolved_version VARCHAR,
+                    synced_at        DATETIME,
+                    tools_json       TEXT,
+                    deployments_json TEXT,
+                    PRIMARY KEY (collection_id, artifact_id),
+                    FOREIGN KEY (collection_id)
+                        REFERENCES collections (id)
+                        ON DELETE CASCADE
+                )
+                """
+            ))
+            conn.execute(text(
+                "CREATE INDEX idx_collection_artifacts_collection_id "
+                "ON collection_artifacts (collection_id)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX idx_collection_artifacts_artifact_id "
+                "ON collection_artifacts (artifact_id)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX idx_collection_artifacts_added_at "
+                "ON collection_artifacts (added_at)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX idx_collection_artifacts_synced_at "
+                "ON collection_artifacts (synced_at)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX idx_collection_artifacts_tools_json "
+                "ON collection_artifacts (tools_json)"
+            ))
+
+            # group_artifacts: old schema uses artifact_id (not artifact_uuid)
+            conn.execute(text("DROP INDEX IF EXISTS idx_group_artifacts_group_id"))
+            conn.execute(text("DROP INDEX IF EXISTS idx_group_artifacts_artifact_uuid"))
+            conn.execute(text("DROP INDEX IF EXISTS idx_group_artifacts_group_position"))
+            conn.execute(text("DROP INDEX IF EXISTS idx_group_artifacts_added_at"))
+            conn.execute(text("DROP TABLE IF EXISTS group_artifacts"))
+            conn.execute(text(
+                """
+                CREATE TABLE group_artifacts (
+                    group_id    VARCHAR NOT NULL,
+                    artifact_id VARCHAR NOT NULL,
+                    position    INTEGER NOT NULL DEFAULT 0,
+                    added_at    DATETIME NOT NULL,
+                    PRIMARY KEY (group_id, artifact_id),
+                    FOREIGN KEY (group_id)
+                        REFERENCES groups (id)
+                        ON DELETE CASCADE,
+                    CONSTRAINT check_group_artifact_position
+                        CHECK (position >= 0)
+                )
+                """
+            ))
+            conn.execute(text(
+                "CREATE INDEX idx_group_artifacts_group_id "
+                "ON group_artifacts (group_id)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX idx_group_artifacts_artifact_id "
+                "ON group_artifacts (artifact_id)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX idx_group_artifacts_group_position "
+                "ON group_artifacts (group_id, position)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX idx_group_artifacts_added_at "
+                "ON group_artifacts (added_at)"
+            ))
+
+            # artifact_tags: old schema uses artifact_id (not artifact_uuid)
+            conn.execute(text("DROP INDEX IF EXISTS idx_artifact_tags_artifact_uuid"))
+            conn.execute(text("DROP INDEX IF EXISTS idx_artifact_tags_tag_id"))
+            conn.execute(text("DROP INDEX IF EXISTS idx_artifact_tags_created_at"))
+            conn.execute(text("DROP TABLE IF EXISTS artifact_tags"))
+            conn.execute(text(
+                """
+                CREATE TABLE artifact_tags (
+                    artifact_id VARCHAR NOT NULL,
+                    tag_id      VARCHAR NOT NULL,
+                    created_at  DATETIME NOT NULL,
+                    PRIMARY KEY (artifact_id, tag_id),
+                    FOREIGN KEY (tag_id)
+                        REFERENCES tags (id)
+                        ON DELETE CASCADE
+                )
+                """
+            ))
+            conn.execute(text(
+                "CREATE INDEX idx_artifact_tags_artifact_id "
+                "ON artifact_tags (artifact_id)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX idx_artifact_tags_tag_id "
+                "ON artifact_tags (tag_id)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX idx_artifact_tags_created_at "
+                "ON artifact_tags (created_at)"
+            ))
+
+            # ------------------------------------------------------------------
+            # Step 3: Drop composite tables so the migration can re-create them.
+            # Drop child table first (FK dependency order).
+            # ------------------------------------------------------------------
             conn.execute(text("DROP TABLE IF EXISTS composite_memberships"))
             conn.execute(text("DROP TABLE IF EXISTS composite_artifacts"))
+
         eng.dispose()
 
-        # Step 3: stamp Alembic at the revision just before composite tables
+        # Step 4: stamp Alembic at the revision just before composite tables
         alembic_cfg = get_alembic_config(db_path)
         command.stamp(
             alembic_cfg,
@@ -781,16 +928,22 @@ class TestMigrationRoundTrip:
         )
 
     def test_composite_tables_absent_after_downgrade(self, tmp_path: Path) -> None:
-        """Rolling back the composite table migration removes composite_artifacts
-        and composite_memberships."""
+        """Rolling back to before the composite table migration removes
+        composite_artifacts and composite_memberships."""
         from skillmeat.cache.migrations import run_migrations, downgrade_migration
 
         db_path = tmp_path / "migration_downgrade_test.db"
         self._prepare_stamped_db(db_path)
         run_migrations(db_path)
 
-        # Downgrade by one step (removes the composite tables migration)
-        downgrade_migration(db_path, revision="-1")
+        # Downgrade to the revision just before composite tables were added.
+        # We target the specific revision rather than "-1" because the current
+        # HEAD is several revisions ahead of the composite tables migration;
+        # "-1" from HEAD would only remove the most recent migration, not the
+        # composite tables migration.
+        downgrade_migration(
+            db_path, revision="20260218_1000_add_artifact_uuid_column"
+        )
 
         engine = create_engine(f"sqlite:///{db_path}")
         table_names = inspect(engine).get_table_names()
@@ -813,7 +966,9 @@ class TestMigrationRoundTrip:
         self._prepare_stamped_db(db_path)
 
         run_migrations(db_path)
-        downgrade_migration(db_path, revision="-1")
+        downgrade_migration(
+            db_path, revision="20260218_1000_add_artifact_uuid_column"
+        )
         run_migrations(db_path)  # re-apply
 
         engine = create_engine(f"sqlite:///{db_path}")
