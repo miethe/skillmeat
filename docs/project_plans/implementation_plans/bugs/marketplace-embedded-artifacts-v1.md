@@ -2,7 +2,7 @@
 schema_version: '1.1'
 doc_type: implementation_plan
 title: Fix Marketplace Embedded Artifacts Detection and File Loading
-status: in-progress
+status: completed
 created: '2026-02-21'
 updated: '2026-02-21'
 feature_slug: marketplace-embedded-artifacts
@@ -16,7 +16,6 @@ related_documents:
 - docs/project_plans/PRDs/features/marketplace-source-detection-improvements-v1.md
 - docs/project_plans/bugs/marketplace-sources-non_skills-v1.md
 ---
-
 # Implementation Plan: Fix Marketplace Embedded Artifacts Detection and File Loading
 
 **Plan ID**: `BUGFIX-2026-02-21-EMBEDDED-ARTIFACTS`
