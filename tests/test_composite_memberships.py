@@ -1020,14 +1020,14 @@ class TestCreateSkillComposite:
         parsed = _json.loads(record["metadata_json"])
         assert parsed["artifact_uuid"] == child_uuid
 
-    def test_no_membership_rows_created_phase1(
+    def test_membership_rows_created_for_embedded_artifacts(
         self, composite_service: CompositeService
     ) -> None:
-        """create_skill_composite() does not create CompositeMembership rows in Phase 1.
+        """create_skill_composite() creates CompositeMembership rows for embedded artifacts.
 
-        Member creation is deferred to Phase 2 (TASK-2.1).  Even when
-        embedded_list is non-empty the method must not create any membership
-        edges in the current phase.
+        Arrange: a skill artifact and one embedded command artifact.
+        Act: call create_skill_composite() with a non-empty embedded_list.
+        Assert: one CompositeMembership row is created and linked to the composite.
         """
         repo = composite_service._repo
         child_uuid = _seed_project_and_artifact(
@@ -1042,7 +1042,10 @@ class TestCreateSkillComposite:
             uuid = child_uuid
 
         class _MockEmbedded:
-            id = "command:some-cmd"
+            artifact_type = "command"
+            name = "some-cmd"
+            upstream_url = "https://github.com/example/repo/commands/some-cmd"
+            content_hash = None
 
         record = composite_service.create_skill_composite(
             skill_artifact=_MockArtifact(),
@@ -1050,12 +1053,14 @@ class TestCreateSkillComposite:
             collection_id="collection-skill-003",
         )
 
-        # Verify no membership rows were created for this composite
-        assert record["memberships"] == []
+        # Verify one membership row was created for this composite
+        assert len(record["memberships"]) == 1
+        assert record["memberships"][0]["composite_id"] == "composite:embedded-skill"
 
         # Double-check via repository query
         children = repo.get_children_of(record["id"], "collection-skill-003")
-        assert children == []
+        assert len(children) == 1
+        assert children[0]["composite_id"] == record["id"]
 
     def test_composite_id_derived_from_skill_artifact_id(
         self, composite_service: CompositeService

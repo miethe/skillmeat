@@ -386,9 +386,25 @@ class CompositeService:
     ) -> "CompositeRecord":
         """Create a CompositeArtifact of type 'skill' wrapping a skill artifact.
 
-        Registers the given skill as a skill-type composite in the DB cache.
-        Member creation (dedup logic) is deferred to Phase 2 (TASK-2.1) and
-        is intentionally not implemented here.
+        Registers the given skill as a skill-type composite in the DB cache,
+        deduplicates embedded child artifacts by content hash, and creates
+        ``CompositeMembership`` rows linking the composite to each child.
+
+        Dedup behaviour
+        ---------------
+        For each item in ``embedded_list``:
+
+        1. If ``content_hash`` is present, query ``artifacts.content_hash``
+           for an existing row — reuse its UUID if found.
+        2. Fall back to an ``artifacts.id`` lookup using the ``type:name`` key.
+        3. If still not found, create a new ``Artifact`` row under the
+           ``collection_artifacts_global`` sentinel project.
+
+        Membership upsert
+        -----------------
+        A ``CompositeMembership`` edge is only inserted when the
+        ``(collection_id, composite_id, child_artifact_uuid)`` triple does not
+        already exist, so re-importing the same skill is idempotent.
 
         The ``metadata_json`` field carries the originating skill's stable UUID
         so that callers can correlate the composite back to the source artifact
@@ -402,10 +418,10 @@ class CompositeService:
             skill_artifact: Artifact ORM instance (or any object exposing
                 ``.id`` and ``.uuid`` attributes) for the skill being
                 wrapped as a composite.
-            embedded_list: List of embedded child artifact objects discovered
-                inside the skill directory.  **Not used in Phase 1** — member
-                rows will be created in Phase 2 (TASK-2.1).  Accepted here so
-                the call-site signature is stable across both phases.
+            embedded_list: List of ``DetectedArtifact``-like objects discovered
+                inside the skill directory.  Each item must expose at least
+                ``artifact_type``, ``name``, ``upstream_url``, and optionally
+                ``content_hash``.
             collection_id: Owning collection identifier.  Defaults to
                 ``"default"`` when not specified.
             display_name: Optional human-readable label for the composite.
@@ -419,12 +435,6 @@ class CompositeService:
         Raises:
             ConstraintError: When a composite with the derived ``composite_id``
                 already exists in the collection.
-
-        Note:
-            **Phase 2 (TASK-2.1)**: Member creation with dedup logic is
-            intentionally omitted here.  Once TASK-2.1 is complete, call
-            ``add_composite_member()`` for each entry in ``embedded_list``
-            after creating the composite.
 
         Example:
             >>> svc = CompositeService()
@@ -450,16 +460,34 @@ class CompositeService:
             collection_id,
         )
 
-        # TODO (TASK-2.1): iterate over embedded_list and call
-        #   add_composite_member() for each entry after applying dedup logic.
-        logger.debug(
-            "create_skill_composite: member creation deferred to Phase 2 "
-            "(TASK-2.1) — %d embedded artifact(s) will be added later",
-            len(embedded_list),
-        )
-
         with self._repo.transaction() as session:
-            from skillmeat.cache.models import CompositeArtifact
+            from skillmeat.cache.models import Artifact, CompositeArtifact, CompositeMembership
+            from skillmeat.cache.models import Project
+
+            # Sentinel project_id for collection-scoped artifact rows (must
+            # match _COLLECTION_ARTIFACTS_PROJECT_ID in artifact_cache_service).
+            _SENTINEL_PROJECT_ID = "collection_artifacts_global"
+
+            # Ensure the sentinel Project row exists so that Artifact FK is satisfied.
+            _sentinel_exists = (
+                session.query(Project.id)
+                .filter(Project.id == _SENTINEL_PROJECT_ID)
+                .first()
+            )
+            if not _sentinel_exists:
+                sentinel = Project(
+                    id=_SENTINEL_PROJECT_ID,
+                    name="Collection Artifacts",
+                    path="~/.skillmeat/collections",
+                    description="Sentinel project for collection artifacts",
+                    status="active",
+                )
+                session.add(sentinel)
+                session.flush()
+                logger.debug(
+                    "create_skill_composite: created sentinel Project row '%s'",
+                    _SENTINEL_PROJECT_ID,
+                )
 
             composite = CompositeArtifact(
                 id=composite_id,
@@ -471,14 +499,113 @@ class CompositeService:
             )
             session.add(composite)
             session.flush()
+
+            # ------------------------------------------------------------------
+            # SCA-P2-01 + SCA-P2-02: Dedup + membership creation
+            # ------------------------------------------------------------------
+            dedup_hits = 0
+            dedup_misses = 0
+            memberships_created = 0
+            memberships_skipped = 0
+
+            for embedded in embedded_list:
+                child_content_hash: Optional[str] = getattr(embedded, "content_hash", None)
+                child_type: str = getattr(embedded, "artifact_type", "skill")
+                child_name: str = getattr(embedded, "name", "")
+                child_artifact_id = f"{child_type}:{child_name}"
+                child_source: Optional[str] = getattr(embedded, "upstream_url", None)
+
+                # --- Dedup: find existing Artifact by content hash first, then id ---
+                existing_artifact: Optional[Any] = None
+                if child_content_hash:
+                    existing_artifact = (
+                        session.query(Artifact)
+                        .filter(Artifact.content_hash == child_content_hash)
+                        .first()
+                    )
+
+                if existing_artifact is None:
+                    # Fall back to id-based lookup (no content hash or no hash match)
+                    existing_artifact = (
+                        session.query(Artifact)
+                        .filter(Artifact.id == child_artifact_id)
+                        .first()
+                    )
+
+                if existing_artifact is not None:
+                    child_uuid = str(existing_artifact.uuid)
+                    dedup_hits += 1
+                    logger.debug(
+                        "create_skill_composite: dedup HIT for '%s' → uuid=%s",
+                        child_artifact_id,
+                        child_uuid,
+                    )
+                else:
+                    # Create a new Artifact row for this embedded child.
+                    import uuid as _uuid_mod  # noqa: PLC0415 — lazy import to avoid re-export
+
+                    child_uuid = _uuid_mod.uuid4().hex
+                    new_artifact = Artifact(
+                        id=child_artifact_id,
+                        uuid=child_uuid,
+                        project_id=_SENTINEL_PROJECT_ID,
+                        name=child_name,
+                        type=child_type,
+                        source=child_source,
+                        content_hash=child_content_hash,
+                    )
+                    session.add(new_artifact)
+                    session.flush()
+                    dedup_misses += 1
+                    logger.debug(
+                        "create_skill_composite: created Artifact row '%s' uuid=%s",
+                        child_artifact_id,
+                        child_uuid,
+                    )
+
+                # --- Upsert membership: skip if the edge already exists ---
+                existing_membership = (
+                    session.query(CompositeMembership)
+                    .filter(
+                        CompositeMembership.collection_id == collection_id,
+                        CompositeMembership.composite_id == composite_id,
+                        CompositeMembership.child_artifact_uuid == child_uuid,
+                    )
+                    .first()
+                )
+                if existing_membership is not None:
+                    memberships_skipped += 1
+                    logger.debug(
+                        "create_skill_composite: membership already exists "
+                        "composite=%s child_uuid=%s — skipping",
+                        composite_id,
+                        child_uuid,
+                    )
+                    continue
+
+                membership = CompositeMembership(
+                    collection_id=collection_id,
+                    composite_id=composite_id,
+                    child_artifact_uuid=child_uuid,
+                    relationship_type="contains",
+                )
+                session.add(membership)
+                memberships_created += 1
+
+            session.flush()
             session.refresh(composite)
             result = self._repo._composite_to_dict(composite)
 
         logger.info(
             "create_skill_composite: created CompositeArtifact id=%s type=skill "
-            "collection=%s",
+            "collection=%s dedup_hits=%d dedup_misses=%d "
+            "memberships_created=%d memberships_skipped=%d",
             composite_id,
             collection_id,
+            dedup_hits,
+            dedup_misses,
+            memberships_created,
+            memberships_skipped,
         )
         return result
 
