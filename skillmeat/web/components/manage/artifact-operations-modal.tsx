@@ -335,11 +335,36 @@ interface HistoryEntry {
 // Tab Configuration
 // ============================================================================
 
-const PLUGIN_TAB: Tab = {
-  value: 'plugin',
-  label: 'Plugin Members',
-  icon: Blocks,
-};
+/**
+ * Returns the "Members" tab definition for composite artifacts.
+ * The label is derived from compositeType so skill-composites show "Skill Members"
+ * and plugin-composites show "Plugin Members". Falls back to "Members" for unknown types.
+ */
+function getMembersTab(compositeType?: Artifact['compositeType']): Tab {
+  let displayName: string;
+  switch (compositeType) {
+    case 'plugin':
+      displayName = 'Plugin';
+      break;
+    case 'skill':
+      displayName = 'Skill';
+      break;
+    case 'stack':
+      displayName = 'Stack';
+      break;
+    case 'suite':
+      displayName = 'Suite';
+      break;
+    default:
+      displayName = '';
+      break;
+  }
+  return {
+    value: 'plugin',
+    label: displayName ? `${displayName} Members` : 'Members',
+    icon: Blocks,
+  };
+}
 
 function getTabs(artifact: Artifact | null): Tab[] {
   const deploymentCount = artifact?.deployments?.length || 0;
@@ -370,8 +395,9 @@ function getTabs(artifact: Artifact | null): Tab[] {
 
   if (!isComposite) return baseTabs;
 
-  // Insert Plugin Members tab after Overview (index 2, after status and overview)
-  return [baseTabs[0]!, baseTabs[1]!, PLUGIN_TAB, ...baseTabs.slice(2)];
+  // Insert Members tab after Overview (index 2, after status and overview)
+  const membersTab = getMembersTab(artifact?.compositeType);
+  return [baseTabs[0]!, baseTabs[1]!, membersTab, ...baseTabs.slice(2)];
 }
 
 // ============================================================================

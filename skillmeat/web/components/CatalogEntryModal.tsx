@@ -159,6 +159,26 @@ const statusConfig: Record<CatalogStatus, { label: string; className: string }> 
 };
 
 /**
+ * Maps a composite_type value to a human-readable display name for the breakdown tab.
+ * Returns "Plugin" for plugin composites, "Skill" for skill composites, and
+ * "Members" as a fallback for unknown or absent composite_type values.
+ */
+function getCompositeDisplayName(compositeType?: string | null): string {
+  switch (compositeType) {
+    case 'plugin':
+      return 'Plugin';
+    case 'skill':
+      return 'Skill';
+    case 'stack':
+      return 'Stack';
+    case 'suite':
+      return 'Suite';
+    default:
+      return 'Members';
+  }
+}
+
+/**
  * Transform flat file list from API to hierarchical FileNode structure
  *
  * Converts flat paths like ["src/index.ts", "src/utils/helper.ts"]
@@ -477,6 +497,7 @@ export function CatalogEntryModal({
   // Fetch catalog entries for composite plugin breakdown tab.
   // Enabled only when the modal is open, the entry is composite, and the plugin tab is active.
   const isComposite = entry?.artifact_type === 'composite';
+  const compositeDisplayName = getCompositeDisplayName(entry?.composite_type);
   const showPluginTab = isComposite && activeTab === 'plugin';
   // Pass empty string when disabled — useSourceCatalog uses !!sourceId to guard the query
   const pluginTabSourceId = showPluginTab && sourceId ? sourceId : '';
@@ -821,7 +842,7 @@ export function CatalogEntryModal({
                   className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
                 >
                   <Blocks className="mr-2 h-4 w-4 text-indigo-500" aria-hidden="true" />
-                  <span className="text-indigo-500 dark:text-indigo-400">Plugin Breakdown</span>
+                  <span className="text-indigo-500 dark:text-indigo-400">{compositeDisplayName} Breakdown</span>
                 </TabsTrigger>
               )}
               {entry.status === 'imported' && (
@@ -1190,10 +1211,10 @@ export function CatalogEntryModal({
                 <div className="space-y-4">
                   <div className="space-y-1">
                     <h3 className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
-                      Plugin Breakdown
+                      {compositeDisplayName} Breakdown
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                      Child artifacts included in this plugin, categorised by import impact.
+                      Child artifacts included in this {compositeDisplayName.toLowerCase()}, categorised by import impact.
                     </p>
                   </div>
 
@@ -1201,7 +1222,7 @@ export function CatalogEntryModal({
                     <div className="flex items-center justify-center py-8" role="status">
                       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
                       <span className="ml-2 text-sm text-muted-foreground">
-                        Loading plugin breakdown...
+                        Loading {compositeDisplayName.toLowerCase()} breakdown...
                       </span>
                     </div>
                   ) : compositePreviewData && compositePreviewData.totalChildren > 0 ? (
@@ -1222,7 +1243,7 @@ export function CatalogEntryModal({
                         No child artifacts detected
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground/70">
-                        Open the Plugin Breakdown tab again after a source rescan to populate children.
+                        Open the {compositeDisplayName} Breakdown tab again after a source rescan to populate children.
                       </p>
                     </div>
                   ) : (
@@ -1233,7 +1254,7 @@ export function CatalogEntryModal({
                         aria-hidden="true"
                       />
                       <p className="text-sm font-medium text-muted-foreground">
-                        Select the Plugin Breakdown tab to load child artifacts
+                        Select the {compositeDisplayName} Breakdown tab to load child artifacts
                       </p>
                     </div>
                   )}
