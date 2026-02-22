@@ -549,6 +549,346 @@ class TestNonSkillArtifactUnchanged:
         mock_children.assert_not_called()
 
 
+# ---------------------------------------------------------------------------
+# Integration tests (TASK-6.3): end-to-end deploy_artifacts scenarios
+# ---------------------------------------------------------------------------
+
+
+def _make_integration_manager(skill_collection, project_dir):
+    """Build a DeploymentManager wired to skill_collection with all side-effects mocked.
+
+    Returns (manager, mock_coll_mgr) so individual tests can further configure mocks.
+    """
+    skill_artifact = _make_artifact("test-skill")
+
+    mock_collection = MagicMock()
+    mock_collection.name = "test-collection"
+    mock_collection.find_artifact.return_value = skill_artifact
+    mock_collection.artifacts = [skill_artifact]
+
+    mock_coll_mgr = MagicMock()
+    mock_coll_mgr.load_collection.return_value = mock_collection
+    # collection_path / artifact.path  => the skill dir itself so source_path is correct
+    mock_coll_mgr.config.get_collection_path.return_value = skill_collection
+
+    manager = DeploymentManager(collection_mgr=mock_coll_mgr)
+    return manager, mock_coll_mgr
+
+
+class TestIntegrationDeployWithMembers:
+    """Scenario 1: deploy_artifacts(include_members=True) writes all member files
+    at their correct type-specific paths alongside the primary skill file."""
+
+    def test_all_four_files_written_at_correct_paths(
+        self, skill_collection, project_dir
+    ):
+        """Deploy skill with 3 composite members → 1 skill + 3 member files written."""
+        from skillmeat.core.path_resolver import default_profile
+
+        manager, _ = _make_integration_manager(skill_collection, project_dir)
+
+        # Three children: one command, one agent, one hook
+        children = [
+            _membership_record("review", "command", "uuid-1"),
+            _membership_record("helper", "agent", "uuid-2"),
+            _membership_record("pre-commit", "hook", "uuid-3"),
+        ]
+
+        with patch.object(
+            manager,
+            "_find_skill_composite_children",
+            return_value=children,
+        ), patch.object(
+            manager, "_record_deployment_version"
+        ), patch.object(
+            manager, "_record_deploy_event"
+        ), patch.object(
+            manager, "_lookup_artifact_uuid", return_value=None
+        ), patch.object(
+            manager, "_resolve_target_profiles", return_value=[default_profile()]
+        ), patch(
+            "skillmeat.storage.deployment.DeploymentTracker"
+        ) as mock_tracker, patch(
+            "skillmeat.core.deployment.compute_content_hash", return_value="a" * 64
+        ):
+            mock_tracker.read_deployments.return_value = []
+            mock_tracker.record_deployment.return_value = None
+
+            manager.deploy_artifacts(
+                artifact_names=["test-skill"],
+                project_path=project_dir,
+                overwrite=True,
+                include_members=True,
+            )
+
+        # Primary skill file
+        skill_dest = project_dir / ".claude" / "skills" / "test-skill"
+        assert skill_dest.exists(), "Primary skill directory not deployed"
+
+        # Member: command
+        cmd_dest = project_dir / ".claude" / "commands" / "review.md"
+        assert cmd_dest.exists(), "Command member not deployed"
+        assert cmd_dest.read_text() == "# Review Command\n\nReview things.\n"
+
+        # Member: agent
+        agent_dest = project_dir / ".claude" / "agents" / "helper.md"
+        assert agent_dest.exists(), "Agent member not deployed"
+        assert agent_dest.read_text() == "# Helper Agent\n\nHelp things.\n"
+
+        # Member: hook
+        hook_dest = project_dir / ".claude" / "hooks" / "pre-commit.md"
+        assert hook_dest.exists(), "Hook member not deployed"
+        assert hook_dest.read_text() == "# Pre-commit Hook\n\nCheck things.\n"
+
+
+class TestIntegrationDeployNoMembers:
+    """Scenario 2: deploy_artifacts(include_members=False) writes only the skill
+    file; member files must NOT be present at their type-specific paths."""
+
+    def test_only_skill_file_written_member_paths_absent(
+        self, skill_collection, project_dir
+    ):
+        """--no-members: only primary skill deployed, member paths not created."""
+        from skillmeat.core.path_resolver import default_profile
+
+        manager, _ = _make_integration_manager(skill_collection, project_dir)
+
+        # Even if the DB had children, include_members=False must skip them entirely.
+        children = [
+            _membership_record("review", "command", "uuid-1"),
+            _membership_record("helper", "agent", "uuid-2"),
+            _membership_record("pre-commit", "hook", "uuid-3"),
+        ]
+
+        with patch.object(
+            manager,
+            "_find_skill_composite_children",
+            return_value=children,
+        ) as mock_children, patch.object(
+            manager, "_record_deployment_version"
+        ), patch.object(
+            manager, "_record_deploy_event"
+        ), patch.object(
+            manager, "_lookup_artifact_uuid", return_value=None
+        ), patch.object(
+            manager, "_resolve_target_profiles", return_value=[default_profile()]
+        ), patch(
+            "skillmeat.storage.deployment.DeploymentTracker"
+        ) as mock_tracker, patch(
+            "skillmeat.core.deployment.compute_content_hash", return_value="a" * 64
+        ):
+            mock_tracker.read_deployments.return_value = []
+            mock_tracker.record_deployment.return_value = None
+
+            manager.deploy_artifacts(
+                artifact_names=["test-skill"],
+                project_path=project_dir,
+                overwrite=True,
+                include_members=False,
+            )
+
+        # DB must never be consulted for children when include_members=False
+        mock_children.assert_not_called()
+
+        # Skill itself is deployed
+        skill_dest = project_dir / ".claude" / "skills" / "test-skill"
+        assert skill_dest.exists(), "Primary skill directory should be deployed"
+
+        # Member paths must be absent
+        assert not (project_dir / ".claude" / "commands" / "review.md").exists(), (
+            "Command member should NOT be deployed with --no-members"
+        )
+        assert not (project_dir / ".claude" / "agents" / "helper.md").exists(), (
+            "Agent member should NOT be deployed with --no-members"
+        )
+        assert not (project_dir / ".claude" / "hooks" / "pre-commit.md").exists(), (
+            "Hook member should NOT be deployed with --no-members"
+        )
+
+
+class TestIntegrationNonSkillArtifact:
+    """Scenario 3: deploying a non-skill artifact (e.g. command) must follow the
+    existing behavior with no member lookup attempted at any point."""
+
+    def test_command_artifact_deployed_normally_no_member_lookup(
+        self, tmp_path, project_dir
+    ):
+        """Command artifact deploys its .md file; _find_skill_composite_children never called."""
+        from skillmeat.core.path_resolver import default_profile
+
+        # Build a minimal command collection layout
+        cmd_collection = tmp_path / "collection"
+        cmd_dir = cmd_collection / "artifacts" / "commands"
+        cmd_dir.mkdir(parents=True)
+        cmd_file = cmd_dir / "review.md"
+        cmd_file.write_text("# Review Command\n\nThis is a standalone command.\n")
+
+        cmd_artifact = _make_artifact(
+            "review",
+            artifact_type=ArtifactType.COMMAND,
+            path="artifacts/commands/review.md",
+        )
+
+        mock_collection = MagicMock()
+        mock_collection.name = "test-collection"
+        mock_collection.find_artifact.return_value = cmd_artifact
+        mock_collection.artifacts = [cmd_artifact]
+
+        mock_coll_mgr = MagicMock()
+        mock_coll_mgr.load_collection.return_value = mock_collection
+        mock_coll_mgr.config.get_collection_path.return_value = cmd_collection
+
+        manager = DeploymentManager(collection_mgr=mock_coll_mgr)
+
+        with patch.object(
+            manager, "_find_skill_composite_children"
+        ) as mock_children, patch.object(
+            manager, "_record_deployment_version"
+        ), patch.object(
+            manager, "_record_deploy_event"
+        ), patch.object(
+            manager, "_lookup_artifact_uuid", return_value=None
+        ), patch.object(
+            manager, "_resolve_target_profiles", return_value=[default_profile()]
+        ), patch(
+            "skillmeat.storage.deployment.DeploymentTracker"
+        ) as mock_tracker, patch(
+            "skillmeat.core.deployment.compute_content_hash", return_value="b" * 64
+        ):
+            mock_tracker.read_deployments.return_value = []
+            mock_tracker.record_deployment.return_value = None
+
+            manager.deploy_artifacts(
+                artifact_names=["review"],
+                project_path=project_dir,
+                artifact_type=ArtifactType.COMMAND,
+                overwrite=True,
+                include_members=True,  # even with True, non-skill must not trigger lookup
+            )
+
+        # No member lookup for non-skill types
+        mock_children.assert_not_called()
+
+        # The command file itself must have been deployed
+        cmd_dest = project_dir / ".claude" / "commands" / "review.md"
+        assert cmd_dest.exists(), "Command file should be deployed normally"
+        assert "standalone command" in cmd_dest.read_text()
+
+
+class TestIntegrationConflictDetectionOnMember:
+    """Scenario 4: when a member file already exists at its target path with
+    different content, conflict detection is triggered (same as parent skill)."""
+
+    def test_existing_modified_member_file_triggers_conflict(
+        self, skill_collection, project_dir
+    ):
+        """Pre-existing member file with differing content triggers overwrite-skip path."""
+        from skillmeat.core.path_resolver import default_profile
+
+        # Pre-create the command member file with different content (simulates local edit)
+        cmd_dest = project_dir / ".claude" / "commands" / "review.md"
+        cmd_dest.write_text("# Locally modified review command\n\nCustom content.\n")
+
+        manager, _ = _make_integration_manager(skill_collection, project_dir)
+
+        children = [
+            _membership_record("review", "command", "uuid-1"),
+        ]
+
+        with patch.object(
+            manager,
+            "_find_skill_composite_children",
+            return_value=children,
+        ), patch.object(
+            manager, "_record_deployment_version"
+        ), patch.object(
+            manager, "_record_deploy_event"
+        ), patch.object(
+            manager, "_lookup_artifact_uuid", return_value=None
+        ), patch.object(
+            manager, "_resolve_target_profiles", return_value=[default_profile()]
+        ), patch(
+            "skillmeat.storage.deployment.DeploymentTracker"
+        ) as mock_tracker, patch(
+            "skillmeat.core.deployment.compute_content_hash", return_value="a" * 64
+        ):
+            mock_tracker.read_deployments.return_value = []
+            mock_tracker.record_deployment.return_value = None
+
+            # overwrite=False → conflict prompt is hit; patch Confirm.ask to refuse
+            with patch("skillmeat.core.deployment.Confirm.ask", return_value=False) as mock_confirm:
+                manager.deploy_artifacts(
+                    artifact_names=["test-skill"],
+                    project_path=project_dir,
+                    overwrite=False,
+                    include_members=True,
+                )
+
+        # Conflict.ask must have been invoked for the pre-existing member file
+        mock_confirm.assert_called_once()
+        call_args = mock_confirm.call_args[0][0]
+        assert "review" in call_args, (
+            f"Confirm.ask should reference member name 'review', got: {call_args!r}"
+        )
+
+        # The locally-modified content must NOT have been overwritten
+        assert cmd_dest.read_text() == "# Locally modified review command\n\nCustom content.\n", (
+            "Local member file content must be preserved when user declines overwrite"
+        )
+
+    def test_existing_member_file_overwritten_when_overwrite_true(
+        self, skill_collection, project_dir
+    ):
+        """When overwrite=True, a pre-existing member file is replaced without prompting."""
+        from skillmeat.core.path_resolver import default_profile
+
+        # Pre-create member file with stale content
+        cmd_dest = project_dir / ".claude" / "commands" / "review.md"
+        cmd_dest.write_text("stale content\n")
+
+        manager, _ = _make_integration_manager(skill_collection, project_dir)
+
+        children = [
+            _membership_record("review", "command", "uuid-1"),
+        ]
+
+        with patch.object(
+            manager,
+            "_find_skill_composite_children",
+            return_value=children,
+        ), patch.object(
+            manager, "_record_deployment_version"
+        ), patch.object(
+            manager, "_record_deploy_event"
+        ), patch.object(
+            manager, "_lookup_artifact_uuid", return_value=None
+        ), patch.object(
+            manager, "_resolve_target_profiles", return_value=[default_profile()]
+        ), patch(
+            "skillmeat.storage.deployment.DeploymentTracker"
+        ) as mock_tracker, patch(
+            "skillmeat.core.deployment.compute_content_hash", return_value="a" * 64
+        ):
+            mock_tracker.read_deployments.return_value = []
+            mock_tracker.record_deployment.return_value = None
+
+            with patch("skillmeat.core.deployment.Confirm.ask") as mock_confirm:
+                manager.deploy_artifacts(
+                    artifact_names=["test-skill"],
+                    project_path=project_dir,
+                    overwrite=True,
+                    include_members=True,
+                )
+
+        # With overwrite=True, Confirm.ask must NOT be called for member files
+        mock_confirm.assert_not_called()
+
+        # The file must have been updated with the collection content
+        assert cmd_dest.read_text() == "# Review Command\n\nReview things.\n", (
+            "Member file should be overwritten with collection content when overwrite=True"
+        )
+
+
 class TestFindSkillCompositeChildren:
     """Unit tests for _find_skill_composite_children helper."""
 

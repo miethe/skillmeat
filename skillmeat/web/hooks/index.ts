@@ -142,6 +142,14 @@ export {
   useArtifactAssociations,
 } from './useArtifactAssociations';
 
+// Per-member version comparison rows (sync diff)
+export {
+  skillSyncDiffKeys,
+  useSkillSyncDiff,
+  type VersionComparisonRow,
+  type UseSkillSyncDiffOptions,
+} from './useSkillSyncDiff';
+
 // ============================================================================
 // COMPOSITES (8 hooks)
 // ============================================================================

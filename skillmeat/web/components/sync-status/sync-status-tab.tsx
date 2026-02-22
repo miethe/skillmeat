@@ -20,6 +20,7 @@ import { ArtifactFlowBanner } from './artifact-flow-banner';
 import { ComparisonSelector, type ComparisonScope } from './comparison-selector';
 import { DriftAlertBanner, type DriftStatus } from './drift-alert-banner';
 import { SyncActionsFooter } from './sync-actions-footer';
+import { SkillMemberDrift } from './skill-member-drift';
 
 // Existing components
 import { DiffViewer } from '@/components/entity/diff-viewer';
@@ -985,6 +986,15 @@ export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatus
           <div className="flex-shrink-0 space-y-2 border-b p-4">
             <ComparisonSelector {...comparisonProps} />
             {!isDriftDismissed && <DriftAlertBanner {...alertProps} />}
+            {/* Member drift rows — only rendered for skill artifacts */}
+            {entity.type === 'skill' && (
+              <SkillMemberDrift
+                artifactId={entity.id}
+                collection={entity.collection}
+                projectId={projectPath}
+                comparisonScope={comparisonScope}
+              />
+            )}
           </div>
           <div className="min-h-0 min-w-0 flex-1 overflow-auto">
             <DiffViewer {...diffProps} />

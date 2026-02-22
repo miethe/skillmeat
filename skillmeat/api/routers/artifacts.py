@@ -8368,6 +8368,125 @@ async def get_unlinked_references(
 
 
 @router.get(
+    "/{artifact_id}/sync-diff",
+    summary="Get per-member version comparison rows for a skill",
+    description=(
+        "Return a flat list of VersionComparisonRow objects for the given skill artifact "
+        "and its composite members.  The first element is always the parent skill row "
+        "(is_member=False); subsequent elements are member rows (is_member=True).  "
+        "Returns a single-element list for skills without embedded members.  "
+        "Requires collection and project_id query parameters."
+    ),
+    responses={
+        200: {"description": "Successfully retrieved sync diff rows"},
+        400: {"model": ErrorResponse, "description": "Invalid artifact ID or missing params"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_skill_sync_diff(
+    artifact_id: str,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (uses active collection if omitted)",
+    ),
+    project_id: Optional[str] = Query(
+        default=None,
+        description="Project identifier for deployed_version lookup",
+    ),
+):
+    """Return hierarchical version comparison rows for a skill and its members.
+
+    Uses ``compute_skill_sync_diff()`` from the sync diff service to build one
+    row per artifact (parent + members) with ``source_version``,
+    ``collection_version``, and ``deployed_version`` fields.
+
+    Args:
+        artifact_id: Artifact identifier in ``type:name`` format.
+        collection_mgr: Collection manager dependency.
+        _token: Authentication token dependency.
+        collection: Collection name; defaults to active collection.
+        project_id: Project identifier for deployed_version resolution.
+
+    Returns:
+        JSON list of VersionComparisonRow-shaped dicts.
+
+    Raises:
+        HTTPException 400: Invalid artifact_id or missing required params.
+        HTTPException 404: Artifact not found.
+        HTTPException 500: Unexpected database or service error.
+    """
+    from skillmeat.core.services.sync_diff_service import compute_skill_sync_diff  # noqa: PLC0415
+
+    try:
+        # Validate artifact ID
+        try:
+            parse_artifact_id(artifact_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        collection_name = collection or collection_mgr.get_active_collection_name()
+        if not collection_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No active collection found. Pass the 'collection' query parameter.",
+            )
+
+        # Resolve a db_path by looking up the collection path
+        try:
+            collection_path = collection_mgr.config.get_collection_path(collection_name)
+            db_path = str(collection_path / "cache.db")
+        except Exception:
+            db_path = None
+
+        effective_project_id = project_id or ""
+
+        rows = compute_skill_sync_diff(
+            artifact_id=artifact_id,
+            collection_id=collection_name,
+            project_id=effective_project_id,
+            db_path=db_path or "",
+            _session=get_session() if not db_path else None,
+        )
+
+        return [
+            {
+                "artifact_id": r.artifact_id,
+                "artifact_name": r.artifact_name,
+                "artifact_type": r.artifact_type,
+                "source_version": r.source_version,
+                "collection_version": r.collection_version,
+                "deployed_version": r.deployed_version,
+                "is_member": r.is_member,
+                "parent_artifact_id": r.parent_artifact_id,
+            }
+            for r in rows
+        ]
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to compute sync diff for '%s': %s", artifact_id, e, exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to compute sync diff: {str(e)}",
+        )
+
+
+@router.get(
     "/{artifact_id}/associations",
     response_model=AssociationsDTO,
     summary="Get artifact associations",
