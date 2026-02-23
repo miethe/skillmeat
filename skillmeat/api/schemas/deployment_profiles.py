@@ -16,6 +16,11 @@ class DeploymentProfileCreate(BaseModel):
     profile_id: str = Field(description="Profile identifier unique per project")
     platform: Platform = Field(description="Target platform for this profile")
     root_dir: str = Field(description="Profile root directory")
+    description: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="Human-readable description of the deployment profile",
+    )
     artifact_path_map: Dict[str, str] = Field(default_factory=dict)
     project_config_filenames: List[str] = Field(default_factory=list)
     context_path_prefixes: List[str] = Field(default_factory=list)
@@ -30,6 +35,11 @@ class DeploymentProfileUpdate(BaseModel):
 
     platform: Optional[Platform] = None
     root_dir: Optional[str] = None
+    description: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="Human-readable description of the deployment profile",
+    )
     artifact_path_map: Optional[Dict[str, str]] = None
     project_config_filenames: Optional[List[str]] = None
     context_path_prefixes: Optional[List[str]] = None
@@ -44,6 +54,11 @@ class DeploymentProfileRead(BaseModel):
     profile_id: str
     platform: Platform
     root_dir: str
+    description: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="Human-readable description of the deployment profile",
+    )
     artifact_path_map: Dict[str, str] = Field(default_factory=dict)
     project_config_filenames: List[str] = Field(default_factory=list)
     context_path_prefixes: List[str] = Field(default_factory=list)

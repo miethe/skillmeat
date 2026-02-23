@@ -408,6 +408,7 @@ class DeploymentProfile(Base):
     profile_id: Mapped[str] = mapped_column(String, nullable=False)
     platform: Mapped[str] = mapped_column(String, nullable=False)
     root_dir: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     artifact_path_map: Mapped[Optional[Dict[str, str]]] = mapped_column(
         JSON, nullable=True
     )
@@ -451,6 +452,7 @@ class DeploymentProfile(Base):
             "profile_id": self.profile_id,
             "platform": self.platform,
             "root_dir": self.root_dir,
+            "description": self.description,
             "artifact_path_map": self.artifact_path_map,
             "config_filenames": self.config_filenames or [],
             "context_prefixes": self.context_prefixes or [],

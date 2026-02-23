@@ -1,72 +1,83 @@
 ---
-title: "PRD: Enhanced Platform Profiles"
+title: 'PRD: Enhanced Platform Profiles'
 schema_version: 2
 doc_type: prd
-status: draft
+status: inferred_complete
 created: 2026-02-22
 updated: 2026-02-22
-feature_slug: "enhanced-platform-profiles"
-feature_version: "v1"
+feature_slug: enhanced-platform-profiles
+feature_version: v1
 prd_ref: null
 plan_ref: null
 related_documents:
-  - "skillmeat/cache/models.py"
-  - "skillmeat/api/schemas/deployment_profiles.py"
-  - "skillmeat/api/routers/deployment_profiles.py"
-  - "skillmeat/web/app/projects/components/create-project-dialog.tsx"
-  - "skillmeat/web/app/projects/[id]/profiles/page.tsx"
-  - "skillmeat/web/app/settings/page.tsx"
-  - "skillmeat/web/components/settings/platform-defaults-settings.tsx"
-  - "skillmeat/web/lib/constants/platform-defaults.ts"
+- skillmeat/cache/models.py
+- skillmeat/api/schemas/deployment_profiles.py
+- skillmeat/api/routers/deployment_profiles.py
+- skillmeat/web/app/projects/components/create-project-dialog.tsx
+- skillmeat/web/app/projects/[id]/profiles/page.tsx
+- skillmeat/web/app/settings/page.tsx
+- skillmeat/web/components/settings/platform-defaults-settings.tsx
+- skillmeat/web/lib/constants/platform-defaults.ts
 owner: null
 contributors: []
 priority: high
 risk_level: medium
-category: "product-planning"
-tags: [prd, planning, feature, deployment-profiles, settings, create-project]
+category: product-planning
+tags:
+- prd
+- planning
+- feature
+- deployment-profiles
+- settings
+- create-project
 milestone: null
 commit_refs: []
 pr_refs: []
 files_affected:
-  - "skillmeat/cache/models.py"
-  - "skillmeat/cache/migrations/"
-  - "skillmeat/api/schemas/deployment_profiles.py"
-  - "skillmeat/api/routers/deployment_profiles.py"
-  - "skillmeat/cache/repositories.py"
-  - "skillmeat/web/app/projects/components/create-project-dialog.tsx"
-  - "skillmeat/web/app/projects/[id]/profiles/page.tsx"
-  - "skillmeat/web/app/settings/page.tsx"
-  - "skillmeat/web/components/settings/platform-defaults-settings.tsx"
-  - "skillmeat/web/components/profiles/"
-  - "skillmeat/web/types/deployments.ts"
-problem_statement: "Users creating projects cannot select or customize platform deployment profiles during project creation, and the Create Profile form is not reusable across the app, making the platform configuration workflow fragmented and error-prone."
-personas: ["Power User", "First-time User"]
+- skillmeat/cache/models.py
+- skillmeat/cache/migrations/
+- skillmeat/api/schemas/deployment_profiles.py
+- skillmeat/api/routers/deployment_profiles.py
+- skillmeat/cache/repositories.py
+- skillmeat/web/app/projects/components/create-project-dialog.tsx
+- skillmeat/web/app/projects/[id]/profiles/page.tsx
+- skillmeat/web/app/settings/page.tsx
+- skillmeat/web/components/settings/platform-defaults-settings.tsx
+- skillmeat/web/components/profiles/
+- skillmeat/web/types/deployments.ts
+problem_statement: Users creating projects cannot select or customize platform deployment
+  profiles during project creation, and the Create Profile form is not reusable across
+  the app, making the platform configuration workflow fragmented and error-prone.
+personas:
+- Power User
+- First-time User
 goals:
-  - "Profile selection integrated into Create Project dialog"
-  - "Reusable Create Profile component usable in page and dialog contexts"
-  - "Intuitive multi-select artifact type field with auto-populated path map"
-  - "Description field on DeploymentProfile visible throughout the UI"
-  - "New Platforms tab in Settings for global platform management"
+- Profile selection integrated into Create Project dialog
+- Reusable Create Profile component usable in page and dialog contexts
+- Intuitive multi-select artifact type field with auto-populated path map
+- Description field on DeploymentProfile visible throughout the UI
+- New Platforms tab in Settings for global platform management
 non_goals:
-  - "Cross-project profile sharing or a global profile library"
-  - "Real-time platform detection from filesystem"
-  - "Breaking changes to existing DeploymentProfile API contract"
+- Cross-project profile sharing or a global profile library
+- Real-time platform detection from filesystem
+- Breaking changes to existing DeploymentProfile API contract
 success_metrics:
-  - "Users can select or customize a platform profile within Create Project without leaving the dialog"
-  - "Create Profile form renders correctly in both inline-page and dialog-modal contexts"
-  - "Artifact type multi-select pre-populates and auto-fills artifact_path_map for all five platforms"
-  - "description field persists through create/edit/read round-trips for DeploymentProfile"
-  - "Settings > Platforms tab loads platform defaults and lists custom profiles"
+- Users can select or customize a platform profile within Create Project without leaving
+  the dialog
+- Create Profile form renders correctly in both inline-page and dialog-modal contexts
+- Artifact type multi-select pre-populates and auto-fills artifact_path_map for all
+  five platforms
+- description field persists through create/edit/read round-trips for DeploymentProfile
+- Settings > Platforms tab loads platform defaults and lists custom profiles
 dependencies:
-  - "Existing DeploymentProfile CRUD (router, repository, schema)"
-  - "platform-defaults.ts constants mirroring backend PLATFORM_DEFAULTS"
-  - "Alembic migration toolchain"
-  - "shadcn/ui multi-select or Radix Select primitive"
+- Existing DeploymentProfile CRUD (router, repository, schema)
+- platform-defaults.ts constants mirroring backend PLATFORM_DEFAULTS
+- Alembic migration toolchain
+- shadcn/ui multi-select or Radix Select primitive
 risks:
-  - "Alembic migration conflict if other branches touch deployment_profiles table"
-  - "Frontend field-name divergence between ORM (supported_types) and API schema (supported_artifact_types)"
+- Alembic migration conflict if other branches touch deployment_profiles table
+- Frontend field-name divergence between ORM (supported_types) and API schema (supported_artifact_types)
 ---
-
 # Feature Brief & Metadata
 
 **Feature Name:**

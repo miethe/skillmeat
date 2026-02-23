@@ -12,6 +12,7 @@ from sqlalchemy.orm import sessionmaker
 
 from skillmeat.api.config import APISettings, Environment
 from skillmeat.api.server import create_app
+from skillmeat.cache.migrations import get_alembic_config
 from skillmeat.cache.models import Project, create_db_engine, create_tables
 from skillmeat.cache.repositories import DeploymentProfileRepository
 
@@ -43,7 +44,17 @@ def app(temp_db, monkeypatch):
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[verify_token] = lambda: "test-token"
 
+    # Create all tables via ORM metadata (includes all current columns), then stamp
+    # the Alembic revision to "head" so the repository's run_migrations() is a no-op.
+    # This avoids broken-migration-chain errors caused by incremental ALTER TABLE
+    # migrations running against a partially-populated schema.
+    from alembic import command as alembic_command
+
     create_tables(temp_db)
+    alembic_command.stamp(get_alembic_config(temp_db), "head")
+
+    repo = DeploymentProfileRepository(db_path=temp_db)
+
     engine = create_db_engine(temp_db)
     SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
     session = SessionLocal()
@@ -61,7 +72,6 @@ def app(temp_db, monkeypatch):
         session.close()
         engine.dispose()
 
-    repo = DeploymentProfileRepository(db_path=temp_db)
     monkeypatch.setattr(deployment_profiles, "DeploymentProfileRepository", lambda: repo)
 
     return app
@@ -116,3 +126,51 @@ def test_deployment_profile_crud_endpoints(client):
 
     missing_resp = client.get("/api/v1/projects/proj-api-1/profiles/codex-default")
     assert missing_resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_deployment_profile_description_field(client):
+    """description field should be stored, returned, and updatable."""
+    payload = {
+        "profile_id": "desc-profile",
+        "platform": "claude_code",
+        "root_dir": ".claude",
+        "description": "Test description for profile",
+    }
+
+    create_resp = client.post("/api/v1/projects/proj-api-1/profiles", json=payload)
+    assert create_resp.status_code == status.HTTP_201_CREATED
+    created = create_resp.json()
+    assert created["description"] == "Test description for profile"
+
+    get_resp = client.get("/api/v1/projects/proj-api-1/profiles/desc-profile")
+    assert get_resp.status_code == status.HTTP_200_OK
+    assert get_resp.json()["description"] == "Test description for profile"
+
+    update_resp = client.put(
+        "/api/v1/projects/proj-api-1/profiles/desc-profile",
+        json={"description": "Updated description"},
+    )
+    assert update_resp.status_code == status.HTTP_200_OK
+    assert update_resp.json()["description"] == "Updated description"
+
+    client.delete("/api/v1/projects/proj-api-1/profiles/desc-profile")
+
+
+def test_deployment_profile_description_optional(client):
+    """Creating a profile without description should succeed with description=None."""
+    payload = {
+        "profile_id": "no-desc-profile",
+        "platform": "claude_code",
+        "root_dir": ".claude",
+    }
+
+    create_resp = client.post("/api/v1/projects/proj-api-1/profiles", json=payload)
+    assert create_resp.status_code == status.HTTP_201_CREATED
+    created = create_resp.json()
+    assert created["description"] is None
+
+    get_resp = client.get("/api/v1/projects/proj-api-1/profiles/no-desc-profile")
+    assert get_resp.status_code == status.HTTP_200_OK
+    assert get_resp.json()["description"] is None
+
+    client.delete("/api/v1/projects/proj-api-1/profiles/no-desc-profile")
