@@ -1910,8 +1910,25 @@ deployed_at = "2026-02-10T12:08:33.576115"
 artifact_path = "skills/changelog-generator"
 content_hash = "0facdb5c491a654e3b0f6d300fb8fa14472d811cb715c632dc2862919b277dae"
 local_modifications = false
+version_lineage = [
+    "0facdb5c491a654e3b0f6d300fb8fa14472d811cb715c632dc2862919b277dae",
+]
 merge_base_snapshot = "0facdb5c491a654e3b0f6d300fb8fa14472d811cb715c632dc2862919b277dae"
 deployment_profile_id = "claude_code"
 platform = "claude_code"
 profile_root_dir = ".claude"
 collection_sha = "0facdb5c491a654e3b0f6d300fb8fa14472d811cb715c632dc2862919b277dae"
+
+[[deployed]]
+artifact_name = "demo-generator"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-02-23T12:50:04.858246"
+artifact_path = "agents/demo-generator.md"
+content_hash = "11d77350aed3b22658a8286e2c121d7509ce3d1ddb33d7e0ff7596043aa80dc9"
+local_modifications = false
+merge_base_snapshot = "11d77350aed3b22658a8286e2c121d7509ce3d1ddb33d7e0ff7596043aa80dc9"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
+collection_sha = "11d77350aed3b22658a8286e2c121d7509ce3d1ddb33d7e0ff7596043aa80dc9"
