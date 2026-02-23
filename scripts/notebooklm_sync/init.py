@@ -19,11 +19,13 @@ from typing import Dict, List
 
 from scripts.notebooklm_sync.config import DEFAULT_NOTEBOOK_TITLE, MAPPING_PATH
 from scripts.notebooklm_sync.utils import (
+    get_display_name,
     get_notebook_id,
     get_target_files,
     load_mapping,
     run_notebooklm_cmd,
     save_mapping,
+    upload_file_with_display_name,
 )
 
 
@@ -232,12 +234,14 @@ def init_notebook(
     current_time = datetime.now(timezone.utc).isoformat()
 
     for i, filepath in enumerate(target_files, 1):
+        display_name = get_display_name(filepath)
         if verbose:
-            print(f"  [{i}/{len(target_files)}] {filepath}...", end=" ")
+            label = f"{filepath}" if display_name == filepath.name else f"{filepath} (as {display_name})"
+            print(f"  [{i}/{len(target_files)}] {label}...", end=" ")
         else:
-            print(f"  [{i}/{len(target_files)}] {filepath.name}...", end=" ")
+            print(f"  [{i}/{len(target_files)}] {display_name}...", end=" ")
 
-        source_id = upload_file(filepath, dry_run=dry_run)
+        source_id = upload_file_with_display_name(filepath, display_name, dry_run=dry_run)
 
         if source_id:
             print("OK")
@@ -245,7 +249,8 @@ def init_notebook(
                 print(f"    Source ID: {source_id}")
             sources[str(filepath)] = {
                 "source_id": source_id,
-                "title": filepath.name,
+                "title": display_name,
+                "display_name": display_name,
                 "added_at": current_time,
                 "last_synced": current_time,
             }

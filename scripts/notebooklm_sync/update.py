@@ -22,11 +22,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from scripts.notebooklm_sync.config import MAPPING_PATH
 from scripts.notebooklm_sync.utils import (
+    get_display_name,
     get_notebook_id,
     is_in_scope,
     load_mapping,
     run_notebooklm_cmd,
     save_mapping,
+    upload_file_with_display_name,
 )
 
 
@@ -101,6 +103,7 @@ def update_source(
         # 1. Normalize the file path
         norm_path = normalize_filepath(str(filepath))
         log_verbose(f"Processing file: {norm_path}", verbose)
+        display_name = get_display_name(norm_path)
 
         # 2. Check if file is in scope
         if not force_add and not is_in_scope(norm_path):
@@ -149,28 +152,21 @@ def update_source(
                 else:
                     log_verbose(f"Deleted old source: {source_id}", verbose)
 
-                # Add new source
-                returncode, output = run_notebooklm_cmd(
-                    ["source", "add", filepath_str, "--json"],
-                    capture_json=True,
+                # Add new source (using display name if different from filename)
+                new_source_id = upload_file_with_display_name(
+                    norm_path, display_name, dry_run=False
                 )
 
-                if returncode != 0 or not output:
+                if not new_source_id:
                     log_error(f"Failed to add new source: {filepath_str}", verbose)
                     return 0  # Don't fail the hook
-
-                # Update mapping with new source_id
-                # Handle both: {"id": "..."} or {"source": {"id": "..."}}
-                new_source_id = output.get("id") or output.get("source", {}).get("id")
-                if not new_source_id:
-                    log_error("No source ID in response", verbose)
-                    return 0
 
                 log_verbose(f"Added new source: {new_source_id}", verbose)
 
                 # Update mapping entry
                 mapping["sources"][filepath_str] = {
                     "source_id": new_source_id,
+                    "display_name": display_name,
                     "last_synced": datetime.now(timezone.utc).isoformat(),
                 }
                 save_mapping(mapping)
@@ -179,24 +175,16 @@ def update_source(
             log_verbose(f"Adding new source: {filepath_str}", verbose)
 
             if dry_run:
-                log_verbose(f"[DRY RUN] Would add source: {filepath_str}", verbose)
+                log_verbose(f"[DRY RUN] Would add source: {filepath_str} (as {display_name})", verbose)
             else:
-                # Add source
-                returncode, output = run_notebooklm_cmd(
-                    ["source", "add", filepath_str, "--json"],
-                    capture_json=True,
+                # Add source (using display name if different from filename)
+                new_source_id = upload_file_with_display_name(
+                    norm_path, display_name, dry_run=False
                 )
 
-                if returncode != 0 or not output:
+                if not new_source_id:
                     log_error(f"Failed to add source: {filepath_str}", verbose)
                     return 0  # Don't fail the hook
-
-                # Add new entry to mapping
-                # Handle both: {"id": "..."} or {"source": {"id": "..."}}
-                new_source_id = output.get("id") or output.get("source", {}).get("id")
-                if not new_source_id:
-                    log_error("No source ID in response", verbose)
-                    return 0
 
                 log_verbose(f"Added source: {new_source_id}", verbose)
 
@@ -206,6 +194,7 @@ def update_source(
 
                 mapping["sources"][filepath_str] = {
                     "source_id": new_source_id,
+                    "display_name": display_name,
                     "last_synced": datetime.now(timezone.utc).isoformat(),
                 }
                 save_mapping(mapping)

@@ -5,6 +5,7 @@ and execute notebooklm CLI commands.
 """
 
 import json
+import shutil
 import subprocess
 import tempfile
 from datetime import datetime
@@ -15,15 +16,17 @@ try:
     from .config import (
         DEFAULT_NOTEBOOK_TITLE,
         EXCLUDE_PATTERNS,
-        INCLUDE_PATTERNS,
+        INCLUDE_DIRS,
         MAPPING_PATH,
+        ROOT_INCLUDE_FILES,
     )
 except ImportError:
     from config import (
         DEFAULT_NOTEBOOK_TITLE,
         EXCLUDE_PATTERNS,
-        INCLUDE_PATTERNS,
+        INCLUDE_DIRS,
         MAPPING_PATH,
+        ROOT_INCLUDE_FILES,
     )
 
 
@@ -81,6 +84,84 @@ def save_mapping(data: Dict[str, Any], path: Optional[Path] = None) -> None:
         raise RuntimeError(f"Failed to save mapping to {target_path}: {e}")
 
 
+def get_display_name(filepath: Path) -> str:
+    """Compute the display name for a file as it will appear in NotebookLM.
+
+    README.md at the root level keeps its name unchanged. README.md files in
+    any subdirectory are renamed to README-{parent_dir}.md to avoid collisions.
+    All other files keep their original filename.
+
+    Args:
+        filepath: Relative path to the file (relative to project root).
+
+    Returns:
+        Display name string to use when uploading.
+
+    Examples:
+        >>> get_display_name(Path("README.md"))
+        'README.md'
+        >>> get_display_name(Path("docs/dev/README.md"))
+        'README-dev.md'
+        >>> get_display_name(Path("docs/dev/patterns.md"))
+        'patterns.md'
+    """
+    parts = filepath.parts
+    if filepath.name == "README.md" and len(parts) > 1:
+        return f"README-{filepath.parent.name}.md"
+    return filepath.name
+
+
+def upload_file_with_display_name(
+    filepath: Path,
+    display_name: str,
+    dry_run: bool = False,
+) -> Optional[str]:
+    """Upload a file to the active notebook, optionally under a different display name.
+
+    If display_name matches filepath.name, the file is uploaded directly. Otherwise
+    a temporary copy is created with the desired display name, uploaded, and then
+    the temporary directory is cleaned up.
+
+    Args:
+        filepath: Path to the actual file on disk.
+        display_name: Name the source should appear as in NotebookLM.
+        dry_run: If True, simulate without uploading.
+
+    Returns:
+        Source ID string, or None on failure.
+    """
+    if display_name == filepath.name:
+        # No rename needed — upload directly
+        if dry_run:
+            return f"dry-run-source-{display_name}"
+        returncode, output = run_notebooklm_cmd(
+            ["source", "add", str(filepath), "--json"],
+            capture_json=True,
+        )
+        if returncode != 0 or not output:
+            return None
+        source_id = output.get("id") or output.get("source", {}).get("id")
+        return source_id
+
+    # Rename needed — copy to a temp location with the desired name
+    if dry_run:
+        return f"dry-run-source-{display_name}"
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir) / display_name
+        shutil.copy2(str(filepath), str(tmp_path))
+
+        returncode, output = run_notebooklm_cmd(
+            ["source", "add", str(tmp_path), "--json"],
+            capture_json=True,
+        )
+
+    if returncode != 0 or not output:
+        return None
+    source_id = output.get("id") or output.get("source", {}).get("id")
+    return source_id
+
+
 def get_target_files(
     base_dir: Path = Path("."),
     include_patterns: Optional[List[str]] = None,
@@ -88,16 +169,15 @@ def get_target_files(
 ) -> List[Path]:
     """Discover all markdown files in scope for NotebookLM sync.
 
-    Default scope:
-    - Root-level .md files (not in subdirectories)
-    - Files under docs/ (recursively, excluding docs/project_plans/)
+    Default scope is defined by ROOT_INCLUDE_FILES (exact filenames at the root)
+    and INCLUDE_DIRS (directories searched recursively for *.md files).
 
     Args:
         base_dir: Base directory to search from. Defaults to current directory.
-        include_patterns: Additional glob patterns to include (e.g., ["docs/project_plans/PRDs/**/*.md"]).
-                         Patterns are relative to base_dir and support ** for recursive matching.
-        exclude_patterns: Glob patterns to exclude (e.g., ["docs/user/beta/**"]).
-                         Applied AFTER includes. Patterns are relative to base_dir.
+        include_patterns: Additional directory paths (strings relative to base_dir)
+                         to add to INCLUDE_DIRS behaviour.
+        exclude_patterns: Additional glob patterns to exclude on top of
+                         EXCLUDE_PATTERNS from config.
 
     Returns:
         Sorted list of relative paths to markdown files.
@@ -106,81 +186,56 @@ def get_target_files(
         # Default scope
         >>> files = get_target_files()
 
-        # Include project_plans PRDs too
-        >>> files = get_target_files(include_patterns=["docs/project_plans/PRDs/**/*.md"])
+        # Also include an extra directory
+        >>> files = get_target_files(include_patterns=["docs/project_plans/ideas"])
 
         # Exclude beta docs
         >>> files = get_target_files(exclude_patterns=["docs/user/beta/**"])
     """
     base_dir = Path(base_dir).resolve()
+    seen: set = set()
     target_files: List[Path] = []
 
-    # Find root-level .md files
-    for md_file in base_dir.glob("*.md"):
-        if md_file.is_file():
-            target_files.append(md_file.relative_to(base_dir))
+    def _add(path: Path) -> None:
+        rel = path.relative_to(base_dir)
+        if rel not in seen:
+            seen.add(rel)
+            target_files.append(rel)
 
-    # Find docs/**/*.md files (recursively)
-    docs_dir = base_dir / "docs"
-    if docs_dir.exists():
-        for md_file in docs_dir.rglob("*.md"):
-            if md_file.is_file():
-                relative_path = md_file.relative_to(base_dir)
+    # 1. Root-level files matching ROOT_INCLUDE_FILES
+    for filename in ROOT_INCLUDE_FILES:
+        candidate = base_dir / filename
+        if candidate.is_file():
+            _add(candidate)
 
-                # Check if it matches any default exclude pattern
-                excluded = False
-                for pattern in EXCLUDE_PATTERNS:
-                    # Convert glob pattern to path check
-                    pattern_prefix = pattern.rstrip("/**").rstrip("/*").rstrip("*")
-                    if str(relative_path).startswith(pattern_prefix):
-                        excluded = True
-                        break
+    # 2. Directories from INCLUDE_DIRS (plus any extra dirs passed in)
+    all_dirs = list(INCLUDE_DIRS)
+    if include_patterns:
+        all_dirs.extend(include_patterns)
 
-                if not excluded:
-                    target_files.append(relative_path)
+    for dir_path in all_dirs:
+        search_dir = base_dir / dir_path
+        if search_dir.exists() and search_dir.is_dir():
+            for md_file in search_dir.rglob("*.md"):
+                if md_file.is_file():
+                    _add(md_file)
 
-    # Add files matching include_patterns (use config defaults if not specified)
-    patterns_to_include = include_patterns if include_patterns is not None else INCLUDE_PATTERNS
-    if patterns_to_include:
-        for pattern in patterns_to_include:
-            # Use glob or rglob depending on whether pattern contains **
-            if "**" in pattern:
-                # For recursive patterns, extract the base directory and use rglob
-                pattern_parts = pattern.split("**", 1)
-                base_pattern = pattern_parts[0].rstrip("/")
-                suffix_pattern = pattern_parts[1].lstrip("/")
-
-                search_base = base_dir / base_pattern if base_pattern else base_dir
-
-                if search_base.exists():
-                    for match in search_base.rglob(suffix_pattern):
-                        if match.is_file():
-                            relative_path = match.relative_to(base_dir)
-                            if relative_path not in target_files:
-                                target_files.append(relative_path)
-            else:
-                # Non-recursive pattern
-                for match in base_dir.glob(pattern):
-                    if match.is_file():
-                        relative_path = match.relative_to(base_dir)
-                        if relative_path not in target_files:
-                            target_files.append(relative_path)
-
-    # Apply exclude_patterns
+    # 3. Apply exclude patterns (config defaults + caller-supplied)
+    all_excludes = list(EXCLUDE_PATTERNS)
     if exclude_patterns:
-        filtered_files = []
+        all_excludes.extend(exclude_patterns)
+
+    if all_excludes:
+        filtered: List[Path] = []
         for filepath in target_files:
             excluded = False
-            for pattern in exclude_patterns:
-                # Use match() for glob-style pattern matching
+            for pattern in all_excludes:
                 if filepath.match(pattern):
                     excluded = True
                     break
-
             if not excluded:
-                filtered_files.append(filepath)
-
-        target_files = filtered_files
+                filtered.append(filepath)
+        target_files = filtered
 
     return sorted(target_files)
 
@@ -189,9 +244,9 @@ def is_in_scope(filepath: Union[str, Path]) -> bool:
     """Check if a file is in scope for NotebookLM sync.
 
     A file is in scope if:
-    - It's a root-level .md file (not in subdirectories)
-    - It's under docs/ (but not docs/project_plans/ unless in INCLUDE_PATTERNS)
-    - It matches one of the INCLUDE_PATTERNS
+    - Its name is in ROOT_INCLUDE_FILES and it is at the project root (no parent dirs)
+    - It lives under one of the INCLUDE_DIRS directories
+    - It is not excluded by any EXCLUDE_PATTERNS entry
 
     Args:
         filepath: Path to check (relative or absolute)
@@ -200,29 +255,29 @@ def is_in_scope(filepath: Union[str, Path]) -> bool:
         True if file is in scope, False otherwise.
     """
     path = Path(filepath)
-    filepath_str = str(path)
     parts = path.parts
+    filepath_str = str(path)
 
-    # Check if it's a root-level .md file
-    if len(parts) == 1 and path.suffix == ".md":
+    # Check root-level inclusion by exact filename
+    if len(parts) == 1 and path.name in ROOT_INCLUDE_FILES:
         return True
 
-    # Check if it matches any include pattern (overrides exclusions)
-    # Convert glob patterns to prefix checks (e.g., "docs/foo/**/*.md" -> "docs/foo/")
-    for pattern in INCLUDE_PATTERNS:
-        # Extract prefix before ** and check if file is under that directory
-        pattern_prefix = pattern.split("**")[0].rstrip("/")
-        if filepath_str.startswith(pattern_prefix + "/") and filepath_str.endswith(".md"):
-            return True
+    # Check directory-based inclusion
+    in_include_dir = False
+    for dir_path in INCLUDE_DIRS:
+        if filepath_str.startswith(dir_path + "/") or filepath_str == dir_path:
+            in_include_dir = True
+            break
 
-    # Check if it's under docs/ but not docs/project_plans/
-    if len(parts) >= 2 and parts[0] == "docs":
-        # Excluded if under project_plans (unless matched by INCLUDE_PATTERNS above)
-        if len(parts) >= 2 and parts[1] == "project_plans":
+    if not in_include_dir:
+        return False
+
+    # Apply exclusion patterns
+    for pattern in EXCLUDE_PATTERNS:
+        if path.match(pattern):
             return False
-        return True
 
-    return False
+    return True
 
 
 def run_notebooklm_cmd(

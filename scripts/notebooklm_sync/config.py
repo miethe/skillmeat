@@ -2,23 +2,20 @@
 
 from pathlib import Path
 
-# File patterns to track
-ROOT_PATTERNS = ["*.md"]
-DOCS_PATTERNS = ["docs/**/*.md"]
+# Root-level .md files to include (by exact filename, not all root *.md)
+ROOT_INCLUDE_FILES = ["README.md", "CHANGELOG.md"]
 
-# Exclude most of project_plans except specific subdirectories we want to track
-EXCLUDE_PATTERNS = [
-    "docs/project_plans/**",
+# Directories to include recursively (all .md files within each dir)
+INCLUDE_DIRS = [
+    "docs/project_plans/PRDs",
+    "docs/project_plans/SPIKEs",
+    "docs/project_plans/design-specs",
+    "docs/dev",
+    ".claude/progress/quick-features",
 ]
 
-# Include patterns override exclusions for specific directories
-INCLUDE_PATTERNS = [
-    "docs/project_plans/PRDs/**/*.md",
-    "docs/project_plans/reports/**/*.md",
-    "docs/project_plans/SPIKEs/**/*.md",
-    "docs/project_plans/design-specs/**/*.md",
-    "docs/project_plans/ideas/**/*.md",
-]
+# Fine-grained exclusion patterns applied on top of INCLUDE_DIRS (glob patterns relative to project root)
+EXCLUDE_PATTERNS: list[str] = []
 
 # Mapping file location
 MAPPING_PATH = Path.home() / ".notebooklm" / "skillmeat-sources.json"

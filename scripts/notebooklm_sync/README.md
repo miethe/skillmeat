@@ -7,6 +7,7 @@ Automated synchronization of SkillMeat documentation to Google NotebookLM notebo
 This script suite enables one-way synchronization of project documentation to NotebookLM, keeping your notebook up-to-date automatically whenever you modify documentation files.
 
 **Key Features**:
+
 - One-time initialization that creates a notebook and uploads all target files
 - Automatic hook-triggered updates when you edit documentation
 - Mapping file to track which files have been uploaded
@@ -37,9 +38,10 @@ python scripts/notebooklm_sync/init.py
 ```
 
 This will:
+
 - Create a "SkillMeat" notebook in NotebookLM
-- Discover all markdown files in scope (root `*.md` and `docs/**/*.md`)
-- Upload each file as a source
+- Discover all markdown files in scope (see **File Scope** section below)
+- Upload each file as a source (README.md files in subdirectories are renamed on upload — see **README Rename Behaviour**)
 - Save a mapping file to `~/.notebooklm/skillmeat-sources.json`
 
 ### 3. Auto-Sync (via Hook)
@@ -82,7 +84,7 @@ python scripts/notebooklm_sync/init.py --verbose
 
 **Output**:
 
-```
+```text
 NotebookLM Sync Initialization
 ==============================
 Authentication: ✓ Verified
@@ -125,7 +127,7 @@ python scripts/notebooklm_sync/update.py new-file.md --force-add
 **Behavior**:
 
 | Scenario | Action |
-|----------|--------|
+| -------- | ------ |
 | File is tracked | Delete old source, add new, update mapping |
 | File not tracked but in scope | Add source, add to mapping |
 | File not in scope | Skip silently |
@@ -168,7 +170,7 @@ python scripts/notebooklm_sync/status.py --json
 
 **Sample Output**:
 
-```
+```text
 NotebookLM Sync Status
 ======================
 Notebook: SkillMeat (abc123...)
@@ -226,7 +228,7 @@ python scripts/notebooklm_sync/batch.py -v
 
 **Sample Output**:
 
-```
+```text
 Syncing 15 files to NotebookLM...
   - Stale: 8
   - Untracked: 7
@@ -280,7 +282,7 @@ python scripts/notebooklm_sync/cleanup.py --verbose
 
 **Sample Output**:
 
-```
+```text
 Found 3 orphaned sources:
   - CACHE_POPULATION_TRACE.md
   - TOOLS_FIELD_IMPLEMENTATION_REPORT.md
@@ -318,6 +320,7 @@ Located in `.git/hooks/`, these hooks:
 ```
 
 This installer will:
+
 - Create symlinks to hook scripts (updates propagate automatically)
 - Create wrapper hooks if you have existing git hooks
 - Make hooks executable
@@ -370,43 +373,61 @@ Run 'python scripts/notebooklm_sync/batch.py' to sync
 
 ## File Scope
 
+Scope is controlled by two constants in `config.py`:
+
+- `ROOT_INCLUDE_FILES` — exact filenames at the project root to include (currently `README.md`, `CHANGELOG.md`)
+- `INCLUDE_DIRS` — directories searched **recursively** for `*.md` files
+
 ### In Scope (Tracked)
 
-- Root markdown files: `CLAUDE.md`, `README.md`, etc.
-- Documentation directory: `docs/**/*.md` (all subdirectories)
-- **Exception**: Excludes `docs/project_plans/` (historical files)
+| Source | What is included |
+| ------ | --------------- |
+| Project root | `README.md`, `CHANGELOG.md` (exact names only) |
+| `docs/project_plans/PRDs` | All `*.md` files recursively |
+| `docs/project_plans/SPIKEs` | All `*.md` files recursively |
+| `docs/project_plans/design-specs` | All `*.md` files recursively |
+| `docs/dev` | All `*.md` files recursively |
+| `.claude/progress/quick-features` | All `*.md` files recursively |
 
 ### Out of Scope (Not Tracked)
 
-- `skillmeat/**/*.md` - Internal package documentation
-- `.claude/**/*.md` - Claude Code internal files
-- `docs/project_plans/**/*.md` - Historical planning docs (can be included with `--include`)
+- `skillmeat/**/*.md` — internal package documentation
+- `.claude/**/*.md` — Claude Code internal files (except `quick-features` above)
+- `docs/project_plans/reports/`, `ideas/` — not in INCLUDE_DIRS
+- `docs/ops/`, `docs/architecture/` — not in INCLUDE_DIRS
 - Node modules, virtual environments, etc.
+
+### README Rename Behaviour
+
+To avoid source-name collisions when multiple `README.md` files exist in different directories, the sync scripts rename them on upload:
+
+| File on disk | Name in NotebookLM |
+| ------------ | ------------------ |
+| `README.md` (root) | `README.md` |
+| `docs/dev/README.md` | `README-dev.md` |
+| `.claude/progress/quick-features/README.md` | `README-quick-features.md` |
+
+The mapping file always uses the **relative file path** as the key; only the `title` / `display_name` fields inside each entry reflect the renamed display name.
 
 ### Customizing Scope
 
-Edit `scripts/notebooklm_sync/config.py` to modify include/exclude patterns:
+Edit `ROOT_INCLUDE_FILES` and `INCLUDE_DIRS` in `scripts/notebooklm_sync/config.py`.
 
-```python
-DEFAULT_INCLUDE_PATTERNS = [
-    "./*.md",                    # Root markdown
-    "./docs/architecture/**/*.md",
-    "./docs/api/**/*.md",
-    # ... more patterns
-]
-
-DEFAULT_EXCLUDE_PATTERNS = [
-    "./docs/project_plans/**",
-    "./.claude/**",
-]
-```
-
-Or pass options to `init.py`:
+You can also pass extra directories or exclusions at runtime:
 
 ```bash
 python scripts/notebooklm_sync/init.py \
-  --include "docs/project_plans/PRDs/**" \
-  --exclude "docs/user/beta/**"
+  --include "docs/project_plans/ideas" \
+  --exclude "docs/dev/drafts/**"
+```
+
+### Migration Note
+
+If you previously ran `init.py` with the old pattern-based scope (which included all of `docs/**/*.md`), re-initialize with `--force` to rebuild the source list, then run `cleanup.py` to remove orphaned sources from the old broader scope:
+
+```bash
+python scripts/notebooklm_sync/init.py --force
+python scripts/notebooklm_sync/cleanup.py
 ```
 
 ---
@@ -450,8 +471,7 @@ The Claude Code hook (configured in `.claude/settings.json`, script at `.claude/
 
 1. You use the **Write** or **Edit** tool
 2. On a `.md` file
-3. That's in scope (root or `docs/` subdirectory)
-4. That's not in `.claude/` or `docs/project_plans/`
+3. That is in scope per `ROOT_INCLUDE_FILES` / `INCLUDE_DIRS` in `config.py`
 
 **What Happens**:
 
