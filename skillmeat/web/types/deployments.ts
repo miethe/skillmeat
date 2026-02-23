@@ -158,6 +158,8 @@ export interface DeploymentProfile {
   profile_id: string;
   platform: Platform;
   root_dir: string;
+  /** Optional human-readable description of this profile */
+  description?: string;
   artifact_path_map: Record<string, string>;
   project_config_filenames: string[];
   context_path_prefixes: string[];
@@ -171,6 +173,8 @@ export interface CreateDeploymentProfileRequest {
   profile_id: string;
   platform: Platform;
   root_dir: string;
+  /** Optional human-readable description of this profile */
+  description?: string;
   artifact_path_map?: Record<string, string>;
   project_config_filenames?: string[];
   context_path_prefixes?: string[];
@@ -181,6 +185,8 @@ export interface CreateDeploymentProfileRequest {
 export interface UpdateDeploymentProfileRequest {
   platform?: Platform;
   root_dir?: string;
+  /** Optional human-readable description of this profile */
+  description?: string;
   artifact_path_map?: Record<string, string>;
   project_config_filenames?: string[];
   context_path_prefixes?: string[];
