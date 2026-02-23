@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -40,6 +41,8 @@ const PLATFORM_NAMES: Record<string, string> = {
 
 const PLATFORM_ORDER = ['claude_code', 'codex', 'gemini', 'cursor', 'other'];
 
+const ARTIFACT_TYPE_OPTIONS = ['skill', 'command', 'agent', 'mcp', 'hook', 'composite'] as const;
+
 function formatPlatformName(platform: string): string {
   return PLATFORM_NAMES[platform] || platform;
 }
@@ -52,7 +55,7 @@ interface FormState {
   root_dir: string;
   artifact_path_map_json: string;
   config_filenames: string;
-  supported_artifact_types: string;
+  supported_artifact_types: string[];
   context_prefixes: string;
 }
 
@@ -94,7 +97,7 @@ export function PlatformDefaultsSettings() {
           root_dir: platformData.root_dir,
           artifact_path_map_json: JSON.stringify(platformData.artifact_path_map, null, 2),
           config_filenames: platformData.config_filenames.join('\n'),
-          supported_artifact_types: platformData.supported_artifact_types.join(', '),
+          supported_artifact_types: platformData.supported_artifact_types,
           context_prefixes: platformData.context_prefixes.join('\n'),
         });
       }
@@ -114,10 +117,7 @@ export function PlatformDefaultsSettings() {
           .split('\n')
           .map((s) => s.trim())
           .filter(Boolean),
-        supported_artifact_types: formState.supported_artifact_types
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
+        supported_artifact_types: formState.supported_artifact_types,
         context_prefixes: formState.context_prefixes
           .split('\n')
           .map((s) => s.trim())
@@ -151,7 +151,7 @@ export function PlatformDefaultsSettings() {
         root_dir: result.root_dir,
         artifact_path_map_json: JSON.stringify(result.artifact_path_map, null, 2),
         config_filenames: result.config_filenames.join('\n'),
-        supported_artifact_types: result.supported_artifact_types.join(', '),
+        supported_artifact_types: result.supported_artifact_types,
         context_prefixes: result.context_prefixes.join('\n'),
       });
 
@@ -168,9 +168,21 @@ export function PlatformDefaultsSettings() {
     }
   };
 
-  // Update a single form field
-  const updateField = (field: keyof FormState, value: string) => {
+  // Update a single string form field
+  const updateField = (field: Exclude<keyof FormState, 'supported_artifact_types'>, value: string) => {
     setFormState((prev) => (prev ? { ...prev, [field]: value } : null));
+  };
+
+  // Toggle an artifact type in the multi-select
+  const toggleArtifactType = (type: string, checked: boolean) => {
+    setFormState((prev) => {
+      if (!prev) return null;
+      const current = prev.supported_artifact_types;
+      const updated = checked
+        ? [...current, type]
+        : current.filter((t) => t !== type);
+      return { ...prev, supported_artifact_types: updated };
+    });
   };
 
   // Loading state
@@ -254,15 +266,34 @@ export function PlatformDefaultsSettings() {
 
                     {/* Supported Artifact Types */}
                     <div className="space-y-2">
-                      <Label htmlFor={`${platform}-artifact-types`}>
-                        Supported Artifact Types (comma-separated)
-                      </Label>
-                      <Input
-                        id={`${platform}-artifact-types`}
-                        value={formState.supported_artifact_types}
-                        onChange={(e) => updateField('supported_artifact_types', e.target.value)}
-                        placeholder="skill, command, agent"
-                      />
+                      <Label>Supported Artifact Types</Label>
+                      <div
+                        role="group"
+                        aria-label="Supported artifact types"
+                        className="flex flex-wrap gap-x-6 gap-y-2 pt-1"
+                      >
+                        {ARTIFACT_TYPE_OPTIONS.map((type) => {
+                          const checked = formState.supported_artifact_types.includes(type);
+                          const checkboxId = `${platform}-type-${type}`;
+                          return (
+                            <div key={type} className="flex items-center gap-2">
+                              <Checkbox
+                                id={checkboxId}
+                                checked={checked}
+                                onCheckedChange={(checkedState) =>
+                                  toggleArtifactType(type, !!checkedState)
+                                }
+                              />
+                              <Label
+                                htmlFor={checkboxId}
+                                className="cursor-pointer font-normal capitalize"
+                              >
+                                {type}
+                              </Label>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {/* Context Prefixes */}
