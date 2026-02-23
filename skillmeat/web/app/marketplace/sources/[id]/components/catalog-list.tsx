@@ -12,7 +12,7 @@
  * - Actions (View on GitHub, Import)
  */
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   ExternalLink,
   Download,
@@ -42,6 +42,7 @@ import { ExcludeArtifactDialog } from '@/components/marketplace/exclude-artifact
 import { useExcludeCatalogEntry } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { CatalogEntry, ArtifactType } from '@/types/marketplace';
+import type { EmbeddedTopLevelEntry } from '../page';
 
 // ============================================================================
 // Types
@@ -49,12 +50,18 @@ import type { CatalogEntry, ArtifactType } from '@/types/marketplace';
 
 interface CatalogListProps {
   entries: CatalogEntry[];
+  /** Embedded artifacts promoted to top-level (TASK-4.2) */
+  embeddedTopLevel?: EmbeddedTopLevelEntry[];
   sourceId: string;
   selectedEntries: Set<string>;
   onSelectEntry: (entryId: string, selected: boolean) => void;
   onImportSingle: (entryId: string) => void;
+  /** Import an embedded artifact standalone by its repository-relative path (TASK-4.3) */
+  onImportEmbedded?: (artifactPath: string) => void;
   onEntryClick: (entry: CatalogEntry) => void;
   isImporting: boolean;
+  /** Loading state for embedded artifact import (TASK-4.3) */
+  isImportingEmbedded?: boolean;
   isLoading?: boolean;
 }
 
@@ -342,13 +349,20 @@ function CatalogRow({
                   onClick={onImport}
                   disabled={isImporting}
                   className="h-7 px-2"
+                  title={
+                    entry.embedded_artifacts && entry.embedded_artifacts.length > 0
+                      ? 'Import this skill and all its embedded sub-artifacts'
+                      : undefined
+                  }
                 >
                   {isImporting ? (
                     <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
                   ) : (
                     <>
                       <Download className="mr-1 h-3 w-3" aria-hidden="true" />
-                      Import
+                      {entry.embedded_artifacts && entry.embedded_artifacts.length > 0
+                        ? 'Import skill'
+                        : 'Import'}
                     </>
                   )}
                 </Button>
@@ -387,25 +401,145 @@ function CatalogRow({
 }
 
 // ============================================================================
+// EmbeddedTopLevelRow Component (TASK-4.2)
+// ============================================================================
+
+interface EmbeddedTopLevelRowProps {
+  entry: EmbeddedTopLevelEntry;
+  onImport?: (artifactPath: string) => void;
+  isImporting?: boolean;
+}
+
+function EmbeddedTopLevelRow({ entry, onImport, isImporting }: EmbeddedTopLevelRowProps) {
+  const { artifact, parentName } = entry;
+  const type = artifact.artifact_type as ArtifactType;
+  const Icon = artifactTypeIcons[type] || HelpCircle;
+  const iconColor = artifactTypeIconColors[type] || 'text-gray-500 dark:text-gray-400';
+  const rowTint = artifactTypeRowTints[type] || 'bg-gray-500/[0.02]';
+  const borderAccent = artifactTypeBorderAccents[type] || 'border-l-gray-400';
+  const typeLabel = artifactTypeLabels[type] || type || 'Unknown';
+
+  return (
+    <TableRow
+      className={cn(
+        'border-l-2 border-dashed',
+        borderAccent,
+        rowTint,
+        'opacity-90'
+      )}
+      aria-label={`Embedded artifact: ${artifact.name}, part of skill: ${parentName}`}
+    >
+      {/* No checkbox — embedded artifacts cannot be individually selected */}
+      <TableCell>
+        <span aria-hidden="true" />
+      </TableCell>
+
+      {/* Name and Path */}
+      <TableCell>
+        <div className="space-y-1">
+          <div className="font-medium">{artifact.name}</div>
+          <div className="max-w-[300px] truncate text-xs text-muted-foreground">
+            {artifact.path}
+          </div>
+        </div>
+      </TableCell>
+
+      {/* Type */}
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <Icon className={cn('h-4 w-4', iconColor)} aria-hidden="true" />
+          <span className="text-sm">{typeLabel}</span>
+        </div>
+      </TableCell>
+
+      {/* Confidence */}
+      <TableCell>
+        <span className="tabular-nums text-sm text-muted-foreground">
+          {Math.round(artifact.confidence_score)}%
+        </span>
+      </TableCell>
+
+      {/* Part-of indicator (TASK-4.2) */}
+      <TableCell>
+        <Badge
+          variant="outline"
+          className="border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+          title={`This artifact is embedded inside the skill: ${parentName}`}
+        >
+          part of: {parentName}
+        </Badge>
+      </TableCell>
+
+      {/* Actions (TASK-4.3: import button for standalone import) */}
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-end gap-2">
+          <a
+            href={artifact.upstream_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            aria-label={`View ${artifact.name} on GitHub`}
+          >
+            <ExternalLink className="h-3 w-3" />
+            <span className="hidden sm:inline">GitHub</span>
+          </a>
+
+          {onImport && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onImport(artifact.path)}
+              disabled={isImporting}
+              className="h-7 px-2"
+              aria-label={`Import ${artifact.name} as a standalone artifact`}
+            >
+              {isImporting ? (
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+              ) : (
+                <>
+                  <Download className="mr-1 h-3 w-3" aria-hidden="true" />
+                  Import
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
 export function CatalogList({
   entries,
+  embeddedTopLevel = [],
   sourceId,
   selectedEntries,
   onSelectEntry,
   onImportSingle,
+  onImportEmbedded,
   onEntryClick,
   isImporting,
+  isImportingEmbedded,
   isLoading,
 }: CatalogListProps) {
   if (isLoading) {
     return <CatalogListSkeleton />;
   }
 
-  if (entries.length === 0) {
+  if (entries.length === 0 && embeddedTopLevel.length === 0) {
     return null; // Empty state handled by parent
+  }
+
+  // Build a map from parentName to embedded entries for interleaving after each parent row
+  const embeddedByParent = new Map<string, EmbeddedTopLevelEntry[]>();
+  for (const ve of embeddedTopLevel) {
+    const list = embeddedByParent.get(ve.parentName) ?? [];
+    list.push(ve);
+    embeddedByParent.set(ve.parentName, list);
   }
 
   return (
@@ -423,16 +557,26 @@ export function CatalogList({
         </TableHeader>
         <TableBody>
           {entries.map((entry) => (
-            <CatalogRow
-              key={entry.id}
-              entry={entry}
-              sourceId={sourceId}
-              selected={selectedEntries.has(entry.id)}
-              onSelect={(selected) => onSelectEntry(entry.id, selected)}
-              onImport={() => onImportSingle(entry.id)}
-              onClick={() => onEntryClick(entry)}
-              isImporting={isImporting}
-            />
+            <React.Fragment key={entry.id}>
+              <CatalogRow
+                entry={entry}
+                sourceId={sourceId}
+                selected={selectedEntries.has(entry.id)}
+                onSelect={(selected) => onSelectEntry(entry.id, selected)}
+                onImport={() => onImportSingle(entry.id)}
+                onClick={() => onEntryClick(entry)}
+                isImporting={isImporting}
+              />
+              {/* Render any embedded entries belonging to this parent skill immediately after */}
+              {(embeddedByParent.get(entry.name) ?? []).map((ve) => (
+                <EmbeddedTopLevelRow
+                  key={ve._key}
+                  entry={ve}
+                  onImport={onImportEmbedded}
+                  isImporting={isImportingEmbedded}
+                />
+              ))}
+            </React.Fragment>
           ))}
         </TableBody>
       </Table>

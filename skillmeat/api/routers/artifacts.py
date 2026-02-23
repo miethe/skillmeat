@@ -129,6 +129,7 @@ from skillmeat.cache.models import (
     Artifact,
     Collection,
     CollectionArtifact,
+    CompositeArtifact,
     MarketplaceCatalogEntry,
     get_session,
 )
@@ -2482,10 +2483,14 @@ async def get_artifact(
         )
 
         # Get UUID from DB cache (filesystem artifacts may have uuid=None)
-        db_artifact = db_session.query(Artifact).filter(
-            Artifact.type == artifact_type.value,
-            Artifact.name == artifact_name,
-        ).first()
+        db_artifact = (
+            db_session.query(Artifact)
+            .filter(
+                Artifact.type == artifact_type.value,
+                Artifact.name == artifact_name,
+            )
+            .first()
+        )
         db_uuid = db_artifact.uuid if db_artifact else None
 
         # Build base response with collections
@@ -4516,7 +4521,9 @@ async def get_artifact_diff(
                 if collection_artifact_path.is_dir():
                     collection_files = {
                         str(f.relative_to(collection_artifact_path))
-                        for f in iter_artifact_files(collection_artifact_path, exclude_dirs)
+                        for f in iter_artifact_files(
+                            collection_artifact_path, exclude_dirs
+                        )
                     }
                 else:
                     collection_files = {collection_artifact_path.name}
@@ -4525,7 +4532,9 @@ async def get_artifact_diff(
                 if project_artifact_path.is_dir():
                     project_files = {
                         str(f.relative_to(project_artifact_path))
-                        for f in iter_artifact_files(project_artifact_path, exclude_dirs)
+                        for f in iter_artifact_files(
+                            project_artifact_path, exclude_dirs
+                        )
                     }
                 else:
                     project_files = {project_artifact_path.name}
@@ -4598,11 +4607,17 @@ async def get_artifact_diff(
                         # Generate unified diff if text file and not summary-only mode
                         unified_diff = None
                         skip_diff = summary_only or not include_unified_diff
-                        if not skip_diff and requested_files is not None and file_rel_path not in requested_files:
+                        if (
+                            not skip_diff
+                            and requested_files is not None
+                            and file_rel_path not in requested_files
+                        ):
                             skip_diff = True
-                        if not skip_diff and not is_binary_file(
-                            coll_file_path
-                        ) and not is_binary_file(proj_file_path):
+                        if (
+                            not skip_diff
+                            and not is_binary_file(coll_file_path)
+                            and not is_binary_file(proj_file_path)
+                        ):
                             try:
                                 with open(coll_file_path, "r", encoding="utf-8") as f:
                                     coll_lines = f.readlines()
@@ -4880,9 +4895,7 @@ async def get_artifact_upstream_diff(
                 try:
                     get_upstream_cache().put(_cache_key, fetch_result)
                 except Exception:
-                    logger.warning(
-                        f"Upstream cache put failed for {_cache_key}"
-                    )
+                    logger.warning(f"Upstream cache put failed for {_cache_key}")
 
         # Check for fetch errors
         if fetch_result.error:
@@ -5029,11 +5042,17 @@ async def get_artifact_upstream_diff(
                     # Generate unified diff if text file and not summary-only mode
                     unified_diff = None
                     skip_diff = summary_only or not include_unified_diff
-                    if not skip_diff and requested_files is not None and file_rel_path not in requested_files:
+                    if (
+                        not skip_diff
+                        and requested_files is not None
+                        and file_rel_path not in requested_files
+                    ):
                         skip_diff = True
-                    if not skip_diff and not is_binary_file(
-                        coll_file_path
-                    ) and not is_binary_file(upstream_file_path):
+                    if (
+                        not skip_diff
+                        and not is_binary_file(coll_file_path)
+                        and not is_binary_file(upstream_file_path)
+                    ):
                         try:
                             with open(coll_file_path, "r", encoding="utf-8") as f:
                                 coll_lines = f.readlines()
@@ -5326,9 +5345,7 @@ async def get_artifact_source_project_diff(
             )
             fetch_result = _cached_fetch
         else:
-            logger.info(
-                f"Fetching upstream for source-project diff: {artifact_id}"
-            )
+            logger.info(f"Fetching upstream for source-project diff: {artifact_id}")
             with PerfTimer(
                 "router.get_artifact_source_project_diff.fetch_upstream",
                 artifact_id=artifact_id,
@@ -5343,9 +5360,7 @@ async def get_artifact_source_project_diff(
                 try:
                     get_upstream_cache().put(_cache_key, fetch_result)
                 except Exception:
-                    logger.warning(
-                        f"Upstream cache put failed for {_cache_key}"
-                    )
+                    logger.warning(f"Upstream cache put failed for {_cache_key}")
 
         try:
             if fetch_result.error:
@@ -5487,11 +5502,17 @@ async def get_artifact_source_project_diff(
                             summary["modified"] += 1
                             unified_diff = None
                             skip_diff = summary_only or not include_unified_diff
-                            if not skip_diff and requested_files is not None and file_rel_path not in requested_files:
+                            if (
+                                not skip_diff
+                                and requested_files is not None
+                                and file_rel_path not in requested_files
+                            ):
                                 skip_diff = True
-                            if not skip_diff and not is_binary_file(
-                                src_file
-                            ) and not is_binary_file(proj_file):
+                            if (
+                                not skip_diff
+                                and not is_binary_file(src_file)
+                                and not is_binary_file(proj_file)
+                            ):
                                 try:
                                     with open(src_file, "r", encoding="utf-8") as f:
                                         src_lines = f.readlines()
@@ -8347,6 +8368,125 @@ async def get_unlinked_references(
 
 
 @router.get(
+    "/{artifact_id}/sync-diff",
+    summary="Get per-member version comparison rows for a skill",
+    description=(
+        "Return a flat list of VersionComparisonRow objects for the given skill artifact "
+        "and its composite members.  The first element is always the parent skill row "
+        "(is_member=False); subsequent elements are member rows (is_member=True).  "
+        "Returns a single-element list for skills without embedded members.  "
+        "Requires collection and project_id query parameters."
+    ),
+    responses={
+        200: {"description": "Successfully retrieved sync diff rows"},
+        400: {"model": ErrorResponse, "description": "Invalid artifact ID or missing params"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_skill_sync_diff(
+    artifact_id: str,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (uses active collection if omitted)",
+    ),
+    project_id: Optional[str] = Query(
+        default=None,
+        description="Project identifier for deployed_version lookup",
+    ),
+):
+    """Return hierarchical version comparison rows for a skill and its members.
+
+    Uses ``compute_skill_sync_diff()`` from the sync diff service to build one
+    row per artifact (parent + members) with ``source_version``,
+    ``collection_version``, and ``deployed_version`` fields.
+
+    Args:
+        artifact_id: Artifact identifier in ``type:name`` format.
+        collection_mgr: Collection manager dependency.
+        _token: Authentication token dependency.
+        collection: Collection name; defaults to active collection.
+        project_id: Project identifier for deployed_version resolution.
+
+    Returns:
+        JSON list of VersionComparisonRow-shaped dicts.
+
+    Raises:
+        HTTPException 400: Invalid artifact_id or missing required params.
+        HTTPException 404: Artifact not found.
+        HTTPException 500: Unexpected database or service error.
+    """
+    from skillmeat.core.services.sync_diff_service import compute_skill_sync_diff  # noqa: PLC0415
+
+    try:
+        # Validate artifact ID
+        try:
+            parse_artifact_id(artifact_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        collection_name = collection or collection_mgr.get_active_collection_name()
+        if not collection_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No active collection found. Pass the 'collection' query parameter.",
+            )
+
+        # Resolve a db_path by looking up the collection path
+        try:
+            collection_path = collection_mgr.config.get_collection_path(collection_name)
+            db_path = str(collection_path / "cache.db")
+        except Exception:
+            db_path = None
+
+        effective_project_id = project_id or ""
+
+        rows = compute_skill_sync_diff(
+            artifact_id=artifact_id,
+            collection_id=collection_name,
+            project_id=effective_project_id,
+            db_path=db_path or "",
+            _session=get_session() if not db_path else None,
+        )
+
+        return [
+            {
+                "artifact_id": r.artifact_id,
+                "artifact_name": r.artifact_name,
+                "artifact_type": r.artifact_type,
+                "source_version": r.source_version,
+                "collection_version": r.collection_version,
+                "deployed_version": r.deployed_version,
+                "is_member": r.is_member,
+                "parent_artifact_id": r.parent_artifact_id,
+            }
+            for r in rows
+        ]
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to compute sync diff for '%s': %s", artifact_id, e, exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to compute sync diff: {str(e)}",
+        )
+
+
+@router.get(
     "/{artifact_id}/associations",
     response_model=AssociationsDTO,
     summary="Get artifact associations",
@@ -8505,8 +8645,7 @@ async def get_artifact_associations(
                 col_row = (
                     db_session.query(Collection)
                     .filter(
-                        (Collection.id == collection)
-                        | (Collection.name == collection)
+                        (Collection.id == collection) | (Collection.name == collection)
                     )
                     .first()
                 )
@@ -8569,6 +8708,36 @@ async def get_artifact_associations(
         children: List[AssociationItemDTO] = []
         if include_children:
             children = [_build_child_dto(r) for r in raw.get("children", [])]
+
+            # For skills: look up the companion CompositeArtifact whose
+            # metadata_json encodes this skill's UUID as the originating
+            # artifact (written by create_skill_composite()).  This surfaces
+            # embedded member artifacts (commands, agents, etc.) that live
+            # inside the skill directory.
+            if artifact_type_str == "skill" and not children:
+                skill_uuid_session = get_session()
+                try:
+                    skill_art = (
+                        skill_uuid_session.query(Artifact)
+                        .filter(Artifact.id == artifact_id)
+                        .first()
+                    )
+                    if skill_art is not None:
+                        skill_members = repo.get_skill_composite_children(
+                            skill_artifact_uuid=str(skill_art.uuid),
+                            collection_id=collection_id,
+                        )
+                        children = [_build_child_dto(r) for r in skill_members]
+                        if skill_members:
+                            logger.debug(
+                                "Associations: found %d embedded member(s) via "
+                                "skill composite for '%s'",
+                                len(skill_members),
+                                artifact_id,
+                            )
+                finally:
+                    skill_uuid_session.close()
+
             if relationship_type is not None:
                 children = [
                     c for c in children if c.relationship_type == relationship_type

@@ -1835,6 +1835,31 @@ async def _perform_scan(
                     if search_metadata.get("deep_search_text"):
                         deep_indexed_at = datetime.utcnow()
 
+                    # Serialize embedded_artifacts into metadata_json so they
+                    # can be recovered at import time for skill composite creation
+                    # (SCA-P2-03: atomic transaction wiring).
+                    catalog_metadata_json = None
+                    if (
+                        artifact.artifact_type in ("skill", "composite")
+                        and getattr(artifact, "embedded_artifacts", None)
+                    ):
+                        try:
+                            embedded_dicts = [
+                                ea.model_dump()
+                                if hasattr(ea, "model_dump")
+                                else ea.dict()
+                                for ea in artifact.embedded_artifacts
+                            ]
+                            catalog_metadata_json = json.dumps(
+                                {"embedded_artifacts": embedded_dicts}
+                            )
+                        except Exception as _meta_err:
+                            logger.warning(
+                                "Failed to serialize embedded_artifacts for %s: %s",
+                                artifact.name,
+                                _meta_err,
+                            )
+
                     entry = MarketplaceCatalogEntry(
                         id=str(uuid.uuid4()),
                         source_id=source_id,
@@ -1865,6 +1890,8 @@ async def _perform_scan(
                         deep_search_text=search_metadata.get("deep_search_text"),
                         deep_indexed_at=deep_indexed_at,
                         deep_index_files=deep_index_files_json,
+                        # Embedded artifacts for skill composite wiring (SCA-P2-03)
+                        metadata_json=catalog_metadata_json,
                     )
                     new_entries.append(entry)
 
@@ -3671,6 +3698,125 @@ async def update_catalog_entry_name(
 
 
 # =============================================================================
+# Skill-contained artifacts composite wiring (SCA-P2-03)
+# =============================================================================
+
+
+def _wire_skill_composite(
+    session,
+    source_id: str,
+    entry,
+    catalog_repo: "MarketplaceCatalogRepository",
+    collection_id: str,
+) -> None:
+    """Wire create_skill_composite_with_session() for a successfully imported skill.
+
+    Called from ``import_artifacts()`` when ``SKILL_CONTAINED_ARTIFACTS_ENABLED``
+    is set.  Retrieves the embedded artifact list stored in the catalog entry's
+    ``metadata_json`` at scan time, then calls
+    :meth:`~skillmeat.core.services.composite_service.CompositeService.create_skill_composite_with_session`
+    within the caller-supplied session so the composite rows are part of the
+    same atomic transaction as the skill's ``Artifact`` row.
+
+    If no embedded artifacts are found in ``metadata_json`` the function is a
+    no-op (not every skill has embedded children).
+
+    Failures are propagated to the caller so that the session can be rolled back
+    and no orphaned rows are left in the database.
+
+    Args:
+        session: Active SQLAlchemy session owned by ``import_artifacts()``.
+        source_id: Marketplace source ID (used for catalog lookup).
+        entry: ``ImportEntry`` for the successfully imported skill.
+        catalog_repo: Repository for fetching the full catalog entry.
+        collection_id: Owning collection identifier (e.g. ``"default"``).
+    """
+    from skillmeat.cache.models import Artifact
+    from skillmeat.core.services.composite_service import CompositeService
+
+    # Retrieve embedded artifacts stored in metadata_json at scan time.
+    catalog_entry = catalog_repo.get_by_id(entry.catalog_entry_id)
+    if catalog_entry is None:
+        logger.debug(
+            "_wire_skill_composite: catalog entry %s not found, skipping",
+            entry.catalog_entry_id,
+        )
+        return
+
+    embedded_dicts: list = []
+    if catalog_entry.metadata_json:
+        try:
+            meta = json.loads(catalog_entry.metadata_json)
+            embedded_dicts = meta.get("embedded_artifacts", [])
+        except (json.JSONDecodeError, AttributeError) as parse_err:
+            logger.warning(
+                "_wire_skill_composite: failed to parse metadata_json for %s:%s — %s",
+                entry.artifact_type,
+                entry.name,
+                parse_err,
+            )
+
+    if not embedded_dicts:
+        # No embedded children recorded; nothing to do.
+        logger.debug(
+            "_wire_skill_composite: no embedded_artifacts in metadata_json for skill %s",
+            entry.name,
+        )
+        return
+
+    # Reconstruct lightweight embedded objects compatible with create_skill_composite.
+    # We use SimpleNamespace so that getattr() access in the service works correctly.
+    from types import SimpleNamespace
+
+    embedded_list = [
+        SimpleNamespace(
+            artifact_type=d.get("artifact_type", ""),
+            name=d.get("name", ""),
+            upstream_url=d.get("upstream_url", ""),
+            content_hash=d.get("content_hash"),
+        )
+        for d in embedded_dicts
+        if d.get("artifact_type") and d.get("name")
+    ]
+
+    if not embedded_list:
+        logger.debug(
+            "_wire_skill_composite: all embedded_artifacts filtered out for skill %s",
+            entry.name,
+        )
+        return
+
+    # Resolve the Artifact ORM row for this skill.
+    artifact_id = f"{entry.artifact_type}:{entry.name}"
+    skill_artifact = (
+        session.query(Artifact).filter(Artifact.id == artifact_id).first()
+    )
+    if skill_artifact is None:
+        logger.error(
+            "_wire_skill_composite: Artifact row for '%s' not found — cannot create composite",
+            artifact_id,
+        )
+        raise RuntimeError(
+            f"Artifact row missing for {artifact_id!r}; cannot create skill composite"
+        )
+
+    svc = CompositeService()
+    svc.create_skill_composite_with_session(
+        session=session,
+        skill_artifact=skill_artifact,
+        embedded_list=embedded_list,
+        collection_id=collection_id,
+        display_name=entry.name,
+        description=entry.description,
+    )
+    logger.info(
+        "_wire_skill_composite: created skill composite for '%s' with %d embedded members",
+        artifact_id,
+        len(embedded_list),
+    )
+
+
+# =============================================================================
 # Composite child-import helper
 # =============================================================================
 
@@ -3964,10 +4110,10 @@ async def import_artifacts(
         HTTPException 404: If source not found or entry IDs invalid
         HTTPException 500: If import operation fails
     """
-    if not request.entry_ids:
+    if not request.entry_ids and not request.artifact_paths:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="entry_ids cannot be empty",
+            detail="At least one of entry_ids or artifact_paths must be provided",
         )
 
     source_repo = MarketplaceSourceRepository()
@@ -4039,6 +4185,56 @@ async def import_artifacts(
                 }
             )
 
+        # Resolve embedded artifact paths to import data.
+        # Embedded artifacts live in parent entries' metadata_json rather than
+        # having their own top-level catalog entries.  We iterate source entries
+        # and match requested paths against embedded_artifacts records.
+        if request.artifact_paths:
+            unresolved_paths = set(request.artifact_paths)
+            all_source_entries = catalog_repo.list_by_source(source_id)
+            for parent_entry in all_source_entries:
+                if not unresolved_paths:
+                    break
+                if not parent_entry.metadata_json:
+                    continue
+                try:
+                    meta = json.loads(parent_entry.metadata_json)
+                    embedded_list = meta.get("embedded_artifacts", [])
+                except (json.JSONDecodeError, AttributeError):
+                    continue
+                for emb in embedded_list:
+                    emb_path = emb.get("path", "")
+                    if emb_path not in unresolved_paths:
+                        continue
+                    # Build a synthetic import entry dict from the embedded metadata
+                    synthetic_id = f"embedded::{parent_entry.id}::{emb_path}"
+                    entries_data.append(
+                        {
+                            "id": synthetic_id,
+                            "artifact_type": emb.get("artifact_type", "skill"),
+                            "name": emb.get("name") or emb_path.split("/")[-1],
+                            "upstream_url": emb.get("upstream_url", ""),
+                            "path": emb_path,
+                            "description": None,
+                            "tags": [],
+                        }
+                    )
+                    unresolved_paths.discard(emb_path)
+
+            if unresolved_paths:
+                logger.warning(
+                    "Could not resolve embedded artifact paths for source %s: %s",
+                    source_id,
+                    unresolved_paths,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=(
+                        f"Embedded artifact path(s) not found in source '{source_id}': "
+                        + ", ".join(sorted(unresolved_paths))
+                    ),
+                )
+
         # Perform import using ImportCoordinator
         # Always import to "default" collection - other collections not supported yet
         coordinator = ImportCoordinator(
@@ -4057,6 +4253,14 @@ async def import_artifacts(
         # Add imported artifacts to default database collection with full metadata.
         # For composite artifacts, child artifacts are also imported automatically
         # so that the complete plugin appears in the user's collection.
+        #
+        # SCA-P2-03: When SKILL_CONTAINED_ARTIFACTS_ENABLED is set, skill artifacts
+        # that have embedded children get a CompositeArtifact row created atomically
+        # in the same session.  Failure rolls back the skill's DB rows via the outer
+        # except handler.
+        _sca_enabled = (
+            os.getenv("SKILL_CONTAINED_ARTIFACTS_ENABLED", "false").lower() == "true"
+        )
         try:
             ensure_default_collection(session)
             from skillmeat.api.services.artifact_cache_service import (
@@ -4076,6 +4280,18 @@ async def import_artifacts(
                     logger.warning(
                         f"Cache population failed for "
                         f"{entry.artifact_type}:{entry.name}: {cache_err}"
+                    )
+                    continue
+
+                # SCA-P2-03: For skills with embedded artifacts, create a
+                # CompositeArtifact row atomically within this same session.
+                if _sca_enabled and entry.artifact_type == "skill":
+                    _wire_skill_composite(
+                        session=session,
+                        source_id=source_id,
+                        entry=entry,
+                        catalog_repo=catalog_repo,
+                        collection_id=DEFAULT_COLLECTION_ID,
                     )
 
                 # For composites, also import child artifacts automatically.

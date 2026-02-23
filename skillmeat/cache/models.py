@@ -2909,8 +2909,8 @@ class CompositeArtifact(Base):
     agents, hooks, mcp servers) into a single installable unit.  The specific
     variant of the bundle is determined by ``composite_type``, which maps to
     ``CompositeType`` in ``skillmeat.core.artifact_detection`` (currently only
-    ``"plugin"`` is implemented; ``"stack"`` and ``"suite"`` are reserved for
-    future use).
+    ``"plugin"`` is implemented; ``"stack"``, ``"suite"``, and ``"skill"`` are
+    reserved for future use).
 
     Primary key format
     ------------------
@@ -2933,7 +2933,7 @@ class CompositeArtifact(Base):
             ``collection_id`` stored on each CompositeMembership row for
             denormalised queries)
         composite_type: Variant classifier — ``"plugin"`` (default),
-            ``"stack"``, or ``"suite"`` — maps to ``CompositeType`` enum
+            ``"stack"``, ``"suite"``, or ``"skill"`` — maps to ``CompositeType`` enum
         display_name: Human-readable label for the composite (nullable)
         description: Free-text description (nullable)
         metadata_json: Raw JSON string for future extension (nullable Text,
@@ -2955,7 +2955,7 @@ class CompositeArtifact(Base):
     # Owning collection
     collection_id: Mapped[str] = mapped_column(String, nullable=False)
 
-    # Composite variant — maps to CompositeType enum ("plugin" | "stack" | "suite")
+    # Composite variant — maps to CompositeType enum ("plugin" | "stack" | "suite" | "skill")
     composite_type: Mapped[str] = mapped_column(
         String, nullable=False, default="plugin", server_default="plugin"
     )
@@ -2986,7 +2986,7 @@ class CompositeArtifact(Base):
     # Constraints and indexes
     __table_args__ = (
         CheckConstraint(
-            "composite_type IN ('plugin', 'stack', 'suite')",
+            "composite_type IN ('plugin', 'stack', 'suite', 'skill')",
             name="check_composite_artifact_type",
         ),
         Index("idx_composite_artifacts_collection_id", "collection_id"),

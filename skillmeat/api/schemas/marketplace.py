@@ -1750,12 +1750,30 @@ class ImportRequest(BaseModel):
     """Request to import artifacts from catalog to collection.
 
     Specifies which entries to import and how to handle conflicts.
+
+    Supports two import modes:
+    - entry_ids: Import top-level catalog entries by their database IDs.
+    - artifact_paths: Import embedded artifacts (e.g. Commands, Agents nested
+      inside a Skill directory) by their repository-relative paths.  These do
+      not have their own catalog entry IDs; the backend locates them via the
+      parent entry's metadata_json.
+
+    At least one of entry_ids or artifact_paths must be non-empty.
     """
 
     entry_ids: List[str] = Field(
+        default_factory=list,
         description="List of catalog entry IDs to import",
-        min_length=1,
         examples=[["cat_canvas_design", "cat_another_skill"]],
+    )
+    artifact_paths: List[str] = Field(
+        default_factory=list,
+        description=(
+            "List of repository-relative artifact paths to import as standalone "
+            "artifacts.  Used for embedded artifacts that do not have their own "
+            "top-level catalog entry (e.g. a Command nested inside a Skill directory)."
+        ),
+        examples=[["skills/my-skill/commands/build.md"]],
     )
     conflict_strategy: Literal["skip", "overwrite", "rename"] = Field(
         default="skip",
@@ -1763,12 +1781,20 @@ class ImportRequest(BaseModel):
         examples=["skip"],
     )
 
+    @model_validator(mode="after")
+    def check_at_least_one_target(self) -> "ImportRequest":
+        """Validate that at least one of entry_ids or artifact_paths is non-empty."""
+        if not self.entry_ids and not self.artifact_paths:
+            raise ValueError("At least one of entry_ids or artifact_paths must be provided")
+        return self
+
     class Config:
         """Pydantic model configuration."""
 
         json_schema_extra = {
             "example": {
                 "entry_ids": ["cat_canvas_design", "cat_another_skill"],
+                "artifact_paths": [],
                 "conflict_strategy": "skip",
             }
         }

@@ -226,6 +226,9 @@ export interface CatalogEntry {
   // Embedded artifacts (Phase 2): artifacts nested inside this artifact's directory
   // e.g., Commands or Agents found inside a Skill directory
   embedded_artifacts?: EmbeddedArtifact[];
+  // Composite sub-type (SCA): distinguishes skill-composites from plugin-composites.
+  // Present only when artifact_type === 'composite'.
+  composite_type?: 'plugin' | 'stack' | 'suite' | 'skill';
 }
 
 /**
@@ -301,6 +304,8 @@ export interface ScanResult {
 
 export interface ImportRequest {
   entry_ids: string[];
+  /** Paths of embedded artifacts to import standalone (no CompositeMembership created). */
+  artifact_paths?: string[];
   conflict_strategy: 'skip' | 'overwrite' | 'rename';
 }
 

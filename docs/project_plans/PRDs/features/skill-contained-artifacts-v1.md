@@ -1,14 +1,14 @@
 ---
 title: 'PRD: Skill-Contained Artifacts'
-description: >
-  Extend the Composite Artifact infrastructure to model Skills with embedded
+description: 'Extend the Composite Artifact infrastructure to model Skills with embedded
   artifacts (commands, agents, hooks, MCPs) as proper parent-child relationships,
-  enabling deduplication on import, member visibility in the UI, coordinated
-  deployment, and version tracking across all three layers (source → collection
-  → project).
+  enabling deduplication on import, member visibility in the UI, coordinated deployment,
+  and version tracking across all three layers (source → collection → project).
+
+  '
 schema_version: 2
 doc_type: prd
-status: draft
+status: inferred_complete
 created: 2026-02-21
 updated: 2026-02-21
 feature_slug: skill-contained-artifacts-v1
@@ -16,40 +16,39 @@ feature_version: v1
 prd_ref: null
 plan_ref: null
 related_documents:
-  - /docs/project_plans/PRDs/features/composite-artifact-infrastructure-v1.md
-  - /docs/project_plans/PRDs/features/composite-artifact-ux-v2.md
-  - /docs/project_plans/implementation_plans/features/composite-artifact-infrastructure-v1.md
+- /docs/project_plans/PRDs/features/composite-artifact-infrastructure-v1.md
+- /docs/project_plans/PRDs/features/composite-artifact-ux-v2.md
+- /docs/project_plans/implementation_plans/features/composite-artifact-infrastructure-v1.md
 owner: null
 contributors: []
 priority: high
 risk_level: medium
 category: product-planning
 tags:
-  - prd
-  - planning
-  - feature
-  - skills
-  - composite-artifacts
-  - embedded-artifacts
-  - import
-  - deduplication
-  - deployment
+- prd
+- planning
+- feature
+- skills
+- composite-artifacts
+- embedded-artifacts
+- import
+- deduplication
+- deployment
 milestone: null
 commit_refs: []
 pr_refs: []
 files_affected:
-  - skillmeat/cache/models.py
-  - skillmeat/cache/composite_repository.py
-  - skillmeat/core/discovery.py
-  - skillmeat/core/marketplace/heuristic_detector.py
-  - skillmeat/core/importer.py
-  - skillmeat/core/deployment.py
-  - skillmeat/api/routers/artifacts.py
-  - skillmeat/web/components/artifact/artifact-contains-tab.tsx
-  - skillmeat/web/components/artifact/artifact-part-of-section.tsx
-  - skillmeat/web/components/marketplace/source-artifact-modal.tsx
+- skillmeat/cache/models.py
+- skillmeat/cache/composite_repository.py
+- skillmeat/core/discovery.py
+- skillmeat/core/marketplace/heuristic_detector.py
+- skillmeat/core/importer.py
+- skillmeat/core/deployment.py
+- skillmeat/api/routers/artifacts.py
+- skillmeat/web/components/artifact/artifact-contains-tab.tsx
+- skillmeat/web/components/artifact/artifact-part-of-section.tsx
+- skillmeat/web/components/marketplace/source-artifact-modal.tsx
 ---
-
 # Feature Brief & Metadata
 
 **Feature Name:**

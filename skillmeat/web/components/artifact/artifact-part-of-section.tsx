@@ -3,8 +3,8 @@
 /**
  * ArtifactPartOfSection
  *
- * Sidebar / detail section that lists parent composite (plugin) artifacts
- * that contain this artifact as a member.
+ * Sidebar / detail section that lists parent composite artifacts (plugins,
+ * skills, stacks, suites, etc.) that contain this artifact as a member.
  *
  * Visibility: rendered ONLY when parents.length > 0. Callers should gate
  * rendering on that condition (or pass the whole parents array and let this
@@ -25,7 +25,7 @@ import type { AssociationItemDTO } from '@/types/associations';
 
 function PartOfSectionSkeleton() {
   return (
-    <div role="status" aria-label="Loading parent plugins" className="space-y-2">
+    <div role="status" aria-label="Loading parent composites" className="space-y-2">
       {[1, 2].map((i) => (
         <Skeleton key={i} className="h-10 w-full rounded-lg" />
       ))}
@@ -34,10 +34,10 @@ function PartOfSectionSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
-// Single parent plugin row
+// Single parent composite row
 // ---------------------------------------------------------------------------
 
-function ParentPluginRow({ parent }: { parent: AssociationItemDTO }) {
+function ParentCompositeRow({ parent }: { parent: AssociationItemDTO }) {
   const href = `/artifacts/${encodeURIComponent(parent.artifact_id)}`;
   const typeLabel =
     parent.artifact_type.charAt(0).toUpperCase() + parent.artifact_type.slice(1);
@@ -47,9 +47,9 @@ function ParentPluginRow({ parent }: { parent: AssociationItemDTO }) {
       <Link
         href={href}
         className="group flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        aria-label={`Open ${parent.artifact_name} plugin detail page`}
+        aria-label={`Open ${parent.artifact_name} ${typeLabel.toLowerCase()} detail page`}
       >
-        {/* Plugin icon */}
+        {/* Composite icon */}
         <Layers
           className="h-3.5 w-3.5 shrink-0 text-muted-foreground group-hover:text-foreground"
           aria-hidden="true"
@@ -85,7 +85,8 @@ export interface ArtifactPartOfSectionProps {
 }
 
 /**
- * Renders a "Part of" section listing parent plugins.
+ * Renders a "Part of" section listing parent composites (plugins, skills,
+ * stacks, suites, etc.).
  *
  * Returns null when not loading AND there are no parents — callers can render
  * this unconditionally; the component self-hides when irrelevant.
@@ -97,7 +98,7 @@ export function ArtifactPartOfSection({
   // Show skeleton while loading (user may have parents we haven't fetched yet)
   if (isLoading) {
     return (
-      <section aria-label="Part of plugins" className="space-y-2">
+      <section aria-label="Part of composites" className="space-y-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Part of
         </h3>
@@ -112,17 +113,17 @@ export function ArtifactPartOfSection({
   }
 
   return (
-    <section aria-label="Parent plugins that contain this artifact" className="space-y-2" data-testid="part-of-section">
+    <section aria-label="Parent composites that contain this artifact" className="space-y-2" data-testid="part-of-section">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Part of
       </h3>
       <ul
         className="space-y-1.5"
         role="list"
-        aria-label="Parent plugin list"
+        aria-label="Parent composite list"
       >
         {parents.map((parent) => (
-          <ParentPluginRow key={parent.artifact_id} parent={parent} />
+          <ParentCompositeRow key={parent.artifact_id} parent={parent} />
         ))}
       </ul>
     </section>

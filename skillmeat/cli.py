@@ -402,6 +402,12 @@ def cmd_list(
         # Show composites when: no type filter (all), or explicitly requesting plugin/composite
         show_composites = not no_cache and (type_filter is None or composite_filter)
 
+        # Batch member-count map: skill_uuid -> member_count (only populated
+        # for skill-type artifacts when the DB is available).
+        skill_member_counts: Dict[str, int] = {}
+
+        resolved_collection: Optional[str] = collection
+
         if show_composites:
             try:
                 from skillmeat.cache.composite_repository import (
@@ -411,7 +417,6 @@ def cmd_list(
                 composite_repo = CompositeMembershipRepository()
 
                 # Resolve collection id — composites use the collection name as collection_id
-                resolved_collection = collection
                 if resolved_collection is None:
                     collection_mgr = CollectionManager()
                     resolved_collection = collection_mgr.get_active_collection_name()
@@ -419,6 +424,35 @@ def cmd_list(
                 composite_rows = composite_repo.list_composites(resolved_collection)
             except Exception as comp_err:
                 logger.debug("Could not fetch composite artifacts: %s", comp_err)
+
+        # ------------------------------------------------------------------
+        # Fetch member counts for skill-type artifacts (single batch query)
+        # ------------------------------------------------------------------
+        if not no_cache and not composite_filter and artifacts:
+            skill_artifacts = [
+                a
+                for a in artifacts
+                if getattr(a, "type", None) is not None
+                and a.type.value == "skill"
+                and getattr(a, "uuid", None)
+            ]
+            if skill_artifacts:
+                try:
+                    from skillmeat.cache.composite_repository import (
+                        CompositeMembershipRepository,
+                    )
+
+                    composite_repo = CompositeMembershipRepository()
+                    if resolved_collection is None:
+                        collection_mgr = CollectionManager()
+                        resolved_collection = collection_mgr.get_active_collection_name()
+
+                    skill_member_counts = composite_repo.get_skill_member_counts(
+                        skill_uuids=[a.uuid for a in skill_artifacts],
+                        collection_id=resolved_collection,
+                    )
+                except Exception as mc_err:
+                    logger.debug("Could not fetch skill member counts: %s", mc_err)
 
         if not artifacts and not composite_rows:
             console.print("[yellow]No artifacts found[/yellow]")
@@ -435,8 +469,18 @@ def cmd_list(
             table.add_column("Tags", style="yellow")
 
         for artifact in (artifacts or []):
+            name = artifact.name
+            # Append [+N members] indicator for skills that have composite members
+            artifact_uuid = getattr(artifact, "uuid", None)
+            if (
+                artifact.type.value == "skill"
+                and artifact_uuid
+                and artifact_uuid in skill_member_counts
+            ):
+                member_count = skill_member_counts[artifact_uuid]
+                name = f"{name} [+{member_count} members]"
             row = [
-                artifact.name,
+                name,
                 artifact.type.value,
                 artifact.origin,
             ]
@@ -1357,6 +1401,15 @@ def quick_add(
     default=False,
     help="Deploy to all configured project profiles",
 )
+@click.option(
+    "--members/--no-members",
+    "include_members",
+    default=True,
+    help=(
+        "Deploy skill's embedded member artifacts (commands, agents, hooks, MCP servers) "
+        "alongside the skill. Use --no-members to deploy only the primary skill file."
+    ),
+)
 @click.pass_context
 def deploy(
     ctx,
@@ -1368,6 +1421,7 @@ def deploy(
     output_format: Optional[str],
     profile_id: Optional[str],
     all_profiles: bool,
+    include_members: bool,
 ):
     """Deploy artifacts to a project's .claude/ directory.
 
@@ -1432,6 +1486,7 @@ def deploy(
                     overwrite=overwrite,
                     profile_id=resolved_profile_id,
                     all_profiles=resolved_all_profiles,
+                    include_members=include_members,
                 )
         else:
             deployments = deployment_mgr.deploy_artifacts(
@@ -1442,6 +1497,7 @@ def deploy(
                 overwrite=overwrite,
                 profile_id=resolved_profile_id,
                 all_profiles=resolved_all_profiles,
+                include_members=include_members,
             )
 
         # Output based on format

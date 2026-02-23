@@ -50,7 +50,7 @@ import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Sequence
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -344,6 +344,61 @@ class CompositeMembershipRepository:
         finally:
             session.close()
 
+    def get_skill_composite_children(
+        self, skill_artifact_uuid: str, collection_id: str
+    ) -> List[MembershipRecord]:
+        """Return membership rows for the skill-type composite that wraps a skill artifact.
+
+        Skill artifacts can be wrapped as a ``CompositeArtifact`` of
+        ``composite_type='skill'`` whose ``metadata_json`` stores the
+        originating skill's UUID as ``{"artifact_uuid": "<skill-uuid>"}``.
+        This method performs the lookup and returns the composite's children.
+
+        Args:
+            skill_artifact_uuid: Stable UUID of the skill ``Artifact`` row.
+            collection_id: Owning collection identifier.
+
+        Returns:
+            List of membership dicts for the companion composite's children.
+            Empty list when no companion composite exists or when it has no
+            members.
+
+        Example:
+            >>> repo.get_skill_composite_children("a1b2c3d4...", "col-abc")
+            [{"composite_id": "composite:my-skill", "child_artifact_uuid": "...", ...}]
+        """
+        import json as _json  # noqa: PLC0415
+
+        session = self._get_session()
+        try:
+            # Find the CompositeArtifact whose metadata_json encodes this
+            # skill's UUID as the originating artifact.
+            target_json = _json.dumps({"artifact_uuid": skill_artifact_uuid})
+            composite = (
+                session.query(CompositeArtifact)
+                .filter(
+                    CompositeArtifact.composite_type == "skill",
+                    CompositeArtifact.collection_id == collection_id,
+                    CompositeArtifact.metadata_json == target_json,
+                )
+                .first()
+            )
+            if composite is None:
+                return []
+
+            rows = (
+                session.query(CompositeMembership)
+                .options(joinedload(CompositeMembership.child_artifact))
+                .filter(
+                    CompositeMembership.composite_id == composite.id,
+                    CompositeMembership.collection_id == collection_id,
+                )
+                .all()
+            )
+            return [self._membership_to_dict(r) for r in rows]
+        finally:
+            session.close()
+
     # ------------------------------------------------------------------
     # Write operations
     # ------------------------------------------------------------------
@@ -414,9 +469,7 @@ class CompositeMembershipRepository:
             )
             return result
 
-    def delete_membership(
-        self, composite_id: str, child_artifact_uuid: str
-    ) -> bool:
+    def delete_membership(self, composite_id: str, child_artifact_uuid: str) -> bool:
         """Delete a specific membership edge.
 
         The ``collection_id`` is intentionally omitted from the delete key
@@ -500,6 +553,92 @@ class CompositeMembershipRepository:
         finally:
             session.close()
 
+    def get_skill_member_counts(
+        self,
+        skill_uuids: Sequence[str],
+        collection_id: str,
+    ) -> Dict[str, int]:
+        """Return member counts for skill-type composites mapped by skill UUID.
+
+        Skill artifacts can be wrapped as a ``CompositeArtifact`` of
+        ``composite_type='skill'`` whose ``metadata_json`` stores the
+        originating skill's UUID as ``{"artifact_uuid": "<skill-uuid>"}``.
+        This method performs a single batch query across all provided UUIDs
+        and returns a dict mapping ``skill_uuid -> member_count``.
+
+        Skills with no companion composite (or with zero members) are omitted
+        from the returned dict.
+
+        Args:
+            skill_uuids: Iterable of stable artifact UUIDs to look up.
+            collection_id: Owning collection identifier.
+
+        Returns:
+            ``{skill_uuid: count}`` for every skill that has at least one
+            ``CompositeMembership`` row via its companion composite.  Skills
+            with no members are absent.
+
+        Example:
+            >>> counts = repo.get_skill_member_counts(["uuid-a", "uuid-b"], "col-abc")
+            >>> counts
+            {"uuid-a": 3, "uuid-b": 1}
+        """
+        import json as _json  # noqa: PLC0415
+
+        if not skill_uuids:
+            return {}
+
+        from sqlalchemy import func  # noqa: PLC0415
+
+        session = self._get_session()
+        try:
+            # Build the set of JSON strings we are looking for so the filter
+            # can use an IN clause instead of N separate queries.
+            target_jsons = [
+                _json.dumps({"artifact_uuid": uid}) for uid in skill_uuids
+            ]
+
+            # Single query: join CompositeArtifact → CompositeMembership and
+            # aggregate per composite, then map back through metadata_json.
+            rows = (
+                session.query(
+                    CompositeArtifact.metadata_json,
+                    func.count(CompositeMembership.child_artifact_uuid).label(
+                        "member_count"
+                    ),
+                )
+                .join(
+                    CompositeMembership,
+                    (CompositeMembership.composite_id == CompositeArtifact.id)
+                    & (
+                        CompositeMembership.collection_id
+                        == CompositeArtifact.collection_id
+                    ),
+                )
+                .filter(
+                    CompositeArtifact.composite_type == "skill",
+                    CompositeArtifact.collection_id == collection_id,
+                    CompositeArtifact.metadata_json.in_(target_jsons),
+                )
+                .group_by(CompositeArtifact.metadata_json)
+                .all()
+            )
+
+            result: Dict[str, int] = {}
+            for metadata_json, count in rows:
+                if not metadata_json or not count:
+                    continue
+                try:
+                    meta = _json.loads(metadata_json)
+                    skill_uuid = meta.get("artifact_uuid")
+                    if skill_uuid and count > 0:
+                        result[skill_uuid] = int(count)
+                except (ValueError, KeyError):
+                    continue
+            return result
+        finally:
+            session.close()
+
     def list_composites(self, collection_id: str) -> List[CompositeRecord]:
         """Return all CompositeArtifacts for a collection, ordered by id.
 
@@ -578,7 +717,7 @@ class CompositeMembershipRepository:
             session.add(composite)
             session.flush()
 
-            for child_uuid in (initial_member_uuids or []):
+            for child_uuid in initial_member_uuids or []:
                 membership = CompositeMembership(
                     collection_id=collection_id,
                     composite_id=composite_id,
@@ -631,9 +770,7 @@ class CompositeMembershipRepository:
                 .first()
             )
             if composite is None:
-                raise NotFoundError(
-                    f"CompositeArtifact not found: {composite_id!r}"
-                )
+                raise NotFoundError(f"CompositeArtifact not found: {composite_id!r}")
 
             if display_name is not None:
                 composite.display_name = display_name
@@ -645,9 +782,7 @@ class CompositeMembershipRepository:
             session.flush()
             session.refresh(composite)
             result = self._composite_to_dict(composite)
-            logger.info(
-                "Updated CompositeArtifact: id=%s", composite_id
-            )
+            logger.info("Updated CompositeArtifact: id=%s", composite_id)
             return result
 
     def delete_composite(
@@ -691,9 +826,9 @@ class CompositeMembershipRepository:
             session.delete(composite)
 
             if cascade_delete_children and child_uuids:
-                session.query(Artifact).filter(
-                    Artifact.uuid.in_(child_uuids)
-                ).delete(synchronize_session=False)
+                session.query(Artifact).filter(Artifact.uuid.in_(child_uuids)).delete(
+                    synchronize_session=False
+                )
                 logger.info(
                     "delete_composite: also deleted %d child Artifact rows",
                     len(child_uuids),

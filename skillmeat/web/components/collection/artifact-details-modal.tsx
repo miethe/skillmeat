@@ -486,12 +486,36 @@ const BASE_TABS: Tab[] = [
   { value: 'deployments', label: 'Deployments' },
 ];
 
-/** Plugin Members tab — only shown for composite artifacts */
-const PLUGIN_TAB: Tab = {
-  value: 'plugin',
-  label: 'Plugin Members',
-  icon: Blocks,
-};
+/**
+ * Returns the "Members" tab definition for composite artifacts.
+ * The label is derived from compositeType so skill-composites show "Skill Members"
+ * and plugin-composites show "Plugin Members". Falls back to "Members" for unknown types.
+ */
+function getMembersTab(compositeType?: Artifact['compositeType']): Tab {
+  let displayName: string;
+  switch (compositeType) {
+    case 'plugin':
+      displayName = 'Plugin';
+      break;
+    case 'skill':
+      displayName = 'Skill';
+      break;
+    case 'stack':
+      displayName = 'Stack';
+      break;
+    case 'suite':
+      displayName = 'Suite';
+      break;
+    default:
+      displayName = '';
+      break;
+  }
+  return {
+    value: 'plugin',
+    label: displayName ? `${displayName} Members` : 'Members',
+    icon: Blocks,
+  };
+}
 
 // ============================================================================
 // Main Component
@@ -548,11 +572,12 @@ export function ArtifactDetailsModal({
   // Determine if this is a composite/plugin artifact
   const isComposite = artifact?.type === 'composite';
 
-  // Build dynamic tab list — insert Plugin Members tab right after Overview for composites
+  // Build dynamic tab list — insert Members tab right after Overview for composites
   const TABS: Tab[] = useMemo(() => {
     if (!isComposite) return BASE_TABS;
-    // Insert plugin tab after overview (index 1)
-    return [BASE_TABS[0]!, PLUGIN_TAB, ...BASE_TABS.slice(1)];
+    // Insert plugin/members tab after overview (index 1)
+    const membersTab = getMembersTab(artifact?.compositeType);
+    return [BASE_TABS[0]!, membersTab, ...BASE_TABS.slice(1)];
   }, [isComposite]);
 
   // Sync activeTab with initialTab when modal opens

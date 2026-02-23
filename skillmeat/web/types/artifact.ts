@@ -173,7 +173,7 @@ export interface Artifact {
    * Sub-type for composite artifacts (plugin, stack, suite).
    * Only present when type === 'composite'.
    */
-  compositeType?: 'plugin' | 'stack' | 'suite';
+  compositeType?: 'plugin' | 'stack' | 'suite' | 'skill';
 
   // ============================================================================
   // Context (supports collection OR project scope)

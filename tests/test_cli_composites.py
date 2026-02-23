@@ -121,6 +121,207 @@ class TestListIncludesComposites:
 
 
 # ===========================================================================
+# skillmeat list — [+N members] indicator for skills
+# ===========================================================================
+
+
+class TestListSkillMemberCount:
+    """Test that 'skillmeat list' appends [+N members] for skills with members."""
+
+    def _make_skill_artifact(
+        self,
+        name: str = "my-skill",
+        uuid: str = "abc123",
+        origin: str = "user/repo",
+    ) -> MagicMock:
+        artifact = MagicMock()
+        artifact.name = name
+        artifact.type = MagicMock()
+        artifact.type.value = "skill"
+        artifact.origin = origin
+        artifact.uuid = uuid
+        artifact.tags = []
+        return artifact
+
+    def test_skill_with_members_shows_indicator(self, cli_runner):
+        """A skill with 3 composite members shows '[+3 members]' in output."""
+        skill_uuid = "deadbeef001"
+        skill = self._make_skill_artifact(name="my-skill", uuid=skill_uuid)
+
+        with (
+            patch(
+                "skillmeat.cli.ArtifactManager.list_artifacts",
+                return_value=[skill],
+            ),
+            patch(
+                "skillmeat.cache.composite_repository.CompositeMembershipRepository.list_composites",
+                return_value=[],
+            ),
+            patch(
+                "skillmeat.cache.composite_repository.CompositeMembershipRepository.get_skill_member_counts",
+                return_value={skill_uuid: 3},
+            ),
+            patch(
+                "skillmeat.cli.CollectionManager.get_active_collection_name",
+                return_value="default",
+            ),
+        ):
+            result = cli_runner.invoke(main, ["list"])
+
+        assert result.exit_code == 0
+        assert "my-skill [+3 members]" in result.output
+
+    def test_skill_without_members_shows_no_indicator(self, cli_runner):
+        """A skill with no members shows its name without any indicator."""
+        skill_uuid = "deadbeef002"
+        skill = self._make_skill_artifact(name="plain-skill", uuid=skill_uuid)
+
+        with (
+            patch(
+                "skillmeat.cli.ArtifactManager.list_artifacts",
+                return_value=[skill],
+            ),
+            patch(
+                "skillmeat.cache.composite_repository.CompositeMembershipRepository.list_composites",
+                return_value=[],
+            ),
+            patch(
+                "skillmeat.cache.composite_repository.CompositeMembershipRepository.get_skill_member_counts",
+                return_value={},
+            ),
+            patch(
+                "skillmeat.cli.CollectionManager.get_active_collection_name",
+                return_value="default",
+            ),
+        ):
+            result = cli_runner.invoke(main, ["list"])
+
+        assert result.exit_code == 0
+        assert "plain-skill" in result.output
+        assert "members" not in result.output
+
+    def test_non_skill_artifacts_unchanged(self, cli_runner):
+        """Command artifacts are not modified by the member count logic."""
+        command_artifact = MagicMock()
+        command_artifact.name = "my-command"
+        command_artifact.type = MagicMock()
+        command_artifact.type.value = "command"
+        command_artifact.origin = "user/repo"
+        command_artifact.uuid = "cmd-uuid-001"
+        command_artifact.tags = []
+
+        with (
+            patch(
+                "skillmeat.cli.ArtifactManager.list_artifacts",
+                return_value=[command_artifact],
+            ),
+            patch(
+                "skillmeat.cache.composite_repository.CompositeMembershipRepository.list_composites",
+                return_value=[],
+            ),
+            patch(
+                "skillmeat.cache.composite_repository.CompositeMembershipRepository.get_skill_member_counts",
+                return_value={"cmd-uuid-001": 99},  # would be ignored for non-skills
+            ),
+            patch(
+                "skillmeat.cli.CollectionManager.get_active_collection_name",
+                return_value="default",
+            ),
+        ):
+            result = cli_runner.invoke(main, ["list"])
+
+        assert result.exit_code == 0
+        assert "my-command" in result.output
+        assert "members" not in result.output
+
+    def test_member_count_query_failure_is_graceful(self, cli_runner):
+        """If get_skill_member_counts raises, list still succeeds without indicator."""
+        skill_uuid = "deadbeef003"
+        skill = self._make_skill_artifact(name="my-skill", uuid=skill_uuid)
+
+        with (
+            patch(
+                "skillmeat.cli.ArtifactManager.list_artifacts",
+                return_value=[skill],
+            ),
+            patch(
+                "skillmeat.cache.composite_repository.CompositeMembershipRepository.list_composites",
+                return_value=[],
+            ),
+            patch(
+                "skillmeat.cache.composite_repository.CompositeMembershipRepository.get_skill_member_counts",
+                side_effect=Exception("DB error"),
+            ),
+            patch(
+                "skillmeat.cli.CollectionManager.get_active_collection_name",
+                return_value="default",
+            ),
+        ):
+            result = cli_runner.invoke(main, ["list"])
+
+        assert result.exit_code == 0
+        assert "my-skill" in result.output
+        # No indicator when count query fails
+        assert "members" not in result.output
+
+    def test_no_cache_skips_member_count_query(self, cli_runner):
+        """With --no-cache, member count query is skipped entirely."""
+        skill = self._make_skill_artifact(name="cached-skill", uuid="uuid-nc-001")
+
+        with (
+            patch(
+                "skillmeat.cli.ArtifactManager.list_artifacts",
+                return_value=[skill],
+            ),
+            patch(
+                "skillmeat.cache.composite_repository.CompositeMembershipRepository.get_skill_member_counts"
+            ) as mock_counts,
+        ):
+            result = cli_runner.invoke(main, ["list", "--no-cache"])
+
+        assert result.exit_code == 0
+        # --no-cache must not trigger member count query
+        mock_counts.assert_not_called()
+        # Skill still shown without indicator
+        assert "cached-skill" in result.output
+        assert "members" not in result.output
+
+    def test_multiple_skills_mixed_member_counts(self, cli_runner):
+        """Multiple skills: only those with members show the indicator."""
+        skill_a = self._make_skill_artifact(
+            name="skill-with-members", uuid="uuid-A001"
+        )
+        skill_b = self._make_skill_artifact(name="skill-without", uuid="uuid-B002")
+
+        with (
+            patch(
+                "skillmeat.cli.ArtifactManager.list_artifacts",
+                return_value=[skill_a, skill_b],
+            ),
+            patch(
+                "skillmeat.cache.composite_repository.CompositeMembershipRepository.list_composites",
+                return_value=[],
+            ),
+            patch(
+                "skillmeat.cache.composite_repository.CompositeMembershipRepository.get_skill_member_counts",
+                return_value={"uuid-A001": 5},
+            ),
+            patch(
+                "skillmeat.cli.CollectionManager.get_active_collection_name",
+                return_value="default",
+            ),
+        ):
+            result = cli_runner.invoke(main, ["list"])
+
+        assert result.exit_code == 0
+        assert "skill-with-members [+5 members]" in result.output
+        # skill-b has no entry in counts dict — should appear without indicator
+        assert "skill-without" in result.output
+        # Verify skill-without does NOT have the indicator
+        assert "skill-without [+" not in result.output
+
+
+# ===========================================================================
 # skillmeat list --type composite/plugin — filtering
 # ===========================================================================
 

@@ -41,6 +41,7 @@ Usage
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -53,6 +54,7 @@ from skillmeat.cache.composite_repository import (
     MembershipRecord,
 )
 from skillmeat.cache.repositories import ConstraintError, NotFoundError
+from skillmeat.observability.tracing import trace_operation
 
 # ---------------------------------------------------------------------------
 # Module-level logger
@@ -374,6 +376,386 @@ class CompositeService:
             initial_member_uuids=resolved_uuids,
             pinned_version_hash=pinned_version_hash,
         )
+
+    def create_skill_composite(
+        self,
+        skill_artifact: Any,
+        embedded_list: List[Any],
+        collection_id: str = "default",
+        display_name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> "CompositeRecord":
+        """Create a CompositeArtifact of type 'skill' wrapping a skill artifact.
+
+        Registers the given skill as a skill-type composite in the DB cache,
+        deduplicates embedded child artifacts by content hash, and creates
+        ``CompositeMembership`` rows linking the composite to each child.
+
+        Dedup behaviour
+        ---------------
+        For each item in ``embedded_list``:
+
+        1. If ``content_hash`` is present, query ``artifacts.content_hash``
+           for an existing row — reuse its UUID if found.
+        2. Fall back to an ``artifacts.id`` lookup using the ``type:name`` key.
+        3. If still not found, create a new ``Artifact`` row under the
+           ``collection_artifacts_global`` sentinel project.
+
+        Membership upsert
+        -----------------
+        A ``CompositeMembership`` edge is only inserted when the
+        ``(collection_id, composite_id, child_artifact_uuid)`` triple does not
+        already exist, so re-importing the same skill is idempotent.
+
+        The ``metadata_json`` field carries the originating skill's stable UUID
+        so that callers can correlate the composite back to the source artifact
+        without a separate join:
+
+        .. code-block:: json
+
+            {"artifact_uuid": "<skill-artifact-uuid>"}
+
+        Args:
+            skill_artifact: Artifact ORM instance (or any object exposing
+                ``.id`` and ``.uuid`` attributes) for the skill being
+                wrapped as a composite.
+            embedded_list: List of ``DetectedArtifact``-like objects discovered
+                inside the skill directory.  Each item must expose at least
+                ``artifact_type``, ``name``, ``upstream_url``, and optionally
+                ``content_hash``.
+            collection_id: Owning collection identifier.  Defaults to
+                ``"default"`` when not specified.
+            display_name: Optional human-readable label for the composite.
+                When ``None``, the skill's ``id`` is used as a fallback label
+                by callers.
+            description: Optional free-text description.
+
+        Returns:
+            ``CompositeRecord`` dict for the newly created composite.
+
+        Raises:
+            ConstraintError: When a composite with the derived ``composite_id``
+                already exists in the collection.
+
+        Example:
+            >>> svc = CompositeService()
+            >>> record = svc.create_skill_composite(
+            ...     skill_artifact=my_skill,
+            ...     embedded_list=[cmd_artifact, agent_artifact],
+            ...     collection_id="my-collection",
+            ... )
+            >>> record["composite_type"]
+            'skill'
+        """
+        composite_id = f"composite:{skill_artifact.id.split(':', 1)[-1]}"
+        artifact_uuid = str(skill_artifact.uuid)
+        member_count = len(embedded_list)
+
+        logger.info(
+            "create_skill_composite: skill=%r composite_id=%s uuid=%s "
+            "embedded_count=%d collection=%s",
+            skill_artifact.id,
+            composite_id,
+            artifact_uuid,
+            member_count,
+            collection_id,
+            extra={
+                "skill_artifact_uuid": artifact_uuid,
+                "composite_id": composite_id,
+                "member_count": member_count,
+                "collection_id": collection_id,
+            },
+        )
+
+        with trace_operation(
+            "composite.create_skill_composite",
+            skill_artifact_uuid=artifact_uuid,
+            composite_id=composite_id,
+            member_count=member_count,
+            collection_id=collection_id,
+        ) as span:
+            with self._repo.transaction() as session:
+                result, dedup_hits, dedup_misses, memberships_created, memberships_skipped = (
+                    self._create_skill_composite_in_session(
+                        session=session,
+                        skill_artifact=skill_artifact,
+                        embedded_list=embedded_list,
+                        collection_id=collection_id,
+                        display_name=display_name,
+                        description=description,
+                    )
+                )
+
+            span.set_attribute("dedup_hit_count", dedup_hits)
+            span.set_attribute("dedup_miss_count", dedup_misses)
+            span.set_attribute("memberships_created", memberships_created)
+            span.set_attribute("memberships_skipped", memberships_skipped)
+
+            logger.info(
+                "create_skill_composite: created CompositeArtifact id=%s type=skill "
+                "collection=%s dedup_hits=%d dedup_misses=%d "
+                "memberships_created=%d memberships_skipped=%d",
+                f"composite:{skill_artifact.id.split(':', 1)[-1]}",
+                collection_id,
+                dedup_hits,
+                dedup_misses,
+                memberships_created,
+                memberships_skipped,
+                extra={
+                    "skill_artifact_uuid": artifact_uuid,
+                    "composite_id": f"composite:{skill_artifact.id.split(':', 1)[-1]}",
+                    "member_count": member_count,
+                    "dedup_hit_count": dedup_hits,
+                    "dedup_miss_count": dedup_misses,
+                    "memberships_created": memberships_created,
+                    "memberships_skipped": memberships_skipped,
+                },
+            )
+            return result
+
+    def create_skill_composite_with_session(
+        self,
+        session: Session,
+        skill_artifact: Any,
+        embedded_list: List[Any],
+        collection_id: str = "default",
+        display_name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> "CompositeRecord":
+        """Create a skill-type CompositeArtifact using a caller-supplied session.
+
+        This is the session-injected variant of :meth:`create_skill_composite`
+        intended for use inside existing transactions (e.g. the marketplace
+        import pipeline) where the caller owns the session lifecycle.  The
+        caller is responsible for committing or rolling back — this method only
+        flushes within the provided session.
+
+        Args:
+            session: Active SQLAlchemy ``Session`` owned by the caller.
+            skill_artifact: Artifact ORM instance (or object with ``.id`` and
+                ``.uuid``) for the parent skill.
+            embedded_list: Detected child artifacts to link as members.
+            collection_id: Owning collection identifier.
+            display_name: Optional human-readable label.
+            description: Optional free-text description.
+
+        Returns:
+            ``CompositeRecord`` dict for the composite.
+
+        Raises:
+            ConstraintError: If a composite with the derived id already exists.
+        """
+        composite_id = f"composite:{skill_artifact.id.split(':', 1)[-1]}"
+        artifact_uuid = str(skill_artifact.uuid)
+        member_count = len(embedded_list)
+
+        logger.info(
+            "create_skill_composite_with_session: skill=%r composite_id=%s uuid=%s "
+            "embedded_count=%d collection=%s",
+            skill_artifact.id,
+            composite_id,
+            artifact_uuid,
+            member_count,
+            collection_id,
+            extra={
+                "skill_artifact_uuid": artifact_uuid,
+                "composite_id": composite_id,
+                "member_count": member_count,
+                "collection_id": collection_id,
+            },
+        )
+
+        with trace_operation(
+            "composite.create_skill_composite_with_session",
+            skill_artifact_uuid=artifact_uuid,
+            composite_id=composite_id,
+            member_count=member_count,
+            collection_id=collection_id,
+        ) as span:
+            result, dedup_hits, dedup_misses, memberships_created, memberships_skipped = (
+                self._create_skill_composite_in_session(
+                    session=session,
+                    skill_artifact=skill_artifact,
+                    embedded_list=embedded_list,
+                    collection_id=collection_id,
+                    display_name=display_name,
+                    description=description,
+                )
+            )
+            span.set_attribute("dedup_hit_count", dedup_hits)
+            span.set_attribute("dedup_miss_count", dedup_misses)
+            span.set_attribute("memberships_created", memberships_created)
+            span.set_attribute("memberships_skipped", memberships_skipped)
+            return result
+
+    def _create_skill_composite_in_session(
+        self,
+        session: Session,
+        skill_artifact: Any,
+        embedded_list: List[Any],
+        collection_id: str,
+        display_name: Optional[str],
+        description: Optional[str],
+    ) -> tuple:
+        """Core implementation of skill composite creation within an existing session.
+
+        Performs dedup + membership creation without opening its own transaction.
+        The caller is responsible for commit/rollback.
+
+        Returns:
+            Tuple of (result_dict, dedup_hits, dedup_misses,
+                      memberships_created, memberships_skipped).
+        """
+        import uuid as _uuid_mod  # noqa: PLC0415
+
+        from skillmeat.cache.models import Artifact, CompositeArtifact, CompositeMembership
+        from skillmeat.cache.models import Project
+
+        composite_id = f"composite:{skill_artifact.id.split(':', 1)[-1]}"
+        artifact_uuid = str(skill_artifact.uuid)
+        metadata = json.dumps({"artifact_uuid": artifact_uuid})
+        member_count = len(embedded_list)
+
+        # Sentinel project_id for collection-scoped artifact rows (must
+        # match _COLLECTION_ARTIFACTS_PROJECT_ID in artifact_cache_service).
+        _SENTINEL_PROJECT_ID = "collection_artifacts_global"
+
+        # Ensure the sentinel Project row exists so that Artifact FK is satisfied.
+        _sentinel_exists = (
+            session.query(Project.id)
+            .filter(Project.id == _SENTINEL_PROJECT_ID)
+            .first()
+        )
+        if not _sentinel_exists:
+            sentinel = Project(
+                id=_SENTINEL_PROJECT_ID,
+                name="Collection Artifacts",
+                path="~/.skillmeat/collections",
+                description="Sentinel project for collection artifacts",
+                status="active",
+            )
+            session.add(sentinel)
+            session.flush()
+            logger.debug(
+                "_create_skill_composite_in_session: created sentinel Project row '%s'",
+                _SENTINEL_PROJECT_ID,
+            )
+
+        composite = CompositeArtifact(
+            id=composite_id,
+            collection_id=collection_id,
+            composite_type="skill",
+            display_name=display_name,
+            description=description,
+            metadata_json=metadata,
+        )
+        session.add(composite)
+        session.flush()
+
+        # ------------------------------------------------------------------
+        # SCA-P2-01 + SCA-P2-02: Dedup + membership creation
+        # ------------------------------------------------------------------
+        dedup_hits = 0
+        dedup_misses = 0
+        memberships_created = 0
+        memberships_skipped = 0
+
+        with trace_operation(
+            "composite.dedup_and_link_members",
+            composite_id=composite_id,
+            member_count=member_count,
+        ) as dedup_span:
+            for embedded in embedded_list:
+                child_content_hash: Optional[str] = getattr(embedded, "content_hash", None)
+                child_type: str = getattr(embedded, "artifact_type", "skill")
+                child_name: str = getattr(embedded, "name", "")
+                child_artifact_id = f"{child_type}:{child_name}"
+                child_source: Optional[str] = getattr(embedded, "upstream_url", None)
+
+                # --- Dedup: find existing Artifact by content hash first, then id ---
+                existing_artifact: Optional[Any] = None
+                if child_content_hash:
+                    existing_artifact = (
+                        session.query(Artifact)
+                        .filter(Artifact.content_hash == child_content_hash)
+                        .first()
+                    )
+
+                if existing_artifact is None:
+                    # Fall back to id-based lookup (no content hash or no hash match)
+                    existing_artifact = (
+                        session.query(Artifact)
+                        .filter(Artifact.id == child_artifact_id)
+                        .first()
+                    )
+
+                if existing_artifact is not None:
+                    child_uuid = str(existing_artifact.uuid)
+                    dedup_hits += 1
+                    logger.debug(
+                        "_create_skill_composite_in_session: dedup HIT for '%s' → uuid=%s",
+                        child_artifact_id,
+                        child_uuid,
+                    )
+                else:
+                    # Create a new Artifact row for this embedded child.
+                    child_uuid = _uuid_mod.uuid4().hex
+                    new_artifact = Artifact(
+                        id=child_artifact_id,
+                        uuid=child_uuid,
+                        project_id=_SENTINEL_PROJECT_ID,
+                        name=child_name,
+                        type=child_type,
+                        source=child_source,
+                        content_hash=child_content_hash,
+                    )
+                    session.add(new_artifact)
+                    session.flush()
+                    dedup_misses += 1
+                    logger.debug(
+                        "_create_skill_composite_in_session: created Artifact row '%s' uuid=%s",
+                        child_artifact_id,
+                        child_uuid,
+                    )
+
+                # --- Upsert membership: skip if the edge already exists ---
+                existing_membership = (
+                    session.query(CompositeMembership)
+                    .filter(
+                        CompositeMembership.collection_id == collection_id,
+                        CompositeMembership.composite_id == composite_id,
+                        CompositeMembership.child_artifact_uuid == child_uuid,
+                    )
+                    .first()
+                )
+                if existing_membership is not None:
+                    memberships_skipped += 1
+                    logger.debug(
+                        "_create_skill_composite_in_session: membership already exists "
+                        "composite=%s child_uuid=%s — skipping",
+                        composite_id,
+                        child_uuid,
+                    )
+                    continue
+
+                membership = CompositeMembership(
+                    collection_id=collection_id,
+                    composite_id=composite_id,
+                    child_artifact_uuid=child_uuid,
+                    relationship_type="contains",
+                )
+                session.add(membership)
+                memberships_created += 1
+
+            dedup_span.set_attribute("dedup_hit_count", dedup_hits)
+            dedup_span.set_attribute("dedup_miss_count", dedup_misses)
+            dedup_span.set_attribute("memberships_created", memberships_created)
+            dedup_span.set_attribute("memberships_skipped", memberships_skipped)
+
+        session.flush()
+        session.refresh(composite)
+        result = self._repo._composite_to_dict(composite)
+        return result, dedup_hits, dedup_misses, memberships_created, memberships_skipped
 
     def update_composite(
         self,

@@ -941,3 +941,179 @@ class TestCompositeService:
         )
 
         assert record["relationship_type"] == "extends"
+
+
+# =============================================================================
+# create_skill_composite() Tests
+# =============================================================================
+
+
+class TestCreateSkillComposite:
+    """Tests for CompositeService.create_skill_composite().
+
+    Verifies that a CompositeArtifact row with composite_type='skill' and
+    correct metadata_json is created when a skill artifact and an embedded
+    list are provided.
+
+    Phase 1 only: member creation (dedup logic) is deferred to TASK-2.1.
+    These tests assert that NO CompositeMembership rows are created.
+    """
+
+    def test_creates_composite_artifact_with_skill_type(
+        self, composite_service: CompositeService
+    ) -> None:
+        """create_skill_composite() creates a CompositeArtifact with composite_type='skill'.
+
+        Arrange: seed a Project and Artifact into the database.
+        Act: call create_skill_composite() with the artifact and an empty embedded list.
+        Assert: the returned record has composite_type='skill'.
+        """
+        repo = composite_service._repo
+        child_uuid = _seed_project_and_artifact(
+            repo,
+            project_id="proj-skill-comp-001",
+            artifact_id="skill:my-skill",
+            artifact_name="my-skill",
+        )
+
+        class _MockArtifact:
+            id = "skill:my-skill"
+            uuid = child_uuid
+
+        record = composite_service.create_skill_composite(
+            skill_artifact=_MockArtifact(),
+            embedded_list=[],
+            collection_id="collection-skill-001",
+        )
+
+        assert record["composite_type"] == "skill"
+
+    def test_creates_composite_artifact_with_correct_metadata_json(
+        self, composite_service: CompositeService
+    ) -> None:
+        """create_skill_composite() stores artifact_uuid in metadata_json.
+
+        The metadata_json field must be a JSON string containing
+        {"artifact_uuid": "<skill-artifact-uuid>"}.
+        """
+        import json as _json
+
+        repo = composite_service._repo
+        child_uuid = _seed_project_and_artifact(
+            repo,
+            project_id="proj-skill-comp-002",
+            artifact_id="skill:another-skill",
+            artifact_name="another-skill",
+        )
+
+        class _MockArtifact:
+            id = "skill:another-skill"
+            uuid = child_uuid
+
+        record = composite_service.create_skill_composite(
+            skill_artifact=_MockArtifact(),
+            embedded_list=[],
+            collection_id="collection-skill-002",
+        )
+
+        assert record["metadata_json"] is not None
+        parsed = _json.loads(record["metadata_json"])
+        assert parsed["artifact_uuid"] == child_uuid
+
+    def test_membership_rows_created_for_embedded_artifacts(
+        self, composite_service: CompositeService
+    ) -> None:
+        """create_skill_composite() creates CompositeMembership rows for embedded artifacts.
+
+        Arrange: a skill artifact and one embedded command artifact.
+        Act: call create_skill_composite() with a non-empty embedded_list.
+        Assert: one CompositeMembership row is created and linked to the composite.
+        """
+        repo = composite_service._repo
+        child_uuid = _seed_project_and_artifact(
+            repo,
+            project_id="proj-skill-comp-003",
+            artifact_id="skill:embedded-skill",
+            artifact_name="embedded-skill",
+        )
+
+        class _MockArtifact:
+            id = "skill:embedded-skill"
+            uuid = child_uuid
+
+        class _MockEmbedded:
+            artifact_type = "command"
+            name = "some-cmd"
+            upstream_url = "https://github.com/example/repo/commands/some-cmd"
+            content_hash = None
+
+        record = composite_service.create_skill_composite(
+            skill_artifact=_MockArtifact(),
+            embedded_list=[_MockEmbedded()],
+            collection_id="collection-skill-003",
+        )
+
+        # Verify one membership row was created for this composite
+        assert len(record["memberships"]) == 1
+        assert record["memberships"][0]["composite_id"] == "composite:embedded-skill"
+
+        # Double-check via repository query
+        children = repo.get_children_of(record["id"], "collection-skill-003")
+        assert len(children) == 1
+        assert children[0]["composite_id"] == record["id"]
+
+    def test_composite_id_derived_from_skill_artifact_id(
+        self, composite_service: CompositeService
+    ) -> None:
+        """create_skill_composite() derives composite_id by replacing the type prefix.
+
+        A skill with id 'skill:my-skill' produces composite id 'composite:my-skill'.
+        """
+        repo = composite_service._repo
+        child_uuid = _seed_project_and_artifact(
+            repo,
+            project_id="proj-skill-comp-004",
+            artifact_id="skill:prefixed-skill",
+            artifact_name="prefixed-skill",
+        )
+
+        class _MockArtifact:
+            id = "skill:prefixed-skill"
+            uuid = child_uuid
+
+        record = composite_service.create_skill_composite(
+            skill_artifact=_MockArtifact(),
+            embedded_list=[],
+            collection_id="collection-skill-004",
+        )
+
+        assert record["id"] == "composite:prefixed-skill"
+
+    def test_duplicate_composite_raises_constraint_error(
+        self, composite_service: CompositeService
+    ) -> None:
+        """create_skill_composite() raises ConstraintError on duplicate composite_id."""
+        repo = composite_service._repo
+        child_uuid = _seed_project_and_artifact(
+            repo,
+            project_id="proj-skill-comp-005",
+            artifact_id="skill:dup-skill",
+            artifact_name="dup-skill",
+        )
+
+        class _MockArtifact:
+            id = "skill:dup-skill"
+            uuid = child_uuid
+
+        composite_service.create_skill_composite(
+            skill_artifact=_MockArtifact(),
+            embedded_list=[],
+            collection_id="collection-skill-005",
+        )
+
+        with pytest.raises(ConstraintError):
+            composite_service.create_skill_composite(
+                skill_artifact=_MockArtifact(),
+                embedded_list=[],
+                collection_id="collection-skill-005",
+            )

@@ -87,6 +87,64 @@ class TestDeployCommand:
         result = runner.invoke(main, ['deploy', '--help'])
         assert '--format' in result.output
 
+    def test_deploy_help_shows_members_flags(self):
+        """deploy --help should list both --members and --no-members flags."""
+        runner = CliRunner()
+        result = runner.invoke(main, ['deploy', '--help'])
+        assert result.exit_code == 0
+        assert '--members' in result.output
+        assert '--no-members' in result.output
+
+    def test_deploy_members_flag_passed_to_manager_default(self):
+        """deploy without --no-members should call deploy_artifacts with include_members=True."""
+        runner = CliRunner()
+        mock_deployment = MagicMock()
+        mock_deployment.artifact_name = 'my-skill'
+        mock_deployment.artifact_type = 'skill'
+        mock_deployment.artifact_path = '/tmp/my-skill'
+        mock_deployment.deployment_profile_id = None
+        mock_deployment.platform = MagicMock(value='claude_code')
+        mock_deployment.profile_root_dir = '/tmp'
+
+        with patch('skillmeat.cli.DeploymentManager') as mock_mgr_cls, \
+             patch('skillmeat.cache.manager.CacheManager', side_effect=Exception('skip')):
+            mock_mgr = MagicMock()
+            mock_mgr.deploy_artifacts.return_value = [mock_deployment]
+            mock_mgr_cls.return_value = mock_mgr
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                result = runner.invoke(main, ['deploy', 'my-skill', '--project', tmpdir])
+
+        call_kwargs = mock_mgr.deploy_artifacts.call_args
+        assert call_kwargs is not None
+        assert call_kwargs.kwargs.get('include_members', True) is True
+
+    def test_deploy_no_members_flag_passed_to_manager(self):
+        """deploy --no-members should call deploy_artifacts with include_members=False."""
+        runner = CliRunner()
+        mock_deployment = MagicMock()
+        mock_deployment.artifact_name = 'my-skill'
+        mock_deployment.artifact_type = 'skill'
+        mock_deployment.artifact_path = '/tmp/my-skill'
+        mock_deployment.deployment_profile_id = None
+        mock_deployment.platform = MagicMock(value='claude_code')
+        mock_deployment.profile_root_dir = '/tmp'
+
+        with patch('skillmeat.cli.DeploymentManager') as mock_mgr_cls, \
+             patch('skillmeat.cache.manager.CacheManager', side_effect=Exception('skip')):
+            mock_mgr = MagicMock()
+            mock_mgr.deploy_artifacts.return_value = [mock_deployment]
+            mock_mgr_cls.return_value = mock_mgr
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                result = runner.invoke(
+                    main, ['deploy', 'my-skill', '--no-members', '--project', tmpdir]
+                )
+
+        call_kwargs = mock_mgr.deploy_artifacts.call_args
+        assert call_kwargs is not None
+        assert call_kwargs.kwargs.get('include_members') is False
+
 
 class TestRemoveCommand:
     """Tests for the remove command with smart defaults."""

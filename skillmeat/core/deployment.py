@@ -323,6 +323,231 @@ class DeploymentManager:
                 return [default_profile()]
             return [self._fallback_profile(profile_id)]
 
+    # ------------------------------------------------------------------
+    # Member-aware deployment helpers (TASK-6.1)
+    # ------------------------------------------------------------------
+
+    def _find_skill_composite_children(
+        self,
+        artifact_name: str,
+        artifact_type_str: str,
+        collection_name: Optional[str],
+    ) -> List[Dict[str, Any]]:
+        """Return MembershipRecord dicts for a skill's companion composite.
+
+        Looks up the Artifact row for the given skill, then queries
+        ``CompositeMembershipRepository.get_skill_composite_children()`` to
+        retrieve the children of the corresponding ``composite_type='skill'``
+        composite.
+
+        Args:
+            artifact_name: Skill name (e.g. ``"my-skill"``).
+            artifact_type_str: Artifact type string (e.g. ``"skill"``).
+            collection_name: Owning collection identifier.
+
+        Returns:
+            List of membership dicts (may be empty when no composite exists or
+            the skill has no embedded children).
+        """
+        if artifact_type_str != "skill":
+            return []
+
+        try:
+            from skillmeat.cache.composite_repository import (
+                CompositeMembershipRepository,
+            )
+            from skillmeat.cache.models import Artifact as CacheArtifact
+            from skillmeat.cache.models import get_session
+
+            artifact_id = f"skill:{artifact_name}"
+            session = get_session()
+            try:
+                cache_artifact = (
+                    session.query(CacheArtifact)
+                    .filter(CacheArtifact.id == artifact_id)
+                    .first()
+                )
+                if cache_artifact is None:
+                    logger.debug(
+                        "_find_skill_composite_children: no cache artifact for %s",
+                        artifact_id,
+                    )
+                    return []
+                skill_uuid = cache_artifact.uuid
+            finally:
+                session.close()
+
+            collection_id = collection_name or "default"
+            repo = CompositeMembershipRepository()
+            children = repo.get_skill_composite_children(skill_uuid, collection_id)
+            logger.debug(
+                "_find_skill_composite_children: skill=%s uuid=%s collection=%s "
+                "found %d children",
+                artifact_name,
+                skill_uuid,
+                collection_id,
+                len(children),
+            )
+            return children
+        except Exception as exc:
+            logger.debug(
+                "_find_skill_composite_children: lookup failed for %s: %s",
+                artifact_name,
+                exc,
+            )
+            return []
+
+    def _deploy_member_artifacts(
+        self,
+        children: List[Dict[str, Any]],
+        skill_source_path: Path,
+        project_path: Path,
+        profile: "DeploymentPathProfile",
+        overwrite: bool,
+    ) -> List[Path]:
+        """Copy embedded child artifacts from the skill source directory to the project.
+
+        Each child's physical file is resolved relative to the skill's source
+        directory using the convention:
+
+        - ``command`` → ``<skill_dir>/commands/<name>.md``
+        - ``agent``   → ``<skill_dir>/agents/<name>.md``
+        - ``hook``    → ``<skill_dir>/hooks/<name>.md``
+        - ``mcp``     → ``<skill_dir>/mcp-servers/<name>/`` (directory)
+        - ``skill``   → ``<skill_dir>/skills/<name>/`` (nested skill directory)
+
+        The destination path is resolved via ``resolve_artifact_path()`` using
+        the same profile as the parent skill.
+
+        Args:
+            children: MembershipRecord dicts from the composite repository.
+                Each must include a ``"child_artifact"`` sub-dict with
+                ``"name"`` and ``"type"`` fields.
+            skill_source_path: Absolute path to the parent skill directory
+                inside the collection (e.g. ``<collection>/artifacts/skills/my-skill/``).
+            project_path: Resolved absolute project root.
+            profile: Deployment profile for resolving destination paths.
+            overwrite: When ``True`` skip interactive conflict prompts.
+
+        Returns:
+            List of destination ``Path`` objects that were successfully written.
+            The caller is responsible for rolling back these files on failure.
+
+        Raises:
+            RuntimeError: When any child copy operation fails.  The exception
+                message identifies which child artifact triggered the failure.
+        """
+        # Type → subfolder inside the skill directory (source side only).
+        # Directory-based artifact types use a directory container; file-based
+        # types use a single ``.md`` file.
+        _MEMBER_SOURCE_DIRS: Dict[str, str] = {
+            "command": "commands",
+            "agent": "agents",
+            "hook": "hooks",
+            "mcp": "mcp-servers",
+            "skill": "skills",
+        }
+
+        written: List[Path] = []
+
+        for child_rec in children:
+            child_info = child_rec.get("child_artifact")
+            if child_info is None:
+                logger.warning(
+                    "_deploy_member_artifacts: membership record missing child_artifact "
+                    "sub-dict — skipping (child_uuid=%s)",
+                    child_rec.get("child_artifact_uuid", "<unknown>"),
+                )
+                continue
+
+            child_name: str = child_info.get("name", "")
+            child_type: str = child_info.get("type", "")
+
+            if not child_name or not child_type:
+                logger.warning(
+                    "_deploy_member_artifacts: child_artifact missing name/type "
+                    "(name=%r type=%r) — skipping",
+                    child_name,
+                    child_type,
+                )
+                continue
+
+            # --- Resolve source path ---
+            source_subdir = _MEMBER_SOURCE_DIRS.get(child_type)
+            if source_subdir is None:
+                logger.debug(
+                    "_deploy_member_artifacts: unrecognised child type %r for "
+                    "artifact %r — skipping",
+                    child_type,
+                    child_name,
+                )
+                continue
+
+            # Directory-based types (mcp, skill) don't append ".md"
+            _dir_types = {"mcp", "skill"}
+            if child_type in _dir_types:
+                candidate_source = skill_source_path / source_subdir / child_name
+            else:
+                candidate_source = (
+                    skill_source_path / source_subdir / f"{child_name}.md"
+                )
+
+            if not candidate_source.exists():
+                logger.debug(
+                    "_deploy_member_artifacts: source path does not exist for "
+                    "child %s/%s at %s — skipping",
+                    child_type,
+                    child_name,
+                    candidate_source,
+                )
+                continue
+
+            # --- Resolve destination path ---
+            try:
+                dest_path = resolve_artifact_path(
+                    artifact_name=child_name,
+                    artifact_type=child_type,
+                    project_path=project_path,
+                    profile=profile,
+                )
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"Cannot resolve deployment path for member {child_type}/{child_name}: {exc}"
+                ) from exc
+
+            # --- Conflict detection ---
+            if dest_path.exists():
+                console.print(
+                    f"[yellow]Warning:[/yellow] Member {dest_path} already exists"
+                )
+                if not overwrite:
+                    if not Confirm.ask(f"Overwrite member {child_type}/{child_name}?"):
+                        console.print(
+                            f"[yellow]Skipped member:[/yellow] {child_type}/{child_name}"
+                        )
+                        continue
+
+            # --- Copy ---
+            try:
+                from skillmeat.core.artifact import ArtifactType as _ArtifactType
+
+                member_artifact_type = _ArtifactType(child_type)
+                self.filesystem_mgr.copy_artifact(
+                    candidate_source, dest_path, member_artifact_type
+                )
+                written.append(dest_path)
+                console.print(
+                    f"[green][/green] Deployed member {child_type}/{child_name} -> "
+                    f"{profile.profile_id}"
+                )
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Failed to copy member {child_type}/{child_name} "
+                    f"from {candidate_source} to {dest_path}: {exc}"
+                ) from exc
+
+        return written
+
     def deploy_artifacts(
         self,
         artifact_names: List[str],
@@ -333,8 +558,22 @@ class DeploymentManager:
         dest_path: Optional[str] = None,
         profile_id: Optional[str] = None,
         all_profiles: bool = False,
+        include_members: bool = True,
     ) -> List[Deployment]:
         """Deploy specified artifacts to project.
+
+        When ``include_members=True`` (the default) and a deployed artifact is
+        a skill that has a companion ``CompositeArtifact`` of
+        ``composite_type='skill'`` in the DB cache, all embedded child
+        artifacts (commands, agents, hooks, MCP servers, nested skills) are
+        also deployed to their type-specific subdirectories inside the profile
+        root.
+
+        The operation is **atomic per skill**: if any member copy fails, all
+        files written during that skill's member deployment are removed and the
+        exception propagates.  The parent skill file itself is always deployed
+        first and is NOT rolled back on member failure — only the member writes
+        are cleaned up.
 
         Args:
             artifact_names: List of artifact names to deploy
@@ -347,6 +586,9 @@ class DeploymentManager:
                 deployed to {dest_path}/{artifact_name}/. Should be pre-validated.
             profile_id: Optional deployment profile identifier.
             all_profiles: Deploy to all project profiles if True.
+            include_members: When ``True`` (default), also deploy embedded
+                child artifacts for skill composites.  When ``False``, deploy
+                only the primary skill file and skip member deployment entirely.
 
         Returns:
             List of Deployment objects
@@ -499,6 +741,49 @@ class DeploymentManager:
                     profile_root_dir=profile.root_dir,
                 )
                 deployments.append(deployment)
+
+                # --- Member-aware deployment (TASK-6.1) ---
+                # When include_members=True and this is a skill, look up its
+                # companion composite and deploy each child atomically.
+                if include_members and artifact.type == ArtifactType.SKILL:
+                    children = self._find_skill_composite_children(
+                        artifact_name=artifact.name,
+                        artifact_type_str=artifact.type.value,
+                        collection_name=collection.name,
+                    )
+                    if children:
+                        member_written: List[Path] = []
+                        try:
+                            member_written = self._deploy_member_artifacts(
+                                children=children,
+                                skill_source_path=source_path,
+                                project_path=project_path,
+                                profile=profile,
+                                overwrite=overwrite,
+                            )
+                        except Exception as member_exc:
+                            # Atomic rollback: remove all files written by this
+                            # member deployment pass so no partial writes persist.
+                            for written_path in member_written:
+                                try:
+                                    self.filesystem_mgr.remove_artifact(written_path)
+                                    logger.debug(
+                                        "Rolled back member file: %s", written_path
+                                    )
+                                except Exception as cleanup_exc:
+                                    logger.warning(
+                                        "Failed to roll back member file %s: %s",
+                                        written_path,
+                                        cleanup_exc,
+                                    )
+                            console.print(
+                                f"[red]Error deploying members for {artifact.name} "
+                                f"({profile.profile_id}):[/red] {member_exc}"
+                            )
+                            # Member failure is reported but does not remove the
+                            # already-written parent skill.  Re-raise so callers
+                            # can detect partial failure.
+                            raise
 
                 self._record_deploy_event(
                     artifact_name=artifact.name,
