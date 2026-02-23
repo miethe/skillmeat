@@ -3072,6 +3072,7 @@ class DeploymentProfileRepository(BaseRepository[DeploymentProfile]):
         profile_id: str,
         platform: str,
         root_dir: str,
+        description: Optional[str] = None,
         artifact_path_map: Optional[Dict[str, str]] = None,
         config_filenames: Optional[List[str]] = None,
         context_prefixes: Optional[List[str]] = None,
@@ -3089,6 +3090,7 @@ class DeploymentProfileRepository(BaseRepository[DeploymentProfile]):
                 profile_id=profile_id,
                 platform=platform_value,
                 root_dir=root_dir,
+                description=description,
                 artifact_path_map=artifact_path_map or {},
                 config_filenames=config_filenames
                 or default_project_config_filenames(platform_enum),
