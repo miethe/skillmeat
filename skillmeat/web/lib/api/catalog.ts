@@ -132,12 +132,12 @@ export async function fetchCatalogFileTree(
   // which would match the wrong route
   const rawPath = artifactPath === '.' ? '' : artifactPath;
 
-  // Defensive: when artifactPath is already a file path (e.g., "skills/foo/commands/bar.md"),
-  // derive the parent directory so the /files listing is for the containing directory.
-  const { artifactDir } = resolveArtifactPaths(rawPath);
-
-  // Encode the artifact path for URL safety
-  const encodedPath = encodeURIComponent(artifactDir);
+  // Pass the full artifact path (including filename for single-file artifacts like ".md").
+  // The backend at marketplace_sources.py already detects single-file artifacts via
+  // `artifact_path.endswith(".md")` and returns only that file — but only when the full
+  // path is present. resolveArtifactPaths() must NOT be used here because stripping the
+  // filename causes the backend to list the entire parent directory instead.
+  const encodedPath = encodeURIComponent(rawPath);
   const response = await fetch(
     buildUrl(`/marketplace/sources/${sourceId}/artifacts/${encodedPath}/files`)
   );
