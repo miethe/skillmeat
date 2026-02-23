@@ -2,17 +2,18 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { useToast, useProject, useDeploymentProfiles, useCreateDeploymentProfile, useUpdateDeploymentProfile, useDeleteDeploymentProfile, usePlatformDefaults, useCustomContextConfig } from '@/hooks';
+
+import { useToast, useProject, useDeploymentProfiles, useCreateDeploymentProfile, useUpdateDeploymentProfile, useDeleteDeploymentProfile, usePlatformDefaults } from '@/hooks';
 import { PlatformBadge } from '@/components/platform-badge';
 import { PlatformChangeDialog } from '@/components/deployments/platform-change-dialog';
+import { CreateProfileForm } from '@/components/profiles/create-profile-form';
 import { Platform } from '@/types/enums';
 import { PLATFORM_DEFAULTS } from '@/lib/constants/platform-defaults';
 import type { PlatformDefaults } from '@/lib/constants/platform-defaults';
@@ -61,18 +62,6 @@ function profileToForm(profile: DeploymentProfile): ProfileFormState {
   };
 }
 
-function parseCreatePayload(form: ProfileFormState): CreateDeploymentProfileRequest {
-  return {
-    profile_id: form.profile_id.trim(),
-    platform: form.platform,
-    root_dir: form.root_dir.trim(),
-    artifact_path_map: JSON.parse(form.artifact_path_map_json || '{}'),
-    project_config_filenames: toList(form.project_config_filenames),
-    context_path_prefixes: toList(form.context_path_prefixes),
-    supported_artifact_types: toList(form.supported_artifact_types),
-  };
-}
-
 function parseUpdatePayload(form: ProfileFormState): UpdateDeploymentProfileRequest {
   return {
     platform: form.platform,
@@ -96,23 +85,11 @@ export default function ProjectProfilesPage() {
   const updateProfile = useUpdateDeploymentProfile(projectId);
   const deleteProfile = useDeleteDeploymentProfile(projectId);
 
-  const [createForm, setCreateForm] = useState<ProfileFormState>(() => {
-    // claude_code is always present in PLATFORM_DEFAULTS
-    const defaults = PLATFORM_DEFAULTS['claude_code']!;
-    return {
-      profile_id: '',
-      platform: Platform.CLAUDE_CODE,
-      ...defaultsToFormFields(defaults),
-    };
-  });
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<ProfileFormState | null>(null);
 
   // Platform defaults from API (with fallback to constants)
   const { data: platformDefaultsData } = usePlatformDefaults();
-  const { data: customContextConfig } = useCustomContextConfig();
-  const [useCustomPrefixes, setUseCustomPrefixes] = useState(false);
-
   // Resolve defaults for a platform — prefer API data, fall back to constants
   const getDefaultsForPlatform = useCallback(
     (platform: string): PlatformDefaults => {
@@ -132,46 +109,19 @@ export default function ProjectProfilesPage() {
     [platformDefaultsData]
   );
 
-  const applyCustomContext = useCallback(
-    (currentPrefixes: string, platform: string): string => {
-      if (!customContextConfig?.enabled) return currentPrefixes;
-      if (customContextConfig.platforms.length > 0 && !customContextConfig.platforms.includes(platform)) {
-        return currentPrefixes;
-      }
-      const customPrefixes = customContextConfig.prefixes;
-      if (customContextConfig.mode === 'override') {
-        return customPrefixes.join('\n');
-      }
-      // addendum mode: append and deduplicate
-      const existing = currentPrefixes.split('\n').map(s => s.trim()).filter(Boolean);
-      const merged = [...new Set([...existing, ...customPrefixes])];
-      return merged.join('\n');
-    },
-    [customContextConfig]
-  );
-
-  // Touched fields tracking for create form
-  const [touchedFields, setTouchedFields] = useState<Set<keyof ProfileFormState>>(new Set());
-
   // Edit form dialog state
   const [showPlatformChangeDialog, setShowPlatformChangeDialog] = useState(false);
   const [pendingEditPlatform, setPendingEditPlatform] = useState<Platform | null>(null);
 
   const profileCountLabel = useMemo(() => `${profiles.length} profile(s) configured`, [profiles.length]);
 
-  const handleCreate = async () => {
+  const handleCreate = async (data: CreateDeploymentProfileRequest) => {
     try {
-      await createProfile.mutateAsync(parseCreatePayload(createForm));
+      await createProfile.mutateAsync(data);
       toast({
         title: 'Profile created',
-        description: `Created profile "${createForm.profile_id}"`,
+        description: `Created profile "${data.profile_id}"`,
       });
-      setTouchedFields(new Set());
-      setUseCustomPrefixes(false);
-      setCreateForm((prev) => ({
-        ...prev,
-        profile_id: '',
-      }));
     } catch (error) {
       toast({
         title: 'Failed to create profile',
@@ -309,147 +259,12 @@ export default function ProjectProfilesPage() {
           <CardTitle className="text-base">Create Profile</CardTitle>
           <CardDescription>Add a new platform profile and path mappings.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="new-profile-id">Profile ID</Label>
-            <Input
-              id="new-profile-id"
-              placeholder="codex-default"
-              value={createForm.profile_id}
-              onChange={(e) => setCreateForm((prev) => ({ ...prev, profile_id: e.target.value }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-platform">Platform</Label>
-            <Select
-              value={createForm.platform}
-              onValueChange={(value) => {
-                const newPlatform = value as Platform;
-                const defaults = getDefaultsForPlatform(value);
-                const newFields = defaultsToFormFields(defaults);
-                setCreateForm((prev) => {
-                  const updated: ProfileFormState = {
-                    ...prev,
-                    platform: newPlatform,
-                  };
-                  // For each field, if the user has touched it, KEEP their value
-                  for (const [key, val] of Object.entries(newFields)) {
-                    const fieldKey = key as keyof typeof newFields;
-                    if (!touchedFields.has(fieldKey)) {
-                      (updated as Record<string, unknown>)[fieldKey] = val;
-                    }
-                  }
-                  return updated;
-                });
-              }}
-            >
-              <SelectTrigger id="new-platform">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={Platform.CLAUDE_CODE}>Claude Code</SelectItem>
-                <SelectItem value={Platform.CODEX}>Codex</SelectItem>
-                <SelectItem value={Platform.GEMINI}>Gemini</SelectItem>
-                <SelectItem value={Platform.CURSOR}>Cursor</SelectItem>
-                <SelectItem value={Platform.OTHER}>Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="new-root-dir">Root Dir</Label>
-            <Input
-              id="new-root-dir"
-              value={createForm.root_dir}
-              onChange={(e) => {
-                setTouchedFields((prev) => new Set(prev).add('root_dir'));
-                setCreateForm((prev) => ({ ...prev, root_dir: e.target.value }));
-              }}
-            />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="new-artifact-map">Artifact Path Map (JSON)</Label>
-            <Textarea
-              id="new-artifact-map"
-              rows={5}
-              value={createForm.artifact_path_map_json}
-              onChange={(e) => {
-                setTouchedFields((prev) => new Set(prev).add('artifact_path_map_json'));
-                setCreateForm((prev) => ({ ...prev, artifact_path_map_json: e.target.value }));
-              }}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-configs">Config Filenames (newline/comma separated)</Label>
-            <Textarea
-              id="new-configs"
-              rows={3}
-              value={createForm.project_config_filenames}
-              onChange={(e) => {
-                setTouchedFields((prev) => new Set(prev).add('project_config_filenames'));
-                setCreateForm((prev) => ({ ...prev, project_config_filenames: e.target.value }));
-              }}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-context-prefixes">Context Prefixes (newline/comma separated)</Label>
-            <Textarea
-              id="new-context-prefixes"
-              rows={3}
-              value={createForm.context_path_prefixes}
-              onChange={(e) => {
-                setTouchedFields((prev) => new Set(prev).add('context_path_prefixes'));
-                setCreateForm((prev) => ({ ...prev, context_path_prefixes: e.target.value }));
-              }}
-            />
-          </div>
-          {customContextConfig?.enabled &&
-            customContextConfig.platforms.includes(createForm.platform) && (
-              <div className="flex items-center gap-2 md:col-span-2">
-                <Switch
-                  id="use-custom-prefixes-create"
-                  checked={useCustomPrefixes}
-                  onCheckedChange={(checked) => {
-                    setUseCustomPrefixes(checked);
-                    if (checked) {
-                      setCreateForm((prev) => ({
-                        ...prev,
-                        context_path_prefixes: applyCustomContext(prev.context_path_prefixes, prev.platform),
-                      }));
-                    } else {
-                      // Revert to platform defaults
-                      const defaults = getDefaultsForPlatform(createForm.platform);
-                      setCreateForm((prev) => ({
-                        ...prev,
-                        context_path_prefixes: defaults.context_prefixes.join('\n'),
-                      }));
-                    }
-                  }}
-                />
-                <Label htmlFor="use-custom-prefixes-create" className="text-sm">
-                  Use custom context prefixes ({customContextConfig.mode} mode)
-                </Label>
-              </div>
-            )}
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="new-supported-types">Supported Artifact Types</Label>
-            <Input
-              id="new-supported-types"
-              value={createForm.supported_artifact_types}
-              onChange={(e) => {
-                setTouchedFields((prev) => new Set(prev).add('supported_artifact_types'));
-                setCreateForm((prev) => ({ ...prev, supported_artifact_types: e.target.value }));
-              }}
-            />
-          </div>
-          <div className="md:col-span-2">
-            <Button
-              onClick={handleCreate}
-              disabled={createProfile.isPending || !createForm.profile_id.trim()}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Create Profile
-            </Button>
-          </div>
+        <CardContent>
+          <CreateProfileForm
+            contextMode="page"
+            onSubmit={handleCreate}
+            isSubmitting={createProfile.isPending}
+          />
         </CardContent>
       </Card>
 
