@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast, useProject, useDeploymentProfiles, useCreateDeploymentProfile, useUpdateDeploymentProfile, useDeleteDeploymentProfile, usePlatformDefaults } from '@/hooks';
 import { PlatformBadge } from '@/components/platform-badge';
 import { PlatformChangeDialog } from '@/components/deployments/platform-change-dialog';
-import { CreateProfileForm } from '@/components/profiles/create-profile-form';
+import { CreateProfileForm } from '@/components/profiles';
 import { Platform } from '@/types/enums';
 import { PLATFORM_DEFAULTS } from '@/lib/constants/platform-defaults';
 import type { PlatformDefaults } from '@/lib/constants/platform-defaults';
