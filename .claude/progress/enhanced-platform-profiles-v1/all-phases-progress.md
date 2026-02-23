@@ -2,407 +2,463 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "enhanced-platform-profiles"
-feature_slug: "enhanced-platform-profiles"
+prd: enhanced-platform-profiles
+feature_slug: enhanced-platform-profiles
 prd_ref: docs/project_plans/PRDs/features/enhanced-platform-profiles-v1.md
 plan_ref: docs/project_plans/implementation_plans/features/enhanced-platform-profiles-v1.md
 phase: all
-title: "Enhanced Platform Profiles — All Phases"
-status: "planning"
-started: "2026-02-22"
+title: Enhanced Platform Profiles — All Phases
+status: pending
+started: '2026-02-22'
 completed: null
 commit_refs: []
 pr_refs: []
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 27
-completed_tasks: 0
+completed_tasks: 16
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
 owners:
-  - "data-layer-expert"
-  - "python-backend-engineer"
-  - "ui-engineer-enhanced"
-  - "frontend-developer"
+- data-layer-expert
+- python-backend-engineer
+- ui-engineer-enhanced
+- frontend-developer
 contributors:
-  - "task-completion-validator"
-  - "code-reviewer"
-
+- task-completion-validator
+- code-reviewer
 tasks:
-  # ─── Phase 1: Backend — description field ───────────────────────────────────
-  - id: "EPP-P1-01"
-    description: "Alembic migration — add nullable description TEXT column to deployment_profiles; implement reversible downgrade()"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "EPP-P1-02"
-    description: "ORM model update — add description: Mapped[Optional[str]] to DeploymentProfile; update to_dict()"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["EPP-P1-01"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "EPP-P1-03"
-    description: "API schema update — add description: Optional[str] = Field(None, max_length=500) to DeploymentProfileCreate, DeploymentProfileUpdate, DeploymentProfileRead"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["EPP-P1-02"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "EPP-P1-04"
-    description: "Repository update — update create_profile() and update_profile() in DeploymentProfileRepository to accept and persist description"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["EPP-P1-03"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "EPP-P1-05"
-    description: "OpenAPI spec regeneration — regenerate skillmeat/api/openapi.json after schema changes"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["EPP-P1-04"]
-    estimated_effort: "0.5 pts"
-    priority: "medium"
-
-  - id: "EPP-P1-06"
-    description: "Integration test — POST profile with description → GET profile → assert description round-trip; also assert description=None is valid"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["EPP-P1-05"]
-    estimated_effort: "0.5 pts"
-    priority: "medium"
-
-  # ─── Phase 2: Reusable CreateProfileForm Component ──────────────────────────
-  - id: "EPP-P2-01"
-    description: "Frontend type update — add description?: string to DeploymentProfile TypeScript interface in types/deployments.ts"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["EPP-P1-06"]
-    estimated_effort: "0.5 pts"
-    priority: "high"
-
-  - id: "EPP-P2-02"
-    description: "CreateProfileForm extraction — create components/profiles/create-profile-form.tsx with props onSubmit, onCancel, defaultValues, contextMode, platformLock; migrate inline form from profiles/page.tsx"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["EPP-P2-01"]
-    estimated_effort: "3 pts"
-    priority: "high"
-
-  - id: "EPP-P2-03"
-    description: "Multi-select for artifact types — replace free-text input with Radix Checkbox group or shadcn multi-select for ArtifactType enum values; keyboard navigation"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["EPP-P2-02"]
-    estimated_effort: "3 pts"
-    priority: "high"
-
-  - id: "EPP-P2-04"
-    description: "Platform pre-population — auto-populate root_dir, artifact_path_map, config_filenames, context_prefixes, supported_artifact_types from PLATFORM_DEFAULTS[platform] on platform change; user override preserved"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["EPP-P2-02"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "EPP-P2-05"
-    description: "Artifact type → path map sync — when supported_artifact_types changes (and artifact_path_map not manually edited), auto-update artifact_path_map with defaults for selected types"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["EPP-P2-04"]
-    estimated_effort: "2 pts"
-    priority: "medium"
-
-  - id: "EPP-P2-06"
-    description: "Field reordering — enforce render order: platform → profile_id → root_dir → supported_artifact_types → artifact_path_map → config_filenames → context_prefixes → description"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["EPP-P2-02"]
-    estimated_effort: "0.5 pts"
-    priority: "medium"
-
-  - id: "EPP-P2-07"
-    description: "Field tooltips — add Radix/shadcn Tooltip to every field label with InfoIcon trigger (aria-label='Info: [field name]') and tooltip content explaining purpose with example value"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["EPP-P2-06"]
-    estimated_effort: "2 pts"
-    priority: "medium"
-
-  - id: "EPP-P2-08"
-    description: "Description textarea — add optional description textarea to CreateProfileForm with max 500 chars, live character counter, explicit label for association"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["EPP-P2-06"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
-  - id: "EPP-P2-09"
-    description: "Barrel export — create skillmeat/web/components/profiles/index.ts exporting CreateProfileForm as named export"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["EPP-P2-08"]
-    estimated_effort: "0.5 pts"
-    priority: "high"
-
-  - id: "EPP-P2-10"
-    description: "Unit tests — Jest/RTL tests: (a) platform selection pre-population, (b) artifact type toggle updates path map, (c) description character limit, (d) tooltip keyboard accessibility"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["EPP-P2-09"]
-    estimated_effort: "2 pts"
-    priority: "medium"
-
-  # ─── Phase 3: Create Project Dialog — Platform Profiles Section ─────────────
-  - id: "EPP-P3-01"
-    description: "Platform Profiles accordion — add collapsible Accordion section labeled 'Platform Profiles' to Create Project dialog below description field; collapsed by default"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["EPP-P2-09"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "EPP-P3-02"
-    description: "Platform toggle cards — render one row per PLATFORM_DEFAULTS key (5 platforms) with platform name/badge, toggle switch, and Customize button (disabled until toggle is ON)"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["EPP-P3-01"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "EPP-P3-03"
-    description: "Toggle state management — toggling platform ON creates pending profile entry in local React state from PLATFORM_DEFAULTS[platform]; toggling OFF removes it; no DB calls"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["EPP-P3-02"]
-    estimated_effort: "1.5 pts"
-    priority: "high"
-
-  - id: "EPP-P3-04"
-    description: "Customize dialog — Customize button opens Dialog with CreateProfileForm contextMode='dialog' platformLock={platform} pre-populated from pending state; closes on save/cancel"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["EPP-P3-03"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "EPP-P3-05"
-    description: "Custom profile state save — saving from Customize dialog updates pending profile state and returns to Create Project dialog; platform card shows Customized indicator"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["EPP-P3-04"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "EPP-P3-06"
-    description: "Profile creation on project save — after project creation, POST each toggled platform profile to /api/v1/projects/{project_id}/profiles; profile creation errors are non-fatal (warning toast)"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["EPP-P3-05"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "EPP-P3-07"
-    description: "Component tests — RTL tests: (a) toggling platform creates pending state, (b) Customize dialog opens with pre-population, (c) form submit updates pending state, (d) project creation triggers profile POST"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["EPP-P3-06"]
-    estimated_effort: "1.5 pts"
-    priority: "medium"
-
-  # ─── Phase 4: Settings Platforms Tab ────────────────────────────────────────
-  - id: "EPP-P4-01"
-    description: "Platforms tab skeleton — add Platforms tab trigger to Tabs navigation in settings/page.tsx; add corresponding TabsContent panel; keyboard-navigable"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["EPP-P2-09"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "EPP-P4-02"
-    description: "Relocate PlatformDefaultsSettings — move PlatformDefaultsSettings to Platforms TabsContent; verify CustomContextSettings remains in correct existing tab"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["EPP-P4-01"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "EPP-P4-03"
-    description: "New Custom Profile button — add button in Platforms tab below PlatformDefaultsSettings; clicking opens Dialog with CreateProfileForm contextMode='dialog'; successful submit shows toast"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["EPP-P4-02"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "EPP-P4-04"
-    description: "E2E navigation test — Playwright test: navigate to Settings > Platforms tab → assert PlatformDefaultsSettings renders → assert New Custom Profile button is present"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["EPP-P4-03"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-
+- id: EPP-P1-01
+  description: Alembic migration — add nullable description TEXT column to deployment_profiles;
+    implement reversible downgrade()
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 2 pts
+  priority: high
+- id: EPP-P1-02
+  description: 'ORM model update — add description: Mapped[Optional[str]] to DeploymentProfile;
+    update to_dict()'
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - EPP-P1-01
+  estimated_effort: 1 pt
+  priority: high
+- id: EPP-P1-03
+  description: 'API schema update — add description: Optional[str] = Field(None, max_length=500)
+    to DeploymentProfileCreate, DeploymentProfileUpdate, DeploymentProfileRead'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - EPP-P1-02
+  estimated_effort: 1 pt
+  priority: high
+- id: EPP-P1-04
+  description: Repository update — update create_profile() and update_profile() in
+    DeploymentProfileRepository to accept and persist description
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - EPP-P1-03
+  estimated_effort: 1 pt
+  priority: high
+- id: EPP-P1-05
+  description: OpenAPI spec regeneration — regenerate skillmeat/api/openapi.json after
+    schema changes
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - EPP-P1-04
+  estimated_effort: 0.5 pts
+  priority: medium
+- id: EPP-P1-06
+  description: Integration test — POST profile with description → GET profile → assert
+    description round-trip; also assert description=None is valid
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - EPP-P1-05
+  estimated_effort: 0.5 pts
+  priority: medium
+- id: EPP-P2-01
+  description: 'Frontend type update — add description?: string to DeploymentProfile
+    TypeScript interface in types/deployments.ts'
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - EPP-P1-06
+  estimated_effort: 0.5 pts
+  priority: high
+- id: EPP-P2-02
+  description: CreateProfileForm extraction — create components/profiles/create-profile-form.tsx
+    with props onSubmit, onCancel, defaultValues, contextMode, platformLock; migrate
+    inline form from profiles/page.tsx
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - EPP-P2-01
+  estimated_effort: 3 pts
+  priority: high
+- id: EPP-P2-03
+  description: Multi-select for artifact types — replace free-text input with Radix
+    Checkbox group or shadcn multi-select for ArtifactType enum values; keyboard navigation
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - EPP-P2-02
+  estimated_effort: 3 pts
+  priority: high
+- id: EPP-P2-04
+  description: Platform pre-population — auto-populate root_dir, artifact_path_map,
+    config_filenames, context_prefixes, supported_artifact_types from PLATFORM_DEFAULTS[platform]
+    on platform change; user override preserved
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - EPP-P2-02
+  estimated_effort: 2 pts
+  priority: high
+- id: EPP-P2-05
+  description: Artifact type → path map sync — when supported_artifact_types changes
+    (and artifact_path_map not manually edited), auto-update artifact_path_map with
+    defaults for selected types
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - EPP-P2-04
+  estimated_effort: 2 pts
+  priority: medium
+- id: EPP-P2-06
+  description: 'Field reordering — enforce render order: platform → profile_id → root_dir
+    → supported_artifact_types → artifact_path_map → config_filenames → context_prefixes
+    → description'
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - EPP-P2-02
+  estimated_effort: 0.5 pts
+  priority: medium
+- id: EPP-P2-07
+  description: 'Field tooltips — add Radix/shadcn Tooltip to every field label with
+    InfoIcon trigger (aria-label=''Info: [field name]'') and tooltip content explaining
+    purpose with example value'
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - EPP-P2-06
+  estimated_effort: 2 pts
+  priority: medium
+- id: EPP-P2-08
+  description: Description textarea — add optional description textarea to CreateProfileForm
+    with max 500 chars, live character counter, explicit label for association
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - EPP-P2-06
+  estimated_effort: 1 pt
+  priority: medium
+- id: EPP-P2-09
+  description: Barrel export — create skillmeat/web/components/profiles/index.ts exporting
+    CreateProfileForm as named export
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - EPP-P2-08
+  estimated_effort: 0.5 pts
+  priority: high
+- id: EPP-P2-10
+  description: 'Unit tests — Jest/RTL tests: (a) platform selection pre-population,
+    (b) artifact type toggle updates path map, (c) description character limit, (d)
+    tooltip keyboard accessibility'
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - EPP-P2-09
+  estimated_effort: 2 pts
+  priority: medium
+- id: EPP-P3-01
+  description: Platform Profiles accordion — add collapsible Accordion section labeled
+    'Platform Profiles' to Create Project dialog below description field; collapsed
+    by default
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - EPP-P2-09
+  estimated_effort: 1 pt
+  priority: high
+- id: EPP-P3-02
+  description: Platform toggle cards — render one row per PLATFORM_DEFAULTS key (5
+    platforms) with platform name/badge, toggle switch, and Customize button (disabled
+    until toggle is ON)
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - EPP-P3-01
+  estimated_effort: 2 pts
+  priority: high
+- id: EPP-P3-03
+  description: Toggle state management — toggling platform ON creates pending profile
+    entry in local React state from PLATFORM_DEFAULTS[platform]; toggling OFF removes
+    it; no DB calls
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - EPP-P3-02
+  estimated_effort: 1.5 pts
+  priority: high
+- id: EPP-P3-04
+  description: Customize dialog — Customize button opens Dialog with CreateProfileForm
+    contextMode='dialog' platformLock={platform} pre-populated from pending state;
+    closes on save/cancel
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - EPP-P3-03
+  estimated_effort: 2 pts
+  priority: high
+- id: EPP-P3-05
+  description: Custom profile state save — saving from Customize dialog updates pending
+    profile state and returns to Create Project dialog; platform card shows Customized
+    indicator
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - EPP-P3-04
+  estimated_effort: 1 pt
+  priority: high
+- id: EPP-P3-06
+  description: Profile creation on project save — after project creation, POST each
+    toggled platform profile to /api/v1/projects/{project_id}/profiles; profile creation
+    errors are non-fatal (warning toast)
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - EPP-P3-05
+  estimated_effort: 2 pts
+  priority: high
+- id: EPP-P3-07
+  description: 'Component tests — RTL tests: (a) toggling platform creates pending
+    state, (b) Customize dialog opens with pre-population, (c) form submit updates
+    pending state, (d) project creation triggers profile POST'
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - EPP-P3-06
+  estimated_effort: 1.5 pts
+  priority: medium
+- id: EPP-P4-01
+  description: Platforms tab skeleton — add Platforms tab trigger to Tabs navigation
+    in settings/page.tsx; add corresponding TabsContent panel; keyboard-navigable
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - EPP-P2-09
+  estimated_effort: 1 pt
+  priority: high
+- id: EPP-P4-02
+  description: Relocate PlatformDefaultsSettings — move PlatformDefaultsSettings to
+    Platforms TabsContent; verify CustomContextSettings remains in correct existing
+    tab
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - EPP-P4-01
+  estimated_effort: 1 pt
+  priority: high
+- id: EPP-P4-03
+  description: New Custom Profile button — add button in Platforms tab below PlatformDefaultsSettings;
+    clicking opens Dialog with CreateProfileForm contextMode='dialog'; successful
+    submit shows toast
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - EPP-P4-02
+  estimated_effort: 2 pts
+  priority: high
+- id: EPP-P4-04
+  description: 'E2E navigation test — Playwright test: navigate to Settings > Platforms
+    tab → assert PlatformDefaultsSettings renders → assert New Custom Profile button
+    is present'
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - EPP-P4-03
+  estimated_effort: 1 pt
+  priority: medium
 parallelization:
-  # Phase 1: strictly sequential (migration → ORM → schema → repo → openapi → test)
   batch_1:
-    - "EPP-P1-01"
+  - EPP-P1-01
   batch_2:
-    - "EPP-P1-02"
+  - EPP-P1-02
   batch_3:
-    - "EPP-P1-03"
+  - EPP-P1-03
   batch_4:
-    - "EPP-P1-04"
+  - EPP-P1-04
   batch_5:
-    - "EPP-P1-05"
+  - EPP-P1-05
   batch_6:
-    - "EPP-P1-06"
-  # Phase 2: type update first, then component extraction; subsets can run in parallel
+  - EPP-P1-06
   batch_7:
-    - "EPP-P2-01"
+  - EPP-P2-01
   batch_8:
-    - "EPP-P2-02"
-  # EPP-P2-03, EPP-P2-04, EPP-P2-06 all depend only on EPP-P2-02 — parallel
+  - EPP-P2-02
   batch_9:
-    - "EPP-P2-03"
-    - "EPP-P2-04"
-    - "EPP-P2-06"
-  # EPP-P2-05 depends on EPP-P2-04; EPP-P2-07 and EPP-P2-08 depend on EPP-P2-06
+  - EPP-P2-03
+  - EPP-P2-04
+  - EPP-P2-06
   batch_10:
-    - "EPP-P2-05"
-    - "EPP-P2-07"
-    - "EPP-P2-08"
+  - EPP-P2-05
+  - EPP-P2-07
+  - EPP-P2-08
   batch_11:
-    - "EPP-P2-09"
+  - EPP-P2-09
   batch_12:
-    - "EPP-P2-10"
-  # Phase 3 and Phase 4 start in parallel once EPP-P2-09 (barrel export) is done
+  - EPP-P2-10
   batch_13:
-    - "EPP-P3-01"
-    - "EPP-P4-01"
+  - EPP-P3-01
+  - EPP-P4-01
   batch_14:
-    - "EPP-P3-02"
-    - "EPP-P4-02"
+  - EPP-P3-02
+  - EPP-P4-02
   batch_15:
-    - "EPP-P3-03"
-    - "EPP-P4-03"
+  - EPP-P3-03
+  - EPP-P4-03
   batch_16:
-    - "EPP-P3-04"
-    - "EPP-P4-04"
+  - EPP-P3-04
+  - EPP-P4-04
   batch_17:
-    - "EPP-P3-05"
+  - EPP-P3-05
   batch_18:
-    - "EPP-P3-06"
+  - EPP-P3-06
   batch_19:
-    - "EPP-P3-07"
+  - EPP-P3-07
   critical_path:
-    - "EPP-P1-01"
-    - "EPP-P1-02"
-    - "EPP-P1-03"
-    - "EPP-P1-04"
-    - "EPP-P1-05"
-    - "EPP-P1-06"
-    - "EPP-P2-01"
-    - "EPP-P2-02"
-    - "EPP-P2-06"
-    - "EPP-P2-07"
-    - "EPP-P2-08"
-    - "EPP-P2-09"
-    - "EPP-P3-01"
-    - "EPP-P3-02"
-    - "EPP-P3-03"
-    - "EPP-P3-04"
-    - "EPP-P3-05"
-    - "EPP-P3-06"
-    - "EPP-P3-07"
-  estimated_total_time: "6-9 days (with Phase 3 and Phase 4 running in parallel)"
-
+  - EPP-P1-01
+  - EPP-P1-02
+  - EPP-P1-03
+  - EPP-P1-04
+  - EPP-P1-05
+  - EPP-P1-06
+  - EPP-P2-01
+  - EPP-P2-02
+  - EPP-P2-06
+  - EPP-P2-07
+  - EPP-P2-08
+  - EPP-P2-09
+  - EPP-P3-01
+  - EPP-P3-02
+  - EPP-P3-03
+  - EPP-P3-04
+  - EPP-P3-05
+  - EPP-P3-06
+  - EPP-P3-07
+  estimated_total_time: 6-9 days (with Phase 3 and Phase 4 running in parallel)
 blockers: []
-
 success_criteria:
-  - id: "SC-P1-1"
-    description: "alembic upgrade head and alembic downgrade -1 both succeed on a clean DB"
-    status: "pending"
-  - id: "SC-P1-2"
-    description: "DeploymentProfileRead response JSON includes description field (nullable)"
-    status: "pending"
-  - id: "SC-P1-3"
-    description: "DeploymentProfileCreate with description > 500 chars returns HTTP 422"
-    status: "pending"
-  - id: "SC-P1-4"
-    description: "Integration test (tests/api/test_deployment_profiles.py) passes"
-    status: "pending"
-  - id: "SC-P2-1"
-    description: "CreateProfileForm renders in contextMode=page on existing profiles page without visual regression"
-    status: "pending"
-  - id: "SC-P2-2"
-    description: "Multi-select for supported_artifact_types is keyboard-accessible (Space/Enter)"
-    status: "pending"
-  - id: "SC-P2-3"
-    description: "Selecting platform 'codex' pre-populates all fields from PLATFORM_DEFAULTS"
-    status: "pending"
-  - id: "SC-P2-4"
-    description: "All 8 form fields have visible tooltip triggers with aria-label"
-    status: "pending"
-  - id: "SC-P2-5"
-    description: "description textarea enforces 500-char limit with live counter"
-    status: "pending"
-  - id: "SC-P2-6"
-    description: "import { CreateProfileForm } from '@/components/profiles' resolves"
-    status: "pending"
-  - id: "SC-P2-7"
-    description: "pnpm type-check passes with zero new errors after Phase 2"
-    status: "pending"
-  - id: "SC-P3-1"
-    description: "Creating a project with two platforms toggled ON results in two DeploymentProfile rows in DB"
-    status: "pending"
-  - id: "SC-P3-2"
-    description: "Profile POST failure shows warning toast; project creation is not rolled back"
-    status: "pending"
-  - id: "SC-P4-1"
-    description: "Platforms tab appears in Settings navigation and is keyboard-reachable"
-    status: "pending"
-  - id: "SC-P4-2"
-    description: "PlatformDefaultsSettings renders exclusively in Platforms tab"
-    status: "pending"
-  - id: "SC-P4-3"
-    description: "New Custom Profile button opens CreateProfileForm dialog; success shows toast"
-    status: "pending"
-  - id: "SC-P4-4"
-    description: "E2E navigation test passes"
-    status: "pending"
-
+- id: SC-P1-1
+  description: alembic upgrade head and alembic downgrade -1 both succeed on a clean
+    DB
+  status: pending
+- id: SC-P1-2
+  description: DeploymentProfileRead response JSON includes description field (nullable)
+  status: pending
+- id: SC-P1-3
+  description: DeploymentProfileCreate with description > 500 chars returns HTTP 422
+  status: pending
+- id: SC-P1-4
+  description: Integration test (tests/api/test_deployment_profiles.py) passes
+  status: pending
+- id: SC-P2-1
+  description: CreateProfileForm renders in contextMode=page on existing profiles
+    page without visual regression
+  status: pending
+- id: SC-P2-2
+  description: Multi-select for supported_artifact_types is keyboard-accessible (Space/Enter)
+  status: pending
+- id: SC-P2-3
+  description: Selecting platform 'codex' pre-populates all fields from PLATFORM_DEFAULTS
+  status: pending
+- id: SC-P2-4
+  description: All 8 form fields have visible tooltip triggers with aria-label
+  status: pending
+- id: SC-P2-5
+  description: description textarea enforces 500-char limit with live counter
+  status: pending
+- id: SC-P2-6
+  description: import { CreateProfileForm } from '@/components/profiles' resolves
+  status: pending
+- id: SC-P2-7
+  description: pnpm type-check passes with zero new errors after Phase 2
+  status: pending
+- id: SC-P3-1
+  description: Creating a project with two platforms toggled ON results in two DeploymentProfile
+    rows in DB
+  status: pending
+- id: SC-P3-2
+  description: Profile POST failure shows warning toast; project creation is not rolled
+    back
+  status: pending
+- id: SC-P4-1
+  description: Platforms tab appears in Settings navigation and is keyboard-reachable
+  status: pending
+- id: SC-P4-2
+  description: PlatformDefaultsSettings renders exclusively in Platforms tab
+  status: pending
+- id: SC-P4-3
+  description: New Custom Profile button opens CreateProfileForm dialog; success shows
+    toast
+  status: pending
+- id: SC-P4-4
+  description: E2E navigation test passes
+  status: pending
 files_modified:
-  # Phase 1
-  - "skillmeat/cache/migrations/versions/[new].py"
-  - "skillmeat/cache/models.py"
-  - "skillmeat/api/schemas/deployment_profiles.py"
-  - "skillmeat/cache/repositories.py"
-  - "skillmeat/api/openapi.json"
-  - "tests/api/test_deployment_profiles.py"
-  # Phase 2
-  - "skillmeat/web/types/deployments.ts"
-  - "skillmeat/web/components/profiles/create-profile-form.tsx"
-  - "skillmeat/web/components/profiles/index.ts"
-  - "skillmeat/web/app/projects/[id]/profiles/page.tsx"
-  - "skillmeat/web/lib/constants/platform-defaults.ts"
-  - "skillmeat/web/hooks/use-deployment-profiles.ts"
-  # Phase 3
-  - "skillmeat/web/app/projects/components/create-project-dialog.tsx"
-  # Phase 4
-  - "skillmeat/web/app/settings/page.tsx"
-  - "skillmeat/web/components/settings/platform-defaults-settings.tsx"
-  - "skillmeat/web/components/settings/custom-context-settings.tsx"
+- skillmeat/cache/migrations/versions/[new].py
+- skillmeat/cache/models.py
+- skillmeat/api/schemas/deployment_profiles.py
+- skillmeat/cache/repositories.py
+- skillmeat/api/openapi.json
+- tests/api/test_deployment_profiles.py
+- skillmeat/web/types/deployments.ts
+- skillmeat/web/components/profiles/create-profile-form.tsx
+- skillmeat/web/components/profiles/index.ts
+- skillmeat/web/app/projects/[id]/profiles/page.tsx
+- skillmeat/web/lib/constants/platform-defaults.ts
+- skillmeat/web/hooks/use-deployment-profiles.ts
+- skillmeat/web/app/projects/components/create-project-dialog.tsx
+- skillmeat/web/app/settings/page.tsx
+- skillmeat/web/components/settings/platform-defaults-settings.tsx
+- skillmeat/web/components/settings/custom-context-settings.tsx
+progress: 59
+updated: '2026-02-22'
 ---
 
 # Enhanced Platform Profiles — All Phases Progress
