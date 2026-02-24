@@ -17,19 +17,26 @@
 'use client';
 
 import * as React from 'react';
-import { useState } from 'react';
-import { Layers, Users, AlertCircle, Loader2, Tag, Calendar, Hash } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Layers, Users, AlertCircle, Loader2, Tag, Calendar, Hash, Info } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Tabs } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ModalHeader } from '@/components/shared/modal-header';
 import { TabNavigation, type Tab } from '@/components/shared/tab-navigation';
 import { TabContentWrapper } from '@/components/shared/tab-content-wrapper';
-import { useDeploymentSet, useResolveSet } from '@/hooks';
+import { useDeploymentSet, useResolveSet, useDeploymentSetMembers, useArtifacts } from '@/hooks';
 import { formatDate } from '@/lib/utils';
-import type { DeploymentSet } from '@/types/deployment-sets';
+import type { DeploymentSet, DeploymentSetMember } from '@/types/deployment-sets';
+import type { Artifact } from '@/types/artifact';
+import {
+  DeploymentSetMemberCard,
+  DeploymentSetMemberCardSkeleton,
+} from '@/components/deployment-sets/deployment-set-member-card';
+import { ArtifactDetailsModal } from '@/components/collection/artifact-details-modal';
 
 // ============================================================================
 // Types
@@ -217,6 +224,230 @@ function DeploymentSetOverviewTab({ deploymentSet }: { deploymentSet: Deployment
 }
 
 // ============================================================================
+// Members tab
+// ============================================================================
+
+/**
+ * GroupMemberPopover
+ *
+ * Displays a simple info popover for group-type members, showing the group ID
+ * since there is no dedicated group detail modal.
+ */
+function GroupMemberPopover({
+  member,
+  children,
+}: {
+  member: DeploymentSetMember;
+  children: React.ReactNode;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>{children}</PopoverTrigger>
+      <PopoverContent className="w-72 p-4" side="top" align="center">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Info className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <h4 className="text-sm font-semibold">Group Member</h4>
+          </div>
+          <Separator />
+          <div className="space-y-1 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-muted-foreground">Group ID</span>
+              <span className="font-mono text-xs break-all text-right">
+                {member.group_id ?? member.id}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-muted-foreground">Position</span>
+              <span className="tabular-nums">{member.position ?? '—'}</span>
+            </div>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * DeploymentSetMembersTab
+ *
+ * Renders the Members tab content for a deployment set. Fetches members via
+ * useDeploymentSetMembers and resolves artifact data for artifact-type members
+ * by building a UUID → Artifact map from useArtifacts.
+ *
+ * Click behaviour:
+ *   - artifact member → opens ArtifactDetailsModal
+ *   - set member → opens a nested DeploymentSetDetailsModal
+ *   - group member → shows a GroupMemberPopover with group info
+ */
+function DeploymentSetMembersTab({ setId }: { setId: string }) {
+  // Members list for this deployment set
+  const {
+    data: members,
+    isLoading: isMembersLoading,
+  } = useDeploymentSetMembers(setId);
+
+  // Fetch all artifacts to build a UUID lookup map for artifact-type members.
+  // useArtifacts() is already cached at 5min stale time — no extra cost when
+  // the collection page has already loaded this data.
+  const { data: artifactsResponse, isLoading: isArtifactsLoading } = useArtifacts();
+
+  // State for the artifact details modal (artifact-type member clicks)
+  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
+  const [artifactModalOpen, setArtifactModalOpen] = useState(false);
+
+  // State for the nested deployment set modal (set-type member clicks)
+  const [nestedSetId, setNestedSetId] = useState<string | null>(null);
+  const [nestedSetModalOpen, setNestedSetModalOpen] = useState(false);
+
+  // Build uuid → Artifact map for O(1) lookups
+  const artifactByUuid = useMemo<Record<string, Artifact>>(() => {
+    const artifacts = artifactsResponse?.artifacts ?? [];
+    return Object.fromEntries(artifacts.map((a) => [a.uuid, a]));
+  }, [artifactsResponse]);
+
+  const isLoading = isMembersLoading || isArtifactsLoading;
+
+  // Sort members by position ascending (null positions go last)
+  const sortedMembers = useMemo(() => {
+    if (!members) return [];
+    return [...members].sort((a, b) => {
+      if (a.position === null && b.position === null) return 0;
+      if (a.position === null) return 1;
+      if (b.position === null) return -1;
+      return a.position - b.position;
+    });
+  }, [members]);
+
+  // ── Loading state ──────────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+        aria-busy="true"
+        aria-label="Loading members"
+      >
+        {[1, 2, 3].map((i) => (
+          <DeploymentSetMemberCardSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
+
+  // ── Empty state ────────────────────────────────────────────────────────────
+  if (sortedMembers.length === 0) {
+    return (
+      <div
+        className="flex flex-col items-center gap-3 rounded-md border border-dashed border-muted-foreground/30 px-4 py-12 text-center"
+        role="status"
+        aria-label="No members"
+      >
+        <Users className="h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
+        <p className="text-sm font-medium text-muted-foreground">No members yet</p>
+        <p className="text-xs text-muted-foreground/70">
+          Add artifacts, groups, or nested sets to this deployment set.
+        </p>
+      </div>
+    );
+  }
+
+  // ── Member grid ────────────────────────────────────────────────────────────
+  return (
+    <>
+      <div
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+        role="list"
+        aria-label="Deployment set members"
+      >
+        {sortedMembers.map((member, index) => {
+          const position = member.position ?? index + 1;
+          const resolvedArtifact =
+            member.member_type === 'artifact' && member.artifact_uuid
+              ? artifactByUuid[member.artifact_uuid]
+              : undefined;
+
+          // ── Artifact member ──────────────────────────────────────────────
+          if (member.member_type === 'artifact') {
+            return (
+              <div key={member.id} role="listitem">
+                <DeploymentSetMemberCard
+                  member={member}
+                  resolvedArtifact={resolvedArtifact}
+                  position={position}
+                  onClick={
+                    resolvedArtifact
+                      ? () => {
+                          setSelectedArtifact(resolvedArtifact);
+                          setArtifactModalOpen(true);
+                        }
+                      : undefined
+                  }
+                />
+              </div>
+            );
+          }
+
+          // ── Set member ───────────────────────────────────────────────────
+          if (member.member_type === 'set') {
+            return (
+              <div key={member.id} role="listitem">
+                <DeploymentSetMemberCard
+                  member={member}
+                  position={position}
+                  onClick={() => {
+                    if (member.nested_set_id) {
+                      setNestedSetId(member.nested_set_id);
+                      setNestedSetModalOpen(true);
+                    }
+                  }}
+                />
+              </div>
+            );
+          }
+
+          // ── Group member ─────────────────────────────────────────────────
+          return (
+            <div key={member.id} role="listitem">
+              <GroupMemberPopover member={member}>
+                <span className="block w-full">
+                  <DeploymentSetMemberCard
+                    member={member}
+                    position={position}
+                    onClick={() => {
+                      /* handled by popover trigger */
+                    }}
+                  />
+                </span>
+              </GroupMemberPopover>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Artifact details modal (artifact-type member navigation) */}
+      <ArtifactDetailsModal
+        artifact={selectedArtifact}
+        open={artifactModalOpen}
+        onClose={() => {
+          setArtifactModalOpen(false);
+          setSelectedArtifact(null);
+        }}
+      />
+
+      {/* Nested deployment set modal (set-type member navigation) */}
+      <DeploymentSetDetailsModal
+        setId={nestedSetId}
+        open={nestedSetModalOpen}
+        onOpenChange={(open) => {
+          setNestedSetModalOpen(open);
+          if (!open) setNestedSetId(null);
+        }}
+      />
+    </>
+  );
+}
+
+// ============================================================================
 // Main component
 // ============================================================================
 
@@ -294,18 +525,9 @@ export function DeploymentSetDetailsModal({
               <DeploymentSetOverviewTab deploymentSet={deploymentSet} />
             </TabContentWrapper>
 
-            {/* Members tab — placeholder for later batch */}
+            {/* Members tab */}
             <TabContentWrapper value="members">
-              <div
-                className="flex flex-col gap-2 rounded-md border border-dashed border-muted-foreground/30 px-4 py-8 text-center"
-                role="region"
-                aria-label="Members placeholder"
-              >
-                <Users className="mx-auto h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
-                <p className="text-sm text-muted-foreground">
-                  Members content will be implemented in a later batch.
-                </p>
-              </div>
+              <DeploymentSetMembersTab setId={deploymentSet.id} />
             </TabContentWrapper>
           </Tabs>
         )}
