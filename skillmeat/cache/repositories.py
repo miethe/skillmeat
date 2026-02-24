@@ -285,11 +285,8 @@ class BaseRepository(Generic[T]):
         # Create engine
         self.engine = create_db_engine(self.db_path)
 
-        # Run Alembic migrations first (creates/updates schema)
-        from skillmeat.cache.migrations import run_migrations
-        run_migrations(self.db_path)
-
-        # Then create any missing base tables (backward compatibility)
+        # Create any missing base tables (backward compatibility)
+        # Note: Alembic migrations run once at app startup via CacheManager
         create_tables(self.db_path)
 
         # Store model class for type-safe operations
