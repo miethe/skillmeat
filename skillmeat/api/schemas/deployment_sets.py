@@ -100,7 +100,7 @@ class DeploymentSetUpdate(BaseModel):
 class DeploymentSetResponse(BaseModel):
     """Response schema for a deployment set."""
 
-    id: int = Field(description="Deployment set primary key")
+    id: str = Field(description="Deployment set unique identifier (UUID hex)")
     name: str = Field(description="Deployment set name")
     description: Optional[str] = Field(
         default=None,
@@ -185,15 +185,15 @@ class MemberCreate(BaseModel):
         description="UUID of the artifact to add as a member",
         examples=["550e8400-e29b-41d4-a716-446655440000"],
     )
-    group_id: Optional[int] = Field(
+    group_id: Optional[str] = Field(
         default=None,
         description="ID of the group to add as a member",
-        examples=[42],
+        examples=["42"],
     )
-    nested_set_id: Optional[int] = Field(
+    nested_set_id: Optional[str] = Field(
         default=None,
-        description="ID of the nested deployment set to add as a member",
-        examples=[7],
+        description="ID of the nested deployment set to add as a member (UUID hex)",
+        examples=["9124ec6b03dd4578a0881a4cde186501"],
     )
     position: Optional[int] = Field(
         default=None,
@@ -252,17 +252,17 @@ class MemberUpdatePosition(BaseModel):
 class MemberResponse(BaseModel):
     """Response schema for a deployment set member."""
 
-    id: int = Field(description="Member primary key")
-    deployment_set_id: int = Field(description="ID of the parent deployment set")
+    id: str = Field(description="Member unique identifier (UUID hex)")
+    deployment_set_id: str = Field(description="ID of the parent deployment set")
     artifact_uuid: Optional[str] = Field(
         default=None,
         description="UUID of the artifact member (if member_type is 'artifact')",
     )
-    group_id: Optional[int] = Field(
+    group_id: Optional[str] = Field(
         default=None,
         description="ID of the group member (if member_type is 'group')",
     )
-    nested_set_id: Optional[int] = Field(
+    nested_set_id: Optional[str] = Field(
         default=None,
         description="ID of the nested deployment set (if member_type is 'set')",
     )
@@ -339,7 +339,7 @@ class ResolvedArtifactItem(BaseModel):
 class ResolveResponse(BaseModel):
     """Response for deployment set artifact resolution."""
 
-    set_id: int = Field(description="ID of the resolved deployment set")
+    set_id: str = Field(description="ID of the resolved deployment set")
     set_name: str = Field(description="Name of the resolved deployment set")
     resolved_artifacts: List[ResolvedArtifactItem] = Field(
         default_factory=list,
@@ -428,7 +428,7 @@ class DeployResultItem(BaseModel):
 class BatchDeployResponse(BaseModel):
     """Response from a batch deployment operation."""
 
-    set_id: int = Field(description="ID of the deployment set that was deployed")
+    set_id: str = Field(description="ID of the deployment set that was deployed")
     set_name: str = Field(description="Name of the deployment set")
     project_path: str = Field(description="Target project path")
     total: int = Field(description="Total number of artifacts attempted")

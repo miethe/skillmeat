@@ -194,6 +194,14 @@ class APISettings(BaseSettings):
         "Configurable via SKILLMEAT_COMPOSITE_ARTIFACTS_ENABLED env var.",
     )
 
+    # Deployment Sets feature flag
+    deployment_sets_enabled: bool = Field(
+        default=True,
+        description="Enable deployment sets feature. "
+        "When disabled, all /api/v1/deployment-sets endpoints return 404. "
+        "Configurable via SKILLMEAT_DEPLOYMENT_SETS_ENABLED env var.",
+    )
+
     # Memory & Context Intelligence System feature flags
     memory_context_enabled: bool = Field(
         default=True,
