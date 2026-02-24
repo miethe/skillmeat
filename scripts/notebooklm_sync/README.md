@@ -71,6 +71,18 @@ python scripts/notebooklm_sync/init.py --notebook-title "SkillMeat Dev"
 python scripts/notebooklm_sync/init.py --dry-run
 python scripts/notebooklm_sync/init.py --include "docs/project_plans/PRDs/**"
 python scripts/notebooklm_sync/init.py --verbose
+
+# Refresh: reconcile sources with current scope (keeps existing notebook)
+python scripts/notebooklm_sync/init.py --refresh
+
+# Preview refresh without making changes
+python scripts/notebooklm_sync/init.py --refresh --dry-run
+
+# Refresh targeting a specific notebook by ID
+python scripts/notebooklm_sync/init.py --refresh --notebook-id e837f0f4
+
+# Use existing notebook for fresh init (skips create, uploads all sources)
+python scripts/notebooklm_sync/init.py --notebook-id abc123
 ```
 
 **Options**:
@@ -81,6 +93,27 @@ python scripts/notebooklm_sync/init.py --verbose
 - `--include PATTERN` - Add additional file patterns (repeatable)
 - `--exclude PATTERN` - Exclude additional patterns (repeatable)
 - `--verbose` - Detailed output
+- `--refresh` - Reconcile sources with current scope (requires init or `--notebook-id`)
+- `--force` - Delete existing notebook entirely and create new (mutually exclusive with `--refresh`)
+
+#### Modes
+
+| Mode | Flag | Behavior |
+| ---- | ---- | -------- |
+| **Init** (default) | *(none)* | Create new notebook, upload all sources, save mapping. Errors if already initialized. |
+| **Refresh** | `--refresh` | Keep existing notebook, remove out-of-scope sources, add newly in-scope sources. Requires existing initialization (or `--notebook-id`). |
+| **Force** | `--force` | Delete existing notebook entirely, create new one, re-upload all sources. Destroys audio overviews and notes. |
+
+`--refresh` and `--force` are mutually exclusive.
+
+#### Targeting a Specific Notebook
+
+Use `--notebook-id <ID>` to target a specific notebook:
+
+- **With `--refresh`**: Switches the mapping to point at the given notebook and reconciles sources against current scope. Useful for recovering from an accidental `--force`.
+- **Without `--refresh`**: Uses the given notebook for a fresh init (skips notebook creation, uploads all sources).
+
+Find notebook IDs with `notebooklm list --json`.
 
 **Output**:
 
@@ -367,6 +400,58 @@ Run 'python scripts/notebooklm_sync/batch.py' to sync
 
 [main abc1234] Update docs
  2 files changed, 10 insertions(+), 5 deletions(-)
+```
+
+---
+
+## Common Workflows
+
+### Changing Sync Scope
+
+After editing `INCLUDE_DIRS` or `ROOT_INCLUDE_FILES` in `config.py`:
+
+```bash
+# Preview the diff (safe, no API calls)
+python scripts/notebooklm_sync/init.py --refresh --dry-run
+
+# Apply the changes
+python scripts/notebooklm_sync/init.py --refresh
+```
+
+This removes sources no longer in scope and adds newly in-scope sources, preserving your notebook's audio overviews and notes.
+
+### Recovering from Accidental `--force`
+
+If `--force` created a new empty notebook while the old one still exists in NotebookLM:
+
+1. Find both notebooks:
+
+   ```bash
+   notebooklm list --json
+   ```
+
+2. Delete the empty new notebook:
+
+   ```bash
+   notebooklm delete <new-notebook-id> --force
+   ```
+
+3. Point the mapping back at the old notebook and reconcile:
+
+   ```bash
+   python scripts/notebooklm_sync/init.py --refresh --notebook-id <old-notebook-id>
+   ```
+
+### Full Re-upload to Existing Notebook
+
+To do a clean re-upload (all sources) into an existing notebook without deleting it:
+
+```bash
+# Remove all tracked sources first
+python scripts/notebooklm_sync/cleanup.py --force
+
+# Re-init targeting the existing notebook
+python scripts/notebooklm_sync/init.py --notebook-id <notebook-id>
 ```
 
 ---
