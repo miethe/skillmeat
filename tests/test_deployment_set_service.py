@@ -574,3 +574,245 @@ class TestAddMemberWithCycleCheck:
         svc = DeploymentSetService(session=None)
         with pytest.raises(RuntimeError, match="requires a session"):
             svc.add_member_with_cycle_check("set-A", "owner-1", member_set_id="set-B")
+
+
+# ---------------------------------------------------------------------------
+# batch_deploy — unit tests
+# ---------------------------------------------------------------------------
+
+
+def _make_project_mock(project_id: str = "proj-1", project_path: str = "/tmp/proj"):
+    """Return a minimal mock Project row."""
+    proj = MagicMock()
+    proj.id = project_id
+    proj.path = project_path
+    return proj
+
+
+def _make_artifact_row(uuid: str, name: str, artifact_type: str):
+    """Return a minimal mock Artifact row with the three columns we access."""
+    row = MagicMock()
+    row.uuid = uuid
+    row.name = name
+    row.type = artifact_type
+    return row
+
+
+class TestBatchDeploy:
+    """Tests for DeploymentSetService.batch_deploy()."""
+
+    # ------------------------------------------------------------------
+    # Guards
+    # ------------------------------------------------------------------
+
+    def test_no_session_raises_runtime_error(self):
+        dm = MagicMock()
+        svc = DeploymentSetService(session=None, deployment_manager=dm)
+        with pytest.raises(RuntimeError, match="requires a session"):
+            svc.batch_deploy("set-1", "proj-1")
+
+    def test_no_deployment_manager_raises_value_error(self):
+        session = MagicMock()
+        svc = DeploymentSetService(session=session)
+        with pytest.raises(ValueError, match="DeploymentManager"):
+            svc.batch_deploy("set-1", "proj-1")
+
+    def test_unknown_project_raises_lookup_error(self):
+        """If project_id is not in the DB, raise LookupError before any deploy."""
+        session = MagicMock()
+        session.query.return_value.filter.return_value.first.return_value = None
+        dm = MagicMock()
+        svc = DeploymentSetService(session=session, deployment_manager=dm)
+
+        # Patch resolve() so we don't need a real DB for it.
+        with patch.object(svc, "resolve", return_value=["uuid-a"]):
+            with pytest.raises(LookupError, match="proj-missing"):
+                svc.batch_deploy("set-1", "proj-missing")
+
+        # deploy_artifacts must NOT have been called.
+        dm.deploy_artifacts.assert_not_called()
+
+    # ------------------------------------------------------------------
+    # All-success case
+    # ------------------------------------------------------------------
+
+    def test_all_success(self):
+        """All artifacts resolve and deploy without error → all results 'success'."""
+        session = MagicMock()
+        project = _make_project_mock("proj-1", "/projects/proj-1")
+        art_a = _make_artifact_row("uuid-a", "canvas", "skill")
+        art_b = _make_artifact_row("uuid-b", "review", "command")
+
+        # Project query returns our project mock.
+        session.query.return_value.filter.return_value.first.return_value = project
+
+        # Artifact/CollectionArtifact join query returns two rows.
+        session.query.return_value.join.return_value.filter.return_value.all.return_value = [
+            art_a,
+            art_b,
+        ]
+
+        dm = MagicMock()
+        dm.deploy_artifacts.return_value = [MagicMock()]
+
+        svc = DeploymentSetService(session=session, deployment_manager=dm)
+
+        with patch.object(svc, "resolve", return_value=["uuid-a", "uuid-b"]):
+            results = svc.batch_deploy("set-1", "proj-1")
+
+        assert len(results) == 2
+        assert all(r["status"] == "success" for r in results)
+        assert all(r["error"] is None for r in results)
+        assert results[0]["artifact_uuid"] == "uuid-a"
+        assert results[1]["artifact_uuid"] == "uuid-b"
+        assert dm.deploy_artifacts.call_count == 2
+
+    # ------------------------------------------------------------------
+    # Mixed-result partial failure
+    # ------------------------------------------------------------------
+
+    def test_partial_failure_continues_loop(self):
+        """One artifact raises → 'error' result; others still processed."""
+        session = MagicMock()
+        project = _make_project_mock()
+        art_a = _make_artifact_row("uuid-a", "canvas", "skill")
+        art_b = _make_artifact_row("uuid-b", "review", "command")
+        art_c = _make_artifact_row("uuid-c", "docx", "skill")
+
+        session.query.return_value.filter.return_value.first.return_value = project
+        session.query.return_value.join.return_value.filter.return_value.all.return_value = [
+            art_a,
+            art_b,
+            art_c,
+        ]
+
+        dm = MagicMock()
+        # Second call raises; first and third succeed.
+        dm.deploy_artifacts.side_effect = [
+            [MagicMock()],
+            RuntimeError("deploy boom"),
+            [MagicMock()],
+        ]
+
+        svc = DeploymentSetService(session=session, deployment_manager=dm)
+
+        with patch.object(svc, "resolve", return_value=["uuid-a", "uuid-b", "uuid-c"]):
+            results = svc.batch_deploy("set-1", "proj-1")
+
+        assert len(results) == 3
+        assert results[0]["status"] == "success"
+        assert results[1]["status"] == "error"
+        assert "deploy boom" in results[1]["error"]
+        assert results[2]["status"] == "success"
+        assert dm.deploy_artifacts.call_count == 3
+
+    # ------------------------------------------------------------------
+    # Unknown UUID (CollectionArtifact mapping failure)
+    # ------------------------------------------------------------------
+
+    def test_unknown_uuid_produces_error_result(self):
+        """A UUID not found in collection_artifacts → 'error' result, no exception."""
+        session = MagicMock()
+        project = _make_project_mock()
+        art_a = _make_artifact_row("uuid-a", "canvas", "skill")
+
+        session.query.return_value.filter.return_value.first.return_value = project
+        # Only uuid-a is returned; uuid-missing is absent.
+        session.query.return_value.join.return_value.filter.return_value.all.return_value = [
+            art_a,
+        ]
+
+        dm = MagicMock()
+        dm.deploy_artifacts.return_value = [MagicMock()]
+
+        svc = DeploymentSetService(session=session, deployment_manager=dm)
+
+        with patch.object(svc, "resolve", return_value=["uuid-a", "uuid-missing"]):
+            results = svc.batch_deploy("set-1", "proj-1")
+
+        assert len(results) == 2
+        assert results[0]["status"] == "success"
+        assert results[1]["artifact_uuid"] == "uuid-missing"
+        assert results[1]["status"] == "error"
+        assert "uuid-missing" in results[1]["error"]
+
+    # ------------------------------------------------------------------
+    # Warning-level log for missing UUID
+    # ------------------------------------------------------------------
+
+    def test_missing_uuid_emits_warning_log(self, caplog):
+        """A UUID not found in the cache should produce a warning-level log entry."""
+        import logging
+
+        session = MagicMock()
+        project = _make_project_mock()
+
+        session.query.return_value.filter.return_value.first.return_value = project
+        # No artifact rows returned — uuid-x is unknown.
+        session.query.return_value.join.return_value.filter.return_value.all.return_value = (
+            []
+        )
+
+        dm = MagicMock()
+        svc = DeploymentSetService(session=session, deployment_manager=dm)
+
+        with caplog.at_level(logging.WARNING, logger="skillmeat.core.deployment_sets"):
+            with patch.object(svc, "resolve", return_value=["uuid-x"]):
+                results = svc.batch_deploy("set-warn", "proj-1")
+
+        assert results[0]["status"] == "error"
+        warning_messages = [
+            r.message for r in caplog.records if r.levelno == logging.WARNING
+        ]
+        assert any(
+            "uuid-x" in msg for msg in warning_messages
+        ), f"Expected warning mentioning 'uuid-x', got: {warning_messages}"
+
+    # ------------------------------------------------------------------
+    # profile_id is passed through to deploy_artifacts
+    # ------------------------------------------------------------------
+
+    def test_profile_id_passed_to_deploy_artifacts(self):
+        """profile_id= is forwarded to DeploymentManager.deploy_artifacts."""
+        session = MagicMock()
+        project = _make_project_mock("proj-1", "/projects/proj-1")
+        art_a = _make_artifact_row("uuid-a", "canvas", "skill")
+
+        session.query.return_value.filter.return_value.first.return_value = project
+        session.query.return_value.join.return_value.filter.return_value.all.return_value = [
+            art_a,
+        ]
+
+        dm = MagicMock()
+        dm.deploy_artifacts.return_value = [MagicMock()]
+        svc = DeploymentSetService(session=session, deployment_manager=dm)
+
+        from pathlib import Path
+
+        with patch.object(svc, "resolve", return_value=["uuid-a"]):
+            svc.batch_deploy("set-1", "proj-1", profile_id="my-profile")
+
+        dm.deploy_artifacts.assert_called_once_with(
+            artifact_names=["canvas"],
+            project_path=Path("/projects/proj-1"),
+            profile_id="my-profile",
+        )
+
+    # ------------------------------------------------------------------
+    # Empty set → empty results
+    # ------------------------------------------------------------------
+
+    def test_empty_resolved_set_returns_empty_list(self):
+        """When resolve() returns [], batch_deploy returns [] without any DB query."""
+        session = MagicMock()
+        project = _make_project_mock()
+        session.query.return_value.filter.return_value.first.return_value = project
+
+        dm = MagicMock()
+        svc = DeploymentSetService(session=session, deployment_manager=dm)
+
+        with patch.object(svc, "resolve", return_value=[]):
+            results = svc.batch_deploy("set-empty", "proj-1")
+
+        assert results == []
+        dm.deploy_artifacts.assert_not_called()

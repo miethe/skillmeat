@@ -45,7 +45,8 @@ Typical usage (FastAPI endpoint)::
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Set
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 from sqlalchemy.orm import Session
 
@@ -53,6 +54,9 @@ from skillmeat.core.exceptions import (
     DeploymentSetCycleError,
     DeploymentSetResolutionError,
 )
+
+if TYPE_CHECKING:
+    from skillmeat.core.deployment import DeploymentManager
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +78,11 @@ class DeploymentSetService:
         depth_limit: Maximum recursion depth before
             :class:`~skillmeat.core.exceptions.DeploymentSetResolutionError`
             is raised.  Defaults to 20.
+        db_path: Optional path to the SQLite database file.  Used by the
+            repository layer when constructing ``DeploymentSetRepository``.
+        deployment_manager: Optional :class:`~skillmeat.core.deployment.DeploymentManager`
+            instance injected for :meth:`batch_deploy`.  When ``None`` a
+            ``ValueError`` is raised if ``batch_deploy`` is called.
     """
 
     def __init__(
@@ -81,10 +90,12 @@ class DeploymentSetService:
         session: Optional[Session] = None,
         depth_limit: int = _DEFAULT_DEPTH_LIMIT,
         db_path: Optional[str] = None,
+        deployment_manager: Optional["DeploymentManager"] = None,
     ) -> None:
         self._session = session
         self._depth_limit = depth_limit
         self._db_path = db_path
+        self._deployment_manager = deployment_manager
 
     # ------------------------------------------------------------------
     # Public API
@@ -182,6 +193,189 @@ class DeploymentSetService:
             member_set_id=member_set_id,
             position=position,
         )
+
+    def batch_deploy(
+        self,
+        set_id: str,
+        project_id: str,
+        profile_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Resolve *set_id* and deploy all artifacts to *project_id*.
+
+        Resolves the deployment set into a flat, deduplicated list of artifact
+        UUIDs, looks up each UUID in the ``CollectionArtifact``/``Artifact``
+        tables to obtain ``name`` and ``type``, constructs the canonical
+        ``type:name`` artifact identifier, then invokes
+        :meth:`~skillmeat.core.deployment.DeploymentManager.deploy_artifacts`
+        for each artifact individually.
+
+        Per-artifact exceptions are caught and recorded as ``"error"`` results
+        so the loop never aborts prematurely.  If the project or a UUID mapping
+        cannot be found, the method raises early (project) or records an error
+        result (missing UUID).
+
+        Args:
+            set_id: Primary key of the :class:`~skillmeat.cache.models.DeploymentSet`
+                to deploy.
+            project_id: ``Project.id`` of the target project.
+            profile_id: Optional deployment profile identifier passed through to
+                :meth:`~skillmeat.core.deployment.DeploymentManager.deploy_artifacts`.
+
+        Returns:
+            List of result dicts, one per resolved artifact UUID.  Each dict
+            contains:
+
+            * ``artifact_uuid`` (str) — the UUID that was processed.
+            * ``status`` (str) — ``"success"``, ``"skip"``, or ``"error"``.
+            * ``error`` (str | None) — human-readable error message, or
+              ``None`` when status is ``"success"`` or ``"skip"``.
+
+        Raises:
+            RuntimeError: If called without a session.
+            ValueError: If no :class:`~skillmeat.core.deployment.DeploymentManager`
+                was provided at construction time.
+            LookupError: If *project_id* does not exist in the ``projects`` table.
+        """
+        if self._session is None:
+            raise RuntimeError(
+                "DeploymentSetService.batch_deploy() requires a session. "
+                "Pass session= to the constructor."
+            )
+        if self._deployment_manager is None:
+            raise ValueError(
+                "DeploymentSetService.batch_deploy() requires a DeploymentManager. "
+                "Pass deployment_manager= to the constructor."
+            )
+
+        # Lazy imports to avoid circular imports at module load time.
+        from skillmeat.cache.models import Artifact, CollectionArtifact, Project
+
+        session = self._session
+
+        # ------------------------------------------------------------------
+        # 1. Resolve project path (fail-fast if not found).
+        # ------------------------------------------------------------------
+        project_row = session.query(Project).filter(Project.id == project_id).first()
+        if project_row is None:
+            raise LookupError(
+                f"Project {project_id!r} not found in the cache database. "
+                "Ensure the project has been registered before deploying."
+            )
+        project_path = Path(project_row.path)
+
+        # ------------------------------------------------------------------
+        # 2. Resolve the set into a flat, deduplicated list of artifact UUIDs.
+        # ------------------------------------------------------------------
+        resolved_uuids: List[str] = self.resolve(set_id)
+
+        logger.info(
+            "batch_deploy: starting deployment",
+            extra={
+                "set_id": set_id,
+                "project_id": project_id,
+                "profile_id": profile_id,
+                "resolved_count": len(resolved_uuids),
+            },
+        )
+
+        # ------------------------------------------------------------------
+        # 3. Build a UUID → (name, type) map via a single JOIN query.
+        # ------------------------------------------------------------------
+        if resolved_uuids:
+            uuid_rows = (
+                session.query(
+                    Artifact.uuid,
+                    Artifact.name,
+                    Artifact.type,
+                )
+                .join(
+                    CollectionArtifact,
+                    CollectionArtifact.artifact_uuid == Artifact.uuid,
+                )
+                .filter(Artifact.uuid.in_(resolved_uuids))
+                .all()
+            )
+        else:
+            uuid_rows = []
+
+        uuid_to_artifact: Dict[str, tuple] = {
+            row.uuid: (row.name, row.type) for row in uuid_rows
+        }
+
+        # ------------------------------------------------------------------
+        # 4. Deploy each artifact, collecting per-artifact results.
+        # ------------------------------------------------------------------
+        results: List[Dict[str, Any]] = []
+
+        for artifact_uuid in resolved_uuids:
+            if artifact_uuid not in uuid_to_artifact:
+                logger.warning(
+                    "batch_deploy: artifact UUID not found in collection cache; "
+                    "skipping — set_id=%s project_id=%s artifact_uuid=%s",
+                    set_id,
+                    project_id,
+                    artifact_uuid,
+                )
+                results.append(
+                    {
+                        "artifact_uuid": artifact_uuid,
+                        "status": "error",
+                        "error": (
+                            f"Artifact UUID {artifact_uuid!r} not found in "
+                            "collection_artifacts / artifacts tables."
+                        ),
+                    }
+                )
+                continue
+
+            artifact_name, artifact_type = uuid_to_artifact[artifact_uuid]
+            artifact_id = f"{artifact_type}:{artifact_name}"
+
+            try:
+                self._deployment_manager.deploy_artifacts(
+                    artifact_names=[artifact_name],
+                    project_path=project_path,
+                    profile_id=profile_id,
+                )
+                logger.info(
+                    "batch_deploy: deployed artifact — set_id=%s artifact_id=%s",
+                    set_id,
+                    artifact_id,
+                )
+                results.append(
+                    {
+                        "artifact_uuid": artifact_uuid,
+                        "status": "success",
+                        "error": None,
+                    }
+                )
+            except Exception as exc:  # noqa: BLE001 — intentional broad catch
+                logger.warning(
+                    "batch_deploy: deploy failed for artifact — "
+                    "set_id=%s artifact_id=%s error=%s",
+                    set_id,
+                    artifact_id,
+                    exc,
+                )
+                results.append(
+                    {
+                        "artifact_uuid": artifact_uuid,
+                        "status": "error",
+                        "error": str(exc),
+                    }
+                )
+
+        logger.info(
+            "batch_deploy: completed — set_id=%s project_id=%s total=%d "
+            "success=%d error=%d",
+            set_id,
+            project_id,
+            len(results),
+            sum(1 for r in results if r["status"] == "success"),
+            sum(1 for r in results if r["status"] == "error"),
+        )
+
+        return results
 
     def _check_cycle(self, set_id: str, candidate_member_set_id: str) -> None:
         """Raise :class:`~skillmeat.core.exceptions.DeploymentSetCycleError` if
