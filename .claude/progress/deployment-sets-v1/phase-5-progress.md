@@ -8,7 +8,7 @@ prd_ref: docs/project_plans/PRDs/features/deployment-sets-v1.md
 plan_ref: docs/project_plans/implementation_plans/features/deployment-sets-v1.md
 phase: 5
 title: Frontend Deploy Integration
-status: in_progress
+status: completed
 started: '2026-02-23'
 completed: null
 commit_refs: []
@@ -16,8 +16,8 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 2
-completed_tasks: 0
-in_progress_tasks: 1
+completed_tasks: 2
+in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
 owners:
@@ -27,7 +27,7 @@ contributors: []
 tasks:
 - id: DS-013
   description: useBatchDeploySet mutation hook
-  status: in_progress
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -36,7 +36,7 @@ tasks:
   priority: high
 - id: DS-014
   description: Batch deploy modal with project/profile selectors and result table
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -73,7 +73,7 @@ files_modified:
 - skillmeat/web/hooks/deployment-sets.ts
 - skillmeat/web/components/deployment-sets/batch-deploy-modal.tsx
 - skillmeat/web/components/deployment-sets/deploy-result-table.tsx
-progress: 0
+progress: 100
 updated: '2026-02-24'
 ---
 

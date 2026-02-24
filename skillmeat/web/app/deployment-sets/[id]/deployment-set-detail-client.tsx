@@ -17,14 +17,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { EditDeploymentSetDialog } from '@/components/deployment-sets/edit-deployment-set-dialog';
 import { AddMemberDialog } from '@/components/deployment-sets/add-member-dialog';
+import { BatchDeployModal } from '@/components/deployment-sets/batch-deploy-modal';
 import { MemberList } from '@/components/deployment-sets/member-list';
 import { COLOR_TAILWIND_CLASSES } from '@/lib/group-constants';
 
@@ -226,6 +222,7 @@ export function DeploymentSetDetailClient({ id }: DeploymentSetDetailClientProps
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [deployOpen, setDeployOpen] = useState(false);
 
   // 404 handling: surface as Next.js not-found boundary
   if (!isLoading && (error?.message?.includes('404') || (!set && !error))) {
@@ -400,19 +397,14 @@ export function DeploymentSetDetailClient({ id }: DeploymentSetDetailClientProps
             Add Member
           </Button>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span tabIndex={0}>
-                <Button size="sm" disabled aria-label="Deploy set (coming in next phase)">
-                  <Rocket className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                  Deploy Set
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Coming in next phase</p>
-            </TooltipContent>
-          </Tooltip>
+          <Button
+            size="sm"
+            onClick={() => setDeployOpen(true)}
+            aria-label="Deploy set to a project"
+          >
+            <Rocket className="mr-1.5 h-4 w-4" aria-hidden="true" />
+            Deploy Set
+          </Button>
         </div>
 
         <Separator />
@@ -441,6 +433,14 @@ export function DeploymentSetDetailClient({ id }: DeploymentSetDetailClientProps
         open={addMemberOpen}
         onOpenChange={setAddMemberOpen}
         setId={set.id}
+      />
+
+      {/* Batch deploy modal */}
+      <BatchDeployModal
+        setId={set.id}
+        setName={set.name}
+        open={deployOpen}
+        onOpenChange={setDeployOpen}
       />
     </TooltipProvider>
   );

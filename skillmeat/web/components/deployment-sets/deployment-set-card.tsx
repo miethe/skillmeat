@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Copy, Edit3, Layers3, Trash2 } from 'lucide-react';
+import { Copy, Edit3, Layers3, Rocket, Trash2 } from 'lucide-react';
 import type { DeploymentSet } from '@/types/deployment-sets';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,9 +31,10 @@ interface DeploymentSetCardProps {
   onEdit: (set: DeploymentSet) => void;
   onDelete: (set: DeploymentSet) => void;
   onClone: (set: DeploymentSet) => void;
+  onDeploy?: (set: DeploymentSet) => void;
 }
 
-export function DeploymentSetCard({ set, onEdit, onDelete, onClone }: DeploymentSetCardProps) {
+export function DeploymentSetCard({ set, onEdit, onDelete, onClone, onDeploy }: DeploymentSetCardProps) {
   const tags = set.tags ?? [];
   const tokenColorClass =
     set.color && !set.color.startsWith('#')
@@ -104,6 +105,12 @@ export function DeploymentSetCard({ set, onEdit, onDelete, onClone }: Deployment
           <Button asChild size="sm">
             <Link href={`/deployment-sets/${set.id}`}>Open Set</Link>
           </Button>
+          {onDeploy && (
+            <Button size="sm" onClick={() => onDeploy(set)} aria-label={`Deploy ${set.name}`}>
+              <Rocket className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+              Deploy
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => onEdit(set)}>
             <Edit3 className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
             Edit

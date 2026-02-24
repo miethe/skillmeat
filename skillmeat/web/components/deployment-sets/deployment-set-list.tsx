@@ -22,6 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { BatchDeployModal } from './batch-deploy-modal';
 import { DeploymentSetCard } from './deployment-set-card';
 import { CreateDeploymentSetDialog } from './create-deployment-set-dialog';
 import { EditDeploymentSetDialog } from './edit-deployment-set-dialog';
@@ -80,6 +81,7 @@ export function DeploymentSetList() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingSet, setEditingSet] = useState<DeploymentSet | null>(null);
   const [deletingSet, setDeletingSet] = useState<DeploymentSet | null>(null);
+  const [deployingSet, setDeployingSet] = useState<DeploymentSet | null>(null);
 
   // --- filtered sets ---
   const filteredSets = useMemo(() => {
@@ -193,6 +195,7 @@ export function DeploymentSetList() {
               onEdit={setEditingSet}
               onDelete={setDeletingSet}
               onClone={handleClone}
+              onDeploy={setDeployingSet}
             />
           ))}
         </div>
@@ -206,6 +209,15 @@ export function DeploymentSetList() {
         onOpenChange={(open) => !open && setEditingSet(null)}
         set={editingSet}
       />
+
+      {deployingSet && (
+        <BatchDeployModal
+          setId={deployingSet.id}
+          setName={deployingSet.name}
+          open={!!deployingSet}
+          onOpenChange={(open) => !open && setDeployingSet(null)}
+        />
+      )}
 
       <AlertDialog open={!!deletingSet} onOpenChange={(open) => !open && setDeletingSet(null)}>
         <AlertDialogContent>
