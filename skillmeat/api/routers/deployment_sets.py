@@ -11,6 +11,7 @@ API Endpoints:
     PUT    /deployment-sets/{set_id}                     - Update set metadata (200)
     DELETE /deployment-sets/{set_id}                     - Delete set, cascade members (204)
     POST   /deployment-sets/{set_id}/clone               - Clone set + members (201)
+    GET    /deployment-sets/{set_id}/members             - List members (200)
     POST   /deployment-sets/{set_id}/members             - Add member (201)
     DELETE /deployment-sets/{set_id}/members/{member_id} - Remove member (204)
     PUT    /deployment-sets/{set_id}/members/{member_id} - Update member position (200)
@@ -398,6 +399,42 @@ def clone_deployment_set(
 # ---------------------------------------------------------------------------
 # Member Endpoints
 # ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{set_id}/members",
+    response_model=List[MemberResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List members of a deployment set",
+)
+def list_members(
+    set_id: str,
+    settings: SettingsDep,
+) -> List[MemberResponse]:
+    """Return all members of a deployment set ordered by position.
+
+    Args:
+        set_id: Primary key of the parent deployment set.
+        settings: API settings.
+
+    Returns:
+        Ordered list of member rows.
+
+    Raises:
+        HTTPException 404: If the set does not exist or belongs to another owner.
+    """
+    owner_id = _get_owner_id(settings)
+    repo = DeploymentSetRepository()
+
+    ds = repo.get(set_id, owner_id)
+    if ds is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Deployment set '{set_id}' not found.",
+        )
+
+    members = repo.get_members(set_id, owner_id)
+    return [_member_to_response(m) for m in members]
 
 
 @router.post(

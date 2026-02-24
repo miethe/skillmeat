@@ -131,6 +131,7 @@ export {
   deploymentSetKeys,
   useDeploymentSets,
   useDeploymentSet,
+  useDeploymentSetMembers,
   useResolveSet,
   useCreateDeploymentSet,
   useUpdateDeploymentSet,

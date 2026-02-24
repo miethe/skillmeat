@@ -23,6 +23,7 @@ import type {
 import {
   fetchDeploymentSets,
   fetchDeploymentSet,
+  fetchDeploymentSetMembers,
   createDeploymentSet,
   updateDeploymentSet,
   deleteDeploymentSet,
@@ -44,6 +45,7 @@ export const deploymentSetKeys = {
   list: (params?: DeploymentSetListParams) => [...deploymentSetKeys.lists(), params] as const,
   details: () => [...deploymentSetKeys.all, 'detail'] as const,
   detail: (id: string) => [...deploymentSetKeys.details(), id] as const,
+  members: (id: string) => [...deploymentSetKeys.all, 'members', id] as const,
   resolves: () => [...deploymentSetKeys.all, 'resolve'] as const,
   resolve: (id: string) => [...deploymentSetKeys.resolves(), id] as const,
 };
@@ -74,6 +76,23 @@ export function useDeploymentSet(id: string) {
   return useQuery<DeploymentSet, Error>({
     queryKey: deploymentSetKeys.detail(id),
     queryFn: () => fetchDeploymentSet(id),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!id,
+  });
+}
+
+/**
+ * List all members of a deployment set, ordered by position.
+ *
+ * Uses a 5-minute stale time (same as detail — member list is stable between
+ * add/remove mutations which invalidate this query key).
+ *
+ * @param id - Deployment set UUID hex
+ */
+export function useDeploymentSetMembers(id: string) {
+  return useQuery<DeploymentSetMember[], Error>({
+    queryKey: deploymentSetKeys.members(id),
+    queryFn: () => fetchDeploymentSetMembers(id),
     staleTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!id,
   });
@@ -191,6 +210,7 @@ export function useAddMember() {
     mutationFn: ({ setId, data }) => addDeploymentSetMember(setId, data),
     onSuccess: (_, { setId }) => {
       queryClient.invalidateQueries({ queryKey: deploymentSetKeys.detail(setId) });
+      queryClient.invalidateQueries({ queryKey: deploymentSetKeys.members(setId) });
       queryClient.invalidateQueries({ queryKey: deploymentSetKeys.resolve(setId) });
       queryClient.invalidateQueries({ queryKey: deploymentSetKeys.lists() });
     },
@@ -212,6 +232,7 @@ export function useRemoveMember() {
     mutationFn: ({ setId, memberId }) => removeDeploymentSetMember(setId, memberId),
     onSuccess: (_, { setId }) => {
       queryClient.invalidateQueries({ queryKey: deploymentSetKeys.detail(setId) });
+      queryClient.invalidateQueries({ queryKey: deploymentSetKeys.members(setId) });
       queryClient.invalidateQueries({ queryKey: deploymentSetKeys.resolve(setId) });
       queryClient.invalidateQueries({ queryKey: deploymentSetKeys.lists() });
     },

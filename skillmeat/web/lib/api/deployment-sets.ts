@@ -145,6 +145,20 @@ export async function cloneDeploymentSet(id: string): Promise<DeploymentSet> {
 // =============================================================================
 
 /**
+ * List all members of a deployment set, ordered by position.
+ */
+export async function fetchDeploymentSetMembers(setId: string): Promise<DeploymentSetMember[]> {
+  const response = await fetch(buildUrl(`/deployment-sets/${setId}/members`));
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Failed to fetch members: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
  * Add an artifact, group, or nested deployment set as a member.
  * Exactly one of artifact_uuid, group_id, or nested_set_id must be set.
  */
