@@ -1,12 +1,13 @@
 'use client';
 
-import Link from 'next/link';
+import * as React from 'react';
 import { Copy, Edit3, Layers3, Rocket, Trash2 } from 'lucide-react';
 import type { DeploymentSet } from '@/types/deployment-sets';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { COLOR_TAILWIND_CLASSES } from '@/lib/group-constants';
+import { cn } from '@/lib/utils';
 
 /**
  * Normalize a color value (token name or hex) to a valid hex string,
@@ -28,13 +29,14 @@ function normalizeHexColor(value: string): string | null {
 
 interface DeploymentSetCardProps {
   set: DeploymentSet;
+  onOpen?: (setId: string) => void;
   onEdit: (set: DeploymentSet) => void;
   onDelete: (set: DeploymentSet) => void;
   onClone: (set: DeploymentSet) => void;
   onDeploy?: (set: DeploymentSet) => void;
 }
 
-export function DeploymentSetCard({ set, onEdit, onDelete, onClone, onDeploy }: DeploymentSetCardProps) {
+export function DeploymentSetCard({ set, onOpen, onEdit, onDelete, onClone, onDeploy }: DeploymentSetCardProps) {
   const tags = set.tags ?? [];
   const tokenColorClass =
     set.color && !set.color.startsWith('#')
@@ -43,19 +45,37 @@ export function DeploymentSetCard({ set, onEdit, onDelete, onClone, onDeploy }: 
   const customColor = set.color ? normalizeHexColor(set.color) : null;
   const borderColorClass = customColor ? 'border-l-border' : tokenColorClass;
 
+  // Handle card click, avoiding trigger when clicking action buttons or dropdowns
+  const handleCardClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[role="menuitem"]')) {
+      return;
+    }
+    onOpen?.(set.id);
+  };
+
+  // Handle keyboard navigation for the card surface
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onOpen?.(set.id);
+    }
+  };
+
   return (
     <Card
-      className={`border-l-4 ${borderColorClass} cursor-pointer transition-shadow hover:shadow-md`}
+      className={cn(
+        'border-l-4 transition-all',
+        borderColorClass,
+        onOpen && 'cursor-pointer hover:border-primary/50 hover:shadow-md',
+        'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+      )}
       style={customColor ? { borderLeftColor: customColor } : undefined}
-      role="button"
-      tabIndex={0}
-      onClick={() => {}}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-        }
-      }}
-      aria-label={`Open ${set.name} deployment set`}
+      role={onOpen ? 'button' : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onClick={onOpen ? handleCardClick : undefined}
+      onKeyDown={onOpen ? handleKeyDown : undefined}
+      aria-label={onOpen ? `Open ${set.name} deployment set` : undefined}
     >
       <CardHeader className="space-y-2">
         <div className="flex items-start justify-between gap-2">
@@ -99,12 +119,9 @@ export function DeploymentSetCard({ set, onEdit, onDelete, onClone, onDeploy }: 
         {/* Action buttons — stopPropagation so they don't trigger card click */}
         <div
           className="flex flex-wrap gap-2"
-          onClick={(event) => event.stopPropagation()}
-          onKeyDown={(event) => event.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
         >
-          <Button asChild size="sm">
-            <Link href={`/deployment-sets/${set.id}`}>Open Set</Link>
-          </Button>
           {onDeploy && (
             <Button size="sm" onClick={() => onDeploy(set)} aria-label={`Deploy ${set.name}`}>
               <Rocket className="mr-1 h-3.5 w-3.5" aria-hidden="true" />

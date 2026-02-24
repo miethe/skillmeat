@@ -5,78 +5,96 @@ doc_type: progress
 prd: deployment-sets-v2
 feature_slug: deployment-sets
 phase: 0
-status: planning
+status: pending
 created: 2026-02-24
-updated: 2026-02-24
+updated: '2026-02-24'
 prd_ref: null
 plan_ref: docs/project_plans/implementation_plans/features/deployment-sets-v2.md
 commit_refs: []
 pr_refs: []
-
-owners: ["ui-engineer-enhanced"]
+owners:
+- ui-engineer-enhanced
 contributors: []
-
 tasks:
-  # Phase 1: Modal Infrastructure (7 pts)
-  - id: "DSv2-001"
-    title: "DeploymentSetDetailsModal shell"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    phase: 1
-    estimate: 3
-  - id: "DSv2-002"
-    title: "Clickable DeploymentSetCard"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: []
-    phase: 1
-    estimate: 1
-  - id: "DSv2-003"
-    title: "Overview tab content"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["DSv2-001"]
-    phase: 1
-    estimate: 2
-  - id: "DSv2-004"
-    title: "Wire modal into list page + deprecate detail page"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["DSv2-001", "DSv2-002"]
-    phase: 1
-    estimate: 1
-
-  # Phase 2: Members Tab + Card Variant (5 pts)
-  - id: "DSv2-005"
-    title: "DeploymentSetMemberCard component"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["DSv2-001"]
-    phase: 2
-    estimate: 3
-  - id: "DSv2-006"
-    title: "Members tab with navigation"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["DSv2-005"]
-    phase: 2
-    estimate: 2
-
-  # Phase 3: AddMemberDialog Redesign (3 pts) — parallel with Phase 2
-  - id: "DSv2-007"
-    title: "AddMemberDialog with MiniArtifactCard grid + filters"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["DSv2-001"]
-    phase: 3
-    estimate: 3
-
+- id: DSv2-001
+  title: DeploymentSetDetailsModal shell
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  phase: 1
+  estimate: 3
+- id: DSv2-002
+  title: Clickable DeploymentSetCard
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies: []
+  phase: 1
+  estimate: 1
+- id: DSv2-003
+  title: Overview tab content
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - DSv2-001
+  phase: 1
+  estimate: 2
+- id: DSv2-004
+  title: Wire modal into list page + deprecate detail page
+  status: pending
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - DSv2-001
+  - DSv2-002
+  phase: 1
+  estimate: 1
+- id: DSv2-005
+  title: DeploymentSetMemberCard component
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - DSv2-001
+  phase: 2
+  estimate: 3
+- id: DSv2-006
+  title: Members tab with navigation
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - DSv2-005
+  phase: 2
+  estimate: 2
+- id: DSv2-007
+  title: AddMemberDialog with MiniArtifactCard grid + filters
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - DSv2-001
+  phase: 3
+  estimate: 3
 parallelization:
-  batch_1: ["DSv2-001", "DSv2-002"]
-  batch_2: ["DSv2-003", "DSv2-004"]
-  batch_3: ["DSv2-005", "DSv2-007"]
-  batch_4: ["DSv2-006"]
+  batch_1:
+  - DSv2-001
+  - DSv2-002
+  batch_2:
+  - DSv2-003
+  - DSv2-004
+  batch_3:
+  - DSv2-005
+  - DSv2-007
+  batch_4:
+  - DSv2-006
+total_tasks: 7
+completed_tasks: 2
+in_progress_tasks: 0
+blocked_tasks: 0
+progress: 28
 ---
 
 # Deployment Sets v2 — Progress Tracking

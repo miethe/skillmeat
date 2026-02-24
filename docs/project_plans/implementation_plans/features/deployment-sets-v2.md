@@ -1,23 +1,23 @@
 ---
-title: 'Implementation Plan: Deployment Sets v2 — UI Enhancement'
+title: "Implementation Plan: Deployment Sets v2 \u2014 UI Enhancement"
 schema_version: 2
 doc_type: implementation_plan
-status: draft
+status: in-progress
 created: 2026-02-24
-updated: 2026-02-24
+updated: '2026-02-24'
 feature_slug: deployment-sets
 feature_version: v2
 prd_ref: null
 plan_ref: null
-scope: Frontend-only UI enhancement — clickable set cards, modal-based detail view with
-  tabbed layout, ArtifactBrowseCard variant for members, and redesigned AddMemberDialog
-  with MiniArtifactCard grid and filtering.
+scope: "Frontend-only UI enhancement \u2014 clickable set cards, modal-based detail\
+  \ view with tabbed layout, ArtifactBrowseCard variant for members, and redesigned\
+  \ AddMemberDialog with MiniArtifactCard grid and filtering."
 effort_estimate: 14 pts
-architecture_summary: "Pure frontend refactor: DeploymentSetCard becomes full-card-click
-  → new DeploymentSetDetailsModal (Overview + Members tabs) replaces dedicated detail
-  page → DeploymentSetMemberCard (ArtifactBrowseCard variant, actions stripped) renders
-  in Members tab → AddMemberDialog upgraded with MiniArtifactCard grid + type/search
-  filters."
+architecture_summary: "Pure frontend refactor: DeploymentSetCard becomes full-card-click\
+  \ \u2192 new DeploymentSetDetailsModal (Overview + Members tabs) replaces dedicated\
+  \ detail page \u2192 DeploymentSetMemberCard (ArtifactBrowseCard variant, actions\
+  \ stripped) renders in Members tab \u2192 AddMemberDialog upgraded with MiniArtifactCard\
+  \ grid + type/search filters."
 related_documents:
 - docs/project_plans/implementation_plans/features/deployment-sets-v1.md
 - docs/project_plans/design-specs/ui-component-specs-page-refactor.md
