@@ -14,7 +14,7 @@ tags:
 created: 2026-02-02
 updated: 2026-02-02
 category: product-planning
-status: inferred_complete
+status: planned
 related:
 - /docs/project_plans/PRDs/features/memory-context-system-v1.md
 - /skillmeat/core/artifact.py

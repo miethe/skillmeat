@@ -18,7 +18,7 @@ tags:
 created: 2026-02-06
 updated: 2026-02-06
 category: product-planning
-status: inferred_complete
+status: planned
 related:
 - /docs/project_plans/PRDs/features/workflow-orchestration-v1.md
 - /docs/project_plans/specs/workflow-orchestration-schema-spec.md
@@ -27,7 +27,7 @@ related:
 schema_version: 2
 doc_type: implementation_plan
 feature_slug: workflow-orchestration
-prd_ref: null
+prd_ref: orchestration
 ---
 # Implementation Plan: Workflow Orchestration Engine
 
