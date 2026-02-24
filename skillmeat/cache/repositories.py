@@ -77,6 +77,8 @@ from skillmeat.cache.models import (
     Base,
     CollectionArtifact,
     DeploymentProfile,
+    DeploymentSet,
+    DeploymentSetMember,
     MarketplaceCatalogEntry,
     MarketplaceSource,
     Tag,
@@ -3857,5 +3859,323 @@ class TagRepository(BaseRepository[Tag]):
             logger.debug(f"Retrieved counts for {len(results)} tags")
             return results
 
+        finally:
+            session.close()
+
+
+# =============================================================================
+# Deployment Set Repository
+# =============================================================================
+
+
+class DeploymentSetRepository(BaseRepository[DeploymentSet]):
+    """Repository for DeploymentSet CRUD with owner-scoped access.
+
+    All reads and writes are scoped to ``owner_id`` — two different owners
+    can never see each other's sets.  Tag filtering uses a JSON ``LIKE``
+    match against the ``tags_json`` column (same approach used elsewhere in
+    the codebase for JSON-text tag columns).
+
+    FR-10 delete semantics: Before deleting a set, any
+    ``DeploymentSetMember`` rows in *other* sets that reference the doomed
+    set via ``member_set_id`` are deleted first, preventing orphan
+    references.
+
+    Usage:
+        >>> repo = DeploymentSetRepository()
+        >>> ds = repo.create(name="My Set", owner_id="user-1")
+        >>> fetched = repo.get(ds.id, owner_id="user-1")
+        >>> sets = repo.list(owner_id="user-1", tag="prod")
+        >>> ok = repo.delete(ds.id, owner_id="user-1")
+    """
+
+    def __init__(self, db_path: Optional[str | Path] = None):
+        """Initialise repository.
+
+        Args:
+            db_path: Optional path to SQLite database file (uses default if None).
+        """
+        super().__init__(db_path, DeploymentSet)
+
+    # =========================================================================
+    # Create
+    # =========================================================================
+
+    def create(
+        self,
+        *,
+        name: str,
+        owner_id: str,
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+    ) -> DeploymentSet:
+        """Create and return a new DeploymentSet.
+
+        Args:
+            name: Human-readable set name (required).
+            owner_id: Owning user / identity scope (required).
+            description: Optional free-text description.
+            tags: Optional list of tag strings.
+
+        Returns:
+            Newly created ``DeploymentSet`` instance.
+
+        Raises:
+            RepositoryError: If the insert fails (e.g. constraint violation).
+        """
+        session = self._get_session()
+        try:
+            now = datetime.utcnow()
+            ds = DeploymentSet(
+                id=uuid.uuid4().hex,
+                name=name,
+                owner_id=owner_id,
+                description=description,
+                created_at=now,
+                updated_at=now,
+            )
+            ds.set_tags(tags or [])
+            session.add(ds)
+            session.commit()
+            session.refresh(ds)
+            logger.debug("Created DeploymentSet id=%s owner=%s", ds.id, owner_id)
+            return ds
+        except IntegrityError as exc:
+            session.rollback()
+            raise RepositoryError(f"Failed to create DeploymentSet: {exc}") from exc
+        finally:
+            session.close()
+
+    # =========================================================================
+    # Read
+    # =========================================================================
+
+    def get(self, set_id: str, owner_id: str) -> Optional[DeploymentSet]:
+        """Fetch a single DeploymentSet by ID, scoped to owner.
+
+        Args:
+            set_id: Primary key of the deployment set.
+            owner_id: Owner scope — returns None if the set belongs to a
+                different owner.
+
+        Returns:
+            ``DeploymentSet`` instance or ``None`` if not found.
+        """
+        session = self._get_session()
+        try:
+            return (
+                session.query(DeploymentSet)
+                .filter(
+                    DeploymentSet.id == set_id,
+                    DeploymentSet.owner_id == owner_id,
+                )
+                .first()
+            )
+        finally:
+            session.close()
+
+    # =========================================================================
+    # List
+    # =========================================================================
+
+    def list(
+        self,
+        owner_id: str,
+        *,
+        name: Optional[str] = None,
+        tag: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[DeploymentSet]:
+        """Return a paginated, filterable list of DeploymentSets for an owner.
+
+        Args:
+            owner_id: Owning user / identity scope (always applied).
+            name: Optional substring filter on ``DeploymentSet.name``
+                (case-insensitive ``LIKE``).
+            tag: Optional tag to filter by.  Matches if the tag string appears
+                anywhere inside the JSON array stored in ``tags_json``.
+            limit: Maximum number of rows to return (default 50).
+            offset: Number of rows to skip for pagination (default 0).
+
+        Returns:
+            List of ``DeploymentSet`` instances ordered by ``created_at`` desc.
+        """
+        session = self._get_session()
+        try:
+            q = session.query(DeploymentSet).filter(
+                DeploymentSet.owner_id == owner_id
+            )
+            if name is not None:
+                q = q.filter(DeploymentSet.name.ilike(f"%{name}%"))
+            if tag is not None:
+                # tags_json stores a JSON array of strings, e.g. '["prod","v2"]'.
+                # A simple LIKE on the serialised text is fast and sufficient.
+                q = q.filter(DeploymentSet.tags_json.like(f'%"{tag}"%'))
+            return (
+                q.order_by(DeploymentSet.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+                .all()
+            )
+        finally:
+            session.close()
+
+    # =========================================================================
+    # Count
+    # =========================================================================
+
+    def count(
+        self,
+        owner_id: str,
+        *,
+        name: Optional[str] = None,
+        tag: Optional[str] = None,
+    ) -> int:
+        """Count DeploymentSets matching the given filters for an owner.
+
+        Args:
+            owner_id: Owning user / identity scope (always applied).
+            name: Optional substring filter on ``DeploymentSet.name``.
+            tag: Optional tag filter (JSON LIKE match).
+
+        Returns:
+            Integer count of matching sets.
+        """
+        session = self._get_session()
+        try:
+            q = session.query(func.count(DeploymentSet.id)).filter(
+                DeploymentSet.owner_id == owner_id
+            )
+            if name is not None:
+                q = q.filter(DeploymentSet.name.ilike(f"%{name}%"))
+            if tag is not None:
+                q = q.filter(DeploymentSet.tags_json.like(f'%"{tag}"%'))
+            return q.scalar() or 0
+        finally:
+            session.close()
+
+    # =========================================================================
+    # Update
+    # =========================================================================
+
+    def update(
+        self,
+        set_id: str,
+        owner_id: str,
+        **kwargs: Any,
+    ) -> Optional[DeploymentSet]:
+        """Update mutable fields on a DeploymentSet.
+
+        Only ``name``, ``description``, and ``tags`` are writable.
+        ``updated_at`` is refreshed automatically on every successful update.
+
+        Args:
+            set_id: Primary key of the deployment set.
+            owner_id: Owner scope — returns None if the set belongs to a
+                different owner or does not exist.
+            **kwargs: Keyword arguments for fields to update.  Supported
+                keys: ``name`` (str), ``description`` (str | None),
+                ``tags`` (list[str]).
+
+        Returns:
+            Updated ``DeploymentSet`` instance, or ``None`` if not found.
+
+        Raises:
+            RepositoryError: If the update fails due to a constraint violation.
+        """
+        session = self._get_session()
+        try:
+            ds = (
+                session.query(DeploymentSet)
+                .filter(
+                    DeploymentSet.id == set_id,
+                    DeploymentSet.owner_id == owner_id,
+                )
+                .first()
+            )
+            if ds is None:
+                return None
+
+            if "name" in kwargs:
+                ds.name = kwargs["name"]
+            if "description" in kwargs:
+                ds.description = kwargs["description"]
+            if "tags" in kwargs:
+                ds.set_tags(kwargs["tags"])
+
+            ds.updated_at = datetime.utcnow()
+            session.commit()
+            session.refresh(ds)
+            logger.debug("Updated DeploymentSet id=%s owner=%s", set_id, owner_id)
+            return ds
+        except IntegrityError as exc:
+            session.rollback()
+            raise RepositoryError(f"Failed to update DeploymentSet: {exc}") from exc
+        finally:
+            session.close()
+
+    # =========================================================================
+    # Delete  (FR-10)
+    # =========================================================================
+
+    def delete(self, set_id: str, owner_id: str) -> bool:
+        """Delete a DeploymentSet, cleaning up cross-set member references first.
+
+        FR-10 semantics: Before deleting the target set, any
+        ``DeploymentSetMember`` rows in *other* sets that reference the
+        target via ``member_set_id`` are deleted to prevent orphan
+        references.  The target set's own members are removed by the
+        ``CASCADE DELETE`` on ``deployment_set_members.set_id``.
+
+        Args:
+            set_id: Primary key of the deployment set to delete.
+            owner_id: Owner scope — returns False if the set belongs to a
+                different owner or does not exist.
+
+        Returns:
+            ``True`` if the set was found and deleted, ``False`` otherwise.
+
+        Raises:
+            RepositoryError: If the deletion fails unexpectedly.
+        """
+        session = self._get_session()
+        try:
+            ds = (
+                session.query(DeploymentSet)
+                .filter(
+                    DeploymentSet.id == set_id,
+                    DeploymentSet.owner_id == owner_id,
+                )
+                .first()
+            )
+            if ds is None:
+                return False
+
+            # FR-10: remove member rows in OTHER sets that reference this set
+            # as a nested member before deleting the set itself.
+            orphan_members = (
+                session.query(DeploymentSetMember)
+                .filter(
+                    DeploymentSetMember.member_set_id == set_id,
+                    DeploymentSetMember.set_id != set_id,
+                )
+                .all()
+            )
+            for member in orphan_members:
+                session.delete(member)
+
+            session.delete(ds)
+            session.commit()
+            logger.debug(
+                "Deleted DeploymentSet id=%s owner=%s (removed %d orphan member refs)",
+                set_id,
+                owner_id,
+                len(orphan_members),
+            )
+            return True
+        except IntegrityError as exc:
+            session.rollback()
+            raise RepositoryError(f"Failed to delete DeploymentSet: {exc}") from exc
         finally:
             session.close()
