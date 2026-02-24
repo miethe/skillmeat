@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Library,
   Layers,
+  Layers3,
   Activity,
   FolderKanban,
   Brain,
@@ -75,6 +76,7 @@ const navigationConfig: NavigationConfig = {
       items: [
         { name: 'Collections', href: '/collection', icon: Library },
         { name: 'Groups', href: '/groups', icon: Layers },
+        { name: 'Deployment Sets', href: '/deployment-sets', icon: Layers3 },
         { name: 'Health & Sync', href: '/manage', icon: Activity },
         { name: 'MCP Servers', href: '/mcp', icon: Server },
       ],
