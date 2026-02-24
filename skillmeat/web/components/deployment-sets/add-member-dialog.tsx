@@ -1,7 +1,20 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { Search, X, Package, Layers, Layers3, Users, CheckCircle2 } from 'lucide-react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import {
+  Search,
+  X,
+  Package,
+  Layers,
+  Layers3,
+  Users,
+  CheckCircle2,
+  Zap,
+  Terminal,
+  Bot,
+  Server,
+  Webhook,
+} from 'lucide-react';
 import {
   useAddMember,
   useArtifacts,
@@ -9,7 +22,7 @@ import {
   useToast,
 } from '@/hooks';
 import type { DeploymentSet } from '@/types/deployment-sets';
-import type { Artifact } from '@/types/artifact';
+import type { Artifact, ArtifactType } from '@/types/artifact';
 import {
   Dialog,
   DialogContent,
@@ -23,27 +36,24 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MiniArtifactCard } from '@/components/collection/mini-artifact-card';
 import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const ARTIFACT_TYPE_LABELS: Record<string, string> = {
-  skill: 'Skill',
-  command: 'Command',
-  agent: 'Agent',
-  mcp: 'MCP',
-  hook: 'Hook',
-};
-
-const ARTIFACT_TYPE_COLORS: Record<string, string> = {
-  skill: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
-  command: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  agent: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  mcp: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-  hook: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
-};
+const ARTIFACT_TYPES: {
+  value: ArtifactType;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  { value: 'skill', label: 'Skills', icon: Zap },
+  { value: 'command', label: 'Commands', icon: Terminal },
+  { value: 'agent', label: 'Agents', icon: Bot },
+  { value: 'mcp', label: 'MCP Servers', icon: Server },
+  { value: 'hook', label: 'Hooks', icon: Webhook },
+];
 
 // ---------------------------------------------------------------------------
 // Types
@@ -62,38 +72,51 @@ type TabValue = 'artifact' | 'group' | 'set';
 // Sub-components
 // ---------------------------------------------------------------------------
 
-/** Skeleton row for loading states */
-function ItemSkeleton() {
+/** Grid skeleton cards for loading states */
+function GridSkeleton({ count = 8 }: { count?: number }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg px-3 py-2.5">
-      <Skeleton className="h-5 w-12 rounded" />
-      <Skeleton className="h-4 w-40" />
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="flex flex-col gap-2 rounded-lg border border-l-[3px] p-3 border-l-muted">
+          <div className="flex items-center gap-1.5">
+            <Skeleton className="h-4 w-4 rounded" />
+            <Skeleton className="h-4 flex-1 rounded" />
+          </div>
+          <Skeleton className="h-3 w-full rounded" />
+          <Skeleton className="h-3 w-2/3 rounded" />
+          <div className="mt-auto pt-1">
+            <Skeleton className="h-4 w-1/2 rounded" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-/** Empty state for each tab */
+/** Empty state */
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-10 text-center">
-      <Package className="h-8 w-8 text-muted-foreground/40" aria-hidden="true" />
-      <p className="mt-2 text-sm text-muted-foreground">{message}</p>
+    <div className="flex flex-col items-center justify-center py-12 text-center">
+      <Package className="h-9 w-9 text-muted-foreground/30" aria-hidden="true" />
+      <p className="mt-3 text-sm text-muted-foreground">{message}</p>
     </div>
   );
 }
 
+/** Search input with icon + clear button */
 interface SearchInputProps {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
+  autoFocus?: boolean;
 }
 
-function SearchInput({ value, onChange, placeholder }: SearchInputProps) {
+function SearchInput({ value, onChange, placeholder, autoFocus }: SearchInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
 
   return (
     <div className="relative">
@@ -123,57 +146,42 @@ function SearchInput({ value, onChange, placeholder }: SearchInputProps) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Keyboard-navigable list item
-// ---------------------------------------------------------------------------
-
-interface PickerItemProps {
-  onSelect: () => void;
-  isAdding?: boolean;
-  justAdded?: boolean;
-  children: React.ReactNode;
-  ariaLabel: string;
+/** Type filter pills — multi-select, shown only on artifact tab */
+interface TypeFilterProps {
+  selected: Set<ArtifactType>;
+  onToggle: (type: ArtifactType) => void;
 }
 
-function PickerItem({ onSelect, isAdding, justAdded, children, ariaLabel }: PickerItemProps) {
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if ((e.key === 'Enter' || e.key === ' ') && !isAdding) {
-        e.preventDefault();
-        onSelect();
-      }
-    },
-    [onSelect, isAdding],
-  );
-
+function TypeFilter({ selected, onToggle }: TypeFilterProps) {
   return (
-    <div
-      role="listitem"
-      tabIndex={0}
-      onClick={!isAdding ? onSelect : undefined}
-      onKeyDown={handleKeyDown}
-      aria-label={ariaLabel}
-      aria-disabled={isAdding}
-      className={cn(
-        'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
-        'hover:bg-accent focus-visible:bg-accent focus-visible:outline-none',
-        isAdding && 'cursor-wait opacity-60',
-        justAdded && 'bg-emerald-50 dark:bg-emerald-950/30',
-      )}
-    >
-      {children}
-      {justAdded && (
-        <CheckCircle2
-          className="ml-auto h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
-          aria-hidden="true"
-        />
-      )}
+    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by artifact type">
+      {ARTIFACT_TYPES.map(({ value, label, icon: Icon }) => {
+        const active = selected.has(value);
+        return (
+          <button
+            key={value}
+            type="button"
+            onClick={() => onToggle(value)}
+            aria-pressed={active}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              active
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-transparent text-muted-foreground hover:border-foreground/40 hover:text-foreground',
+            )}
+          >
+            <Icon className="h-3 w-3" aria-hidden="true" />
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Artifact tab
+// Artifact tab — grid of MiniArtifactCards with selection overlay
 // ---------------------------------------------------------------------------
 
 interface ArtifactTabProps {
@@ -184,6 +192,7 @@ interface ArtifactTabProps {
 function ArtifactTab({ setId, onAdded }: ArtifactTabProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState('');
+  const [selectedTypes, setSelectedTypes] = useState<Set<ArtifactType>>(new Set());
   const [addingId, setAddingId] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const addMember = useAddMember();
@@ -191,9 +200,22 @@ function ArtifactTab({ setId, onAdded }: ArtifactTabProps) {
   const { data: artifactsData, isLoading } = useArtifacts({}, { field: 'name', order: 'asc' });
   const artifacts: Artifact[] = artifactsData?.artifacts ?? [];
 
-  const filtered = artifacts.filter((a) =>
-    a.name.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = useMemo(() => {
+    return artifacts.filter((a) => {
+      const matchesSearch = a.name.toLowerCase().includes(search.toLowerCase());
+      const matchesType = selectedTypes.size === 0 || selectedTypes.has(a.type as ArtifactType);
+      return matchesSearch && matchesType;
+    });
+  }, [artifacts, search, selectedTypes]);
+
+  const toggleType = useCallback((type: ArtifactType) => {
+    setSelectedTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  }, []);
 
   const handleAdd = useCallback(
     async (artifact: Artifact) => {
@@ -207,7 +229,6 @@ function ArtifactTab({ setId, onAdded }: ArtifactTabProps) {
         setAddedIds((prev) => new Set([...prev, artifact.uuid]));
         onAdded(artifact.uuid);
         toast({ title: 'Member added', description: `"${artifact.name}" added to set.` });
-        // Clear the just-added indicator after 1.5s
         setTimeout(() => {
           setAddedIds((prev) => {
             const next = new Set(prev);
@@ -237,46 +258,60 @@ function ArtifactTab({ setId, onAdded }: ArtifactTabProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <SearchInput value={search} onChange={setSearch} placeholder="Search artifacts…" />
+      <SearchInput value={search} onChange={setSearch} placeholder="Search artifacts…" autoFocus />
+      <TypeFilter selected={selectedTypes} onToggle={toggleType} />
 
-      <ScrollArea className="h-64">
+      <ScrollArea className="h-[340px]">
         {isLoading ? (
-          <div role="list" aria-label="Loading artifacts">
-            {[1, 2, 3, 4].map((i) => (
-              <ItemSkeleton key={i} />
-            ))}
-          </div>
+          <GridSkeleton count={8} />
         ) : filtered.length === 0 ? (
           <EmptyState
-            message={search ? `No artifacts match "${search}".` : 'No artifacts in your collection.'}
+            message={
+              search || selectedTypes.size > 0
+                ? 'No artifacts match your filters.'
+                : 'No artifacts in your collection.'
+            }
           />
         ) : (
-          <div role="list" aria-label="Artifacts">
-            {filtered.map((artifact) => (
-              <PickerItem
-                key={artifact.uuid}
-                onSelect={() => void handleAdd(artifact)}
-                isAdding={addingId === artifact.uuid}
-                justAdded={addedIds.has(artifact.uuid)}
-                ariaLabel={`Add ${artifact.name} (${artifact.type})`}
-              >
-                <span
-                  className={cn(
-                    'shrink-0 rounded px-1.5 py-0.5 text-xs font-medium',
-                    ARTIFACT_TYPE_COLORS[artifact.type] ??
-                      'bg-muted text-muted-foreground',
-                  )}
+          <div
+            className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4"
+            role="list"
+            aria-label="Artifacts"
+          >
+            {filtered.map((artifact) => {
+              const isAdding = addingId === artifact.uuid;
+              const isAdded = addedIds.has(artifact.uuid);
+              return (
+                <div
+                  key={artifact.uuid}
+                  role="listitem"
+                  className="relative"
                 >
-                  {ARTIFACT_TYPE_LABELS[artifact.type] ?? artifact.type}
-                </span>
-                <span className="min-w-0 truncate font-medium">{artifact.name}</span>
-                {artifact.description && (
-                  <span className="ml-auto shrink-0 max-w-[120px] truncate text-xs text-muted-foreground">
-                    {artifact.description}
-                  </span>
-                )}
-              </PickerItem>
-            ))}
+                  <MiniArtifactCard
+                    artifact={artifact}
+                    onClick={() => void handleAdd(artifact)}
+                    className={cn(
+                      'cursor-pointer transition-all',
+                      isAdding && 'cursor-wait opacity-60',
+                      isAdded && 'ring-2 ring-emerald-500 ring-offset-1',
+                    )}
+                    aria-label={`Add ${artifact.name} (${artifact.type})`}
+                    aria-disabled={isAdding}
+                  />
+                  {/* Selection checkmark overlay */}
+                  {isAdded && (
+                    <div
+                      className="pointer-events-none absolute inset-0 flex items-start justify-end rounded-lg bg-emerald-500/10 p-1.5"
+                      aria-hidden="true"
+                    >
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 shadow">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </ScrollArea>
@@ -285,10 +320,9 @@ function ArtifactTab({ setId, onAdded }: ArtifactTabProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Group tab
+// Group tab — list view (groups don't map to MiniArtifactCard)
 // ---------------------------------------------------------------------------
 
-// Minimal Group shape needed for picker (avoids requiring collection ID in this context)
 interface GroupPickerItem {
   id: string;
   name: string;
@@ -308,7 +342,6 @@ function GroupTab({ setId, onAdded }: GroupTabProps) {
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const addMember = useAddMember();
 
-  // Fetch all groups via the groups endpoint (no collection filter = all groups)
   const [groups, setGroups] = useState<GroupPickerItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -384,13 +417,17 @@ function GroupTab({ setId, onAdded }: GroupTabProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <SearchInput value={search} onChange={setSearch} placeholder="Search groups…" />
+      <SearchInput value={search} onChange={setSearch} placeholder="Search groups…" autoFocus />
 
-      <ScrollArea className="h-64">
+      <ScrollArea className="h-[340px]">
         {isLoading ? (
-          <div role="list" aria-label="Loading groups">
-            {[1, 2, 3].map((i) => (
-              <ItemSkeleton key={i} />
+          <div className="flex flex-col gap-1" role="list" aria-label="Loading groups">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center gap-3 rounded-lg px-3 py-2.5">
+                <Skeleton className="h-4 w-4 rounded-full" />
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="ml-auto h-5 w-20 rounded-full" />
+              </div>
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -398,25 +435,45 @@ function GroupTab({ setId, onAdded }: GroupTabProps) {
             message={search ? `No groups match "${search}".` : 'No groups found.'}
           />
         ) : (
-          <div role="list" aria-label="Groups">
-            {filtered.map((group) => (
-              <PickerItem
-                key={group.id}
-                onSelect={() => void handleAdd(group)}
-                isAdding={addingId === group.id}
-                justAdded={addedIds.has(group.id)}
-                ariaLabel={`Add group ${group.name}`}
-              >
-                <Users
-                  className="h-4 w-4 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <span className="min-w-0 truncate font-medium">{group.name}</span>
-                <Badge variant="outline" className="ml-auto shrink-0 text-xs">
-                  {group.artifact_count} {group.artifact_count === 1 ? 'artifact' : 'artifacts'}
-                </Badge>
-              </PickerItem>
-            ))}
+          <div className="flex flex-col gap-0.5" role="list" aria-label="Groups">
+            {filtered.map((group) => {
+              const isAdding = addingId === group.id;
+              const isAdded = addedIds.has(group.id);
+              return (
+                <div
+                  key={group.id}
+                  role="listitem"
+                  tabIndex={0}
+                  onClick={!isAdding ? () => void handleAdd(group) : undefined}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && !isAdding) {
+                      e.preventDefault();
+                      void handleAdd(group);
+                    }
+                  }}
+                  aria-label={`Add group ${group.name}`}
+                  aria-disabled={isAdding}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
+                    'hover:bg-accent focus-visible:bg-accent focus-visible:outline-none',
+                    isAdding && 'cursor-wait opacity-60',
+                    isAdded && 'bg-emerald-50 dark:bg-emerald-950/30',
+                  )}
+                >
+                  <Users className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span className="min-w-0 truncate font-medium">{group.name}</span>
+                  <Badge variant="outline" className="ml-auto shrink-0 text-xs">
+                    {group.artifact_count} {group.artifact_count === 1 ? 'artifact' : 'artifacts'}
+                  </Badge>
+                  {isAdded && (
+                    <CheckCircle2
+                      className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+                      aria-hidden="true"
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </ScrollArea>
@@ -425,7 +482,7 @@ function GroupTab({ setId, onAdded }: GroupTabProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Set tab
+// Set tab — list view (deployment sets are not artifacts)
 // ---------------------------------------------------------------------------
 
 interface SetTabProps {
@@ -441,7 +498,6 @@ function SetTab({ setId, onAdded }: SetTabProps) {
   const addMember = useAddMember();
 
   const { data: setsData, isLoading } = useDeploymentSets({ limit: 200 });
-  // Exclude the current set from the picker
   const otherSets: DeploymentSet[] = (setsData?.items ?? []).filter((s) => s.id !== setId);
 
   const filtered = otherSets.filter((s) =>
@@ -470,7 +526,6 @@ function SetTab({ setId, onAdded }: SetTabProps) {
       } catch (err) {
         const message =
           err instanceof Error ? err.message : 'An unexpected error occurred.';
-        // 422 = circular reference
         const isCircular =
           message.toLowerCase().includes('circular') ||
           (err as { status?: number })?.status === 422;
@@ -490,13 +545,17 @@ function SetTab({ setId, onAdded }: SetTabProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <SearchInput value={search} onChange={setSearch} placeholder="Search deployment sets…" />
+      <SearchInput value={search} onChange={setSearch} placeholder="Search deployment sets…" autoFocus />
 
-      <ScrollArea className="h-64">
+      <ScrollArea className="h-[340px]">
         {isLoading ? (
-          <div role="list" aria-label="Loading deployment sets">
+          <div className="flex flex-col gap-1" role="list" aria-label="Loading deployment sets">
             {[1, 2, 3].map((i) => (
-              <ItemSkeleton key={i} />
+              <div key={i} className="flex items-center gap-3 rounded-lg px-3 py-2.5">
+                <Skeleton className="h-3 w-3 rounded-full" />
+                <Skeleton className="h-4 w-44" />
+                <Skeleton className="ml-auto h-5 w-20 rounded-full" />
+              </div>
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -510,36 +569,58 @@ function SetTab({ setId, onAdded }: SetTabProps) {
             }
           />
         ) : (
-          <div role="list" aria-label="Deployment sets">
-            {filtered.map((depSet) => (
-              <PickerItem
-                key={depSet.id}
-                onSelect={() => void handleAdd(depSet)}
-                isAdding={addingId === depSet.id}
-                justAdded={addedIds.has(depSet.id)}
-                ariaLabel={`Add deployment set ${depSet.name}`}
-              >
-                {/* Color indicator */}
-                <span
-                  className="h-3 w-3 shrink-0 rounded-full border border-border"
-                  style={{
-                    backgroundColor: depSet.color?.startsWith('#')
-                      ? depSet.color
-                      : 'hsl(var(--muted-foreground))',
+          <div className="flex flex-col gap-0.5" role="list" aria-label="Deployment sets">
+            {filtered.map((depSet) => {
+              const isAdding = addingId === depSet.id;
+              const isAdded = addedIds.has(depSet.id);
+              return (
+                <div
+                  key={depSet.id}
+                  role="listitem"
+                  tabIndex={0}
+                  onClick={!isAdding ? () => void handleAdd(depSet) : undefined}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && !isAdding) {
+                      e.preventDefault();
+                      void handleAdd(depSet);
+                    }
                   }}
-                  aria-hidden="true"
-                />
-                {depSet.icon && (
-                  <span className="shrink-0 text-base leading-none" aria-hidden="true">
-                    {depSet.icon}
-                  </span>
-                )}
-                <span className="min-w-0 truncate font-medium">{depSet.name}</span>
-                <Badge variant="outline" className="ml-auto shrink-0 text-xs">
-                  {depSet.member_count} {depSet.member_count === 1 ? 'member' : 'members'}
-                </Badge>
-              </PickerItem>
-            ))}
+                  aria-label={`Add deployment set ${depSet.name}`}
+                  aria-disabled={isAdding}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
+                    'hover:bg-accent focus-visible:bg-accent focus-visible:outline-none',
+                    isAdding && 'cursor-wait opacity-60',
+                    isAdded && 'bg-emerald-50 dark:bg-emerald-950/30',
+                  )}
+                >
+                  <span
+                    className="h-3 w-3 shrink-0 rounded-full border border-border"
+                    style={{
+                      backgroundColor: depSet.color?.startsWith('#')
+                        ? depSet.color
+                        : 'hsl(var(--muted-foreground))',
+                    }}
+                    aria-hidden="true"
+                  />
+                  {depSet.icon && (
+                    <span className="shrink-0 text-base leading-none" aria-hidden="true">
+                      {depSet.icon}
+                    </span>
+                  )}
+                  <span className="min-w-0 truncate font-medium">{depSet.name}</span>
+                  <Badge variant="outline" className="ml-auto shrink-0 text-xs">
+                    {depSet.member_count} {depSet.member_count === 1 ? 'member' : 'members'}
+                  </Badge>
+                  {isAdded && (
+                    <CheckCircle2
+                      className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+                      aria-hidden="true"
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </ScrollArea>
@@ -558,9 +639,10 @@ function SetTab({ setId, onAdded }: SetTabProps) {
  * as members of the given deployment set.
  *
  * Features:
- * - Artifact tab: search + type badge + click to add
- * - Group tab: search + artifact count + click to add
- * - Set tab: search + color indicator + member count + click to add (circular-ref protected)
+ * - Artifact tab: responsive grid of MiniArtifactCards with search + type filter pills
+ * - Group tab: list view with search
+ * - Set tab: list view with search + color indicator + member count (circular-ref protected)
+ * - Selection checkmark overlay on added cards
  * - Success toast on add, error toast on failure
  * - WCAG 2.1 AA: keyboard navigation, ARIA labels, focus management
  */
@@ -578,7 +660,7 @@ export function AddMemberDialog({ open, onOpenChange, setId }: AddMemberDialogPr
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-lg"
+        className="sm:max-w-3xl"
         aria-label="Add member to deployment set"
       >
         <DialogHeader>
@@ -587,8 +669,8 @@ export function AddMemberDialog({ open, onOpenChange, setId }: AddMemberDialogPr
             Add Member
           </DialogTitle>
           <DialogDescription>
-            Choose an artifact, group, or deployment set to add to this set. Click any
-            item to add it immediately.
+            Choose an artifact, group, or deployment set to add to this set.
+            Click any item to add it immediately.
           </DialogDescription>
         </DialogHeader>
 

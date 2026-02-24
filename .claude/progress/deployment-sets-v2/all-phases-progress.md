@@ -53,7 +53,7 @@ tasks:
   estimate: 1
 - id: DSv2-005
   title: DeploymentSetMemberCard component
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -71,7 +71,7 @@ tasks:
   estimate: 2
 - id: DSv2-007
   title: AddMemberDialog with MiniArtifactCard grid + filters
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -91,10 +91,10 @@ parallelization:
   batch_4:
   - DSv2-006
 total_tasks: 7
-completed_tasks: 4
+completed_tasks: 6
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 57
+progress: 85
 ---
 
 # Deployment Sets v2 — Progress Tracking
