@@ -27,6 +27,7 @@
  * - Collections (CRUD + artifacts)
  * - Groups (CRUD + artifacts)
  * - Deployments (CRUD + deploy/undeploy)
+ * - Deployment Sets (CRUD + members + resolve + batch deploy)
  * - Artifacts (list + bulk import)
  * - Composites (import + conflict resolution + member management + CRUD)
  * - Projects (CRUD + discovery + caching)
@@ -121,6 +122,25 @@ export {
  * This hook duplicates functionality from the deployments module.
  */
 export { useDeploy, useUndeploy } from './useDeploy';
+
+// ============================================================================
+// DEPLOYMENT SETS (10 hooks)
+// ============================================================================
+// Named, ordered sets of artifacts for batch deployment operations
+export {
+  deploymentSetKeys,
+  useDeploymentSets,
+  useDeploymentSet,
+  useResolveSet,
+  useCreateDeploymentSet,
+  useUpdateDeploymentSet,
+  useDeleteDeploymentSet,
+  useCloneDeploymentSet,
+  useAddMember,
+  useRemoveMember,
+  useUpdateMemberPosition,
+  useBatchDeploy,
+} from './deployment-sets';
 
 // ============================================================================
 // ARTIFACTS (7 hooks)

@@ -69,3 +69,6 @@ export * from './context-entity';
 
 // Path-based tag extraction (Phase 1)
 export * from './path-tags';
+
+// Deployment sets (DS-009)
+export * from './deployment-sets';
