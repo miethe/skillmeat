@@ -8,7 +8,7 @@ prd_ref: docs/project_plans/PRDs/features/deployment-sets-v1.md
 plan_ref: docs/project_plans/implementation_plans/features/deployment-sets-v1.md
 phase: 4
 title: Frontend Core
-status: in_progress
+status: completed
 started: '2026-02-23'
 completed: null
 commit_refs: []
@@ -16,8 +16,8 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 4
-completed_tasks: 2
-in_progress_tasks: 1
+completed_tasks: 4
+in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
 owners:
@@ -46,7 +46,7 @@ tasks:
   priority: high
 - id: DS-011
   description: Set detail/edit page with member list, inline edit, resolved count
-  status: in_progress
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -56,7 +56,7 @@ tasks:
 - id: DS-012
   description: Add-member dialog with 3-tab picker (Artifact/Group/Set), circular-ref
     error toast
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -105,7 +105,7 @@ files_modified:
 - skillmeat/web/app/deployment-sets/[id]/page.tsx
 - skillmeat/web/components/deployment-sets/add-member-dialog.tsx
 - skillmeat/web/components/deployment-sets/member-list.tsx
-progress: 50
+progress: 100
 updated: '2026-02-24'
 ---
 
