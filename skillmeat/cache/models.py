@@ -3227,6 +3227,7 @@ class DeploymentSet(Base):
     # Relationships
     members: Mapped[List["DeploymentSetMember"]] = relationship(
         "DeploymentSetMember",
+        foreign_keys="[DeploymentSetMember.set_id]",
         back_populates="deployment_set",
         cascade="all, delete-orphan",
         lazy="selectin",
