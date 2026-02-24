@@ -1,7 +1,7 @@
 """Configuration API schemas.
 
 Provides Pydantic models for configuration-related API endpoints,
-including detection patterns for artifact type inference.
+including detection patterns for artifact type inference and feature flags.
 """
 
 from typing import Dict, List
@@ -97,5 +97,51 @@ class DetectionPatternsResponse(BaseModel):
                     "hook": "hooks",
                     "mcp": "mcp",
                 },
+            }
+        }
+
+
+class FeatureFlagsResponse(BaseModel):
+    """Response model for backend feature flags.
+
+    Exposes feature flag state to the frontend so the UI can conditionally
+    render features that depend on backend capabilities. Frontend components
+    should gate visibility and routing on these flags.
+
+    Attributes:
+        composite_artifacts_enabled: Whether composite artifact detection is active.
+        deployment_sets_enabled: Whether the deployment sets feature is active.
+            When False, all /api/v1/deployment-sets endpoints return 404.
+        memory_context_enabled: Whether the Memory & Context Intelligence System
+            (memory items, context modules, context packing) is active.
+    """
+
+    composite_artifacts_enabled: bool = Field(
+        description=(
+            "Whether composite artifact detection is enabled. "
+            "When False, discovery always performs flat detection."
+        )
+    )
+    deployment_sets_enabled: bool = Field(
+        description=(
+            "Whether the deployment sets feature is enabled. "
+            "When False, all /api/v1/deployment-sets endpoints return 404."
+        )
+    )
+    memory_context_enabled: bool = Field(
+        description=(
+            "Whether the Memory & Context Intelligence System is enabled. "
+            "Covers memory items, context modules, and context packing."
+        )
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "composite_artifacts_enabled": True,
+                "deployment_sets_enabled": True,
+                "memory_context_enabled": True,
             }
         }

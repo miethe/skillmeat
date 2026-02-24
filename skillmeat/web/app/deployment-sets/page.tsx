@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { DeploymentSetList } from '@/components/deployment-sets/deployment-set-list';
+import { DeploymentSetsPageClient } from './deployment-sets-page-client';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export const metadata = {
@@ -8,55 +8,45 @@ export const metadata = {
 };
 
 /**
- * Deployment Sets Page - Batch deployment management hub
+ * Deployment Sets Page - Server component wrapper
  *
- * Provides a dedicated view for managing deployment sets, including:
- * - Creating, editing, cloning, and deleting deployment sets
- * - Searching and filtering sets by name or tag
- * - Navigating to individual set detail pages
- *
- * Server component wrapper with client component for interactivity.
+ * Exports static metadata for SEO and delegates all interactivity (including
+ * feature-flag gating) to the client component. This pattern is required by
+ * Next.js App Router: `metadata` cannot be exported from a Client Component.
  */
 export default function DeploymentSetsPage() {
   return (
-    <div className="container mx-auto space-y-6 py-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Deployment Sets</h1>
-          <p className="text-muted-foreground">
-            Create and manage named sets of artifacts for one-click batch deployment
-          </p>
-        </div>
-      </div>
-      <Suspense fallback={<DeploymentSetsPageSkeleton />}>
-        <DeploymentSetList />
-      </Suspense>
-    </div>
+    <Suspense fallback={<DeploymentSetsPageSkeleton />}>
+      <DeploymentSetsPageClient />
+    </Suspense>
   );
 }
 
 /**
- * Loading skeleton shown while the client component hydrates
+ * Loading skeleton shown during hydration
  */
 function DeploymentSetsPageSkeleton() {
   return (
-    <div className="space-y-6">
-      {/* Toolbar skeleton */}
-      <div className="flex items-center gap-4 rounded-lg border bg-card p-4">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-10 w-40" />
-        <div className="ml-auto">
-          <Skeleton className="h-10 w-36" />
+    <div className="container mx-auto space-y-6 py-6">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-96" />
         </div>
       </div>
-
-      {/* Card grid skeleton */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="space-y-3">
-            <Skeleton className="h-52 w-full rounded-lg" />
+      <div className="space-y-6">
+        <div className="flex items-center gap-4 rounded-lg border bg-card p-4">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-10 w-40" />
+          <div className="ml-auto">
+            <Skeleton className="h-10 w-36" />
           </div>
-        ))}
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-52 w-full rounded-lg" />
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -124,7 +124,7 @@ export {
 export { useDeploy, useUndeploy } from './useDeploy';
 
 // ============================================================================
-// DEPLOYMENT SETS (11 hooks)
+// DEPLOYMENT SETS (13 hooks)
 // ============================================================================
 // Named, ordered sets of artifacts for batch deployment operations
 export {
@@ -250,7 +250,7 @@ export { useCacheRefresh } from './useCacheRefresh';
 export { useCacheStatus } from './useCacheStatus';
 
 // ============================================================================
-// SETTINGS & CONFIG (2 hooks)
+// SETTINGS & CONFIG (3 hooks)
 // ============================================================================
 // Application configuration and settings
 export {
@@ -270,6 +270,14 @@ export {
   DEFAULT_ROOT_EXCLUSIONS,
   type DetectionPatternsResponse,
 } from './use-detection-patterns';
+
+// Backend feature flags (deployment sets, composites, memory context)
+export {
+  featureFlagKeys,
+  useFeatureFlags,
+  DEFAULT_FEATURE_FLAGS,
+  type FeatureFlagsResponse,
+} from './use-feature-flags';
 
 // ============================================================================
 // PLATFORM DEFAULTS (5 hooks)
