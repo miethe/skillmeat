@@ -124,7 +124,7 @@ export {
 export { useDeploy, useUndeploy } from './useDeploy';
 
 // ============================================================================
-// DEPLOYMENT SETS (10 hooks)
+// DEPLOYMENT SETS (11 hooks)
 // ============================================================================
 // Named, ordered sets of artifacts for batch deployment operations
 export {
@@ -141,6 +141,7 @@ export {
   useRemoveMember,
   useUpdateMemberPosition,
   useBatchDeploy,
+  useBatchDeploySet,
 } from './deployment-sets';
 
 // ============================================================================

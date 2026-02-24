@@ -2,58 +2,79 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "deployment-sets-v1"
-feature_slug: "deployment-sets"
+prd: deployment-sets-v1
+feature_slug: deployment-sets
 prd_ref: docs/project_plans/PRDs/features/deployment-sets-v1.md
 plan_ref: docs/project_plans/implementation_plans/features/deployment-sets-v1.md
 phase: 5
-title: "Frontend Deploy Integration"
-status: "planning"
-started: "2026-02-23"
+title: Frontend Deploy Integration
+status: in_progress
+started: '2026-02-23'
 completed: null
 commit_refs: []
 pr_refs: []
 overall_progress: 0
-completion_estimate: "on-track"
+completion_estimate: on-track
 total_tasks: 2
 completed_tasks: 0
-in_progress_tasks: 0
+in_progress_tasks: 1
 blocked_tasks: 0
 at_risk_tasks: 0
-owners: ["ui-engineer-enhanced", "frontend-developer"]
+owners:
+- ui-engineer-enhanced
+- frontend-developer
 contributors: []
 tasks:
-  - id: "DS-013"
-    description: "useBatchDeploySet mutation hook"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["DS-009"]
-    estimated_effort: "1 pt"
-    priority: "high"
-  - id: "DS-014"
-    description: "Batch deploy modal with project/profile selectors and result table"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["DS-013"]
-    estimated_effort: "2 pts"
-    priority: "high"
+- id: DS-013
+  description: useBatchDeploySet mutation hook
+  status: in_progress
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - DS-009
+  estimated_effort: 1 pt
+  priority: high
+- id: DS-014
+  description: Batch deploy modal with project/profile selectors and result table
+  status: pending
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - DS-013
+  estimated_effort: 2 pts
+  priority: high
 parallelization:
-  batch_1: ["DS-013"]
-  batch_2: ["DS-014"]
-  critical_path: ["DS-013", "DS-014"]
-  estimated_total_time: "1 day"
+  batch_1:
+  - DS-013
+  batch_2:
+  - DS-014
+  critical_path:
+  - DS-013
+  - DS-014
+  estimated_total_time: 1 day
 blockers: []
 success_criteria:
-  - { id: "SC-1", description: "pnpm type-check passes", status: "pending" }
-  - { id: "SC-2", description: "Batch deploy modal: project + profile selectors work end-to-end", status: "pending" }
-  - { id: "SC-3", description: "Result table renders success/skip/error states", status: "pending" }
-  - { id: "SC-4", description: "Deploy Set button visible on list card and detail page", status: "pending" }
-  - { id: "SC-5", description: "Loading state shown during in-flight request", status: "pending" }
-files_modified: [
-  "skillmeat/web/hooks/deployment-sets.ts",
-  "skillmeat/web/components/deployment-sets/batch-deploy-modal.tsx",
-  "skillmeat/web/components/deployment-sets/deploy-result-table.tsx"
-]
+- id: SC-1
+  description: pnpm type-check passes
+  status: pending
+- id: SC-2
+  description: 'Batch deploy modal: project + profile selectors work end-to-end'
+  status: pending
+- id: SC-3
+  description: Result table renders success/skip/error states
+  status: pending
+- id: SC-4
+  description: Deploy Set button visible on list card and detail page
+  status: pending
+- id: SC-5
+  description: Loading state shown during in-flight request
+  status: pending
+files_modified:
+- skillmeat/web/hooks/deployment-sets.ts
+- skillmeat/web/components/deployment-sets/batch-deploy-modal.tsx
+- skillmeat/web/components/deployment-sets/deploy-result-table.tsx
+progress: 0
+updated: '2026-02-24'
 ---
 
 # deployment-sets-v1 - Phase 5: Frontend Deploy Integration

@@ -244,7 +244,7 @@ export async function resolveDeploymentSet(id: string): Promise<DeploymentSetRes
 }
 
 /**
- * Batch-deploy all artifacts in a deployment set to a target project
+ * Batch-deploy all artifacts in a deployment set to a target project (by path)
  */
 export async function batchDeployDeploymentSet(
   id: string,
@@ -254,6 +254,47 @@ export async function batchDeployDeploymentSet(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to batch deploy deployment set: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Request body for project-ID-based batch deployment
+ */
+export interface BatchDeployByProjectIdRequest {
+  /** Database project ID to deploy into */
+  project_id: string;
+  /** Optional deployment profile ID */
+  profile_id?: string;
+}
+
+/**
+ * Batch-deploy all artifacts in a deployment set to a target project (by project ID).
+ *
+ * Unlike batchDeployDeploymentSet (which accepts a filesystem project_path),
+ * this variant targets a project by its database ID and an optional profile.
+ */
+export async function batchDeploySetByProjectId(
+  setId: string,
+  data: BatchDeployByProjectIdRequest
+): Promise<BatchDeployResponse> {
+  const body: Record<string, string> = { project_id: data.project_id };
+  if (data.profile_id !== undefined) {
+    body.profile_id = data.profile_id;
+  }
+
+  const response = await fetch(buildUrl(`/deployment-sets/${setId}/deploy`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {

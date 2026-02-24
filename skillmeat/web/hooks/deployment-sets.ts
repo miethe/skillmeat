@@ -33,6 +33,7 @@ import {
   updateDeploymentSetMemberPosition,
   resolveDeploymentSet,
   batchDeployDeploymentSet,
+  batchDeploySetByProjectId,
 } from '@/lib/api/deployment-sets';
 
 // =============================================================================
@@ -261,7 +262,7 @@ export function useUpdateMemberPosition() {
 }
 
 /**
- * Batch-deploy all artifacts in a deployment set to a target project.
+ * Batch-deploy all artifacts in a deployment set to a target project (by path).
  *
  * Per-artifact errors are captured and returned in results — a single failure
  * does not abort the entire batch.
@@ -275,6 +276,40 @@ export function useBatchDeploy() {
     mutationFn: ({ id, data }) => batchDeployDeploymentSet(id, data),
     onSuccess: () => {
       // Invalidate deployment queries so deployed artifact status refreshes
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
+    },
+  });
+}
+
+/**
+ * Batch-deploy all artifacts in a deployment set to a target project (by project ID).
+ *
+ * Variant of useBatchDeploy that accepts a database project ID and an optional
+ * deployment profile ID instead of a filesystem project path. Use this when the
+ * caller has a project record from the DB rather than a raw filesystem path.
+ *
+ * Per-artifact errors are captured and returned in results — a single failure
+ * does not abort the entire batch. Does not invalidate deployment-set cache
+ * because the deploy operation does not mutate set data.
+ *
+ * Invalidates ['deployments'] so deployed artifact status reflects the new state.
+ *
+ * @example
+ * const deploy = useBatchDeploySet();
+ * deploy.mutate({ set_id: 'abc123', project_id: 'proj456', profile_id: 'prof789' });
+ */
+export function useBatchDeploySet() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    BatchDeployResponse,
+    Error,
+    { set_id: string; project_id: string; profile_id?: string }
+  >({
+    mutationFn: ({ set_id, project_id, profile_id }) =>
+      batchDeploySetByProjectId(set_id, { project_id, profile_id }),
+    onSuccess: () => {
+      // Invalidate deployment queries so deployed artifact status reflects the batch deploy
       queryClient.invalidateQueries({ queryKey: ['deployments'] });
     },
   });
