@@ -22,6 +22,8 @@ Models:
     - CacheMetadata: Cache system metadata
     - CompositeArtifact: Deployable multi-artifact bundle (composite-artifact-infrastructure-v1)
     - CompositeMembership: Child-artifact membership within a CompositeArtifact
+    - DeploymentSet: Named, ordered set of artifacts/groups for batch deployment (deployment-sets-v1)
+    - DeploymentSetMember: Polymorphic member entry within a DeploymentSet
 
 Usage:
     >>> from skillmeat.cache.models import get_session, Project, Artifact
@@ -3161,6 +3163,261 @@ class CompositeMembership(Base):
                 "type": self.child_artifact.type,
             }
         return result
+
+
+# =============================================================================
+# Deployment Set Models (deployment-sets-v1)
+# =============================================================================
+
+
+class DeploymentSet(Base):
+    """Named, ordered set of artifacts/groups for batch deployment.
+
+    A DeploymentSet groups collection artifacts, artifact groups, and/or
+    nested deployment sets into a single deployable unit.  Membership is
+    tracked via ``DeploymentSetMember`` rows that use a polymorphic
+    reference: exactly one of ``artifact_uuid``, ``group_id``, or
+    ``member_set_id`` must be non-null on each member row (enforced by a
+    DB CHECK constraint on that table).
+
+    Attributes:
+        id: Unique identifier (UUID hex, primary key)
+        name: Human-readable set name (required)
+        description: Optional free-text description
+        tags_json: JSON-serialized list of tag strings, default ``"[]"``
+        owner_id: Owning user / identity scope (required)
+        created_at: UTC timestamp when the set was created
+        updated_at: UTC timestamp on last modification (auto-refreshed)
+        members: Ordered list of ``DeploymentSetMember`` children
+
+    Indexes:
+        - idx_deployment_sets_owner_id: Fast lookup by owner
+        - idx_deployment_sets_created_at: Chronological queries
+    """
+
+    __tablename__ = "deployment_sets"
+
+    # Primary key — UUID hex
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Core fields
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tags_json: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default="[]",
+        server_default="[]",
+        comment="JSON-serialized list of tag strings",
+    )
+
+    # Ownership
+    owner_id: Mapped[str] = mapped_column(String, nullable=False)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    members: Mapped[List["DeploymentSetMember"]] = relationship(
+        "DeploymentSetMember",
+        back_populates="deployment_set",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="DeploymentSetMember.position",
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        CheckConstraint(
+            "length(name) > 0 AND length(name) <= 255",
+            name="check_deployment_set_name_length",
+        ),
+        Index("idx_deployment_sets_owner_id", "owner_id"),
+        Index("idx_deployment_sets_created_at", "created_at"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of DeploymentSet."""
+        return (
+            f"<DeploymentSet(id={self.id!r}, name={self.name!r}, "
+            f"owner_id={self.owner_id!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert DeploymentSet to dictionary for JSON serialisation."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "tags": self.get_tags(),
+            "owner_id": self.owner_id,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "members": [m.to_dict() for m in self.members],
+        }
+
+    def get_tags(self) -> List[str]:
+        """Parse and return tags as a list."""
+        if not self.tags_json:
+            return []
+        try:
+            parsed = json.loads(self.tags_json)
+        except json.JSONDecodeError:
+            return []
+        return parsed if isinstance(parsed, list) else []
+
+    def set_tags(self, tags: List[str]) -> None:
+        """Persist tags from a list as JSON text."""
+        self.tags_json = json.dumps(tags or [])
+
+
+class DeploymentSetMember(Base):
+    """Polymorphic member entry within a DeploymentSet.
+
+    Each row references exactly one of three target types via a mutually
+    exclusive nullable column — artifact, group, or a nested deployment
+    set.  A DB CHECK constraint enforces that exactly one reference is
+    non-null.
+
+    Member type semantics
+    ---------------------
+    - ``artifact_uuid`` set  → member is a collection artifact (ADR-007 UUID)
+    - ``group_id`` set       → member is an artifact group
+    - ``member_set_id`` set  → member is a nested DeploymentSet (nesting)
+
+    Attributes:
+        id: Unique identifier (UUID hex, primary key)
+        set_id: FK to ``deployment_sets.id``, CASCADE delete (required)
+        artifact_uuid: Collection artifact UUID (nullable; one-of-three)
+        group_id: Artifact group id (nullable; one-of-three)
+        member_set_id: Nested deployment set id (nullable; one-of-three)
+        position: Display/deployment order within the set (0-based, default 0)
+        created_at: UTC timestamp when membership was created
+
+    CHECK constraint:
+        Exactly one of ``artifact_uuid``, ``group_id``, ``member_set_id``
+        must be non-null.  Expressed in SQL as:
+        ``(artifact_uuid IS NOT NULL) + (group_id IS NOT NULL) +
+        (member_set_id IS NOT NULL) = 1``
+        (SQLite supports integer coercion of boolean expressions.)
+
+    Indexes:
+        - idx_deployment_set_members_set_id: Fast child lookup by parent set
+        - idx_deployment_set_members_member_set_id: Reverse lookup for nesting
+        - idx_deployment_set_members_set_position: Ordered retrieval within set
+    """
+
+    __tablename__ = "deployment_set_members"
+
+    # Primary key — UUID hex
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Parent set FK
+    set_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("deployment_sets.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    # Polymorphic references — exactly one must be non-null (CHECK constraint)
+    artifact_uuid: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+        comment="Collection artifact UUID (ADR-007 stable identity)",
+    )
+    group_id: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+        comment="Artifact group id",
+    )
+    member_set_id: Mapped[Optional[str]] = mapped_column(
+        String,
+        ForeignKey("deployment_sets.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Nested deployment set id for hierarchical sets",
+    )
+
+    # Ordering
+    position: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Relationships
+    deployment_set: Mapped["DeploymentSet"] = relationship(
+        "DeploymentSet",
+        back_populates="members",
+        foreign_keys=[set_id],
+        lazy="joined",
+    )
+    nested_set: Mapped[Optional["DeploymentSet"]] = relationship(
+        "DeploymentSet",
+        foreign_keys=[member_set_id],
+        lazy="joined",
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        CheckConstraint(
+            "(artifact_uuid IS NOT NULL) + (group_id IS NOT NULL)"
+            " + (member_set_id IS NOT NULL) = 1",
+            name="check_deployment_set_member_one_ref",
+        ),
+        CheckConstraint("position >= 0", name="check_deployment_set_member_position"),
+        Index("idx_deployment_set_members_set_id", "set_id"),
+        Index("idx_deployment_set_members_member_set_id", "member_set_id"),
+        Index("idx_deployment_set_members_set_position", "set_id", "position"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of DeploymentSetMember."""
+        ref = (
+            f"artifact_uuid={self.artifact_uuid!r}"
+            if self.artifact_uuid
+            else (
+                f"group_id={self.group_id!r}"
+                if self.group_id
+                else f"member_set_id={self.member_set_id!r}"
+            )
+        )
+        return (
+            f"<DeploymentSetMember(id={self.id!r}, set_id={self.set_id!r}, "
+            f"{ref}, position={self.position})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert DeploymentSetMember to dictionary for JSON serialisation."""
+        return {
+            "id": self.id,
+            "set_id": self.set_id,
+            "artifact_uuid": self.artifact_uuid,
+            "group_id": self.group_id,
+            "member_set_id": self.member_set_id,
+            "position": self.position,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+    @property
+    def member_type(self) -> str:
+        """Return the member type as a string: 'artifact', 'group', or 'set'."""
+        if self.artifact_uuid is not None:
+            return "artifact"
+        if self.group_id is not None:
+            return "group"
+        return "set"
 
 
 # =============================================================================

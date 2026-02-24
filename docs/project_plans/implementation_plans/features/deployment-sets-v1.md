@@ -2,9 +2,9 @@
 title: 'Implementation Plan: Deployment Sets'
 schema_version: 2
 doc_type: implementation_plan
-status: draft
+status: in-progress
 created: 2026-02-23
-updated: 2026-02-24
+updated: '2026-02-24'
 feature_slug: deployment-sets
 feature_version: v1
 prd_ref: docs/project_plans/PRDs/features/deployment-sets-v1.md
