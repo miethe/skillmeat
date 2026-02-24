@@ -24,6 +24,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { EditDeploymentSetDialog } from '@/components/deployment-sets/edit-deployment-set-dialog';
+import { AddMemberDialog } from '@/components/deployment-sets/add-member-dialog';
 import { MemberList } from '@/components/deployment-sets/member-list';
 import { COLOR_TAILWIND_CLASSES } from '@/lib/group-constants';
 
@@ -224,6 +225,7 @@ export function DeploymentSetDetailClient({ id }: DeploymentSetDetailClientProps
   const { toast } = useToast();
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
 
   // 404 handling: surface as Next.js not-found boundary
   if (!isLoading && (error?.message?.includes('404') || (!set && !error))) {
@@ -391,8 +393,8 @@ export function DeploymentSetDetailClient({ id }: DeploymentSetDetailClientProps
           <Button
             size="sm"
             variant="outline"
-            disabled
-            aria-label="Add member (coming soon)"
+            onClick={() => setAddMemberOpen(true)}
+            aria-label="Add member to deployment set"
           >
             <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
             Add Member
@@ -422,9 +424,7 @@ export function DeploymentSetDetailClient({ id }: DeploymentSetDetailClientProps
             members={members}
             setId={set.id}
             isLoading={membersLoading}
-            onAddMember={() => {
-              /* DS-012 will wire this up */
-            }}
+            onAddMember={() => setAddMemberOpen(true)}
           />
         </section>
       </div>
@@ -434,6 +434,13 @@ export function DeploymentSetDetailClient({ id }: DeploymentSetDetailClientProps
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         set={set}
+      />
+
+      {/* Add member dialog */}
+      <AddMemberDialog
+        open={addMemberOpen}
+        onOpenChange={setAddMemberOpen}
+        setId={set.id}
       />
     </TooltipProvider>
   );
