@@ -56,6 +56,11 @@ function EmptyState({
 // Main component
 // ============================================================================
 
+interface DeploymentSetListProps {
+  /** Callback fired when a card is clicked to open the details modal */
+  onOpen?: (setId: string) => void;
+}
+
 /**
  * DeploymentSetList — client component rendered inside the deployment-sets page.
  *
@@ -65,7 +70,7 @@ function EmptyState({
  * - Create dialog triggered from toolbar button or empty-state CTA
  * - Inline delete confirmation via AlertDialog
  */
-export function DeploymentSetList() {
+export function DeploymentSetList({ onOpen }: DeploymentSetListProps) {
   const { toast } = useToast();
 
   // --- data ---
@@ -192,6 +197,7 @@ export function DeploymentSetList() {
             <DeploymentSetCard
               key={set.id}
               set={set}
+              onOpen={onOpen}
               onEdit={setEditingSet}
               onDelete={setDeletingSet}
               onClone={handleClone}

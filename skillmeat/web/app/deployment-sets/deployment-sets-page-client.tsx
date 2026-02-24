@@ -1,7 +1,8 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import { DeploymentSetList } from '@/components/deployment-sets/deployment-set-list';
+import { DeploymentSetDetailsModal } from '@/components/deployment-sets/deployment-set-details-modal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFeatureFlags } from '@/hooks';
 import { Layers3, AlertCircle } from 'lucide-react';
@@ -15,6 +16,7 @@ import { Layers3, AlertCircle } from 'lucide-react';
  */
 export function DeploymentSetsPageClient() {
   const { deploymentSetsEnabled, isLoading: flagsLoading } = useFeatureFlags();
+  const [selectedSetId, setSelectedSetId] = useState<string | null>(null);
 
   // Show a skeleton while feature flags load to avoid layout shift
   if (flagsLoading) {
@@ -70,8 +72,16 @@ export function DeploymentSetsPageClient() {
         </div>
       </div>
       <Suspense fallback={<DeploymentSetsContentSkeleton />}>
-        <DeploymentSetList />
+        <DeploymentSetList onOpen={setSelectedSetId} />
       </Suspense>
+
+      <DeploymentSetDetailsModal
+        setId={selectedSetId}
+        open={selectedSetId !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedSetId(null);
+        }}
+      />
     </div>
   );
 }

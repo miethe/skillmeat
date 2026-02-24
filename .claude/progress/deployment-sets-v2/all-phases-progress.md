@@ -34,7 +34,7 @@ tasks:
   estimate: 1
 - id: DSv2-003
   title: Overview tab content
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -43,7 +43,7 @@ tasks:
   estimate: 2
 - id: DSv2-004
   title: Wire modal into list page + deprecate detail page
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -91,10 +91,10 @@ parallelization:
   batch_4:
   - DSv2-006
 total_tasks: 7
-completed_tasks: 2
+completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
-progress: 28
+progress: 57
 ---
 
 # Deployment Sets v2 — Progress Tracking

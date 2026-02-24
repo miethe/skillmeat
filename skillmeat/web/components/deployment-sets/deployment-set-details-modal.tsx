@@ -18,14 +18,18 @@
 
 import * as React from 'react';
 import { useState } from 'react';
-import { Layers, Users, AlertCircle, Loader2 } from 'lucide-react';
+import { Layers, Users, AlertCircle, Loader2, Tag, Calendar, Hash } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Tabs } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ModalHeader } from '@/components/shared/modal-header';
 import { TabNavigation, type Tab } from '@/components/shared/tab-navigation';
 import { TabContentWrapper } from '@/components/shared/tab-content-wrapper';
-import { useDeploymentSet } from '@/hooks';
+import { useDeploymentSet, useResolveSet } from '@/hooks';
+import { formatDate } from '@/lib/utils';
+import type { DeploymentSet } from '@/types/deployment-sets';
 
 // ============================================================================
 // Types
@@ -86,6 +90,128 @@ function DeploymentSetDetailsError({ message }: { message: string }) {
       <AlertCircle className="h-8 w-8 text-destructive" aria-hidden="true" />
       <p className="text-sm font-medium text-destructive">Failed to load deployment set</p>
       <p className="max-w-xs text-xs text-muted-foreground">{message}</p>
+    </div>
+  );
+}
+
+// ============================================================================
+// Overview tab
+// ============================================================================
+
+/**
+ * DeploymentSetOverviewTab
+ *
+ * Displays the full metadata for a deployment set:
+ * name, description, color swatch, icon, tags, resolved member count,
+ * and created/updated timestamps.
+ *
+ * Uses useResolveSet for the resolved artifact count (30s stale time so it
+ * stays fresh after member mutations).
+ */
+function DeploymentSetOverviewTab({ deploymentSet }: { deploymentSet: DeploymentSet }) {
+  const { data: resolution, isLoading: isResolving } = useResolveSet(deploymentSet.id);
+
+  return (
+    <div className="space-y-6" role="region" aria-label="Deployment set overview">
+      {/* Identity: name, color swatch, icon */}
+      <div>
+        <div className="mb-1 flex items-center gap-2">
+          <h2 className="text-base font-semibold leading-tight">{deploymentSet.name}</h2>
+          {deploymentSet.color && (
+            <span
+              className="inline-block h-4 w-4 shrink-0 rounded-full border border-border"
+              style={{ backgroundColor: deploymentSet.color }}
+              aria-label={`Color: ${deploymentSet.color}`}
+              title={deploymentSet.color}
+            />
+          )}
+          {deploymentSet.icon && (
+            <span
+              className="text-base leading-none"
+              aria-label={`Icon: ${deploymentSet.icon}`}
+              role="img"
+            >
+              {deploymentSet.icon}
+            </span>
+          )}
+        </div>
+        {deploymentSet.description && (
+          <p className="text-sm text-muted-foreground">{deploymentSet.description}</p>
+        )}
+      </div>
+
+      <Separator />
+
+      {/* Tags */}
+      <div>
+        <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
+          <Tag className="h-4 w-4" aria-hidden="true" />
+          Tags
+        </h3>
+        {deploymentSet.tags.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5" role="list" aria-label="Tags">
+            {[...deploymentSet.tags].sort((a, b) => a.localeCompare(b)).map((tag) => (
+              <Badge key={tag} variant="secondary" className="text-xs" role="listitem">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No tags</p>
+        )}
+      </div>
+
+      <Separator />
+
+      {/* Member count */}
+      <div>
+        <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
+          <Hash className="h-4 w-4" aria-hidden="true" />
+          Members
+        </h3>
+        <div className="space-y-1.5 text-sm text-muted-foreground">
+          <div className="flex items-center justify-between">
+            <span>Direct members</span>
+            <span className="tabular-nums font-medium text-foreground">
+              {deploymentSet.member_count}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Resolved artifacts</span>
+            {isResolving ? (
+              <Skeleton className="h-4 w-8" aria-label="Loading resolved count" />
+            ) : (
+              <span className="tabular-nums font-medium text-foreground">
+                {resolution?.total_count ?? '—'}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Timestamps */}
+      <div>
+        <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
+          <Calendar className="h-4 w-4" aria-hidden="true" />
+          Timestamps
+        </h3>
+        <div className="space-y-1.5 text-sm text-muted-foreground">
+          <div className="flex items-center justify-between">
+            <span>Created</span>
+            <time dateTime={deploymentSet.created_at} className="tabular-nums">
+              {formatDate(deploymentSet.created_at)}
+            </time>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Updated</span>
+            <time dateTime={deploymentSet.updated_at} className="tabular-nums">
+              {formatDate(deploymentSet.updated_at)}
+            </time>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -163,18 +289,9 @@ export function DeploymentSetDetailsModal({
               ariaLabel="Deployment set detail tabs"
             />
 
-            {/* Overview tab — placeholder for next batch */}
+            {/* Overview tab */}
             <TabContentWrapper value="overview">
-              <div
-                className="flex flex-col gap-2 rounded-md border border-dashed border-muted-foreground/30 px-4 py-8 text-center"
-                role="region"
-                aria-label="Overview placeholder"
-              >
-                <Layers className="mx-auto h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
-                <p className="text-sm text-muted-foreground">
-                  Overview content will be implemented in the next batch.
-                </p>
-              </div>
+              <DeploymentSetOverviewTab deploymentSet={deploymentSet} />
             </TabContentWrapper>
 
             {/* Members tab — placeholder for later batch */}
