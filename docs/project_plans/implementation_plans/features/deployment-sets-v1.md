@@ -2,7 +2,7 @@
 title: 'Implementation Plan: Deployment Sets'
 schema_version: 2
 doc_type: implementation_plan
-status: in-progress
+status: completed
 created: 2026-02-23
 updated: '2026-02-24'
 feature_slug: deployment-sets

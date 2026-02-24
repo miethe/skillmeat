@@ -2,64 +2,92 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "deployment-sets-v1"
-feature_slug: "deployment-sets"
+prd: deployment-sets-v1
+feature_slug: deployment-sets
 prd_ref: docs/project_plans/PRDs/features/deployment-sets-v1.md
 plan_ref: docs/project_plans/implementation_plans/features/deployment-sets-v1.md
 phase: 2
-title: "Service Layer"
-status: "planning"
-started: "2026-02-23"
+title: Service Layer
+status: completed
+started: '2026-02-23'
 completed: null
 commit_refs: []
 pr_refs: []
 overall_progress: 0
-completion_estimate: "on-track"
+completion_estimate: on-track
 total_tasks: 3
-completed_tasks: 0
+completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-owners: ["python-backend-engineer", "backend-architect"]
+owners:
+- python-backend-engineer
+- backend-architect
 contributors: []
 tasks:
-  - id: "DS-004"
-    description: "Resolution service: DFS traversal, depth limit 20, deduplication by artifact_uuid"
-    status: "pending"
-    assigned_to: ["backend-architect", "python-backend-engineer"]
-    dependencies: ["DS-003"]
-    estimated_effort: "3 pts"
-    priority: "critical"
-  - id: "DS-005"
-    description: "Circular-reference detection on add_member via descendant reachability from candidate member set"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DS-004"]
-    estimated_effort: "2 pts"
-    priority: "high"
-  - id: "DS-006"
-    description: "Batch deploy service: resolve set, adapt artifact_uuid/project identifiers to deploy contract, deploy each artifact, collect per-artifact results"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DS-005"]
-    estimated_effort: "2 pts"
-    priority: "high"
+- id: DS-004
+  description: 'Resolution service: DFS traversal, depth limit 20, deduplication by
+    artifact_uuid'
+  status: completed
+  assigned_to:
+  - backend-architect
+  - python-backend-engineer
+  dependencies:
+  - DS-003
+  estimated_effort: 3 pts
+  priority: critical
+- id: DS-005
+  description: Circular-reference detection on add_member via descendant reachability
+    from candidate member set
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DS-004
+  estimated_effort: 2 pts
+  priority: high
+- id: DS-006
+  description: 'Batch deploy service: resolve set, adapt artifact_uuid/project identifiers
+    to deploy contract, deploy each artifact, collect per-artifact results'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DS-005
+  estimated_effort: 2 pts
+  priority: high
 parallelization:
-  batch_1: ["DS-004"]
-  batch_2: ["DS-005"]
-  batch_3: ["DS-006"]
-  critical_path: ["DS-004", "DS-005", "DS-006"]
-  estimated_total_time: "1-2 days"
+  batch_1:
+  - DS-004
+  batch_2:
+  - DS-005
+  batch_3:
+  - DS-006
+  critical_path:
+  - DS-004
+  - DS-005
+  - DS-006
+  estimated_total_time: 1-2 days
 blockers: []
 success_criteria:
-  - { id: "SC-1", description: "Resolution unit tests >90% branch coverage", status: "pending" }
-  - { id: "SC-2", description: "Cycle detection covers direct, transitive, self-reference cases", status: "pending" }
-  - { id: "SC-3", description: "Batch deploy adapter path validated (artifact_uuid -> deploy request + project path)", status: "pending" }
-  - { id: "SC-4", description: "Domain exceptions defined: DeploymentSetResolutionError, DeploymentSetCycleError", status: "pending" }
-files_modified: [
-  "skillmeat/core/deployment_sets.py",
-  "skillmeat/core/exceptions.py"
-]
+- id: SC-1
+  description: Resolution unit tests >90% branch coverage
+  status: pending
+- id: SC-2
+  description: Cycle detection covers direct, transitive, self-reference cases
+  status: pending
+- id: SC-3
+  description: Batch deploy adapter path validated (artifact_uuid -> deploy request
+    + project path)
+  status: pending
+- id: SC-4
+  description: 'Domain exceptions defined: DeploymentSetResolutionError, DeploymentSetCycleError'
+  status: pending
+files_modified:
+- skillmeat/core/deployment_sets.py
+- skillmeat/core/exceptions.py
+updated: '2026-02-24'
+progress: 100
 ---
 
 # deployment-sets-v1 - Phase 2: Service Layer

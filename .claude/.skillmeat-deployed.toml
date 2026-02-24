@@ -1927,8 +1927,59 @@ deployed_at = "2026-02-23T12:50:04.858246"
 artifact_path = "agents/demo-generator.md"
 content_hash = "11d77350aed3b22658a8286e2c121d7509ce3d1ddb33d7e0ff7596043aa80dc9"
 local_modifications = false
+version_lineage = [
+    "11d77350aed3b22658a8286e2c121d7509ce3d1ddb33d7e0ff7596043aa80dc9",
+]
 merge_base_snapshot = "11d77350aed3b22658a8286e2c121d7509ce3d1ddb33d7e0ff7596043aa80dc9"
 deployment_profile_id = "claude_code"
 platform = "claude_code"
 profile_root_dir = ".claude"
 collection_sha = "11d77350aed3b22658a8286e2c121d7509ce3d1ddb33d7e0ff7596043aa80dc9"
+
+[[deployed]]
+artifact_name = "codex"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2026-02-24T13:36:20.411484"
+artifact_path = "skills/codex"
+content_hash = "4b7e8695807b567a7a7d467ab15b3da330aa0a847827067d79c654c540a72fe9"
+local_modifications = false
+version_lineage = [
+    "4b7e8695807b567a7a7d467ab15b3da330aa0a847827067d79c654c540a72fe9",
+]
+merge_base_snapshot = "4b7e8695807b567a7a7d467ab15b3da330aa0a847827067d79c654c540a72fe9"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
+collection_sha = "4b7e8695807b567a7a7d467ab15b3da330aa0a847827067d79c654c540a72fe9"
+
+[[deployed]]
+artifact_name = "nano-banana-pro"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2026-02-24T13:44:17.516655"
+artifact_path = "skills/nano-banana-pro"
+content_hash = "ebf4cec3695d863fb3ea671ab62f0a5700843ba68973a3d38c2036054ec6d4ff"
+local_modifications = false
+version_lineage = [
+    "ebf4cec3695d863fb3ea671ab62f0a5700843ba68973a3d38c2036054ec6d4ff",
+]
+merge_base_snapshot = "ebf4cec3695d863fb3ea671ab62f0a5700843ba68973a3d38c2036054ec6d4ff"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
+collection_sha = "ebf4cec3695d863fb3ea671ab62f0a5700843ba68973a3d38c2036054ec6d4ff"
+
+[[deployed]]
+artifact_name = "gemini-cli"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2026-02-24T13:46:16.894350"
+artifact_path = "skills/gemini-cli"
+content_hash = "0d20432b0357859633bfb68fd7540c43940c610fb51ad510a4f84a0852c550c2"
+local_modifications = false
+merge_base_snapshot = "0d20432b0357859633bfb68fd7540c43940c610fb51ad510a4f84a0852c550c2"
+deployment_profile_id = "claude_code"
+platform = "claude_code"
+profile_root_dir = ".claude"
+collection_sha = "0d20432b0357859633bfb68fd7540c43940c610fb51ad510a4f84a0852c550c2"
