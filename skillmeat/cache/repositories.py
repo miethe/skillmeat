@@ -4179,3 +4179,249 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
             raise RepositoryError(f"Failed to delete DeploymentSet: {exc}") from exc
         finally:
             session.close()
+
+    # =========================================================================
+    # Member management
+    # =========================================================================
+
+    def add_member(
+        self,
+        set_id: str,
+        owner_id: str,
+        *,
+        artifact_uuid: Optional[str] = None,
+        group_id: Optional[str] = None,
+        member_set_id: Optional[str] = None,
+        position: Optional[int] = None,
+    ) -> DeploymentSetMember:
+        """Add a member to a DeploymentSet.
+
+        Exactly one of ``artifact_uuid``, ``group_id``, or ``member_set_id``
+        must be provided — this mirrors the DB CHECK constraint and produces
+        a clear error before the row is even attempted.
+
+        If ``position`` is omitted, the member is appended after the current
+        maximum position (``max_position + 1``).  If the set has no existing
+        members, position defaults to ``0``.
+
+        Args:
+            set_id: Primary key of the parent deployment set.
+            owner_id: Owner scope — set must belong to this owner.
+            artifact_uuid: Collection artifact UUID (ADR-007 stable identity).
+            group_id: Artifact group id.
+            member_set_id: Nested deployment set id.
+            position: Explicit 0-based ordering position.  Auto-assigned
+                when omitted.
+
+        Returns:
+            Newly created ``DeploymentSetMember`` instance.
+
+        Raises:
+            ValueError: If the exactly-one-ref constraint is violated, or if
+                the parent set does not exist / belongs to a different owner.
+            RepositoryError: If the insert fails due to a DB constraint.
+        """
+        # Repo-level guard: exactly one reference must be supplied.
+        refs_provided = sum(
+            [
+                artifact_uuid is not None,
+                group_id is not None,
+                member_set_id is not None,
+            ]
+        )
+        if refs_provided != 1:
+            raise ValueError(
+                "Exactly one of artifact_uuid, group_id, or member_set_id must be "
+                f"provided (got {refs_provided} non-null values)."
+            )
+
+        session = self._get_session()
+        try:
+            # Verify parent set exists and is owned by owner_id.
+            ds = (
+                session.query(DeploymentSet)
+                .filter(
+                    DeploymentSet.id == set_id,
+                    DeploymentSet.owner_id == owner_id,
+                )
+                .first()
+            )
+            if ds is None:
+                raise ValueError(
+                    f"DeploymentSet id={set_id!r} not found for owner {owner_id!r}."
+                )
+
+            # Auto-assign position when not supplied.
+            if position is None:
+                max_pos = (
+                    session.query(func.max(DeploymentSetMember.position))
+                    .filter(DeploymentSetMember.set_id == set_id)
+                    .scalar()
+                )
+                position = 0 if max_pos is None else max_pos + 1
+
+            member = DeploymentSetMember(
+                set_id=set_id,
+                artifact_uuid=artifact_uuid,
+                group_id=group_id,
+                member_set_id=member_set_id,
+                position=position,
+                created_at=datetime.utcnow(),
+            )
+            session.add(member)
+            session.commit()
+            session.refresh(member)
+            logger.debug(
+                "Added DeploymentSetMember id=%s to set=%s owner=%s position=%d",
+                member.id,
+                set_id,
+                owner_id,
+                position,
+            )
+            return member
+        except IntegrityError as exc:
+            session.rollback()
+            raise RepositoryError(
+                f"Failed to add member to DeploymentSet {set_id!r}: {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+    def remove_member(self, member_id: str, owner_id: str) -> bool:
+        """Remove a member from a DeploymentSet.
+
+        The parent set must belong to ``owner_id``; if it does not, or if
+        the member does not exist, ``False`` is returned without raising.
+
+        Args:
+            member_id: Primary key of the ``DeploymentSetMember`` to delete.
+            owner_id: Owner scope — parent set must belong to this owner.
+
+        Returns:
+            ``True`` if the member was found and deleted, ``False`` otherwise.
+
+        Raises:
+            RepositoryError: If the deletion fails unexpectedly.
+        """
+        session = self._get_session()
+        try:
+            member = (
+                session.query(DeploymentSetMember)
+                .join(
+                    DeploymentSet,
+                    DeploymentSet.id == DeploymentSetMember.set_id,
+                )
+                .filter(
+                    DeploymentSetMember.id == member_id,
+                    DeploymentSet.owner_id == owner_id,
+                )
+                .first()
+            )
+            if member is None:
+                return False
+
+            session.delete(member)
+            session.commit()
+            logger.debug(
+                "Removed DeploymentSetMember id=%s owner=%s", member_id, owner_id
+            )
+            return True
+        except IntegrityError as exc:
+            session.rollback()
+            raise RepositoryError(
+                f"Failed to remove DeploymentSetMember {member_id!r}: {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+    def update_member_position(
+        self, member_id: str, owner_id: str, position: int
+    ) -> Optional[DeploymentSetMember]:
+        """Update the ordering position of a DeploymentSetMember.
+
+        The parent set must belong to ``owner_id``; if it does not, or if
+        the member does not exist, ``None`` is returned.
+
+        Args:
+            member_id: Primary key of the ``DeploymentSetMember`` to update.
+            owner_id: Owner scope — parent set must belong to this owner.
+            position: New 0-based position value (must be >= 0).
+
+        Returns:
+            Updated ``DeploymentSetMember`` instance, or ``None`` if not found.
+
+        Raises:
+            RepositoryError: If the update fails due to a constraint violation.
+        """
+        session = self._get_session()
+        try:
+            member = (
+                session.query(DeploymentSetMember)
+                .join(
+                    DeploymentSet,
+                    DeploymentSet.id == DeploymentSetMember.set_id,
+                )
+                .filter(
+                    DeploymentSetMember.id == member_id,
+                    DeploymentSet.owner_id == owner_id,
+                )
+                .first()
+            )
+            if member is None:
+                return None
+
+            member.position = position
+            session.commit()
+            session.refresh(member)
+            logger.debug(
+                "Updated DeploymentSetMember id=%s position=%d owner=%s",
+                member_id,
+                position,
+                owner_id,
+            )
+            return member
+        except IntegrityError as exc:
+            session.rollback()
+            raise RepositoryError(
+                f"Failed to update position for DeploymentSetMember {member_id!r}: {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+    def get_members(
+        self, set_id: str, owner_id: str
+    ) -> List[DeploymentSetMember]:
+        """Return all members of a DeploymentSet, ordered by position.
+
+        The set must belong to ``owner_id``; an empty list is returned if
+        the set does not exist or belongs to a different owner.
+
+        Args:
+            set_id: Primary key of the parent deployment set.
+            owner_id: Owner scope — set must belong to this owner.
+
+        Returns:
+            List of ``DeploymentSetMember`` instances ordered by
+            ``position`` ascending.  Empty list when not found.
+        """
+        session = self._get_session()
+        try:
+            ds = (
+                session.query(DeploymentSet)
+                .filter(
+                    DeploymentSet.id == set_id,
+                    DeploymentSet.owner_id == owner_id,
+                )
+                .first()
+            )
+            if ds is None:
+                return []
+
+            return (
+                session.query(DeploymentSetMember)
+                .filter(DeploymentSetMember.set_id == set_id)
+                .order_by(DeploymentSetMember.position)
+                .all()
+            )
+        finally:
+            session.close()
