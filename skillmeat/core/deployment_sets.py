@@ -49,7 +49,10 @@ from typing import Dict, List, Optional, Set
 
 from sqlalchemy.orm import Session
 
-from skillmeat.core.exceptions import DeploymentSetResolutionError
+from skillmeat.core.exceptions import (
+    DeploymentSetCycleError,
+    DeploymentSetResolutionError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,9 +80,11 @@ class DeploymentSetService:
         self,
         session: Optional[Session] = None,
         depth_limit: int = _DEFAULT_DEPTH_LIMIT,
+        db_path: Optional[str] = None,
     ) -> None:
         self._session = session
         self._depth_limit = depth_limit
+        self._db_path = db_path
 
     # ------------------------------------------------------------------
     # Public API
@@ -121,6 +126,146 @@ class DeploymentSetService:
             member_map=member_map,
             group_map=group_map,
         )
+
+    def add_member_with_cycle_check(
+        self,
+        set_id: str,
+        owner_id: str,
+        *,
+        member_set_id: Optional[str] = None,
+        artifact_uuid: Optional[str] = None,
+        group_id: Optional[str] = None,
+        position: Optional[int] = None,
+    ):
+        """Add a member to *set_id*, performing cycle detection for set-type members.
+
+        For set-type members (``member_set_id`` is provided) this method calls
+        :meth:`_check_cycle` before delegating to the repository.  Artifact and
+        group members cannot form cycles so they bypass the check.
+
+        Args:
+            set_id: Primary key of the parent deployment set.
+            owner_id: Owner scope passed through to the repository.
+            member_set_id: Nested deployment set to add.  Triggers cycle check.
+            artifact_uuid: Collection artifact UUID.  No cycle check.
+            group_id: Artifact group id.  No cycle check.
+            position: Explicit 0-based ordering position.  Auto-assigned when
+                omitted.
+
+        Returns:
+            Newly created ``DeploymentSetMember`` instance.
+
+        Raises:
+            DeploymentSetCycleError: If adding *member_set_id* would create a
+                circular reference.
+            ValueError: Propagated from the repository if the exactly-one-ref
+                constraint is violated.
+            RuntimeError: If called without a session.
+        """
+        if self._session is None:
+            raise RuntimeError(
+                "DeploymentSetService.add_member_with_cycle_check() requires a "
+                "session.  Pass session= to the constructor."
+            )
+
+        if member_set_id is not None:
+            self._check_cycle(set_id, member_set_id)
+
+        from skillmeat.cache.repositories import DeploymentSetRepository
+
+        repo = DeploymentSetRepository(self._db_path)
+        return repo.add_member(
+            set_id,
+            owner_id,
+            artifact_uuid=artifact_uuid,
+            group_id=group_id,
+            member_set_id=member_set_id,
+            position=position,
+        )
+
+    def _check_cycle(self, set_id: str, candidate_member_set_id: str) -> None:
+        """Raise :class:`~skillmeat.core.exceptions.DeploymentSetCycleError` if
+        adding *candidate_member_set_id* as a member of *set_id* would create a
+        circular reference.
+
+        A cycle exists when *set_id* is reachable by traversing the descendants
+        of *candidate_member_set_id* — that is, when the proposed edge would
+        close a path back to the parent.  A self-reference (``set_id ==
+        candidate_member_set_id``) is also rejected.
+
+        The check uses a BFS over set-type members only (artifact/group members
+        can never form cycles).
+
+        Args:
+            set_id: The set that would *receive* the new member.
+            candidate_member_set_id: The set that would become a nested member.
+
+        Raises:
+            DeploymentSetCycleError: Cycle detected; the exception carries the
+                traversal path showing the chain that would close the loop.
+            RuntimeError: If called without a session (programming error).
+        """
+        if self._session is None:
+            raise RuntimeError(
+                "DeploymentSetService._check_cycle() requires a session."
+            )
+
+        # Lazy import to avoid circular imports at module load time.
+        from skillmeat.cache.models import DeploymentSetMember
+
+        session = self._session
+
+        # Self-reference is an immediate cycle.
+        if candidate_member_set_id == set_id:
+            raise DeploymentSetCycleError(
+                set_id=set_id,
+                path=[set_id, set_id],
+            )
+
+        # BFS: traverse descendants of candidate_member_set_id.
+        # If we ever reach set_id, a cycle would be created.
+        #
+        # visited maps each visited set_id → the path used to reach it from
+        # candidate_member_set_id (inclusive).  This lets us reconstruct the
+        # full cycle path for the error message.
+        visited: Dict[str, List[str]] = {
+            candidate_member_set_id: [candidate_member_set_id]
+        }
+        frontier: List[str] = [candidate_member_set_id]
+
+        while frontier:
+            rows = (
+                session.query(
+                    DeploymentSetMember.set_id,
+                    DeploymentSetMember.member_set_id,
+                )
+                .filter(
+                    DeploymentSetMember.set_id.in_(frontier),
+                    DeploymentSetMember.member_set_id.isnot(None),
+                )
+                .all()
+            )
+
+            next_frontier: List[str] = []
+            for parent_id, child_id in rows:
+                if child_id is None or child_id in visited:
+                    continue
+
+                path_to_child = visited[parent_id] + [child_id]
+
+                if child_id == set_id:
+                    # Cycle detected: the full cycle path is the proposed edge
+                    # (set_id → candidate_member_set_id) plus the path back.
+                    cycle_path = [set_id] + path_to_child
+                    raise DeploymentSetCycleError(
+                        set_id=set_id,
+                        path=cycle_path,
+                    )
+
+                visited[child_id] = path_to_child
+                next_frontier.append(child_id)
+
+            frontier = next_frontier
 
     # ------------------------------------------------------------------
     # Core DFS logic (session-free — injectable for unit tests)
