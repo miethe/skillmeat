@@ -5,6 +5,12 @@
  * and quick actions (rescan, view details).
  *
  * Visual design follows the unified card style with colored left border accents.
+ *
+ * Similarity badge integration:
+ * When `artifactId` is provided (a collection artifact UUID mapped from this
+ * source's primary artifact), the card uses IntersectionObserver to defer
+ * the similarity query until the card enters the viewport. This avoids
+ * firing N concurrent requests for off-screen cards in a long list.
  */
 
 'use client';
@@ -35,8 +41,73 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { GitHubSource, TrustLevel, ScanStatus } from '@/types/marketplace';
+import { useSimilarArtifacts, useSimilaritySettings } from '@/hooks';
+import { SimilarityBadge } from './similarity-badge';
 import { TagBadge } from './tag-badge';
 import { CountBadge } from './count-badge';
+
+// ============================================================================
+// Lazy similarity loader (IntersectionObserver-based)
+// ============================================================================
+
+/**
+ * Returns `true` once the referenced element has been seen in the viewport.
+ * Uses a single shared IntersectionObserver per threshold value for efficiency.
+ * The "seen" state is sticky — scrolling the card out of view never resets it,
+ * which prevents badge flicker and keeps the query cache warm.
+ */
+function useInView(threshold = 0.1): [React.RefObject<HTMLDivElement | null>, boolean] {
+  const ref = React.useRef<HTMLDivElement | null>(null);
+  const [inView, setInView] = React.useState(false);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    // Once seen, no need to keep observing
+    if (inView) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setInView(true);
+            observer.disconnect();
+          }
+        }
+      },
+      { threshold }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [inView, threshold]);
+
+  return [ref, inView];
+}
+
+/**
+ * Fetches the top similarity score for a given collection artifact UUID,
+ * but only after the card has entered the viewport. Returns `null` when
+ * no similar artifacts exist above the floor threshold.
+ *
+ * The query is gated on `inView` via the `enabled` option so React Query
+ * never fires a network request until the card is visible.
+ */
+function useLazySimilarity(artifactId: string | undefined, inView: boolean) {
+  const { thresholds, colors } = useSimilaritySettings();
+
+  const { data } = useSimilarArtifacts(artifactId, {
+    limit: 1,
+    minScore: thresholds.floor,
+    source: 'collection',
+    enabled: inView && !!artifactId,
+  });
+
+  const topScore = data?.items[0]?.composite_score ?? null;
+
+  return { topScore, thresholds, colors };
+}
 
 // ============================================================================
 // Sub-components
@@ -329,6 +400,15 @@ function IndexingBadge({
 export interface SourceCardProps {
   /** GitHub source data */
   source: GitHubSource;
+  /**
+   * UUID of the corresponding collection artifact, when this source has been
+   * imported as a single artifact into the user's collection.
+   *
+   * When provided, the card will display a SimilarityBadge after the card
+   * enters the viewport. When absent (unimported / multi-artifact source),
+   * no badge is shown.
+   */
+  artifactId?: string;
   /** Callback when rescan button is clicked */
   onRescan?: (sourceId: string) => void;
   /** Whether rescan is in progress */
@@ -345,6 +425,7 @@ export interface SourceCardProps {
 
 export function SourceCard({
   source,
+  artifactId,
   onRescan,
   isRescanning = false,
   onClick,
@@ -353,6 +434,12 @@ export function SourceCard({
   onTagClick,
 }: SourceCardProps) {
   const router = useRouter();
+
+  // IntersectionObserver-based lazy loading for the similarity badge.
+  // The ref is attached to the Card element so the query fires as soon as
+  // any part of the card enters the viewport.
+  const [cardRef, inView] = useInView(0.1);
+  const { topScore, thresholds, colors } = useLazySimilarity(artifactId, inView);
 
   const handleClick = () => {
     if (onClick) {
@@ -396,6 +483,7 @@ export function SourceCard({
 
   return (
     <Card
+      ref={cardRef}
       className={cn(
         'group relative cursor-pointer border-l-4 border-l-blue-500',
         'transition-shadow duration-200 hover:shadow-md',
@@ -428,6 +516,16 @@ export function SourceCard({
             </div>
           </div>
           <div className="flex flex-shrink-0 items-center gap-1">
+            {/* Similarity badge — only shown when artifactId is provided and score
+                is above the floor threshold; appears within ~200ms of viewport entry */}
+            {artifactId && topScore !== null && (
+              <SimilarityBadge
+                score={topScore}
+                thresholds={thresholds}
+                colors={colors}
+                className="mr-0.5"
+              />
+            )}
             <StatusBadge
               status={source.scan_status}
               errorMessage={source.last_error}

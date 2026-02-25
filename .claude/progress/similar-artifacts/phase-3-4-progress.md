@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 11
-completed_tasks: 7
+completed_tasks: 9
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -80,7 +80,7 @@ tasks:
   priority: high
 - id: SA-P4-004
   description: Register Similarity sub-tab in Settings page
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -98,7 +98,7 @@ tasks:
   priority: high
 - id: SA-P4-006
   description: SourceCard — badge integration with lazy loading
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -193,7 +193,7 @@ files_modified:
 - skillmeat/web/__tests__/marketplace/similarity-badge.test.tsx
 - skillmeat/web/__tests__/e2e/marketplace-similar-tab.e2e.ts
 - skillmeat/web/__tests__/e2e/marketplace-badge.e2e.ts
-progress: 63
+progress: 81
 updated: '2026-02-25'
 ---
 
