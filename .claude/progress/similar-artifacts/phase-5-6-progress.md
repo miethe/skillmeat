@@ -9,7 +9,7 @@ plan_ref: docs/project_plans/implementation_plans/features/similar-artifacts-v1.
 phase: 5
 phase_6_included: true
 title: 'Phase 5-6: Collection Consolidation View + CLI Integration'
-status: pending
+status: completed
 started: '2026-02-25'
 completed: null
 commit_refs: []
@@ -17,7 +17,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 18
-completed_tasks: 17
+completed_tasks: 18
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -130,7 +130,7 @@ tasks:
   priority: medium
 - id: SA-P5-012
   description: E2E test — consolidation merge
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -293,7 +293,7 @@ files_modified:
 - skillmeat/cli.py
 - tests/test_consolidation_api.py
 - tests/test_cli_similar.py
-progress: 94
+progress: 100
 updated: '2026-02-25'
 ---
 
