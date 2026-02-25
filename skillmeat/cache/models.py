@@ -25,6 +25,7 @@ Models:
     - DeploymentSet: Named, ordered set of artifacts/groups for batch deployment (deployment-sets-v1)
     - DeploymentSetMember: Polymorphic member entry within a DeploymentSet
     - CustomColor: User-defined hex colors for the site-wide color palette registry
+    - DuplicatePair: Persisted record of a similar/duplicate artifact pair with optional ignored flag
 
 Usage:
     >>> from skillmeat.cache.models import get_session, Project, Artifact
@@ -3570,6 +3571,143 @@ class CustomColor(Base):
             "hex": self.hex,
             "name": self.name,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+# =============================================================================
+# Similar Artifacts
+# =============================================================================
+
+
+class DuplicatePair(Base):
+    """Persisted record of a similar/duplicate artifact pair.
+
+    Stores the result of pairwise similarity analysis between two collection
+    artifacts.  When users dismiss a suggestion (e.g. "these are not really
+    duplicates") the ``ignored`` flag is set to ``True`` so the pair is
+    excluded from future results without being permanently deleted.
+
+    Attributes:
+        id: Unique record identifier (primary key, UUID hex)
+        artifact1_uuid: UUID of the first artifact in the pair
+        artifact2_uuid: UUID of the second artifact in the pair
+        similarity_score: Normalised similarity score in the range [0.0, 1.0]
+        match_reasons: JSON-encoded list of human-readable reasons for the match
+        ignored: When True the user has dismissed this pair; excluded from UI
+        created_at: Timestamp when the pair was first detected
+        updated_at: Timestamp of the most recent update to this record
+
+    Constraints:
+        - check_duplicate_pair_score: similarity_score must be in [0.0, 1.0]
+        - uq_duplicate_pair_artifacts: (artifact1_uuid, artifact2_uuid) is UNIQUE
+          so the same ordered pair cannot be inserted twice
+
+    Indexes:
+        - idx_duplicate_pairs_artifact1: Fast lookup by artifact1_uuid
+        - idx_duplicate_pairs_artifact2: Fast lookup by artifact2_uuid
+        - idx_duplicate_pairs_ignored: Filter on ignored flag efficiently
+    """
+
+    __tablename__ = "duplicate_pairs"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Pair members — reference collection_artifacts by UUID
+    artifact1_uuid: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        comment="UUID of the first artifact in the similar pair",
+    )
+    artifact2_uuid: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        comment="UUID of the second artifact in the similar pair",
+    )
+
+    # Similarity data
+    similarity_score: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        comment="Normalised similarity score in the range [0.0, 1.0]",
+    )
+    match_reasons: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        default="[]",
+        server_default="[]",
+        comment="JSON-encoded list of human-readable match reason strings",
+    )
+
+    # User-controlled dismissal flag
+    ignored: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+        comment="True when the user has dismissed this pair from the UI",
+    )
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        CheckConstraint(
+            "similarity_score >= 0.0 AND similarity_score <= 1.0",
+            name="check_duplicate_pair_score",
+        ),
+        UniqueConstraint(
+            "artifact1_uuid",
+            "artifact2_uuid",
+            name="uq_duplicate_pair_artifacts",
+        ),
+        Index("idx_duplicate_pairs_artifact1", "artifact1_uuid"),
+        Index("idx_duplicate_pairs_artifact2", "artifact2_uuid"),
+        Index("idx_duplicate_pairs_ignored", "ignored"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of DuplicatePair."""
+        return (
+            f"<DuplicatePair(id={self.id!r}, "
+            f"artifact1={self.artifact1_uuid!r}, "
+            f"artifact2={self.artifact2_uuid!r}, "
+            f"score={self.similarity_score!r}, "
+            f"ignored={self.ignored!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert DuplicatePair to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the duplicate pair
+        """
+        import json as _json
+
+        reasons: List[str] = []
+        if self.match_reasons:
+            try:
+                reasons = _json.loads(self.match_reasons)
+            except (ValueError, TypeError):
+                reasons = []
+
+        return {
+            "id": self.id,
+            "artifact1_uuid": self.artifact1_uuid,
+            "artifact2_uuid": self.artifact2_uuid,
+            "similarity_score": self.similarity_score,
+            "match_reasons": reasons,
+            "ignored": self.ignored,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
 
