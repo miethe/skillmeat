@@ -1,5 +1,7 @@
 """Icon pack configuration API schemas for request and response models."""
 
+from typing import List
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -56,4 +58,14 @@ class IconPackToggleRequest(BaseModel):
                 "enabled": False,
             }
         }
+    )
+
+
+class IconPackDefinition(BaseModel):
+    """Icon pack definition structure for validation."""
+
+    id: str = Field(description="Unique identifier for the pack")
+    name: str = Field(description="Human-readable display name")
+    icons: List[dict] = Field(
+        description="List of icon objects with at least a 'name' field"
     )

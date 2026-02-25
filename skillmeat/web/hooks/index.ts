@@ -273,13 +273,16 @@ export {
 } from './use-colors';
 
 // ============================================================================
-// ICON PACKS (2 hooks)
+// ICON PACKS (5 hooks)
 // ============================================================================
-// Icon pack listing and enabled-state management
+// Icon pack listing, enabled-state management, install, and delete
 export {
   iconPackKeys,
   useIconPacks,
   usePatchIconPacks,
+  useInstallIconPackFromUrl,
+  useInstallIconPackFromFile,
+  useDeleteIconPack,
 } from './use-icon-packs';
 
 // Detection patterns for artifact container identification

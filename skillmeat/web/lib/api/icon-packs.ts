@@ -63,3 +63,39 @@ export async function patchIconPacks(entries: IconPackPatchEntry[]): Promise<Ico
   }
   return response.json();
 }
+
+export async function installIconPackFromUrl(url: string): Promise<IconPack> {
+  const formData = new FormData();
+  formData.append('url', url);
+  const response = await fetch(buildUrl('/settings/icon-packs/install'), {
+    method: 'POST',
+    body: formData,
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error((errorBody as { detail?: string }).detail || `Failed to install icon pack: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function installIconPackFromFile(file: File): Promise<IconPack> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await fetch(buildUrl('/settings/icon-packs/install'), {
+    method: 'POST',
+    body: formData,
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error((errorBody as { detail?: string }).detail || `Failed to install icon pack: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function deleteIconPack(packId: string): Promise<void> {
+  const response = await fetch(buildUrl(`/settings/icon-packs/${packId}`), { method: 'DELETE' });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error((errorBody as { detail?: string }).detail || `Failed to delete icon pack: ${response.statusText}`);
+  }
+}

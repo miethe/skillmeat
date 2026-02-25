@@ -10,6 +10,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchIconPacks,
   patchIconPacks,
+  installIconPackFromUrl,
+  installIconPackFromFile,
+  deleteIconPack,
   type IconPackPatchEntry,
 } from '@/lib/api/icon-packs';
 import type { IconPack } from '@/lib/icon-constants';
@@ -79,5 +82,29 @@ export function usePatchIconPacks() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: iconPackKeys.all });
     },
+  });
+}
+
+export function useInstallIconPackFromUrl() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (url: string) => installIconPackFromUrl(url),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: iconPackKeys.all }); },
+  });
+}
+
+export function useInstallIconPackFromFile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => installIconPackFromFile(file),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: iconPackKeys.all }); },
+  });
+}
+
+export function useDeleteIconPack() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (packId: string) => deleteIconPack(packId),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: iconPackKeys.all }); },
   });
 }
