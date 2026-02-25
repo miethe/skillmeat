@@ -58,7 +58,7 @@ interface IconPackRowProps {
 
 function IconPackRow({ pack, onToggle, isPending }: IconPackRowProps) {
   const switchId = `icon-pack-toggle-${pack.id}`;
-  const iconCount = pack.icons.length;
+  const iconCount = pack.icons?.length ?? 0;
 
   return (
     <div
