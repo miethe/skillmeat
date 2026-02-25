@@ -3,9 +3,10 @@
 import * as React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Palette, Shapes } from 'lucide-react';
+import { Palette, Shapes, SlidersHorizontal } from 'lucide-react';
 import { ColorsSettings } from './colors-settings';
 import { IconsSettings } from './icons-settings';
+import { SimilaritySettings } from './similarity-settings';
 
 // ---------------------------------------------------------------------------
 // AppearanceSettings
@@ -26,6 +27,10 @@ export function AppearanceSettings() {
         <TabsTrigger value="icons" className="flex items-center gap-2">
           <Shapes className="h-4 w-4" />
           Icons
+        </TabsTrigger>
+        <TabsTrigger value="similarity" className="flex items-center gap-2">
+          <SlidersHorizontal className="h-4 w-4" />
+          Similarity
         </TabsTrigger>
       </TabsList>
 
@@ -61,6 +66,23 @@ export function AppearanceSettings() {
           </CardHeader>
           <CardContent>
             <IconsSettings />
+          </CardContent>
+        </Card>
+      </TabsContent>
+      {/* Similarity sub-tab */}
+      <TabsContent value="similarity" className="space-y-4">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="h-5 w-5" />
+              <CardTitle>Similarity Settings</CardTitle>
+            </div>
+            <CardDescription>
+              Configure score thresholds and band colors for the Similar Artifacts feature.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SimilaritySettings />
           </CardContent>
         </Card>
       </TabsContent>
