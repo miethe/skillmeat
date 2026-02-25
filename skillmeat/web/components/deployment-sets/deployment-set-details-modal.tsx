@@ -34,6 +34,9 @@ import {
   Check,
   Plus,
   X,
+  ChevronDown,
+  ChevronRight,
+  Package,
 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Tabs } from '@/components/ui/tabs';
@@ -42,6 +45,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -82,6 +90,7 @@ import {
   DeploymentSetMemberCardSkeleton,
 } from '@/components/deployment-sets/deployment-set-member-card';
 import { ArtifactDetailsModal } from '@/components/collection/artifact-details-modal';
+import { AddMemberDialog } from '@/components/deployment-sets/add-member-dialog';
 
 // ============================================================================
 // Types
@@ -704,12 +713,150 @@ function GroupMemberPopover({
   );
 }
 
+// ============================================================================
+// Member type section config
+// ============================================================================
+
+type MemberTypeKey = 'artifact' | 'group' | 'set';
+
+const MEMBER_TYPE_CONFIG: Record<
+  MemberTypeKey,
+  { label: string; icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }> }
+> = {
+  artifact: { label: 'Artifacts', icon: Package },
+  group: { label: 'Groups', icon: Users },
+  set: { label: 'Sets', icon: Layers },
+};
+
+const MEMBER_TYPE_ORDER: MemberTypeKey[] = ['artifact', 'group', 'set'];
+
+// ============================================================================
+// Collapsible member section
+// ============================================================================
+
+interface MemberSectionProps {
+  sectionKey: MemberTypeKey;
+  members: DeploymentSetMember[];
+  isCollapsed: boolean;
+  onToggle: () => void;
+  artifactByUuid: Record<string, Artifact>;
+  onArtifactClick: (artifact: Artifact) => void;
+  onSetClick: (nestedSetId: string) => void;
+}
+
+function MemberSection({
+  sectionKey,
+  members,
+  isCollapsed,
+  onToggle,
+  artifactByUuid,
+  onArtifactClick,
+  onSetClick,
+}: MemberSectionProps) {
+  const config = MEMBER_TYPE_CONFIG[sectionKey];
+  const Icon = config.icon;
+  const ChevronIcon = isCollapsed ? ChevronRight : ChevronDown;
+
+  return (
+    <Collapsible open={!isCollapsed} onOpenChange={() => onToggle()}>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-md px-1 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-expanded={!isCollapsed}
+          aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${config.label} section`}
+        >
+          <ChevronIcon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span>
+            {config.label}{' '}
+            <span className="font-normal text-muted-foreground">({members.length})</span>
+          </span>
+        </button>
+      </CollapsibleTrigger>
+
+      <CollapsibleContent>
+        <div
+          className="mt-2 max-h-[300px] overflow-y-auto"
+          aria-label={`${config.label} members`}
+        >
+          <div
+            className="grid grid-cols-1 gap-3 pb-1 pr-1 sm:grid-cols-2 lg:grid-cols-3"
+            role="list"
+            aria-label={`${config.label} member cards`}
+          >
+            {members.map((member, index) => {
+              const position = member.position ?? index + 1;
+
+              if (sectionKey === 'artifact') {
+                const resolvedArtifact =
+                  member.artifact_uuid ? artifactByUuid[member.artifact_uuid] : undefined;
+                return (
+                  <div key={member.id} role="listitem">
+                    <DeploymentSetMemberCard
+                      member={member}
+                      resolvedArtifact={resolvedArtifact}
+                      position={position}
+                      onClick={
+                        resolvedArtifact
+                          ? () => onArtifactClick(resolvedArtifact)
+                          : undefined
+                      }
+                    />
+                  </div>
+                );
+              }
+
+              if (sectionKey === 'set') {
+                return (
+                  <div key={member.id} role="listitem">
+                    <DeploymentSetMemberCard
+                      member={member}
+                      position={position}
+                      onClick={() => {
+                        if (member.nested_set_id) {
+                          onSetClick(member.nested_set_id);
+                        }
+                      }}
+                    />
+                  </div>
+                );
+              }
+
+              // group
+              return (
+                <div key={member.id} role="listitem">
+                  <GroupMemberPopover member={member}>
+                    <span className="block w-full">
+                      <DeploymentSetMemberCard
+                        member={member}
+                        position={position}
+                        onClick={() => {
+                          /* handled by popover trigger */
+                        }}
+                      />
+                    </span>
+                  </GroupMemberPopover>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 /**
  * DeploymentSetMembersTab
  *
  * Renders the Members tab content for a deployment set. Fetches members via
  * useDeploymentSetMembers and resolves artifact data for artifact-type members
  * by building a UUID → Artifact map from useArtifacts.
+ *
+ * Layout:
+ *   - Header row: "Members (N)" title + "Add Members" button
+ *   - Collapsible sections grouped by member type (artifact, group, set)
  *
  * Click behaviour:
  *   - artifact member → opens ArtifactDetailsModal
@@ -736,6 +883,24 @@ function DeploymentSetMembersTab({ setId }: { setId: string }) {
   const [nestedSetId, setNestedSetId] = useState<string | null>(null);
   const [nestedSetModalOpen, setNestedSetModalOpen] = useState(false);
 
+  // State for the Add Members dialog
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+
+  // Collapsed sections — tracked by member type key
+  const [collapsedSections, setCollapsedSections] = useState<Set<MemberTypeKey>>(new Set());
+
+  const toggleSection = useCallback((key: MemberTypeKey) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
   // Build uuid → Artifact map for O(1) lookups
   const artifactByUuid = useMemo<Record<string, Artifact>>(() => {
     const artifacts = artifactsResponse?.artifacts ?? [];
@@ -755,110 +920,115 @@ function DeploymentSetMembersTab({ setId }: { setId: string }) {
     });
   }, [members]);
 
+  // Group members by type
+  const membersByType = useMemo(() => {
+    const groups: Record<MemberTypeKey, DeploymentSetMember[]> = {
+      artifact: [],
+      group: [],
+      set: [],
+    };
+    for (const member of sortedMembers) {
+      const key = member.member_type as MemberTypeKey;
+      if (key in groups) {
+        groups[key].push(member);
+      }
+    }
+    return groups;
+  }, [sortedMembers]);
+
+  const totalCount = sortedMembers.length;
+
   // ── Loading state ──────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div
-        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
-        aria-busy="true"
-        aria-label="Loading members"
-      >
-        {[1, 2, 3].map((i) => (
-          <DeploymentSetMemberCardSkeleton key={i} />
-        ))}
+      <div className="space-y-4">
+        {/* Header skeleton */}
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-5 w-28" aria-label="Loading members count" />
+          <Skeleton className="h-8 w-32" aria-label="Loading add button" />
+        </div>
+        <div
+          className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+          aria-busy="true"
+          aria-label="Loading members"
+        >
+          {[1, 2, 3].map((i) => (
+            <DeploymentSetMemberCardSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }
 
-  // ── Empty state ────────────────────────────────────────────────────────────
-  if (sortedMembers.length === 0) {
-    return (
-      <div
-        className="flex flex-col items-center gap-3 rounded-md border border-dashed border-muted-foreground/30 px-4 py-12 text-center"
-        role="status"
-        aria-label="No members"
-      >
-        <Users className="h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
-        <p className="text-sm font-medium text-muted-foreground">No members yet</p>
-        <p className="text-xs text-muted-foreground/70">
-          Add artifacts, groups, or nested sets to this deployment set.
-        </p>
-      </div>
-    );
-  }
-
-  // ── Member grid ────────────────────────────────────────────────────────────
   return (
     <>
-      <div
-        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
-        role="list"
-        aria-label="Deployment set members"
-      >
-        {sortedMembers.map((member, index) => {
-          const position = member.position ?? index + 1;
-          const resolvedArtifact =
-            member.member_type === 'artifact' && member.artifact_uuid
-              ? artifactByUuid[member.artifact_uuid]
-              : undefined;
-
-          // ── Artifact member ──────────────────────────────────────────────
-          if (member.member_type === 'artifact') {
-            return (
-              <div key={member.id} role="listitem">
-                <DeploymentSetMemberCard
-                  member={member}
-                  resolvedArtifact={resolvedArtifact}
-                  position={position}
-                  onClick={
-                    resolvedArtifact
-                      ? () => {
-                          setSelectedArtifact(resolvedArtifact);
-                          setArtifactModalOpen(true);
-                        }
-                      : undefined
-                  }
-                />
-              </div>
-            );
-          }
-
-          // ── Set member ───────────────────────────────────────────────────
-          if (member.member_type === 'set') {
-            return (
-              <div key={member.id} role="listitem">
-                <DeploymentSetMemberCard
-                  member={member}
-                  position={position}
-                  onClick={() => {
-                    if (member.nested_set_id) {
-                      setNestedSetId(member.nested_set_id);
-                      setNestedSetModalOpen(true);
-                    }
-                  }}
-                />
-              </div>
-            );
-          }
-
-          // ── Group member ─────────────────────────────────────────────────
-          return (
-            <div key={member.id} role="listitem">
-              <GroupMemberPopover member={member}>
-                <span className="block w-full">
-                  <DeploymentSetMemberCard
-                    member={member}
-                    position={position}
-                    onClick={() => {
-                      /* handled by popover trigger */
-                    }}
-                  />
-                </span>
-              </GroupMemberPopover>
-            </div>
-          );
-        })}
+      {/* Header row */}
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-sm font-medium text-foreground">
+          Members
+          {totalCount > 0 && (
+            <span className="ml-1 font-normal text-muted-foreground">({totalCount})</span>
+          )}
+        </h3>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5 px-3 text-xs"
+          onClick={() => setAddMemberOpen(true)}
+          aria-label="Add members to this deployment set"
+        >
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+          Add Members
+        </Button>
       </div>
+
+      {/* Empty state — shown when there are no members across all types */}
+      {totalCount === 0 ? (
+        <div
+          className="flex flex-col items-center gap-3 rounded-md border border-dashed border-muted-foreground/30 px-4 py-12 text-center"
+          role="status"
+          aria-label="No members"
+        >
+          <Users className="h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
+          <p className="text-sm font-medium text-muted-foreground">No members yet</p>
+          <p className="text-xs text-muted-foreground/70">
+            Add artifacts, groups, or nested sets to this deployment set.
+          </p>
+        </div>
+      ) : (
+        /* Collapsible sections grouped by type */
+        <div className="space-y-1" role="region" aria-label="Members by type">
+          {MEMBER_TYPE_ORDER.map((typeKey) => {
+            const sectionMembers = membersByType[typeKey];
+            if (sectionMembers.length === 0) return null;
+            return (
+              <MemberSection
+                key={typeKey}
+                sectionKey={typeKey}
+                members={sectionMembers}
+                isCollapsed={collapsedSections.has(typeKey)}
+                onToggle={() => toggleSection(typeKey)}
+                artifactByUuid={artifactByUuid}
+                onArtifactClick={(artifact) => {
+                  setSelectedArtifact(artifact);
+                  setArtifactModalOpen(true);
+                }}
+                onSetClick={(nestedId) => {
+                  setNestedSetId(nestedId);
+                  setNestedSetModalOpen(true);
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add Members dialog */}
+      <AddMemberDialog
+        open={addMemberOpen}
+        onOpenChange={setAddMemberOpen}
+        setId={setId}
+      />
 
       {/* Artifact details modal (artifact-type member navigation) */}
       <ArtifactDetailsModal
