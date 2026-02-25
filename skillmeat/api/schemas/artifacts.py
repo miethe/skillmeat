@@ -1391,3 +1391,68 @@ class ArtifactTagsUpdate(BaseModel):
                 "tags": ["productivity", "ai_tools", "automation"],
             }
         }
+
+
+class SimilarityBreakdownDTO(BaseModel):
+    """Score breakdown for a similarity match."""
+
+    content_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Content similarity score"
+    )
+    structure_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Structure similarity score"
+    )
+    metadata_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Metadata similarity score"
+    )
+    keyword_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Keyword/TF-IDF similarity score"
+    )
+    semantic_score: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Semantic similarity score (None if unavailable)",
+    )
+
+
+class SimilarArtifactDTO(BaseModel):
+    """A similar artifact with similarity score and breakdown."""
+
+    artifact_id: str = Field(
+        ..., description="Unique identifier of the similar artifact"
+    )
+    name: str = Field(..., description="Display name of the similar artifact")
+    artifact_type: str = Field(
+        ..., description="Type of the artifact (skill, command, etc.)"
+    )
+    source: Optional[str] = Field(
+        None, description="Source repository or path"
+    )
+    composite_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Overall similarity score"
+    )
+    match_type: str = Field(
+        ...,
+        description="Match classification: exact, near_duplicate, similar, related",
+    )
+    breakdown: SimilarityBreakdownDTO = Field(
+        ..., description="Individual score components"
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class SimilarArtifactsResponse(BaseModel):
+    """Response for the GET /api/v1/artifacts/{id}/similar endpoint."""
+
+    artifact_id: str = Field(
+        ..., description="Canonical identifier of the source artifact"
+    )
+    items: List[SimilarArtifactDTO] = Field(
+        ..., description="Similar artifacts ordered by composite score descending"
+    )
+    total: int = Field(..., description="Total number of similar artifacts returned")
