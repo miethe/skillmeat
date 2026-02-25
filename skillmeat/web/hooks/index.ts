@@ -260,6 +260,28 @@ export {
   type IndexingModeResponse,
 } from './useIndexingMode';
 
+// ============================================================================
+// COLORS (4 hooks)
+// ============================================================================
+// Custom color CRUD operations
+export {
+  colorKeys,
+  useCustomColors,
+  useCreateCustomColor,
+  useUpdateCustomColor,
+  useDeleteCustomColor,
+} from './use-colors';
+
+// ============================================================================
+// ICON PACKS (2 hooks)
+// ============================================================================
+// Icon pack listing and enabled-state management
+export {
+  iconPackKeys,
+  useIconPacks,
+  usePatchIconPacks,
+} from './use-icon-packs';
+
 // Detection patterns for artifact container identification
 export {
   detectionPatternKeys,

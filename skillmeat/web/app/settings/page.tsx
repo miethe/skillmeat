@@ -11,10 +11,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Settings, Github, MonitorCog, Layers, Plus, Info } from 'lucide-react';
+import { Settings, Github, MonitorCog, Layers, Plus, Info, Palette } from 'lucide-react';
 import { GitHubSettings } from '@/components/settings/github-settings';
 import { PlatformDefaultsSettings } from '@/components/settings/platform-defaults-settings';
 import { CustomContextSettings } from '@/components/settings/custom-context-settings';
+import { AppearanceSettings } from '@/app/settings/components/appearance-settings';
 import { CreateProfileForm } from '@/components/profiles';
 import { useCreateDeploymentProfile } from '@/hooks';
 import { useToast } from '@/hooks';
@@ -79,6 +80,10 @@ export default function SettingsPage() {
           <TabsTrigger value="platforms" className="flex items-center gap-2">
             <MonitorCog className="h-4 w-4" />
             Platforms
+          </TabsTrigger>
+          <TabsTrigger value="appearance" className="flex items-center gap-2">
+            <Palette className="h-4 w-4" />
+            Appearance
           </TabsTrigger>
         </TabsList>
 
@@ -159,6 +164,10 @@ export default function SettingsPage() {
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+        {/* Appearance Tab */}
+        <TabsContent value="appearance" className="space-y-4">
+          <AppearanceSettings />
         </TabsContent>
       </Tabs>
 
