@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useUpdateDeploymentSet, useToast } from '@/hooks';
+import { useUpdateDeploymentSet, useTags, useToast } from '@/hooks';
 import type { DeploymentSet } from '@/types/deployment-sets';
 import {
   Dialog,
@@ -15,8 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { X } from 'lucide-react';
+import { TagEditor } from '@/components/shared/tag-editor';
 import { COLOR_OPTIONS } from '@/lib/group-constants';
 
 interface EditDeploymentSetDialogProps {
@@ -28,8 +27,9 @@ interface EditDeploymentSetDialogProps {
 /**
  * Dialog for editing an existing Deployment Set.
  *
- * Pre-fills all fields from the provided set and calls useUpdateDeploymentSet
- * on save. Closes on success.
+ * Pre-fills all fields from the provided set. Tags use the shared tags API
+ * for search/autocomplete — users can select existing tags or create new ones.
+ * Calls useUpdateDeploymentSet on save. Closes on success.
  */
 export function EditDeploymentSetDialog({ open, onOpenChange, set }: EditDeploymentSetDialogProps) {
   const { toast } = useToast();
@@ -39,8 +39,11 @@ export function EditDeploymentSetDialog({ open, onOpenChange, set }: EditDeploym
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('');
   const [icon, setIcon] = useState('');
-  const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+
+  // Pre-fetch all tags for the autocomplete popover (client-side filtering)
+  const { data: tagsData } = useTags(200);
+  const availableTags = tagsData?.items.map((t) => t.name) ?? [];
 
   // Sync form fields whenever the dialog opens or the set changes
   useEffect(() => {
@@ -51,28 +54,8 @@ export function EditDeploymentSetDialog({ open, onOpenChange, set }: EditDeploym
     setDescription(set.description ?? '');
     setColor(set.color ?? '');
     setIcon(set.icon ?? '');
-    setTagInput('');
     setTags(set.tags ?? []);
   }, [open, set]);
-
-  const handleAddTag = () => {
-    const trimmed = tagInput.trim();
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags((prev) => [...prev, trimmed]);
-    }
-    setTagInput('');
-  };
-
-  const handleTagInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter' || event.key === ',') {
-      event.preventDefault();
-      handleAddTag();
-    }
-  };
-
-  const handleRemoveTag = (tag: string) => {
-    setTags((prev) => prev.filter((t) => t !== tag));
-  };
 
   const handleSave = async () => {
     if (!set) {
@@ -187,36 +170,15 @@ export function EditDeploymentSetDialog({ open, onOpenChange, set }: EditDeploym
 
           {/* Tags */}
           <div className="space-y-2">
-            <Label htmlFor="ds-edit-tags">Tags</Label>
-            <div className="flex gap-2">
-              <Input
-                id="ds-edit-tags"
-                placeholder="Add a tag and press Enter"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={handleTagInputKeyDown}
-              />
-              <Button type="button" variant="outline" size="sm" onClick={handleAddTag}>
-                Add
-              </Button>
-            </div>
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1" role="list" aria-label="Current tags">
-                {tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="gap-1" role="listitem">
-                    {tag}
-                    <button
-                      type="button"
-                      aria-label={`Remove tag ${tag}`}
-                      onClick={() => handleRemoveTag(tag)}
-                      className="rounded-sm hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    >
-                      <X className="h-3 w-3" aria-hidden="true" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
+            <Label>Tags</Label>
+            <TagEditor
+              tags={tags}
+              onTagsChange={setTags}
+              availableTags={availableTags}
+            />
+            <p className="text-xs text-muted-foreground">
+              Search existing tags or type a new name to create one.
+            </p>
           </div>
         </div>
 

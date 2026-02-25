@@ -251,7 +251,11 @@ class Artifact(Base):
 
     # Stable cross-context identity (ADR-007)
     uuid: Mapped[str] = mapped_column(
-        String, unique=True, nullable=False, default=lambda: uuid.uuid4().hex, index=True
+        String,
+        unique=True,
+        nullable=False,
+        default=lambda: uuid.uuid4().hex,
+        index=True,
     )
 
     # Foreign key
@@ -1229,6 +1233,14 @@ class Tag(Base):
         back_populates="tags",
         viewonly=True,
     )
+    deployment_sets: Mapped[List["DeploymentSet"]] = relationship(
+        "DeploymentSet",
+        secondary="deployment_set_tags",
+        primaryjoin="Tag.id == DeploymentSetTag.tag_id",
+        secondaryjoin="foreign(DeploymentSetTag.deployment_set_id) == DeploymentSet.id",
+        lazy="selectin",
+        viewonly=True,
+    )
 
     # Constraints
     __table_args__ = (
@@ -1316,6 +1328,55 @@ class ArtifactTag(Base):
         """Return string representation of ArtifactTag."""
         return (
             f"<ArtifactTag(artifact_uuid={self.artifact_uuid!r}, "
+            f"tag_id={self.tag_id!r}, created_at={self.created_at!r})>"
+        )
+
+
+class DeploymentSetTag(Base):
+    """Association between DeploymentSet and Tag (many-to-many).
+
+    Links deployment sets to tags for categorization and filtering. Each
+    deployment set can have multiple tags, and each tag can be applied to
+    multiple deployment sets.
+
+    Attributes:
+        deployment_set_id: FK to deployment_sets.id (part of composite PK;
+            CASCADE delete so removing a set purges its tag associations)
+        tag_id: Foreign key to tags.id (part of composite PK)
+        created_at: Timestamp when tag was added to deployment set
+
+    Indexes:
+        - idx_deployment_set_tags_set_id: Fast lookup by deployment set
+        - idx_deployment_set_tags_tag_id: Fast lookup by tag
+    """
+
+    __tablename__ = "deployment_set_tags"
+
+    # Composite primary key
+    deployment_set_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("deployment_sets.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    tag_id: Mapped[str] = mapped_column(
+        String, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_deployment_set_tags_set_id", "deployment_set_id"),
+        Index("idx_deployment_set_tags_tag_id", "tag_id"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of DeploymentSetTag."""
+        return (
+            f"<DeploymentSetTag(deployment_set_id={self.deployment_set_id!r}, "
             f"tag_id={self.tag_id!r}, created_at={self.created_at!r})>"
         )
 
@@ -2833,9 +2894,7 @@ class ContextModule(Base):
     )
 
     # Constraints and indexes
-    __table_args__ = (
-        Index("idx_context_modules_project", "project_id"),
-    )
+    __table_args__ = (Index("idx_context_modules_project", "project_id"),)
 
     @property
     def selectors(self) -> Optional[Dict[str, Any]]:
@@ -2889,9 +2948,7 @@ class ModuleMemoryItem(Base):
     )
 
     # Indexes
-    __table_args__ = (
-        Index("idx_module_memory_items_memory", "memory_id"),
-    )
+    __table_args__ = (Index("idx_module_memory_items_memory", "memory_id"),)
 
     def __repr__(self) -> str:
         """Return string representation of ModuleMemoryItem."""
@@ -3099,7 +3156,9 @@ class CompositeMembership(Base):
     pinned_version_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # Display order within the composite (0-based, nullable for backward compat)
-    position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
+    position: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, default=None
+    )
 
     # Extensibility — raw JSON string for future per-membership metadata
     membership_metadata: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -3233,6 +3292,14 @@ class DeploymentSet(Base):
         lazy="selectin",
         order_by="DeploymentSetMember.position",
     )
+    tag_objects: Mapped[List["Tag"]] = relationship(
+        "Tag",
+        secondary="deployment_set_tags",
+        primaryjoin="DeploymentSet.id == DeploymentSetTag.deployment_set_id",
+        secondaryjoin="foreign(DeploymentSetTag.tag_id) == Tag.id",
+        lazy="selectin",
+        viewonly=True,
+    )
 
     # Constraints and indexes
     __table_args__ = (
@@ -3265,7 +3332,14 @@ class DeploymentSet(Base):
         }
 
     def get_tags(self) -> List[str]:
-        """Parse and return tags as a list."""
+        """Return tag names from the relational tag_objects relationship.
+
+        Falls back to parsing tags_json for backward compatibility during
+        migration when tag_objects may not yet be populated.
+        """
+        if self.tag_objects:
+            return [t.name for t in self.tag_objects]
+        # Fallback to tags_json for backward compatibility during migration
         if not self.tags_json:
             return []
         try:
@@ -3275,7 +3349,11 @@ class DeploymentSet(Base):
         return parsed if isinstance(parsed, list) else []
 
     def set_tags(self, tags: List[str]) -> None:
-        """Persist tags from a list as JSON text."""
+        """Persist tags from a list as JSON text (legacy — prefer junction table).
+
+        Kept for backward compatibility. New code should use the repository's
+        _sync_tags() method which writes to the deployment_set_tags junction table.
+        """
         self.tags_json = json.dumps(tags or [])
 
 

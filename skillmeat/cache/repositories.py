@@ -60,6 +60,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -79,6 +80,7 @@ from skillmeat.cache.models import (
     DeploymentProfile,
     DeploymentSet,
     DeploymentSetMember,
+    DeploymentSetTag,
     MarketplaceCatalogEntry,
     MarketplaceSource,
     Tag,
@@ -439,9 +441,7 @@ class ScanUpdateContext:
         # Update ref if provided (branch fallback detected during scan)
         if ref is not None:
             source.ref = ref
-            logger.info(
-                f"Updated source {self.source_id} ref to '{ref}'"
-            )
+            logger.info(f"Updated source {self.source_id} ref to '{ref}'")
 
         logger.info(
             f"Updated source {self.source_id}: status={status}, "
@@ -3080,8 +3080,14 @@ class DeploymentProfileRepository(BaseRepository[DeploymentProfile]):
         """Create a deployment profile."""
         session = self._get_session()
         try:
-            platform_value = platform.value if isinstance(platform, Platform) else str(platform)
-            platform_enum = Platform(platform_value) if platform_value in {p.value for p in Platform} else Platform.OTHER
+            platform_value = (
+                platform.value if isinstance(platform, Platform) else str(platform)
+            )
+            platform_enum = (
+                Platform(platform_value)
+                if platform_value in {p.value for p in Platform}
+                else Platform.OTHER
+            )
             root_prefix = f"{root_dir.rstrip('/')}/context/"
             profile = DeploymentProfile(
                 id=uuid.uuid4().hex,
@@ -3629,11 +3635,7 @@ class TagRepository(BaseRepository[Tag]):
                 )
 
             # Verify artifact and tag exist
-            artifact = (
-                session.query(Artifact)
-                .filter_by(uuid=artifact_uuid)
-                .first()
-            )
+            artifact = session.query(Artifact).filter_by(uuid=artifact_uuid).first()
             if not artifact:
                 raise RepositoryError(
                     f"Artifact with uuid={artifact_uuid!r} not found in cache"
@@ -3859,6 +3861,62 @@ class TagRepository(BaseRepository[Tag]):
         finally:
             session.close()
 
+    def get_tag_deployment_set_count(self, tag_id: str) -> int:
+        """Get number of deployment sets with a specific tag.
+
+        Args:
+            tag_id: Tag identifier
+
+        Returns:
+            Count of deployment sets with this tag
+
+        Example:
+            >>> count = repo.get_tag_deployment_set_count("tag-123")
+            >>> print(f"Tag used on {count} deployment sets")
+        """
+        session = self._get_session()
+        try:
+            result = (
+                session.query(func.count(DeploymentSetTag.deployment_set_id))
+                .filter(DeploymentSetTag.tag_id == tag_id)
+                .scalar()
+            )
+            return result or 0
+        finally:
+            session.close()
+
+    def get_all_deployment_set_tag_counts(self) -> List[tuple[Tag, int]]:
+        """Get all tags with their deployment set counts.
+
+        Returns:
+            List of (tag, count) tuples where count is the number of
+            deployment sets associated with each tag, ordered by count
+            descending then by name.
+
+        Example:
+            >>> ds_counts = repo.get_all_deployment_set_tag_counts()
+            >>> for tag, count in ds_counts:
+            ...     print(f"{tag.name}: {count} deployment sets")
+        """
+        session = self._get_session()
+        try:
+            results = (
+                session.query(
+                    Tag,
+                    func.count(DeploymentSetTag.deployment_set_id).label("count"),
+                )
+                .outerjoin(DeploymentSetTag, Tag.id == DeploymentSetTag.tag_id)
+                .group_by(Tag.id)
+                .order_by(
+                    func.count(DeploymentSetTag.deployment_set_id).desc(), Tag.name
+                )
+                .all()
+            )
+            logger.debug(f"Retrieved deployment-set counts for {len(results)} tags")
+            return results
+        finally:
+            session.close()
+
 
 # =============================================================================
 # Deployment Set Repository
@@ -3893,6 +3951,69 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
             db_path: Optional path to SQLite database file (uses default if None).
         """
         super().__init__(db_path, DeploymentSet)
+
+    # =========================================================================
+    # Internal Helpers
+    # =========================================================================
+
+    def _sync_tags(self, session: Session, set_id: str, tag_names: List[str]) -> None:
+        """Sync deployment set tags via the deployment_set_tags junction table.
+
+        Clears all existing tag associations for the given deployment set, then
+        for each tag name finds or creates a ``Tag`` record and inserts a
+        ``DeploymentSetTag`` junction row.
+
+        Args:
+            session: Active SQLAlchemy session (caller owns commit/rollback).
+            set_id: Primary key of the deployment set to sync.
+            tag_names: List of tag name strings to associate with the set.
+        """
+        # Clear existing tag associations for this set
+        session.query(DeploymentSetTag).filter(
+            DeploymentSetTag.deployment_set_id == set_id
+        ).delete(synchronize_session=False)
+
+        now = datetime.utcnow()
+
+        for raw_name in tag_names:
+            name = raw_name.strip()
+            if not name:
+                continue
+
+            # Find existing tag by name (case-insensitive)
+            tag = (
+                session.query(Tag)
+                .filter(func.lower(Tag.name) == func.lower(name))
+                .first()
+            )
+
+            if not tag:
+                # Build a unique slug
+                slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+                if not slug:
+                    slug = uuid.uuid4().hex[:8]
+                base_slug = slug
+                counter = 1
+                while session.query(Tag).filter(Tag.slug == slug).first():
+                    slug = f"{base_slug}-{counter}"
+                    counter += 1
+
+                tag = Tag(
+                    id=uuid.uuid4().hex,
+                    name=name,
+                    slug=slug,
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(tag)
+                session.flush()  # Assign id before referencing in junction row
+
+            assoc = DeploymentSetTag(
+                deployment_set_id=set_id,
+                tag_id=tag.id,
+                created_at=now,
+            )
+            session.add(assoc)
 
     # =========================================================================
     # Create
@@ -3931,8 +4052,10 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
                 created_at=now,
                 updated_at=now,
             )
-            ds.set_tags(tags or [])
             session.add(ds)
+            session.flush()  # Assign the id before syncing tags
+            if tags:
+                self._sync_tags(session, ds.id, tags)
             session.commit()
             session.refresh(ds)
             logger.debug("Created DeploymentSet id=%s owner=%s", ds.id, owner_id)
@@ -4000,15 +4123,18 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
         """
         session = self._get_session()
         try:
-            q = session.query(DeploymentSet).filter(
-                DeploymentSet.owner_id == owner_id
-            )
+            q = session.query(DeploymentSet).filter(DeploymentSet.owner_id == owner_id)
             if name is not None:
                 q = q.filter(DeploymentSet.name.ilike(f"%{name}%"))
             if tag is not None:
-                # tags_json stores a JSON array of strings, e.g. '["prod","v2"]'.
-                # A simple LIKE on the serialised text is fast and sufficient.
-                q = q.filter(DeploymentSet.tags_json.like(f'%"{tag}"%'))
+                q = (
+                    q.join(
+                        DeploymentSetTag,
+                        DeploymentSetTag.deployment_set_id == DeploymentSet.id,
+                    )
+                    .join(Tag, Tag.id == DeploymentSetTag.tag_id)
+                    .filter(func.lower(Tag.name) == func.lower(tag))
+                )
             return (
                 q.order_by(DeploymentSet.created_at.desc())
                 .limit(limit)
@@ -4047,7 +4173,14 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
             if name is not None:
                 q = q.filter(DeploymentSet.name.ilike(f"%{name}%"))
             if tag is not None:
-                q = q.filter(DeploymentSet.tags_json.like(f'%"{tag}"%'))
+                q = (
+                    q.join(
+                        DeploymentSetTag,
+                        DeploymentSetTag.deployment_set_id == DeploymentSet.id,
+                    )
+                    .join(Tag, Tag.id == DeploymentSetTag.tag_id)
+                    .filter(func.lower(Tag.name) == func.lower(tag))
+                )
             return q.scalar() or 0
         finally:
             session.close()
@@ -4099,7 +4232,7 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
             if "description" in kwargs:
                 ds.description = kwargs["description"]
             if "tags" in kwargs:
-                ds.set_tags(kwargs["tags"])
+                self._sync_tags(session, ds.id, kwargs["tags"])
 
             ds.updated_at = datetime.utcnow()
             session.commit()
@@ -4385,9 +4518,7 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
         finally:
             session.close()
 
-    def get_members(
-        self, set_id: str, owner_id: str
-    ) -> List[DeploymentSetMember]:
+    def get_members(self, set_id: str, owner_id: str) -> List[DeploymentSetMember]:
         """Return all members of a DeploymentSet, ordered by position.
 
         The set must belong to ``owner_id``; an empty list is returned if

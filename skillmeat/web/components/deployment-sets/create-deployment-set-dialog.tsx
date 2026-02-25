@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useCreateDeploymentSet, useToast } from '@/hooks';
+import { useCreateDeploymentSet, useTags, useToast } from '@/hooks';
 import {
   Dialog,
   DialogContent,
@@ -14,8 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { X } from 'lucide-react';
+import { TagEditor } from '@/components/shared/tag-editor';
 import { COLOR_OPTIONS } from '@/lib/group-constants';
 
 interface CreateDeploymentSetDialogProps {
@@ -27,6 +26,8 @@ interface CreateDeploymentSetDialogProps {
  * Dialog for creating a new Deployment Set.
  *
  * Fields: name (required), description, color preset, icon (emoji), tags.
+ * Tags use the shared tags API for search/autocomplete — users can select
+ * existing tags or create new ones by typing a name.
  * Calls useCreateDeploymentSet on submit and closes on success.
  */
 export function CreateDeploymentSetDialog({ open, onOpenChange }: CreateDeploymentSetDialogProps) {
@@ -37,8 +38,11 @@ export function CreateDeploymentSetDialog({ open, onOpenChange }: CreateDeployme
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('');
   const [icon, setIcon] = useState('');
-  const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+
+  // Pre-fetch all tags for the autocomplete popover (client-side filtering)
+  const { data: tagsData } = useTags(200);
+  const availableTags = tagsData?.items.map((t) => t.name) ?? [];
 
   // Reset form when dialog opens/closes
   useEffect(() => {
@@ -49,28 +53,8 @@ export function CreateDeploymentSetDialog({ open, onOpenChange }: CreateDeployme
     setDescription('');
     setColor('');
     setIcon('');
-    setTagInput('');
     setTags([]);
   }, [open]);
-
-  const handleAddTag = () => {
-    const trimmed = tagInput.trim();
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags((prev) => [...prev, trimmed]);
-    }
-    setTagInput('');
-  };
-
-  const handleTagInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter' || event.key === ',') {
-      event.preventDefault();
-      handleAddTag();
-    }
-  };
-
-  const handleRemoveTag = (tag: string) => {
-    setTags((prev) => prev.filter((t) => t !== tag));
-  };
 
   const handleSave = async () => {
     const trimmedName = name.trim();
@@ -180,36 +164,15 @@ export function CreateDeploymentSetDialog({ open, onOpenChange }: CreateDeployme
 
           {/* Tags */}
           <div className="space-y-2">
-            <Label htmlFor="ds-tags">Tags</Label>
-            <div className="flex gap-2">
-              <Input
-                id="ds-tags"
-                placeholder="Add a tag and press Enter"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={handleTagInputKeyDown}
-              />
-              <Button type="button" variant="outline" size="sm" onClick={handleAddTag}>
-                Add
-              </Button>
-            </div>
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1" role="list" aria-label="Added tags">
-                {tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="gap-1" role="listitem">
-                    {tag}
-                    <button
-                      type="button"
-                      aria-label={`Remove tag ${tag}`}
-                      onClick={() => handleRemoveTag(tag)}
-                      className="rounded-sm hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    >
-                      <X className="h-3 w-3" aria-hidden="true" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
+            <Label>Tags</Label>
+            <TagEditor
+              tags={tags}
+              onTagsChange={setTags}
+              availableTags={availableTags}
+            />
+            <p className="text-xs text-muted-foreground">
+              Search existing tags or type a new name to create one.
+            </p>
           </div>
         </div>
 
