@@ -3,7 +3,7 @@ title: "Similar Artifacts \u2014 Phase 5\u20136: Collection Consolidation View +
   \ Integration"
 schema_version: 2
 doc_type: phase_plan
-status: in-progress
+status: completed
 created: 2026-02-25
 updated: '2026-02-25'
 feature_slug: similar-artifacts
@@ -35,7 +35,6 @@ tags:
 - cli
 - similar-artifacts
 ---
-
 # Phase 5–6: Collection Consolidation View + CLI Integration
 
 **Parent Plan**: [similar-artifacts-v1.md](../similar-artifacts-v1.md)
