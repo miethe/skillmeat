@@ -116,6 +116,35 @@ Commands are prompt templates. Skills are knowledge repositories. Without explic
 
 **Default: Sonnet 4.6** — Sonnet is now near-Opus for coding (79.6% SWE-bench). Use Opus only for deep reasoning.
 
+### Multi-Model Integration
+
+External models are available as **opt-in** supplements to Claude. Claude Opus remains the sole orchestrator; external models are execution targets.
+
+**Configuration**: `.claude/config/multi-model.toml` — controls model routing, effort policies, checkpoints, and asset pipeline.
+
+| Capability | Model | Trigger |
+|-----------|-------|---------|
+| Plan review (second opinion) | GPT-5.3-Codex | Opt-in checkpoint |
+| PR cross-validation | Gemini 3.1 Pro / Flash | Opt-in checkpoint |
+| Debug escalation | GPT-5.3-Codex | After 2+ failed Claude cycles |
+| Web research | Gemini 3.1 Pro | Current web info needed |
+| Image generation | Nano Banana Pro | Task requires image output |
+| SVG/animation (complex) | Gemini 3.1 Pro | Multi-element visual tasks |
+| Video generation | Sora 2 | Explicit request |
+| Privacy-sensitive | Local LLM | Configured + requested |
+
+**Effort Policy**: Thinking/reasoning is a budgeted policy layer. Claude uses adaptive thinking by default; escalate to extended only when **blocked with concrete artifacts**. Codex uses graduated reasoning (`none`/`low`/`medium`/`high`/`xhigh`). `budget_tokens` is deprecated on Opus 4.6.
+
+**Disagreement Protocol**: When models conflict, tests decide — not model preference. CI is the neutral arbiter. See `.claude/skills/dev-execution/orchestration/disagreement-protocol.md`.
+
+**Key references**:
+- Spec: `.claude/specs/multi-model-usage-spec.md`
+- Config: `.claude/config/multi-model.toml`
+- Model selection: `.claude/skills/dev-execution/orchestration/model-selection-guide.md`
+- Checkpoints: `.claude/skills/dev-execution/orchestration/cross-model-review.md`
+- Escalation: `.claude/skills/dev-execution/orchestration/escalation-protocols.md`
+- Creative workflows: `.claude/skills/dev-execution/orchestration/creative-workflows.md`
+
 ### Implementation Agents
 
 | Agent | Model | Skills | Permission | Memory |

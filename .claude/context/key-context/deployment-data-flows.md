@@ -2,6 +2,8 @@
 
 Agent context for deployment lifecycle, cache sync patterns, and API response generation.
 
+**Updated**: 2026-02-25
+
 ## Quick Reference
 
 | Operation | FS Write | DB Cache | Frontend Invalidation |
@@ -342,3 +344,64 @@ if assoc:
 - Next cache refresh syncs
 
 **Recovery**: `POST /api/v1/cache/refresh` triggers full rescan and DB sync.
+
+---
+
+## Deployment Sets Data Flow
+
+### Resolution Flow
+
+```
+DeploymentSet → resolve members recursively (DFS)
+  ├── Direct artifacts → add to result set
+  ├── Group members → expand group artifacts → add
+  └── Nested set members → recurse (with depth limit)
+  → Deduplicate by artifact_uuid
+  → Return flat resolved artifact list
+```
+
+**Implementation**: `skillmeat/api/services/deployment_sets_service.py::resolve_deployment_set()`
+
+### Batch Deploy Flow
+
+```
+POST /api/v1/deployment-sets/{id}/batch-deploy
+  ├── Resolve set → flat artifact list
+  ├── For each artifact: deploy to target project + profile
+  │   ├── Success → record in results
+  │   └── Failure → record error, continue (partial failure OK)
+  └── Return BatchDeployResult with per-artifact status
+```
+
+**Handler**: `skillmeat/api/routers/deployment_sets.py::batch_deploy_set()`
+
+**Response Schema**: `BatchDeployResult` containing:
+- `deployment_set_id` (str): Set identifier
+- `target_project_id` (str): Target project path
+- `results` (List[ArtifactDeploymentResult]): Per-artifact outcomes
+  - `artifact_id` (str): Artifact identifier
+  - `status` ('success' | 'failed'): Deployment status
+  - `error` (str|null): Error message if failed
+
+### Cache Invalidation
+
+**Set CRUD mutations** invalidate:
+- `deployment-sets` (list cache)
+- `deployment-set-{id}` (detail cache)
+
+**Member mutations** invalidate:
+- `deployment-set-{id}` (detail and member list)
+- `deployment-set-members-{id}` (member collection)
+
+**Batch deploy** invalidates:
+- `deployments` (deployment list)
+- `deployment-stats` (analytics)
+- `project-{id}` (project artifacts)
+
+### Feature Flag
+
+Deployment Sets feature is gated by environment variable:
+- **Gate**: `SKILLMEAT_DEPLOYMENT_SETS_ENABLED` (boolean)
+- **Frontend**: `useFeatureFlags()` hook controls sidebar visibility
+- **Backend**: All endpoints return 501 Not Implemented when disabled
+- **Default**: False (feature in beta)

@@ -2,7 +2,7 @@
 title: 'PRD: Deployment Sets'
 schema_version: 2
 doc_type: prd
-status: draft
+status: inferred_complete
 created: 2026-02-23
 updated: 2026-02-24
 feature_slug: deployment-sets
@@ -50,7 +50,8 @@ personas:
 - Power User
 - Team Lead
 goals:
-- CRUD for named Deployment Sets with nested composition (sets within sets, groups, individual artifacts)
+- CRUD for named Deployment Sets with nested composition (sets within sets, groups,
+  individual artifacts)
 - Recursive member resolution that deduplicates and batch-deploys all resolved artifacts
 - Web UI for managing sets and triggering batch deployments to a target project
 non_goals:
@@ -59,11 +60,13 @@ non_goals:
 - Linking Deployment Sets to Memory items or Context Packs (future)
 - Auto-grouping of collection artifacts (separate backlog item REQ-20260130)
 success_metrics:
-- A Deployment Set with 3 levels of nesting deploys all resolved artifacts to a project in a single action
+- A Deployment Set with 3 levels of nesting deploys all resolved artifacts to a project
+  in a single action
 - Circular-reference detection prevents invalid set configurations at write time
 - Batch deploy completes in under 5 seconds for sets resolving up to 50 artifacts
 dependencies:
-- Existing Groups model and GroupArtifact join table (collection-scoped organizational layer)
+- Existing Groups model and GroupArtifact join table (collection-scoped organizational
+  layer)
 - Existing DeploymentProfile + Deployment TOML/DB layer (project-scoped deploy layer)
 - ADR-007 stable artifact_uuid as cross-context identity key
 - Alembic migration toolchain
@@ -73,7 +76,6 @@ risks:
 - Batch deploy fails partially, leaving project in inconsistent deployment state
 - Schema divergence between ORM models and API response types
 ---
-
 # Feature Brief & Metadata
 
 **Feature Name:**

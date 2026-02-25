@@ -151,6 +151,12 @@ class TagResponse(BaseModel):
         ge=0,
         examples=[12],
     )
+    deployment_set_count: Optional[int] = Field(
+        default=None,
+        description="Number of deployment sets with this tag (included when fetching list)",
+        ge=0,
+        examples=[3],
+    )
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -163,6 +169,7 @@ class TagResponse(BaseModel):
                 "created_at": "2025-12-18T10:00:00Z",
                 "updated_at": "2025-12-18T15:30:00Z",
                 "artifact_count": 12,
+                "deployment_set_count": 3,
             }
         },
     )

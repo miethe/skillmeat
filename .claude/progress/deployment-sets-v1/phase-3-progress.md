@@ -2,58 +2,80 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "deployment-sets-v1"
-feature_slug: "deployment-sets"
+prd: deployment-sets-v1
+feature_slug: deployment-sets
 prd_ref: docs/project_plans/PRDs/features/deployment-sets-v1.md
 plan_ref: docs/project_plans/implementation_plans/features/deployment-sets-v1.md
 phase: 3
-title: "API Layer"
-status: "planning"
-started: "2026-02-23"
+title: API Layer
+status: completed
+started: '2026-02-23'
 completed: null
 commit_refs: []
 pr_refs: []
 overall_progress: 0
-completion_estimate: "on-track"
+completion_estimate: on-track
 total_tasks: 2
-completed_tasks: 0
+completed_tasks: 2
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-owners: ["python-backend-engineer"]
+owners:
+- python-backend-engineer
 contributors: []
 tasks:
-  - id: "DS-007"
-    description: "Pydantic schemas for all deployment set DTOs (create, update, response, member, resolve, batch deploy)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DS-006"]
-    estimated_effort: "1 pt"
-    priority: "high"
-  - id: "DS-008"
-    description: "11 REST endpoints + router registration in server.py with owner-scope enforcement hooks"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DS-007"]
-    estimated_effort: "3 pts"
-    priority: "high"
+- id: DS-007
+  description: Pydantic schemas for all deployment set DTOs (create, update, response,
+    member, resolve, batch deploy)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DS-006
+  estimated_effort: 1 pt
+  priority: high
+- id: DS-008
+  description: 11 REST endpoints + router registration in server.py with owner-scope
+    enforcement hooks
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DS-007
+  estimated_effort: 3 pts
+  priority: high
 parallelization:
-  batch_1: ["DS-007"]
-  batch_2: ["DS-008"]
-  critical_path: ["DS-007", "DS-008"]
-  estimated_total_time: "1 day"
+  batch_1:
+  - DS-007
+  batch_2:
+  - DS-008
+  critical_path:
+  - DS-007
+  - DS-008
+  estimated_total_time: 1 day
 blockers: []
 success_criteria:
-  - { id: "SC-1", description: "All 11 endpoints registered and returning correct HTTP status codes", status: "pending" }
-  - { id: "SC-2", description: "Integration tests cover happy path + error cases", status: "pending" }
-  - { id: "SC-3", description: "HTTP 422 for circular-ref add-member confirmed by test", status: "pending" }
-  - { id: "SC-4", description: "No ORM model objects returned in any response (DTOs only)", status: "pending" }
-  - { id: "SC-5", description: "Router registered in server.py; dev server starts without error", status: "pending" }
-files_modified: [
-  "skillmeat/api/schemas/deployment_sets.py",
-  "skillmeat/api/routers/deployment_sets.py",
-  "skillmeat/api/server.py"
-]
+- id: SC-1
+  description: All 11 endpoints registered and returning correct HTTP status codes
+  status: pending
+- id: SC-2
+  description: Integration tests cover happy path + error cases
+  status: pending
+- id: SC-3
+  description: HTTP 422 for circular-ref add-member confirmed by test
+  status: pending
+- id: SC-4
+  description: No ORM model objects returned in any response (DTOs only)
+  status: pending
+- id: SC-5
+  description: Router registered in server.py; dev server starts without error
+  status: pending
+files_modified:
+- skillmeat/api/schemas/deployment_sets.py
+- skillmeat/api/routers/deployment_sets.py
+- skillmeat/api/server.py
+progress: 100
+updated: '2026-02-24'
 ---
 
 # deployment-sets-v1 - Phase 3: API Layer

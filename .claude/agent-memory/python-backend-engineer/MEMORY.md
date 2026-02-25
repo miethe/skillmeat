@@ -87,3 +87,18 @@ session.query(Artifact.id, CollectionArtifact.source, ...)
 - Three cases: (1) artifact_path ends with file_path → use artifact_path; (2) artifact_path ends with known extension → defensive fallback, use artifact_path, log debug; (3) directory → concatenate
 - File extension list: `.md .py .yaml .yml .json .toml .txt .sh .ts .tsx .jsx .js .css`
 - Test file: `tests/api/test_marketplace_sources.py` → `TestFileServingPathResolution`
+
+### Alembic Migration Table Existence Checks
+- When migrations create new tables (via `op.create_table()`), failure occurs if tables already exist (e.g., from `Base.metadata.create_all()`)
+- Solution: Use `sqlalchemy.inspect()` to check table existence before creating:
+  ```python
+  from sqlalchemy import inspect as sa_inspect
+  bind = op.get_bind()
+  inspector = sa_inspect(bind)
+  existing_tables = inspector.get_table_names()
+  if "table_name" not in existing_tables:
+      op.create_table(...)
+  ```
+- Same check needed for indexes (`if "table_name" not in existing_tables:` before `op.create_index(...)`)
+- Makes migrations idempotent and safe on DBs pre-populated via ORM
+- Applied to: `20260224_1000_add_deployment_set_tables.py`

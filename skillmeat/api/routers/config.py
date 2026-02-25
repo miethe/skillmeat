@@ -8,7 +8,8 @@ import logging
 
 from fastapi import APIRouter, status
 
-from skillmeat.api.schemas.config import DetectionPatternsResponse
+from skillmeat.api.dependencies import SettingsDep
+from skillmeat.api.schemas.config import DetectionPatternsResponse, FeatureFlagsResponse
 from skillmeat.core.artifact_detection import (
     CANONICAL_CONTAINERS,
     CONTAINER_ALIASES,
@@ -77,4 +78,39 @@ async def get_detection_patterns() -> DetectionPatternsResponse:
         container_aliases=container_aliases,
         leaf_containers=leaf_containers,
         canonical_containers=canonical_containers,
+    )
+
+
+@router.get(
+    "/feature-flags",
+    response_model=FeatureFlagsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get backend feature flags",
+    description="""
+    Returns the current state of backend feature flags so the frontend can
+    conditionally render features that depend on backend capabilities.
+
+    Features gated by these flags:
+    - **deployment_sets_enabled**: Controls visibility of Deployment Sets UI and nav item.
+      When False, the `/api/v1/deployment-sets` endpoints return 404.
+    - **composite_artifacts_enabled**: Controls composite artifact detection UI.
+    - **memory_context_enabled**: Controls Memory & Context Intelligence System UI.
+    """,
+)
+async def get_feature_flags(settings: SettingsDep) -> FeatureFlagsResponse:
+    """Get backend feature flags for frontend consumption.
+
+    Reads current feature flag state from APISettings and returns it to the
+    frontend. The frontend uses these flags to conditionally show/hide nav items,
+    pages, and UI elements that depend on backend feature availability.
+
+    Returns:
+        FeatureFlagsResponse with boolean flag values for each feature.
+    """
+    logger.debug("Returning feature flags to frontend")
+
+    return FeatureFlagsResponse(
+        composite_artifacts_enabled=settings.composite_artifacts_enabled,
+        deployment_sets_enabled=settings.deployment_sets_enabled,
+        memory_context_enabled=settings.memory_context_enabled,
     )

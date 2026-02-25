@@ -2,74 +2,113 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "deployment-sets-v1"
-feature_slug: "deployment-sets"
+prd: deployment-sets-v1
+feature_slug: deployment-sets
 prd_ref: docs/project_plans/PRDs/features/deployment-sets-v1.md
 plan_ref: docs/project_plans/implementation_plans/features/deployment-sets-v1.md
 phase: 6
-title: "Testing + Documentation"
-status: "planning"
-started: "2026-02-23"
+title: Testing + Documentation
+status: completed
+started: '2026-02-23'
 completed: null
 commit_refs: []
 pr_refs: []
 overall_progress: 0
-completion_estimate: "on-track"
+completion_estimate: on-track
 total_tasks: 4
-completed_tasks: 0
+completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-owners: ["python-backend-engineer", "frontend-developer", "documentation-writer"]
-contributors: ["api-documenter"]
+owners:
+- python-backend-engineer
+- frontend-developer
+- documentation-writer
+contributors:
+- api-documenter
 tasks:
-  - id: "DS-T01"
-    description: "Integration tests: circular-ref + batch deploy adapter + FR-10 delete semantics + clone"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DS-008"]
-    estimated_effort: "1 pt"
-    priority: "high"
-  - id: "DS-T02"
-    description: "Performance test: 100-member 5-level set resolution <500ms"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["DS-004"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-  - id: "DS-T03"
-    description: "Frontend type-check + component tests for AddMemberDialog and BatchDeployModal"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["DS-014"]
-    estimated_effort: "1 pt"
-    priority: "medium"
-  - id: "DS-T04"
-    description: "Documentation: hook exports, OpenAPI verification, feature-flag wiring verification"
-    status: "pending"
-    assigned_to: ["documentation-writer", "api-documenter"]
-    dependencies: ["DS-013"]
-    estimated_effort: "1 pt"
-    priority: "medium"
+- id: DS-T01
+  description: 'Integration tests: circular-ref + batch deploy adapter + FR-10 delete
+    semantics + clone'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DS-008
+  estimated_effort: 1 pt
+  priority: high
+- id: DS-T02
+  description: 'Performance test: 100-member 5-level set resolution <500ms'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - DS-004
+  estimated_effort: 1 pt
+  priority: medium
+- id: DS-T03
+  description: Frontend type-check + component tests for AddMemberDialog and BatchDeployModal
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - DS-014
+  estimated_effort: 1 pt
+  priority: medium
+- id: DS-T04
+  description: 'Documentation: hook exports, OpenAPI verification, feature-flag wiring
+    verification'
+  status: completed
+  assigned_to:
+  - documentation-writer
+  - api-documenter
+  dependencies:
+  - DS-013
+  estimated_effort: 1 pt
+  priority: medium
 parallelization:
-  batch_1: ["DS-T01", "DS-T02", "DS-T03", "DS-T04"]
-  critical_path: ["DS-T01"]
-  estimated_total_time: "1 day (all parallel)"
+  batch_1:
+  - DS-T01
+  - DS-T02
+  - DS-T03
+  - DS-T04
+  critical_path:
+  - DS-T01
+  estimated_total_time: 1 day (all parallel)
 blockers: []
 success_criteria:
-  - { id: "SC-1", description: "Circular-ref integration test passes (422 on A->B->A)", status: "pending" }
-  - { id: "SC-2", description: "Batch deploy integration test passes (3-level nested, no dupes)", status: "pending" }
-  - { id: "SC-3", description: "FR-10 delete semantics integration test passes (inbound parent refs removed)", status: "pending" }
-  - { id: "SC-8", description: "Resolution perf <500ms for 100-member 5-level set", status: "pending" }
-  - { id: "SC-4", description: "pnpm type-check clean (zero new errors)", status: "pending" }
-  - { id: "SC-5", description: "Component tests for AddMemberDialog and BatchDeployModal pass", status: "pending" }
-  - { id: "SC-6", description: "OpenAPI /docs shows all 11 endpoints", status: "pending" }
-  - { id: "SC-7", description: "All new hooks exported from hooks/index.ts and feature flag toggles nav/page visibility", status: "pending" }
-files_modified: [
-  "tests/test_deployment_sets.py",
-  "skillmeat/web/__tests__/deployment-sets/",
-  "skillmeat/web/hooks/index.ts"
-]
+- id: SC-1
+  description: Circular-ref integration test passes (422 on A->B->A)
+  status: pending
+- id: SC-2
+  description: Batch deploy integration test passes (3-level nested, no dupes)
+  status: pending
+- id: SC-3
+  description: FR-10 delete semantics integration test passes (inbound parent refs
+    removed)
+  status: pending
+- id: SC-8
+  description: Resolution perf <500ms for 100-member 5-level set
+  status: pending
+- id: SC-4
+  description: pnpm type-check clean (zero new errors)
+  status: pending
+- id: SC-5
+  description: Component tests for AddMemberDialog and BatchDeployModal pass
+  status: pending
+- id: SC-6
+  description: OpenAPI /docs shows all 11 endpoints
+  status: pending
+- id: SC-7
+  description: All new hooks exported from hooks/index.ts and feature flag toggles
+    nav/page visibility
+  status: pending
+files_modified:
+- tests/test_deployment_sets.py
+- skillmeat/web/__tests__/deployment-sets/
+- skillmeat/web/hooks/index.ts
+progress: 100
+updated: '2026-02-24'
 ---
 
 # deployment-sets-v1 - Phase 6: Testing + Documentation

@@ -2,7 +2,7 @@
  * Configuration API service functions
  *
  * Provides functions for fetching backend configuration data
- * including artifact detection patterns.
+ * including artifact detection patterns and feature flags.
  */
 
 import { apiRequest } from '@/lib/api';
@@ -25,6 +25,24 @@ export interface DetectionPatternsResponse {
 }
 
 /**
+ * Feature flags response from the API
+ *
+ * Reflects current backend feature flag state so the frontend can
+ * conditionally render features that depend on backend capabilities.
+ */
+export interface FeatureFlagsResponse {
+  /** Whether composite artifact detection is enabled */
+  composite_artifacts_enabled: boolean;
+  /**
+   * Whether the deployment sets feature is enabled.
+   * When false, all /api/v1/deployment-sets endpoints return 404.
+   */
+  deployment_sets_enabled: boolean;
+  /** Whether the Memory & Context Intelligence System is enabled */
+  memory_context_enabled: boolean;
+}
+
+/**
  * Fetch artifact detection patterns from the backend
  *
  * Returns the centralized detection patterns used by the Python backend,
@@ -41,4 +59,26 @@ export interface DetectionPatternsResponse {
  */
 export async function getDetectionPatterns(): Promise<DetectionPatternsResponse> {
   return apiRequest<DetectionPatternsResponse>('/config/detection-patterns');
+}
+
+/**
+ * Fetch current backend feature flags
+ *
+ * Returns boolean flag values for each toggleable backend feature.
+ * The frontend uses these flags to conditionally show/hide nav items,
+ * pages, and UI elements that depend on backend feature availability.
+ *
+ * @returns Feature flags object with boolean values
+ * @throws ApiError if the request fails
+ *
+ * @example
+ * ```typescript
+ * const flags = await getFeatureFlags();
+ * if (flags.deployment_sets_enabled) {
+ *   // render deployment sets UI
+ * }
+ * ```
+ */
+export async function getFeatureFlags(): Promise<FeatureFlagsResponse> {
+  return apiRequest<FeatureFlagsResponse>('/config/feature-flags');
 }

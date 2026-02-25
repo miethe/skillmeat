@@ -180,10 +180,15 @@ class TagService:
             self.logger.warning(f"Tag not found: {tag_id}")
             return None
 
-        # Get artifact count for this tag
+        # Get artifact and deployment set counts for this tag
         artifact_count = self.repo.get_tag_artifact_count(tag_id)
+        deployment_set_count = self.repo.get_tag_deployment_set_count(tag_id)
 
-        response = self._tag_to_response(tag, artifact_count=artifact_count)
+        response = self._tag_to_response(
+            tag,
+            artifact_count=artifact_count,
+            deployment_set_count=deployment_set_count,
+        )
         self.logger.debug(f"Retrieved tag: {tag.name} (id={tag.id})")
         return response
 
@@ -208,10 +213,15 @@ class TagService:
             self.logger.warning(f"Tag not found by slug: {slug}")
             return None
 
-        # Get artifact count for this tag
+        # Get artifact and deployment set counts for this tag
         artifact_count = self.repo.get_tag_artifact_count(tag.id)
+        deployment_set_count = self.repo.get_tag_deployment_set_count(tag.id)
 
-        response = self._tag_to_response(tag, artifact_count=artifact_count)
+        response = self._tag_to_response(
+            tag,
+            artifact_count=artifact_count,
+            deployment_set_count=deployment_set_count,
+        )
         self.logger.debug(f"Retrieved tag: {tag.name} (slug={slug})")
         return response
 
@@ -345,9 +355,20 @@ class TagService:
             if tag.id in tag_counts:
                 tag_counts[tag.id] = count
 
+        # Get deployment set counts for all tags efficiently
+        ds_counts: dict[str, int] = {tag.id: 0 for tag in tags}
+        all_ds_counts = self.repo.get_all_deployment_set_tag_counts()
+        for tag, count in all_ds_counts:
+            if tag.id in ds_counts:
+                ds_counts[tag.id] = count
+
         # Convert to response schemas with counts
         items = [
-            self._tag_to_response(tag, artifact_count=tag_counts.get(tag.id, 0))
+            self._tag_to_response(
+                tag,
+                artifact_count=tag_counts.get(tag.id, 0),
+                deployment_set_count=ds_counts.get(tag.id, 0),
+            )
             for tag in tags
         ]
 
@@ -397,9 +418,20 @@ class TagService:
             if tag.id in tag_counts:
                 tag_counts[tag.id] = count
 
+        # Get deployment set counts for all tags efficiently
+        ds_counts: dict[str, int] = {tag.id: 0 for tag in tags}
+        all_ds_counts = self.repo.get_all_deployment_set_tag_counts()
+        for tag, count in all_ds_counts:
+            if tag.id in ds_counts:
+                ds_counts[tag.id] = count
+
         # Convert to response schemas with counts
         results = [
-            self._tag_to_response(tag, artifact_count=tag_counts.get(tag.id, 0))
+            self._tag_to_response(
+                tag,
+                artifact_count=tag_counts.get(tag.id, 0),
+                deployment_set_count=ds_counts.get(tag.id, 0),
+            )
             for tag in tags
         ]
 
@@ -456,7 +488,9 @@ class TagService:
 
         for tag_id in desired_ids - existing_ids:
             try:
-                self.repo.add_tag_to_artifact(artifact_uuid=artifact_uuid, tag_id=tag_id)
+                self.repo.add_tag_to_artifact(
+                    artifact_uuid=artifact_uuid, tag_id=tag_id
+                )
             except RepositoryError as e:
                 self.logger.warning(
                     f"Failed to add tag {tag_id} to artifact {artifact_uuid}: {e}"
@@ -567,7 +601,9 @@ class TagService:
         # Convert to response schemas (no artifact count needed for this view)
         results = [self._tag_to_response(tag) for tag in tags]
 
-        self.logger.debug(f"Found {len(results)} tags for artifact uuid={artifact_uuid}")
+        self.logger.debug(
+            f"Found {len(results)} tags for artifact uuid={artifact_uuid}"
+        )
         return results
 
     # =========================================================================
@@ -575,13 +611,17 @@ class TagService:
     # =========================================================================
 
     def _tag_to_response(
-        self, tag, artifact_count: Optional[int] = None
+        self,
+        tag,
+        artifact_count: Optional[int] = None,
+        deployment_set_count: Optional[int] = None,
     ) -> TagResponse:
         """Convert ORM model to response schema.
 
         Args:
             tag: Tag ORM model instance
             artifact_count: Optional artifact count to include
+            deployment_set_count: Optional deployment set count to include
 
         Returns:
             TagResponse schema instance
@@ -594,4 +634,5 @@ class TagService:
             created_at=tag.created_at,
             updated_at=tag.updated_at,
             artifact_count=artifact_count,
+            deployment_set_count=deployment_set_count,
         )

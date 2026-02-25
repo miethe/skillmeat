@@ -1,7 +1,7 @@
 {
   "$schema": "./features.schema.json",
   "version": "0.3.0-beta",
-  "lastUpdated": "2026-02-19",
+  "lastUpdated": "2026-02-25",
   "categories": [
     {
       "id": "collection",
@@ -98,6 +98,56 @@
           "shortDescription": "Update notifications",
           "webPage": "/projects",
           "since": "0.2.0"
+        }
+      ]
+    },
+    {
+      "id": "deployment-sets",
+      "name": "Deployment Sets",
+      "icon": "layers",
+      "tagline": "Group and batch-deploy artifact bundles",
+      "features": [
+        {
+          "id": "named-sets",
+          "name": "Named Deployment Sets",
+          "description": "Create named sets of artifacts, groups, and nested sets for reusable deployment bundles",
+          "shortDescription": "Composable deployment bundles",
+          "webPage": "/deployment-sets",
+          "since": "0.3.0",
+          "highlight": true
+        },
+        {
+          "id": "nested-composition",
+          "name": "Nested Composition",
+          "description": "Sets can contain individual artifacts, groups, and other sets with circular-reference detection",
+          "shortDescription": "Sets within sets",
+          "webPage": "/deployment-sets",
+          "since": "0.3.0"
+        },
+        {
+          "id": "batch-deploy",
+          "name": "Batch Deploy",
+          "description": "Deploy all resolved artifacts from a set to a project and profile in a single action",
+          "shortDescription": "One-click set deployment",
+          "webPage": "/deployment-sets",
+          "since": "0.3.0",
+          "highlight": true
+        },
+        {
+          "id": "set-detail-modal",
+          "name": "Set Detail Modal",
+          "description": "Tabbed modal with Overview and Members tabs, inline editing, colored tags, and member management",
+          "shortDescription": "Rich modal-based management",
+          "webPage": "/deployment-sets",
+          "since": "0.3.0"
+        },
+        {
+          "id": "minified-member-cards",
+          "name": "Minified Member Cards",
+          "description": "Compact artifact cards with already-selected state for quick member browsing and selection",
+          "shortDescription": "Compact member preview",
+          "webPage": "/deployment-sets",
+          "since": "0.3.0"
         }
       ]
     },
@@ -564,8 +614,8 @@
   "stats": {
     "totalCommands": 116,
     "commandGroups": 23,
-    "webPages": 23,
-    "apiEndpoints": 150,
+    "webPages": 25,
+    "apiEndpoints": 160,
     "modals": 40
   }
 }

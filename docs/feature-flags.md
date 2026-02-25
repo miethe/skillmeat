@@ -12,6 +12,16 @@ SkillMeat supports feature flags to enable or disable functionality at runtime. 
 Memory and extraction APIs are deployed directly and are not runtime-gated by
 feature flags.
 
+## Deployment Sets
+
+### `DEPLOYMENT_SETS_ENABLED`
+
+**Environment Variable**: `SKILLMEAT_DEPLOYMENT_SETS_ENABLED`
+**Default**: `true`
+**Type**: boolean
+
+Enable deployment sets feature for grouping and batch-deploying artifact bundles. When disabled, the Deployment Sets navigation link and all `/api/v1/deployment-sets/` endpoints are hidden.
+
 ## Discovery Features
 
 ### `ENABLE_AUTO_DISCOVERY`

@@ -24,6 +24,7 @@ Models:
     - CompositeMembership: Child-artifact membership within a CompositeArtifact
     - DeploymentSet: Named, ordered set of artifacts/groups for batch deployment (deployment-sets-v1)
     - DeploymentSetMember: Polymorphic member entry within a DeploymentSet
+    - CustomColor: User-defined hex colors for the site-wide color palette registry
 
 Usage:
     >>> from skillmeat.cache.models import get_session, Project, Artifact
@@ -251,7 +252,11 @@ class Artifact(Base):
 
     # Stable cross-context identity (ADR-007)
     uuid: Mapped[str] = mapped_column(
-        String, unique=True, nullable=False, default=lambda: uuid.uuid4().hex, index=True
+        String,
+        unique=True,
+        nullable=False,
+        default=lambda: uuid.uuid4().hex,
+        index=True,
     )
 
     # Foreign key
@@ -1229,6 +1234,14 @@ class Tag(Base):
         back_populates="tags",
         viewonly=True,
     )
+    deployment_sets: Mapped[List["DeploymentSet"]] = relationship(
+        "DeploymentSet",
+        secondary="deployment_set_tags",
+        primaryjoin="Tag.id == DeploymentSetTag.tag_id",
+        secondaryjoin="foreign(DeploymentSetTag.deployment_set_id) == DeploymentSet.id",
+        lazy="selectin",
+        viewonly=True,
+    )
 
     # Constraints
     __table_args__ = (
@@ -1316,6 +1329,55 @@ class ArtifactTag(Base):
         """Return string representation of ArtifactTag."""
         return (
             f"<ArtifactTag(artifact_uuid={self.artifact_uuid!r}, "
+            f"tag_id={self.tag_id!r}, created_at={self.created_at!r})>"
+        )
+
+
+class DeploymentSetTag(Base):
+    """Association between DeploymentSet and Tag (many-to-many).
+
+    Links deployment sets to tags for categorization and filtering. Each
+    deployment set can have multiple tags, and each tag can be applied to
+    multiple deployment sets.
+
+    Attributes:
+        deployment_set_id: FK to deployment_sets.id (part of composite PK;
+            CASCADE delete so removing a set purges its tag associations)
+        tag_id: Foreign key to tags.id (part of composite PK)
+        created_at: Timestamp when tag was added to deployment set
+
+    Indexes:
+        - idx_deployment_set_tags_set_id: Fast lookup by deployment set
+        - idx_deployment_set_tags_tag_id: Fast lookup by tag
+    """
+
+    __tablename__ = "deployment_set_tags"
+
+    # Composite primary key
+    deployment_set_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("deployment_sets.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    tag_id: Mapped[str] = mapped_column(
+        String, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_deployment_set_tags_set_id", "deployment_set_id"),
+        Index("idx_deployment_set_tags_tag_id", "tag_id"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of DeploymentSetTag."""
+        return (
+            f"<DeploymentSetTag(deployment_set_id={self.deployment_set_id!r}, "
             f"tag_id={self.tag_id!r}, created_at={self.created_at!r})>"
         )
 
@@ -2833,9 +2895,7 @@ class ContextModule(Base):
     )
 
     # Constraints and indexes
-    __table_args__ = (
-        Index("idx_context_modules_project", "project_id"),
-    )
+    __table_args__ = (Index("idx_context_modules_project", "project_id"),)
 
     @property
     def selectors(self) -> Optional[Dict[str, Any]]:
@@ -2889,9 +2949,7 @@ class ModuleMemoryItem(Base):
     )
 
     # Indexes
-    __table_args__ = (
-        Index("idx_module_memory_items_memory", "memory_id"),
-    )
+    __table_args__ = (Index("idx_module_memory_items_memory", "memory_id"),)
 
     def __repr__(self) -> str:
         """Return string representation of ModuleMemoryItem."""
@@ -3099,7 +3157,9 @@ class CompositeMembership(Base):
     pinned_version_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # Display order within the composite (0-based, nullable for backward compat)
-    position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
+    position: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, default=None
+    )
 
     # Extensibility — raw JSON string for future per-membership metadata
     membership_metadata: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -3184,6 +3244,8 @@ class DeploymentSet(Base):
         id: Unique identifier (UUID hex, primary key)
         name: Human-readable set name (required)
         description: Optional free-text description
+        color: Optional hex color code (e.g. ``"#7c3aed"``), max 7 chars
+        icon: Optional icon identifier string (e.g. ``"layers"``), max 64 chars
         tags_json: JSON-serialized list of tag strings, default ``"[]"``
         owner_id: Owning user / identity scope (required)
         created_at: UTC timestamp when the set was created
@@ -3205,6 +3267,8 @@ class DeploymentSet(Base):
     # Core fields
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
+    icon: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     tags_json: Mapped[str] = mapped_column(
         Text,
         nullable=False,
@@ -3232,6 +3296,14 @@ class DeploymentSet(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
         order_by="DeploymentSetMember.position",
+    )
+    tag_objects: Mapped[List["Tag"]] = relationship(
+        "Tag",
+        secondary="deployment_set_tags",
+        primaryjoin="DeploymentSet.id == DeploymentSetTag.deployment_set_id",
+        secondaryjoin="foreign(DeploymentSetTag.tag_id) == Tag.id",
+        lazy="selectin",
+        viewonly=True,
     )
 
     # Constraints and indexes
@@ -3265,7 +3337,14 @@ class DeploymentSet(Base):
         }
 
     def get_tags(self) -> List[str]:
-        """Parse and return tags as a list."""
+        """Return tag names from the relational tag_objects relationship.
+
+        Falls back to parsing tags_json for backward compatibility during
+        migration when tag_objects may not yet be populated.
+        """
+        if self.tag_objects:
+            return [t.name for t in self.tag_objects]
+        # Fallback to tags_json for backward compatibility during migration
         if not self.tags_json:
             return []
         try:
@@ -3275,7 +3354,11 @@ class DeploymentSet(Base):
         return parsed if isinstance(parsed, list) else []
 
     def set_tags(self, tags: List[str]) -> None:
-        """Persist tags from a list as JSON text."""
+        """Persist tags from a list as JSON text (legacy — prefer junction table).
+
+        Kept for backward compatibility. New code should use the repository's
+        _sync_tags() method which writes to the deployment_set_tags junction table.
+        """
         self.tags_json = json.dumps(tags or [])
 
 
@@ -3419,6 +3502,75 @@ class DeploymentSetMember(Base):
         if self.group_id is not None:
             return "group"
         return "set"
+
+
+class CustomColor(Base):
+    """User-defined custom color stored in the palette registry.
+
+    Tracks hex color values that users have added to the site-wide color
+    management system. Each color is uniquely identified by its hex code
+    and may carry an optional human-readable name.
+
+    Attributes:
+        id: Unique color identifier (primary key, UUID hex)
+        hex: CSS hex color string, e.g. ``#7c3aed`` (7 chars, UNIQUE, NOT NULL)
+        name: Optional human-readable label for the color
+        created_at: Timestamp when the color was first registered
+
+    Indexes:
+        - idx_custom_colors_hex (UNIQUE): Fast lookup and uniqueness enforcement
+    """
+
+    __tablename__ = "custom_colors"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Core fields
+    hex: Mapped[str] = mapped_column(
+        String(7),
+        nullable=False,
+        unique=True,
+        comment="CSS hex color string including leading '#', e.g. #7c3aed",
+    )
+    name: Mapped[Optional[str]] = mapped_column(
+        String(64),
+        nullable=True,
+        comment="Optional human-readable label for the color",
+    )
+
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        CheckConstraint(
+            "hex LIKE '#______' OR hex LIKE '#___'",
+            name="check_custom_color_hex_format",
+        ),
+        Index("idx_custom_colors_hex", "hex", unique=True),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of CustomColor."""
+        return f"<CustomColor(id={self.id!r}, hex={self.hex!r}, name={self.name!r})>"
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert CustomColor to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the custom color
+        """
+        return {
+            "id": self.id,
+            "hex": self.hex,
+            "name": self.name,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
 
 
 # =============================================================================

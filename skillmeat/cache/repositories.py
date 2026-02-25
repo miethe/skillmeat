@@ -60,6 +60,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -76,9 +77,11 @@ from skillmeat.cache.models import (
     ArtifactTag,
     Base,
     CollectionArtifact,
+    CustomColor,
     DeploymentProfile,
     DeploymentSet,
     DeploymentSetMember,
+    DeploymentSetTag,
     MarketplaceCatalogEntry,
     MarketplaceSource,
     Tag,
@@ -285,11 +288,8 @@ class BaseRepository(Generic[T]):
         # Create engine
         self.engine = create_db_engine(self.db_path)
 
-        # Run Alembic migrations first (creates/updates schema)
-        from skillmeat.cache.migrations import run_migrations
-        run_migrations(self.db_path)
-
-        # Then create any missing base tables (backward compatibility)
+        # Create any missing base tables (backward compatibility)
+        # Note: Alembic migrations run once at app startup via CacheManager
         create_tables(self.db_path)
 
         # Store model class for type-safe operations
@@ -442,9 +442,7 @@ class ScanUpdateContext:
         # Update ref if provided (branch fallback detected during scan)
         if ref is not None:
             source.ref = ref
-            logger.info(
-                f"Updated source {self.source_id} ref to '{ref}'"
-            )
+            logger.info(f"Updated source {self.source_id} ref to '{ref}'")
 
         logger.info(
             f"Updated source {self.source_id}: status={status}, "
@@ -3083,8 +3081,14 @@ class DeploymentProfileRepository(BaseRepository[DeploymentProfile]):
         """Create a deployment profile."""
         session = self._get_session()
         try:
-            platform_value = platform.value if isinstance(platform, Platform) else str(platform)
-            platform_enum = Platform(platform_value) if platform_value in {p.value for p in Platform} else Platform.OTHER
+            platform_value = (
+                platform.value if isinstance(platform, Platform) else str(platform)
+            )
+            platform_enum = (
+                Platform(platform_value)
+                if platform_value in {p.value for p in Platform}
+                else Platform.OTHER
+            )
             root_prefix = f"{root_dir.rstrip('/')}/context/"
             profile = DeploymentProfile(
                 id=uuid.uuid4().hex,
@@ -3632,11 +3636,7 @@ class TagRepository(BaseRepository[Tag]):
                 )
 
             # Verify artifact and tag exist
-            artifact = (
-                session.query(Artifact)
-                .filter_by(uuid=artifact_uuid)
-                .first()
-            )
+            artifact = session.query(Artifact).filter_by(uuid=artifact_uuid).first()
             if not artifact:
                 raise RepositoryError(
                     f"Artifact with uuid={artifact_uuid!r} not found in cache"
@@ -3862,6 +3862,62 @@ class TagRepository(BaseRepository[Tag]):
         finally:
             session.close()
 
+    def get_tag_deployment_set_count(self, tag_id: str) -> int:
+        """Get number of deployment sets with a specific tag.
+
+        Args:
+            tag_id: Tag identifier
+
+        Returns:
+            Count of deployment sets with this tag
+
+        Example:
+            >>> count = repo.get_tag_deployment_set_count("tag-123")
+            >>> print(f"Tag used on {count} deployment sets")
+        """
+        session = self._get_session()
+        try:
+            result = (
+                session.query(func.count(DeploymentSetTag.deployment_set_id))
+                .filter(DeploymentSetTag.tag_id == tag_id)
+                .scalar()
+            )
+            return result or 0
+        finally:
+            session.close()
+
+    def get_all_deployment_set_tag_counts(self) -> List[tuple[Tag, int]]:
+        """Get all tags with their deployment set counts.
+
+        Returns:
+            List of (tag, count) tuples where count is the number of
+            deployment sets associated with each tag, ordered by count
+            descending then by name.
+
+        Example:
+            >>> ds_counts = repo.get_all_deployment_set_tag_counts()
+            >>> for tag, count in ds_counts:
+            ...     print(f"{tag.name}: {count} deployment sets")
+        """
+        session = self._get_session()
+        try:
+            results = (
+                session.query(
+                    Tag,
+                    func.count(DeploymentSetTag.deployment_set_id).label("count"),
+                )
+                .outerjoin(DeploymentSetTag, Tag.id == DeploymentSetTag.tag_id)
+                .group_by(Tag.id)
+                .order_by(
+                    func.count(DeploymentSetTag.deployment_set_id).desc(), Tag.name
+                )
+                .all()
+            )
+            logger.debug(f"Retrieved deployment-set counts for {len(results)} tags")
+            return results
+        finally:
+            session.close()
+
 
 # =============================================================================
 # Deployment Set Repository
@@ -3898,6 +3954,69 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
         super().__init__(db_path, DeploymentSet)
 
     # =========================================================================
+    # Internal Helpers
+    # =========================================================================
+
+    def _sync_tags(self, session: Session, set_id: str, tag_names: List[str]) -> None:
+        """Sync deployment set tags via the deployment_set_tags junction table.
+
+        Clears all existing tag associations for the given deployment set, then
+        for each tag name finds or creates a ``Tag`` record and inserts a
+        ``DeploymentSetTag`` junction row.
+
+        Args:
+            session: Active SQLAlchemy session (caller owns commit/rollback).
+            set_id: Primary key of the deployment set to sync.
+            tag_names: List of tag name strings to associate with the set.
+        """
+        # Clear existing tag associations for this set
+        session.query(DeploymentSetTag).filter(
+            DeploymentSetTag.deployment_set_id == set_id
+        ).delete(synchronize_session=False)
+
+        now = datetime.utcnow()
+
+        for raw_name in tag_names:
+            name = raw_name.strip()
+            if not name:
+                continue
+
+            # Find existing tag by name (case-insensitive)
+            tag = (
+                session.query(Tag)
+                .filter(func.lower(Tag.name) == func.lower(name))
+                .first()
+            )
+
+            if not tag:
+                # Build a unique slug
+                slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+                if not slug:
+                    slug = uuid.uuid4().hex[:8]
+                base_slug = slug
+                counter = 1
+                while session.query(Tag).filter(Tag.slug == slug).first():
+                    slug = f"{base_slug}-{counter}"
+                    counter += 1
+
+                tag = Tag(
+                    id=uuid.uuid4().hex,
+                    name=name,
+                    slug=slug,
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(tag)
+                session.flush()  # Assign id before referencing in junction row
+
+            assoc = DeploymentSetTag(
+                deployment_set_id=set_id,
+                tag_id=tag.id,
+                created_at=now,
+            )
+            session.add(assoc)
+
+    # =========================================================================
     # Create
     # =========================================================================
 
@@ -3907,6 +4026,8 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
         name: str,
         owner_id: str,
         description: Optional[str] = None,
+        color: Optional[str] = None,
+        icon: Optional[str] = None,
         tags: Optional[List[str]] = None,
     ) -> DeploymentSet:
         """Create and return a new DeploymentSet.
@@ -3915,6 +4036,8 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
             name: Human-readable set name (required).
             owner_id: Owning user / identity scope (required).
             description: Optional free-text description.
+            color: Optional hex color code (e.g. ``"#7c3aed"``).
+            icon: Optional icon identifier string (e.g. ``"layers"``).
             tags: Optional list of tag strings.
 
         Returns:
@@ -3931,11 +4054,15 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
                 name=name,
                 owner_id=owner_id,
                 description=description,
+                color=color,
+                icon=icon,
                 created_at=now,
                 updated_at=now,
             )
-            ds.set_tags(tags or [])
             session.add(ds)
+            session.flush()  # Assign the id before syncing tags
+            if tags:
+                self._sync_tags(session, ds.id, tags)
             session.commit()
             session.refresh(ds)
             logger.debug("Created DeploymentSet id=%s owner=%s", ds.id, owner_id)
@@ -4003,15 +4130,18 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
         """
         session = self._get_session()
         try:
-            q = session.query(DeploymentSet).filter(
-                DeploymentSet.owner_id == owner_id
-            )
+            q = session.query(DeploymentSet).filter(DeploymentSet.owner_id == owner_id)
             if name is not None:
                 q = q.filter(DeploymentSet.name.ilike(f"%{name}%"))
             if tag is not None:
-                # tags_json stores a JSON array of strings, e.g. '["prod","v2"]'.
-                # A simple LIKE on the serialised text is fast and sufficient.
-                q = q.filter(DeploymentSet.tags_json.like(f'%"{tag}"%'))
+                q = (
+                    q.join(
+                        DeploymentSetTag,
+                        DeploymentSetTag.deployment_set_id == DeploymentSet.id,
+                    )
+                    .join(Tag, Tag.id == DeploymentSetTag.tag_id)
+                    .filter(func.lower(Tag.name) == func.lower(tag))
+                )
             return (
                 q.order_by(DeploymentSet.created_at.desc())
                 .limit(limit)
@@ -4050,7 +4180,14 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
             if name is not None:
                 q = q.filter(DeploymentSet.name.ilike(f"%{name}%"))
             if tag is not None:
-                q = q.filter(DeploymentSet.tags_json.like(f'%"{tag}"%'))
+                q = (
+                    q.join(
+                        DeploymentSetTag,
+                        DeploymentSetTag.deployment_set_id == DeploymentSet.id,
+                    )
+                    .join(Tag, Tag.id == DeploymentSetTag.tag_id)
+                    .filter(func.lower(Tag.name) == func.lower(tag))
+                )
             return q.scalar() or 0
         finally:
             session.close()
@@ -4067,8 +4204,9 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
     ) -> Optional[DeploymentSet]:
         """Update mutable fields on a DeploymentSet.
 
-        Only ``name``, ``description``, and ``tags`` are writable.
-        ``updated_at`` is refreshed automatically on every successful update.
+        Only ``name``, ``description``, ``color``, ``icon``, and ``tags`` are
+        writable.  ``updated_at`` is refreshed automatically on every
+        successful update.
 
         Args:
             set_id: Primary key of the deployment set.
@@ -4076,6 +4214,7 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
                 different owner or does not exist.
             **kwargs: Keyword arguments for fields to update.  Supported
                 keys: ``name`` (str), ``description`` (str | None),
+                ``color`` (str | None), ``icon`` (str | None),
                 ``tags`` (list[str]).
 
         Returns:
@@ -4101,8 +4240,12 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
                 ds.name = kwargs["name"]
             if "description" in kwargs:
                 ds.description = kwargs["description"]
+            if "color" in kwargs:
+                ds.color = kwargs["color"]
+            if "icon" in kwargs:
+                ds.icon = kwargs["icon"]
             if "tags" in kwargs:
-                ds.set_tags(kwargs["tags"])
+                self._sync_tags(session, ds.id, kwargs["tags"])
 
             ds.updated_at = datetime.utcnow()
             session.commit()
@@ -4388,9 +4531,7 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
         finally:
             session.close()
 
-    def get_members(
-        self, set_id: str, owner_id: str
-    ) -> List[DeploymentSetMember]:
+    def get_members(self, set_id: str, owner_id: str) -> List[DeploymentSetMember]:
         """Return all members of a DeploymentSet, ordered by position.
 
         The set must belong to ``owner_id``; an empty list is returned if
@@ -4423,5 +4564,222 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
                 .order_by(DeploymentSetMember.position)
                 .all()
             )
+        finally:
+            session.close()
+
+
+# =============================================================================
+# CustomColorRepository
+# =============================================================================
+
+# Compiled regex for hex color validation (module-level for performance)
+_HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{3,6}$")
+
+
+class CustomColorRepository(BaseRepository[CustomColor]):
+    """Repository for user-defined custom color palette management.
+
+    Provides CRUD operations for custom colors stored in the site-wide
+    color registry. Each color is uniquely identified by its hex value
+    and may carry an optional human-readable name.
+
+    Hex values are validated against ``#[0-9a-fA-F]{3,6}$`` before any
+    write operation; invalid values raise ``ValueError``.
+
+    Usage:
+        >>> repo = CustomColorRepository()
+        >>>
+        >>> # List all persisted colors
+        >>> colors = repo.list_all()
+        >>>
+        >>> # Add a new color
+        >>> color = repo.create("#7c3aed", name="Violet")
+        >>>
+        >>> # Update the name only
+        >>> updated = repo.update(color.id, name="Purple")
+        >>>
+        >>> # Remove a color
+        >>> repo.delete(color.id)
+    """
+
+    def __init__(self, db_path: Optional[str | Path] = None):
+        """Initialize custom color repository.
+
+        Args:
+            db_path: Optional path to database file (uses default if None)
+        """
+        super().__init__(db_path, CustomColor)
+
+    # =========================================================================
+    # Internal helpers
+    # =========================================================================
+
+    @staticmethod
+    def _validate_hex(hex_value: str) -> None:
+        """Validate a CSS hex color string.
+
+        Args:
+            hex_value: Hex color to validate (e.g. ``#7c3aed``)
+
+        Raises:
+            ValueError: If the value does not match ``#[0-9a-fA-F]{3,6}$``
+        """
+        if not _HEX_COLOR_RE.match(hex_value):
+            raise ValueError(f"Invalid hex color: {hex_value!r}")
+
+    # =========================================================================
+    # CRUD Operations
+    # =========================================================================
+
+    def list_all(self) -> List[CustomColor]:
+        """Return all custom colors ordered by creation date (oldest first).
+
+        Returns:
+            List of ``CustomColor`` instances, may be empty.
+
+        Example:
+            >>> colors = repo.list_all()
+            >>> for c in colors:
+            ...     print(c.hex, c.name)
+        """
+        session = self._get_session()
+        try:
+            return (
+                session.query(CustomColor)
+                .order_by(CustomColor.created_at)
+                .all()
+            )
+        finally:
+            session.close()
+
+    def create(self, hex: str, name: Optional[str] = None) -> CustomColor:
+        """Create and persist a new custom color.
+
+        Args:
+            hex: CSS hex color string including the leading ``#``
+                 (e.g. ``#7c3aed``).  Must match ``#[0-9a-fA-F]{3,6}$``.
+            name: Optional human-readable label (max 64 characters).
+
+        Returns:
+            Newly created ``CustomColor`` instance.
+
+        Raises:
+            ValueError: If ``hex`` does not pass format validation.
+            RepositoryError: If a color with the same hex already exists.
+
+        Example:
+            >>> color = repo.create("#7c3aed", name="Violet")
+            >>> print(color.id)
+        """
+        self._validate_hex(hex)
+
+        session = self._get_session()
+        try:
+            color = CustomColor(
+                id=uuid.uuid4().hex,
+                hex=hex,
+                name=name,
+                created_at=datetime.utcnow(),
+            )
+
+            session.add(color)
+            session.commit()
+            session.refresh(color)
+
+            logger.info(f"Created custom color: {color.hex!r} (id={color.id})")
+            return color
+
+        except IntegrityError as e:
+            session.rollback()
+            raise RepositoryError(
+                f"Custom color with hex {hex!r} already exists"
+            ) from e
+        finally:
+            session.close()
+
+    def update(
+        self,
+        id: str,
+        hex: Optional[str] = None,
+        name: Optional[str] = None,
+    ) -> Optional[CustomColor]:
+        """Update fields on an existing custom color.
+
+        Only fields that are explicitly provided (not ``None``) are modified.
+        If no color with ``id`` exists, ``None`` is returned.
+
+        Args:
+            id: Primary key of the color to update.
+            hex: New hex value.  Must match ``#[0-9a-fA-F]{3,6}$`` when
+                 provided.
+            name: New human-readable label.  Pass an empty string to clear
+                  an existing name.
+
+        Returns:
+            Updated ``CustomColor`` instance, or ``None`` if not found.
+
+        Raises:
+            ValueError: If ``hex`` is provided but fails format validation.
+            RepositoryError: If the update violates a uniqueness constraint.
+
+        Example:
+            >>> updated = repo.update(color.id, name="Deep Purple")
+            >>> if updated is None:
+            ...     print("Color not found")
+        """
+        if hex is not None:
+            self._validate_hex(hex)
+
+        session = self._get_session()
+        try:
+            color = session.query(CustomColor).filter_by(id=id).first()
+            if color is None:
+                return None
+
+            if hex is not None:
+                color.hex = hex
+            if name is not None:
+                color.name = name
+
+            session.commit()
+            session.refresh(color)
+
+            logger.info(f"Updated custom color id={id!r}")
+            return color
+
+        except IntegrityError as e:
+            session.rollback()
+            raise RepositoryError(
+                f"Failed to update custom color id={id!r}: {e}"
+            ) from e
+        finally:
+            session.close()
+
+    def delete(self, id: str) -> bool:
+        """Delete a custom color by its primary key.
+
+        Args:
+            id: Primary key of the color to delete.
+
+        Returns:
+            ``True`` if the color was found and deleted, ``False`` if no color
+            with the given ``id`` exists.
+
+        Example:
+            >>> deleted = repo.delete(color.id)
+            >>> print("Deleted" if deleted else "Not found")
+        """
+        session = self._get_session()
+        try:
+            color = session.query(CustomColor).filter_by(id=id).first()
+            if color is None:
+                return False
+
+            session.delete(color)
+            session.commit()
+
+            logger.info(f"Deleted custom color id={id!r}")
+            return True
+
         finally:
             session.close()

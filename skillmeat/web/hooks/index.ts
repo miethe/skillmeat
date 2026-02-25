@@ -27,6 +27,7 @@
  * - Collections (CRUD + artifacts)
  * - Groups (CRUD + artifacts)
  * - Deployments (CRUD + deploy/undeploy)
+ * - Deployment Sets (CRUD + members + resolve + batch deploy)
  * - Artifacts (list + bulk import)
  * - Composites (import + conflict resolution + member management + CRUD)
  * - Projects (CRUD + discovery + caching)
@@ -121,6 +122,27 @@ export {
  * This hook duplicates functionality from the deployments module.
  */
 export { useDeploy, useUndeploy } from './useDeploy';
+
+// ============================================================================
+// DEPLOYMENT SETS (13 hooks)
+// ============================================================================
+// Named, ordered sets of artifacts for batch deployment operations
+export {
+  deploymentSetKeys,
+  useDeploymentSets,
+  useDeploymentSet,
+  useDeploymentSetMembers,
+  useResolveSet,
+  useCreateDeploymentSet,
+  useUpdateDeploymentSet,
+  useDeleteDeploymentSet,
+  useCloneDeploymentSet,
+  useAddMember,
+  useRemoveMember,
+  useUpdateMemberPosition,
+  useBatchDeploy,
+  useBatchDeploySet,
+} from './deployment-sets';
 
 // ============================================================================
 // ARTIFACTS (7 hooks)
@@ -228,7 +250,7 @@ export { useCacheRefresh } from './useCacheRefresh';
 export { useCacheStatus } from './useCacheStatus';
 
 // ============================================================================
-// SETTINGS & CONFIG (2 hooks)
+// SETTINGS & CONFIG (3 hooks)
 // ============================================================================
 // Application configuration and settings
 export {
@@ -237,6 +259,31 @@ export {
   type IndexingMode,
   type IndexingModeResponse,
 } from './useIndexingMode';
+
+// ============================================================================
+// COLORS (4 hooks)
+// ============================================================================
+// Custom color CRUD operations
+export {
+  colorKeys,
+  useCustomColors,
+  useCreateCustomColor,
+  useUpdateCustomColor,
+  useDeleteCustomColor,
+} from './use-colors';
+
+// ============================================================================
+// ICON PACKS (5 hooks)
+// ============================================================================
+// Icon pack listing, enabled-state management, install, and delete
+export {
+  iconPackKeys,
+  useIconPacks,
+  usePatchIconPacks,
+  useInstallIconPackFromUrl,
+  useInstallIconPackFromFile,
+  useDeleteIconPack,
+} from './use-icon-packs';
 
 // Detection patterns for artifact container identification
 export {
@@ -248,6 +295,14 @@ export {
   DEFAULT_ROOT_EXCLUSIONS,
   type DetectionPatternsResponse,
 } from './use-detection-patterns';
+
+// Backend feature flags (deployment sets, composites, memory context)
+export {
+  featureFlagKeys,
+  useFeatureFlags,
+  DEFAULT_FEATURE_FLAGS,
+  type FeatureFlagsResponse,
+} from './use-feature-flags';
 
 // ============================================================================
 // PLATFORM DEFAULTS (5 hooks)

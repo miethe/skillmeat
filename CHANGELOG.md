@@ -9,6 +9,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Site-Wide Color & Icon Management (2026-02-25)
+
+**Custom Colors API**
+- New `/api/v1/custom-colors` CRUD endpoints for a shared, API-backed color palette replacing per-component localStorage
+- Custom colors model added to database with Alembic migration
+- Real-time cache invalidation via React Query on palette changes
+
+**Shared Components**
+- New `components/shared/color-selector.tsx` component with preset colors grid and custom user colors from API
+- Used by Groups and Deployment Sets for unified color selection
+- New `components/shared/icon-picker.tsx` component powered by configurable icon packs (`icon-packs.config.json`)
+- Replaces locked Select dropdown with searchable grid picker supporting multiple icon sets (Lucide core, development, weather, etc.)
+
+**Deployment Set Persistence**
+- Deployment Set create/edit dialogs now include color and icon fields
+- Backend schemas and models updated to persist `color` and `icon` on `DeploymentSet`
+- Deployment Sets display with custom colors in UI
+
+**Settings Page Enhancement**
+- New Colors tab for managing the custom color palette — add/remove/edit colors with hex input and color picker
+- New Icons tab for managing icon packs — install from URL or file upload, remove packs, browse icons in large viewer dialog
+- Icon count and pack metadata display in Icons tab
+- Changes propagate to all color selectors application-wide
+
+**Data Migration**
+- Automated migration script moves legacy per-component localStorage color values to the new API-backed store on first load
+
+**Testing**
+- Backend integration tests for custom colors API
+- E2E smoke test for a11y compliance
+- Type error verification pass
+
+#### Deployment Sets v2 — UI Enhancement (2026-02-24)
+
+**Card & Modal Experience**
+- `DeploymentSetCard` now uses full-card click to open a detail modal instead of navigating to a separate page
+- New `DeploymentSetDetailsModal` with Overview and Members tabs, matching the ArtifactDetailsModal pattern
+- Overview tab shows set name, description, member count, tags, and creation metadata
+- Members tab displays member grid with navigation
+
+**Inline Editing**
+- Set name and description are editable inline within the modal header using contentEditable
+
+**Member Management**
+- New `DeploymentSetMemberCard` (ArtifactBrowseCard variant) renders members in the Members tab with type badges and remove button
+- New `MiniArtifactCard` variant with compact layout and already-selected visual state for the AddMemberDialog
+- Collapsible member sections organized by type (artifacts, groups, nested sets) with Add Members button
+
+**Redesigned AddMemberDialog**
+- 3-tab member picker (Artifacts, Groups, Sets) with type/search filters
+- MiniArtifactCard grid display for browsing
+- Circular-reference error handling prevents invalid configurations
+
+**Header Actions & Tags**
+- Batch deploy, edit, delete buttons in modal header
+- Colored tag display with color-coded badges, unified with artifact tag system
+- Tag editor uses same component and API-compliant 100-character limit as artifacts
+- Groups Tab populated with collection-scoped groups with smart collectionId fallback
+
+#### Deployment Sets v1 — Full Feature (2026-02-23)
+
+**Resolution & Validation Services**
+- DFS-based resolution service with configurable depth limit for resolving nested sets into flat artifact lists
+- BFS circular-reference detection preventing invalid set configurations at write time
+- Batch deploy service with per-artifact error handling — deploys all resolved artifacts to a target project/profile in a single action
+
+**API Layer (11 Endpoints)**
+- Full CRUD under `/api/v1/deployment-sets/` covering creation, updates, deletion, member management, resolution, batch deploy, and cloning
+- Pydantic schemas for all deployment set DTOs (create, update, response, member, resolution result, batch deploy)
+- Feature flag (`SKILLMEAT_DEPLOYMENT_SETS_ENABLED`) for controlled rollout
+
+**Frontend Pages & Components**
+- Deployment Sets list page with card grid, search, and create/edit dialogs
+- Detail page with inline edit, member list, and dedicated members endpoint
+- 3-tab AddMemberDialog (Artifacts, Groups, Sets) with circular-reference error handling
+- Batch deploy modal with project/profile selectors and result table showing per-artifact success/failure
+- Complete TypeScript types, API client module, and 10 React Query hooks
+- `useFeatureFlags` hook and navigation gating (sidebar link hidden when flag disabled)
+
+**Testing**
+- Integration tests for circular-reference detection, batch deploy, delete, and clone operations
+- Performance benchmark for large set resolution (up to 50 artifacts)
+- Component tests for AddMemberDialog and BatchDeployModal
+
+#### Multi-Model SDLC Integration (2026-02-22)
+
+**Core Framework**
+- Multi-model orchestration framework for supplementing Claude with external AI models (GPT-5.3-Codex, Gemini 3.1 Pro/Flash, local LLMs)
+- Model routing configuration via `.claude/config/multi-model.toml` with effort policies and checkpoint gates
+- Disagreement protocol: when models conflict, CI tests are the neutral arbiter
+
+**Checkpoint Architecture**
+- Cross-model review checkpoints for plan review and PR validation
+- Creative workflows integration for SVG/animation (Gemini) and image generation (Nano Banana Pro)
+- Debug escalation protocol: after 2+ failed Claude cycles, optionally escalate to Codex
+
+**Documentation & Configuration**
+- Usage spec and CLAUDE.md integration documentation for orchestration workflows
+- Effort policy configuration with adaptive thinking budgets
+
 #### Sync Status Performance Refactor (2026-02-21)
 
 **Performance**
@@ -454,6 +554,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zero regression in collection, tagging, and grouping features
 
 ### Fixed
+
+#### Site-Wide Color & Icon Management (2026-02-25)
+
+- Fixed icon picker crash when `pack.icons` is undefined — added null-coalesce guard in edit dialog
+- Fixed Icons settings tab crash when `pack.icons` is undefined — added optional chaining guard
+
+#### Deployment Sets v1 (2026-02-23)
+
+- Removed per-request Alembic migration call from `BaseRepository` that caused unnecessary overhead on every DB operation
 
 #### Memory Extraction Pipeline v2 (2026-02-08)
 

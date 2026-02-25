@@ -52,7 +52,7 @@ If the key is missing, give the user these steps:
 - Input reference images must be jpg/png/webp and should match target size.
 - Download URLs expire after about 1 hour; copy assets to your own storage.
 - Prefer the bundled CLI and **never modify** `scripts/sora.py` unless the user asks.
-- Sora can generate audio; if a user requests voiceover/audio, specify it explicitly in the `Audio:` and `Dialogue:` lines and keep it short.
+- Sora 2 supports synced audio (ambient sound, music, voiceover, and dialogue synchronized to video); if a user requests voiceover/audio, specify it explicitly in the `Audio:` and `Dialogue:` lines and keep it short.
 
 ## API limitations
 - Models are limited to `sora-2` and `sora-2-pro`.
@@ -151,3 +151,28 @@ Use these modules when the request is for a specific artifact. They provide targ
 - **`references/social-ads.md`**: templates for short social ad beats.
 - **`references/troubleshooting.md`**: common errors and fixes.
 - **`references/codex-network.md`**: network/approval troubleshooting.
+
+## SDLC Integration
+
+Sora 2 is integrated into the multi-model SDLC as the sole video generation provider.
+
+**Routing**: All video generation tasks route to Sora 2 via `models.defaults.video_generation` in `.claude/config/multi-model.toml`.
+
+**Use cases in development workflow**:
+- Product demo videos for PRs and releases
+- Feature showcase clips for documentation
+- Marketing and promotional content
+- UI animation previews (longer sequences outside CSS animation scope)
+
+**Orchestration pattern**:
+1. Opus identifies video generation need.
+2. Check config: `checkpoints.creative_model_selection`.
+3. If `"ask"` — confirm with user; if `"auto"` — proceed.
+4. Invoke sora skill with structured prompt.
+5. Poll for completion (generation has significant latency).
+6. Download and review before use.
+7. Store in asset pipeline: `assets/ai-gen/{date}/sora/`.
+
+**Provenance**: Save prompt, metadata, and output together following asset pipeline conventions.
+
+**Cross-references**: Creative workflow routing at `.claude/skills/dev-execution/orchestration/creative-workflows.md`.
