@@ -8,7 +8,7 @@ gemini_enabled = true
 nano_banana_enabled = true
 sora_enabled = true
 local_llm_enabled = false
-claude_teams_enabled = false
+claude_teams_enabled = true
 
 [models.defaults]
 implementation = "claude-sonnet-4-6"
