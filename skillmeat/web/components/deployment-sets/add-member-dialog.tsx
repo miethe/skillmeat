@@ -75,9 +75,9 @@ type TabValue = 'artifact' | 'group' | 'set';
 /** Grid skeleton cards for loading states */
 function GridSkeleton({ count = 8 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex flex-col gap-2 rounded-lg border border-l-[3px] p-3 border-l-muted">
+        <div key={i} className="flex min-w-[180px] flex-col gap-2 rounded-lg border border-l-[3px] p-3 border-l-muted">
           <div className="flex items-center gap-1.5">
             <Skeleton className="h-4 w-4 rounded" />
             <Skeleton className="h-4 flex-1 rounded" />
@@ -274,7 +274,7 @@ function ArtifactTab({ setId, onAdded }: ArtifactTabProps) {
           />
         ) : (
           <div
-            className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4"
+            className="grid grid-cols-2 gap-2 sm:grid-cols-3"
             role="list"
             aria-label="Artifacts"
           >
@@ -285,7 +285,7 @@ function ArtifactTab({ setId, onAdded }: ArtifactTabProps) {
                 <div
                   key={artifact.uuid}
                   role="listitem"
-                  className="relative"
+                  className="relative min-w-[180px]"
                 >
                   <MiniArtifactCard
                     artifact={artifact}

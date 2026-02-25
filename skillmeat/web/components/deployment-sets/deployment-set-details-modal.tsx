@@ -17,19 +17,64 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useMemo } from 'react';
-import { Layers, Users, AlertCircle, Loader2, Tag, Calendar, Hash, Info } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import {
+  Layers,
+  Users,
+  AlertCircle,
+  Loader2,
+  Tag,
+  Calendar,
+  Hash,
+  Info,
+  Rocket,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Check,
+  Plus,
+  X,
+} from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Tabs } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { ModalHeader } from '@/components/shared/modal-header';
 import { TabNavigation, type Tab } from '@/components/shared/tab-navigation';
 import { TabContentWrapper } from '@/components/shared/tab-content-wrapper';
-import { useDeploymentSet, useResolveSet, useDeploymentSetMembers, useArtifacts } from '@/hooks';
-import { formatDate } from '@/lib/utils';
+import {
+  useDeploymentSet,
+  useResolveSet,
+  useDeploymentSetMembers,
+  useArtifacts,
+  useUpdateDeploymentSet,
+  useDeleteDeploymentSet,
+  useBatchDeploy,
+  useTags,
+  useCreateTag,
+  useToast,
+} from '@/hooks';
+import { formatDate, cn } from '@/lib/utils';
+import { getTagColor } from '@/lib/utils/tag-colors';
 import type { DeploymentSet, DeploymentSetMember } from '@/types/deployment-sets';
 import type { Artifact } from '@/types/artifact';
 import {
@@ -49,6 +94,10 @@ export interface DeploymentSetDetailsModalProps {
   open: boolean;
   /** Callback to control open state */
   onOpenChange: (open: boolean) => void;
+  /** Optional callback triggered when user selects "Edit" from the menu */
+  onEdit?: () => void;
+  /** Optional callback triggered when user selects "Delete" from the menu */
+  onDelete?: () => void;
 }
 
 // ============================================================================
@@ -102,6 +151,243 @@ function DeploymentSetDetailsError({ message }: { message: string }) {
 }
 
 // ============================================================================
+// Inline tag editor (deployment-set-specific, uses useUpdateDeploymentSet)
+// ============================================================================
+
+interface DeploymentSetTagEditorProps {
+  deploymentSet: DeploymentSet;
+}
+
+function DeploymentSetTagEditor({ deploymentSet }: DeploymentSetTagEditorProps) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [pendingTags, setPendingTags] = useState<Set<string>>(new Set());
+
+  const { data: allTagsResponse, isLoading: isLoadingAllTags } = useTags(100);
+  const updateSet = useUpdateDeploymentSet();
+  const createTagMutation = useCreateTag();
+
+  const allTags = useMemo(
+    () => [...(allTagsResponse?.items ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+    [allTagsResponse?.items]
+  );
+
+  const currentTagNames = useMemo(
+    () => new Set(deploymentSet.tags),
+    [deploymentSet.tags]
+  );
+
+  const filteredTags = useMemo(() => {
+    if (!search.trim()) return allTags;
+    const q = search.toLowerCase().trim();
+    return allTags.filter((t) => t.name.toLowerCase().includes(q));
+  }, [allTags, search]);
+
+  const exactMatch = useMemo(() => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase().trim();
+    return allTags.some((t) => t.name.toLowerCase() === q);
+  }, [allTags, search]);
+
+  const handleToggle = useCallback(
+    async (tagName: string) => {
+      const isApplied = currentTagNames.has(tagName);
+      setPendingTags((prev) => new Set(prev).add(tagName));
+
+      const updatedTags = isApplied
+        ? deploymentSet.tags.filter((t) => t !== tagName)
+        : [...deploymentSet.tags, tagName];
+
+      try {
+        await updateSet.mutateAsync({ id: deploymentSet.id, data: { tags: updatedTags } });
+      } catch (err) {
+        console.error('Failed to toggle tag:', err);
+      } finally {
+        setPendingTags((prev) => {
+          const next = new Set(prev);
+          next.delete(tagName);
+          return next;
+        });
+      }
+    },
+    [deploymentSet.id, deploymentSet.tags, currentTagNames, updateSet]
+  );
+
+  const handleRemoveTag = useCallback(
+    async (tagName: string) => {
+      const updatedTags = deploymentSet.tags.filter((t) => t !== tagName);
+      try {
+        await updateSet.mutateAsync({ id: deploymentSet.id, data: { tags: updatedTags } });
+      } catch (err) {
+        console.error('Failed to remove tag:', err);
+      }
+    },
+    [deploymentSet.id, deploymentSet.tags, updateSet]
+  );
+
+  const handleCreate = useCallback(async () => {
+    const name = search.trim();
+    if (!name) return;
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    try {
+      await createTagMutation.mutateAsync({ name, slug, color: getTagColor(name) });
+      const updatedTags = [...deploymentSet.tags, name];
+      await updateSet.mutateAsync({ id: deploymentSet.id, data: { tags: updatedTags } });
+      setSearch('');
+    } catch (err) {
+      console.error('Failed to create tag:', err);
+    }
+  }, [search, deploymentSet.id, deploymentSet.tags, createTagMutation, updateSet]);
+
+  const sortedCurrentTags = useMemo(
+    () => [...deploymentSet.tags].sort((a, b) => a.localeCompare(b)),
+    [deploymentSet.tags]
+  );
+
+  return (
+    <div>
+      <div
+        className="flex flex-wrap items-center gap-1.5"
+        role="list"
+        aria-label="Tags"
+      >
+        {sortedCurrentTags.map((tag) => {
+          const color = getTagColor(tag);
+          return (
+            <div
+              key={tag}
+              className="group relative flex items-center"
+              role="listitem"
+            >
+              <Badge colorStyle={color} className="pr-5 text-xs">
+                {tag}
+              </Badge>
+              <button
+                type="button"
+                onClick={() => handleRemoveTag(tag)}
+                className="absolute right-0.5 top-1/2 -translate-y-1/2 rounded-sm p-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                aria-label={`Remove tag ${tag}`}
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </div>
+          );
+        })}
+
+        {sortedCurrentTags.length === 0 && (
+          <p className="text-sm text-muted-foreground">No tags</p>
+        )}
+
+        {/* Add tag popover trigger */}
+        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 rounded-full p-0"
+              aria-label="Add tag"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-64 p-0"
+            align="start"
+            side="bottom"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <Command shouldFilter={false}>
+              <CommandInput
+                placeholder="Search or create tags..."
+                value={search}
+                onValueChange={setSearch}
+              />
+              <CommandList className="max-h-56">
+                {isLoadingAllTags ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-sm text-muted-foreground">Loading tags...</span>
+                  </div>
+                ) : (
+                  <>
+                    {filteredTags.length === 0 && !search.trim() && (
+                      <CommandEmpty>No tags available.</CommandEmpty>
+                    )}
+                    {filteredTags.length === 0 && search.trim() && !exactMatch && (
+                      <CommandEmpty>No matching tags found.</CommandEmpty>
+                    )}
+                    {filteredTags.length > 0 && (
+                      <CommandGroup>
+                        {filteredTags.map((tag) => {
+                          const isApplied = currentTagNames.has(tag.name);
+                          const isPending = pendingTags.has(tag.name);
+                          const color = tag.color || getTagColor(tag.name);
+                          return (
+                            <CommandItem
+                              key={tag.id}
+                              value={tag.name}
+                              onSelect={() => handleToggle(tag.name)}
+                              className="flex items-center gap-2 px-2 py-1.5"
+                              disabled={isPending}
+                            >
+                              <div
+                                className={cn(
+                                  'flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm border',
+                                  isApplied
+                                    ? 'border-primary bg-primary text-primary-foreground'
+                                    : 'border-muted-foreground/30'
+                                )}
+                              >
+                                {isApplied && <Check className="h-3 w-3" />}
+                              </div>
+                              <Badge colorStyle={color} className="text-xs">
+                                {tag.name}
+                              </Badge>
+                              {isPending && (
+                                <Loader2 className="ml-auto h-3 w-3 animate-spin text-muted-foreground" />
+                              )}
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    )}
+                    {search.trim() && !exactMatch && (
+                      <CommandGroup>
+                        <CommandItem
+                          value={`create:${search}`}
+                          onSelect={handleCreate}
+                          className="flex items-center gap-2 px-2 py-1.5"
+                          disabled={createTagMutation.isPending}
+                        >
+                          <Plus className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                          <span className="text-sm">
+                            Create{' '}
+                            <Badge colorStyle={getTagColor(search.trim())} className="text-xs">
+                              {search.trim()}
+                            </Badge>
+                          </span>
+                          {createTagMutation.isPending && (
+                            <Loader2 className="ml-auto h-3 w-3 animate-spin text-muted-foreground" />
+                          )}
+                        </CommandItem>
+                      </CommandGroup>
+                    )}
+                  </>
+                )}
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // Overview tab
 // ============================================================================
 
@@ -109,63 +395,213 @@ function DeploymentSetDetailsError({ message }: { message: string }) {
  * DeploymentSetOverviewTab
  *
  * Displays the full metadata for a deployment set:
- * name, description, color swatch, icon, tags, resolved member count,
+ * name, description, color swatch, icon, tags (editable), resolved member count,
  * and created/updated timestamps.
  *
+ * Supports inline editing of name and description via useUpdateDeploymentSet.
  * Uses useResolveSet for the resolved artifact count (30s stale time so it
  * stays fresh after member mutations).
  */
 function DeploymentSetOverviewTab({ deploymentSet }: { deploymentSet: DeploymentSet }) {
   const { data: resolution, isLoading: isResolving } = useResolveSet(deploymentSet.id);
+  const updateSet = useUpdateDeploymentSet();
+
+  // ── Editable name ──────────────────────────────────────────────────────────
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(deploymentSet.name);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Editable description ───────────────────────────────────────────────────
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [descriptionValue, setDescriptionValue] = useState(
+    deploymentSet.description ?? ''
+  );
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+
+  // Sync local state when deploymentSet changes (e.g., after a successful mutation)
+  useEffect(() => {
+    if (!isEditingName) setNameValue(deploymentSet.name);
+  }, [deploymentSet.name, isEditingName]);
+
+  useEffect(() => {
+    if (!isEditingDescription) setDescriptionValue(deploymentSet.description ?? '');
+  }, [deploymentSet.description, isEditingDescription]);
+
+  // Auto-focus inputs when editing starts
+  useEffect(() => {
+    if (isEditingName) nameInputRef.current?.focus();
+  }, [isEditingName]);
+
+  useEffect(() => {
+    if (isEditingDescription) descriptionRef.current?.focus();
+  }, [isEditingDescription]);
+
+  const saveName = useCallback(async () => {
+    const trimmed = nameValue.trim();
+    if (!trimmed || trimmed === deploymentSet.name) {
+      setIsEditingName(false);
+      setNameValue(deploymentSet.name);
+      return;
+    }
+    try {
+      await updateSet.mutateAsync({ id: deploymentSet.id, data: { name: trimmed } });
+    } catch (err) {
+      console.error('Failed to update name:', err);
+      setNameValue(deploymentSet.name);
+    } finally {
+      setIsEditingName(false);
+    }
+  }, [nameValue, deploymentSet.id, deploymentSet.name, updateSet]);
+
+  const saveDescription = useCallback(async () => {
+    const trimmed = descriptionValue.trim();
+    const current = deploymentSet.description ?? '';
+    if (trimmed === current) {
+      setIsEditingDescription(false);
+      return;
+    }
+    try {
+      await updateSet.mutateAsync({
+        id: deploymentSet.id,
+        data: { description: trimmed || null },
+      });
+    } catch (err) {
+      console.error('Failed to update description:', err);
+      setDescriptionValue(deploymentSet.description ?? '');
+    } finally {
+      setIsEditingDescription(false);
+    }
+  }, [descriptionValue, deploymentSet.id, deploymentSet.description, updateSet]);
+
+  const handleNameKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveName();
+      } else if (e.key === 'Escape') {
+        setIsEditingName(false);
+        setNameValue(deploymentSet.name);
+      }
+    },
+    [saveName, deploymentSet.name]
+  );
+
+  const handleDescriptionKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        saveDescription();
+      } else if (e.key === 'Escape') {
+        setIsEditingDescription(false);
+        setDescriptionValue(deploymentSet.description ?? '');
+      }
+    },
+    [saveDescription, deploymentSet.description]
+  );
 
   return (
     <div className="space-y-6" role="region" aria-label="Deployment set overview">
       {/* Identity: name, color swatch, icon */}
       <div>
-        <div className="mb-1 flex items-center gap-2">
-          <h2 className="text-base font-semibold leading-tight">{deploymentSet.name}</h2>
-          {deploymentSet.color && (
-            <span
-              className="inline-block h-4 w-4 shrink-0 rounded-full border border-border"
-              style={{ backgroundColor: deploymentSet.color }}
-              aria-label={`Color: ${deploymentSet.color}`}
-              title={deploymentSet.color}
+        <div className="mb-1 flex items-start gap-2">
+          {/* Editable name */}
+          {isEditingName ? (
+            <Input
+              ref={nameInputRef}
+              value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
+              onBlur={saveName}
+              onKeyDown={handleNameKeyDown}
+              className="h-7 flex-1 py-0 text-base font-semibold leading-tight"
+              aria-label="Edit deployment set name"
             />
+          ) : (
+            <div className="group flex flex-1 items-center gap-1.5">
+              <h2 className="text-base font-semibold leading-tight">{deploymentSet.name}</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0 opacity-0 transition-opacity group-hover:opacity-60 focus-visible:opacity-60"
+                onClick={() => setIsEditingName(true)}
+                aria-label="Edit name"
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+            </div>
           )}
-          {deploymentSet.icon && (
-            <span
-              className="text-base leading-none"
-              aria-label={`Icon: ${deploymentSet.icon}`}
-              role="img"
-            >
-              {deploymentSet.icon}
-            </span>
-          )}
+
+          {/* Color swatch + icon (always visible) */}
+          <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+            {deploymentSet.color && (
+              <span
+                className="inline-block h-4 w-4 shrink-0 rounded-full border border-border"
+                style={{ backgroundColor: deploymentSet.color }}
+                aria-label={`Color: ${deploymentSet.color}`}
+                title={deploymentSet.color}
+              />
+            )}
+            {deploymentSet.icon && (
+              <span
+                className="text-base leading-none"
+                aria-label={`Icon: ${deploymentSet.icon}`}
+                role="img"
+              >
+                {deploymentSet.icon}
+              </span>
+            )}
+          </div>
         </div>
-        {deploymentSet.description && (
-          <p className="text-sm text-muted-foreground">{deploymentSet.description}</p>
+
+        {/* Editable description */}
+        {isEditingDescription ? (
+          <Textarea
+            ref={descriptionRef}
+            value={descriptionValue}
+            onChange={(e) => setDescriptionValue(e.target.value)}
+            onBlur={saveDescription}
+            onKeyDown={handleDescriptionKeyDown}
+            className="mt-1 min-h-[60px] resize-none text-sm text-muted-foreground"
+            placeholder="Add a description... (Enter to save, Shift+Enter for newline, Escape to cancel)"
+            aria-label="Edit deployment set description"
+          />
+        ) : (
+          <div className="group flex items-start gap-1.5">
+            {deploymentSet.description ? (
+              <p className="text-sm text-muted-foreground">{deploymentSet.description}</p>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsEditingDescription(true)}
+                className="text-sm text-muted-foreground/50 italic transition-colors hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                aria-label="Add description"
+              >
+                Add description...
+              </button>
+            )}
+            {deploymentSet.description && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-0.5 h-4 w-4 shrink-0 p-0 opacity-0 transition-opacity group-hover:opacity-60 focus-visible:opacity-60"
+                onClick={() => setIsEditingDescription(true)}
+                aria-label="Edit description"
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
       <Separator />
 
-      {/* Tags */}
+      {/* Tags — inline editable */}
       <div>
         <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
           <Tag className="h-4 w-4" aria-hidden="true" />
           Tags
         </h3>
-        {deploymentSet.tags.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5" role="list" aria-label="Tags">
-            {[...deploymentSet.tags].sort((a, b) => a.localeCompare(b)).map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-xs" role="listitem">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No tags</p>
-        )}
+        <DeploymentSetTagEditor deploymentSet={deploymentSet} />
       </div>
 
       <Separator />
@@ -454,22 +890,33 @@ function DeploymentSetMembersTab({ setId }: { setId: string }) {
 /**
  * DeploymentSetDetailsModal
  *
- * Renders a max-w-2xl Dialog containing tabbed content for a deployment set.
+ * Renders a max-w-5xl Dialog containing tabbed content for a deployment set.
  * Fetches the set via useDeploymentSet — disabled when setId is null.
  * Shows loading skeleton while fetching and an error state on failure.
+ *
+ * Header actions:
+ *   - Deploy button: batch-deploys the set to the current directory
+ *   - Kebab menu: Edit (calls onEdit prop) and Delete (calls onDelete prop or
+ *     executes deletion directly via useDeleteDeploymentSet)
  */
 export function DeploymentSetDetailsModal({
   setId,
   open,
   onOpenChange,
+  onEdit,
+  onDelete,
 }: DeploymentSetDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<string>('overview');
+  const { toast } = useToast();
 
   const {
     data: deploymentSet,
     isLoading,
     error,
   } = useDeploymentSet(setId ?? '');
+
+  const batchDeploy = useBatchDeploy();
+  const deleteSet = useDeleteDeploymentSet();
 
   // Reset to overview tab whenever a different set is opened
   React.useEffect(() => {
@@ -482,10 +929,109 @@ export function DeploymentSetDetailsModal({
   const title = deploymentSet?.name ?? (isLoading ? 'Loading…' : 'Deployment Set');
   const description = deploymentSet?.description ?? undefined;
 
+  const handleDeploy = useCallback(async () => {
+    if (!deploymentSet) return;
+    try {
+      const result = await batchDeploy.mutateAsync({
+        id: deploymentSet.id,
+        data: { project_path: '.' },
+      });
+      const successCount = result.results.filter((r) => r.status === 'success').length;
+      const failedCount = result.results.filter((r) => r.status === 'failed').length;
+      toast({
+        title: 'Deployment complete',
+        description:
+          failedCount > 0
+            ? `${successCount} deployed, ${failedCount} failed`
+            : `${successCount} artifact${successCount !== 1 ? 's' : ''} deployed successfully`,
+      });
+    } catch (err) {
+      toast({
+        title: 'Deployment failed',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  }, [deploymentSet, batchDeploy, toast]);
+
+  const handleDelete = useCallback(async () => {
+    if (!deploymentSet) return;
+    if (onDelete) {
+      onDelete();
+      return;
+    }
+    try {
+      await deleteSet.mutateAsync(deploymentSet.id);
+      onOpenChange(false);
+      toast({ title: 'Deployment set deleted' });
+    } catch (err) {
+      toast({
+        title: 'Failed to delete',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  }, [deploymentSet, deleteSet, onDelete, onOpenChange, toast]);
+
+  // Header actions — Deploy button + kebab menu
+  const headerActions = deploymentSet ? (
+    <>
+      <Button
+        variant="default"
+        size="sm"
+        className="h-7 gap-1.5 px-3 text-xs"
+        onClick={handleDeploy}
+        disabled={batchDeploy.isPending}
+        aria-label="Deploy this deployment set"
+      >
+        {batchDeploy.isPending ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+        ) : (
+          <Rocket className="h-3.5 w-3.5" aria-hidden="true" />
+        )}
+        Deploy
+      </Button>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0"
+            aria-label="More options"
+          >
+            <MoreVertical className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {onEdit && (
+            <DropdownMenuItem onClick={onEdit}>
+              <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+              Edit
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem
+            onClick={handleDelete}
+            className="text-destructive focus:text-destructive"
+            disabled={deleteSet.isPending}
+          >
+            <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  ) : isLoading ? (
+    <Loader2
+      className="h-4 w-4 animate-spin text-muted-foreground"
+      aria-label="Loading"
+    />
+  ) : undefined;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex max-h-[90vh] max-w-2xl flex-col gap-0 overflow-hidden p-0"
+        className="flex max-h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0"
         aria-label={`Deployment set details: ${title}`}
       >
         {/* Header */}
@@ -494,14 +1040,7 @@ export function DeploymentSetDetailsModal({
           iconClassName="text-primary"
           title={title}
           description={description}
-          actions={
-            isLoading ? (
-              <Loader2
-                className="h-4 w-4 animate-spin text-muted-foreground"
-                aria-label="Loading"
-              />
-            ) : undefined
-          }
+          actions={headerActions}
         />
 
         {/* Body */}
