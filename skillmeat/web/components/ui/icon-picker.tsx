@@ -191,7 +191,7 @@ const IconPicker = React.forwardRef<
     
     virtualItems.forEach((item, index) => {
       if (item.type === 'category') {
-        indices[categorizedIcons[item.categoryIndex].name] = index;
+        indices[categorizedIcons[item.categoryIndex]!.name] = index;
       }
     });
     
@@ -203,7 +203,7 @@ const IconPicker = React.forwardRef<
   const virtualizer = useVirtualizer({
     count: virtualItems.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: (index) => virtualItems[index].type === 'category' ? 25 : 40,
+    estimateSize: (index) => virtualItems[index]!.type === 'category' ? 25 : 40,
     paddingEnd: 2,
     gap: 10,
     overscan: 5,
@@ -335,7 +335,7 @@ const IconPicker = React.forwardRef<
                 className="top-0 bg-background z-10"
               >
                 <h3 className="font-medium text-sm capitalize">
-                  {categorizedIcons[item.categoryIndex].name}
+                  {categorizedIcons[item.categoryIndex]!.name}
                 </h3>
                 <div className="h-[1px] bg-foreground/10 w-full" />
               </div>
