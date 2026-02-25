@@ -15,7 +15,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { TagEditor } from '@/components/shared/tag-editor';
-import { COLOR_OPTIONS } from '@/lib/group-constants';
+import { ColorSelector } from '@/components/shared/color-selector';
+import { IconPicker } from '@/components/shared/icon-picker';
+import { PRESET_COLORS } from '@/lib/color-constants';
 
 interface CreateDeploymentSetDialogProps {
   open: boolean;
@@ -36,7 +38,7 @@ export function CreateDeploymentSetDialog({ open, onOpenChange }: CreateDeployme
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [color, setColor] = useState('');
+  const [color, setColor] = useState(PRESET_COLORS[0]?.hex ?? '');
   const [icon, setIcon] = useState('');
   const [tags, setTags] = useState<string[]>([]);
 
@@ -51,7 +53,7 @@ export function CreateDeploymentSetDialog({ open, onOpenChange }: CreateDeployme
     }
     setName('');
     setDescription('');
-    setColor('');
+    setColor(PRESET_COLORS[0]?.hex ?? '');
     setIcon('');
     setTags([]);
   }, [open]);
@@ -129,37 +131,16 @@ export function CreateDeploymentSetDialog({ open, onOpenChange }: CreateDeployme
           </div>
 
           {/* Color */}
-          <div className="space-y-2">
-            <Label>Color</Label>
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Color presets">
-              {COLOR_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  aria-label={option.label}
-                  aria-pressed={color === option.value}
-                  className={`h-7 w-7 rounded-full border-2 transition-all ${
-                    color === option.value
-                      ? 'scale-110 border-foreground'
-                      : 'border-transparent hover:border-muted-foreground'
-                  }`}
-                  style={{ backgroundColor: option.hex }}
-                  onClick={() => setColor(color === option.value ? '' : option.value)}
-                />
-              ))}
-            </div>
-          </div>
+          <ColorSelector
+            label="Color"
+            value={color}
+            onChange={setColor}
+          />
 
           {/* Icon */}
           <div className="space-y-2">
-            <Label htmlFor="ds-icon">Icon (emoji or identifier)</Label>
-            <Input
-              id="ds-icon"
-              placeholder="e.g. 🚀 or deploy"
-              value={icon}
-              onChange={(e) => setIcon(e.target.value)}
-              className="w-40"
-            />
+            <Label>Icon</Label>
+            <IconPicker value={icon} onChange={setIcon} />
           </div>
 
           {/* Tags */}

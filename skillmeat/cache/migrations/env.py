@@ -117,9 +117,22 @@ if config.config_file_name is not None:
         pass
 
 # SQLAlchemy MetaData object for autogenerate support
-# Since we're using raw SQL schema, we don't have SQLAlchemy models
-# This is None for now, but can be populated if we add SQLAlchemy models
-target_metadata = None
+from skillmeat.cache.models import Base, create_db_engine  # noqa: E402
+
+target_metadata = Base.metadata
+
+# Resolve DB URL from skillmeat config if not set in alembic.ini
+if config.get_main_option("sqlalchemy.url") is None:
+    try:
+        from skillmeat.core.config import ConfigManager  # noqa: E402
+
+        cfg_mgr = ConfigManager()
+        db_path = cfg_mgr.get("cache.db-path") or (
+            Path.home() / ".skillmeat" / "cache" / "cache.db"
+        )
+    except Exception:
+        db_path = Path.home() / ".skillmeat" / "cache" / "cache.db"
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
 
 
 def run_migrations_offline() -> None:
@@ -157,7 +170,9 @@ def run_migrations_online() -> None:
     """
     # Get configuration and add SQLite-specific settings
     configuration = config.get_section(config.config_ini_section) or {}
-    configuration["sqlalchemy.url"] = config.get_main_option("sqlalchemy.url")
+    db_url = config.get_main_option("sqlalchemy.url")
+    if db_url:
+        configuration["sqlalchemy.url"] = db_url
 
     # Create engine with SQLite-optimized settings
     connectable = engine_from_config(

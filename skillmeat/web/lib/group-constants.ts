@@ -1,6 +1,12 @@
 import { Book, Folder, Layers, Sparkles, Tag, Wrench } from 'lucide-react';
 import type { ComponentType } from 'react';
 
+// Re-export shared color types and helpers for backward compatibility.
+// Consumers can import ColorOption, PRESET_COLORS, and isValidHex from either
+// @/lib/group-constants or @/lib/color-constants.
+export type { ColorOption } from './color-constants';
+export { PRESET_COLORS, isValidHex } from './color-constants';
+
 // ---------------------------------------------------------------------------
 // Color constants
 // ---------------------------------------------------------------------------

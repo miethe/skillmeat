@@ -77,6 +77,7 @@ from skillmeat.cache.models import (
     ArtifactTag,
     Base,
     CollectionArtifact,
+    CustomColor,
     DeploymentProfile,
     DeploymentSet,
     DeploymentSetMember,
@@ -4025,6 +4026,8 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
         name: str,
         owner_id: str,
         description: Optional[str] = None,
+        color: Optional[str] = None,
+        icon: Optional[str] = None,
         tags: Optional[List[str]] = None,
     ) -> DeploymentSet:
         """Create and return a new DeploymentSet.
@@ -4033,6 +4036,8 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
             name: Human-readable set name (required).
             owner_id: Owning user / identity scope (required).
             description: Optional free-text description.
+            color: Optional hex color code (e.g. ``"#7c3aed"``).
+            icon: Optional icon identifier string (e.g. ``"layers"``).
             tags: Optional list of tag strings.
 
         Returns:
@@ -4049,6 +4054,8 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
                 name=name,
                 owner_id=owner_id,
                 description=description,
+                color=color,
+                icon=icon,
                 created_at=now,
                 updated_at=now,
             )
@@ -4197,8 +4204,9 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
     ) -> Optional[DeploymentSet]:
         """Update mutable fields on a DeploymentSet.
 
-        Only ``name``, ``description``, and ``tags`` are writable.
-        ``updated_at`` is refreshed automatically on every successful update.
+        Only ``name``, ``description``, ``color``, ``icon``, and ``tags`` are
+        writable.  ``updated_at`` is refreshed automatically on every
+        successful update.
 
         Args:
             set_id: Primary key of the deployment set.
@@ -4206,6 +4214,7 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
                 different owner or does not exist.
             **kwargs: Keyword arguments for fields to update.  Supported
                 keys: ``name`` (str), ``description`` (str | None),
+                ``color`` (str | None), ``icon`` (str | None),
                 ``tags`` (list[str]).
 
         Returns:
@@ -4231,6 +4240,10 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
                 ds.name = kwargs["name"]
             if "description" in kwargs:
                 ds.description = kwargs["description"]
+            if "color" in kwargs:
+                ds.color = kwargs["color"]
+            if "icon" in kwargs:
+                ds.icon = kwargs["icon"]
             if "tags" in kwargs:
                 self._sync_tags(session, ds.id, kwargs["tags"])
 
@@ -4551,5 +4564,222 @@ class DeploymentSetRepository(BaseRepository[DeploymentSet]):
                 .order_by(DeploymentSetMember.position)
                 .all()
             )
+        finally:
+            session.close()
+
+
+# =============================================================================
+# CustomColorRepository
+# =============================================================================
+
+# Compiled regex for hex color validation (module-level for performance)
+_HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{3,6}$")
+
+
+class CustomColorRepository(BaseRepository[CustomColor]):
+    """Repository for user-defined custom color palette management.
+
+    Provides CRUD operations for custom colors stored in the site-wide
+    color registry. Each color is uniquely identified by its hex value
+    and may carry an optional human-readable name.
+
+    Hex values are validated against ``#[0-9a-fA-F]{3,6}$`` before any
+    write operation; invalid values raise ``ValueError``.
+
+    Usage:
+        >>> repo = CustomColorRepository()
+        >>>
+        >>> # List all persisted colors
+        >>> colors = repo.list_all()
+        >>>
+        >>> # Add a new color
+        >>> color = repo.create("#7c3aed", name="Violet")
+        >>>
+        >>> # Update the name only
+        >>> updated = repo.update(color.id, name="Purple")
+        >>>
+        >>> # Remove a color
+        >>> repo.delete(color.id)
+    """
+
+    def __init__(self, db_path: Optional[str | Path] = None):
+        """Initialize custom color repository.
+
+        Args:
+            db_path: Optional path to database file (uses default if None)
+        """
+        super().__init__(db_path, CustomColor)
+
+    # =========================================================================
+    # Internal helpers
+    # =========================================================================
+
+    @staticmethod
+    def _validate_hex(hex_value: str) -> None:
+        """Validate a CSS hex color string.
+
+        Args:
+            hex_value: Hex color to validate (e.g. ``#7c3aed``)
+
+        Raises:
+            ValueError: If the value does not match ``#[0-9a-fA-F]{3,6}$``
+        """
+        if not _HEX_COLOR_RE.match(hex_value):
+            raise ValueError(f"Invalid hex color: {hex_value!r}")
+
+    # =========================================================================
+    # CRUD Operations
+    # =========================================================================
+
+    def list_all(self) -> List[CustomColor]:
+        """Return all custom colors ordered by creation date (oldest first).
+
+        Returns:
+            List of ``CustomColor`` instances, may be empty.
+
+        Example:
+            >>> colors = repo.list_all()
+            >>> for c in colors:
+            ...     print(c.hex, c.name)
+        """
+        session = self._get_session()
+        try:
+            return (
+                session.query(CustomColor)
+                .order_by(CustomColor.created_at)
+                .all()
+            )
+        finally:
+            session.close()
+
+    def create(self, hex: str, name: Optional[str] = None) -> CustomColor:
+        """Create and persist a new custom color.
+
+        Args:
+            hex: CSS hex color string including the leading ``#``
+                 (e.g. ``#7c3aed``).  Must match ``#[0-9a-fA-F]{3,6}$``.
+            name: Optional human-readable label (max 64 characters).
+
+        Returns:
+            Newly created ``CustomColor`` instance.
+
+        Raises:
+            ValueError: If ``hex`` does not pass format validation.
+            RepositoryError: If a color with the same hex already exists.
+
+        Example:
+            >>> color = repo.create("#7c3aed", name="Violet")
+            >>> print(color.id)
+        """
+        self._validate_hex(hex)
+
+        session = self._get_session()
+        try:
+            color = CustomColor(
+                id=uuid.uuid4().hex,
+                hex=hex,
+                name=name,
+                created_at=datetime.utcnow(),
+            )
+
+            session.add(color)
+            session.commit()
+            session.refresh(color)
+
+            logger.info(f"Created custom color: {color.hex!r} (id={color.id})")
+            return color
+
+        except IntegrityError as e:
+            session.rollback()
+            raise RepositoryError(
+                f"Custom color with hex {hex!r} already exists"
+            ) from e
+        finally:
+            session.close()
+
+    def update(
+        self,
+        id: str,
+        hex: Optional[str] = None,
+        name: Optional[str] = None,
+    ) -> Optional[CustomColor]:
+        """Update fields on an existing custom color.
+
+        Only fields that are explicitly provided (not ``None``) are modified.
+        If no color with ``id`` exists, ``None`` is returned.
+
+        Args:
+            id: Primary key of the color to update.
+            hex: New hex value.  Must match ``#[0-9a-fA-F]{3,6}$`` when
+                 provided.
+            name: New human-readable label.  Pass an empty string to clear
+                  an existing name.
+
+        Returns:
+            Updated ``CustomColor`` instance, or ``None`` if not found.
+
+        Raises:
+            ValueError: If ``hex`` is provided but fails format validation.
+            RepositoryError: If the update violates a uniqueness constraint.
+
+        Example:
+            >>> updated = repo.update(color.id, name="Deep Purple")
+            >>> if updated is None:
+            ...     print("Color not found")
+        """
+        if hex is not None:
+            self._validate_hex(hex)
+
+        session = self._get_session()
+        try:
+            color = session.query(CustomColor).filter_by(id=id).first()
+            if color is None:
+                return None
+
+            if hex is not None:
+                color.hex = hex
+            if name is not None:
+                color.name = name
+
+            session.commit()
+            session.refresh(color)
+
+            logger.info(f"Updated custom color id={id!r}")
+            return color
+
+        except IntegrityError as e:
+            session.rollback()
+            raise RepositoryError(
+                f"Failed to update custom color id={id!r}: {e}"
+            ) from e
+        finally:
+            session.close()
+
+    def delete(self, id: str) -> bool:
+        """Delete a custom color by its primary key.
+
+        Args:
+            id: Primary key of the color to delete.
+
+        Returns:
+            ``True`` if the color was found and deleted, ``False`` if no color
+            with the given ``id`` exists.
+
+        Example:
+            >>> deleted = repo.delete(color.id)
+            >>> print("Deleted" if deleted else "Not found")
+        """
+        session = self._get_session()
+        try:
+            color = session.query(CustomColor).filter_by(id=id).first()
+            if color is None:
+                return False
+
+            session.delete(color)
+            session.commit()
+
+            logger.info(f"Deleted custom color id={id!r}")
+            return True
+
         finally:
             session.close()
