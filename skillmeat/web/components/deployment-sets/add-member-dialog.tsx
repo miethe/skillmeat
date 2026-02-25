@@ -346,9 +346,20 @@ function GroupTab({ setId, onAdded, collectionId }: GroupTabProps) {
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const addMember = useAddMember();
 
-  // Resolve collection ID: use prop if provided, otherwise fall back to the first collection
-  const { data: collectionsData } = useCollections({ limit: 1 });
-  const resolvedCollectionId = collectionId ?? collectionsData?.items[0]?.id;
+  // Resolve collection ID: use prop if provided, otherwise pick the best default collection.
+  // Priority: prop > id/name matches "default"/"main" > highest artifact_count > first item.
+  const { data: collectionsData } = useCollections();
+  const resolvedCollectionId = collectionId ?? (() => {
+    const items = collectionsData?.items ?? [];
+    if (items.length === 0) return undefined;
+    const HOME_NAMES = ['default', 'main', 'personal', 'home'];
+    const byName = items.find(
+      (c) => HOME_NAMES.includes(c.id.toLowerCase()) || HOME_NAMES.includes(c.name.toLowerCase()),
+    );
+    if (byName) return byName.id;
+    const byCount = [...items].sort((a, b) => b.artifact_count - a.artifact_count)[0];
+    return byCount?.id ?? items[0]?.id;
+  })();
 
   const { data: groupsData, isLoading } = useGroups(resolvedCollectionId);
   const groups = groupsData?.groups ?? [];

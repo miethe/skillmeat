@@ -94,6 +94,12 @@ export interface DeploymentSetDetailsModalProps {
   onEdit?: () => void;
   /** Optional callback triggered when user selects "Delete" from the menu */
   onDelete?: () => void;
+  /**
+   * Optional collection ID for the Groups tab in the Add Members dialog.
+   * When omitted, the best available collection is resolved automatically.
+   * Pass explicitly to ensure groups load from the correct collection.
+   */
+  collectionId?: string;
 }
 
 // ============================================================================
@@ -613,7 +619,7 @@ function MemberSection({
  *   - set member → opens a nested DeploymentSetDetailsModal
  *   - group member → shows a GroupMemberPopover with group info
  */
-function DeploymentSetMembersTab({ setId }: { setId: string }) {
+function DeploymentSetMembersTab({ setId, collectionId }: { setId: string; collectionId?: string }) {
   // Members list for this deployment set
   const {
     data: members,
@@ -778,6 +784,7 @@ function DeploymentSetMembersTab({ setId }: { setId: string }) {
         open={addMemberOpen}
         onOpenChange={setAddMemberOpen}
         setId={setId}
+        collectionId={collectionId}
       />
 
       {/* Artifact details modal (artifact-type member navigation) */}
@@ -825,6 +832,7 @@ export function DeploymentSetDetailsModal({
   onOpenChange,
   onEdit,
   onDelete,
+  collectionId,
 }: DeploymentSetDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<string>('overview');
   const { toast } = useToast();
@@ -986,7 +994,7 @@ export function DeploymentSetDetailsModal({
 
             {/* Members tab */}
             <TabContentWrapper value="members">
-              <DeploymentSetMembersTab setId={deploymentSet.id} />
+              <DeploymentSetMembersTab setId={deploymentSet.id} collectionId={collectionId} />
             </TabContentWrapper>
           </Tabs>
         )}

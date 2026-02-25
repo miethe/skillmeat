@@ -1,10 +1,10 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useMemo } from 'react';
 import { DeploymentSetList } from '@/components/deployment-sets/deployment-set-list';
 import { DeploymentSetDetailsModal } from '@/components/deployment-sets/deployment-set-details-modal';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFeatureFlags } from '@/hooks';
+import { useFeatureFlags, useCollections } from '@/hooks';
 import { Layers3, AlertCircle } from 'lucide-react';
 
 /**
@@ -17,6 +17,21 @@ import { Layers3, AlertCircle } from 'lucide-react';
 export function DeploymentSetsPageClient() {
   const { deploymentSetsEnabled, isLoading: flagsLoading } = useFeatureFlags();
   const [selectedSetId, setSelectedSetId] = useState<string | null>(null);
+
+  // Resolve the user's home collection to pass into the details modal for the Groups tab.
+  // Priority: id/name matches "default"/"main" > highest artifact_count > first item.
+  const { data: collectionsData } = useCollections();
+  const defaultCollectionId = useMemo(() => {
+    const items = collectionsData?.items ?? [];
+    if (items.length === 0) return undefined;
+    const HOME_NAMES = ['default', 'main', 'personal', 'home'];
+    const byName = items.find(
+      (c) => HOME_NAMES.includes(c.id.toLowerCase()) || HOME_NAMES.includes(c.name.toLowerCase()),
+    );
+    if (byName) return byName.id;
+    const byCount = [...items].sort((a, b) => b.artifact_count - a.artifact_count)[0];
+    return byCount?.id ?? items[0]?.id;
+  }, [collectionsData]);
 
   // Show a skeleton while feature flags load to avoid layout shift
   if (flagsLoading) {
@@ -81,6 +96,7 @@ export function DeploymentSetsPageClient() {
         onOpenChange={(open) => {
           if (!open) setSelectedSetId(null);
         }}
+        collectionId={defaultCollectionId}
       />
     </div>
   );
