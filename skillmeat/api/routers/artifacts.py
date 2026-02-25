@@ -56,6 +56,8 @@ from skillmeat.api.schemas.artifacts import (
     ArtifactUpstreamResponse,
     ArtifactVersionInfo,
     ConflictInfo,
+    ConsolidationActionRequest,
+    ConsolidationActionResponse,
     ConsolidationClustersResponse,
     CreateLinkedArtifactRequest,
     DeploymentStatistics,
@@ -9170,4 +9172,443 @@ async def get_similar_artifacts(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to find similar artifacts: {str(e)}",
+        )
+
+
+def _create_auto_snapshot_for_consolidation(
+    cluster_id: str,
+    action: str,
+) -> str:
+    """Create an auto-snapshot before a destructive consolidation action.
+
+    Args:
+        cluster_id: Cluster identifier (used in snapshot message).
+        action: Action name (``'merge'`` or ``'replace'``).
+
+    Returns:
+        Snapshot ID string.
+
+    Raises:
+        RuntimeError: If snapshot creation fails for any reason.
+    """
+    from skillmeat.core.version import VersionManager
+
+    version_mgr = VersionManager()
+    snapshot = version_mgr.auto_snapshot(
+        message=f"Before consolidation {action}: cluster {cluster_id}",
+    )
+    return snapshot.id
+
+
+@router.post(
+    "/consolidation/clusters/{cluster_id}/merge",
+    response_model=ConsolidationActionResponse,
+    summary="Merge consolidation cluster (secondary into primary)",
+    description=(
+        "Merges all secondary artifacts in the cluster into the primary artifact, "
+        "then removes the secondaries from the collection.  An auto-snapshot is "
+        "always created before any data is modified.  If the snapshot step fails "
+        "the action is aborted and a 500 is returned — the collection is never "
+        "modified without a confirmed snapshot."
+    ),
+    responses={
+        200: {"description": "Merge completed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request parameters"},
+        404: {"model": ErrorResponse, "description": "Cluster or primary artifact not found"},
+        500: {"model": ErrorResponse, "description": "Snapshot failed or internal error"},
+    },
+    status_code=status.HTTP_200_OK,
+)
+async def merge_consolidation_cluster(
+    cluster_id: str,
+    request: ConsolidationActionRequest,
+    artifact_mgr: ArtifactManagerDep,
+    token: TokenDep,
+) -> ConsolidationActionResponse:
+    """Merge secondary artifacts into the primary for a consolidation cluster.
+
+    The endpoint:
+    1. Creates an auto-snapshot (aborts with HTTP 500 if this fails).
+    2. Resolves the cluster members from ``DuplicatePair`` records.
+    3. Removes each secondary artifact from the collection.
+    4. Marks all pairs in the cluster as resolved (ignored).
+
+    Args:
+        cluster_id: Opaque cluster identifier (used in snapshot message).
+        request:     Request body with ``primary_artifact_uuid`` and optional
+                     ``collection_name``.
+        artifact_mgr: Injected ArtifactManager.
+        token:        Authentication token (dependency injection).
+
+    Returns:
+        ConsolidationActionResponse describing what was done.
+
+    Raises:
+        HTTPException 500: If the auto-snapshot fails (action is aborted).
+        HTTPException 404: If the primary artifact UUID is not found.
+        HTTPException 500: On unexpected errors during the merge.
+
+    Example:
+        POST /api/v1/artifacts/consolidation/clusters/abc123/merge
+        {"primary_artifact_uuid": "deadbeef...", "collection_name": null}
+    """
+    # --- Step 1: Auto-snapshot (mandatory gate) ---
+    try:
+        snapshot_id = _create_auto_snapshot_for_consolidation(cluster_id, "merge")
+        logger.info(
+            "Auto-snapshot created before merge of cluster %r: snapshot_id=%r",
+            cluster_id,
+            snapshot_id,
+        )
+    except Exception as snap_err:
+        logger.error(
+            "Snapshot failed before merge of cluster %r: %s",
+            cluster_id,
+            snap_err,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Snapshot failed — action aborted",
+        )
+
+    # --- Step 2: Resolve cluster members ---
+    try:
+        from skillmeat.cache.models import DuplicatePair
+        from skillmeat.cache.repositories import DuplicatePairRepository
+
+        primary_uuid = request.primary_artifact_uuid
+
+        with get_session() as session:
+            # Validate primary artifact exists
+            primary_art = (
+                session.query(Artifact)
+                .filter(Artifact.uuid == primary_uuid)
+                .first()
+            )
+            if primary_art is None:
+                logger.warning(
+                    "Merge cluster %r: primary artifact UUID %r not found",
+                    cluster_id,
+                    primary_uuid,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Primary artifact '{primary_uuid}' not found",
+                )
+
+            # Collect all UUIDs in the cluster via DuplicatePair records
+            pairs = (
+                session.query(DuplicatePair)
+                .filter(
+                    DuplicatePair.ignored.is_(False),
+                    (DuplicatePair.artifact1_uuid == primary_uuid)
+                    | (DuplicatePair.artifact2_uuid == primary_uuid),
+                )
+                .all()
+            )
+
+            secondary_uuids: List[str] = []
+            for pair in pairs:
+                other = (
+                    pair.artifact2_uuid
+                    if pair.artifact1_uuid == primary_uuid
+                    else pair.artifact1_uuid
+                )
+                if other not in secondary_uuids:
+                    secondary_uuids.append(other)
+
+            pair_ids = [pair.id for pair in pairs]
+
+        logger.info(
+            "Merge cluster %r: primary=%r, secondaries=%r",
+            cluster_id,
+            primary_uuid,
+            secondary_uuids,
+        )
+
+        # --- Step 3: Remove each secondary artifact from the collection ---
+        removed_uuids: List[str] = []
+        with get_session() as session:
+            for sec_uuid in secondary_uuids:
+                sec_art = (
+                    session.query(Artifact)
+                    .filter(Artifact.uuid == sec_uuid)
+                    .first()
+                )
+                if sec_art is None:
+                    logger.warning(
+                        "Merge cluster %r: secondary artifact UUID %r not found, skipping",
+                        cluster_id,
+                        sec_uuid,
+                    )
+                    continue
+
+                try:
+                    from skillmeat.core.enums import ArtifactType as CoreArtifactType
+
+                    art_type = CoreArtifactType(sec_art.artifact_type)
+                    artifact_mgr.remove(
+                        artifact_name=sec_art.name,
+                        artifact_type=art_type,
+                        collection_name=request.collection_name,
+                    )
+                    removed_uuids.append(sec_uuid)
+                    logger.info(
+                        "Merge cluster %r: removed secondary artifact %r (%r)",
+                        cluster_id,
+                        sec_art.name,
+                        sec_uuid,
+                    )
+                except Exception as rm_err:
+                    logger.warning(
+                        "Merge cluster %r: could not remove secondary %r: %s",
+                        cluster_id,
+                        sec_uuid,
+                        rm_err,
+                    )
+
+        # --- Step 4: Mark pairs as resolved (ignored) ---
+        repo = DuplicatePairRepository()
+        pairs_resolved = 0
+        for pid in pair_ids:
+            if repo.mark_pair_ignored(pid):
+                pairs_resolved += 1
+
+        logger.info(
+            "Merge cluster %r completed: removed=%d, pairs_resolved=%d",
+            cluster_id,
+            len(removed_uuids),
+            pairs_resolved,
+        )
+
+        return ConsolidationActionResponse(
+            action="merge",
+            cluster_id=cluster_id,
+            primary_artifact_uuid=primary_uuid,
+            removed_artifact_uuids=removed_uuids,
+            pairs_resolved=pairs_resolved,
+            snapshot_id=snapshot_id,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Merge cluster %r failed: %s",
+            cluster_id,
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to merge consolidation cluster: {str(e)}",
+        )
+
+
+@router.post(
+    "/consolidation/clusters/{cluster_id}/replace",
+    response_model=ConsolidationActionResponse,
+    summary="Replace consolidation cluster (keep primary, discard secondaries)",
+    description=(
+        "Keeps the primary artifact unchanged and discards all secondary artifacts "
+        "in the cluster.  An auto-snapshot is always created before any data is "
+        "modified.  If the snapshot step fails the action is aborted and a 500 is "
+        "returned — the collection is never modified without a confirmed snapshot."
+    ),
+    responses={
+        200: {"description": "Replace completed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request parameters"},
+        404: {"model": ErrorResponse, "description": "Cluster or primary artifact not found"},
+        500: {"model": ErrorResponse, "description": "Snapshot failed or internal error"},
+    },
+    status_code=status.HTTP_200_OK,
+)
+async def replace_consolidation_cluster(
+    cluster_id: str,
+    request: ConsolidationActionRequest,
+    artifact_mgr: ArtifactManagerDep,
+    token: TokenDep,
+) -> ConsolidationActionResponse:
+    """Keep the primary artifact and discard all secondaries in the cluster.
+
+    Unlike merge, no content from the secondaries is incorporated — the primary
+    is kept exactly as-is while the secondaries are deleted from the collection.
+
+    The endpoint:
+    1. Creates an auto-snapshot (aborts with HTTP 500 if this fails).
+    2. Resolves the cluster members from ``DuplicatePair`` records.
+    3. Removes each secondary artifact from the collection.
+    4. Marks all pairs in the cluster as resolved (ignored).
+
+    Args:
+        cluster_id: Opaque cluster identifier (used in snapshot message).
+        request:     Request body with ``primary_artifact_uuid`` and optional
+                     ``collection_name``.
+        artifact_mgr: Injected ArtifactManager.
+        token:        Authentication token (dependency injection).
+
+    Returns:
+        ConsolidationActionResponse describing what was done.
+
+    Raises:
+        HTTPException 500: If the auto-snapshot fails (action is aborted).
+        HTTPException 404: If the primary artifact UUID is not found.
+        HTTPException 500: On unexpected errors during the replace.
+
+    Example:
+        POST /api/v1/artifacts/consolidation/clusters/abc123/replace
+        {"primary_artifact_uuid": "deadbeef...", "collection_name": null}
+    """
+    # --- Step 1: Auto-snapshot (mandatory gate) ---
+    try:
+        snapshot_id = _create_auto_snapshot_for_consolidation(cluster_id, "replace")
+        logger.info(
+            "Auto-snapshot created before replace of cluster %r: snapshot_id=%r",
+            cluster_id,
+            snapshot_id,
+        )
+    except Exception as snap_err:
+        logger.error(
+            "Snapshot failed before replace of cluster %r: %s",
+            cluster_id,
+            snap_err,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Snapshot failed — action aborted",
+        )
+
+    # --- Step 2: Resolve cluster members ---
+    try:
+        from skillmeat.cache.models import DuplicatePair
+        from skillmeat.cache.repositories import DuplicatePairRepository
+
+        primary_uuid = request.primary_artifact_uuid
+
+        with get_session() as session:
+            # Validate primary artifact exists
+            primary_art = (
+                session.query(Artifact)
+                .filter(Artifact.uuid == primary_uuid)
+                .first()
+            )
+            if primary_art is None:
+                logger.warning(
+                    "Replace cluster %r: primary artifact UUID %r not found",
+                    cluster_id,
+                    primary_uuid,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Primary artifact '{primary_uuid}' not found",
+                )
+
+            # Collect all UUIDs in the cluster via DuplicatePair records
+            pairs = (
+                session.query(DuplicatePair)
+                .filter(
+                    DuplicatePair.ignored.is_(False),
+                    (DuplicatePair.artifact1_uuid == primary_uuid)
+                    | (DuplicatePair.artifact2_uuid == primary_uuid),
+                )
+                .all()
+            )
+
+            secondary_uuids: List[str] = []
+            for pair in pairs:
+                other = (
+                    pair.artifact2_uuid
+                    if pair.artifact1_uuid == primary_uuid
+                    else pair.artifact1_uuid
+                )
+                if other not in secondary_uuids:
+                    secondary_uuids.append(other)
+
+            pair_ids = [pair.id for pair in pairs]
+
+        logger.info(
+            "Replace cluster %r: primary=%r, secondaries=%r",
+            cluster_id,
+            primary_uuid,
+            secondary_uuids,
+        )
+
+        # --- Step 3: Remove each secondary artifact from the collection ---
+        removed_uuids: List[str] = []
+        with get_session() as session:
+            for sec_uuid in secondary_uuids:
+                sec_art = (
+                    session.query(Artifact)
+                    .filter(Artifact.uuid == sec_uuid)
+                    .first()
+                )
+                if sec_art is None:
+                    logger.warning(
+                        "Replace cluster %r: secondary artifact UUID %r not found, skipping",
+                        cluster_id,
+                        sec_uuid,
+                    )
+                    continue
+
+                try:
+                    from skillmeat.core.enums import ArtifactType as CoreArtifactType
+
+                    art_type = CoreArtifactType(sec_art.artifact_type)
+                    artifact_mgr.remove(
+                        artifact_name=sec_art.name,
+                        artifact_type=art_type,
+                        collection_name=request.collection_name,
+                    )
+                    removed_uuids.append(sec_uuid)
+                    logger.info(
+                        "Replace cluster %r: removed secondary artifact %r (%r)",
+                        cluster_id,
+                        sec_art.name,
+                        sec_uuid,
+                    )
+                except Exception as rm_err:
+                    logger.warning(
+                        "Replace cluster %r: could not remove secondary %r: %s",
+                        cluster_id,
+                        sec_uuid,
+                        rm_err,
+                    )
+
+        # --- Step 4: Mark pairs as resolved (ignored) ---
+        repo = DuplicatePairRepository()
+        pairs_resolved = 0
+        for pid in pair_ids:
+            if repo.mark_pair_ignored(pid):
+                pairs_resolved += 1
+
+        logger.info(
+            "Replace cluster %r completed: removed=%d, pairs_resolved=%d",
+            cluster_id,
+            len(removed_uuids),
+            pairs_resolved,
+        )
+
+        return ConsolidationActionResponse(
+            action="replace",
+            cluster_id=cluster_id,
+            primary_artifact_uuid=primary_uuid,
+            removed_artifact_uuids=removed_uuids,
+            pairs_resolved=pairs_resolved,
+            snapshot_id=snapshot_id,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Replace cluster %r failed: %s",
+            cluster_id,
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to replace consolidation cluster: {str(e)}",
         )

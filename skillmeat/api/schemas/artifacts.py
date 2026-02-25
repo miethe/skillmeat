@@ -1515,3 +1515,62 @@ class ConsolidationClustersResponse(BaseModel):
             "pages are available."
         ),
     )
+
+
+class ConsolidationActionRequest(BaseModel):
+    """Request body for consolidation merge/replace cluster actions.
+
+    Used by ``POST /api/v1/artifacts/consolidation/clusters/{cluster_id}/merge``
+    and ``POST /api/v1/artifacts/consolidation/clusters/{cluster_id}/replace``.
+    """
+
+    primary_artifact_uuid: str = Field(
+        ...,
+        description=(
+            "UUID (hex string) of the artifact to treat as the authoritative primary "
+            "during the consolidation action. All other cluster members are secondaries."
+        ),
+    )
+    collection_name: Optional[str] = Field(
+        None,
+        description=(
+            "Name of the collection to operate on. Uses the active collection when "
+            "``null``."
+        ),
+    )
+
+
+class ConsolidationActionResponse(BaseModel):
+    """Response for consolidation merge/replace cluster actions.
+
+    Returned by both the merge and replace endpoints after a successful
+    destructive action.  A snapshot is always created before any data is
+    modified; the snapshot ID is included so the caller can surface a rollback
+    option to the user.
+    """
+
+    action: str = Field(
+        ...,
+        description="The action that was performed: ``'merge'`` or ``'replace'``.",
+    )
+    cluster_id: str = Field(
+        ..., description="The cluster identifier that was acted upon."
+    )
+    primary_artifact_uuid: str = Field(
+        ..., description="UUID of the artifact that was kept as primary."
+    )
+    removed_artifact_uuids: List[str] = Field(
+        ...,
+        description="UUIDs of artifacts that were removed during the action.",
+    )
+    pairs_resolved: int = Field(
+        ...,
+        description="Number of DuplicatePair records marked as resolved.",
+    )
+    snapshot_id: str = Field(
+        ...,
+        description=(
+            "ID of the auto-snapshot created before the destructive action. "
+            "Can be used for rollback if needed."
+        ),
+    )

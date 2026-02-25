@@ -704,3 +704,148 @@ class TestIgnoreExcludesFromClusters:
             cleanup_session.commit()
         finally:
             cleanup_session.close()
+
+
+# =============================================================================
+# Tests: POST /api/v1/artifacts/consolidation/clusters/{cluster_id}/merge
+# Tests: POST /api/v1/artifacts/consolidation/clusters/{cluster_id}/replace
+# Focus: snapshot-gate abort path (SA-P5-009)
+# =============================================================================
+
+
+class TestConsolidationActionSnapshotGate:
+    """Verify that merge and replace endpoints abort when auto-snapshot fails.
+
+    These tests patch ``_create_auto_snapshot_for_consolidation`` to raise an
+    exception, then assert that:
+    - The endpoint returns HTTP 500
+    - The detail message is exactly ``"Snapshot failed — action aborted"``
+    - The artifact_mgr.remove() method is NEVER called (no destructive action)
+    """
+
+    def _make_action_client(self, app, artifact_mgr_mock):
+        """Return a TestClient with auth and ArtifactManagerDep overridden."""
+        from skillmeat.api.dependencies import get_artifact_manager
+        from skillmeat.api.middleware.auth import verify_token
+
+        app.dependency_overrides[verify_token] = lambda: "mock-token"
+        app.dependency_overrides[get_artifact_manager] = lambda: artifact_mgr_mock
+        return TestClient(app)
+
+    def test_merge_aborts_when_snapshot_fails(self, app):
+        """Merge endpoint must return 500 and skip removal when snapshot raises."""
+        primary_uuid = _uuid_mod.uuid4().hex
+        artifact_mgr_mock = MagicMock()
+
+        client = self._make_action_client(app, artifact_mgr_mock)
+
+        snapshot_target = (
+            "skillmeat.api.routers.artifacts"
+            "._create_auto_snapshot_for_consolidation"
+        )
+        with patch(snapshot_target, side_effect=RuntimeError("disk full")):
+            response = client.post(
+                "/api/v1/artifacts/consolidation/clusters/cluster-abc/merge",
+                json={"primary_artifact_uuid": primary_uuid},
+            )
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR, (
+            f"Expected 500, got {response.status_code}: {response.text}"
+        )
+        detail = response.json().get("detail", "")
+        assert detail == "Snapshot failed — action aborted", (
+            f"Unexpected detail message: {detail!r}"
+        )
+        # Confirm that no artifact was removed
+        artifact_mgr_mock.remove.assert_not_called()
+
+    def test_replace_aborts_when_snapshot_fails(self, app):
+        """Replace endpoint must return 500 and skip removal when snapshot raises."""
+        primary_uuid = _uuid_mod.uuid4().hex
+        artifact_mgr_mock = MagicMock()
+
+        client = self._make_action_client(app, artifact_mgr_mock)
+
+        snapshot_target = (
+            "skillmeat.api.routers.artifacts"
+            "._create_auto_snapshot_for_consolidation"
+        )
+        with patch(snapshot_target, side_effect=RuntimeError("snapshot dir missing")):
+            response = client.post(
+                "/api/v1/artifacts/consolidation/clusters/cluster-xyz/replace",
+                json={"primary_artifact_uuid": primary_uuid},
+            )
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR, (
+            f"Expected 500, got {response.status_code}: {response.text}"
+        )
+        detail = response.json().get("detail", "")
+        assert detail == "Snapshot failed — action aborted", (
+            f"Unexpected detail message: {detail!r}"
+        )
+        # Confirm that no artifact was removed
+        artifact_mgr_mock.remove.assert_not_called()
+
+    def test_merge_succeeds_when_snapshot_and_no_pairs(
+        self, app, test_session_factory, artifact_rows
+    ):
+        """When snapshot succeeds and no pairs exist, merge returns 200 with empty lists.
+
+        This confirms the snapshot is created and the action proceeds — when
+        there are no DuplicatePair records for the primary, the secondary lists
+        are empty and pairs_resolved is 0.
+        """
+        primary_uuid = artifact_rows[0].uuid
+        artifact_mgr_mock = MagicMock()
+
+        # Ensure no pairs exist for this artifact
+        cleanup = test_session_factory()
+        try:
+            cleanup.query(DuplicatePair).filter(
+                (DuplicatePair.artifact1_uuid == primary_uuid)
+                | (DuplicatePair.artifact2_uuid == primary_uuid)
+            ).delete(synchronize_session=False)
+            cleanup.commit()
+        finally:
+            cleanup.close()
+
+        client = self._make_action_client(app, artifact_mgr_mock)
+
+        snapshot_target = (
+            "skillmeat.api.routers.artifacts"
+            "._create_auto_snapshot_for_consolidation"
+        )
+        with patch(snapshot_target, return_value="snap-001"):
+            with patch(
+                "skillmeat.api.routers.artifacts.get_session"
+            ) as mock_get_session:
+                # Provide a real session via the test session factory so the
+                # primary Artifact lookup succeeds.
+                from contextlib import contextmanager
+
+                @contextmanager
+                def _real_session():
+                    session = test_session_factory()
+                    try:
+                        yield session
+                    finally:
+                        session.close()
+
+                mock_get_session.side_effect = _real_session
+
+                response = client.post(
+                    "/api/v1/artifacts/consolidation/clusters/cluster-abc/merge",
+                    json={"primary_artifact_uuid": primary_uuid},
+                )
+
+        assert response.status_code == status.HTTP_200_OK, (
+            f"Expected 200, got {response.status_code}: {response.text}"
+        )
+        data = response.json()
+        assert data["action"] == "merge"
+        assert data["primary_artifact_uuid"] == primary_uuid
+        assert data["snapshot_id"] == "snap-001"
+        assert data["removed_artifact_uuids"] == []
+        assert data["pairs_resolved"] == 0
+        # No removal attempted since there are no secondaries
+        artifact_mgr_mock.remove.assert_not_called()

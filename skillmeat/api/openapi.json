@@ -6479,6 +6479,190 @@
         }
       }
     },
+    "/api/v1/artifacts/consolidation/clusters/{cluster_id}/merge": {
+      "post": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Merge consolidation cluster (secondary into primary)",
+        "description": "Merges all secondary artifacts in the cluster into the primary artifact, then removes the secondaries from the collection.  An auto-snapshot is always created before any data is modified.  If the snapshot step fails the action is aborted and a 500 is returned \u2014 the collection is never modified without a confirmed snapshot.",
+        "operationId": "merge_consolidation_cluster_api_v1_artifacts_consolidation_clusters__cluster_id__merge_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cluster_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cluster Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsolidationActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Merge completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsolidationActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cluster or primary artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Snapshot failed or internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts/consolidation/clusters/{cluster_id}/replace": {
+      "post": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Replace consolidation cluster (keep primary, discard secondaries)",
+        "description": "Keeps the primary artifact unchanged and discards all secondary artifacts in the cluster.  An auto-snapshot is always created before any data is modified.  If the snapshot step fails the action is aborted and a 500 is returned \u2014 the collection is never modified without a confirmed snapshot.",
+        "operationId": "replace_consolidation_cluster_api_v1_artifacts_consolidation_clusters__cluster_id__replace_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cluster_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cluster Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsolidationActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replace completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsolidationActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cluster or primary artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Snapshot failed or internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/artifacts/{artifact_id}/history": {
       "get": {
         "tags": [
@@ -28796,6 +28980,81 @@
           "resolution_applied": "use_local",
           "success": true
         }
+      },
+      "ConsolidationActionRequest": {
+        "properties": {
+          "primary_artifact_uuid": {
+            "type": "string",
+            "title": "Primary Artifact Uuid",
+            "description": "UUID (hex string) of the artifact to treat as the authoritative primary during the consolidation action. All other cluster members are secondaries."
+          },
+          "collection_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collection Name",
+            "description": "Name of the collection to operate on. Uses the active collection when ``null``."
+          }
+        },
+        "type": "object",
+        "required": [
+          "primary_artifact_uuid"
+        ],
+        "title": "ConsolidationActionRequest",
+        "description": "Request body for consolidation merge/replace cluster actions.\n\nUsed by ``POST /api/v1/artifacts/consolidation/clusters/{cluster_id}/merge``\nand ``POST /api/v1/artifacts/consolidation/clusters/{cluster_id}/replace``."
+      },
+      "ConsolidationActionResponse": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action",
+            "description": "The action that was performed: ``'merge'`` or ``'replace'``."
+          },
+          "cluster_id": {
+            "type": "string",
+            "title": "Cluster Id",
+            "description": "The cluster identifier that was acted upon."
+          },
+          "primary_artifact_uuid": {
+            "type": "string",
+            "title": "Primary Artifact Uuid",
+            "description": "UUID of the artifact that was kept as primary."
+          },
+          "removed_artifact_uuids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Removed Artifact Uuids",
+            "description": "UUIDs of artifacts that were removed during the action."
+          },
+          "pairs_resolved": {
+            "type": "integer",
+            "title": "Pairs Resolved",
+            "description": "Number of DuplicatePair records marked as resolved."
+          },
+          "snapshot_id": {
+            "type": "string",
+            "title": "Snapshot Id",
+            "description": "ID of the auto-snapshot created before the destructive action. Can be used for rollback if needed."
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "cluster_id",
+          "primary_artifact_uuid",
+          "removed_artifact_uuids",
+          "pairs_resolved",
+          "snapshot_id"
+        ],
+        "title": "ConsolidationActionResponse",
+        "description": "Response for consolidation merge/replace cluster actions.\n\nReturned by both the merge and replace endpoints after a successful\ndestructive action.  A snapshot is always created before any data is\nmodified; the snapshot ID is included so the caller can surface a rollback\noption to the user."
       },
       "ConsolidationClustersResponse": {
         "properties": {
