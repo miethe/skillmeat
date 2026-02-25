@@ -327,6 +327,49 @@
       ]
     },
     {
+      "id": "similar-artifacts",
+      "name": "Similar Artifacts Detection",
+      "icon": "sparkles",
+      "tagline": "Find and consolidate duplicates",
+      "features": [
+        {
+          "id": "similar-detection",
+          "name": "Similar Artifacts Detection",
+          "description": "Find similar and duplicate artifacts in your collection using fingerprint matching and semantic scoring",
+          "shortDescription": "Find duplicates",
+          "cliCommand": "skillmeat similar",
+          "since": "0.3.0",
+          "highlight": true
+        },
+        {
+          "id": "collection-consolidation",
+          "name": "Collection Consolidation",
+          "description": "Dedicated page to review and merge duplicate artifact clusters with auto-snapshot safety",
+          "shortDescription": "Merge duplicates",
+          "cliCommand": "skillmeat consolidate",
+          "webPage": "/consolidation",
+          "since": "0.3.0",
+          "highlight": true
+        },
+        {
+          "id": "similarity-badges",
+          "name": "Similarity Badges",
+          "description": "Visual similarity indicators on marketplace cards showing match strength and confidence",
+          "shortDescription": "Badge indicators",
+          "webPage": "/collection",
+          "since": "0.3.0"
+        },
+        {
+          "id": "similarity-score-tuning",
+          "name": "Configurable Scoring",
+          "description": "Fine-tune similarity thresholds with --min-score and --limit options for precise deduplication",
+          "shortDescription": "Tunable detection",
+          "cliCommand": "skillmeat similar --min-score",
+          "since": "0.3.0"
+        }
+      ]
+    },
+    {
       "id": "versioning",
       "name": "Versioning & Safety",
       "icon": "git-branch",

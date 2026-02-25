@@ -1,5 +1,5 @@
 <!-- AUTO-GENERATED: Do not edit directly. See .github/readme/ -->
-<!-- GENERATED: 2026-02-25T19:43:05.211Z -->
+<!-- GENERATED: 2026-02-25T22:21:27.285Z -->
 <!-- VERSION: 0.3.0-beta -->
 
 <!-- BEGIN:hero -->
@@ -245,6 +245,17 @@ _Find anything instantly_
 | Duplicate Detection | Find duplicates (`skillmeat find-duplicates`) |
 | Ripgrep Integration | Fast search |
 
+### Similar Artifacts Detection
+
+_Find and consolidate duplicates_
+
+| Feature | Description |
+|---------|-------------|
+| **Similar Artifacts Detection** | Find duplicates (`skillmeat similar`) |
+| **Collection Consolidation** | Merge duplicates (`skillmeat consolidate`) |
+| Similarity Badges | Badge indicators |
+| Configurable Scoring | Tunable detection (`skillmeat similar --min-score`) |
+
 ### Versioning &amp; Safety
 
 _Snapshots and rollback_
@@ -342,6 +353,7 @@ SkillMeat provides **116+ commands** across **23 command groups**.
 | **Marketplace &amp; Discovery** | &#x60;skillmeat marketplace-publish&#x60; |
 | **Analytics &amp; Insights** | &#x60;skillmeat analytics usage&#x60;, &#x60;skillmeat analytics top&#x60;, &#x60;skillmeat analytics cleanup&#x60;, &#x60;skillmeat analytics trends&#x60; |
 | **Search &amp; Discovery** | &#x60;skillmeat search&#x60;, &#x60;skillmeat find-duplicates&#x60; |
+| **Similar Artifacts Detection** | &#x60;skillmeat similar&#x60;, &#x60;skillmeat consolidate&#x60;, &#x60;skillmeat similar --min-score&#x60; |
 | **Versioning &amp; Safety** | &#x60;skillmeat snapshot&#x60;, &#x60;skillmeat rollback&#x60;, &#x60;skillmeat history&#x60; |
 | **MCP Server Management** | &#x60;skillmeat mcp add&#x60;, &#x60;skillmeat mcp deploy&#x60;, &#x60;skillmeat mcp health&#x60; |
 | **Context Entities** | &#x60;skillmeat context&#x60;, &#x60;skillmeat context deploy&#x60; |
@@ -430,6 +442,16 @@ skillmeat web start               # Start production servers
 |---------|-------------|
 | `skillmeat search` | Search everything |
 | `skillmeat find-duplicates` | Find duplicates |
+
+</details>
+<details>
+<summary><strong>Similar Artifacts Detection</strong> - Find and consolidate duplicates</summary>
+
+| Command | Description |
+|---------|-------------|
+| `skillmeat similar` | Find duplicates |
+| `skillmeat consolidate` | Merge duplicates |
+| `skillmeat similar --min-score` | Tunable detection |
 
 </details>
 <details>

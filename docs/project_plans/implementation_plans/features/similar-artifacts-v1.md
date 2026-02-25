@@ -1,8 +1,8 @@
 ---
-title: "Implementation Plan: Similar Artifacts \u2014 Detection, Comparison & Consolidation"
+title: 'Implementation Plan: Similar Artifacts — Detection, Comparison & Consolidation'
 schema_version: 2
 doc_type: implementation_plan
-status: in-progress
+status: inferred_complete
 created: 2026-02-25
 updated: '2026-02-25'
 feature_slug: similar-artifacts
@@ -28,8 +28,8 @@ architecture_summary: 'SimilarityService (new service layer) wraps ArtifactFinge
   '
 phases:
 - 'Phase 1: Core Similarity Engine (backend service + API + DB migration)'
-- "Phase 2: Similar Artifacts Tab \u2014 Collection (frontend tab + hooks)"
-- "Phase 3: Similar Artifacts Tab \u2014 Marketplace (reuse tab in marketplace context)"
+- 'Phase 2: Similar Artifacts Tab — Collection (frontend tab + hooks)'
+- 'Phase 3: Similar Artifacts Tab — Marketplace (reuse tab in marketplace context)'
 - 'Phase 4: Marketplace Similarity Badges (badges + settings sub-tab)'
 - 'Phase 5: Collection Consolidation View (consolidation page + cluster API)'
 - 'Phase 6: CLI Integration (similar + consolidate commands)'
@@ -89,7 +89,6 @@ files_affected:
 - skillmeat/web/app/collection/consolidate/page.tsx
 - skillmeat/cli.py
 ---
-
 # Implementation Plan: Similar Artifacts — Detection, Comparison & Consolidation
 
 **Plan ID**: `IMPL-2026-02-25-SIMILAR-ARTIFACTS`
