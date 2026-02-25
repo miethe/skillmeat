@@ -706,3 +706,61 @@ class TestListArtifacts:
                     assert response.status_code == 200
                     data = response.json()
                     assert len(data["items"]) == 1
+
+class TestGetArtifactFileContent:
+    """Test GET /api/v1/artifacts/{id}/files/{path} endpoint."""
+
+    def test_get_artifact_file_content(self, client, sample_artifact, tmp_path):
+        """Test getting text file content."""
+        # Setup collection and artifact files
+        collection_path = tmp_path / "collection"
+        collection_path.mkdir(parents=True)
+        artifact_path = collection_path / "skills" / "test-skill"
+        artifact_path.mkdir(parents=True)
+
+        file_content = "# Test Skill Content"
+        file_path = artifact_path / "SKILL.md"
+        file_path.write_text(file_content, encoding="utf-8")
+
+        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
+            mock_coll = Mock()
+            mock_coll.find_artifact.return_value = sample_artifact
+            mock_coll_mgr.list_collections.return_value = ["default"]
+            mock_coll_mgr.load_collection.return_value = mock_coll
+            mock_coll_mgr.config.get_collection_path.return_value = collection_path
+
+            response = client.get(
+                "/api/v1/artifacts/skill:test-skill/files/SKILL.md"
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["content"] == file_content
+            assert data["path"] == "SKILL.md"
+
+    def test_get_artifact_binary_file_content(self, client, sample_artifact, tmp_path):
+        """Test getting binary file content (should fail)."""
+        # Setup collection and artifact files
+        collection_path = tmp_path / "collection"
+        collection_path.mkdir(parents=True)
+        artifact_path = collection_path / "skills" / "test-skill"
+        artifact_path.mkdir(parents=True)
+
+        # Write binary file
+        file_path = artifact_path / "image.png"
+        with open(file_path, "wb") as f:
+            f.write(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
+
+        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
+            mock_coll = Mock()
+            mock_coll.find_artifact.return_value = sample_artifact
+            mock_coll_mgr.list_collections.return_value = ["default"]
+            mock_coll_mgr.load_collection.return_value = mock_coll
+            mock_coll_mgr.config.get_collection_path.return_value = collection_path
+
+            response = client.get(
+                "/api/v1/artifacts/skill:test-skill/files/image.png"
+            )
+
+            assert response.status_code == 400
+            assert "binary files are not supported" in response.json()["detail"].lower()
