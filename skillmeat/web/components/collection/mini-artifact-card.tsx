@@ -30,6 +30,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 import { getArtifactTypeConfig } from '@/types/artifact';
+import type { SimilarityBreakdown } from '@/types/similarity';
 import { ArtifactGroupBadges } from '@/components/collection/artifact-group-badges';
 import { getTagColor } from '@/lib/utils/tag-colors';
 import { useTags } from '@/hooks';
@@ -61,6 +62,12 @@ export interface MiniArtifactCardProps {
   groupId?: string;
   /** Additional CSS classes */
   className?: string;
+  /** Whether to show a similarity score badge (default false) */
+  showScore?: boolean;
+  /** Composite similarity score in range [0, 1] */
+  similarityScore?: number;
+  /** Optional score breakdown for tooltip display */
+  scoreBreakdown?: SimilarityBreakdown;
 }
 
 export interface DraggableMiniArtifactCardProps {
@@ -72,6 +79,27 @@ export interface DraggableMiniArtifactCardProps {
   groupId: string;
   /** Additional CSS classes */
   className?: string;
+}
+
+// ============================================================================
+// Score badge helpers
+// ============================================================================
+
+/** Returns Tailwind classes for the score badge based on score value */
+function getScoreBadgeClasses(score: number): string {
+  if (score >= 0.8) {
+    return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
+  }
+  if (score >= 0.5) {
+    return 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
+  }
+  return 'bg-muted text-muted-foreground';
+}
+
+/** Formats a score as a percentage string, or "N/A" if null */
+function formatScore(score: number | null): string {
+  if (score === null) return 'N/A';
+  return `${Math.round(score * 100)}%`;
 }
 
 // ============================================================================
@@ -97,7 +125,7 @@ export interface DraggableMiniArtifactCardProps {
 export const MiniArtifactCard = React.forwardRef<
   HTMLDivElement,
   MiniArtifactCardProps & Omit<React.HTMLAttributes<HTMLDivElement>, 'onClick'>
->(({ artifact, onClick, groupId, className, style, ...htmlProps }, ref) => {
+>(({ artifact, onClick, groupId, className, style, showScore, similarityScore, scoreBreakdown, ...htmlProps }, ref) => {
   const config = getArtifactTypeConfig(artifact.type);
 
   // Fetch all tags to build a name->color map from DB
@@ -147,11 +175,14 @@ export const MiniArtifactCard = React.forwardRef<
   )[iconName];
   const Icon = IconComponent || LucideIcons.FileText;
 
+  // Determine whether to render the score badge
+  const shouldShowScore = showScore === true && similarityScore !== undefined;
+
   return (
     <div
       ref={ref}
       className={cn(
-        'flex w-full min-h-[140px] flex-col rounded-lg border border-l-[3px] bg-card p-3',
+        'relative flex w-full min-h-[140px] flex-col rounded-lg border border-l-[3px] bg-card p-3',
         'cursor-grab shadow-sm transition-shadow hover:shadow-md',
         'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1',
         typeBarColors[artifact.type],
@@ -165,6 +196,67 @@ export const MiniArtifactCard = React.forwardRef<
       aria-label={`${artifact.name}, ${config?.label ?? artifact.type} artifact`}
       {...htmlProps}
     >
+      {/* Similarity score badge (top-right corner) */}
+      {shouldShowScore && (() => {
+        const pct = formatScore(similarityScore!);
+        const badgeClasses = cn(
+          'absolute top-2 right-2 z-10',
+          'inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium',
+          getScoreBadgeClasses(similarityScore!)
+        );
+
+        if (scoreBreakdown) {
+          return (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    className={badgeClasses}
+                    aria-label={`Similarity score: ${pct}`}
+                    tabIndex={0}
+                  >
+                    {pct}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="text-xs">
+                  <div className="flex flex-col gap-0.5 min-w-[120px]">
+                    <div className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">Content</span>
+                      <span className="font-medium">{formatScore(scoreBreakdown.content_score)}</span>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">Structure</span>
+                      <span className="font-medium">{formatScore(scoreBreakdown.structure_score)}</span>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">Metadata</span>
+                      <span className="font-medium">{formatScore(scoreBreakdown.metadata_score)}</span>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">Keyword</span>
+                      <span className="font-medium">{formatScore(scoreBreakdown.keyword_score)}</span>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">Semantic</span>
+                      <span className="font-medium">{formatScore(scoreBreakdown.semantic_score)}</span>
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
+        }
+
+        return (
+          <span
+            className={badgeClasses}
+            aria-label={`Similarity score: ${pct}`}
+          >
+            {pct}
+          </span>
+        );
+      })()}
+
       {/* Type icon + Artifact name (single line) */}
       <div className="flex items-center gap-1.5">
         <TooltipProvider>

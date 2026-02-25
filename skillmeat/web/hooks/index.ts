@@ -522,6 +522,15 @@ export { useAnalyticsStream } from './useAnalyticsStream';
 export { useArtifactHistory, getArtifactHistoryId, artifactHistoryKeys } from './useArtifactHistory';
 
 // ============================================================================
+// SIMILARITY (1 hook)
+// ============================================================================
+// Similar artifact detection by content, structure, metadata, and semantics
+export {
+  similarArtifactKeys,
+  useSimilarArtifacts,
+} from './use-similar-artifacts';
+
+// ============================================================================
 // SSE (1 hook)
 // ============================================================================
 // Server-sent events for real-time data streaming
