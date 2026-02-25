@@ -93,25 +93,25 @@ Choose the right model for the task.
 ### Decision Tree
 
 ```
-Is the task complex (architecture, multi-file, deep analysis)?
-├── Yes → Use default (Gemini 3 Pro)
+Is the task complex (architecture, multi-file, deep analysis, image gen)?
+├── Yes → Use default (Gemini 3.1 Pro)
 └── No → Is speed critical?
-    ├── Yes → Use gemini-2.5-flash
+    ├── Yes → Use gemini-3-flash
     └── No → Is it trivial (formatting, simple query)?
         ├── Yes → Use gemini-2.5-flash-lite
-        └── No → Use gemini-2.5-flash
+        └── No → Use gemini-3-flash
 ```
 
 ### Examples
 ```bash
-# Complex: Architecture analysis
+# Complex: Architecture analysis or image generation
 gemini "Analyze codebase architecture" -o text
 
 # Quick: Simple formatting
-gemini "Format this JSON" -m gemini-2.5-flash -o text
+gemini "Format this JSON" -m gemini-3-flash -o text
 
 # Trivial: One-liner
-gemini "What is 2+2?" -m gemini-2.5-flash -o text
+gemini "What is 2+2?" -m gemini-3-flash -o text
 ```
 
 ## Pattern 5: Rate Limit Handling
@@ -127,7 +127,7 @@ Default behavior - CLI retries automatically with backoff.
 gemini "[important task]" --yolo -o text
 
 # Lower priority: Use Flash (different quota)
-gemini "[less critical task]" -m gemini-2.5-flash -o text
+gemini "[less critical task]" -m gemini-3-flash -o text
 ```
 
 ### Approach 3: Batch Operations
@@ -293,6 +293,144 @@ echo "Focus on the authentication flow" | gemini -r 1 -o text
 - Building on previous context
 - Debugging sessions
 
+## Pattern 11: UI Mockup Generation
+
+Use Gemini 3.1 Pro's image generation capability to produce visual mockups alongside code.
+
+### When to Use
+- Designing a new component with no existing reference
+- Communicating layout intent before implementation
+- Rapid prototyping where visual + code together accelerate review
+
+### Prompt Structure
+```bash
+gemini "Generate a UI mockup image for [component name].
+Context: [1-2 sentences on purpose and data it displays]
+Tech stack: Next.js 15, Tailwind CSS, shadcn/ui
+After the image, output the complete React/TSX implementation." --yolo -o text
+```
+
+### Example
+```bash
+gemini "Generate a UI mockup image for a DeploymentSet member card.
+Context: Shows artifact name, type badge, version, and deploy status.
+Tech stack: Next.js 15, Tailwind CSS, shadcn/ui
+After the image, output the complete React/TSX implementation." --yolo -o text
+```
+
+### Validation
+- Review the image for layout intent before integrating the code
+- Check TSX for correct shadcn/ui imports and Tailwind class names
+- Verify accessibility (labels, roles) before committing
+
+## Pattern 12: SVG / Animation Generation
+
+Route SVG requests by complexity: simple SVGs stay with Claude; complex ones go to Gemini.
+
+### Routing Decision
+
+```
+Is the SVG simple (icon, logo, basic shape)?
+├── Yes → Stay with Claude (faster, no CLI overhead)
+└── No → Is it complex (illustration, animation, data viz)?
+    └── Yes → Delegate to Gemini 3.1 Pro
+```
+
+### Simple SVG (Claude handles directly)
+Single-path icons, logos under 50 elements — write inline.
+
+### Complex SVG (Gemini)
+```bash
+gemini "Create an SVG diagram of [subject].
+Requirements:
+- [dimension/style requirements]
+- Include embedded CSS animations for [motion description]
+- Output complete, self-contained SVG markup only (no wrapper HTML)" --yolo -o text
+```
+
+### CSS Animation Pattern
+```bash
+gemini "Generate CSS keyframe animations for [UI element].
+Behavior: [describe motion]
+Constraints: prefers-reduced-motion must be respected with a @media query.
+Output: only the @keyframes and animation class CSS, no component wrapper." -o text
+```
+
+### Validation
+```bash
+# Check SVG is well-formed
+xmllint --noout output.svg
+
+# Preview in browser
+open output.svg
+```
+
+## Pattern 13: Output Chunking Discipline
+
+Gemini 3.1 Pro and Gemini 3 Flash both cap output at ~65K tokens. Requests that would produce more will be silently truncated.
+
+### Detection
+Signs of truncation:
+- Response ends mid-function or mid-block
+- Final JSON/code block is unclosed
+- `-o json` response `candidates` token count equals exactly 65536
+
+### Threshold
+**Chunk any request expected to produce more than ~32K output tokens** (roughly 24K words or 800+ lines of dense code).
+
+### Chunking Strategies
+
+**By file**:
+```bash
+gemini "Generate tests for auth.py only. Do not include other modules." --yolo -o text
+gemini "Generate tests for user.py only." --yolo -o text
+```
+
+**By section**:
+```bash
+gemini "Generate the data model section of the spec. Stop after the models. Do not proceed to endpoints." -o text
+gemini "Generate the endpoints section of the spec. Assume data models are already defined." -o text
+```
+
+**Explicit length instruction**:
+```bash
+gemini "Generate the API spec. If you reach 3000 lines, stop and indicate 'CHUNK BOUNDARY' so I can resume." -o text
+```
+
+### Resume Pattern
+```bash
+# After a chunk boundary:
+echo "Continue from CHUNK BOUNDARY. Remaining sections: [list]" | gemini -r latest -o text
+```
+
+## Pattern 14: Context Hygiene
+
+Gemini's ~1M input window is large, but larger context degrades response quality and increases cost. Prefer targeted injection over dumping the whole repo.
+
+### Preferred: Repo Map + Targeted Files
+```bash
+# 1. Generate a lightweight repo map (symbols)
+jq '.symbols[] | {name, file, layer}' ai/symbols-api.json > /tmp/map.json
+
+# 2. Inject map + only the files Gemini needs
+gemini "Given this repo map: $(cat /tmp/map.json)
+And these files: @./skillmeat/api/routers/artifacts.py @./skillmeat/api/schemas/artifact.py
+Review for API contract consistency." -o text
+```
+
+### Anti-Pattern: Repo Dump
+```bash
+# Avoid: blasting all source files into context
+gemini "Review the whole codebase" --include-directories ./skillmeat -o text
+```
+
+### Context Hygiene Rules
+- Inject repo map or symbol list to orient Gemini without full file reads
+- Use `@./path/to/file` for only the files directly relevant to the task
+- Use `.geminiignore` to exclude build artifacts, node_modules, generated files
+- Prefer scoped prompts: "Review auth.py and its direct imports" over "review the auth system"
+- For architecture questions, inject the symbols graph JSON, not all source files
+
 ## Anti-Patterns to Avoid
 
 ### Don't: Expect Immediate Execution
@@ -316,6 +454,11 @@ Extremely long prompts can confuse the model.
 **Do**: Use incremental refinement for complex tasks
 
 ### Don't: Forget Context Limits
-Even with 1M tokens, context can overflow.
+Even with 1M tokens, context can overflow and quality degrades with noise.
 
-**Do**: Use .geminiignore, be specific about files
+**Do**: Use .geminiignore, inject only relevant files, use repo map for orientation (see Pattern 14)
+
+### Don't: Expect Full Output for Long Generations
+65K output cap means large codebases or specs will be silently cut off.
+
+**Do**: Chunk by file or section (see Pattern 13), use session resume for continuation

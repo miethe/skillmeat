@@ -1,6 +1,6 @@
 ---
 name: gemini-cli
-description: "Google Gemini CLI orchestration for AI-assisted development. Capabilities: second opinion/cross-validation, real-time web search (Google Search), codebase architecture analysis, parallel code generation, code review from different perspective. Actions: query, search, analyze, generate, review with Gemini. Keywords: Gemini CLI, second opinion, cross-validation, Google Search, web research, current information, parallel AI, code review, architecture analysis, gemini prompt, AI comparison, real-time search, alternative perspective, code generation. Use when: needing second AI opinion, searching current web information, analyzing codebase architecture, generating code in parallel, getting alternative code review, researching current events/docs."
+description: "Google Gemini CLI orchestration for AI-assisted development. Capabilities: second opinion/cross-validation, real-time web search (Google Search), codebase architecture analysis, parallel code generation, code review from different perspective, image generation, SVG/animation generation, multimodal screenshot-to-code. Actions: query, search, analyze, generate, review, visualize with Gemini. Keywords: Gemini CLI, second opinion, cross-validation, Google Search, web research, current information, parallel AI, code review, architecture analysis, gemini prompt, AI comparison, real-time search, alternative perspective, code generation, image gen, UI mockup, SVG, animation, multimodal. Use when: needing second AI opinion, searching current web information, analyzing codebase architecture, generating code in parallel, getting alternative code review, researching current events/docs, generating UI mockups, creating SVG animations, screenshot-to-code workflows."
 allowed-tools:
   - Bash
   - Read
@@ -11,7 +11,7 @@ allowed-tools:
 
 # Gemini CLI Integration Skill
 
-This skill enables Claude Code to effectively orchestrate Gemini CLI (v0.16.0+) with Gemini 3 Pro for code generation, review, analysis, and specialized tasks.
+This skill enables Claude Code to effectively orchestrate Gemini CLI (v0.16.0+) with Gemini 3.1 Pro for code generation, review, analysis, image generation, and specialized tasks.
 
 ## When to Use This Skill
 
@@ -42,6 +42,16 @@ This skill enables Claude Code to effectively orchestrate Gemini CLI (v0.16.0+) 
    - JSDoc/documentation generation
    - Code translation between languages
 
+6. **Image Generation (Gemini 3.1 Pro)**
+   - UI component mockups with accompanying React/TSX code
+   - Complex SVG diagrams and animations that benefit from visual preview
+   - Screenshot-to-code: pass a UI screenshot and get corrected code back
+
+7. **SVG / Animation Workflows**
+   - Complex SVG illustrations requiring visual precision
+   - CSS keyframe animations with multimodal verification
+   - Architecture diagrams as editable SVG
+
 ### When NOT to Use
 
 - Simple, quick tasks (overhead not worth it)
@@ -65,9 +75,9 @@ gemini "[prompt]" --yolo -o text 2>&1
 
 Key flags:
 - `--yolo` or `-y`: Auto-approve all tool calls
-- `-o text`: Human-readable output
+- `-o text`: Human-readable output (preferred — avoids JSON envelope overhead)
 - `-o json`: Structured output with stats
-- `-m gemini-2.5-flash`: Use faster model for simple tasks
+- `-m gemini-3-flash`: Use faster model for simple tasks
 
 ### 3. Critical Behavioral Notes
 
@@ -77,6 +87,11 @@ Key flags:
 - "Do this without asking for confirmation"
 
 **Rate Limits**: Free tier has 60 requests/min, 1000/day. CLI auto-retries with backoff. Expect messages like "quota will reset after Xs".
+
+**Output Truncation at 65K**: Gemini 3.1 Pro and Gemini 3 Flash both cap output at ~65K tokens. Long responses may be silently truncated. Mitigations:
+- Set explicit max output tokens in the prompt: "Respond in chunks of no more than 4000 lines."
+- Chunk requests that are expected to produce >32K output tokens — split by file, section, or phase.
+- Use `-o text` (not stream-json) to make truncation visible rather than silent.
 
 ### 4. Output Processing
 
@@ -130,14 +145,24 @@ gemini "What are the latest [topic]? Use Google Search." -o text
 
 ### Faster Model (Simple Tasks)
 ```bash
-gemini "[prompt]" -m gemini-2.5-flash -o text
+gemini "[prompt]" -m gemini-3-flash -o text
+```
+
+### Image Generation
+```bash
+gemini "Generate a UI mockup image for [component]. Include React/TSX implementation using Next.js 15, Tailwind, shadcn/ui." --yolo -o text
+```
+
+### SVG / Animation
+```bash
+gemini "Create an SVG illustration of [subject]. Output complete SVG markup with embedded CSS animations." --yolo -o text
 ```
 
 ## Error Handling
 
 ### Rate Limit Exceeded
 - CLI auto-retries with backoff
-- Use `-m gemini-2.5-flash` for lower priority tasks
+- Use `-m gemini-3-flash` for lower priority tasks
 - Run in background for long operations
 
 ### Command Failures
@@ -182,6 +207,8 @@ These tools are available only through Gemini:
 1. **google_web_search** - Real-time internet search via Google
 2. **codebase_investigator** - Deep architectural analysis
 3. **save_memory** - Cross-session persistent memory
+4. **Image generation** - Inline image synthesis (Gemini 3.1 Pro); generate mockups and diagrams alongside code
+5. **Multimodal input** - Accepts screenshot/image input for visual-to-code tasks
 
 ## Configuration
 
@@ -198,5 +225,6 @@ Resume session: `echo "follow-up" | gemini -r [index] -o text`
 
 - `reference.md` - Complete command and flag reference
 - `templates.md` - Prompt templates for common operations
+- `templates-creative.md` - Image, SVG, and animation prompt templates
 - `patterns.md` - Advanced integration patterns
 - `tools.md` - Gemini's built-in tools documentation

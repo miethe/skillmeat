@@ -52,7 +52,7 @@ If the key is missing, give the user these steps:
 - Input reference images must be jpg/png/webp and should match target size.
 - Download URLs expire after about 1 hour; copy assets to your own storage.
 - Prefer the bundled CLI and **never modify** `scripts/sora.py` unless the user asks.
-- Sora can generate audio; if a user requests voiceover/audio, specify it explicitly in the `Audio:` and `Dialogue:` lines and keep it short.
+- Sora 2 supports synced audio (ambient sound, music, voiceover, and dialogue synchronized to video); if a user requests voiceover/audio, specify it explicitly in the `Audio:` and `Dialogue:` lines and keep it short.
 
 ## API limitations
 - Models are limited to `sora-2` and `sora-2-pro`.

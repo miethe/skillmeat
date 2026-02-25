@@ -1,16 +1,16 @@
 ---
 name: codex
-description: Use when the user asks to run Codex CLI (codex exec, codex resume) or references OpenAI Codex for code analysis, refactoring, or automated editing. Uses GPT-5.2 by default for state-of-the-art software engineering.
+description: Use when the user asks to run Codex CLI (codex exec, codex resume) or references OpenAI Codex for code analysis, refactoring, or automated editing. Uses GPT-5.3-Codex by default for state-of-the-art software engineering.
 ---
 
 # Codex Skill Guide
 
 ## Running a Task
-1. Default to `gpt-5.2` model. Ask the user (via `AskUserQuestion`) which reasoning effort to use (`xhigh`,`high`, `medium`, or `low`). User can override model if needed (see Model Options below).
+1. Default to `gpt-5.3-codex` model. Ask the user (via `AskUserQuestion`) which reasoning effort to use (`xhigh`, `high`, `medium`, `low`, or `none`). User can override model if needed (see Model Options below).
 2. Select the sandbox mode required for the task; default to `--sandbox read-only` unless edits or network access are necessary.
 3. Assemble the command with the appropriate options:
    - `-m, --model <MODEL>`
-   - `--config model_reasoning_effort="<high|medium|low>"`
+   - `--config model_reasoning_effort="<xhigh|high|medium|low|none>"`
    - `--sandbox <read-only|workspace-write|danger-full-access>`
    - `--full-auto`
    - `-C, --cd <DIR>`
@@ -32,20 +32,46 @@ description: Use when the user asks to run Codex CLI (codex exec, codex resume) 
 
 ## Model Options
 
+### Codex Line (coding and execution tasks)
+
+| Model | Best for | Context window | Key features |
+| --- | --- | --- | --- |
+| `gpt-5.3-codex` ⭐ | **Default**: Software engineering, agentic coding workflows, repo-scale edits | 400K input / 128K output | Optimized for coding, adaptive reasoning |
+| `gpt-5.3-codex-spark` | Ultra-fast simple tasks (formatting, search, trivial fixes) | 400K input / 128K output | Highest speed, lowest latency |
+
+### General Line (review, analysis, and planning tasks)
+
 | Model | Best for | Context window | Key features |
 | --- | --- | --- | --- |
 | `gpt-5.2-max` | **Max model**: Ultra-complex reasoning, deep problem analysis | 400K input / 128K output | 76.3% SWE-bench, adaptive reasoning, $1.25/$10.00 |
-| `gpt-5.2` ⭐ | **Flagship model**: Software engineering, agentic coding workflows | 400K input / 128K output | 76.3% SWE-bench, adaptive reasoning, $1.25/$10.00 |
-| `gpt-5.2-mini` | Cost-efficient coding (4x more usage allowance) | 400K input / 128K output | Near SOTA performance, $0.25/$2.00 |
+| `gpt-5.2` | **Flagship general model**: Architecture review, planning, analysis | 400K input / 128K output | 76.3% SWE-bench, adaptive reasoning, $1.25/$10.00 |
+| `gpt-5.2-mini` | Cost-efficient review/analysis (4x more usage allowance) | 400K input / 128K output | Near SOTA performance, $0.25/$2.00 |
 | `gpt-5.1-thinking` | Ultra-complex reasoning, deep problem analysis | 400K input / 128K output | Adaptive thinking depth, runs 2x slower on hardest tasks |
 
-**GPT-5.2 Advantages**: 76.3% SWE-bench (vs 72.8% GPT-5), 30% faster on average tasks, better tool handling, reduced hallucinations, improved code quality. Knowledge cutoff: September 30, 2024.
+**Reliability Hazard**: Codex models can overfit to their own generated plan — re-check outputs against repo reality (existing types, APIs, test state) before committing.
 
 **Reasoning Effort Levels**:
 - `xhigh` - Ultra-complex tasks (deep problem analysis, complex reasoning, deep understanding of the problem)
 - `high` - Complex tasks (refactoring, architecture, security analysis, performance optimization)
 - `medium` - Standard tasks (refactoring, code organization, feature additions, bug fixes)
 - `low` - Simple tasks (quick fixes, simple changes, code formatting, documentation)
+- `none` - Mechanical tasks (pure formatting, trivial text changes, no reasoning required)
+
+**Effort Policy** (default selection by task type):
+
+| Task type | Reasoning effort |
+| --- | --- |
+| Architecture design | `xhigh` |
+| Complex debug | `xhigh` |
+| Plan generation | `high` |
+| Plan review | `medium` |
+| Implementation | `medium` |
+| Code review | `medium` |
+| Simple search | `low` |
+| Documentation | `low` |
+| Formatting | `none` |
+
+**Escalation rule**: Only escalate to `xhigh` when blocked with concrete artifacts (failing tests, stack traces). Attempt with `medium` first.
 
 **Cached Input Discount**: 90% off ($0.125/M tokens) for repeated context, cache lasts up to 24 hours.
 
@@ -61,6 +87,6 @@ description: Use when the user asks to run Codex CLI (codex exec, codex resume) 
 
 ## CLI Version
 
-Requires Codex CLI v0.57.0 or later for GPT-5.2 model support. The CLI defaults to `gpt-5.2` on macOS/Linux and `gpt-5.2` on Windows. Check version: `codex --version`
+Requires Codex CLI v0.57.0 or later for GPT-5.2 model support and v0.60.0 or later for GPT-5.3-Codex model support. The CLI defaults to `gpt-5.3-codex` on macOS/Linux and Windows. Check version: `codex --version`
 
 Use `/model` slash command within a Codex session to switch models, or configure default in `~/.codex/config.toml`.

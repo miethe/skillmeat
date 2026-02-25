@@ -169,6 +169,31 @@ Always use task-completion-validator after:
 - Milestone completion
 - Phase completion
 
+## External Model Assignments
+
+For tasks that benefit from a different AI perspective, use external models as opt-in checkpoints.
+
+| Task Type | Model | Trigger | Effort | Notes |
+|-----------|-------|---------|--------|-------|
+| Plan review (second opinion) | GPT-5.3-Codex | Opt-in checkpoint | medium | Read-only sandbox; structured PASS/CONCERN/BLOCK output |
+| PR cross-review | Gemini 3.1 Pro / Flash | Opt-in checkpoint | Pro for >5 files or security; Flash for small | `-o text` flag; chunk long diffs |
+| Debug escalation | GPT-5.3-Codex | After 2+ failed Claude cycles | xhigh | Workspace-write sandbox; independent investigation |
+| MVP rapid prototype | Gemini 3.1 Pro | Explicit user request | Pro | Post-process through Claude for convention alignment |
+| UI mockup generation | Gemini 3.1 Pro | Design skill invoked | Pro | Visual mockup + React/TSX code |
+| SVG/animation (complex) | Gemini 3.1 Pro | Complex multi-element | Pro | Simple SVG stays with Claude |
+| Image generation | Nano Banana Pro | Task requires image output | — | Default for quality; Gemini for context-aware |
+| Video generation | Sora 2 | Explicit request | — | 4-12s clips with synced audio |
+| Web research | Gemini 3.1 Pro | Current web info needed | Pro | Google Search grounding |
+| Privacy-sensitive | Local LLM | Configured + requested | — | Fallback to Claude if quality insufficient |
+
+### Reliability Hazards
+
+- **Codex**: Can overfit to own hypothesis; always include "re-check against repo reality" in prompts
+- **Gemini**: 65K output cap may silently truncate; set explicit output tokens and chunk
+- **Local LLM**: Quality variable; require eval suite pass before trusting
+
+**Model Selection**: See `model-selection-guide.md` for the full decision tree.
+
 ## Delegation Template
 
 ```

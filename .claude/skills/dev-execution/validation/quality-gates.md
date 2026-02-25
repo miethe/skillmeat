@@ -181,6 +181,25 @@ pnpm --filter "./packages/ui" storybook
 - [ ] A11y tests for UI components
 - [ ] Coverage meets requirements
 
+## Optional: Cross-Model Validation Gate
+
+When `checkpoints.pr_cross_review` is enabled in `.claude/config/multi-model.toml`:
+
+| Gate | Model | When | Output |
+|------|-------|------|--------|
+| Plan second opinion | GPT-5.3-Codex (read-only) | After plan generation, >20 tasks | PASS / CONCERN / BLOCK |
+| PR cross-review | Gemini 3.1 Pro or Flash | Before PR creation, security-sensitive | LGTM / ISSUES (file:line) |
+| Debug independent investigation | GPT-5.3-Codex (workspace-write) | After 2+ failed debug cycles | Root cause + minimal fix |
+
+### Disagreement Protocol
+
+When models disagree:
+1. Existing tests? → Run both implementations; winner = passes tests (simpler diff breaks tie)
+2. No tests? → Write minimal tests first, then compare
+3. Design disagreement (no testable behavior)? → Reversible: pick either, document. Irreversible: escalate to Opus adaptive.
+
+**Key rule**: Tests decide, not model preference. CI is the neutral arbiter.
+
 ## Validation with Subagent
 
 For major completions, use task-completion-validator:
