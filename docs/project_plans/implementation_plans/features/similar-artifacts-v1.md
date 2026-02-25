@@ -1,90 +1,93 @@
 ---
-title: "Implementation Plan: Similar Artifacts — Detection, Comparison & Consolidation"
+title: "Implementation Plan: Similar Artifacts \u2014 Detection, Comparison & Consolidation"
 schema_version: 2
 doc_type: implementation_plan
-status: draft
+status: in-progress
 created: 2026-02-25
-updated: 2026-02-25
+updated: '2026-02-25'
 feature_slug: similar-artifacts
 feature_version: v1
 prd_ref: docs/project_plans/PRDs/features/similar-artifacts-v1.md
 plan_ref: null
-scope: >
-  Build artifact-to-artifact similarity engine on existing scoring stack; expose via new
-  API endpoint, Similar Artifacts tab in ArtifactDetailsModal and marketplace panels,
-  color-coded marketplace badges with configurable thresholds, a Consolidation view for
-  duplicate cluster management, and CLI parity via `skillmeat similar` and
+scope: 'Build artifact-to-artifact similarity engine on existing scoring stack; expose
+  via new API endpoint, Similar Artifacts tab in ArtifactDetailsModal and marketplace
+  panels, color-coded marketplace badges with configurable thresholds, a Consolidation
+  view for duplicate cluster management, and CLI parity via `skillmeat similar` and
   `skillmeat consolidate` commands.
-effort_estimate: "42 pts"
-architecture_summary: >
-  SimilarityService (new service layer) wraps ArtifactFingerprint + MatchAnalyzer +
-  optional SemanticScorer (800 ms timeout / keyword-only fallback). A single new endpoint
-  GET /api/v1/artifacts/{id}/similar is added to the artifacts router. Frontend adds
-  React Query hooks, SimilarArtifactsTab, SimilarityBadge, SimilaritySettings sub-tab,
-  and a full-page /collection/consolidate route. DuplicatePair gains an `ignored` boolean
-  column via an additive Alembic migration. CLI gains `similar` and `consolidate` Click
-  commands wired directly to SimilarityService.
+
+  '
+effort_estimate: 42 pts
+architecture_summary: 'SimilarityService (new service layer) wraps ArtifactFingerprint
+  + MatchAnalyzer + optional SemanticScorer (800 ms timeout / keyword-only fallback).
+  A single new endpoint GET /api/v1/artifacts/{id}/similar is added to the artifacts
+  router. Frontend adds React Query hooks, SimilarArtifactsTab, SimilarityBadge, SimilaritySettings
+  sub-tab, and a full-page /collection/consolidate route. DuplicatePair gains an `ignored`
+  boolean column via an additive Alembic migration. CLI gains `similar` and `consolidate`
+  Click commands wired directly to SimilarityService.
+
+  '
 phases:
-  - "Phase 1: Core Similarity Engine (backend service + API + DB migration)"
-  - "Phase 2: Similar Artifacts Tab — Collection (frontend tab + hooks)"
-  - "Phase 3: Similar Artifacts Tab — Marketplace (reuse tab in marketplace context)"
-  - "Phase 4: Marketplace Similarity Badges (badges + settings sub-tab)"
-  - "Phase 5: Collection Consolidation View (consolidation page + cluster API)"
-  - "Phase 6: CLI Integration (similar + consolidate commands)"
-test_strategy: >
-  Unit tests on SimilarityService (scorer fallback, score filtering, empty results).
-  Integration tests on new API endpoints (happy path, 404, filter params). E2E tests
-  covering Similar tab render, marketplace badge, and consolidation merge with
-  auto-snapshot verification. Performance test: similar endpoint under 2000 ms for
-  500-artifact collection.
+- 'Phase 1: Core Similarity Engine (backend service + API + DB migration)'
+- "Phase 2: Similar Artifacts Tab \u2014 Collection (frontend tab + hooks)"
+- "Phase 3: Similar Artifacts Tab \u2014 Marketplace (reuse tab in marketplace context)"
+- 'Phase 4: Marketplace Similarity Badges (badges + settings sub-tab)'
+- 'Phase 5: Collection Consolidation View (consolidation page + cluster API)'
+- 'Phase 6: CLI Integration (similar + consolidate commands)'
+test_strategy: 'Unit tests on SimilarityService (scorer fallback, score filtering,
+  empty results). Integration tests on new API endpoints (happy path, 404, filter
+  params). E2E tests covering Similar tab render, marketplace badge, and consolidation
+  merge with auto-snapshot verification. Performance test: similar endpoint under
+  2000 ms for 500-artifact collection.
+
+  '
 related_documents:
-  - docs/project_plans/PRDs/features/similar-artifacts-v1.md
-  - docs/project_plans/implementation_plans/features/similar-artifacts-v1/phase-1-2-backend-and-collection-tab.md
-  - docs/project_plans/implementation_plans/features/similar-artifacts-v1/phase-3-4-marketplace.md
-  - docs/project_plans/implementation_plans/features/similar-artifacts-v1/phase-5-6-consolidation-and-cli.md
-  - skillmeat/models.py
-  - skillmeat/core/scoring/match_analyzer.py
-  - skillmeat/core/scoring/semantic_scorer.py
-  - skillmeat/api/routers/match.py
-  - skillmeat/web/components/collection/artifact-details-modal.tsx
-  - skillmeat/web/components/collection/mini-artifact-card.tsx
-  - skillmeat/web/components/marketplace/source-card.tsx
-  - skillmeat/web/components/discovery/duplicate-review-modal.tsx
+- docs/project_plans/PRDs/features/similar-artifacts-v1.md
+- docs/project_plans/implementation_plans/features/similar-artifacts-v1/phase-1-2-backend-and-collection-tab.md
+- docs/project_plans/implementation_plans/features/similar-artifacts-v1/phase-3-4-marketplace.md
+- docs/project_plans/implementation_plans/features/similar-artifacts-v1/phase-5-6-consolidation-and-cli.md
+- skillmeat/models.py
+- skillmeat/core/scoring/match_analyzer.py
+- skillmeat/core/scoring/semantic_scorer.py
+- skillmeat/api/routers/match.py
+- skillmeat/web/components/collection/artifact-details-modal.tsx
+- skillmeat/web/components/collection/mini-artifact-card.tsx
+- skillmeat/web/components/marketplace/source-card.tsx
+- skillmeat/web/components/discovery/duplicate-review-modal.tsx
 owner: null
 contributors: []
 priority: medium
 risk_level: medium
 category: product-planning
 tags:
-  - implementation
-  - planning
-  - similarity
-  - deduplication
-  - consolidation
-  - marketplace
-  - collection
-  - cli
+- implementation
+- planning
+- similarity
+- deduplication
+- consolidation
+- marketplace
+- collection
+- cli
 milestone: null
 commit_refs: []
 pr_refs: []
 files_affected:
-  - skillmeat/models.py
-  - skillmeat/core/similarity.py
-  - skillmeat/core/scoring/match_analyzer.py
-  - skillmeat/cache/models.py
-  - skillmeat/cache/repositories.py
-  - skillmeat/api/routers/artifacts.py
-  - skillmeat/api/schemas/artifacts.py
-  - skillmeat/api/openapi.json
-  - skillmeat/web/hooks/similarity.ts
-  - skillmeat/web/types/similarity.ts
-  - skillmeat/web/components/collection/similar-artifacts-tab.tsx
-  - skillmeat/web/components/collection/artifact-details-modal.tsx
-  - skillmeat/web/components/marketplace/similarity-badge.tsx
-  - skillmeat/web/components/marketplace/source-card.tsx
-  - skillmeat/web/app/settings/components/similarity-settings.tsx
-  - skillmeat/web/app/collection/consolidate/page.tsx
-  - skillmeat/cli.py
+- skillmeat/models.py
+- skillmeat/core/similarity.py
+- skillmeat/core/scoring/match_analyzer.py
+- skillmeat/cache/models.py
+- skillmeat/cache/repositories.py
+- skillmeat/api/routers/artifacts.py
+- skillmeat/api/schemas/artifacts.py
+- skillmeat/api/openapi.json
+- skillmeat/web/hooks/similarity.ts
+- skillmeat/web/types/similarity.ts
+- skillmeat/web/components/collection/similar-artifacts-tab.tsx
+- skillmeat/web/components/collection/artifact-details-modal.tsx
+- skillmeat/web/components/marketplace/similarity-badge.tsx
+- skillmeat/web/components/marketplace/source-card.tsx
+- skillmeat/web/app/settings/components/similarity-settings.tsx
+- skillmeat/web/app/collection/consolidate/page.tsx
+- skillmeat/cli.py
 ---
 
 # Implementation Plan: Similar Artifacts — Detection, Comparison & Consolidation
