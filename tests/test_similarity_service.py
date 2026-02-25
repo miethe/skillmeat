@@ -865,3 +865,258 @@ def test_find_similar_marketplace_source():
 
     assert len(results) == 1
     assert results[0].artifact_id == "skill:mkt-skill"
+
+
+# ---------------------------------------------------------------------------
+# SA-P5-001: SimilarityService.get_consolidation_clusters tests
+# ---------------------------------------------------------------------------
+
+def _make_duplicate_pair(
+    pair_id: str,
+    uuid1: str,
+    uuid2: str,
+    score: float,
+    ignored: bool = False,
+) -> MagicMock:
+    """Return a mock DuplicatePair ORM row."""
+    pair = MagicMock()
+    pair.id = pair_id
+    pair.artifact1_uuid = uuid1
+    pair.artifact2_uuid = uuid2
+    pair.similarity_score = score
+    pair.ignored = ignored
+    return pair
+
+
+def _make_cluster_service(pairs: list, artifact_rows: list | None = None) -> tuple:
+    """Build a SimilarityService with a session mocked for cluster tests.
+
+    Returns (svc, session) so callers can assert against session if needed.
+
+    The session mock is wired so:
+    - session.query(DuplicatePair).filter(...).all() → pairs
+    - session.query(Artifact).filter(...).all() → artifact_rows (default [])
+    """
+    session = MagicMock()
+
+    if artifact_rows is None:
+        artifact_rows = []
+
+    # We need to route query calls to the correct mock depending on the model
+    # class passed to session.query().
+    from skillmeat.cache.models import DuplicatePair as _DP, Artifact as _Artifact
+
+    class _QueryRouter:
+        """Routes .query(Model) calls to appropriate mock data."""
+
+        def __init__(self, pairs_data, artifacts_data):
+            self._pairs = pairs_data
+            self._artifacts = artifacts_data
+
+        def __call__(self, model):
+            if model is _DP:
+                q = MagicMock()
+                q.filter.return_value = q
+                q.all.return_value = self._pairs
+                return q
+            if model is _Artifact:
+                q = MagicMock()
+                q.filter.return_value = q
+                q.all.return_value = self._artifacts
+                return q
+            q = MagicMock()
+            q.filter.return_value = q
+            q.all.return_value = []
+            q.first.return_value = None
+            return q
+
+    session.query = _QueryRouter(pairs, artifact_rows)
+
+    svc = _make_service(session)
+    return svc, session
+
+
+class TestGetConsolidationClusters:
+    """Tests for SimilarityService.get_consolidation_clusters."""
+
+    def test_empty_when_no_pairs(self):
+        """Returns empty clusters list when no DuplicatePair rows exist."""
+        svc, _ = _make_cluster_service(pairs=[])
+        result = svc.get_consolidation_clusters(min_score=0.5)
+        assert result["clusters"] == []
+        assert result["next_cursor"] is None
+
+    def test_single_pair_forms_single_cluster(self):
+        """A single qualifying pair becomes one cluster with two artifacts."""
+        pairs = [
+            _make_duplicate_pair("p1", "uuid-a", "uuid-b", score=0.8, ignored=False),
+        ]
+        svc, _ = _make_cluster_service(pairs=pairs)
+        result = svc.get_consolidation_clusters(min_score=0.5)
+
+        assert len(result["clusters"]) == 1
+        cluster = result["clusters"][0]
+        assert set(cluster["artifacts"]) == {"uuid-a", "uuid-b"}
+        assert cluster["max_score"] == pytest.approx(0.8)
+        assert cluster["pair_count"] == 1
+        assert result["next_cursor"] is None
+
+    def test_transitive_pairs_merge_into_single_cluster(self):
+        """Pairs (A,B) and (B,C) must be merged into a single cluster {A,B,C}."""
+        pairs = [
+            _make_duplicate_pair("p1", "uuid-a", "uuid-b", score=0.8),
+            _make_duplicate_pair("p2", "uuid-b", "uuid-c", score=0.7),
+        ]
+        svc, _ = _make_cluster_service(pairs=pairs)
+        result = svc.get_consolidation_clusters(min_score=0.5)
+
+        assert len(result["clusters"]) == 1
+        cluster = result["clusters"][0]
+        assert set(cluster["artifacts"]) == {"uuid-a", "uuid-b", "uuid-c"}
+        assert cluster["max_score"] == pytest.approx(0.8)
+        assert cluster["pair_count"] == 2
+
+    def test_disjoint_pairs_form_separate_clusters(self):
+        """Pairs (A,B) and (C,D) have no shared member → two separate clusters."""
+        pairs = [
+            _make_duplicate_pair("p1", "uuid-a", "uuid-b", score=0.9),
+            _make_duplicate_pair("p2", "uuid-c", "uuid-d", score=0.6),
+        ]
+        svc, _ = _make_cluster_service(pairs=pairs)
+        result = svc.get_consolidation_clusters(min_score=0.5)
+
+        assert len(result["clusters"]) == 2
+        # Sorted by max_score descending: first cluster is the 0.9 one.
+        assert result["clusters"][0]["max_score"] == pytest.approx(0.9)
+        assert result["clusters"][1]["max_score"] == pytest.approx(0.6)
+
+    def test_ignored_pairs_excluded(self):
+        """Pairs with ignored=True must not appear in any cluster."""
+        pairs = [
+            _make_duplicate_pair("p1", "uuid-a", "uuid-b", score=0.8, ignored=True),
+            _make_duplicate_pair("p2", "uuid-c", "uuid-d", score=0.7, ignored=False),
+        ]
+        # The mock for DuplicatePair query returns only non-ignored pairs
+        # (the service passes `ignored.is_(False)` filter; our mock just
+        # returns whatever we give it, so we simulate by only passing active).
+        active_pairs = [p for p in pairs if not p.ignored]
+        svc, _ = _make_cluster_service(pairs=active_pairs)
+        result = svc.get_consolidation_clusters(min_score=0.5)
+
+        all_uuids = {
+            u for c in result["clusters"] for u in c["artifacts"]
+        }
+        # The ignored pair's uuids must not appear.
+        assert "uuid-a" not in all_uuids
+        assert "uuid-b" not in all_uuids
+
+    def test_clusters_sorted_by_max_score_descending(self):
+        """Clusters must be ordered highest max_score first."""
+        pairs = [
+            _make_duplicate_pair("p1", "uuid-a", "uuid-b", score=0.6),
+            _make_duplicate_pair("p2", "uuid-c", "uuid-d", score=0.95),
+            _make_duplicate_pair("p3", "uuid-e", "uuid-f", score=0.75),
+        ]
+        svc, _ = _make_cluster_service(pairs=pairs)
+        result = svc.get_consolidation_clusters(min_score=0.5)
+
+        scores = [c["max_score"] for c in result["clusters"]]
+        assert scores == sorted(scores, reverse=True)
+
+    def test_cursor_pagination_first_page(self):
+        """First-page response has next_cursor when more clusters exist."""
+        pairs = [
+            _make_duplicate_pair(f"p{i}", f"uuid-{i}a", f"uuid-{i}b", score=0.9 - i * 0.01)
+            for i in range(10)
+        ]
+        svc, _ = _make_cluster_service(pairs=pairs)
+        result = svc.get_consolidation_clusters(min_score=0.5, limit=3)
+
+        assert len(result["clusters"]) == 3
+        assert result["next_cursor"] is not None
+
+    def test_cursor_pagination_last_page(self):
+        """Last page has next_cursor=None."""
+        pairs = [
+            _make_duplicate_pair(f"p{i}", f"uuid-{i}a", f"uuid-{i}b", score=0.9 - i * 0.01)
+            for i in range(5)
+        ]
+        svc, _ = _make_cluster_service(pairs=pairs)
+
+        # First page: limit=3
+        page1 = svc.get_consolidation_clusters(min_score=0.5, limit=3)
+        assert page1["next_cursor"] is not None
+
+        # Second page uses cursor from first page
+        page2 = svc.get_consolidation_clusters(
+            min_score=0.5, limit=3, cursor=page1["next_cursor"]
+        )
+        assert len(page2["clusters"]) == 2  # 5 total - 3 on page1
+        assert page2["next_cursor"] is None
+
+    def test_cursor_pagination_non_overlapping(self):
+        """Pages must not return duplicate clusters."""
+        pairs = [
+            _make_duplicate_pair(f"p{i}", f"uuid-{i}a", f"uuid-{i}b", score=0.9 - i * 0.01)
+            for i in range(6)
+        ]
+        svc, _ = _make_cluster_service(pairs=pairs)
+
+        page1 = svc.get_consolidation_clusters(min_score=0.5, limit=3)
+        page2 = svc.get_consolidation_clusters(
+            min_score=0.5, limit=3, cursor=page1["next_cursor"]
+        )
+
+        ids1 = {frozenset(c["artifacts"]) for c in page1["clusters"]}
+        ids2 = {frozenset(c["artifacts"]) for c in page2["clusters"]}
+        assert ids1.isdisjoint(ids2), "Pages must not overlap"
+
+    def test_invalid_cursor_treated_as_first_page(self):
+        """An invalid cursor string falls back to offset=0 (first page)."""
+        pairs = [
+            _make_duplicate_pair("p1", "uuid-a", "uuid-b", score=0.8),
+        ]
+        svc, _ = _make_cluster_service(pairs=pairs)
+        result = svc.get_consolidation_clusters(
+            min_score=0.5, limit=10, cursor="not-valid-base64!!!"
+        )
+        assert len(result["clusters"]) == 1
+
+    def test_artifact_type_resolved_from_db(self):
+        """artifact_type on each cluster is resolved via bulk Artifact look-up."""
+        pairs = [
+            _make_duplicate_pair("p1", "uuid-a", "uuid-b", score=0.8),
+        ]
+
+        art_a = MagicMock()
+        art_a.uuid = "uuid-a"
+        art_a.type = "skill"
+        art_b = MagicMock()
+        art_b.uuid = "uuid-b"
+        art_b.type = "skill"
+
+        svc, _ = _make_cluster_service(pairs=pairs, artifact_rows=[art_a, art_b])
+        result = svc.get_consolidation_clusters(min_score=0.5)
+
+        assert result["clusters"][0]["artifact_type"] == "skill"
+
+    def test_artifact_type_empty_when_no_db_rows(self):
+        """artifact_type falls back to empty string when artifact rows are missing."""
+        pairs = [
+            _make_duplicate_pair("p1", "uuid-x", "uuid-y", score=0.7),
+        ]
+        svc, _ = _make_cluster_service(pairs=pairs, artifact_rows=[])
+        result = svc.get_consolidation_clusters(min_score=0.5)
+
+        assert result["clusters"][0]["artifact_type"] == ""
+
+    def test_limit_enforced(self):
+        """No more than ``limit`` clusters are returned."""
+        pairs = [
+            _make_duplicate_pair(f"p{i}", f"uuid-{i}a", f"uuid-{i}b", score=0.8)
+            for i in range(15)
+        ]
+        svc, _ = _make_cluster_service(pairs=pairs)
+        result = svc.get_consolidation_clusters(min_score=0.5, limit=7)
+
+        assert len(result["clusters"]) <= 7

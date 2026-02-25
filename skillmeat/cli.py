@@ -11140,6 +11140,192 @@ def compliance_history(publisher):
 
 
 # ====================
+# Similarity Commands
+# ====================
+
+
+@main.command()
+@click.argument("artifact")
+@click.option(
+    "--limit",
+    "-l",
+    type=int,
+    default=10,
+    help="Maximum number of results to return (default: 10)",
+)
+@click.option(
+    "--min-score",
+    "-m",
+    type=float,
+    default=0.3,
+    help="Minimum similarity score threshold 0.0–1.0 (default: 0.3)",
+)
+@click.option(
+    "--source",
+    "-s",
+    type=click.Choice(["collection", "marketplace", "all"]),
+    default="collection",
+    help="Where to search for similar artifacts (default: collection)",
+)
+def similar(artifact: str, limit: int, min_score: float, source: str):
+    """Find artifacts similar to a given artifact.
+
+    ARTIFACT may be a name (e.g. canvas-design), a type:name ID
+    (e.g. skill:canvas-design), or a UUID hex string.
+
+    Results are ranked by similarity score and classified as exact,
+    near_duplicate, similar, or related.
+
+    \b
+    Examples:
+      skillmeat similar canvas-design
+      skillmeat similar skill:canvas-design --limit 5
+      skillmeat similar my-agent --source marketplace
+      skillmeat similar my-skill --min-score 0.5 --source all
+    """
+    # Use a plain console that respects TTY state so piped output has no ANSI codes.
+    is_tty = sys.stdout.isatty()
+    out = Console(force_terminal=is_tty, legacy_windows=False)
+
+    try:
+        from skillmeat.cache.models import Artifact, get_session
+        from skillmeat.core.similarity import SimilarityService
+
+        # ----------------------------------------------------------------
+        # 1. Resolve the user-supplied identifier to an Artifact UUID.
+        # ----------------------------------------------------------------
+        session = get_session()
+        try:
+            target_row: Optional[Artifact] = None
+
+            # Case 1: looks like a UUID hex (32 hex chars, no colon).
+            if len(artifact) == 32 and ":" not in artifact:
+                target_row = (
+                    session.query(Artifact)
+                    .filter(Artifact.uuid == artifact)
+                    .first()
+                )
+
+            # Case 2: type:name composite ID.
+            if target_row is None and ":" in artifact:
+                target_row = (
+                    session.query(Artifact)
+                    .filter(Artifact.id == artifact)
+                    .first()
+                )
+
+            # Case 3: bare name — search by name across all types.
+            if target_row is None:
+                rows = (
+                    session.query(Artifact)
+                    .filter(Artifact.name == artifact)
+                    .all()
+                )
+                if len(rows) == 1:
+                    target_row = rows[0]
+                elif len(rows) > 1:
+                    out.print(
+                        f"[yellow]Ambiguous artifact name '[bold]{artifact}[/bold]' "
+                        f"matches {len(rows)} artifacts.[/yellow]"
+                    )
+                    out.print(
+                        "[dim]Use the type:name format (e.g. skill:canvas-design) "
+                        "to be specific.[/dim]"
+                    )
+                    for row in rows:
+                        out.print(f"  [cyan]{row.id}[/cyan]")
+                    sys.exit(1)
+
+            if target_row is None:
+                out.print(
+                    f"[red]Artifact '[bold]{artifact}[/bold]' not found.[/red]"
+                )
+                out.print(
+                    "[dim]Run [bold]skillmeat list[/bold] to see available artifacts.[/dim]"
+                )
+                sys.exit(1)
+
+            artifact_uuid = target_row.uuid
+            artifact_display = target_row.id  # type:name for display
+            artifact_type_str = target_row.type
+        finally:
+            session.close()
+
+        # ----------------------------------------------------------------
+        # 2. Run similarity search.
+        # ----------------------------------------------------------------
+        svc = SimilarityService()
+        results = svc.find_similar(
+            artifact_id=artifact_uuid,
+            limit=limit,
+            min_score=min_score,
+            source=source,
+        )
+
+        # ----------------------------------------------------------------
+        # 3. Render results.
+        # ----------------------------------------------------------------
+        if not results:
+            out.print(
+                f"[dim]No similar artifacts found for [bold]{artifact_display}[/bold] "
+                f"(source: {source}, min-score: {min_score}).[/dim]"
+            )
+            return
+
+        # Match-type colour mapping.
+        match_type_styles = {
+            "exact": "bright_green",
+            "near_duplicate": "green",
+            "similar": "yellow",
+            "related": "dim",
+        }
+
+        table = Table(
+            title=f"Similar to [bold]{artifact_display}[/bold] ({source})",
+            show_header=True,
+            header_style="bold cyan",
+        )
+        table.add_column("#", justify="right", width=3, style="dim")
+        table.add_column("Name", style="cyan", no_wrap=True)
+        table.add_column("Type", style="green", width=12)
+        table.add_column("Score %", justify="right", width=8)
+        table.add_column("Match Type", width=14)
+
+        for rank, result in enumerate(results, start=1):
+            score_pct = f"{result.composite_score * 100:.1f}%"
+            match_type_val = result.match_type.value  # e.g. "near_duplicate"
+            match_style = match_type_styles.get(match_type_val, "")
+
+            # Derive display name: prefer type:name from artifact_id field.
+            name_parts = result.artifact_id.split(":", 1)
+            display_name = name_parts[-1]  # bare name portion
+            row_type = getattr(result.artifact, "type", "") or (
+                name_parts[0] if len(name_parts) == 2 else artifact_type_str
+            )
+
+            table.add_row(
+                str(rank),
+                display_name,
+                row_type,
+                score_pct,
+                f"[{match_style}]{match_type_val}[/{match_style}]",
+            )
+
+        out.print(table)
+        out.print(
+            f"\n[dim]Showing {len(results)} result(s) | "
+            f"min-score: {min_score} | source: {source}[/dim]"
+        )
+
+    except SystemExit:
+        raise
+    except Exception as e:
+        out.print(f"[red]Error:[/red] {e}", err=True)
+        logger.exception("Failed to find similar artifacts")
+        sys.exit(1)
+
+
+# ====================
 # Context Entity Management Commands
 # ====================
 

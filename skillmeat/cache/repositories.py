@@ -4783,3 +4783,197 @@ class CustomColorRepository(BaseRepository[CustomColor]):
 
         finally:
             session.close()
+
+
+# =============================================================================
+# Similar Artifacts
+# =============================================================================
+
+
+class DuplicatePairRepository(BaseRepository["DuplicatePair"]):
+    """Repository for ``DuplicatePair`` similar-artifact records.
+
+    Provides CRUD and dismissal operations for persisted pairwise similarity
+    results.  The ``ignored`` flag lets users dismiss "not really a duplicate"
+    suggestions without permanently deleting the pair record.
+
+    Example:
+        >>> repo = DuplicatePairRepository()
+        >>> pair = repo.get_by_id("abc123")
+        >>> repo.mark_pair_ignored(pair.id)
+        >>> repo.unmark_pair_ignored(pair.id)
+    """
+
+    def __init__(self, db_path: Optional[str | Path] = None) -> None:
+        """Initialise with optional path to the SQLite DB.
+
+        Args:
+            db_path: Path to the SQLite database file.  Defaults to
+                     ``~/.skillmeat/cache/cache.db`` when ``None``.
+        """
+        from skillmeat.cache.models import DuplicatePair as _DuplicatePair
+
+        super().__init__(db_path, _DuplicatePair)
+
+    # ------------------------------------------------------------------
+    # Read helpers
+    # ------------------------------------------------------------------
+
+    def get_by_id(self, pair_id: str) -> Optional["DuplicatePair"]:
+        """Return the ``DuplicatePair`` with the given primary key, or ``None``.
+
+        Args:
+            pair_id: Primary key (UUID hex string) of the pair record.
+
+        Returns:
+            The matching ``DuplicatePair`` row, or ``None`` if not found.
+
+        Example:
+            >>> pair = repo.get_by_id("abc123")
+            >>> print(pair.similarity_score if pair else "not found")
+        """
+        from skillmeat.cache.models import DuplicatePair
+
+        session = self._get_session()
+        try:
+            return session.query(DuplicatePair).filter_by(id=pair_id).first()
+        finally:
+            session.close()
+
+    def list_active(self, min_score: float = 0.0) -> List["DuplicatePair"]:
+        """Return all non-ignored pairs whose score is >= ``min_score``.
+
+        Pairs are returned ordered by ``similarity_score`` descending.
+
+        Args:
+            min_score: Minimum similarity score threshold (default 0.0, i.e.
+                       all non-ignored pairs).
+
+        Returns:
+            List of ``DuplicatePair`` instances, may be empty.
+
+        Example:
+            >>> pairs = repo.list_active(min_score=0.5)
+            >>> for p in pairs:
+            ...     print(p.artifact1_uuid, p.artifact2_uuid, p.similarity_score)
+        """
+        from skillmeat.cache.models import DuplicatePair
+
+        session = self._get_session()
+        try:
+            return (
+                session.query(DuplicatePair)
+                .filter(
+                    DuplicatePair.ignored.is_(False),
+                    DuplicatePair.similarity_score >= min_score,
+                )
+                .order_by(DuplicatePair.similarity_score.desc())
+                .all()
+            )
+        finally:
+            session.close()
+
+    # ------------------------------------------------------------------
+    # Dismissal helpers
+    # ------------------------------------------------------------------
+
+    def mark_pair_ignored(self, pair_id: str) -> bool:
+        """Set ``ignored=True`` on the ``DuplicatePair`` identified by ``pair_id``.
+
+        Idempotent: if the pair is already ignored the call still succeeds and
+        returns ``True``.
+
+        Args:
+            pair_id: Primary key (UUID hex string) of the pair record.
+
+        Returns:
+            ``True`` when the pair was found and updated (or was already
+            ignored), ``False`` when no pair with ``pair_id`` exists.
+
+        Raises:
+            RepositoryError: On unexpected database errors.
+
+        Example:
+            >>> success = repo.mark_pair_ignored("abc123")
+            >>> print("dismissed" if success else "not found")
+        """
+        from skillmeat.cache.models import DuplicatePair
+
+        session = self._get_session()
+        try:
+            pair = session.query(DuplicatePair).filter_by(id=pair_id).first()
+            if pair is None:
+                logger.debug(
+                    "DuplicatePairRepository.mark_pair_ignored: "
+                    "pair id=%r not found.",
+                    pair_id,
+                )
+                return False
+
+            pair.ignored = True
+            session.commit()
+
+            logger.info(
+                "DuplicatePairRepository: marked pair id=%r as ignored.", pair_id
+            )
+            return True
+
+        except IntegrityError as exc:
+            session.rollback()
+            raise RepositoryError(
+                f"Failed to mark pair id={pair_id!r} as ignored: {exc}"
+            ) from exc
+        finally:
+            session.close()
+
+    def unmark_pair_ignored(self, pair_id: str) -> bool:
+        """Set ``ignored=False`` on the ``DuplicatePair`` identified by ``pair_id``.
+
+        Idempotent: if the pair is already active (not ignored) the call still
+        succeeds and returns ``True``.
+
+        Args:
+            pair_id: Primary key (UUID hex string) of the pair record.
+
+        Returns:
+            ``True`` when the pair was found and updated (or was already
+            active), ``False`` when no pair with ``pair_id`` exists.
+
+        Raises:
+            RepositoryError: On unexpected database errors.
+
+        Example:
+            >>> repo.mark_pair_ignored("abc123")
+            True
+            >>> repo.unmark_pair_ignored("abc123")
+            True
+        """
+        from skillmeat.cache.models import DuplicatePair
+
+        session = self._get_session()
+        try:
+            pair = session.query(DuplicatePair).filter_by(id=pair_id).first()
+            if pair is None:
+                logger.debug(
+                    "DuplicatePairRepository.unmark_pair_ignored: "
+                    "pair id=%r not found.",
+                    pair_id,
+                )
+                return False
+
+            pair.ignored = False
+            session.commit()
+
+            logger.info(
+                "DuplicatePairRepository: unmarked pair id=%r (now active).",
+                pair_id,
+            )
+            return True
+
+        except IntegrityError as exc:
+            session.rollback()
+            raise RepositoryError(
+                f"Failed to unmark pair id={pair_id!r}: {exc}"
+            ) from exc
+        finally:
+            session.close()

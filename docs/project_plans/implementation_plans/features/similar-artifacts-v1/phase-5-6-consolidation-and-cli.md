@@ -1,36 +1,39 @@
 ---
-title: "Similar Artifacts — Phase 5–6: Collection Consolidation View + CLI Integration"
+title: "Similar Artifacts \u2014 Phase 5\u20136: Collection Consolidation View + CLI\
+  \ Integration"
 schema_version: 2
 doc_type: phase_plan
-status: draft
+status: in-progress
 created: 2026-02-25
-updated: 2026-02-25
+updated: '2026-02-25'
 feature_slug: similar-artifacts
 feature_version: v1
 phase: 5
-phase_title: "Collection Consolidation View + CLI Integration"
+phase_title: Collection Consolidation View + CLI Integration
 prd_ref: docs/project_plans/PRDs/features/similar-artifacts-v1.md
 plan_ref: docs/project_plans/implementation_plans/features/similar-artifacts-v1.md
 entry_criteria:
-  - "Phase 1 complete: SimilarityService available; DuplicatePair.ignored migration merged"
-  - "Phase 1 repository work confirmed: DuplicatePair.ignored mark/unmark methods in place"
+- 'Phase 1 complete: SimilarityService available; DuplicatePair.ignored migration
+  merged'
+- 'Phase 1 repository work confirmed: DuplicatePair.ignored mark/unmark methods in
+  place'
 exit_criteria:
-  - "All Phase 5 and Phase 6 tasks marked completed"
-  - "Consolidation page /collection/consolidate renders cluster list with pagination"
-  - "Merge, replace, and skip actions complete with auto-snapshot verified"
-  - "Ignored pairs hidden by default; un-ignore restores to list"
-  - "CLI skillmeat similar and skillmeat consolidate commands exit 0"
-  - "task-completion-validator sign-off"
+- All Phase 5 and Phase 6 tasks marked completed
+- Consolidation page /collection/consolidate renders cluster list with pagination
+- Merge, replace, and skip actions complete with auto-snapshot verified
+- Ignored pairs hidden by default; un-ignore restores to list
+- CLI skillmeat similar and skillmeat consolidate commands exit 0
+- task-completion-validator sign-off
 priority: medium
 risk_level: medium
 category: product-planning
 tags:
-  - phase-plan
-  - frontend
-  - backend
-  - consolidation
-  - cli
-  - similar-artifacts
+- phase-plan
+- frontend
+- backend
+- consolidation
+- cli
+- similar-artifacts
 ---
 
 # Phase 5–6: Collection Consolidation View + CLI Integration

@@ -36,13 +36,16 @@ Usage
 
 from __future__ import annotations
 
+import base64
 import concurrent.futures
+import hashlib
+import json
 import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -290,6 +293,76 @@ class SimilarityService:
             )
 
             return results
+
+    def get_consolidation_clusters(
+        self,
+        min_score: float = 0.5,
+        limit: int = 20,
+        cursor: str | None = None,
+    ) -> Dict:
+        """Group similar artifacts into consolidation clusters for deduplication.
+
+        Loads all non-ignored ``DuplicatePair`` records whose
+        ``similarity_score >= min_score``, performs union-find clustering so
+        that transitively related artifacts end up in the same cluster, and
+        returns a paginated slice sorted by ``max_score`` descending.
+
+        Performance note
+        ----------------
+        Only pairs that already pass the ``similarity_score >= min_score``
+        pre-filter in the DB are loaded.  The union-find step is O(N · α(N))
+        where N is the number of qualifying pairs.  For a collection of 500
+        artifacts this is well under 5 s even on a slow machine.
+
+        Cursor encoding
+        ---------------
+        The opaque cursor is a base64-encoded JSON object
+        ``{"offset": <int>}``.  Callers should treat it as an opaque string
+        and pass it verbatim to the next call.
+
+        Args:
+            min_score: Minimum ``similarity_score`` for a pair to be
+                       included (default 0.5).
+            limit:     Maximum number of clusters to return per page
+                       (default 20).
+            cursor:    Opaque cursor from a previous call's
+                       ``"next_cursor"`` value, or ``None`` for the first
+                       page.
+
+        Returns:
+            A dict with two keys:
+
+            * ``"clusters"`` — list of cluster dicts, each containing:
+
+              - ``"artifacts"`` — list of artifact UUID strings in the cluster
+              - ``"max_score"`` — highest pairwise score among cluster members
+              - ``"artifact_type"`` — most common artifact type in the cluster
+                (resolved by DB look-up; ``""`` when unavailable)
+              - ``"pair_count"`` — number of non-ignored pairs in the cluster
+
+            * ``"next_cursor"`` — opaque cursor string for the next page, or
+              ``None`` when this is the last page.
+
+        Example:
+            >>> svc = SimilarityService()
+            >>> page1 = svc.get_consolidation_clusters(min_score=0.6, limit=5)
+            >>> for cluster in page1["clusters"]:
+            ...     print(cluster["artifacts"], cluster["max_score"])
+            >>> page2 = svc.get_consolidation_clusters(
+            ...     min_score=0.6, limit=5, cursor=page1["next_cursor"]
+            ... )
+        """
+        session = self._get_session()
+        try:
+            return self._get_consolidation_clusters_impl(
+                session=session,
+                min_score=min_score,
+                limit=limit,
+                cursor=cursor,
+            )
+        finally:
+            if self._session is None:
+                session.close()
 
     # ------------------------------------------------------------------
     # Private implementation helpers
@@ -612,6 +685,176 @@ class SimilarityService:
         if raw_score is None:
             return None
         return min(1.0, max(0.0, raw_score / 100.0))
+
+    def _get_consolidation_clusters_impl(
+        self,
+        session: "Session",
+        min_score: float,
+        limit: int,
+        cursor: str | None,
+    ) -> Dict:
+        """Core implementation for get_consolidation_clusters (requires open session).
+
+        Uses union-find (disjoint-set union) to merge transitive pairs into
+        clusters.  Looks up artifact types via a single bulk Artifact query to
+        avoid per-cluster round-trips.
+
+        Args:
+            session:   Open SQLAlchemy session.
+            min_score: Minimum similarity_score threshold.
+            limit:     Page size.
+            cursor:    Opaque cursor from a previous page (or ``None``).
+
+        Returns:
+            See :meth:`get_consolidation_clusters` return-value docs.
+        """
+        from skillmeat.cache.models import Artifact, DuplicatePair
+
+        # ------------------------------------------------------------------ #
+        # 1. Decode cursor → offset
+        # ------------------------------------------------------------------ #
+        offset = 0
+        if cursor is not None:
+            try:
+                payload = json.loads(base64.b64decode(cursor).decode())
+                offset = int(payload.get("offset", 0))
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "SimilarityService.get_consolidation_clusters: "
+                    "invalid cursor %r; ignoring.",
+                    cursor,
+                )
+                offset = 0
+
+        # ------------------------------------------------------------------ #
+        # 2. Load qualifying pairs from DB (keyword-score pre-filter)
+        # ------------------------------------------------------------------ #
+        pairs: List[DuplicatePair] = (
+            session.query(DuplicatePair)
+            .filter(
+                DuplicatePair.ignored.is_(False),
+                DuplicatePair.similarity_score >= min_score,
+            )
+            .all()
+        )
+
+        if not pairs:
+            return {"clusters": [], "next_cursor": None}
+
+        # ------------------------------------------------------------------ #
+        # 3. Union-Find clustering
+        # ------------------------------------------------------------------ #
+        parent: Dict[str, str] = {}
+
+        def _find(x: str) -> str:
+            if parent.setdefault(x, x) != x:
+                parent[x] = _find(parent[x])  # path compression
+            return parent[x]
+
+        def _union(a: str, b: str) -> None:
+            parent[_find(a)] = _find(b)
+
+        # Track max score and pair count per root.
+        root_max_score: Dict[str, float] = {}
+        root_pair_count: Dict[str, int] = {}
+
+        for pair in pairs:
+            u = pair.artifact1_uuid
+            v = pair.artifact2_uuid
+            score = pair.similarity_score
+
+            # Initialise parents before unioning.
+            _find(u)
+            _find(v)
+
+            # Record score on both roots before union (we update after).
+            for node in (u, v):
+                r = _find(node)
+                if r not in root_max_score or score > root_max_score[r]:
+                    root_max_score[r] = score
+
+            _union(u, v)
+
+            # After union the new root's score should reflect the max.
+            new_root = _find(u)
+            combined_max = max(
+                root_max_score.get(_find(u), 0.0),
+                root_max_score.get(_find(v), score),
+                score,
+            )
+            root_max_score[new_root] = combined_max
+            root_pair_count[new_root] = root_pair_count.get(new_root, 0) + 1
+
+        # Collect all member UUIDs per cluster root.
+        cluster_members: Dict[str, List[str]] = {}
+        for node in parent:
+            root = _find(node)
+            cluster_members.setdefault(root, []).append(node)
+
+        # Rebuild authoritative max_score per cluster (some roots may have
+        # changed during path compression).
+        cluster_max_score: Dict[str, float] = {}
+        cluster_pair_count: Dict[str, int] = {}
+        for pair in pairs:
+            root = _find(pair.artifact1_uuid)
+            s = pair.similarity_score
+            if root not in cluster_max_score or s > cluster_max_score[root]:
+                cluster_max_score[root] = s
+            cluster_pair_count[root] = cluster_pair_count.get(root, 0) + 1
+
+        # ------------------------------------------------------------------ #
+        # 4. Resolve artifact types via bulk DB look-up
+        # ------------------------------------------------------------------ #
+        all_uuids: List[str] = list(parent.keys())
+        artifact_rows: List[Artifact] = (
+            session.query(Artifact)
+            .filter(Artifact.uuid.in_(all_uuids))
+            .all()
+        )
+        uuid_to_type: Dict[str, str] = {
+            row.uuid: (getattr(row, "type", "") or "") for row in artifact_rows
+        }
+
+        def _dominant_type(members: List[str]) -> str:
+            """Return the most common artifact type among members."""
+            counts: Dict[str, int] = {}
+            for m in members:
+                t = uuid_to_type.get(m, "")
+                counts[t] = counts.get(t, 0) + 1
+            if not counts:
+                return ""
+            return max(counts, key=lambda k: counts[k])
+
+        # ------------------------------------------------------------------ #
+        # 5. Build and sort clusters
+        # ------------------------------------------------------------------ #
+        clusters = []
+        for root, members in cluster_members.items():
+            clusters.append(
+                {
+                    "artifacts": sorted(members),  # deterministic order
+                    "max_score": cluster_max_score.get(root, 0.0),
+                    "artifact_type": _dominant_type(members),
+                    "pair_count": cluster_pair_count.get(root, 0),
+                }
+            )
+
+        # Sort by max_score descending, then by artifact list for determinism.
+        clusters.sort(key=lambda c: (-c["max_score"], c["artifacts"]))
+
+        # ------------------------------------------------------------------ #
+        # 6. Cursor-based pagination
+        # ------------------------------------------------------------------ #
+        total = len(clusters)
+        page = clusters[offset : offset + limit]
+
+        next_offset = offset + limit
+        next_cursor: str | None = None
+        if next_offset < total:
+            payload = json.dumps({"offset": next_offset})
+            next_cursor = base64.b64encode(payload.encode()).decode()
+
+        return {"clusters": page, "next_cursor": next_cursor}
 
     def _compute_composite_score(self, breakdown: ScoreBreakdown) -> float:
         """Compute weighted average of score components.
