@@ -1,5 +1,5 @@
 <!-- AUTO-GENERATED: Do not edit directly. See .github/readme/ -->
-<!-- GENERATED: 2026-02-19T17:12:43.656Z -->
+<!-- GENERATED: 2026-02-25T19:43:05.211Z -->
 <!-- VERSION: 0.3.0-beta -->
 
 <!-- BEGIN:hero -->
@@ -163,7 +163,7 @@ For complete documentation, see the [Quickstart Guide](docs/user/quickstart.md) 
 <!-- BEGIN:features -->
 ## Features
 
-> **116+ CLI commands** | **150+ API endpoints** | **23 web pages**
+> **116+ CLI commands** | **160+ API endpoints** | **25 web pages**
 
 ### Collection Management
 
@@ -187,6 +187,18 @@ _Deploy anywhere, track everything_
 | Multi-Platform Profiles | Profile-aware deploy (`skillmeat deploy --profile codex`) |
 | Project Management | Manage projects |
 | Update Alerts | Update notifications |
+
+### Deployment Sets
+
+_Group and batch-deploy artifact bundles_
+
+| Feature | Description |
+|---------|-------------|
+| **Named Deployment Sets** | Composable deployment bundles |
+| Nested Composition | Sets within sets |
+| **Batch Deploy** | One-click set deployment |
+| Set Detail Modal | Rich modal-based management |
+| Minified Member Cards | Compact member preview |
 
 ### Intelligence &amp; Sync
 
@@ -222,8 +234,6 @@ _Track usage, identify patterns_
 | Top Artifacts | Most used (`skillmeat analytics top`) |
 | Cleanup Suggestions | Cleanup help (`skillmeat analytics cleanup`) |
 | Trend Analysis | Usage trends (`skillmeat analytics trends`) |
-| Enterprise Metrics | Delivery, reliability, and adoption dashboard metrics |
-| Observability Export | Export analytics as JSON, Prometheus, or OTel |
 
 ### Search &amp; Discovery
 
@@ -244,7 +254,6 @@ _Snapshots and rollback_
 | Collection Snapshots | Backup collection (`skillmeat snapshot`) |
 | Rollback Support | Easy restore (`skillmeat rollback`) |
 | Version History | View history (`skillmeat history`) |
-| Provenance Timelines | Unified artifact history across versions, deployments, and analytics events |
 
 ### MCP Server Management
 

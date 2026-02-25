@@ -4,14 +4,14 @@ description: Comprehensive guide to component architecture, styling, and accessi
 audience: developers
 tags: [react, typescript, components, accessibility, shadcn, radix-ui]
 created: 2025-01-14
-updated: 2025-01-14
+updated: 2026-02-25
 category: frontend
 status: active
 references:
   - skillmeat/web/components/**/*.tsx
   - skillmeat/web/app/**/*.tsx
   - skillmeat/web/lib/utils.ts
-last_verified: 2025-01-14
+last_verified: 2026-02-25
 ---
 
 # React Component Patterns Reference
@@ -25,8 +25,8 @@ Comprehensive patterns for building accessible, maintainable React components in
 ```
 components/
 ├── ui/              # shadcn/ui primitives (DO NOT MODIFY)
-├── shared/          # Cross-feature reusable components
-├── [feature]/       # Feature-specific components (collections, groups, etc.)
+├── shared/          # Cross-feature reusable components (ColorSelector, IconPicker)
+├── [feature]/       # Feature-specific components (collections, groups, deployment-sets, etc.)
 └── providers.tsx    # App-level context providers
 ```
 
@@ -35,8 +35,78 @@ components/
 | Directory | Purpose | When to Use | Examples |
 |-----------|---------|-------------|----------|
 | `ui/` | shadcn/ui primitives | Never create/modify - use CLI | button, dialog, dropdown-menu |
-| `shared/` | Cross-cutting UI | Used by 2+ features | nav, layout, common forms |
-| `[feature]/` | Domain-specific | Only used within one feature | collection-card, group-list |
+| `shared/` | Cross-cutting UI | Used by 2+ features | nav, layout, common forms, ColorSelector, IconPicker |
+| `[feature]/` | Domain-specific | Only used within one feature | collection-card, group-list, deployment-set-card |
+
+---
+
+## Shared Components
+
+### ColorSelector (`components/shared/color-selector.tsx`)
+
+Reusable color picker combining preset colors with user-defined custom colors from the API.
+
+**Props:**
+- `value: string` - Currently selected color (hex or preset name)
+- `onChange: (color: string) => void` - Callback when color is selected
+- `className?: string` - Optional styling override
+
+**Features:**
+- Fetches custom colors via `useCustomColors()` hook
+- Displays preset color grid
+- Shows custom colors section when available
+- Accessible color selection with visual indicators
+
+**Used by:**
+- Groups metadata editor (group color selection)
+- Deployment Set create/edit dialogs (set color selection)
+
+**Example:**
+```typescript
+import { ColorSelector } from '@/components/shared/color-selector';
+
+export function GroupColorEditor({ color, onColorChange }: Props) {
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium">Group Color</label>
+      <ColorSelector value={color} onChange={onColorChange} />
+    </div>
+  );
+}
+```
+
+### IconPicker (`components/shared/icon-picker.tsx`)
+
+Searchable icon grid picker powered by configurable icon packs.
+
+**Props:**
+- `value: string` - Currently selected icon name
+- `onChange: (icon: string) => void` - Callback when icon is selected
+- `className?: string` - Optional styling override
+
+**Features:**
+- Loads icon packs from `icon-packs.config.json`
+- Searchable with real-time filtering
+- Pack selection/filtering tabs
+- Visual icon preview with selection indicator
+
+**Used by:**
+- Groups metadata editor (group icon selection)
+- Deployment Set create/edit dialogs (set icon selection)
+
+**Example:**
+```typescript
+import { IconPicker } from '@/components/shared/icon-picker';
+
+export function GroupIconEditor({ icon, onIconChange }: Props) {
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium">Group Icon</label>
+      <IconPicker value={icon} onChange={onIconChange} />
+    </div>
+  );
+}
+```
 
 ---
 
@@ -648,6 +718,122 @@ export function ConfirmDialog({ title, message, onConfirm }: Props) {
   );
 }
 ```
+
+---
+
+## Deployment Sets Components (`components/deployment-sets/`)
+
+Feature-specific components for deployment set management, following established patterns used in artifact and group features.
+
+### DeploymentSetCard
+
+Clickable card displaying deployment set metadata and member summary.
+
+**Props:**
+- `deploymentSet: DeploymentSet` - Set object with name, description, members, tags, color, icon
+- `onSelect?: (id: string) => void` - Optional click handler to open details modal
+- `className?: string` - Optional styling override
+
+**Behavior:**
+- Full-card click triggers selection (opens `DeploymentSetDetailsModal`)
+- Displays set color indicator (square or circle badge)
+- Shows set icon if available
+- Renders tags using unified tag system (matches artifact/group tagging)
+- Shows member count summary
+- Supports hover state and focus indicators for keyboard navigation
+
+**Related Pattern:**
+- Follows `ArtifactCard` structure from collections feature
+- Uses same tag rendering as `GroupCard`
+
+### DeploymentSetDetailsModal
+
+Tabbed modal for viewing and editing deployment set details, matching `ArtifactDetailsModal` pattern.
+
+**Tabs:**
+1. **Overview** - Set name, description, color/icon metadata
+2. **Members** - Listed members (artifacts, groups, sets)
+3. **Groups** - Groups containing this set
+
+**Features:**
+- **Inline editing:** Name and description editable via `contentEditable` elements with blur save
+- **Header actions:** Batch deploy button, edit dropdown, delete confirmation
+- **Colored tag display** unified with artifact tag system
+- **Mutation triggers:** Save/delete operations invalidate relevant queries via `useQueryClient()`
+
+**Implementation Pattern:**
+```typescript
+// Similar to ArtifactDetailsModal but for deployment sets
+<DialogContent className="max-w-2xl">
+  <DialogHeader>
+    {/* Color/icon + title + actions */}
+  </DialogHeader>
+  <Tabs value={activeTab} onValueChange={setActiveTab}>
+    <TabsList>
+      <TabsTrigger value="overview">Overview</TabsTrigger>
+      <TabsTrigger value="members">Members</TabsTrigger>
+      <TabsTrigger value="groups">Groups</TabsTrigger>
+    </TabsList>
+    <TabsContent value="overview">{/* ... */}</TabsContent>
+    <TabsContent value="members">{/* ... */}</TabsContent>
+    <TabsContent value="groups">{/* ... */}</TabsContent>
+  </Tabs>
+</DialogContent>
+```
+
+### MiniArtifactCard (variant)
+
+Compact artifact card used in member selection dialogs (e.g., `AddMemberDialog`).
+
+**Props:**
+- `artifact: Artifact` - Artifact to display
+- `selected?: boolean` - Visual selection indicator
+- `onSelect: (id: string) => void` - Selection callback
+- `className?: string` - Optional styling override
+
+**Behavior:**
+- Minimal visual footprint (single row or compact grid item)
+- Shows artifact name, type badge
+- Visual indicator when already selected (checkmark or highlight)
+- Supports click and Enter/Space keyboard selection
+- No description or metadata (for density)
+
+**Used in:**
+- `AddMemberDialog` artifacts tab
+- Multi-select scenarios where space is constrained
+
+### AddMemberDialog
+
+Three-tab dialog for selecting members to add to a deployment set.
+
+**Tabs:**
+1. **Artifacts** - Search/filter artifacts (skills, commands, agents, etc.)
+2. **Groups** - Search/filter groups
+3. **Sets** - Search/filter other deployment sets
+
+**Features:**
+- Per-tab search and type filtering
+- Visual selection state (checkmarks, highlighting)
+- MiniArtifactCard grid for artifact selection
+- Circular reference validation before submission
+  - Prevents adding a set to itself
+  - Prevents adding a set that already contains this set
+- Batch addition with single submit (add multiple members at once)
+
+**Validation Logic:**
+```typescript
+// Before allowing member addition
+const canAddMember = (memberId: string, targetSetId: string) => {
+  // Check if targetSetId is already in the dependency chain
+  return !isMemberInSet(memberId, targetSetId);
+};
+```
+
+**Implementation Pattern:**
+- Similar structure to search modals used in artifact linking
+- Tab-based organization for different member types
+- Maintains selection state within modal session
+- Submit triggers mutation to add members batch
 
 ---
 

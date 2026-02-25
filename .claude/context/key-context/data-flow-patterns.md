@@ -3,6 +3,8 @@
 Detailed reference for SkillMeat's canonical data flow standard.
 **Source**: `docs/project_plans/reports/data-flow-standardization-report.md`
 
+**Updated**: 2026-02-25
+
 ---
 
 ## Write-Through Pattern (FS-Backed Data)
@@ -46,6 +48,8 @@ Web mutations on filesystem-backed data:
 | Tags (search) | 30 sec | Interactive, needs freshness |
 | Groups (all hooks) | 5 min | Low-frequency changes |
 | Deployments | 2 min | More dynamic, filesystem-backed |
+| Deployment Sets (list) | 5 min | Standard browsing |
+| Deployment Set (detail) | 30 sec | Interactive, resolve calls can be expensive |
 | Diff queries (sync) | 30 sec | Interactive, expensive queries; reuse on scope switches |
 | Projects | 5 min | Low-frequency changes |
 | Marketplace listings | 1 min | External, moderately dynamic |
@@ -57,7 +61,7 @@ Web mutations on filesystem-backed data:
 | Cache status | 30 sec | Monitoring |
 | Context Sync status | 30 sec | Active sync monitoring |
 
-**Rule**: Interactive/monitoring queries use 30sec (includes diff queries for sync). Standard browsing uses 5min. Deployments use 2min (FS-backed, more dynamic). Diff GC time is 5min to cache across reopen/scope-switch flows.
+**Rule**: Interactive/monitoring queries use 30sec (includes diff queries for sync and deployment set detail). Standard browsing uses 5min. Deployments use 2min (FS-backed, more dynamic). Diff GC time is 5min to cache across reopen/scope-switch flows.
 
 ---
 
@@ -75,6 +79,9 @@ Mutations **must** invalidate all listed keys. Missing invalidations are non-com
 | Group CRUD | `['groups']`, `['artifact-groups']` |
 | Group artifact add/remove/move | `['groups']`, `['artifact-groups']` |
 | Deploy/Undeploy | `['deployments']`, `['artifacts']`, `['projects']` |
+| Deployment Set CRUD | `['deployment-sets']`, `['deployment-set-{id}']` |
+| Deployment Set add/remove member | `['deployment-set-{id}']`, `['deployment-set-members-{id}']` |
+| Deployment Set batch deploy | `['deployments']`, `['deployment-stats']`, `['project-{id}']` |
 | Snapshot rollback | `['snapshots']`, `['artifacts']`, `['deployments']`, `['collections']` |
 | Context entity deploy | `['context-entities']`, `['deployments']` |
 | Context sync push/pull | `['context-sync-status']`, `['artifact-files']`, `['context-entities']`, `['deployments']` |

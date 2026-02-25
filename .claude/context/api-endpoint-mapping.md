@@ -6,6 +6,7 @@ references:
   - skillmeat/api/routers/user_collections.py
   - skillmeat/api/routers/artifacts.py
   - skillmeat/api/routers/deployments.py
+  - skillmeat/api/routers/deployment_sets.py
   - skillmeat/api/routers/projects.py
   - skillmeat/api/routers/marketplace.py
   - skillmeat/api/routers/marketplace_sources.py
@@ -15,8 +16,9 @@ references:
   - skillmeat/api/routers/cache.py
   - skillmeat/api/routers/context_sync.py
   - skillmeat/api/routers/analytics.py
+  - skillmeat/api/routers/custom_colors.py
   - skillmeat/api/routers/health.py
-last_verified: 2025-02-04
+last_verified: 2026-02-25
 ---
 
 # API Endpoint Mapping
@@ -180,6 +182,40 @@ offset: int = Query(0, ge=0)
 | `/api/v1/deployments/rollback` | POST | RollbackResponse | `@router.post("/rollback", response_model=RollbackResponse` | ~192 |
 | `/api/v1/deployments/{project_id}` | GET | DeploymentListResponse | `@router.get("/{project_id}", response_model=DeploymentListResponse` | ~287 |
 
+## Deployment Sets API
+
+**Router**: `skillmeat/api/routers/deployment_sets.py`
+**Base**: `/api/v1/deployment-sets`
+**Purpose**: Manage grouped deployments and batch operations on artifact sets
+**Feature Flag**: `SKILLMEAT_DEPLOYMENT_SETS_ENABLED` — returns 404 when disabled
+
+| Endpoint | Method | Response Model | Decorator Pattern | Status |
+|----------|--------|----------------|-------------------|--------|
+| `/api/v1/deployment-sets` | GET | DeploymentSetListResponse | `@router.get("", response_model=DeploymentSetListResponse` | Active |
+| `/api/v1/deployment-sets` | POST | DeploymentSetResponse | `@router.post("", response_model=DeploymentSetResponse, status_code=status.HTTP_201_CREATED` | Active |
+| `/api/v1/deployment-sets/{id}` | GET | DeploymentSetDetailResponse | `@router.get("/{id}", response_model=DeploymentSetDetailResponse` | Active |
+| `/api/v1/deployment-sets/{id}` | PUT | DeploymentSetResponse | `@router.put("/{id}", response_model=DeploymentSetResponse` | Active |
+| `/api/v1/deployment-sets/{id}` | DELETE | None (204) | `@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT` | Active |
+| `/api/v1/deployment-sets/{id}/members` | GET | DeploymentSetMembersResponse | `@router.get("/{id}/members", response_model=DeploymentSetMembersResponse` | Active |
+| `/api/v1/deployment-sets/{id}/members` | POST | DeploymentSetMemberResponse | `@router.post("/{id}/members", response_model=DeploymentSetMemberResponse, status_code=status.HTTP_201_CREATED` | Active |
+| `/api/v1/deployment-sets/{id}/members/{member_id}` | DELETE | None (204) | `@router.delete("/{id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT` | Active |
+| `/api/v1/deployment-sets/{id}/resolve` | POST | DeploymentSetResolveResponse | `@router.post("/{id}/resolve", response_model=DeploymentSetResolveResponse` | Active |
+| `/api/v1/deployment-sets/{id}/batch-deploy` | POST | BatchDeployResponse | `@router.post("/{id}/batch-deploy", response_model=BatchDeployResponse` | Active |
+| `/api/v1/deployment-sets/{id}/clone` | POST | DeploymentSetCloneResponse | `@router.post("/{id}/clone", response_model=DeploymentSetCloneResponse, status_code=status.HTTP_201_CREATED` | Active |
+
+**Key Operations**:
+- List & Browse: `GET /`, `GET /{id}`
+- Create & Manage: `POST /`, `PUT /{id}`, `DELETE /{id}`
+- Members: `GET /{id}/members`, `POST /{id}/members`, `DELETE /{id}/members/{member_id}`
+- Resolve & Deploy: `POST /{id}/resolve`, `POST /{id}/batch-deploy`
+- Duplication: `POST /{id}/clone`
+
+**Cache Invalidation** (on mutation):
+- `['deployment-sets']` - List view
+- `['deployment-sets', id]` - Detail view
+- `['deployment-sets', id, 'members']` - Members list
+- `['deployments']` - Invalidate deployments after batch-deploy
+
 ## Projects API
 
 **Router**: `skillmeat/api/routers/projects.py`
@@ -322,6 +358,27 @@ offset: int = Query(0, ge=0)
 | `/health/ready` | GET | ReadinessResponse | `@router.get("/ready", response_model=ReadinessResponse` | ~133 |
 | `/health/live` | GET | LivenessResponse | `@router.get("/live", response_model=LivenessResponse` | ~242 |
 | `/health/version` | GET | VersionResponse | `@router.get("/version", response_model=VersionResponse` | ~276 |
+
+## Custom Colors API
+
+**Router**: `skillmeat/api/routers/custom_colors.py`
+**Base**: `/api/v1/custom-colors`
+**Purpose**: Manage custom color definitions for icons and theme customization
+
+| Endpoint | Method | Response Model | Decorator Pattern | Status |
+|----------|--------|----------------|-------------------|--------|
+| `/api/v1/custom-colors` | GET | CustomColorListResponse | `@router.get("", response_model=CustomColorListResponse` | Active |
+| `/api/v1/custom-colors` | POST | CustomColorResponse | `@router.post("", response_model=CustomColorResponse, status_code=status.HTTP_201_CREATED` | Active |
+| `/api/v1/custom-colors/{id}` | PUT | CustomColorResponse | `@router.put("/{id}", response_model=CustomColorResponse` | Active |
+| `/api/v1/custom-colors/{id}` | DELETE | None (204) | `@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT` | Active |
+
+**Key Operations**:
+- List & Browse: `GET /`
+- Create & Manage: `POST /`, `PUT /{id}`, `DELETE /{id}`
+
+**Cache Invalidation** (on mutation):
+- `['custom-colors']` - List view
+- `['custom-colors', id]` - Detail view (if applicable)
 
 ## Key Distinctions
 

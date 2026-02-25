@@ -11,6 +11,8 @@ This guide covers the SkillMeat web interface, including launching the UI, manag
 - [Artifact Management](#artifact-management)
 - [Notification Center](#notification-center)
 - [Deploying to Projects](#deploying-to-projects)
+- [Deployment Sets](#deployment-sets)
+- [Color & Icon Customization](#color--icon-customization)
 - [Memory & Context Workspace](#memory--context-workspace)
 - [Analytics Dashboard](#analytics-dashboard)
 - [Settings and Configuration](#settings-and-configuration)
@@ -580,6 +582,70 @@ Recent deployments offer rollback:
 3. Confirm
 4. Monitor restoration
 
+## Deployment Sets
+
+Deployment Sets let you group related artifacts into reusable deployment bundles. Instead of deploying artifacts one at a time, you can create a named set and deploy all its members in a single action.
+
+### Accessing Deployment Sets
+
+Navigate to **Deployment Sets** in the sidebar. If the link is not visible, ensure the feature flag `SKILLMEAT_DEPLOYMENT_SETS_ENABLED` is set to `true`.
+
+### Creating a Set
+
+1. Click **Create Set** on the Deployment Sets page
+2. Enter a name and optional description
+3. Choose a color and icon for visual identification
+4. Click **Create**
+
+### Managing Members
+
+Open a set by clicking its card. In the **Members** tab:
+
+- Click **Add Members** to open the member picker
+- Browse three tabs: **Artifacts**, **Groups**, and **Sets** (nested composition)
+- Use search and type filters to find specific artifacts
+- Selected members show an "already selected" visual state
+- Members are organized in collapsible sections by type
+
+### Batch Deploying
+
+1. Open a deployment set
+2. Click **Batch Deploy** in the header
+3. Select a target **project** and **deployment profile**
+4. Review the resolved artifact list (nested sets are flattened automatically)
+5. Click **Deploy** — results show per-artifact success/failure status
+
+### Set Detail Modal
+
+Clicking a set card opens a tabbed modal:
+
+- **Overview**: Set name, description, member count, tags, and metadata. Name and description are editable inline.
+- **Members**: Grid of member cards with type badges. Add/remove members directly.
+- **Groups**: Collection-scoped groups associated with the set.
+
+Tags support colored badges and use the same 100-character limit as artifact tags.
+
+## Color & Icon Customization
+
+Colors and icons can be customized globally from the Settings page and are used across Groups and Deployment Sets.
+
+### Custom Colors
+
+1. Navigate to **Settings** → **Colors** tab
+2. Add custom colors using the hex input or color picker
+3. Remove colors by clicking the delete button
+4. Changes propagate immediately to all color selectors in the application
+
+### Icon Packs
+
+1. Navigate to **Settings** → **Icons** tab
+2. Browse installed icon packs and their icon counts
+3. Click a pack to view all its icons in a large viewer dialog
+4. Install new packs from a URL or by uploading a file
+5. Remove unused packs
+
+The shared icon picker appears in Group and Deployment Set create/edit dialogs, replacing the previous fixed dropdown.
+
 ## Memory & Context Workspace
 
 The Memory workspace gives each project a dedicated triage and context composition flow.
@@ -744,6 +810,25 @@ Access tag management from **Settings** → **Tags** in the sidebar.
 - Search and filter tags by name or slug
 
 For detailed tag usage instructions, see the [Tags User Guide](./tags-user-guide.md).
+
+### Colors and Icons Management
+
+SkillMeat provides dedicated tabs in Settings for managing custom colors and icon packs:
+
+**Colors Tab** (`/settings/colors`):
+- Create and manage custom colors used throughout the application
+- Add colors via hex input or interactive color picker
+- Remove colors you no longer need
+- Colors propagate instantly to all color selectors (Groups, Deployment Sets, etc.)
+
+**Icons Tab** (`/settings/icons`):
+- Browse and manage installed icon packs
+- View icon count for each pack
+- Preview all icons in a pack using the large viewer dialog
+- Install new icon packs from URL or file upload
+- Remove unused icon packs
+
+These customizations are used when creating or editing Groups and Deployment Sets.
 
 ### Data Management
 
