@@ -1456,3 +1456,62 @@ class SimilarArtifactsResponse(BaseModel):
         ..., description="Similar artifacts ordered by composite score descending"
     )
     total: int = Field(..., description="Total number of similar artifacts returned")
+
+
+class ArtifactSummaryDTO(BaseModel):
+    """Minimal artifact summary used inside a consolidation cluster."""
+
+    artifact_id: str = Field(
+        ..., description="Artifact UUID (hex string) identifying this artifact"
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class SimilarityClusterDTO(BaseModel):
+    """A group of similar artifacts identified for potential consolidation.
+
+    Produced by ``GET /api/v1/artifacts/consolidation/clusters``.
+    Each cluster is derived from transitive union-find grouping of
+    ``DuplicatePair`` records whose score exceeds ``min_score``.
+    """
+
+    artifacts: List[str] = Field(
+        ...,
+        description=(
+            "List of artifact UUIDs (hex strings) that belong to this cluster, "
+            "sorted deterministically."
+        ),
+    )
+    max_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Highest pairwise similarity score in the cluster"
+    )
+    artifact_type: str = Field(
+        ..., description="Dominant artifact type among cluster members (e.g. 'skill')"
+    )
+    pair_count: int = Field(
+        ..., ge=0, description="Number of qualifying similarity pairs within this cluster"
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class ConsolidationClustersResponse(BaseModel):
+    """Response for the GET /api/v1/artifacts/consolidation/clusters endpoint."""
+
+    clusters: List[SimilarityClusterDTO] = Field(
+        ..., description="Consolidation clusters ordered by max_score descending"
+    )
+    next_cursor: Optional[str] = Field(
+        None,
+        description=(
+            "Opaque cursor for the next page of results. ``null`` when no further "
+            "pages are available."
+        ),
+    )

@@ -56,6 +56,7 @@ from skillmeat.api.schemas.artifacts import (
     ArtifactUpstreamResponse,
     ArtifactVersionInfo,
     ConflictInfo,
+    ConsolidationClustersResponse,
     CreateLinkedArtifactRequest,
     DeploymentStatistics,
     FileDiff,
@@ -70,6 +71,7 @@ from skillmeat.api.schemas.artifacts import (
     SimilarArtifactDTO,
     SimilarArtifactsResponse,
     SimilarityBreakdownDTO,
+    SimilarityClusterDTO,
     VersionGraphNodeResponse,
     VersionGraphResponse,
 )
@@ -8768,6 +8770,256 @@ async def get_artifact_associations(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get associations: {str(e)}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Consolidation endpoints (fixed paths — registered before /{artifact_id}/*)
+# to prevent FastAPI from matching "consolidation" as an artifact_id value.
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/consolidation/clusters",
+    response_model=ConsolidationClustersResponse,
+    summary="List consolidation clusters",
+    description=(
+        "Returns groups of similar artifacts identified for potential consolidation. "
+        "Clusters are formed by union-find grouping of DuplicatePair records whose "
+        "similarity_score meets the min_score threshold, then paginated via cursor."
+    ),
+    responses={
+        200: {"description": "Successfully retrieved consolidation clusters"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_consolidation_clusters(
+    db_session: DbSessionDep,
+    token: TokenDep,
+    min_score: float = Query(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Minimum similarity score threshold (0.0–1.0, default 0.5)",
+    ),
+    limit: int = Query(
+        default=20,
+        ge=1,
+        le=100,
+        description="Maximum number of clusters to return per page (1–100, default 20)",
+    ),
+    cursor: Optional[str] = Query(
+        default=None,
+        description="Opaque pagination cursor returned by a previous call",
+    ),
+) -> ConsolidationClustersResponse:
+    """Return paginated consolidation clusters for deduplication review.
+
+    Loads non-ignored DuplicatePair records that meet the min_score threshold,
+    groups them using union-find clustering, and returns a sorted, paginated
+    result.  Use ``next_cursor`` from the response to fetch subsequent pages.
+
+    Args:
+        db_session: Injected SQLAlchemy session.
+        token:      Authentication token (dependency injection).
+        min_score:  Minimum pairwise similarity score (0.0–1.0, default 0.5).
+        limit:      Page size (1–100, default 20).
+        cursor:     Opaque cursor from a previous page, or ``None`` for the first page.
+
+    Returns:
+        ConsolidationClustersResponse with clusters and optional next_cursor.
+
+    Raises:
+        HTTPException 500: On unexpected errors.
+
+    Example:
+        GET /api/v1/artifacts/consolidation/clusters?min_score=0.7&limit=10
+    """
+    try:
+        logger.info(
+            "Getting consolidation clusters (min_score=%.2f, limit=%d, cursor=%r)",
+            min_score,
+            limit,
+            cursor,
+        )
+
+        from skillmeat.core.similarity import SimilarityService
+
+        service = SimilarityService(session=db_session)
+        result = service.get_consolidation_clusters(
+            min_score=min_score,
+            limit=limit,
+            cursor=cursor,
+        )
+
+        clusters: List[SimilarityClusterDTO] = [
+            SimilarityClusterDTO(
+                artifacts=cluster["artifacts"],
+                max_score=cluster["max_score"],
+                artifact_type=cluster["artifact_type"],
+                pair_count=cluster["pair_count"],
+            )
+            for cluster in result["clusters"]
+        ]
+
+        logger.info(
+            "Consolidation clusters: returned %d cluster(s), next_cursor=%r",
+            len(clusters),
+            result["next_cursor"],
+        )
+
+        return ConsolidationClustersResponse(
+            clusters=clusters,
+            next_cursor=result["next_cursor"],
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed to get consolidation clusters: %s",
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get consolidation clusters: {str(e)}",
+        )
+
+
+@router.post(
+    "/consolidation/pairs/{pair_id}/ignore",
+    summary="Ignore a duplicate pair",
+    description=(
+        "Marks the specified DuplicatePair as ignored so it is excluded from "
+        "consolidation cluster results.  Idempotent: calling this on an already-"
+        "ignored pair still returns 200."
+    ),
+    responses={
+        200: {"description": "Pair successfully marked as ignored"},
+        404: {"model": ErrorResponse, "description": "Pair not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+    status_code=status.HTTP_200_OK,
+)
+async def ignore_duplicate_pair(
+    pair_id: str,
+    token: TokenDep,
+) -> dict:
+    """Mark a DuplicatePair as ignored (consolidation skip action).
+
+    Args:
+        pair_id: Primary key (UUID hex string) of the DuplicatePair record.
+        token:   Authentication token (dependency injection).
+
+    Returns:
+        JSON object ``{"pair_id": "<id>", "ignored": true}``.
+
+    Raises:
+        HTTPException 404: If no pair with ``pair_id`` exists.
+        HTTPException 500: On unexpected database errors.
+
+    Example:
+        POST /api/v1/artifacts/consolidation/pairs/abc123/ignore
+    """
+    try:
+        logger.info("Marking duplicate pair %r as ignored", pair_id)
+
+        from skillmeat.cache.repositories import DuplicatePairRepository
+
+        repo = DuplicatePairRepository()
+        found = repo.mark_pair_ignored(pair_id)
+
+        if not found:
+            logger.info("Duplicate pair not found: %r", pair_id)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Duplicate pair '{pair_id}' not found",
+            )
+
+        logger.info("Duplicate pair %r marked as ignored", pair_id)
+        return {"pair_id": pair_id, "ignored": True}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed to ignore duplicate pair '%s': %s",
+            pair_id,
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to ignore duplicate pair: {str(e)}",
+        )
+
+
+@router.delete(
+    "/consolidation/pairs/{pair_id}/ignore",
+    summary="Unignore a duplicate pair",
+    description=(
+        "Clears the ignored flag on the specified DuplicatePair, making it "
+        "visible again in consolidation cluster results.  Idempotent: calling "
+        "this on a pair that is already active still returns 200."
+    ),
+    responses={
+        200: {"description": "Pair ignore flag successfully cleared"},
+        404: {"model": ErrorResponse, "description": "Pair not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+    status_code=status.HTTP_200_OK,
+)
+async def unignore_duplicate_pair(
+    pair_id: str,
+    token: TokenDep,
+) -> dict:
+    """Clear the ignored flag on a DuplicatePair (undo consolidation skip).
+
+    Args:
+        pair_id: Primary key (UUID hex string) of the DuplicatePair record.
+        token:   Authentication token (dependency injection).
+
+    Returns:
+        JSON object ``{"pair_id": "<id>", "ignored": false}``.
+
+    Raises:
+        HTTPException 404: If no pair with ``pair_id`` exists.
+        HTTPException 500: On unexpected database errors.
+
+    Example:
+        DELETE /api/v1/artifacts/consolidation/pairs/abc123/ignore
+    """
+    try:
+        logger.info("Clearing ignored flag on duplicate pair %r", pair_id)
+
+        from skillmeat.cache.repositories import DuplicatePairRepository
+
+        repo = DuplicatePairRepository()
+        found = repo.unmark_pair_ignored(pair_id)
+
+        if not found:
+            logger.info("Duplicate pair not found: %r", pair_id)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Duplicate pair '{pair_id}' not found",
+            )
+
+        logger.info("Duplicate pair %r ignore flag cleared", pair_id)
+        return {"pair_id": pair_id, "ignored": False}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed to unignore duplicate pair '%s': %s",
+            pair_id,
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to unignore duplicate pair: {str(e)}",
         )
 
 
