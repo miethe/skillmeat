@@ -20,6 +20,15 @@ from skillmeat.core.artifact import ArtifactMetadata
 from skillmeat.core.similarity import ScoreBreakdown
 from skillmeat.models import ArtifactFingerprint
 
+# Optional OpenTelemetry integration — works whether or not otel is installed.
+try:
+    from opentelemetry import trace as _otel_trace
+
+    _tracer = _otel_trace.get_tracer(__name__)
+except ImportError:  # pragma: no cover
+    _otel_trace = None  # type: ignore[assignment]
+    _tracer = None  # type: ignore[assignment]
+
 
 # Field weights for scoring (must sum to 1.0)
 FIELD_WEIGHTS = {
@@ -240,13 +249,38 @@ class MatchAnalyzer:
             >>> assert breakdown.content_score == 1.0  # identical content hash
             >>> assert breakdown.semantic_score is None
         """
-        return ScoreBreakdown(
-            keyword_score=self._compute_keyword_score(artifact_a, artifact_b),
-            content_score=self._compute_content_score(artifact_a, artifact_b),
-            structure_score=self._compute_structure_score(artifact_a, artifact_b),
-            metadata_score=self._compute_metadata_score(artifact_a, artifact_b),
-            semantic_score=None,
+        from skillmeat.observability.tracing import trace_operation
+
+        artifact_a_id = artifact_a.artifact_name
+        artifact_b_id = artifact_b.artifact_name
+
+        # OTel span (no-op when opentelemetry is not installed).
+        otel_span = (
+            _tracer.start_span("match_analyzer.compare")
+            if _tracer is not None
+            else None
         )
+        if otel_span is not None:
+            otel_span.set_attribute("artifact_a_id", artifact_a_id)
+            otel_span.set_attribute("artifact_b_id", artifact_b_id)
+
+        with trace_operation(
+            "match_analyzer.compare",
+            artifact_a_id=artifact_a_id,
+            artifact_b_id=artifact_b_id,
+        ):
+            result = ScoreBreakdown(
+                keyword_score=self._compute_keyword_score(artifact_a, artifact_b),
+                content_score=self._compute_content_score(artifact_a, artifact_b),
+                structure_score=self._compute_structure_score(artifact_a, artifact_b),
+                metadata_score=self._compute_metadata_score(artifact_a, artifact_b),
+                semantic_score=None,
+            )
+
+        if otel_span is not None:
+            otel_span.end()
+
+        return result
 
     # ------------------------------------------------------------------
     # Private helpers for compare()

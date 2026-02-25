@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -47,6 +48,15 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+# Optional OpenTelemetry integration — works whether or not otel is installed.
+try:
+    from opentelemetry import trace as _otel_trace
+
+    _tracer = _otel_trace.get_tracer(__name__)
+except ImportError:  # pragma: no cover
+    _otel_trace = None  # type: ignore[assignment]
+    _tracer = None  # type: ignore[assignment]
 
 
 class MatchType(str, Enum):
@@ -219,19 +229,67 @@ class SimilarityService:
             descending.  Returns an empty list when the target artifact is not
             found or no candidates meet ``min_score``.
         """
-        session = self._get_session()
-        try:
-            return self._find_similar_impl(
-                session=session,
-                artifact_id=artifact_id,
-                limit=limit,
-                min_score=min_score,
-                source=source,
+        from skillmeat.observability.tracing import trace_operation
+
+        t_start = time.perf_counter()
+
+        # OTel span (no-op when opentelemetry is not installed).
+        otel_span = (
+            _tracer.start_span("similarity_service.find_similar")
+            if _tracer is not None
+            else None
+        )
+        if otel_span is not None:
+            otel_span.set_attribute("artifact_id", artifact_id)
+            otel_span.set_attribute("limit", limit)
+            otel_span.set_attribute("min_score", min_score)
+            otel_span.set_attribute("source", source)
+
+        with trace_operation(
+            "similarity_service.find_similar",
+            artifact_id=artifact_id,
+            limit=limit,
+            min_score=min_score,
+            source=source,
+        ) as span:
+            session = self._get_session()
+            try:
+                results = self._find_similar_impl(
+                    session=session,
+                    artifact_id=artifact_id,
+                    limit=limit,
+                    min_score=min_score,
+                    source=source,
+                )
+            finally:
+                if self._session is None:
+                    # We opened the session ourselves — close it.
+                    session.close()
+
+            latency_ms = round((time.perf_counter() - t_start) * 1000, 2)
+            result_count = len(results)
+
+            span.set_attribute("result_count", result_count)
+            span.set_attribute("latency_ms", latency_ms)
+
+            if otel_span is not None:
+                otel_span.set_attribute("result_count", result_count)
+                otel_span.set_attribute("latency_ms", latency_ms)
+                otel_span.end()
+
+            logger.info(
+                "SimilarityService.find_similar completed",
+                extra={
+                    "artifact_id": artifact_id,
+                    "result_count": result_count,
+                    "latency_ms": latency_ms,
+                    "source": source,
+                    "limit": limit,
+                    "min_score": min_score,
+                },
             )
-        finally:
-            if self._session is None:
-                # We opened the session ourselves — close it.
-                session.close()
+
+            return results
 
     # ------------------------------------------------------------------
     # Private implementation helpers
@@ -454,6 +512,8 @@ class SimilarityService:
         Returns:
             Semantic similarity score in [0, 1], or ``None``.
         """
+        from skillmeat.observability.tracing import trace_operation
+
         if self._semantic is None:
             return None
 
@@ -493,24 +553,60 @@ class SimilarityService:
                 loop.close()
 
         timeout_s = self.SEMANTIC_TIMEOUT_MS / 1000.0
-        try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(_run_async)
-                raw_score = future.result(timeout=timeout_s)
-        except concurrent.futures.TimeoutError:
-            logger.warning(
-                "SimilarityService: SemanticScorer timed out after %d ms; "
-                "falling back to keyword-only scoring.",
-                self.SEMANTIC_TIMEOUT_MS,
-            )
-            return None
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "SimilarityService: SemanticScorer raised %s; "
-                "falling back to keyword-only scoring.",
-                exc,
-            )
-            return None
+
+        # OTel span (no-op when opentelemetry is not installed).
+        otel_span = (
+            _tracer.start_span("similarity_service.score_semantic_with_timeout")
+            if _tracer is not None
+            else None
+        )
+
+        with trace_operation("similarity_service.score_semantic_with_timeout") as span:
+            timed_out = False
+            scorer_used = "semantic"
+
+            try:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(_run_async)
+                    raw_score = future.result(timeout=timeout_s)
+            except concurrent.futures.TimeoutError:
+                timed_out = True
+                scorer_used = "keyword_only"
+                span.set_attribute("scorer_used", scorer_used)
+                span.set_attribute("timed_out", True)
+                if otel_span is not None:
+                    otel_span.set_attribute("scorer_used", scorer_used)
+                    otel_span.set_attribute("timed_out", True)
+                    otel_span.end()
+                logger.warning(
+                    "SimilarityService: SemanticScorer timed out after %d ms; "
+                    "falling back to keyword-only scoring.",
+                    self.SEMANTIC_TIMEOUT_MS,
+                    extra={"scorer_used": scorer_used, "timed_out": True},
+                )
+                return None
+            except Exception as exc:  # noqa: BLE001
+                scorer_used = "keyword_only"
+                span.set_attribute("scorer_used", scorer_used)
+                span.set_attribute("timed_out", False)
+                if otel_span is not None:
+                    otel_span.set_attribute("scorer_used", scorer_used)
+                    otel_span.set_attribute("timed_out", False)
+                    otel_span.end()
+                logger.warning(
+                    "SimilarityService: SemanticScorer raised %s; "
+                    "falling back to keyword-only scoring.",
+                    exc,
+                    extra={"scorer_used": scorer_used, "timed_out": False},
+                )
+                return None
+
+            span.set_attribute("scorer_used", scorer_used)
+            span.set_attribute("timed_out", timed_out)
+            if otel_span is not None:
+                otel_span.set_attribute("scorer_used", scorer_used)
+                otel_span.set_attribute("timed_out", timed_out)
+                otel_span.end()
 
         # SemanticScorer returns scores in [0, 100]; normalise to [0, 1].
         if raw_score is None:

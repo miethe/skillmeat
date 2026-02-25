@@ -67,6 +67,9 @@ from skillmeat.api.schemas.artifacts import (
     MergeDeployDetails,
     MergeFileAction,
     ProjectDeploymentInfo,
+    SimilarArtifactDTO,
+    SimilarArtifactsResponse,
+    SimilarityBreakdownDTO,
     VersionGraphNodeResponse,
     VersionGraphResponse,
 )
@@ -8765,4 +8768,154 @@ async def get_artifact_associations(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get associations: {str(e)}",
+        )
+
+
+@router.get(
+    "/{artifact_id}/similar",
+    response_model=SimilarArtifactsResponse,
+    summary="Find similar artifacts",
+    description=(
+        "Returns artifacts similar to the specified artifact, ranked by composite "
+        "similarity score. The artifact_id must be in 'type:name' format "
+        "(e.g. 'skill:canvas-design')."
+    ),
+    responses={
+        200: {"description": "Successfully retrieved similar artifacts"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_similar_artifacts(
+    artifact_id: str,
+    db_session: DbSessionDep,
+    token: TokenDep,
+    limit: int = Query(
+        default=10,
+        ge=1,
+        le=50,
+        description="Maximum number of similar artifacts to return",
+    ),
+    min_score: float = Query(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Minimum composite similarity score threshold (0.0–1.0)",
+    ),
+    source: str = Query(
+        default="collection",
+        pattern="^(collection|marketplace|all)$",
+        description="Search scope: 'collection', 'marketplace', or 'all'",
+    ),
+) -> SimilarArtifactsResponse:
+    """Find artifacts similar to the given artifact.
+
+    Resolves the artifact_id (type:name) to its internal UUID, then delegates
+    to SimilarityService which scores candidates using keyword, content,
+    structure, metadata, and (optionally) semantic scorers.
+
+    Args:
+        artifact_id: Artifact identifier in 'type:name' format.
+        db_session:  Injected SQLAlchemy session.
+        token:       Authentication token (dependency injection).
+        limit:       Maximum results to return (1–50, default 10).
+        min_score:   Minimum composite score threshold (0.0–1.0, default 0.3).
+        source:      Where to search — 'collection', 'marketplace', or 'all'.
+
+    Returns:
+        SimilarArtifactsResponse with items ordered by composite score descending.
+
+    Raises:
+        HTTPException 404: If the artifact does not exist in the DB cache.
+        HTTPException 500: On unexpected errors.
+
+    Example:
+        GET /api/v1/artifacts/skill:canvas-design/similar?limit=5&min_score=0.5&source=collection
+    """
+    try:
+        logger.info(
+            "Finding similar artifacts for '%s' (limit=%d, min_score=%.2f, source=%s)",
+            artifact_id,
+            limit,
+            min_score,
+            source,
+        )
+
+        # 1. Resolve type:name → UUID.  Artifact.id stores the 'type:name' string;
+        #    SimilarityService expects the hex UUID (Artifact.uuid).
+        artifact_row: Optional[Artifact] = (
+            db_session.query(Artifact).filter(Artifact.id == artifact_id).first()
+        )
+        if artifact_row is None:
+            logger.info("Artifact not found in DB cache: '%s'", artifact_id)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        artifact_uuid: str = str(artifact_row.uuid)
+
+        # 2. Run similarity search.
+        from skillmeat.core.similarity import SimilarityService
+
+        service = SimilarityService(session=db_session)
+        results = service.find_similar(
+            artifact_id=artifact_uuid,
+            limit=limit,
+            min_score=min_score,
+            source=source,
+        )
+
+        # 3. Convert SimilarityResult objects to SimilarArtifactDTO.
+        items: List[SimilarArtifactDTO] = []
+        for result in results:
+            row = result.artifact  # Artifact or MarketplaceCatalogEntry ORM row
+            name: str = getattr(row, "name", "") or ""
+            artifact_type: str = getattr(row, "type", "") or getattr(
+                row, "artifact_type", ""
+            ) or ""
+            artifact_source: Optional[str] = getattr(row, "source", None)
+
+            breakdown = SimilarityBreakdownDTO(
+                content_score=result.breakdown.content_score,
+                structure_score=result.breakdown.structure_score,
+                metadata_score=result.breakdown.metadata_score,
+                keyword_score=result.breakdown.keyword_score,
+                semantic_score=result.breakdown.semantic_score,
+            )
+
+            items.append(
+                SimilarArtifactDTO(
+                    artifact_id=result.artifact_id,
+                    name=name,
+                    artifact_type=artifact_type,
+                    source=artifact_source,
+                    composite_score=result.composite_score,
+                    match_type=result.match_type.value,
+                    breakdown=breakdown,
+                )
+            )
+
+        logger.info(
+            "Similar artifacts for '%s': found %d result(s)", artifact_id, len(items)
+        )
+
+        return SimilarArtifactsResponse(
+            artifact_id=artifact_id,
+            items=items,
+            total=len(items),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed to find similar artifacts for '%s': %s",
+            artifact_id,
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to find similar artifacts: {str(e)}",
         )
