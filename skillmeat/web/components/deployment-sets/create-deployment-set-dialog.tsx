@@ -40,8 +40,8 @@ export function CreateDeploymentSetDialog({ open, onOpenChange }: CreateDeployme
   const [icon, setIcon] = useState('');
   const [tags, setTags] = useState<string[]>([]);
 
-  // Pre-fetch all tags for the autocomplete popover (client-side filtering)
-  const { data: tagsData } = useTags(200);
+  // Pre-fetch tags for the autocomplete popover (API max limit is 100)
+  const { data: tagsData } = useTags(100);
   const availableTags = tagsData?.items.map((t) => t.name) ?? [];
 
   // Reset form when dialog opens/closes

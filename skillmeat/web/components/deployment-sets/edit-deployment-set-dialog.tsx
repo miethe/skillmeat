@@ -41,8 +41,8 @@ export function EditDeploymentSetDialog({ open, onOpenChange, set }: EditDeploym
   const [icon, setIcon] = useState('');
   const [tags, setTags] = useState<string[]>([]);
 
-  // Pre-fetch all tags for the autocomplete popover (client-side filtering)
-  const { data: tagsData } = useTags(200);
+  // Pre-fetch tags for the autocomplete popover (API max limit is 100)
+  const { data: tagsData } = useTags(100);
   const availableTags = tagsData?.items.map((t) => t.name) ?? [];
 
   // Sync form fields whenever the dialog opens or the set changes
