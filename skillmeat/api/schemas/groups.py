@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field, field_validator
 
 
 GROUP_COLOR_OPTIONS = {"slate", "blue", "green", "amber", "rose"}
-GROUP_ICON_OPTIONS = {"layers", "folder", "tag", "sparkles", "book", "wrench"}
 GROUP_TAG_PATTERN = re.compile(r"^[a-z0-9_-]{1,32}$")
 GROUP_HEX_COLOR_PATTERN = re.compile(r"^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$")
 GROUP_MAX_TAGS = 20
@@ -142,10 +141,15 @@ class GroupCreateRequest(BaseModel):
     @field_validator("icon", mode="before")
     @classmethod
     def validate_icon(cls, value: object) -> str:
-        """Validate icon token."""
-        return _normalize_and_validate_choice(
-            value, options=GROUP_ICON_OPTIONS, field_name="icon"
-        )
+        """Validate icon token is a non-empty string within the DB column limit."""
+        if not isinstance(value, str):
+            raise ValueError("icon must be a string")
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("icon must not be empty")
+        if len(stripped) > 32:
+            raise ValueError("icon must be 32 characters or fewer")
+        return stripped
 
 
 class GroupUpdateRequest(BaseModel):
@@ -207,12 +211,17 @@ class GroupUpdateRequest(BaseModel):
     @field_validator("icon", mode="before")
     @classmethod
     def validate_icon(cls, value: object) -> Optional[str]:
-        """Validate icon token when supplied."""
+        """Validate icon token is a non-empty string within the DB column limit."""
         if value is None:
             return None
-        return _normalize_and_validate_choice(
-            value, options=GROUP_ICON_OPTIONS, field_name="icon"
-        )
+        if not isinstance(value, str):
+            raise ValueError("icon must be a string")
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("icon must not be empty")
+        if len(stripped) > 32:
+            raise ValueError("icon must be 32 characters or fewer")
+        return stripped
 
 
 class GroupPositionUpdate(BaseModel):
