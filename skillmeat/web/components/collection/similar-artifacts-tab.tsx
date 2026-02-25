@@ -20,7 +20,7 @@
  * @example
  * ```tsx
  * <SimilarArtifactsTab
- *   artifactId={artifact.uuid}
+ *   artifactId={artifact.id}
  *   onArtifactClick={(id) => openArtifact(id)}
  * />
  * ```
@@ -280,7 +280,14 @@ function SimilarArtifactsEmpty() {
           No similar artifacts found
         </p>
         <p className="text-xs text-muted-foreground/70">
-          Try adjusting the similarity threshold in Settings.
+          Try adjusting the similarity threshold in{' '}
+          <a
+            href="/settings?tab=appearance"
+            className="underline hover:text-foreground transition-colors"
+          >
+            Settings
+          </a>
+          .
         </p>
       </div>
     </div>
@@ -349,8 +356,8 @@ function SimilarArtifactsTabContent({
 
 export interface SimilarArtifactsTabProps {
   /**
-   * UUID of the artifact to find similar items for.
-   * Pass `artifact.uuid` (not `artifact.id`) to match API expectations.
+   * Composite ID of the artifact to find similar items for.
+   * Pass `artifact.id` (type:name format like "skill:canvas-design"), not `artifact.uuid`.
    */
   artifactId: string;
   /**

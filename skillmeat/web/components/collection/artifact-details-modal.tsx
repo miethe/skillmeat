@@ -1637,7 +1637,7 @@ export function ArtifactDetailsModal({
             {/* Similar Tab */}
             <TabContentWrapper value="similar">
               <SimilarArtifactsTab
-                artifactId={artifact.uuid}
+                artifactId={artifact.id}
                 onArtifactClick={onNavigateToArtifact}
               />
             </TabContentWrapper>
