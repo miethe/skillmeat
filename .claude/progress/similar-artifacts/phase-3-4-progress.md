@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 11
-completed_tasks: 2
+completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -36,7 +36,7 @@ tasks:
   priority: high
 - id: SA-P3-002
   description: Add Similar tab to marketplace detail panel
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -62,7 +62,7 @@ tasks:
   priority: high
 - id: SA-P4-002
   description: useSimilaritySettings hook
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -193,7 +193,7 @@ files_modified:
 - skillmeat/web/__tests__/marketplace/similarity-badge.test.tsx
 - skillmeat/web/__tests__/e2e/marketplace-similar-tab.e2e.ts
 - skillmeat/web/__tests__/e2e/marketplace-badge.e2e.ts
-progress: 18
+progress: 36
 updated: '2026-02-25'
 ---
 

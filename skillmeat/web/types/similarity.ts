@@ -103,3 +103,61 @@ export interface SimilarArtifactsOptions {
   /** Whether the query is enabled (default: true) */
   enabled?: boolean;
 }
+
+// ============================================================================
+// Similarity Settings Types
+// ============================================================================
+
+/**
+ * Score thresholds that classify a similarity result into a band.
+ *
+ * The score bands are applied in descending order:
+ *   score >= high    → "high" match (strong duplicate / near-identical)
+ *   score >= partial → "partial" match (meaningful overlap)
+ *   score >= low     → "low" match (some shared concepts)
+ *   score >= floor   → surfaced at all (below this, results are suppressed)
+ *
+ * All values are in the range [0.0, 1.0].
+ *
+ * Mirrors SimilarityThresholdsDTO from the backend.
+ * See: GET /api/v1/settings/similarity
+ */
+export interface SimilarityThresholds {
+  /** Minimum score for a "high" match band (default: 0.80) */
+  high: number;
+  /** Minimum score for a "partial" match band (default: 0.55) */
+  partial: number;
+  /** Minimum score for a "low" match band (default: 0.35) */
+  low: number;
+  /** Absolute minimum score — results below this are excluded (default: 0.20) */
+  floor: number;
+}
+
+/**
+ * CSS color strings assigned to each similarity score band.
+ *
+ * Used to render score badges and highlight rows in the Similar Artifacts tab.
+ * Values must be valid CSS color strings (hex, rgb, hsl, named colors, etc.).
+ *
+ * Mirrors SimilarityColorsDTO from the backend.
+ * See: GET /api/v1/settings/similarity
+ */
+export interface SimilarityColors {
+  /** Color for the "high" score band (default: "#22c55e" — green-500) */
+  high: string;
+  /** Color for the "partial" score band (default: "#eab308" — yellow-500) */
+  partial: string;
+  /** Color for the "low" score band (default: "#f97316" — orange-500) */
+  low: string;
+}
+
+/**
+ * Combined similarity settings response from GET /api/v1/settings/similarity.
+ *
+ * Bundles thresholds and colors into a single payload so consumers
+ * can read both in a single query.
+ */
+export interface SimilaritySettings {
+  thresholds: SimilarityThresholds;
+  colors: SimilarityColors;
+}
