@@ -522,7 +522,7 @@ export { useAnalyticsStream } from './useAnalyticsStream';
 export { useArtifactHistory, getArtifactHistoryId, artifactHistoryKeys } from './useArtifactHistory';
 
 // ============================================================================
-// SIMILARITY (4 hooks)
+// SIMILARITY (7 hooks)
 // ============================================================================
 // Similar artifact detection by content, structure, metadata, and semantics
 export {
@@ -531,13 +531,20 @@ export {
   useDebouncedSimilarArtifacts,
 } from './use-similar-artifacts';
 
-// Similarity score thresholds and score-band color settings
+// Similarity score thresholds, score-band color settings, and consolidation clusters
 export {
   similaritySettingsKeys,
   useSimilaritySettings,
+  consolidationKeys,
+  useConsolidationClusters,
+  useIgnorePair,
+  useUnignorePair,
   type SimilarityThresholds,
   type SimilarityColors,
   type SimilaritySettings,
+  type ConsolidationCluster,
+  type ConsolidationClustersResponse,
+  type ConsolidationClustersOptions,
 } from './similarity';
 
 // ============================================================================

@@ -17,7 +17,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 18
-completed_tasks: 6
+completed_tasks: 9
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -65,7 +65,7 @@ tasks:
   priority: high
 - id: SA-P5-005
   description: useConsolidationClusters hook
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -139,7 +139,7 @@ tasks:
   priority: high
 - id: SA-P5-013
   description: Integration tests — consolidation API
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -166,7 +166,7 @@ tasks:
   priority: high
 - id: SA-P6-003
   description: skillmeat consolidate — non-interactive mode
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -293,7 +293,7 @@ files_modified:
 - skillmeat/cli.py
 - tests/test_consolidation_api.py
 - tests/test_cli_similar.py
-progress: 33
+progress: 50
 updated: '2026-02-25'
 ---
 

@@ -11340,7 +11340,21 @@ def similar(artifact: str, limit: int, min_score: float, source: str):
     default=20,
     help="Maximum number of clusters to review (default: 20)",
 )
-def consolidate(min_score: float, limit: int):
+@click.option(
+    "--non-interactive",
+    "-n",
+    is_flag=True,
+    default=False,
+    help="Output cluster data to stdout and exit without prompting.",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Choice(["json", "text"]),
+    default="json",
+    help="Output format for non-interactive mode: json (default) or text.",
+)
+def consolidate(min_score: float, limit: int, non_interactive: bool, output: str):
     """Interactively consolidate duplicate or similar artifacts.
 
     Fetches consolidation clusters (groups of similar artifacts) and
@@ -11355,34 +11369,77 @@ def consolidate(min_score: float, limit: int):
       skillmeat consolidate
       skillmeat consolidate --min-score 0.7
       skillmeat consolidate --limit 5
+      skillmeat consolidate --non-interactive
+      skillmeat consolidate -n --output text
     """
     is_tty = sys.stdin.isatty()
     out = Console(force_terminal=sys.stdout.isatty(), legacy_windows=False)
 
     # ------------------------------------------------------------------
-    # Non-interactive (piped) mode: just list clusters and exit.
+    # Non-interactive mode: explicit flag or auto-detected non-TTY stdin.
     # ------------------------------------------------------------------
-    if not is_tty:
+    if non_interactive or not is_tty:
+        if not non_interactive and not is_tty:
+            # Auto-detected non-TTY: warn on stderr before outputting data.
+            sys.stderr.write(
+                "Warning: non-interactive mode auto-enabled (stdin is not a TTY)\n"
+            )
         try:
             from skillmeat.core.similarity import SimilarityService
 
             svc = SimilarityService()
             page = svc.get_consolidation_clusters(min_score=min_score, limit=limit)
             clusters = page.get("clusters", [])
-            if not clusters:
-                out.print(
-                    f"[dim]No consolidation clusters found "
-                    f"(min-score: {min_score}).[/dim]"
-                )
-                return
-            for i, cluster in enumerate(clusters, start=1):
-                artifacts = ", ".join(cluster.get("artifacts", []))
-                max_score = cluster.get("max_score", 0.0)
-                out.print(
-                    f"Cluster {i}: score={max_score:.2f}  artifacts=[{artifacts}]"
-                )
+
+            if output == "json":
+                import json as _json
+
+                cluster_data = []
+                for cluster in clusters:
+                    artifact_ids = cluster.get("artifacts", [])
+                    cluster_data.append(
+                        {
+                            "artifact_ids": artifact_ids,
+                            "names": cluster.get("names", []),
+                            "scores": cluster.get("scores", []),
+                            "max_score": cluster.get("max_score", 0.0),
+                            "artifact_type": cluster.get("artifact_type", ""),
+                            "pair_count": cluster.get("pair_count", 0),
+                        }
+                    )
+                result = {
+                    "clusters": cluster_data,
+                    "total_count": len(cluster_data),
+                }
+                sys.stdout.write(_json.dumps(result) + "\n")
+            else:
+                # Text mode: human-readable summary.
+                if not clusters:
+                    sys.stdout.write(
+                        f"No consolidation clusters found (min-score: {min_score})\n"
+                    )
+                else:
+                    sys.stdout.write(
+                        f"Consolidation clusters: {len(clusters)} found\n\n"
+                    )
+                    for i, cluster in enumerate(clusters, start=1):
+                        artifact_ids = cluster.get("artifacts", [])
+                        max_score = cluster.get("max_score", 0.0)
+                        artifact_type = cluster.get("artifact_type", "mixed") or "mixed"
+                        pair_count = cluster.get("pair_count", 0)
+                        names = cluster.get("names", [])
+                        sys.stdout.write(
+                            f"Cluster {i}: score={max_score:.2f}  "
+                            f"type={artifact_type}  pairs={pair_count}\n"
+                        )
+                        for j, aid in enumerate(artifact_ids):
+                            name = names[j] if j < len(names) else ""
+                            label = "PRIMARY" if j == 0 else f"    [{j + 1}]"
+                            name_part = f"  ({name})" if name else ""
+                            sys.stdout.write(f"  {label}  {aid}{name_part}\n")
+                        sys.stdout.write("\n")
         except Exception as e:
-            out.print(f"[red]Error:[/red] {e}", err=True)
+            sys.stderr.write(f"Error: {e}\n")
             logger.exception("Failed to list consolidation clusters")
             sys.exit(1)
         return

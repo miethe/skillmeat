@@ -161,3 +161,82 @@ export interface SimilaritySettings {
   thresholds: SimilarityThresholds;
   colors: SimilarityColors;
 }
+
+// ============================================================================
+// Consolidation Cluster Types
+// ============================================================================
+
+/**
+ * A single artifact member within a consolidation cluster.
+ *
+ * Mirrors ConsolidationClusterMemberDTO from the backend.
+ */
+export interface ConsolidationClusterMember {
+  /** Unique identifier of the artifact */
+  artifact_id: string;
+  /** Display name of the artifact */
+  name: string;
+  /** Type of the artifact (skill, command, agent, mcp, hook) */
+  artifact_type: string;
+  /** Source repository or path; null for locally-created artifacts */
+  source: string | null;
+}
+
+/**
+ * A pair of artifacts within a consolidation cluster and their pairwise score.
+ *
+ * Mirrors ConsolidationPairDTO from the backend.
+ */
+export interface ConsolidationPair {
+  /** Opaque pair identifier used for ignore/unignore mutations */
+  pair_id: string;
+  /** Identifier of the first artifact in the pair */
+  artifact_id_a: string;
+  /** Identifier of the second artifact in the pair */
+  artifact_id_b: string;
+  /** Pairwise composite similarity score in the range [0.0, 1.0] */
+  score: number;
+  /** Whether the user has chosen to ignore this pair */
+  ignored: boolean;
+}
+
+/**
+ * A cluster of similar artifacts that may be candidates for consolidation.
+ *
+ * Mirrors ConsolidationClusterDTO from the backend.
+ * All non-ignored pairs within the cluster exceed the configured min_score.
+ */
+export interface ConsolidationCluster {
+  /** Opaque cluster identifier */
+  cluster_id: string;
+  /** Artifacts that belong to this cluster */
+  members: ConsolidationClusterMember[];
+  /** All pairwise relationships within the cluster (including ignored pairs) */
+  pairs: ConsolidationPair[];
+  /** Average pairwise score across all non-ignored pairs */
+  avg_score: number;
+  /** Highest pairwise score within the cluster */
+  max_score: number;
+}
+
+/**
+ * Paginated response envelope for GET /api/v1/artifacts/consolidation/clusters.
+ *
+ * Uses opaque cursor-based pagination for stable results across pages.
+ */
+export interface ConsolidationClustersResponse {
+  /** Clusters for this page, ordered by max_score descending */
+  items: ConsolidationCluster[];
+  /** Total number of clusters across all pages */
+  total: number;
+  /** Cursor to pass as `cursor` param to fetch the next page; null on the last page */
+  next_cursor: string | null;
+}
+
+/**
+ * Options for the useConsolidationClusters hook.
+ */
+export interface ConsolidationClustersOptions {
+  /** Minimum pairwise score a pair must exceed to be included (0.0–1.0) */
+  minScore?: number;
+}

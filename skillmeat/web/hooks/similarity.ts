@@ -1,13 +1,18 @@
 /**
- * React Query hooks for similarity settings (thresholds and score-band colors).
+ * React Query hooks for similarity settings and consolidation clusters.
  *
- * Reads and mutates the settings that control how similarity scores are
- * classified and displayed across the Similar Artifacts tab.
+ * Sections:
+ *   1. useSimilaritySettings — reads/mutates threshold + color settings
+ *   2. useConsolidationClusters — infinite-scroll list of similarity clusters
+ *   3. useIgnorePair / useUnignorePair — ignore/unignore a specific pair
  *
  * Endpoints:
  *   GET  /api/v1/settings/similarity              → current thresholds + colors
  *   PUT  /api/v1/settings/similarity/thresholds   → partial threshold update
  *   PUT  /api/v1/settings/similarity/colors       → partial color update
+ *   GET  /api/v1/artifacts/consolidation/clusters → paginated cluster list
+ *   POST /api/v1/artifacts/consolidation/pairs/{pairId}/ignore
+ *   DELETE /api/v1/artifacts/consolidation/pairs/{pairId}/ignore
  *
  * @example
  * ```tsx
@@ -20,16 +25,26 @@
  * ```
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
 import type {
   SimilaritySettings,
   SimilarityThresholds,
   SimilarityColors,
+  ConsolidationCluster,
+  ConsolidationClustersResponse,
+  ConsolidationClustersOptions,
 } from '@/types/similarity';
 
 // Re-export types so consumers can import from the hook module directly
-export type { SimilarityThresholds, SimilarityColors, SimilaritySettings };
+export type {
+  SimilarityThresholds,
+  SimilarityColors,
+  SimilaritySettings,
+  ConsolidationCluster,
+  ConsolidationClustersResponse,
+  ConsolidationClustersOptions,
+};
 
 // ============================================================================
 // Defaults
@@ -57,7 +72,7 @@ const DEFAULT_COLORS: SimilarityColors = {
 };
 
 // ============================================================================
-// Query Key Factory
+// Query Key Factories
 // ============================================================================
 
 /**
@@ -75,8 +90,20 @@ export const similaritySettingsKeys = {
   colors: () => [...similaritySettingsKeys.all, 'colors'] as const,
 };
 
+/**
+ * Query key factory for consolidation cluster queries.
+ *
+ * Scoped under `['artifacts', 'consolidation']` so broad artifact invalidations
+ * naturally sweep cluster data too.
+ */
+export const consolidationKeys = {
+  all: ['artifacts', 'consolidation'] as const,
+  clusters: (minScore?: number) =>
+    [...consolidationKeys.all, 'clusters', { minScore }] as const,
+};
+
 // ============================================================================
-// API Functions
+// API Functions — Settings
 // ============================================================================
 
 /**
@@ -123,7 +150,58 @@ async function patchSimilarityColors(
 }
 
 // ============================================================================
-// Hook
+// API Functions — Consolidation
+// ============================================================================
+
+/**
+ * Fetch a single page of consolidation clusters.
+ *
+ * @param minScore - Minimum pairwise score a pair must exceed
+ * @param limit    - Page size (default 20)
+ * @param cursor   - Opaque continuation cursor from a previous response
+ */
+async function fetchConsolidationClusters(
+  minScore: number | undefined,
+  limit: number,
+  cursor: string | undefined
+): Promise<ConsolidationClustersResponse> {
+  const params = new URLSearchParams();
+  if (minScore !== undefined) params.set('min_score', String(minScore));
+  params.set('limit', String(limit));
+  if (cursor) params.set('cursor', cursor);
+
+  const qs = params.toString();
+  return apiRequest<ConsolidationClustersResponse>(
+    `/artifacts/consolidation/clusters${qs ? `?${qs}` : ''}`
+  );
+}
+
+/**
+ * Mark an artifact pair as ignored.
+ *
+ * The backend records this preference and will exclude the pair from future
+ * cluster results unless the caller explicitly requests ignored pairs.
+ */
+async function postIgnorePair(pairId: string): Promise<void> {
+  return apiRequest<void>(`/artifacts/consolidation/pairs/${encodeURIComponent(pairId)}/ignore`, {
+    method: 'POST',
+  });
+}
+
+/**
+ * Remove an ignore record from an artifact pair.
+ *
+ * After this call the pair will re-appear in cluster results once the cache
+ * expires (or is invalidated).
+ */
+async function deleteIgnorePair(pairId: string): Promise<void> {
+  return apiRequest<void>(`/artifacts/consolidation/pairs/${encodeURIComponent(pairId)}/ignore`, {
+    method: 'DELETE',
+  });
+}
+
+// ============================================================================
+// Hook: useSimilaritySettings
 // ============================================================================
 
 /**
@@ -360,4 +438,263 @@ export function useSimilaritySettings() {
     /** Manually trigger a fresh fetch */
     refetch: query.refetch,
   };
+}
+
+// ============================================================================
+// Hook: useConsolidationClusters
+// ============================================================================
+
+/** Default page size for cluster pagination */
+const CLUSTERS_PAGE_SIZE = 20;
+
+/**
+ * Fetch consolidation clusters with cursor-based infinite scroll pagination.
+ *
+ * Clusters group similar artifacts that exceed the configured `minScore`
+ * threshold.  Each page returns up to 20 clusters; call `fetchNextPage()`
+ * when the user scrolls to the bottom of the list.
+ *
+ * Stale time: 30 seconds (interactive/monitoring tier — cluster data changes
+ * as pairs are ignored and new artifacts are added).
+ * Cache time: 5 minutes (keep entries warm while the panel is open).
+ *
+ * @param options.minScore - Minimum pairwise score to include (0.0–1.0)
+ *
+ * @example
+ * ```tsx
+ * function ConsolidationPanel() {
+ *   const {
+ *     clusters,
+ *     fetchNextPage,
+ *     hasNextPage,
+ *     isFetchingNextPage,
+ *     isLoading,
+ *   } = useConsolidationClusters({ minScore: 0.75 });
+ *
+ *   return (
+ *     <div>
+ *       {clusters.map(cluster => (
+ *         <ClusterCard key={cluster.cluster_id} cluster={cluster} />
+ *       ))}
+ *       {hasNextPage && (
+ *         <button onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+ *           {isFetchingNextPage ? 'Loading…' : 'Load more'}
+ *         </button>
+ *       )}
+ *     </div>
+ *   );
+ * }
+ * ```
+ */
+export function useConsolidationClusters(options?: ConsolidationClustersOptions) {
+  const { minScore } = options ?? {};
+
+  const query = useInfiniteQuery({
+    queryKey: consolidationKeys.clusters(minScore),
+    queryFn: async ({ pageParam }): Promise<ConsolidationClustersResponse> => {
+      return fetchConsolidationClusters(minScore, CLUSTERS_PAGE_SIZE, pageParam as string | undefined);
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage: ConsolidationClustersResponse) =>
+      lastPage.next_cursor ?? undefined,
+    staleTime: 30 * 1000,        // 30s — interactive/monitoring tier
+    gcTime: 5 * 60 * 1000,       // 5 minutes
+    retry: 1,
+  });
+
+  // Flatten all pages into a single cluster array for convenient consumption
+  const clusters: ConsolidationCluster[] =
+    query.data?.pages.flatMap((page) => page.items) ?? [];
+
+  // Total count from the first page (stable across page loads)
+  const total: number = query.data?.pages[0]?.total ?? 0;
+
+  return {
+    /** All clusters fetched so far (flattened across pages) */
+    clusters,
+    /** Total cluster count reported by the server */
+    total,
+    /** Raw pages data for consumers that need per-page access */
+    pages: query.data?.pages,
+    /** True while the initial page fetch is in flight */
+    isLoading: query.isLoading,
+    /** True during any background refetch (including subsequent pages) */
+    isFetching: query.isFetching,
+    /** True while an additional page is being fetched */
+    isFetchingNextPage: query.isFetchingNextPage,
+    /** True when another page is available to fetch */
+    hasNextPage: query.hasNextPage,
+    /** Fetch the next page of clusters */
+    fetchNextPage: query.fetchNextPage,
+    /** Query error, if any */
+    error: query.error,
+    /** Manually trigger a fresh fetch starting from the first page */
+    refetch: query.refetch,
+  };
+}
+
+// ============================================================================
+// Hook: useIgnorePair
+// ============================================================================
+
+/**
+ * Mutation to mark an artifact pair as ignored.
+ *
+ * Applies an optimistic update immediately: the targeted pair's `ignored`
+ * flag is set to `true` in the cache before the network request completes.
+ * On error the optimistic change is rolled back.
+ *
+ * Invalidates the full consolidation clusters query on settled so stale
+ * cluster memberships are re-fetched.
+ *
+ * @example
+ * ```tsx
+ * const { mutate: ignorePair, isPending } = useIgnorePair();
+ *
+ * <button
+ *   disabled={isPending}
+ *   onClick={() => ignorePair({ pairId: pair.pair_id, minScore })}
+ * >
+ *   Ignore
+ * </button>
+ * ```
+ */
+export function useIgnorePair() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, { pairId: string; minScore?: number }>({
+    mutationFn: ({ pairId }) => postIgnorePair(pairId),
+
+    onMutate: async ({ pairId, minScore }) => {
+      // Cancel in-flight cluster fetches to avoid overwriting the optimistic state
+      await queryClient.cancelQueries({
+        queryKey: consolidationKeys.clusters(minScore),
+      });
+
+      // Snapshot for rollback
+      const previousData = queryClient.getQueryData(
+        consolidationKeys.clusters(minScore)
+      );
+
+      // Optimistically flip the pair's ignored flag to true
+      queryClient.setQueryData(
+        consolidationKeys.clusters(minScore),
+        (old: { pages: ConsolidationClustersResponse[]; pageParams: unknown[] } | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((cluster) => ({
+                ...cluster,
+                pairs: cluster.pairs.map((pair) =>
+                  pair.pair_id === pairId ? { ...pair, ignored: true } : pair
+                ),
+              })),
+            })),
+          };
+        }
+      );
+
+      return { previousData, minScore };
+    },
+
+    onError: (_err, _vars, context) => {
+      const ctx = context as { previousData?: unknown; minScore?: number } | undefined;
+      if (ctx?.previousData !== undefined) {
+        queryClient.setQueryData(
+          consolidationKeys.clusters(ctx.minScore),
+          ctx.previousData
+        );
+      }
+    },
+
+    onSettled: (_data, _err, vars) => {
+      queryClient.invalidateQueries({
+        queryKey: consolidationKeys.clusters(vars.minScore),
+      });
+    },
+  });
+}
+
+// ============================================================================
+// Hook: useUnignorePair
+// ============================================================================
+
+/**
+ * Mutation to remove an ignore record from an artifact pair.
+ *
+ * Applies an optimistic update immediately: the targeted pair's `ignored`
+ * flag is set to `false` in the cache before the network request completes.
+ * On error the optimistic change is rolled back.
+ *
+ * Invalidates the full consolidation clusters query on settled so the
+ * pair re-appears in cluster results.
+ *
+ * @example
+ * ```tsx
+ * const { mutate: unignorePair, isPending } = useUnignorePair();
+ *
+ * <button
+ *   disabled={isPending}
+ *   onClick={() => unignorePair({ pairId: pair.pair_id, minScore })}
+ * >
+ *   Restore
+ * </button>
+ * ```
+ */
+export function useUnignorePair() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, { pairId: string; minScore?: number }>({
+    mutationFn: ({ pairId }) => deleteIgnorePair(pairId),
+
+    onMutate: async ({ pairId, minScore }) => {
+      await queryClient.cancelQueries({
+        queryKey: consolidationKeys.clusters(minScore),
+      });
+
+      const previousData = queryClient.getQueryData(
+        consolidationKeys.clusters(minScore)
+      );
+
+      // Optimistically flip the pair's ignored flag to false
+      queryClient.setQueryData(
+        consolidationKeys.clusters(minScore),
+        (old: { pages: ConsolidationClustersResponse[]; pageParams: unknown[] } | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((cluster) => ({
+                ...cluster,
+                pairs: cluster.pairs.map((pair) =>
+                  pair.pair_id === pairId ? { ...pair, ignored: false } : pair
+                ),
+              })),
+            })),
+          };
+        }
+      );
+
+      return { previousData, minScore };
+    },
+
+    onError: (_err, _vars, context) => {
+      const ctx = context as { previousData?: unknown; minScore?: number } | undefined;
+      if (ctx?.previousData !== undefined) {
+        queryClient.setQueryData(
+          consolidationKeys.clusters(ctx.minScore),
+          ctx.previousData
+        );
+      }
+    },
+
+    onSettled: (_data, _err, vars) => {
+      queryClient.invalidateQueries({
+        queryKey: consolidationKeys.clusters(vars.minScore),
+      });
+    },
+  });
 }
