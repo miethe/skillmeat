@@ -128,3 +128,63 @@ uv run ~/.codex/skills/nano-banana-pro/scripts/generate_image.py --prompt "A ser
 ```bash
 uv run ~/.codex/skills/nano-banana-pro/scripts/generate_image.py --prompt "make the sky more dramatic with storm clouds" --filename "2025-11-23-14-25-30-dramatic-sky.png" --input-image "original-photo.jpg" --resolution 2K
 ```
+
+## Asset Pipeline Integration
+
+When generating images for a project, follow the asset pipeline configuration from `.claude/config/multi-model.toml`.
+
+**Output structure**:
+```
+assets/ai-gen/
+  {date}/
+    nbp/
+      {filename}.png              # Generated image
+      {filename}.prompt.txt       # Exact prompt used
+      {filename}.meta.json        # Provenance metadata
+```
+
+**Provenance metadata format** (`meta.json`):
+```json
+{
+  "model": "gemini-3-pro-image",
+  "product_name": "Nano Banana Pro",
+  "timestamp": "2026-02-25T14:30:00Z",
+  "prompt": "full prompt text",
+  "resolution": "2048x2048",
+  "seed": null,
+  "parameters": {},
+  "watermark_preserved": true,
+  "generation_attempt": 1
+}
+```
+
+**Rules**:
+- Always save prompt alongside output (`store_prompts = true` in config)
+- Preserve Google's image generation metadata/watermarking
+- Save seeds when available for reproducibility
+- Use date-based directory structure for organization
+- Create `assets/ai-gen/` directory if it doesn't exist
+
+## Batch Generation
+
+For generating multiple related images (icon sets, marketing variants):
+1. Generate sequentially (not parallel) to maintain rate limit compliance
+2. Use consistent prompt prefix for style coherence across batch
+3. Name files descriptively: `hero-dark.png`, `hero-light.png`, `icon-search.png`
+4. Generate at draft resolution (1K) first, iterate, then final resolution (2K or 4K)
+
+## Model Routing Context
+
+NBP is the default for `image_generation` in multi-model config. Routing:
+- High-fidelity images (marketing, hero art) → NBP at 4K
+- Contextual images (UI mockups with code understanding) → Gemini 3.1 Pro
+- Icon sets / simple graphics → NBP at 1K (draft) → 2K (final)
+- If NBP fails → fallback to Gemini 3.1 Pro inline generation
+
+**Important**: Gemini 3.1 Pro Image Generation and NBP use the same underlying model (Gemini 3 Pro Image). NBP is the direct image generation interface; Gemini adds reasoning/multimodal context. Choose based on whether you need code-context-aware generation (Gemini) or pure image quality (NBP).
+
+## Integration with Creative Workflows
+
+- Referenced from `model-selection-guide.md` for image routing decisions
+- Works alongside Gemini for UI mockup → implementation workflows
+- Output directory managed per `[asset_pipeline]` config in `multi-model.toml`

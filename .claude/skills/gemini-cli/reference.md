@@ -27,8 +27,8 @@ gemini  # First run prompts for auth
 | Flag | Short | Description |
 |------|-------|-------------|
 | `--yolo` | `-y` | Auto-approve all tool calls |
-| `--output-format` | `-o` | Output format: `text`, `json`, `stream-json` |
-| `--model` | `-m` | Model selection (e.g., `gemini-2.5-flash`) |
+| `--output-format` | `-o` | Output format: `text`, `json`, `stream-json`. Prefer `text` — avoids silent truncation in JSON envelope |
+| `--model` | `-m` | Model selection (e.g., `gemini-3-flash`) |
 
 ### Session Management
 
@@ -123,19 +123,21 @@ Real-time newline-delimited JSON events for monitoring long tasks.
 
 ### Available Models
 
-| Model | Use Case | Context |
-|-------|----------|---------|
-| `gemini-3-pro` | Complex tasks (default) | 1M tokens |
-| `gemini-2.5-flash` | Quick tasks, lower latency | Large |
-| `gemini-2.5-flash-lite` | Fastest, simplest tasks | Medium |
+| Model | Use Case | Context In | Context Out |
+|-------|----------|------------|-------------|
+| `gemini-3.1-pro` | Complex tasks, image gen, multimodal (default) | ~1M tokens | ~65K tokens |
+| `gemini-3-flash` | Quick tasks, cost-efficient multimodal | ~1M tokens | ~65K tokens |
+| `gemini-2.5-flash-lite` | Fastest, simplest tasks, lowest cost | Medium | Medium |
+
+**Output cap**: Both Pro and Flash hard-cap output at ~65K tokens. Requests expected to produce more than ~32K output tokens should be chunked. See patterns.md — "Output Chunking Discipline".
 
 ### Usage
 ```bash
-# Default (Pro)
+# Default (Pro — complex/multimodal tasks)
 gemini "complex analysis" -o text
 
-# Flash for speed
-gemini "simple task" -m gemini-2.5-flash -o text
+# Flash for speed or cost efficiency
+gemini "simple task" -m gemini-3-flash -o text
 ```
 
 ## Configuration Files
@@ -224,7 +226,7 @@ echo "continue" | gemini -r latest -o text
 - Typical wait: 1-5 seconds
 
 ### Mitigation
-1. Use `gemini-2.5-flash` for simple tasks
+1. Use `gemini-3-flash` for simple tasks
 2. Batch operations into single prompts
 3. Run long tasks in background
 
@@ -280,9 +282,10 @@ In interactive mode, prefix with `!`:
 | Issue | Solution |
 |-------|----------|
 | "API key not found" | Set `GEMINI_API_KEY` env var |
-| "Rate limit exceeded" | Wait for auto-retry or use Flash |
+| "Rate limit exceeded" | Wait for auto-retry or use `gemini-3-flash` |
 | "Context too large" | Use `.geminiignore` or be specific |
 | "Tool call failed" | Check JSON stats for details |
+| Output appears cut off | Expected — 65K output cap. Chunk the request or ask for section-by-section output |
 
 ### Debug Mode
 ```bash

@@ -1,8 +1,8 @@
 # Multi-Model SDLC Integration — Architecture Report
 
-**Status**: Draft — Pending Review
-**Date**: 2026-02-24
-**Scope**: Expand SkillMeat's development lifecycle to orchestrate multiple AI models (Claude, Codex/GPT-5.2, Gemini 3.1 Pro, Nano Banana Pro, Sora, local LLMs) with configurable opt-in controls, model/thinking-level selection, and cross-validation workflows.
+**Status**: Approved — Phase 1 Implemented
+**Date**: 2026-02-25
+**Scope**: Expand SkillMeat's development lifecycle to orchestrate multiple AI models (Claude, Codex/GPT-5.3, Gemini 3.1 Pro, Nano Banana Pro, Sora 2, local LLMs) with configurable opt-in controls, effort/thinking policy, and cross-validation workflows.
 
 ---
 
@@ -13,7 +13,9 @@ SkillMeat's SDLC currently treats Claude (Opus/Sonnet/Haiku) as the sole model f
 - Plugs external models into specific SDLC phases as **opt-in checkpoints**
 - Makes model selection **configurable** at the skill, agent, and workflow level
 - Adds **self-assessed thresholds** for when cross-validation is recommended
-- Supports **Claude Teams threads**, **local LLMs**, and **thinking-level tuning**
+- Supports **Claude Teams threads**, **local LLMs**, and **effort/thinking policy tuning**
+- Introduces a **disagreement protocol** where tests decide when models conflict
+- Treats thinking/reasoning effort as a **budgeted policy layer**, not a vibe
 - Maintains Claude Opus as the orchestrator while expanding the execution pool
 
 **Design Principle**: Every external model integration is opt-in by default. Some workflows (e.g., image generation for UI design) may require specific models, but the choice of *which* model fulfills the capability is configurable.
@@ -26,10 +28,10 @@ SkillMeat's SDLC currently treats Claude (Opus/Sonnet/Haiku) as the sole model f
 
 | Skill | Current State | Model Version | Key Gap |
 |-------|--------------|---------------|---------|
-| `codex` | Functional | GPT-5.2 (default) | Not integrated into SDLC checkpoints |
-| `gemini-cli` | Functional | Gemini 2.5 Pro | Needs update to 3.1 Pro; no image/SVG workflows |
-| `nano-banana-pro` | Functional | Gemini 3 Pro Image | Standalone; no asset pipeline integration |
-| `sora` | Functional | Sora v2/v2-pro | Standalone; no demo generation workflow |
+| `codex` | Functional | GPT-5.2 (default) | Needs update to GPT-5.3-Codex; not integrated into SDLC checkpoints |
+| `gemini-cli` | Functional | Gemini 2.5 Pro | Needs update to 3.1 Pro; no image/SVG workflows; context numbers wrong |
+| `nano-banana-pro` | Functional | Gemini 3 Pro Image | Standalone; no asset pipeline integration; no provenance tracking |
+| `sora` | Functional | "Sora v2/v2-pro" naming | Needs alignment to Sora 2 naming; standalone |
 
 ### 2.2 Agent Integration Gaps
 
@@ -37,7 +39,8 @@ The `agent-assignments.md` table maps tasks exclusively to Claude agents. No dec
 - When to escalate to an external model
 - How to route creative tasks (images, SVG, video) to the right provider
 - Cross-model validation workflows
-- Thinking-level optimization within Claude itself
+- Thinking/effort optimization within Claude itself
+- Disagreement resolution when models conflict
 
 ### 2.3 Configuration Gaps
 
@@ -45,7 +48,8 @@ No unified configuration exists for:
 - Enabling/disabling external model integrations
 - Setting cost thresholds or usage budgets
 - Model preference overrides (e.g., "use local LLM for X")
-- Thinking-level defaults per task type
+- Effort/thinking policy defaults per task type
+- Asset provenance tracking (prompts, seeds, outputs)
 
 ---
 
@@ -53,48 +57,73 @@ No unified configuration exists for:
 
 ### 3.1 Available Models
 
-| Provider | Model | Context | Strengths | Cost Tier | Access |
-|----------|-------|---------|-----------|-----------|--------|
-| **Anthropic** | Claude Opus 4.6 | 200K | Orchestration, deep reasoning, architecture | $$$ | Direct |
-| **Anthropic** | Claude Sonnet 4.6 | 200K | Implementation, review (79.6% SWE-bench) | $$ | Direct |
-| **Anthropic** | Claude Haiku 4.5 | 200K | Search, extraction, simple queries | $ | Direct |
-| **OpenAI** | GPT-5.2 (Codex) | 400K in/128K out | Independent coding (76.3% SWE-bench), sandbox | $$ | Codex CLI |
-| **OpenAI** | GPT-5.2-mini | 400K in/128K out | Cost-efficient coding (4x allowance) | $ | Codex CLI |
-| **OpenAI** | GPT-5.1-thinking | 400K in/128K out | Ultra-complex reasoning, adaptive depth | $$$ | Codex CLI |
-| **Google** | Gemini 3.1 Pro | 2M | Multimodal (code+images), Google Search, massive context | $$ | Gemini CLI |
-| **Google** | Gemini 3.1 Flash | 1M | Fast multimodal, cost-efficient | $ | Gemini CLI |
-| **Google** | Nano Banana Pro (Gemini 3 Pro Image) | — | High-quality image gen/edit (1K-4K) | $ | API script |
-| **OpenAI** | Sora v2/v2-pro | — | Video generation, remix (4-12s) | $$ | API script |
-| **Local** | Ollama/LM Studio models | Varies | Zero cost, offline, privacy, custom fine-tunes | Free | Local API |
-| **Anthropic** | Claude Teams threads | 200K | Parallel Claude instances, isolated contexts | $$ | Teams API |
+| Provider | Model | Context (In/Out) | Best For | Reliability Hazards | Cost Tier | Access |
+|----------|-------|-------------------|----------|---------------------|-----------|--------|
+| **Anthropic** | Claude Opus 4.6 | 200K/200K (1M beta on Dev Platform) | Orchestrate, reason, architect | Extended thinking can balloon token usage if unconstrained | $$$ | Direct |
+| **Anthropic** | Claude Sonnet 4.6 | 200K/200K | Implement, review (79.6% SWE-bench) | Context compaction (beta) may lose nuance in long sessions | $$ | Direct |
+| **Anthropic** | Claude Haiku 4.5 | 200K/64K | Search, extract, simple queries | 64K output cap; may truncate long generation tasks | $ | Direct |
+| **OpenAI** | GPT-5.3-Codex | 400K/128K | Agentic coding, sandbox execution (default for Codex) | Can "overfit" to its own plan; re-check against repo reality | $$ | Codex CLI |
+| **OpenAI** | GPT-5.3-Codex-Spark | Smaller/faster | Ultra-fast coding, simple tasks | Smaller context; not for architecture-scale analysis | $ | Codex CLI |
+| **OpenAI** | GPT-5.2 | 400K/128K | General reasoning, fallback/pinned version | Superseded by 5.3 for coding; still valid for non-coding review | $$ | Codex CLI |
+| **OpenAI** | GPT-5.2-mini | 400K/128K | Cost-efficient coding (4x allowance) | Near-SOTA but may miss edge cases on complex tasks | $ | Codex CLI |
+| **Google** | Gemini 3.1 Pro (preview) | ~1M/65K | Multimodal (code+images), Google Search, thinking, agentic workflows | Long outputs need explicit chunking discipline; defaults may truncate | $$ | Gemini CLI |
+| **Google** | Gemini 3 Flash (preview) | ~1M/65K | Fast multimodal, cost-efficient | Same output truncation risk; less capable on complex reasoning | $ | Gemini CLI |
+| **Google** | Nano Banana Pro (Gemini 3 Pro Image) | — | High-quality image gen/edit (1K-4K) | Official name is Gemini 3 Pro Image; "Nano Banana Pro" is the product alias | $ | API script |
+| **OpenAI** | Sora 2 | — | Video generation + synced audio (4-12s) | Generation latency; review outputs before publishing | $$ | API script |
+| **Local** | Ollama/LM Studio models | Varies | Zero cost, offline, privacy, custom fine-tunes | Quality highly variable; require eval suite before trusting output | Free | Local API |
+| **Anthropic** | Claude Teams threads | 200K/200K | Parallel Claude instances, isolated contexts | API programmatic access TBD; may be Claude Code interface only | $$ | Teams |
 
-### 3.2 Thinking-Level Spectrum (Claude-Specific)
+**Important distinction — Codex model line**:
+OpenAI treats "Codex" models (`GPT-5.3-Codex`, `GPT-5.3-Codex-Spark`) as a **specialized agentic coding line**, distinct from general GPT models (`GPT-5.2`, `GPT-5.2-mini`). The Codex line is tuned for tool use, file editing, and sandbox execution. General GPT models are better for open-ended reasoning and review. Our skill should reflect this split:
+- **Coding/execution tasks** → GPT-5.3-Codex (default) or Codex-Spark (simple)
+- **Review/analysis tasks** → GPT-5.2 or GPT-5.3-Codex in read-only mode
 
-An often-overlooked optimization axis. Not all tasks need maximum reasoning depth.
+### 3.2 Effort & Thinking Policy
 
-| Thinking Level | Token Cost Multiplier | Use When |
-|---------------|----------------------|----------|
-| **Extended** (Opus) | ~3-5x base | Architecture decisions, complex debugging, plan review |
-| **Standard** (Sonnet) | 1x base | Implementation, code review, most tasks |
-| **Minimal** (Haiku) | ~0.2x base | Pattern search, extraction, formatting |
-| **Budget mode** | Custom | Set `thinking_budget` tokens on Sonnet for constrained reasoning |
+**This is a policy layer, not a fixed multiplier.** Thinking/reasoning effort should be treated as a budgeted resource controlled through provider-specific mechanisms, not a vague "3-5x cost" assumption.
 
-Codex also has explicit reasoning effort (`xhigh`/`high`/`medium`/`low`) — align these.
+#### Provider-Specific Controls
+
+| Provider | Mechanism | Levels | Notes |
+|----------|-----------|--------|-------|
+| **Claude (Opus 4.6)** | Adaptive thinking + effort controls | Adaptive (default), extended | `budget_tokens` is **deprecated** on Opus 4.6; use effort controls instead |
+| **Claude (Sonnet 4.6)** | Adaptive thinking + extended thinking + context compaction (beta) | Adaptive (default), extended | Compaction helps sustain long sessions without context overflow |
+| **Claude (Haiku 4.5)** | Standard (no extended thinking) | Standard only | Use for tasks that don't need reasoning depth |
+| **Codex (GPT-5.x)** | Reasoning effort parameter | `none` / `low` / `medium` / `high` / `xhigh` | Explicit, graduated; `none` available for pure execution |
+| **Gemini** | Model selection (Pro vs Flash) | Pro (deeper), Flash (faster) | No explicit effort knob; select model based on task complexity |
+
+#### Effort Policy Defaults
+
+Rather than fixed multipliers, define **policies** that map task types to effort settings:
+
+| Task Category | Claude Policy | Codex Effort | Gemini Model |
+|--------------|--------------|--------------|--------------|
+| **Architecture decisions** | Opus, adaptive thinking (let model decide depth) | xhigh | 3.1 Pro |
+| **Complex debugging** | Opus or Sonnet with extended thinking | xhigh | 3.1 Pro |
+| **Plan generation** | Opus, adaptive | high | 3.1 Pro |
+| **Plan review** | Sonnet, adaptive | medium | 3.1 Pro |
+| **Implementation** | Sonnet, adaptive | medium | 3.1 Pro |
+| **Code review** | Sonnet, adaptive | medium | Flash |
+| **Simple search** | Haiku | low | Flash |
+| **Documentation** | Haiku | low | Flash |
+| **Formatting/mechanical** | Haiku | none | Flash |
+
+**Escalation rule**: Only escalate to extended thinking / xhigh when a task is **blocked** and you have concrete artifacts to reason over (failing tests, stack traces, conflicting requirements). "Hard problem" alone is not sufficient justification — the model should attempt with adaptive first.
 
 ### 3.3 Unique Capability Map
 
-Capabilities that are exclusive to or significantly better on specific models:
+Capabilities that are exclusive to or significantly better on specific models within this architecture:
 
 | Capability | Best Model(s) | Runner-Up | Notes |
 |------------|--------------|-----------|-------|
-| **Real-time web search** | Gemini (Google Search) | — | Only model with native search grounding |
+| **Real-time web search** | Gemini (Google Search grounding) | — | Only Gemini in this architecture has native search grounding enabled. Claude has web search preview in some environments but not in our CLI toolchain. |
 | **Image generation (from text)** | Nano Banana Pro, Gemini 3.1 Pro | — | NBP for quality; Gemini for code+image combos |
 | **Image editing (from image)** | Nano Banana Pro, Gemini 3.1 Pro | — | NBP for precision; Gemini for context-aware edits |
 | **SVG/animation code** | Gemini 3.1 Pro | Claude Sonnet | Gemini can preview visually + generate code |
-| **Video generation** | Sora | — | Only option currently |
-| **Sandboxed execution** | Codex | — | True isolated sandbox with file system access |
+| **Video generation** | Sora 2 | — | Only option; now includes synced audio |
+| **Sandboxed execution** | Codex (GPT-5.3-Codex) | — | True isolated sandbox with file system access |
 | **Codebase-wide analysis** | Gemini (`codebase_investigator`) | Claude (codebase-explorer) | Different approaches; complementary |
-| **2M context ingestion** | Gemini 3.1 Pro | Codex (400K) | For massive codebase dumps or log analysis |
+| **Large context ingestion** | Gemini 3.1 Pro (~1M) | Codex (400K) | For large codebase context or log analysis. Prefer targeted injection over "dump everything." |
 | **Offline/private** | Local LLMs | — | When data can't leave the machine |
 | **Parallel Claude instances** | Claude Teams | — | Isolated contexts, no cross-contamination |
 
@@ -126,7 +155,7 @@ CREATIVE        —                         Gemini 3.1 Pro                  Conf
                                           (SVG, animation, UI mockup)     NBP vs Gemini vs Claude
                                           Nano Banana Pro                 for image generation
                                           (high-quality images)
-                                          Sora (demo videos)
+                                          Sora 2 (demo videos)
 
 REVIEW          Claude Sonnet             Codex Review                    —
                 (code review)             (second opinion)
@@ -134,7 +163,7 @@ REVIEW          Claude Sonnet             Codex Review                    —
                                           (diff analysis)
 
 VALIDATION      Claude Sonnet             Cross-Model Consensus           —
-                (task-completion)         (2+ models agree)
+                (task-completion)         (2+ models agree; tests decide)
 
 DEPLOY          Claude Haiku              —                               —
                 (changelog, docs)
@@ -157,7 +186,7 @@ Task arrives at orchestrator (Opus)
 │   ├─ SVG/animation needed?
 │   │   ├─ Complex (multi-element, animated) → Gemini 3.1 Pro
 │   │   └─ Simple (icons, basic shapes) → Claude Sonnet
-│   └─ Video needed? → Sora
+│   └─ Video needed? → Sora 2
 │
 ├─ Is this a review/validation task?
 │   ├─ User requested cross-validation? → Route to specified model
@@ -170,7 +199,7 @@ Task arrives at orchestrator (Opus)
 │
 ├─ Is this a research task?
 │   ├─ Needs current web info? → Gemini Google Search
-│   ├─ Needs massive context (>200K)? → Gemini 3.1 Pro (2M)
+│   ├─ Needs massive context (>200K)? → Gemini 3.1 Pro (~1M)
 │   └─ Codebase patterns? → Claude (codebase-explorer)
 │
 ├─ Is this a debug escalation?
@@ -180,6 +209,9 @@ Task arrives at orchestrator (Opus)
 │
 ├─ Is this privacy-sensitive?
 │   └─ Yes → Local LLM (if configured) or Claude (no external)
+│
+├─ Models disagree on approach?
+│   └─ → Disagreement Protocol (Section 4.5)
 │
 └─ Default: Claude Sonnet (implementation) or Haiku (search/docs)
 ```
@@ -209,37 +241,62 @@ orchestration = "claude-opus-4-6"
 documentation = "claude-haiku-4-5"
 image_generation = "nano-banana-pro"       # or "gemini-3.1-pro" or "claude"
 svg_generation = "gemini-3.1-pro"          # or "claude-sonnet-4-6"
-video_generation = "sora-v2"
+video_generation = "sora-2"
 web_research = "gemini-3.1-pro"
 
-[models.thinking_levels]
-# Default thinking/reasoning effort per task type
-architecture_decisions = "extended"        # Opus-level
-plan_review = "high"                       # Codex: high, Claude: extended
-implementation = "standard"                # Sonnet default
-code_review = "standard"
-debugging = "high"                         # Escalates to xhigh on retry
-simple_search = "minimal"                  # Haiku
-documentation = "minimal"
+[models.effort_policy]
+# Effort/thinking policy per task type
+# Claude: "adaptive" (default) | "extended" (deep reasoning)
+# Codex: "none" | "low" | "medium" | "high" | "xhigh"
+# Gemini: model selection handles this (Pro vs Flash)
+architecture_decisions = { claude = "adaptive", codex = "xhigh" }
+plan_generation = { claude = "adaptive", codex = "high" }
+plan_review = { claude = "adaptive", codex = "medium" }
+implementation = { claude = "adaptive", codex = "medium" }
+code_review = { claude = "adaptive", codex = "medium" }
+debugging = { claude = "adaptive", codex = "high" }     # escalates on retry
+debugging_escalated = { claude = "extended", codex = "xhigh" }
+simple_search = { claude = "adaptive", codex = "low" }
+documentation = { claude = "adaptive", codex = "low" }
+formatting = { claude = "adaptive", codex = "none" }
+
+# Escalation rule: only use extended/xhigh when blocked with concrete
+# artifacts (failing tests, stack traces, conflicting requirements).
+# "Hard problem" alone is insufficient justification.
+escalation_requires_artifacts = true
 
 [models.codex]
-default_model = "gpt-5.2"
+default_model = "gpt-5.3-codex"           # Specialized agentic coding line
+fast_model = "gpt-5.3-codex-spark"        # Ultra-fast, smaller context
+general_model = "gpt-5.2"                 # For non-coding review/analysis
 default_reasoning = "medium"
 sandbox_default = "read-only"
 # Escalation: auto-suggest after N failed debug cycles
 debug_escalation_threshold = 2
 
 [models.gemini]
-default_model = "gemini-3.1-pro"
-fast_model = "gemini-3.1-flash"
+default_model = "gemini-3.1-pro"           # ~1M input / 65K output
+fast_model = "gemini-3-flash"              # ~1M input / 65K output
 # Use flash for simple tasks below this complexity
 flash_threshold = "simple"                 # simple | moderate | never
+# Output chunking discipline: explicitly set max output tokens
+# to avoid silent truncation on long generation tasks
+max_output_tokens = 65536
+chunking_threshold = 32000                 # chunk requests above this
 
 [models.local_llm]
 endpoint = "http://localhost:11434"        # Ollama default
-model = "codellama:34b"
+model = "qwen2.5-coder:32b"               # Example; must be pinned
 # Tasks to always route locally (privacy)
 always_local = []                          # e.g., ["secrets-analysis", "internal-docs"]
+# Require eval suite pass before model is trusted for code generation
+require_eval = true
+
+[models.local_llm.pinning]
+# Local models MUST be pinned to reproducible identifiers
+# model_id = "ollama tag or HF revision"
+# checksum = "sha256 of model weights (optional but recommended)"
+# eval_suite = "path to eval script that must pass"
 
 [models.claude_teams]
 # Parallel Claude instances for isolated work
@@ -262,6 +319,14 @@ security_sensitive_patterns = [
 ]
 suggest_gemini_for_context_above = 150000  # tokens — large analysis
 suggest_codex_debug_after_cycles = 2
+
+[asset_pipeline]
+# AI-generated asset provenance tracking
+output_dir = "assets/ai-gen"               # versioned output directory
+structure = "{date}/{model}/{filename}"    # e.g., 2026-02-25/nbp/hero.png
+store_prompts = true                       # save prompt alongside output
+store_seeds = true                         # save seeds when supported
+store_metadata = true                      # provenance metadata (model, params, timestamp)
 ```
 
 ### 4.4 Opt-In Interaction Patterns
@@ -302,6 +367,36 @@ Opus: "Debug has stalled after 2 cycles. Options:
        Which approach? [1/2/3]"
 ```
 
+### 4.5 Disagreement Protocol (CI as Referee)
+
+When two models produce conflicting implementations or design recommendations, **tests decide — not model preference**.
+
+```
+Disagreement detected (Model A says X, Model B says Y)
+│
+├─ Are there existing tests covering this behavior?
+│   ├─ Yes → Run tests against both implementations
+│   │        Winner = implementation that passes all tests
+│   │        If both pass → prefer the simpler/smaller diff
+│   │        If both fail → escalate to Opus with extended thinking
+│   └─ No → "Prove it" rule: require creation of minimal tests first
+│            Both implementations must pass the new tests
+│            Then apply the same winner selection
+│
+├─ Is this a design/architecture disagreement (no testable behavior)?
+│   ├─ Is the decision reversible? → Pick either, document rationale, move on
+│   └─ Is the decision irreversible (DB schema, API contract)?
+│       → Escalate to Opus (adaptive thinking) with both proposals
+│       → Only use extended thinking if Opus can't decide with adaptive
+│
+└─ Escalation is NOT justified by:
+    - "This is a hard problem" (try harder with adaptive first)
+    - "The models disagree" (tests decide, not authority)
+    - "I'm not sure" (write tests to gain certainty)
+```
+
+**Key principle**: This prevents "model-religion wars." The CI pipeline is the neutral arbiter. Models are tools, not authorities.
+
 ---
 
 ## 5. Workflow Specifications
@@ -309,7 +404,7 @@ Opus: "Debug has stalled after 2 cycles. Options:
 ### 5.1 Plan Review Checkpoint (Codex)
 
 **Trigger**: After PRD or implementation plan generation, when `checkpoints.plan_review != "off"`
-**Model**: Codex GPT-5.2, reasoning `medium`, sandbox `read-only`
+**Model**: GPT-5.3-Codex, reasoning `medium`, sandbox `read-only`
 **Behavior**: `ask` (default) prompts user; `auto` runs automatically for plans >20 tasks
 
 ```
@@ -350,10 +445,12 @@ Output: Review findings → Opus presents alongside Claude's review
 - Files changed > 5 or security patterns detected → Gemini 3.1 Pro
 - User can override: "use Codex for this review" → Codex read-only
 
+**Output discipline**: Set explicit `-o text` and chunk long diffs to avoid Gemini output truncation (65K output cap).
+
 ### 5.3 Debug Escalation (Codex)
 
 **Trigger**: After `debug_escalation_threshold` failed cycles (default: 2)
-**Model**: Codex GPT-5.2, reasoning `xhigh`, sandbox `workspace-write`
+**Model**: GPT-5.3-Codex, reasoning `xhigh`, sandbox `workspace-write`
 **Behavior**: Always `ask` — never auto-escalate to external model for debugging
 
 ```
@@ -366,20 +463,22 @@ Prompt: "Independent debugging investigation.
 
          Investigate independently. Do not assume previous conclusions are correct.
          Find the root cause and propose a minimal fix.
-         If you can reproduce the issue in sandbox, do so."
+         If you can reproduce the issue in sandbox, do so.
+         IMPORTANT: Re-check your proposed fix against the actual repo state
+         before finalizing — do not overfit to your initial hypothesis."
 Output: Root cause analysis + proposed fix → Opus evaluates and delegates implementation
 ```
 
-**Why Codex for debug**: True sandbox isolation means it can safely execute, modify, and test hypotheses without affecting the working tree. 400K context handles large log dumps.
+**Why Codex for debug**: True sandbox isolation means it can safely execute, modify, and test hypotheses without affecting the working tree. 400K context handles large log dumps. The "re-check" instruction mitigates Codex's known tendency to overfit to its own plan.
 
 ### 5.4 MVP Rapid Prototyping (Gemini 3.1 Pro)
 
 **Trigger**: User requests rapid prototype or MVP of a feature
-**Model**: Gemini 3.1 Pro (2M context for ingesting large codebase context)
+**Model**: Gemini 3.1 Pro (~1M context for ingesting large codebase context)
 **Behavior**: Always explicit user request — never auto-suggested
 
 ```
-Input:  Feature description, relevant codebase files (can dump many due to 2M context)
+Input:  Feature description, relevant codebase files
 Prompt: "Create a working MVP of {feature}.
          Existing patterns to follow: {file_list}
          Tech stack: Next.js 15, React, TypeScript, Tailwind, shadcn/ui
@@ -388,6 +487,12 @@ Prompt: "Create a working MVP of {feature}.
          Apply now."
 Output: Generated files → Claude Sonnet refines to match project conventions
 ```
+
+**Context hygiene**: Prefer targeted file injection (repo map → relevant files) over dumping the entire repo into Gemini's ~1M context window. Use:
+1. `ai/repo.map.json` for structural overview
+2. `ai/symbols-*.json` for targeted symbol discovery
+3. Specific files identified from the map
+This approach is more reliable than "dump and pray" even with large context windows.
 
 **Post-processing**: Always route Gemini output through Claude for convention alignment. Gemini generates fast; Claude ensures quality.
 
@@ -446,8 +551,24 @@ Icon sets / simple graphics:
 
 Batch generation:
   → Nano Banana Pro with sequential prompts
-  → Output directory: public/images/ or assets/
+  → Output directory: assets/ai-gen/{date}/{model}/
 ```
+
+**Provenance tracking** (all AI-generated assets):
+```
+assets/ai-gen/
+  2026-02-25/
+    nbp/
+      hero-illustration.png
+      hero-illustration.prompt.txt     # Exact prompt used
+      hero-illustration.meta.json      # Model, params, seed, timestamp, watermark status
+    gemini/
+      component-mockup.png
+      component-mockup.prompt.txt
+      component-mockup.meta.json
+```
+
+This enables reproducibility (re-generate with same prompt/seed), attribution (which model made what), and auditability (Google's image generation includes metadata/watermarking — preserve it).
 
 ### 5.8 Parallel Claude Threads (Teams)
 
@@ -487,43 +608,38 @@ Integration pattern:
 - Track quality metrics to know when local is "good enough"
 ```
 
+**Local model requirements** (before allowing code generation):
+- Pinned model ID + Ollama tag or HuggingFace revision
+- Reproducible runner configuration
+- Pass a quick eval suite (project-specific test cases)
+- Quality tracking over time to calibrate trust level
+
+**On DeepSeek and other community models**: Models like DeepSeek-V3.2 are worth evaluating but should be listed under "Optional / community models" with the same pinning and eval requirements. Avoid spec-sheeting based on secondary/speculative sources — only trust concrete artifacts (HF model cards, official release notes, reproducible benchmarks).
+
 ---
 
-## 6. Thinking-Level Optimization
+## 6. Context Hygiene
 
-### 6.1 The Hidden Cost Axis
+### 6.1 Principles
 
-Model selection is the obvious optimization. **Thinking level** is the subtle one. Using Opus with extended thinking for a simple file rename wastes 10-50x the tokens needed.
+Both Claude (context compaction beta) and Codex (compaction in Codex-tuned models) are moving toward longer-horizon sessions without ballooning prompts. Our architecture should explicitly prefer:
 
-### 6.2 Proposed Thinking-Level Defaults
+1. **Repo map / symbol index first** — `ai/repo.map.json`, `ai/symbols-*.json` (~150 tokens vs 5-15K for file reads)
+2. **Targeted file injection** — identify files from the map, inject only what's needed
+3. **Summaries of prior decisions** — ADR-style references, not full conversation replay
+4. **Compaction-aware session design** — structure work so Claude's context compaction can safely summarize earlier phases
 
-| Task Category | Claude Level | Codex Reasoning | Gemini Model |
-|--------------|-------------|-----------------|--------------|
-| **Architecture decisions** | Opus (extended thinking) | xhigh | 3.1 Pro |
-| **Complex debugging** | Opus or Sonnet (extended) | xhigh | 3.1 Pro |
-| **Plan generation** | Opus (standard thinking) | high | 3.1 Pro |
-| **Plan review** | Sonnet (standard) | medium | 3.1 Pro |
-| **Implementation** | Sonnet (standard) | medium | 3.1 Pro |
-| **Code review** | Sonnet (standard) | medium | Flash |
-| **Simple search** | Haiku (minimal) | low | Flash |
-| **Documentation** | Haiku (minimal) | low | Flash |
-| **Formatting/mechanical** | Haiku (minimal) | low | Flash |
+Over **"dump the repo into 2M tokens and pray."**
 
-### 6.3 Adaptive Escalation
+### 6.2 Per-Model Context Strategy
 
-Rather than fixed levels, some tasks should escalate:
-
-```
-Debugging:
-  Attempt 1: Sonnet (standard thinking)
-  Attempt 2: Sonnet (extended thinking) or Opus
-  Attempt 3: Suggest Codex (xhigh) or Gemini (codebase_investigator)
-
-Code Review:
-  Standard PR: Sonnet
-  Security-sensitive: Opus or Codex (high)
-  Architecture change: Opus + Gemini cross-validation
-```
+| Model | Context Window | Strategy |
+|-------|---------------|----------|
+| Claude Opus/Sonnet | 200K (1M beta) | Symbol-first, targeted injection, compaction-aware |
+| Codex GPT-5.3 | 400K | Focused file list + error context; sandbox explores on its own |
+| Gemini 3.1 Pro | ~1M | Can handle more context but still prefer targeted; chunk long outputs |
+| Haiku | 200K in / 64K out | Minimal context; single-purpose queries |
+| Local LLMs | Varies (8K-128K typical) | Strict context budgets; smallest viable payload |
 
 ---
 
@@ -532,29 +648,32 @@ Code Review:
 ### 7.1 Phased Rollout
 
 **Phase 1 — Skill Updates** (foundation, no workflow changes):
-- Update `gemini-cli` skill for Gemini 3.1 Pro (model refs, new capabilities, image/SVG templates)
-- Verify `codex` skill is current (GPT-5.2 models, reasoning effort flags)
+- Update `codex` skill: default to GPT-5.3-Codex, add Codex-Spark, separate general vs coding model lines, add `none` reasoning effort level
+- Update `gemini-cli` skill: Gemini 3.1 Pro (~1M/65K context, not 2M), add image/SVG workflows, output chunking discipline, correct model names
+- Update `sora` skill: align naming to "Sora 2" with synced audio capability
 - Create `multi-model.toml` configuration schema
 - Add model-selection-guide to dev-execution orchestration docs
+- Add effort policy documentation (replacing deprecated budget_tokens references)
 
 **Phase 2 — Checkpoint Workflows** (opt-in SDLC integration):
 - Implement plan-review checkpoint (Codex read-only)
 - Implement PR cross-validation (Gemini diff review)
-- Implement debug escalation protocol
+- Implement debug escalation protocol (with repo re-check instruction)
+- Implement disagreement protocol (CI as referee)
 - Add threshold-based suggestions to orchestrator
 - Update agent-assignments table with external model entries
 
 **Phase 3 — Creative Workflows** (new capabilities):
 - Gemini 3.1 Pro UI mockup workflow
 - Gemini 3.1 Pro SVG/animation generation
-- Nano Banana Pro asset pipeline (batch generation, output directory management)
-- Sora demo video generation workflow
+- Nano Banana Pro asset pipeline (batch generation, provenance tracking, output directory management)
+- Sora 2 demo video generation workflow
 
 **Phase 4 — Advanced Integration** (extended model pool):
 - Claude Teams parallel thread orchestration
-- Local LLM integration (Ollama/LM Studio)
-- Thinking-level auto-tuning based on task complexity
-- Cross-model consensus workflows (2+ models must agree)
+- Local LLM integration (Ollama/LM Studio) with eval suite requirement
+- Effort policy auto-tuning based on task outcomes
+- Cross-model consensus workflows (2+ models must agree; tests referee)
 - Usage tracking and cost reporting
 
 ### 7.2 Files to Create/Modify
@@ -565,14 +684,17 @@ Code Review:
 | **Create** | `.claude/skills/dev-execution/orchestration/model-selection-guide.md` | Decision tree for model routing |
 | **Create** | `.claude/skills/dev-execution/orchestration/cross-model-review.md` | Cross-validation workflow specs |
 | **Create** | `.claude/skills/dev-execution/orchestration/escalation-protocols.md` | Debug/review escalation rules |
-| **Update** | `.claude/skills/gemini-cli/SKILL.md` | Gemini 3.1 Pro capabilities, image/SVG workflows |
-| **Update** | `.claude/skills/gemini-cli/reference.md` | Updated CLI flags, model names |
-| **Update** | `.claude/skills/gemini-cli/patterns.md` | New patterns for UI mockup, SVG gen |
+| **Create** | `.claude/skills/dev-execution/orchestration/disagreement-protocol.md` | CI-as-referee when models conflict |
+| **Update** | `.claude/skills/codex/SKILL.md` | GPT-5.3-Codex default, model line separation, effort levels |
+| **Update** | `.claude/skills/gemini-cli/SKILL.md` | Gemini 3.1 Pro capabilities, corrected context numbers, output chunking |
+| **Update** | `.claude/skills/gemini-cli/reference.md` | Updated CLI flags, model names, output settings |
+| **Update** | `.claude/skills/gemini-cli/patterns.md` | New patterns for UI mockup, SVG gen, chunking discipline |
 | **Create** | `.claude/skills/gemini-cli/templates-creative.md` | Prompt templates for visual tasks |
-| **Update** | `.claude/agents/ai/gemini-orchestrator.md` | Updated triggers, model refs |
-| **Update** | `.claude/skills/dev-execution/orchestration/agent-assignments.md` | Add external model assignments |
-| **Update** | `.claude/skills/dev-execution/validation/quality-gates.md` | Optional cross-model gate |
-| **Update** | `CLAUDE.md` | New "Multi-Model Integration" section |
+| **Update** | `.claude/skills/sora/SKILL.md` | Sora 2 naming, synced audio capability |
+| **Update** | `.claude/agents/ai/gemini-orchestrator.md` | Updated triggers, model refs, output discipline |
+| **Update** | `.claude/skills/dev-execution/orchestration/agent-assignments.md` | Add external model assignments + reliability hazards |
+| **Update** | `.claude/skills/dev-execution/validation/quality-gates.md` | Optional cross-model gate + disagreement protocol |
+| **Update** | `CLAUDE.md` | New "Multi-Model Integration" section, corrected thinking policy |
 
 ### 7.3 What NOT to Change
 
@@ -588,13 +710,16 @@ Code Review:
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
 | External model generates insecure code | Medium | High | All external output validated by Claude before integration |
-| Cost overrun from frequent cross-validation | Medium | Medium | Opt-in defaults, configurable thresholds, Flash models for simple tasks |
+| Cost overrun from frequent cross-validation | Medium | Medium | Opt-in defaults, configurable thresholds, Flash/Spark models for simple tasks |
 | Rate limiting on Gemini free tier | High | Low | Flash fallback, batching, sequential with delays |
+| Codex overfits to own hypothesis during debug | Medium | Medium | "Re-check against repo reality" instruction in prompts |
+| Gemini truncates long output silently | Medium | Medium | Explicit output token settings, chunking discipline, `-o text` flag |
 | Codex sandbox restrictions block debugging | Low | Medium | Escalate sandbox level with user permission |
 | Model version drift breaks skill | Medium | Medium | Pin model versions in config, test on update |
 | Over-reliance on external models | Low | Medium | Claude remains default; external is supplementary |
 | Context contamination across models | Low | High | Isolated execution; no shared state between models |
-| Local LLM quality insufficient | Medium | Low | Quality tracking; auto-fallback to Claude |
+| Local LLM quality insufficient | Medium | Low | Eval suite requirement; auto-fallback to Claude |
+| Deprecated thinking controls cause unexpected behavior | Medium | Low | Remove budget_tokens references; use adaptive/effort controls only |
 
 ---
 
@@ -604,14 +729,14 @@ Code Review:
 
 | Operation | Model | Est. Cost | Frequency |
 |-----------|-------|-----------|-----------|
-| Plan review | Codex GPT-5.2 (read-only, medium) | $0.05-0.15 | Per plan |
+| Plan review | GPT-5.3-Codex (read-only, medium) | $0.05-0.15 | Per plan |
 | PR cross-review | Gemini 3.1 Pro | Free tier (or $0.02) | Per PR |
 | PR cross-review | Gemini Flash | Free tier | Per small PR |
-| Debug escalation | Codex GPT-5.2 (workspace-write, xhigh) | $0.20-0.50 | Rare |
+| Debug escalation | GPT-5.3-Codex (workspace-write, xhigh) | $0.20-0.50 | Rare |
 | SVG generation | Gemini 3.1 Pro | Free tier (or $0.01) | Per asset |
 | Image generation | Nano Banana Pro | ~$0.01-0.05 | Per image |
 | MVP prototyping | Gemini 3.1 Pro | Free tier (or $0.05) | Per feature |
-| Video generation | Sora v2 | ~$0.10-0.50 | Rare |
+| Video generation | Sora 2 | ~$0.10-0.50 | Rare |
 
 ### Monthly Budget Impact (Estimated, Active Development)
 
@@ -625,25 +750,14 @@ Code Review:
 
 ## 10. Open Questions
 
-1. **Config file location**: `.claude/config/multi-model.toml` vs extending existing SkillMeat config? The former keeps it portable across projects; the latter centralizes configuration.
+1. **Config file location**: `.claude/config/multi-model.toml` vs extending existing SkillMeat config? The former keeps it portable across projects; the latter centralizes configuration. (Recommendation: separate file for clarity and modularity.)
 
-2. **Gemini 3.1 Pro image generation quality vs NBP**: Need hands-on comparison for UI mockups. Gemini may be "good enough" for prototyping while NBP is reserved for production assets. May want to test both and document quality differences.
+2. **Gemini 3.1 Pro image generation quality vs NBP**: Need hands-on comparison for UI mockups. Gemini may be "good enough" for prototyping while NBP is reserved for production assets. Test both and document quality differences. (Recommendation: Gemini 3.1/3 Pro Image Generation actually uses NBP, with additional reasoning capabilities.)
 
-3. **Local LLM model recommendations**: Which local models are worth integrating? Codellama 34B, Qwen 2.5 Coder, DeepSeek Coder? This needs benchmarking against our codebase patterns.
+3. **Claude Teams API access**: Is the Teams thread-spawning API available for programmatic use, or only through the Claude Code interface? This affects the parallel thread orchestration design. (Recommendation: UTilize your own knowledge of Claude Code Agent Teams, and use docs as needed: https://code.claude.com/docs/en/agent-teams.)
 
-4. **Claude Teams API access**: Is the Teams thread-spawning API available for programmatic use, or only through the Claude Code interface? This affects the parallel thread orchestration design.
+4. **Metric tracking**: Should we track which model produced which output for quality comparison over time? This would help optimize defaults but adds complexity. (Recommendation: yes, at least at the asset pipeline level where provenance is already tracked. We should also update the Planning/artifact_tracking skills to include optimal model designations per task (in addition to current Agent designations) as necessary when configured to support.)
 
-5. **Metric tracking**: Should we track which model produced which output for quality comparison over time? This would help optimize defaults but adds complexity.
+5. **Gemini output truncation testing**: Before relying on Gemini for large code generation, validate actual output behavior at various sizes. Document the practical ceiling where chunking becomes mandatory. Generally, don't rely on Gemini for large code outputs.
 
----
-
-## 11. Summary of Recommendations
-
-1. **Start with skill updates** (Phase 1) — low risk, immediate value from updated Gemini capabilities
-2. **Add opt-in checkpoints** (Phase 2) — plan review and PR cross-validation deliver the most SDLC value
-3. **Use `ask` as default behavior** — the orchestrator suggests, the user decides
-4. **Make provider choice configurable** — especially for creative tasks where multiple models can serve
-5. **Include thinking-level optimization** — often more impactful than model switching for cost
-6. **Defer Teams and local LLM** (Phase 4) — these need API investigation before design
-7. **Always validate external output through Claude** — external models generate; Claude reviews and integrates
-8. **Track costs from day one** — even rough estimates help calibrate threshold defaults
+6. **Local LLM eval suite**: What project-specific test cases should local models pass before being trusted? Propose: Unnecessary at this time
