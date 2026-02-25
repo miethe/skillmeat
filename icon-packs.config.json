@@ -1,0 +1,9 @@
+{
+  "packs": [
+    {
+      "id": "lucide-default",
+      "name": "Lucide Default",
+      "enabled": true
+    }
+  ]
+}

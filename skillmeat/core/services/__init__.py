@@ -28,6 +28,10 @@ from skillmeat.core.services.tag_write_service import TagWriteService
 from skillmeat.core.services.context_module_service import ContextModuleService
 from skillmeat.core.services.context_packer_service import ContextPackerService
 from skillmeat.core.services.memory_service import MemoryService
+from skillmeat.core.services.custom_color_service import (
+    CustomColorService,
+    NotFoundError as CustomColorNotFoundError,
+)
 
 __all__ = [
     # Template service
@@ -56,4 +60,7 @@ __all__ = [
     "ContextPackerService",
     # Memory service (memory system)
     "MemoryService",
+    # Custom color service
+    "CustomColorService",
+    "CustomColorNotFoundError",
 ]

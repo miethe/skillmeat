@@ -24,6 +24,7 @@ Models:
     - CompositeMembership: Child-artifact membership within a CompositeArtifact
     - DeploymentSet: Named, ordered set of artifacts/groups for batch deployment (deployment-sets-v1)
     - DeploymentSetMember: Polymorphic member entry within a DeploymentSet
+    - CustomColor: User-defined hex colors for the site-wide color palette registry
 
 Usage:
     >>> from skillmeat.cache.models import get_session, Project, Artifact
@@ -3243,6 +3244,8 @@ class DeploymentSet(Base):
         id: Unique identifier (UUID hex, primary key)
         name: Human-readable set name (required)
         description: Optional free-text description
+        color: Optional hex color code (e.g. ``"#7c3aed"``), max 7 chars
+        icon: Optional icon identifier string (e.g. ``"layers"``), max 64 chars
         tags_json: JSON-serialized list of tag strings, default ``"[]"``
         owner_id: Owning user / identity scope (required)
         created_at: UTC timestamp when the set was created
@@ -3264,6 +3267,8 @@ class DeploymentSet(Base):
     # Core fields
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
+    icon: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     tags_json: Mapped[str] = mapped_column(
         Text,
         nullable=False,
@@ -3497,6 +3502,75 @@ class DeploymentSetMember(Base):
         if self.group_id is not None:
             return "group"
         return "set"
+
+
+class CustomColor(Base):
+    """User-defined custom color stored in the palette registry.
+
+    Tracks hex color values that users have added to the site-wide color
+    management system. Each color is uniquely identified by its hex code
+    and may carry an optional human-readable name.
+
+    Attributes:
+        id: Unique color identifier (primary key, UUID hex)
+        hex: CSS hex color string, e.g. ``#7c3aed`` (7 chars, UNIQUE, NOT NULL)
+        name: Optional human-readable label for the color
+        created_at: Timestamp when the color was first registered
+
+    Indexes:
+        - idx_custom_colors_hex (UNIQUE): Fast lookup and uniqueness enforcement
+    """
+
+    __tablename__ = "custom_colors"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Core fields
+    hex: Mapped[str] = mapped_column(
+        String(7),
+        nullable=False,
+        unique=True,
+        comment="CSS hex color string including leading '#', e.g. #7c3aed",
+    )
+    name: Mapped[Optional[str]] = mapped_column(
+        String(64),
+        nullable=True,
+        comment="Optional human-readable label for the color",
+    )
+
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        CheckConstraint(
+            "hex LIKE '#______' OR hex LIKE '#___'",
+            name="check_custom_color_hex_format",
+        ),
+        Index("idx_custom_colors_hex", "hex", unique=True),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of CustomColor."""
+        return f"<CustomColor(id={self.id!r}, hex={self.hex!r}, name={self.name!r})>"
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert CustomColor to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the custom color
+        """
+        return {
+            "id": self.id,
+            "hex": self.hex,
+            "name": self.name,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
 
 
 # =============================================================================

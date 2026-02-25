@@ -32,6 +32,7 @@ from .routers import (
     bundles,
     cache,
     collections,
+    colors,
     composites,
     config,
     context_entities,
@@ -43,6 +44,7 @@ from .routers import (
     deployments,
     groups,
     health,
+    icon_packs,
     marketplace,
     marketplace_catalog,
     marketplace_sources,
@@ -399,6 +401,10 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(ratings.router, prefix=settings.api_prefix, tags=["ratings"])
     app.include_router(
         settings_router.router, prefix=settings.api_prefix, tags=["settings"]
+    )
+    app.include_router(colors.router, prefix=settings.api_prefix, tags=["colors"])
+    app.include_router(
+        icon_packs.router, prefix=settings.api_prefix, tags=["settings"]
     )
     app.include_router(tags.router, prefix=settings.api_prefix, tags=["tags"])
     app.include_router(versions.router, prefix=settings.api_prefix, tags=["versions"])

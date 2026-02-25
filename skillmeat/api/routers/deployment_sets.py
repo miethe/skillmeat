@@ -75,8 +75,8 @@ def _ds_to_response(ds: DeploymentSet) -> DeploymentSetResponse:
         id=ds.id,
         name=ds.name,
         description=ds.description,
-        icon=None,   # not persisted in current model
-        color=None,  # not persisted in current model
+        icon=ds.icon,
+        color=ds.color,
         tags=ds.get_tags(),
         owner_id=ds.owner_id,
         member_count=len(ds.members) if ds.members is not None else 0,
@@ -140,6 +140,8 @@ def create_deployment_set(
             name=request.name,
             owner_id=owner_id,
             description=request.description,
+            color=request.color,
+            icon=request.icon,
             tags=request.tags,
         )
     except RepositoryError as exc:
@@ -257,6 +259,10 @@ def update_deployment_set(
         kwargs["name"] = request.name
     if request.description is not None:
         kwargs["description"] = request.description
+    if request.color is not None:
+        kwargs["color"] = request.color
+    if request.icon is not None:
+        kwargs["icon"] = request.icon
     if request.tags is not None:
         kwargs["tags"] = request.tags
 
@@ -368,6 +374,8 @@ def clone_deployment_set(
             name=clone_name,
             owner_id=owner_id,
             description=source.description,
+            color=source.color,
+            icon=source.icon,
             tags=source.get_tags(),
         )
 
