@@ -2,7 +2,7 @@
 title: 'PRD: Site-Wide Color & Icon Management System'
 schema_version: 2
 doc_type: prd
-status: draft
+status: inferred_complete
 created: 2026-02-25
 updated: 2026-02-25
 feature_slug: color-icon-management
@@ -71,8 +71,7 @@ goals:
   Sets, and a new Settings tab
 - Shared icon picker powered by shadcn-iconpicker with configurable icon packs, replacing
   the current locked Select dropdown
-- Deployment Set dialogs adopt the shared color and icon components identical to
-  Groups
+- Deployment Set dialogs adopt the shared color and icon components identical to Groups
 - Real-time propagation of palette changes via React Query cache invalidation
 non_goals:
 - Per-artifact color/icon overrides (only Groups and Sets)
@@ -84,8 +83,8 @@ success_metrics:
   Set dialogs (no reload)
 - Deployment Set create/edit dialogs are visually and functionally identical to Group
   dialogs for color and icon fields
-- Icon packs declared in icon-packs.config.json are reflected in the icon picker
-  without code changes
+- Icon packs declared in icon-packs.config.json are reflected in the icon picker without
+  code changes
 dependencies:
 - Existing Groups model and GroupMetadataEditor component
 - Existing DeploymentSet model and create/edit dialogs
@@ -98,7 +97,6 @@ risks:
 - Migrating localStorage custom colors to API-backed store requires a one-time migration
   UX (users may lose existing custom colors if not handled)
 ---
-
 # Feature Brief & Metadata
 
 **Feature Name:**
