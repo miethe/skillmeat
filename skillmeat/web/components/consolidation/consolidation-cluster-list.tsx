@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Package, Terminal, Bot, Server, Webhook, Blocks, Layers, AlertCircle } from 'lucide-react';
+import { Package, Terminal, Bot, Server, Webhook, Blocks, Layers, AlertCircle, EyeOff, RotateCcw } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { useConsolidationClusters } from '@/hooks';
+import { useConsolidationClusters, useUnignorePair } from '@/hooks';
 import { ConsolidationClusterDetail } from './consolidation-cluster-detail';
 import type { ConsolidationCluster } from '@/types/similarity';
 
@@ -82,6 +82,13 @@ function getPrimaryArtifactName(cluster: ConsolidationCluster): string {
  */
 function formatScore(score: number): string {
   return `${Math.round(score * 100)}%`;
+}
+
+/**
+ * Determines whether a cluster is fully ignored (all pairs ignored).
+ */
+function isFullyIgnored(cluster: ConsolidationCluster): boolean {
+  return cluster.pairs.length > 0 && cluster.pairs.every((pair) => pair.ignored);
 }
 
 /**
@@ -217,6 +224,46 @@ function ScoreBadge({ score }: ScoreBadgeProps) {
 }
 
 // ============================================================================
+// Un-ignore button for a fully-ignored cluster row
+// ============================================================================
+
+interface UnignoreClusterButtonProps {
+  cluster: ConsolidationCluster;
+  minScore?: number;
+}
+
+function UnignoreClusterButton({ cluster, minScore }: UnignoreClusterButtonProps) {
+  const { mutate: unignorePair, isPending } = useUnignorePair();
+
+  // Collect all ignored pair IDs in this cluster
+  const ignoredPairs = cluster.pairs.filter((p) => p.ignored);
+
+  function handleUnignore(e: React.MouseEvent) {
+    // Prevent row click (which would open the detail panel)
+    e.stopPropagation();
+    for (const pair of ignoredPairs) {
+      unignorePair({ pairId: pair.pair_id, minScore });
+    }
+  }
+
+  if (ignoredPairs.length === 0) return null;
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-7 gap-1.5 px-2 text-xs"
+      onClick={handleUnignore}
+      disabled={isPending}
+      aria-label={`Un-ignore ${ignoredPairs.length === 1 ? 'ignored pair' : `all ${ignoredPairs.length} ignored pairs`} in this cluster`}
+    >
+      <RotateCcw className="h-3 w-3" aria-hidden="true" />
+      {isPending ? 'Restoring\u2026' : 'Un-ignore'}
+    </Button>
+  );
+}
+
+// ============================================================================
 // Main component
 // ============================================================================
 
@@ -239,10 +286,14 @@ export function ConsolidationClusterList({ minScore }: ConsolidationClusterListP
     error,
   } = useConsolidationClusters({ minScore });
 
-  // Filter clusters: when showIgnored is false, hide clusters whose every pair is ignored.
+  // Clusters whose every pair is ignored (fully-ignored clusters hidden by default)
+  const fullyIgnoredClusters = clusters.filter(isFullyIgnored);
+  const ignoredCount = fullyIgnoredClusters.length;
+
+  // Filter clusters: when showIgnored is false, hide fully-ignored clusters.
   const visibleClusters = showIgnored
     ? clusters
-    : clusters.filter((cluster) => cluster.pairs.some((pair) => !pair.ignored));
+    : clusters.filter((cluster) => !isFullyIgnored(cluster));
 
   // ---- Error state ----
   if (error) {
@@ -276,9 +327,9 @@ export function ConsolidationClusterList({ minScore }: ConsolidationClusterListP
           {total === 1
             ? '1 cluster found'
             : `${total} clusters found`}
-          {!showIgnored && clusters.length !== visibleClusters.length && (
+          {!showIgnored && ignoredCount > 0 && (
             <span className="ml-1">
-              ({clusters.length - visibleClusters.length} hidden)
+              ({ignoredCount} ignored {ignoredCount === 1 ? 'cluster' : 'clusters'} hidden)
             </span>
           )}
         </p>
@@ -288,13 +339,28 @@ export function ConsolidationClusterList({ minScore }: ConsolidationClusterListP
             id="show-ignored-toggle"
             checked={showIgnored}
             onCheckedChange={setShowIgnored}
-            aria-label="Show ignored pairs"
+            aria-label={
+              showIgnored
+                ? 'Hide ignored pairs'
+                : ignoredCount > 0
+                  ? `Show ignored pairs (${ignoredCount} hidden)`
+                  : 'Show ignored pairs'
+            }
           />
           <Label
             htmlFor="show-ignored-toggle"
             className="cursor-pointer select-none text-sm text-muted-foreground"
           >
             Show ignored pairs
+            {!showIgnored && ignoredCount > 0 && (
+              <Badge
+                variant="secondary"
+                className="ml-1.5 px-1.5 py-0 text-xs tabular-nums"
+                aria-label={`${ignoredCount} hidden`}
+              >
+                {ignoredCount}
+              </Badge>
+            )}
           </Label>
         </div>
       </div>
@@ -339,6 +405,11 @@ export function ConsolidationClusterList({ minScore }: ConsolidationClusterListP
                   Top Score
                 </TableHead>
                 <TableHead aria-label="Primary artifact name">Primary Artifact</TableHead>
+                {showIgnored && (
+                  <TableHead className="w-[120px]" aria-label="Ignored cluster actions">
+                    Actions
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -346,18 +417,31 @@ export function ConsolidationClusterList({ minScore }: ConsolidationClusterListP
                 const primaryType = getPrimaryType(cluster);
                 const primaryName = getPrimaryArtifactName(cluster);
                 const isSelected = selectedCluster?.cluster_id === cluster.cluster_id;
+                const fullyIgnored = isFullyIgnored(cluster);
                 const clusterHasIgnored = hasIgnoredPairs(cluster);
 
                 return (
                   <TableRow
                     key={cluster.cluster_id}
-                    className={`cursor-pointer transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
-                      isSelected ? 'bg-accent' : ''
-                    }`}
+                    className={[
+                      'cursor-pointer transition-colors',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                      fullyIgnored
+                        ? 'opacity-50 hover:opacity-70 hover:bg-muted/40'
+                        : 'hover:bg-muted/60',
+                      isSelected ? 'bg-accent' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
                     role="row"
                     aria-rowindex={rowIndex + 1}
                     aria-selected={isSelected}
-                    aria-label={`Cluster with ${cluster.members.length} artifacts, top score ${formatScore(cluster.max_score)}, primary artifact ${primaryName}`}
+                    aria-label={
+                      fullyIgnored
+                        ? `Ignored cluster with ${cluster.members.length} artifacts, primary artifact ${primaryName}`
+                        : `Cluster with ${cluster.members.length} artifacts, top score ${formatScore(cluster.max_score)}, primary artifact ${primaryName}`
+                    }
+                    aria-disabled={fullyIgnored ? true : undefined}
                     tabIndex={0}
                     onClick={() =>
                       setSelectedCluster(isSelected ? null : cluster)
@@ -369,6 +453,7 @@ export function ConsolidationClusterList({ minScore }: ConsolidationClusterListP
                       }
                     }}
                     data-testid="cluster-row"
+                    data-ignored={fullyIgnored ? 'true' : undefined}
                   >
                     {/* Artifact count */}
                     <TableCell>
@@ -384,27 +469,45 @@ export function ConsolidationClusterList({ minScore }: ConsolidationClusterListP
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <TypeBadge type={primaryType} />
-                        {clusterHasIgnored && (
+                        {fullyIgnored ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+                            aria-label="All pairs ignored"
+                            title="All pairs in this cluster are ignored"
+                          >
+                            <EyeOff className="h-3 w-3" aria-hidden="true" />
+                            ignored
+                          </span>
+                        ) : clusterHasIgnored ? (
                           <span
                             className="text-xs text-muted-foreground"
-                            aria-label="Has ignored pairs"
-                            title="This cluster contains ignored pairs"
+                            aria-label="Has some ignored pairs"
+                            title="This cluster contains some ignored pairs"
                           >
                             (some ignored)
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </TableCell>
 
                     {/* Highest score */}
                     <TableCell>
-                      <ScoreBadge score={cluster.max_score} />
+                      <span className={fullyIgnored ? 'line-through decoration-muted-foreground/50' : undefined}>
+                        <ScoreBadge score={cluster.max_score} />
+                      </span>
                     </TableCell>
 
                     {/* Primary artifact name + member count hint */}
                     <TableCell>
                       <div className="space-y-0.5">
-                        <div className="text-sm font-medium leading-tight">
+                        <div
+                          className={[
+                            'text-sm font-medium leading-tight',
+                            fullyIgnored ? 'line-through text-muted-foreground' : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
+                        >
                           {primaryName}
                         </div>
                         {cluster.members.length > 1 && (
@@ -414,6 +517,18 @@ export function ConsolidationClusterList({ minScore }: ConsolidationClusterListP
                         )}
                       </div>
                     </TableCell>
+
+                    {/* Un-ignore action column (only rendered when showIgnored) */}
+                    {showIgnored && (
+                      <TableCell>
+                        {fullyIgnored && (
+                          <UnignoreClusterButton
+                            cluster={cluster}
+                            minScore={minScore}
+                          />
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })}
