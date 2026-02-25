@@ -368,7 +368,7 @@ export function CatalogEntryModal({
   onNavigateToDeployment,
 }: CatalogEntryModalProps) {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'contents' | 'tags' | 'collections' | 'deployments' | 'plugin'
+    'overview' | 'contents' | 'tags' | 'collections' | 'deployments' | 'plugin' | 'similar'
   >('overview');
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
