@@ -581,8 +581,8 @@ test.describe('Merge flow', () => {
     // Verify snapshot response structure
     expect(capturedSnapshotResponse).not.toBeNull();
     expect(capturedSnapshotResponse!.snapshots).toHaveLength(1);
-    expect(capturedSnapshotResponse!.snapshots[0].id).toBe('snap-abc123');
-    expect(capturedSnapshotResponse!.snapshots[0].message).toMatch(
+    expect(capturedSnapshotResponse!.snapshots![0].id).toBe('snap-abc123');
+    expect(capturedSnapshotResponse!.snapshots![0].message).toMatch(
       /auto-snapshot before consolidation merge/i
     );
   });
