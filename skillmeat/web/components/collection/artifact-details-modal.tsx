@@ -44,6 +44,7 @@ import {
   AlertCircle,
   Plus,
   Blocks,
+  GitCompare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -86,6 +87,7 @@ import type { ArtifactDeploymentInfo } from '@/types/deployments';
 import type { Deployment } from '@/components/deployments/deployment-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PluginMembersTab } from '@/components/entity/plugin-members-tab';
+import { SimilarArtifactsTab } from '@/components/collection/similar-artifacts-tab';
 import { MiniArtifactCard } from '@/components/collection/mini-artifact-card';
 import {
   useArtifactAssociations,
@@ -167,7 +169,8 @@ export type ArtifactDetailsTab =
   | 'sources'
   | 'history'
   | 'deployments'
-  | 'plugin';
+  | 'plugin'
+  | 'similar';
 
 export interface ArtifactDetailsModalProps {
   /** The artifact to display in the modal */
@@ -484,6 +487,7 @@ const BASE_TABS: Tab[] = [
   { value: 'sources', label: 'Sources' },
   { value: 'history', label: 'History' },
   { value: 'deployments', label: 'Deployments' },
+  { value: 'similar', label: 'Similar', icon: GitCompare },
 ];
 
 /**
@@ -1628,6 +1632,14 @@ export function ArtifactDetailsModal({
                   </div>
                 )}
               </div>
+            </TabContentWrapper>
+
+            {/* Similar Tab */}
+            <TabContentWrapper value="similar">
+              <SimilarArtifactsTab
+                artifactId={artifact.uuid}
+                onArtifactClick={onNavigateToArtifact}
+              />
             </TabContentWrapper>
           </Tabs>
         </DialogContent>
