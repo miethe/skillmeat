@@ -1,28 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { Check, Copy, Edit3, Layers3, Loader2, Plus, Rocket, Trash2, X } from 'lucide-react';
+import { Copy, Edit3, Layers3, Rocket, Trash2 } from 'lucide-react';
 import type { DeploymentSet } from '@/types/deployment-sets';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
 import { COLOR_TAILWIND_CLASSES } from '@/lib/group-constants';
 import { cn } from '@/lib/utils';
-import { getTagColor } from '@/lib/utils/tag-colors';
-import { useUpdateDeploymentSet } from '@/hooks';
+import { DeploymentSetTagEditor } from '@/components/deployment-sets/deployment-set-tag-editor';
 
 /**
  * Normalize a color value (token name or hex) to a valid hex string,
@@ -42,156 +28,6 @@ function normalizeHexColor(value: string): string | null {
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Inline tag editing popover for deployment sets
-// ---------------------------------------------------------------------------
-
-interface DeploymentSetTagPopoverProps {
-  set: DeploymentSet;
-}
-
-function DeploymentSetTagPopover({ set }: DeploymentSetTagPopoverProps) {
-  const [open, setOpen] = React.useState(false);
-  const [search, setSearch] = React.useState('');
-  const [isPending, setIsPending] = React.useState(false);
-  const updateSet = useUpdateDeploymentSet();
-
-  const currentTags = set.tags ?? [];
-
-  // Filter to tags matching search (plus show current tags)
-  const filteredTags = React.useMemo(() => {
-    if (!search.trim()) return currentTags;
-    const q = search.toLowerCase().trim();
-    return currentTags.filter((t) => t.toLowerCase().includes(q));
-  }, [currentTags, search]);
-
-  const exactMatch = React.useMemo(() => {
-    if (!search.trim()) return true;
-    return currentTags.some((t) => t.toLowerCase() === search.toLowerCase().trim());
-  }, [currentTags, search]);
-
-  const handleRemoveTag = React.useCallback(
-    async (tag: string) => {
-      setIsPending(true);
-      try {
-        await updateSet.mutateAsync({
-          id: set.id,
-          data: { tags: currentTags.filter((t) => t !== tag) },
-        });
-      } catch (err) {
-        console.error('[DeploymentSetTagPopover] Failed to remove tag:', err);
-      } finally {
-        setIsPending(false);
-      }
-    },
-    [set.id, currentTags, updateSet],
-  );
-
-  const handleAddTag = React.useCallback(
-    async (tag: string) => {
-      const trimmed = tag.trim();
-      if (!trimmed || currentTags.includes(trimmed)) return;
-      setIsPending(true);
-      try {
-        await updateSet.mutateAsync({
-          id: set.id,
-          data: { tags: [...currentTags, trimmed] },
-        });
-        setSearch('');
-      } catch (err) {
-        console.error('[DeploymentSetTagPopover] Failed to add tag:', err);
-      } finally {
-        setIsPending(false);
-      }
-    },
-    [set.id, currentTags, updateSet],
-  );
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5 rounded-full"
-          aria-label="Edit tags"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Plus className="h-3 w-3" aria-hidden="true" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-64 p-0"
-        align="start"
-        side="bottom"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Search or add tags..."
-            value={search}
-            onValueChange={setSearch}
-          />
-          <CommandList className="max-h-56">
-            {currentTags.length === 0 && !search.trim() ? (
-              <CommandEmpty>No tags yet. Type to add one.</CommandEmpty>
-            ) : (
-              <>
-                {filteredTags.length > 0 && (
-                  <CommandGroup heading="Current tags">
-                    {filteredTags.map((tag) => (
-                      <CommandItem
-                        key={tag}
-                        value={tag}
-                        onSelect={() => void handleRemoveTag(tag)}
-                        className="flex items-center gap-2 px-2 py-1.5"
-                        disabled={isPending}
-                      >
-                        <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm border border-primary bg-primary text-primary-foreground">
-                          <Check className="h-3 w-3" aria-hidden="true" />
-                        </div>
-                        <Badge colorStyle={getTagColor(tag)} className="text-xs">
-                          {tag}
-                        </Badge>
-                        <X className="ml-auto h-3 w-3 text-muted-foreground" aria-hidden="true" />
-                        {isPending && (
-                          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                        )}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                )}
-                {search.trim() && !exactMatch && (
-                  <CommandGroup>
-                    <CommandItem
-                      value={`create:${search}`}
-                      onSelect={() => void handleAddTag(search)}
-                      className="flex items-center gap-2 px-2 py-1.5"
-                      disabled={isPending}
-                    >
-                      <Plus className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                      <span className="text-sm">
-                        Add{' '}
-                        <Badge colorStyle={getTagColor(search.trim())} className="text-xs">
-                          {search.trim()}
-                        </Badge>
-                      </span>
-                      {isPending && (
-                        <Loader2 className="ml-auto h-3 w-3 animate-spin text-muted-foreground" />
-                      )}
-                    </CommandItem>
-                  </CommandGroup>
-                )}
-              </>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 interface DeploymentSetCardProps {
   set: DeploymentSet;
   onOpen?: (setId: string) => void;
@@ -202,7 +38,6 @@ interface DeploymentSetCardProps {
 }
 
 export function DeploymentSetCard({ set, onOpen, onEdit, onDelete, onClone, onDeploy }: DeploymentSetCardProps) {
-  const tags = set.tags ?? [];
   const tokenColorClass =
     set.color && !set.color.startsWith('#')
       ? (COLOR_TAILWIND_CLASSES[set.color] ?? COLOR_TAILWIND_CLASSES.slate)
@@ -264,18 +99,13 @@ export function DeploymentSetCard({ set, onOpen, onEdit, onDelete, onClone, onDe
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {/* Tags row */}
-        <div className="flex min-h-[1.5rem] flex-wrap items-center gap-1">
-          {tags.length > 0 ? (
-            tags.map((tag) => (
-              <Badge key={tag} colorStyle={getTagColor(tag)} className="text-xs">
-                {tag}
-              </Badge>
-            ))
-          ) : (
-            <span className="text-xs text-muted-foreground">No tags</span>
-          )}
-          <DeploymentSetTagPopover set={set} />
+        {/* Tags — unified editor handles display + editing */}
+        <div
+          className="flex min-h-[1.5rem] flex-wrap items-center gap-1"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <DeploymentSetTagEditor deploymentSet={set} />
         </div>
 
         <div className="text-xs text-muted-foreground">

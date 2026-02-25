@@ -124,6 +124,7 @@ export function useResolveSet(id: string) {
  * Create a new deployment set.
  *
  * Invalidates all deployment set list queries on success.
+ * Also invalidates tag queries because a new set may affect deployment_set_count.
  */
 export function useCreateDeploymentSet() {
   const queryClient = useQueryClient();
@@ -132,6 +133,8 @@ export function useCreateDeploymentSet() {
     mutationFn: (data) => createDeploymentSet(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: deploymentSetKeys.lists() });
+      // Invalidate tag queries — deployment_set_count may change when a tagged set is created
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
     },
   });
 }
@@ -139,16 +142,22 @@ export function useCreateDeploymentSet() {
 /**
  * Update an existing deployment set (partial update).
  *
- * Invalidates the specific detail query and all list queries on success.
+ * Immediately updates the detail cache with the mutation response to avoid
+ * a refetch round-trip, then invalidates list queries and tag queries so
+ * all consumers (cards, tag pages) stay fresh.
  */
 export function useUpdateDeploymentSet() {
   const queryClient = useQueryClient();
 
   return useMutation<DeploymentSet, Error, { id: string; data: DeploymentSetUpdate }>({
     mutationFn: ({ id, data }) => updateDeploymentSet(id, data),
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: deploymentSetKeys.detail(id) });
+    onSuccess: (updatedSet, { id }) => {
+      // Immediately update detail cache with the returned data (no refetch delay)
+      queryClient.setQueryData(deploymentSetKeys.detail(id), updatedSet);
+      // Invalidate list queries so cards reflect the change
       queryClient.invalidateQueries({ queryKey: deploymentSetKeys.lists() });
+      // Invalidate tag queries so deployment_set_count stays fresh
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
     },
   });
 }
@@ -157,7 +166,7 @@ export function useUpdateDeploymentSet() {
  * Delete a deployment set.
  *
  * Cascade-deletes all member rows on the backend.
- * Invalidates the specific detail query and all list queries on success.
+ * Invalidates the specific detail query, all list queries, and tag queries on success.
  */
 export function useDeleteDeploymentSet() {
   const queryClient = useQueryClient();
@@ -167,6 +176,8 @@ export function useDeleteDeploymentSet() {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: deploymentSetKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: deploymentSetKeys.lists() });
+      // Invalidate tag queries — deployment_set_count changes when a set is deleted
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
     },
   });
 }
