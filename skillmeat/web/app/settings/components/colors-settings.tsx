@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { Plus, Trash2, Pencil } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Plus, Trash2, Pencil, HardDriveDownload, X } from 'lucide-react';
 import { useCustomColors, useCreateCustomColor, useDeleteCustomColor, useUpdateCustomColor } from '@/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,9 +21,60 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { isValidHex } from '@/lib/color-constants';
 import type { ColorResponse } from '@/lib/api/colors';
+
+// ---------------------------------------------------------------------------
+// LocalStorage migration key
+// ---------------------------------------------------------------------------
+
+const LS_LEGACY_KEY = 'skillmeat-group-custom-colors-v1';
+
+// ---------------------------------------------------------------------------
+// Migration banner
+// ---------------------------------------------------------------------------
+
+interface MigrationBannerProps {
+  onMigrate: () => Promise<void>;
+  onDismiss: () => void;
+  isMigrating: boolean;
+}
+
+function MigrationBanner({ onMigrate, onDismiss, isMigrating }: MigrationBannerProps) {
+  return (
+    <Alert className="relative flex items-start gap-3 border-amber-500/40 bg-amber-500/5 text-amber-900 dark:text-amber-200">
+      <HardDriveDownload className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+      <AlertDescription className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <span className="text-sm">
+          You have custom colors saved locally. Migrate them to sync across devices?
+        </span>
+        <div className="flex shrink-0 gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-amber-500/40 bg-transparent text-amber-800 hover:bg-amber-500/10 hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100"
+            onClick={() => void onMigrate()}
+            disabled={isMigrating}
+          >
+            {isMigrating ? 'Migrating…' : 'Migrate'}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-amber-800/60 hover:bg-amber-500/10 hover:text-amber-800 dark:text-amber-400/60 dark:hover:text-amber-300"
+            onClick={onDismiss}
+            disabled={isMigrating}
+            aria-label="Dismiss migration banner"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
+        </div>
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Loading skeleton
@@ -283,6 +334,66 @@ export function ColorsSettings() {
 
   const [pendingDelete, setPendingDelete] = useState<ColorResponse | null>(null);
 
+  // ── LocalStorage migration banner ────────────────────────────────────────
+  const [showMigrationBanner, setShowMigrationBanner] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(LS_LEGACY_KEY);
+      if (stored) {
+        setShowMigrationBanner(true);
+      }
+    } catch {
+      // localStorage unavailable (e.g. SSR or privacy mode) — silently ignore
+    }
+  }, []);
+
+  const handleMigrate = async () => {
+    setIsMigrating(true);
+    try {
+      const raw = localStorage.getItem(LS_LEGACY_KEY);
+      if (!raw) {
+        setShowMigrationBanner(false);
+        return;
+      }
+
+      let colors: string[];
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        colors = Array.isArray(parsed)
+          ? (parsed as unknown[]).filter((v): v is string => typeof v === 'string')
+          : [];
+      } catch {
+        // Malformed JSON — remove the key and hide the banner
+        localStorage.removeItem(LS_LEGACY_KEY);
+        setShowMigrationBanner(false);
+        return;
+      }
+
+      // Migrate each color; skip duplicates gracefully
+      for (const hex of colors) {
+        const normalised = hex.trim().startsWith('#') ? hex.trim() : `#${hex.trim()}`;
+        if (!isValidHex(normalised)) continue;
+        try {
+          await createColor.mutateAsync({ hex: normalised.toLowerCase() });
+        } catch {
+          // Duplicate or other error — skip and continue
+        }
+      }
+
+      localStorage.removeItem(LS_LEGACY_KEY);
+      setShowMigrationBanner(false);
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
+  const handleDismissMigration = () => {
+    // Hides the banner only; does NOT remove localStorage so user can migrate later
+    setShowMigrationBanner(false);
+  };
+
   const handleAdd = async (hex: string) => {
     await createColor.mutateAsync({ hex });
   };
@@ -299,6 +410,15 @@ export function ColorsSettings() {
 
   return (
     <div className="space-y-4">
+      {/* LocalStorage migration banner */}
+      {showMigrationBanner && (
+        <MigrationBanner
+          onMigrate={handleMigrate}
+          onDismiss={handleDismissMigration}
+          isMigrating={isMigrating}
+        />
+      )}
+
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div>
