@@ -1,87 +1,40 @@
 'use client';
 
-import { useState } from 'react';
-import { Trash2, Box, Users, Layers3 } from 'lucide-react';
-import type { DeploymentSetMember, DeploymentSetMemberType } from '@/types/deployment-sets';
-import { useRemoveMember, useToast } from '@/hooks';
-import { Badge } from '@/components/ui/badge';
+import { useState, useMemo } from 'react';
+import { Trash2, Layers3 } from 'lucide-react';
+import type { DeploymentSetMember } from '@/types/deployment-sets';
+import { useRemoveMember, useToast, useArtifacts, useGroup, useDeploymentSet } from '@/hooks';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { MiniArtifactCard } from '@/components/collection/mini-artifact-card';
+import { MiniGroupCard, MiniGroupCardSkeleton } from '@/components/deployment-sets/mini-group-card';
+import {
+  MiniDeploymentSetCard,
+  MiniDeploymentSetCardSkeleton,
+} from '@/components/deployment-sets/mini-deployment-set-card';
+import { cn } from '@/lib/utils';
+import type { Artifact } from '@/types/artifact';
 
 // ---------------------------------------------------------------------------
-// Type badge configuration
+// Remove overlay
 // ---------------------------------------------------------------------------
 
-interface MemberTypeMeta {
-  label: string;
-  icon: React.ElementType;
-  badgeClass: string;
-}
-
-const MEMBER_TYPE_META: Record<DeploymentSetMemberType, MemberTypeMeta> = {
-  artifact: {
-    label: 'Artifact',
-    icon: Box,
-    badgeClass:
-      'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800',
-  },
-  group: {
-    label: 'Group',
-    icon: Users,
-    badgeClass:
-      'bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800',
-  },
-  set: {
-    label: 'Set',
-    icon: Layers3,
-    badgeClass:
-      'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800',
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Derive a human-readable display name for a member row. */
-function getMemberDisplayName(member: DeploymentSetMember): string {
-  if (member.member_type === 'artifact' && member.artifact_uuid) {
-    return member.artifact_uuid;
-  }
-  if (member.member_type === 'group' && member.group_id) {
-    return `Group ${member.group_id}`;
-  }
-  if (member.member_type === 'set' && member.nested_set_id) {
-    return `Set ${member.nested_set_id}`;
-  }
-  return member.id;
-}
-
-// ---------------------------------------------------------------------------
-// Individual member row
-// ---------------------------------------------------------------------------
-
-interface MemberRowProps {
+interface RemoveOverlayProps {
   member: DeploymentSetMember;
   setId: string;
-  position: number;
+  displayName: string;
 }
 
-function MemberRow({ member, setId, position }: MemberRowProps) {
+function RemoveOverlay({ member, setId, displayName }: RemoveOverlayProps) {
   const [confirming, setConfirming] = useState(false);
   const removeMember = useRemoveMember();
   const { toast } = useToast();
 
-  const meta = MEMBER_TYPE_META[member.member_type];
-  const Icon = meta.icon;
-  const displayName = getMemberDisplayName(member);
-
-  const handleRemoveClick = () => {
+  const handleRemoveClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!confirming) {
       setConfirming(true);
       return;
     }
-    // Confirmed — fire the mutation
     removeMember.mutate(
       { setId, memberId: member.id },
       {
@@ -97,45 +50,23 @@ function MemberRow({ member, setId, position }: MemberRowProps) {
     );
   };
 
-  const handleCancelConfirm = () => setConfirming(false);
+  const handleCancelConfirm = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirming(false);
+  };
 
-  return (
-    <li
-      role="listitem"
-      className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 text-sm transition-colors hover:bg-accent/40"
-    >
-      {/* Position badge */}
-      <span
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
-        aria-label={`Position ${position}`}
+  if (confirming) {
+    return (
+      <div
+        className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-background/85 backdrop-blur-sm"
+        onClick={(e) => e.stopPropagation()}
       >
-        {position}
-      </span>
-
-      {/* Type icon */}
-      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-
-      {/* Type badge */}
-      <Badge
-        variant="outline"
-        className={`shrink-0 text-xs font-medium ${meta.badgeClass}`}
-      >
-        {meta.label}
-      </Badge>
-
-      {/* Name / identifier */}
-      <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground" title={displayName}>
-        {displayName}
-      </span>
-
-      {/* Remove / Confirm */}
-      {confirming ? (
-        <div className="flex shrink-0 items-center gap-1">
-          <span className="text-xs text-destructive">Remove?</span>
+        <p className="text-xs font-medium text-destructive">Remove member?</p>
+        <div className="flex items-center gap-1.5">
           <Button
             size="sm"
             variant="destructive"
-            className="h-7 px-2 text-xs"
+            className="h-7 px-3 text-xs"
             onClick={handleRemoveClick}
             disabled={removeMember.isPending}
             aria-label="Confirm remove member"
@@ -145,7 +76,7 @@ function MemberRow({ member, setId, position }: MemberRowProps) {
           <Button
             size="sm"
             variant="outline"
-            className="h-7 px-2 text-xs"
+            className="h-7 px-3 text-xs"
             onClick={handleCancelConfirm}
             disabled={removeMember.isPending}
             aria-label="Cancel remove"
@@ -153,39 +84,256 @@ function MemberRow({ member, setId, position }: MemberRowProps) {
             No
           </Button>
         </div>
-      ) : (
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 w-7 shrink-0 p-0 text-muted-foreground hover:text-destructive"
-          onClick={handleRemoveClick}
-          disabled={removeMember.isPending}
-          aria-label={`Remove ${meta.label} member ${displayName}`}
-        >
-          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        'absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full',
+        'bg-background/70 text-muted-foreground opacity-0 shadow-sm transition-all',
+        'hover:bg-destructive hover:text-destructive-foreground hover:opacity-100',
+        'group-hover:opacity-60 focus-visible:opacity-100',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
       )}
-    </li>
+      onClick={handleRemoveClick}
+      aria-label={`Remove ${displayName}`}
+    >
+      <Trash2 className="h-3 w-3" aria-hidden="true" />
+    </button>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Skeleton rows shown while loading
+// Card wrappers with remove overlay
+// ---------------------------------------------------------------------------
+
+interface ArtifactMemberCardProps {
+  member: DeploymentSetMember;
+  setId: string;
+  position: number;
+  artifact: Artifact;
+  onClick?: () => void;
+}
+
+function ArtifactMemberCard({ member, setId, position, artifact, onClick }: ArtifactMemberCardProps) {
+  return (
+    <div className="group relative" role="listitem">
+      {/* Position badge — absolute top-left over the card */}
+      <span
+        className="absolute left-1.5 top-1.5 z-10 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-muted/90 px-1.5 text-[10px] font-semibold tabular-nums text-muted-foreground shadow-sm"
+        aria-label={`Position ${position}`}
+      >
+        #{position}
+      </span>
+
+      <MiniArtifactCard
+        artifact={artifact}
+        onClick={onClick ?? (() => {})}
+        className="cursor-pointer"
+      />
+
+      <RemoveOverlay member={member} setId={setId} displayName={artifact.name} />
+    </div>
+  );
+}
+
+interface GroupMemberCardProps {
+  member: DeploymentSetMember;
+  setId: string;
+  position: number;
+  onClick?: () => void;
+}
+
+function GroupMemberCard({ member, setId, position, onClick }: GroupMemberCardProps) {
+  const { data: group, isLoading } = useGroup(member.group_id ?? undefined);
+
+  if (isLoading) {
+    return (
+      <div role="listitem">
+        <MiniGroupCardSkeleton />
+      </div>
+    );
+  }
+
+  if (!group) {
+    // Fallback skeleton-like placeholder when group can't be resolved
+    return (
+      <div
+        role="listitem"
+        className="flex min-h-[140px] items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground"
+      >
+        Group not found
+      </div>
+    );
+  }
+
+  return (
+    <div className="group relative" role="listitem">
+      <MiniGroupCard
+        group={group}
+        onClick={onClick}
+        position={position}
+      />
+      <RemoveOverlay member={member} setId={setId} displayName={group.name} />
+    </div>
+  );
+}
+
+interface SetMemberCardProps {
+  member: DeploymentSetMember;
+  setId: string;
+  position: number;
+  onClick?: () => void;
+}
+
+function SetMemberCard({ member, setId, position, onClick }: SetMemberCardProps) {
+  const { data: nestedSet, isLoading } = useDeploymentSet(member.nested_set_id ?? '');
+
+  if (isLoading) {
+    return (
+      <div role="listitem">
+        <MiniDeploymentSetCardSkeleton />
+      </div>
+    );
+  }
+
+  if (!nestedSet) {
+    return (
+      <div
+        role="listitem"
+        className="flex min-h-[140px] items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground"
+      >
+        Set not found
+      </div>
+    );
+  }
+
+  return (
+    <div className="group relative" role="listitem">
+      <MiniDeploymentSetCard
+        set={nestedSet}
+        onClick={onClick}
+        position={position}
+      />
+      <RemoveOverlay member={member} setId={setId} displayName={nestedSet.name} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Skeleton grid shown while loading
 // ---------------------------------------------------------------------------
 
 function MemberListSkeleton() {
   return (
-    <ul role="list" aria-label="Loading members" className="space-y-2">
+    <div
+      className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+      role="list"
+      aria-label="Loading members"
+      aria-busy="true"
+    >
       {[1, 2, 3].map((i) => (
-        <li key={i} className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3">
-          <Skeleton className="h-6 w-6 rounded-full" />
-          <Skeleton className="h-4 w-4" />
-          <Skeleton className="h-5 w-16 rounded-full" />
-          <Skeleton className="h-4 flex-1" />
-          <Skeleton className="h-7 w-7 rounded" />
-        </li>
+        <div key={i} role="listitem">
+          <MiniDeploymentSetCardSkeleton />
+        </div>
       ))}
-    </ul>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inner member grid (fetches artifacts itself)
+// ---------------------------------------------------------------------------
+
+interface MemberGridProps {
+  members: DeploymentSetMember[];
+  setId: string;
+  onArtifactClick?: (artifactUuid: string) => void;
+  onSetClick?: (nestedSetId: string) => void;
+  onGroupClick?: (groupId: string) => void;
+}
+
+function MemberGrid({ members, setId, onArtifactClick, onSetClick, onGroupClick }: MemberGridProps) {
+  // Fetch all artifacts to build a UUID lookup map — already cached by the collection page
+  const { data: artifactsResponse } = useArtifacts();
+
+  const artifactByUuid = useMemo<Record<string, Artifact>>(() => {
+    const artifacts = artifactsResponse?.artifacts ?? [];
+    return Object.fromEntries(artifacts.map((a) => [a.uuid, a]));
+  }, [artifactsResponse]);
+
+  return (
+    <div
+      className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+      role="list"
+      aria-label="Deployment set members"
+    >
+      {members.map((member, index) => {
+        const position = member.position ?? index + 1;
+
+        if (member.member_type === 'artifact') {
+          const artifact = member.artifact_uuid ? artifactByUuid[member.artifact_uuid] : undefined;
+
+          if (!artifact) {
+            // Still loading or unresolved — show a skeleton placeholder
+            return (
+              <div key={member.id} role="listitem">
+                <MiniDeploymentSetCardSkeleton />
+              </div>
+            );
+          }
+
+          return (
+            <ArtifactMemberCard
+              key={member.id}
+              member={member}
+              setId={setId}
+              position={position}
+              artifact={artifact}
+              onClick={
+                onArtifactClick && member.artifact_uuid
+                  ? () => onArtifactClick(member.artifact_uuid!)
+                  : undefined
+              }
+            />
+          );
+        }
+
+        if (member.member_type === 'group') {
+          return (
+            <GroupMemberCard
+              key={member.id}
+              member={member}
+              setId={setId}
+              position={position}
+              onClick={
+                onGroupClick && member.group_id
+                  ? () => onGroupClick(member.group_id!)
+                  : undefined
+              }
+            />
+          );
+        }
+
+        // set
+        return (
+          <SetMemberCard
+            key={member.id}
+            member={member}
+            setId={setId}
+            position={position}
+            onClick={
+              onSetClick && member.nested_set_id
+                ? () => onSetClick(member.nested_set_id!)
+                : undefined
+            }
+          />
+        );
+      })}
+    </div>
   );
 }
 
@@ -198,13 +346,25 @@ export interface MemberListProps {
   members: DeploymentSetMember[];
   /** ID of the parent deployment set (needed for remove mutations) */
   setId: string;
-  /** Called when the user clicks "Add Member" — wired up by DS-012 */
+  /** Called when the user clicks "Add Member" */
   onAddMember: () => void;
   /** Show skeleton loading state */
   isLoading?: boolean;
+  /** Optional click handlers for opening member detail views */
+  onArtifactClick?: (artifactUuid: string) => void;
+  onSetClick?: (nestedSetId: string) => void;
+  onGroupClick?: (groupId: string) => void;
 }
 
-export function MemberList({ members, setId, onAddMember, isLoading }: MemberListProps) {
+export function MemberList({
+  members,
+  setId,
+  onAddMember,
+  isLoading,
+  onArtifactClick,
+  onSetClick,
+  onGroupClick,
+}: MemberListProps) {
   if (isLoading) {
     return <MemberListSkeleton />;
   }
@@ -243,15 +403,12 @@ export function MemberList({ members, setId, onAddMember, isLoading }: MemberLis
   });
 
   return (
-    <ul role="list" aria-label="Deployment set members" className="space-y-2">
-      {sorted.map((member, index) => (
-        <MemberRow
-          key={member.id}
-          member={member}
-          setId={setId}
-          position={member.position ?? index + 1}
-        />
-      ))}
-    </ul>
+    <MemberGrid
+      members={sorted}
+      setId={setId}
+      onArtifactClick={onArtifactClick}
+      onSetClick={onSetClick}
+      onGroupClick={onGroupClick}
+    />
   );
 }

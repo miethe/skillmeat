@@ -26,7 +26,6 @@ import {
   Tag,
   Calendar,
   Hash,
-  Info,
   Rocket,
   MoreVertical,
   Pencil,
@@ -48,7 +47,6 @@ import {
   CollapsibleContent,
 } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,15 +65,19 @@ import {
   useDeleteDeploymentSet,
   useBatchDeploy,
   useToast,
+  useRemoveMember,
+  useGroup,
 } from '@/hooks';
 import { formatDate } from '@/lib/utils';
 import type { DeploymentSet, DeploymentSetMember } from '@/types/deployment-sets';
 import type { Artifact } from '@/types/artifact';
-import {
-  DeploymentSetMemberCard,
-  DeploymentSetMemberCardSkeleton,
-} from '@/components/deployment-sets/deployment-set-member-card';
 import { ArtifactDetailsModal } from '@/components/collection/artifact-details-modal';
+import { MiniArtifactCard } from '@/components/collection/mini-artifact-card';
+import { MiniGroupCard, MiniGroupCardSkeleton } from '@/components/deployment-sets/mini-group-card';
+import {
+  MiniDeploymentSetCard,
+  MiniDeploymentSetCardSkeleton,
+} from '@/components/deployment-sets/mini-deployment-set-card';
 import { AddMemberDialog } from '@/components/deployment-sets/add-member-dialog';
 import { DeploymentSetTagEditor } from '@/components/deployment-sets/deployment-set-tag-editor';
 
@@ -425,51 +427,6 @@ function DeploymentSetOverviewTab({ deploymentSet }: { deploymentSet: Deployment
 }
 
 // ============================================================================
-// Members tab
-// ============================================================================
-
-/**
- * GroupMemberPopover
- *
- * Displays a simple info popover for group-type members, showing the group ID
- * since there is no dedicated group detail modal.
- */
-function GroupMemberPopover({
-  member,
-  children,
-}: {
-  member: DeploymentSetMember;
-  children: React.ReactNode;
-}) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent className="w-72 p-4" side="top" align="center">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Info className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            <h4 className="text-sm font-semibold">Group Member</h4>
-          </div>
-          <Separator />
-          <div className="space-y-1 text-sm">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-muted-foreground">Group ID</span>
-              <span className="font-mono text-xs break-all text-right">
-                {member.group_id ?? member.id}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-muted-foreground">Position</span>
-              <span className="tabular-nums">{member.position ?? '—'}</span>
-            </div>
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-// ============================================================================
 // Member type section config
 // ============================================================================
 
@@ -487,6 +444,198 @@ const MEMBER_TYPE_CONFIG: Record<
 const MEMBER_TYPE_ORDER: MemberTypeKey[] = ['artifact', 'group', 'set'];
 
 // ============================================================================
+// Remove overlay (hover X → inline confirm)
+// ============================================================================
+
+interface RemoveOverlayProps {
+  member: DeploymentSetMember;
+  setId: string;
+  displayName: string;
+}
+
+function RemoveOverlay({ member, setId, displayName }: RemoveOverlayProps) {
+  const [confirming, setConfirming] = useState(false);
+  const removeMember = useRemoveMember();
+  const { toast } = useToast();
+
+  const handleRemoveClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+    removeMember.mutate(
+      { setId, memberId: member.id },
+      {
+        onError: (err) => {
+          toast({
+            title: 'Remove failed',
+            description: err instanceof Error ? err.message : 'An unexpected error occurred.',
+            variant: 'destructive',
+          });
+          setConfirming(false);
+        },
+      },
+    );
+  };
+
+  const handleCancelConfirm = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirming(false);
+  };
+
+  if (confirming) {
+    return (
+      <div
+        className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-background/85 backdrop-blur-sm"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-xs font-medium text-destructive">Remove member?</p>
+        <div className="flex items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="destructive"
+            className="h-7 px-3 text-xs"
+            onClick={handleRemoveClick}
+            disabled={removeMember.isPending}
+            aria-label="Confirm remove member"
+          >
+            Yes
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-3 text-xs"
+            onClick={handleCancelConfirm}
+            disabled={removeMember.isPending}
+            aria-label="Cancel remove"
+          >
+            No
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-background/70 text-muted-foreground opacity-0 shadow-sm transition-all hover:bg-destructive hover:text-destructive-foreground hover:opacity-100 group-hover:opacity-60 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      onClick={handleRemoveClick}
+      aria-label={`Remove ${displayName}`}
+    >
+      <Trash2 className="h-3 w-3" aria-hidden="true" />
+    </button>
+  );
+}
+
+// ============================================================================
+// Mini card wrappers with position badge + remove overlay
+// ============================================================================
+
+interface ArtifactMemberCardProps {
+  member: DeploymentSetMember;
+  setId: string;
+  position: number;
+  artifact: Artifact;
+  onClick?: () => void;
+}
+
+function ArtifactMemberCard({ member, setId, position, artifact, onClick }: ArtifactMemberCardProps) {
+  return (
+    <div className="group relative" role="listitem">
+      {/* Position badge — absolute top-left over the card */}
+      <span
+        className="absolute left-1.5 top-1.5 z-10 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-muted/90 px-1.5 text-[10px] font-semibold tabular-nums text-muted-foreground shadow-sm"
+        aria-label={`Position ${position}`}
+      >
+        #{position}
+      </span>
+      <MiniArtifactCard
+        artifact={artifact}
+        onClick={onClick ?? (() => {})}
+        className="cursor-pointer"
+      />
+      <RemoveOverlay member={member} setId={setId} displayName={artifact.name} />
+    </div>
+  );
+}
+
+interface GroupMemberCardProps {
+  member: DeploymentSetMember;
+  setId: string;
+  position: number;
+  onClick?: () => void;
+}
+
+function GroupMemberCard({ member, setId, position, onClick }: GroupMemberCardProps) {
+  const { data: group, isLoading } = useGroup(member.group_id ?? undefined);
+
+  if (isLoading) {
+    return (
+      <div role="listitem">
+        <MiniGroupCardSkeleton />
+      </div>
+    );
+  }
+
+  if (!group) {
+    return (
+      <div
+        role="listitem"
+        className="flex min-h-[140px] items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground"
+      >
+        Group not found
+      </div>
+    );
+  }
+
+  return (
+    <div className="group relative" role="listitem">
+      <MiniGroupCard group={group} onClick={onClick} position={position} />
+      <RemoveOverlay member={member} setId={setId} displayName={group.name} />
+    </div>
+  );
+}
+
+interface SetMemberCardProps {
+  member: DeploymentSetMember;
+  setId: string;
+  position: number;
+  onClick?: () => void;
+}
+
+function SetMemberCard({ member, setId, position, onClick }: SetMemberCardProps) {
+  const { data: nestedSet, isLoading } = useDeploymentSet(member.nested_set_id ?? '');
+
+  if (isLoading) {
+    return (
+      <div role="listitem">
+        <MiniDeploymentSetCardSkeleton />
+      </div>
+    );
+  }
+
+  if (!nestedSet) {
+    return (
+      <div
+        role="listitem"
+        className="flex min-h-[140px] items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground"
+      >
+        Set not found
+      </div>
+    );
+  }
+
+  return (
+    <div className="group relative" role="listitem">
+      <MiniDeploymentSetCard set={nestedSet} onClick={onClick} position={position} />
+      <RemoveOverlay member={member} setId={setId} displayName={nestedSet.name} />
+    </div>
+  );
+}
+
+// ============================================================================
 // Collapsible member section
 // ============================================================================
 
@@ -496,6 +645,7 @@ interface MemberSectionProps {
   isCollapsed: boolean;
   onToggle: () => void;
   artifactByUuid: Record<string, Artifact>;
+  setId: string;
   onArtifactClick: (artifact: Artifact) => void;
   onSetClick: (nestedSetId: string) => void;
 }
@@ -506,6 +656,7 @@ function MemberSection({
   isCollapsed,
   onToggle,
   artifactByUuid,
+  setId,
   onArtifactClick,
   onSetClick,
 }: MemberSectionProps) {
@@ -533,11 +684,11 @@ function MemberSection({
 
       <CollapsibleContent>
         <div
-          className="mt-2 max-h-[300px] overflow-y-auto"
+          className="mt-2 max-h-[360px] overflow-y-auto"
           aria-label={`${config.label} members`}
         >
           <div
-            className="grid grid-cols-1 gap-3 pb-1 pr-1 sm:grid-cols-2 lg:grid-cols-3"
+            className="grid grid-cols-2 gap-3 pb-1 pr-1 sm:grid-cols-3"
             role="list"
             aria-label={`${config.label} member cards`}
           >
@@ -545,55 +696,55 @@ function MemberSection({
               const position = member.position ?? index + 1;
 
               if (sectionKey === 'artifact') {
-                const resolvedArtifact =
-                  member.artifact_uuid ? artifactByUuid[member.artifact_uuid] : undefined;
+                const artifact = member.artifact_uuid
+                  ? artifactByUuid[member.artifact_uuid]
+                  : undefined;
+
+                if (!artifact) {
+                  // Artifact not yet resolved — show skeleton placeholder
+                  return (
+                    <div key={member.id} role="listitem">
+                      <MiniDeploymentSetCardSkeleton />
+                    </div>
+                  );
+                }
+
                 return (
-                  <div key={member.id} role="listitem">
-                    <DeploymentSetMemberCard
-                      member={member}
-                      resolvedArtifact={resolvedArtifact}
-                      position={position}
-                      onClick={
-                        resolvedArtifact
-                          ? () => onArtifactClick(resolvedArtifact)
-                          : undefined
-                      }
-                    />
-                  </div>
+                  <ArtifactMemberCard
+                    key={member.id}
+                    member={member}
+                    setId={setId}
+                    position={position}
+                    artifact={artifact}
+                    onClick={() => onArtifactClick(artifact)}
+                  />
                 );
               }
 
-              if (sectionKey === 'set') {
+              if (sectionKey === 'group') {
                 return (
-                  <div key={member.id} role="listitem">
-                    <DeploymentSetMemberCard
-                      member={member}
-                      position={position}
-                      onClick={() => {
-                        if (member.nested_set_id) {
-                          onSetClick(member.nested_set_id);
-                        }
-                      }}
-                    />
-                  </div>
+                  <GroupMemberCard
+                    key={member.id}
+                    member={member}
+                    setId={setId}
+                    position={position}
+                  />
                 );
               }
 
-              // group
+              // set
               return (
-                <div key={member.id} role="listitem">
-                  <GroupMemberPopover member={member}>
-                    <span className="block w-full">
-                      <DeploymentSetMemberCard
-                        member={member}
-                        position={position}
-                        onClick={() => {
-                          /* handled by popover trigger */
-                        }}
-                      />
-                    </span>
-                  </GroupMemberPopover>
-                </div>
+                <SetMemberCard
+                  key={member.id}
+                  member={member}
+                  setId={setId}
+                  position={position}
+                  onClick={
+                    member.nested_set_id
+                      ? () => onSetClick(member.nested_set_id!)
+                      : undefined
+                  }
+                />
               );
             })}
           </div>
@@ -617,7 +768,7 @@ function MemberSection({
  * Click behaviour:
  *   - artifact member → opens ArtifactDetailsModal
  *   - set member → opens a nested DeploymentSetDetailsModal
- *   - group member → shows a GroupMemberPopover with group info
+ *   - group member → opens MiniGroupCard (resolves group via useGroup)
  */
 function DeploymentSetMembersTab({ setId, collectionId }: { setId: string; collectionId?: string }) {
   // Members list for this deployment set
@@ -704,12 +855,12 @@ function DeploymentSetMembersTab({ setId, collectionId }: { setId: string; colle
           <Skeleton className="h-8 w-32" aria-label="Loading add button" />
         </div>
         <div
-          className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3"
           aria-busy="true"
           aria-label="Loading members"
         >
           {[1, 2, 3].map((i) => (
-            <DeploymentSetMemberCardSkeleton key={i} />
+            <MiniDeploymentSetCardSkeleton key={i} />
           ))}
         </div>
       </div>
@@ -765,6 +916,7 @@ function DeploymentSetMembersTab({ setId, collectionId }: { setId: string; colle
                 isCollapsed={collapsedSections.has(typeKey)}
                 onToggle={() => toggleSection(typeKey)}
                 artifactByUuid={artifactByUuid}
+                setId={setId}
                 onArtifactClick={(artifact) => {
                   setSelectedArtifact(artifact);
                   setArtifactModalOpen(true);

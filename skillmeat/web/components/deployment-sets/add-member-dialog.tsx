@@ -19,6 +19,7 @@ import {
   useAddMember,
   useArtifacts,
   useCollections,
+  useDeploymentSetMembers,
   useDeploymentSets,
   useGroups,
   useToast,
@@ -35,11 +36,12 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MiniArtifactCard } from '@/components/collection/mini-artifact-card';
+import { MiniGroupCard, MiniGroupCardSkeleton } from './mini-group-card';
+import { MiniDeploymentSetCard, MiniDeploymentSetCardSkeleton } from './mini-deployment-set-card';
 import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
@@ -196,9 +198,10 @@ function TypeFilter({ selected, onToggle }: TypeFilterProps) {
 interface ArtifactTabProps {
   setId: string;
   onAdded: (uuid: string) => void;
+  existingMemberUuids: Set<string>;
 }
 
-function ArtifactTab({ setId, onAdded }: ArtifactTabProps) {
+function ArtifactTab({ setId, onAdded, existingMemberUuids }: ArtifactTabProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<Set<ArtifactType>>(new Set());
@@ -290,6 +293,7 @@ function ArtifactTab({ setId, onAdded }: ArtifactTabProps) {
             {filtered.map((artifact) => {
               const isAdding = addingId === artifact.uuid;
               const isAdded = addedIds.has(artifact.uuid);
+              const isAlreadyMember = existingMemberUuids.has(artifact.uuid);
               return (
                 <div
                   key={artifact.uuid}
@@ -298,17 +302,29 @@ function ArtifactTab({ setId, onAdded }: ArtifactTabProps) {
                 >
                   <MiniArtifactCard
                     artifact={artifact}
-                    onClick={() => void handleAdd(artifact)}
+                    onClick={isAlreadyMember ? () => {} : () => void handleAdd(artifact)}
                     className={cn(
                       'cursor-pointer transition-all',
                       isAdding && 'cursor-wait opacity-60',
                       isAdded && 'ring-2 ring-emerald-500 ring-offset-1',
+                      isAlreadyMember && 'opacity-50 cursor-not-allowed pointer-events-none',
                     )}
                     aria-label={`Add ${artifact.name} (${artifact.type})`}
-                    aria-disabled={isAdding}
+                    aria-disabled={isAdding || isAlreadyMember}
                   />
+                  {/* "Already Selected" overlay */}
+                  {isAlreadyMember && (
+                    <div
+                      className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-background/50"
+                      aria-hidden="true"
+                    >
+                      <span className="rounded bg-background/80 px-2 py-0.5 text-xs font-medium text-muted-foreground shadow-sm">
+                        Already Selected
+                      </span>
+                    </div>
+                  )}
                   {/* Selection checkmark overlay */}
-                  {isAdded && (
+                  {isAdded && !isAlreadyMember && (
                     <div
                       className="pointer-events-none absolute inset-0 flex items-start justify-end rounded-lg bg-emerald-500/10 p-1.5"
                       aria-hidden="true"
@@ -337,9 +353,10 @@ interface GroupTabProps {
   onAdded: (groupId: string) => void;
   /** Collection ID to load groups from. Falls back to the first available collection. */
   collectionId?: string;
+  existingMemberGroupIds: Set<string>;
 }
 
-function GroupTab({ setId, onAdded, collectionId }: GroupTabProps) {
+function GroupTab({ setId, onAdded, collectionId, existingMemberGroupIds }: GroupTabProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [addingId, setAddingId] = useState<string | null>(null);
@@ -408,13 +425,9 @@ function GroupTab({ setId, onAdded, collectionId }: GroupTabProps) {
 
       <ScrollArea className="h-[340px]">
         {isLoading ? (
-          <div className="flex flex-col gap-1" role="list" aria-label="Loading groups">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-center gap-3 rounded-lg px-3 py-2.5">
-                <Skeleton className="h-4 w-4 rounded-full" />
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="ml-auto h-5 w-20 rounded-full" />
-              </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" role="list" aria-label="Loading groups">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <MiniGroupCardSkeleton key={i} />
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -422,42 +435,20 @@ function GroupTab({ setId, onAdded, collectionId }: GroupTabProps) {
             message={search ? `No groups match "${search}".` : 'No groups found.'}
           />
         ) : (
-          <div className="flex flex-col gap-0.5" role="list" aria-label="Groups">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" role="list" aria-label="Groups">
             {filtered.map((group) => {
               const isAdding = addingId === group.id;
               const isAdded = addedIds.has(group.id);
+              const isAlreadyMember = existingMemberGroupIds.has(group.id);
               return (
-                <div
-                  key={group.id}
-                  role="listitem"
-                  tabIndex={0}
-                  onClick={!isAdding ? () => void handleAdd(group) : undefined}
-                  onKeyDown={(e) => {
-                    if ((e.key === 'Enter' || e.key === ' ') && !isAdding) {
-                      e.preventDefault();
-                      void handleAdd(group);
-                    }
-                  }}
-                  aria-label={`Add group ${group.name}`}
-                  aria-disabled={isAdding}
-                  className={cn(
-                    'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
-                    'hover:bg-accent focus-visible:bg-accent focus-visible:outline-none',
-                    isAdding && 'cursor-wait opacity-60',
-                    isAdded && 'bg-emerald-50 dark:bg-emerald-950/30',
-                  )}
-                >
-                  <Users className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  <span className="min-w-0 truncate font-medium">{group.name}</span>
-                  <Badge variant="outline" className="ml-auto shrink-0 text-xs">
-                    {group.artifact_count} {group.artifact_count === 1 ? 'artifact' : 'artifacts'}
-                  </Badge>
-                  {isAdded && (
-                    <CheckCircle2
-                      className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
-                      aria-hidden="true"
-                    />
-                  )}
+                <div key={group.id} role="listitem" className="relative">
+                  <MiniGroupCard
+                    group={group}
+                    onClick={isAlreadyMember || isAdding ? undefined : () => void handleAdd(group)}
+                    disabled={isAlreadyMember}
+                    selected={isAdded}
+                    className={cn(isAdding && 'cursor-wait opacity-60')}
+                  />
                 </div>
               );
             })}
@@ -475,9 +466,10 @@ function GroupTab({ setId, onAdded, collectionId }: GroupTabProps) {
 interface SetTabProps {
   setId: string;
   onAdded: (nestedSetId: string) => void;
+  existingMemberSetIds: Set<string>;
 }
 
-function SetTab({ setId, onAdded }: SetTabProps) {
+function SetTab({ setId, onAdded, existingMemberSetIds }: SetTabProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [addingId, setAddingId] = useState<string | null>(null);
@@ -536,13 +528,9 @@ function SetTab({ setId, onAdded }: SetTabProps) {
 
       <ScrollArea className="h-[340px]">
         {isLoading ? (
-          <div className="flex flex-col gap-1" role="list" aria-label="Loading deployment sets">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-3 rounded-lg px-3 py-2.5">
-                <Skeleton className="h-3 w-3 rounded-full" />
-                <Skeleton className="h-4 w-44" />
-                <Skeleton className="ml-auto h-5 w-20 rounded-full" />
-              </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" role="list" aria-label="Loading deployment sets">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <MiniDeploymentSetCardSkeleton key={i} />
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -556,55 +544,20 @@ function SetTab({ setId, onAdded }: SetTabProps) {
             }
           />
         ) : (
-          <div className="flex flex-col gap-0.5" role="list" aria-label="Deployment sets">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" role="list" aria-label="Deployment sets">
             {filtered.map((depSet) => {
               const isAdding = addingId === depSet.id;
               const isAdded = addedIds.has(depSet.id);
+              const isAlreadyMember = existingMemberSetIds.has(depSet.id);
               return (
-                <div
-                  key={depSet.id}
-                  role="listitem"
-                  tabIndex={0}
-                  onClick={!isAdding ? () => void handleAdd(depSet) : undefined}
-                  onKeyDown={(e) => {
-                    if ((e.key === 'Enter' || e.key === ' ') && !isAdding) {
-                      e.preventDefault();
-                      void handleAdd(depSet);
-                    }
-                  }}
-                  aria-label={`Add deployment set ${depSet.name}`}
-                  aria-disabled={isAdding}
-                  className={cn(
-                    'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
-                    'hover:bg-accent focus-visible:bg-accent focus-visible:outline-none',
-                    isAdding && 'cursor-wait opacity-60',
-                    isAdded && 'bg-emerald-50 dark:bg-emerald-950/30',
-                  )}
-                >
-                  <span
-                    className="h-3 w-3 shrink-0 rounded-full border border-border"
-                    style={{
-                      backgroundColor: depSet.color?.startsWith('#')
-                        ? depSet.color
-                        : 'hsl(var(--muted-foreground))',
-                    }}
-                    aria-hidden="true"
+                <div key={depSet.id} role="listitem" className="relative">
+                  <MiniDeploymentSetCard
+                    set={depSet}
+                    onClick={isAlreadyMember || isAdding ? undefined : () => void handleAdd(depSet)}
+                    disabled={isAlreadyMember}
+                    selected={isAdded}
+                    className={cn(isAdding && 'cursor-wait opacity-60')}
                   />
-                  {depSet.icon && (
-                    <span className="shrink-0 text-base leading-none" aria-hidden="true">
-                      {depSet.icon}
-                    </span>
-                  )}
-                  <span className="min-w-0 truncate font-medium">{depSet.name}</span>
-                  <Badge variant="outline" className="ml-auto shrink-0 text-xs">
-                    {depSet.member_count} {depSet.member_count === 1 ? 'member' : 'members'}
-                  </Badge>
-                  {isAdded && (
-                    <CheckCircle2
-                      className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
-                      aria-hidden="true"
-                    />
-                  )}
                 </div>
               );
             })}
@@ -644,6 +597,35 @@ export function AddMemberDialog({ open, onOpenChange, setId, collectionId }: Add
   // noop — cache invalidation from useAddMember handles list refresh automatically
   const handleAdded = useCallback(() => {}, []);
 
+  // Fetch existing members to compute "already selected" state across all tabs.
+  // Only enabled when the dialog is open to avoid unnecessary requests.
+  const { data: existingMembers } = useDeploymentSetMembers(open ? setId : '');
+
+  // Derive already-selected ID sets per member type
+  const existingMemberUuids = useMemo<Set<string>>(() => {
+    const s = new Set<string>();
+    for (const m of existingMembers ?? []) {
+      if (m.member_type === 'artifact' && m.artifact_uuid) s.add(m.artifact_uuid);
+    }
+    return s;
+  }, [existingMembers]);
+
+  const existingMemberGroupIds = useMemo<Set<string>>(() => {
+    const s = new Set<string>();
+    for (const m of existingMembers ?? []) {
+      if (m.member_type === 'group' && m.group_id) s.add(m.group_id);
+    }
+    return s;
+  }, [existingMembers]);
+
+  const existingMemberSetIds = useMemo<Set<string>>(() => {
+    const s = new Set<string>();
+    for (const m of existingMembers ?? []) {
+      if (m.member_type === 'set' && m.nested_set_id) s.add(m.nested_set_id);
+    }
+    return s;
+  }, [existingMembers]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -682,15 +664,28 @@ export function AddMemberDialog({ open, onOpenChange, setId, collectionId }: Add
           </TabsList>
 
           <TabsContent value="artifact" className="mt-3 focus-visible:outline-none">
-            <ArtifactTab setId={setId} onAdded={handleAdded} />
+            <ArtifactTab
+              setId={setId}
+              onAdded={handleAdded}
+              existingMemberUuids={existingMemberUuids}
+            />
           </TabsContent>
 
           <TabsContent value="group" className="mt-3 focus-visible:outline-none">
-            <GroupTab setId={setId} onAdded={handleAdded} collectionId={collectionId} />
+            <GroupTab
+              setId={setId}
+              onAdded={handleAdded}
+              collectionId={collectionId}
+              existingMemberGroupIds={existingMemberGroupIds}
+            />
           </TabsContent>
 
           <TabsContent value="set" className="mt-3 focus-visible:outline-none">
-            <SetTab setId={setId} onAdded={handleAdded} />
+            <SetTab
+              setId={setId}
+              onAdded={handleAdded}
+              existingMemberSetIds={existingMemberSetIds}
+            />
           </TabsContent>
         </Tabs>
 
