@@ -522,12 +522,13 @@ export { useAnalyticsStream } from './useAnalyticsStream';
 export { useArtifactHistory, getArtifactHistoryId, artifactHistoryKeys } from './useArtifactHistory';
 
 // ============================================================================
-// SIMILARITY (3 hooks)
+// SIMILARITY (4 hooks)
 // ============================================================================
 // Similar artifact detection by content, structure, metadata, and semantics
 export {
   similarArtifactKeys,
   useSimilarArtifacts,
+  useDebouncedSimilarArtifacts,
 } from './use-similar-artifacts';
 
 // Similarity score thresholds and score-band color settings

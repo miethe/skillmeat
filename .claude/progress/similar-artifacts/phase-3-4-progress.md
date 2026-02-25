@@ -8,7 +8,7 @@ prd_ref: docs/project_plans/PRDs/features/similar-artifacts-v1.md
 plan_ref: docs/project_plans/implementation_plans/features/similar-artifacts-v1.md
 phase: 3
 title: Marketplace Tab + Similarity Badges & Settings
-status: pending
+status: completed
 started: '2026-02-25'
 completed: null
 commit_refs: []
@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 11
-completed_tasks: 9
+completed_tasks: 11
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -107,7 +107,7 @@ tasks:
   priority: high
 - id: SA-P4-007
   description: Badge batch query optimization
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -116,7 +116,7 @@ tasks:
   priority: medium
 - id: SA-P4-008
   description: E2E test — marketplace badge
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -193,7 +193,7 @@ files_modified:
 - skillmeat/web/__tests__/marketplace/similarity-badge.test.tsx
 - skillmeat/web/__tests__/e2e/marketplace-similar-tab.e2e.ts
 - skillmeat/web/__tests__/e2e/marketplace-badge.e2e.ts
-progress: 81
+progress: 100
 updated: '2026-02-25'
 ---
 

@@ -41,7 +41,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { GitHubSource, TrustLevel, ScanStatus } from '@/types/marketplace';
-import { useSimilarArtifacts, useSimilaritySettings } from '@/hooks';
+import { useDebouncedSimilarArtifacts, useSimilaritySettings } from '@/hooks';
 import { SimilarityBadge } from './similarity-badge';
 import { TagBadge } from './tag-badge';
 import { CountBadge } from './count-badge';
@@ -91,17 +91,30 @@ function useInView(threshold = 0.1): [React.RefObject<HTMLDivElement | null>, bo
  * but only after the card has entered the viewport. Returns `null` when
  * no similar artifacts exist above the floor threshold.
  *
- * The query is gated on `inView` via the `enabled` option so React Query
- * never fires a network request until the card is visible.
+ * Batching strategy (SA-P4-007):
+ * Delegates to `useDebouncedSimilarArtifacts`, which coalesces viewport-entry
+ * events that arrive within a 200ms window into a single React render cycle.
+ * All cards entering the viewport together have their React Query fetches
+ * dispatched concurrently rather than as scattered sequential renders.
+ * React Query's built-in per-key deduplication prevents duplicate network
+ * requests when the same artifact UUID appears across multiple card instances.
+ *
+ * Network tab expectation:
+ *   - Dense initial render / fast scroll: requests fire in one concurrent burst
+ *     ~200ms after the last card in the burst becomes visible.
+ *   - Slow scroll: one request fires ~200ms after each card individually.
+ *   - Re-scroll over already-seen cards: no requests (sticky inView + 5min staleTime).
  */
 function useLazySimilarity(artifactId: string | undefined, inView: boolean) {
   const { thresholds, colors } = useSimilaritySettings();
 
-  const { data } = useSimilarArtifacts(artifactId, {
+  // useDebouncedSimilarArtifacts manages the debounce gate internally.
+  // We pass `inView` as the trigger signal; the hook's `gated` state only
+  // flips to true after the 200ms debounce window clears.
+  const { data } = useDebouncedSimilarArtifacts(artifactId, inView, {
     limit: 1,
     minScore: thresholds.floor,
     source: 'collection',
-    enabled: inView && !!artifactId,
   });
 
   const topScore = data?.items[0]?.composite_score ?? null;
