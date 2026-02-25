@@ -85,7 +85,7 @@ export function IconPicker({ value, onChange, disabled = false }: IconPickerProp
     const icons: IconData[] = [];
 
     for (const pack of enabledPacks) {
-      for (const icon of pack.icons) {
+      for (const icon of pack.icons ?? []) {
         if (!seen.has(icon.name)) {
           seen.add(icon.name);
           // Cast to IconData — name is the required field; tags/categories are optional.
