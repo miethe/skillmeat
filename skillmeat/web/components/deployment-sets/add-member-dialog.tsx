@@ -18,11 +18,14 @@ import {
 import {
   useAddMember,
   useArtifacts,
+  useCollections,
   useDeploymentSets,
+  useGroups,
   useToast,
 } from '@/hooks';
 import type { DeploymentSet } from '@/types/deployment-sets';
 import type { Artifact, ArtifactType } from '@/types/artifact';
+import type { Group } from '@/types/groups';
 import {
   Dialog,
   DialogContent,
@@ -64,6 +67,12 @@ export interface AddMemberDialogProps {
   onOpenChange: (open: boolean) => void;
   /** The deployment set ID to add members to */
   setId: string;
+  /**
+   * Optional collection ID for the Groups tab.
+   * When omitted, the first available collection is used automatically.
+   * Pass explicitly to support a future collection selector.
+   */
+  collectionId?: string;
 }
 
 type TabValue = 'artifact' | 'group' | 'set';
@@ -323,66 +332,33 @@ function ArtifactTab({ setId, onAdded }: ArtifactTabProps) {
 // Group tab — list view (groups don't map to MiniArtifactCard)
 // ---------------------------------------------------------------------------
 
-interface GroupPickerItem {
-  id: string;
-  name: string;
-  artifact_count: number;
-  color?: string;
-}
-
 interface GroupTabProps {
   setId: string;
   onAdded: (groupId: string) => void;
+  /** Collection ID to load groups from. Falls back to the first available collection. */
+  collectionId?: string;
 }
 
-function GroupTab({ setId, onAdded }: GroupTabProps) {
+function GroupTab({ setId, onAdded, collectionId }: GroupTabProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [addingId, setAddingId] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const addMember = useAddMember();
 
-  const [groups, setGroups] = useState<GroupPickerItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Resolve collection ID: use prop if provided, otherwise fall back to the first collection
+  const { data: collectionsData } = useCollections({ limit: 1 });
+  const resolvedCollectionId = collectionId ?? collectionsData?.items[0]?.id;
 
-  useEffect(() => {
-    let cancelled = false;
-    setIsLoading(true);
-    fetch('/api/v1/groups', {
-      headers: { 'Content-Type': 'application/json' },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`Groups fetch failed: ${res.status}`);
-        return res.json() as Promise<{ groups: GroupPickerItem[]; total: number }>;
-      })
-      .then((data) => {
-        if (!cancelled) {
-          const sorted = [...(data.groups ?? [])].sort((a, b) =>
-            a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
-          );
-          setGroups(sorted);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          console.warn('[add-member-dialog] Failed to fetch groups:', err);
-          setGroups([]);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data: groupsData, isLoading } = useGroups(resolvedCollectionId);
+  const groups = groupsData?.groups ?? [];
 
   const filtered = groups.filter((g) =>
     g.name.toLowerCase().includes(search.toLowerCase()),
   );
 
   const handleAdd = useCallback(
-    async (group: GroupPickerItem) => {
+    async (group: Group) => {
       if (addingId) return;
       setAddingId(group.id);
       try {
@@ -646,7 +622,7 @@ function SetTab({ setId, onAdded }: SetTabProps) {
  * - Success toast on add, error toast on failure
  * - WCAG 2.1 AA: keyboard navigation, ARIA labels, focus management
  */
-export function AddMemberDialog({ open, onOpenChange, setId }: AddMemberDialogProps) {
+export function AddMemberDialog({ open, onOpenChange, setId, collectionId }: AddMemberDialogProps) {
   const [activeTab, setActiveTab] = useState<TabValue>('artifact');
 
   // Reset tab when dialog opens
@@ -699,7 +675,7 @@ export function AddMemberDialog({ open, onOpenChange, setId }: AddMemberDialogPr
           </TabsContent>
 
           <TabsContent value="group" className="mt-3 focus-visible:outline-none">
-            <GroupTab setId={setId} onAdded={handleAdded} />
+            <GroupTab setId={setId} onAdded={handleAdded} collectionId={collectionId} />
           </TabsContent>
 
           <TabsContent value="set" className="mt-3 focus-visible:outline-none">
