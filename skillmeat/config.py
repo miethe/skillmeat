@@ -1,6 +1,7 @@
 """Configuration management for SkillMeat."""
 
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -415,3 +416,117 @@ class ConfigManager:
             config: Dictionary with custom context configuration
         """
         self.set("platform.custom_context", config)
+
+    # -------------------------------------------------------------------------
+    # Similarity settings
+    # -------------------------------------------------------------------------
+
+    DEFAULT_SIMILARITY_THRESHOLDS: Dict[str, float] = {
+        "high": 0.80,
+        "partial": 0.55,
+        "low": 0.35,
+        "floor": 0.20,
+    }
+
+    DEFAULT_SIMILARITY_COLORS: Dict[str, str] = {
+        "high": "#22c55e",
+        "partial": "#eab308",
+        "low": "#f97316",
+    }
+
+    def get_similarity_thresholds(self) -> Dict[str, float]:
+        """Get similarity badge threshold configuration.
+
+        Returns:
+            Dict mapping band names (high/partial/low/floor) to float cutoffs.
+            Falls back to class defaults when not configured.
+
+        Example:
+            >>> config = ConfigManager()
+            >>> thresholds = config.get_similarity_thresholds()
+            >>> assert 0 < thresholds["floor"] < thresholds["high"] <= 1.0
+        """
+        stored = self.get("similarity.thresholds")
+        if stored is None:
+            return dict(self.DEFAULT_SIMILARITY_THRESHOLDS)
+        # Merge stored values over defaults so new keys are always present.
+        result = dict(self.DEFAULT_SIMILARITY_THRESHOLDS)
+        result.update(stored)
+        return result
+
+    def set_similarity_thresholds(self, thresholds: Dict[str, float]) -> None:
+        """Persist similarity threshold overrides to TOML.
+
+        Args:
+            thresholds: Mapping of band names to float cutoffs.
+                Valid keys: high, partial, low, floor.
+
+        Raises:
+            ValueError: If any threshold is outside [0.0, 1.0] or ordering
+                        constraint (floor < low < partial < high) is violated.
+        """
+        valid_keys = {"high", "partial", "low", "floor"}
+        unknown = set(thresholds) - valid_keys
+        if unknown:
+            raise ValueError(f"Unknown threshold keys: {unknown}. Valid: {valid_keys}")
+
+        for name, val in thresholds.items():
+            if not isinstance(val, (int, float)) or not (0.0 <= float(val) <= 1.0):
+                raise ValueError(
+                    f"Threshold '{name}' must be a float in [0.0, 1.0], got {val!r}"
+                )
+
+        # Merge with current to support partial updates before validating order.
+        merged = self.get_similarity_thresholds()
+        merged.update({k: float(v) for k, v in thresholds.items()})
+
+        # Enforce ordering: floor < low < partial < high
+        order = [("floor", "low"), ("low", "partial"), ("partial", "high")]
+        for lower_key, upper_key in order:
+            if merged[lower_key] >= merged[upper_key]:
+                raise ValueError(
+                    f"Threshold ordering violated: '{lower_key}' ({merged[lower_key]}) "
+                    f"must be less than '{upper_key}' ({merged[upper_key]})"
+                )
+
+        self.set("similarity.thresholds", merged)
+
+    def get_similarity_colors(self) -> Dict[str, str]:
+        """Get similarity badge color configuration.
+
+        Returns:
+            Dict mapping band names (high/partial/low) to CSS hex color strings.
+            Falls back to class defaults when not configured.
+        """
+        stored = self.get("similarity.colors")
+        if stored is None:
+            return dict(self.DEFAULT_SIMILARITY_COLORS)
+        result = dict(self.DEFAULT_SIMILARITY_COLORS)
+        result.update(stored)
+        return result
+
+    def set_similarity_colors(self, colors: Dict[str, str]) -> None:
+        """Persist similarity color overrides to TOML.
+
+        Args:
+            colors: Mapping of band names to CSS hex color strings.
+                Valid keys: high, partial, low.
+
+        Raises:
+            ValueError: If any key is unknown or color string is not a valid hex.
+        """
+        valid_keys = {"high", "partial", "low"}
+        unknown = set(colors) - valid_keys
+        if unknown:
+            raise ValueError(f"Unknown color keys: {unknown}. Valid: {valid_keys}")
+
+        hex_pattern = re.compile(r"^#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?$")
+        for name, val in colors.items():
+            if not isinstance(val, str) or not hex_pattern.match(val):
+                raise ValueError(
+                    f"Color '{name}' must be a CSS hex string (e.g. '#22c55e'), got {val!r}"
+                )
+
+        merged = self.get_similarity_colors()
+        merged.update(colors)
+        self.set("similarity.colors", merged)
