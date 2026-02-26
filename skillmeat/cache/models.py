@@ -26,6 +26,7 @@ Models:
     - DeploymentSetMember: Polymorphic member entry within a DeploymentSet
     - CustomColor: User-defined hex colors for the site-wide color palette registry
     - DuplicatePair: Persisted record of a similar/duplicate artifact pair with optional ignored flag
+    - SimilarityCache: Cached pairwise composite similarity scores with breakdown JSON (SSO-2.2)
 
 Usage:
     >>> from skillmeat.cache.models import get_session, Project, Artifact
@@ -1131,6 +1132,32 @@ class CollectionArtifact(Base):
         Text, nullable=True
     )  # JSON array of deployment paths
     version: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Fingerprint fields for similarity scoring (SSO-2.1)
+    artifact_content_hash: Mapped[Optional[str]] = mapped_column(
+        String(64),
+        nullable=True,
+        comment="SHA-256 hash of artifact file contents — distinct from context-entity content_hash",
+    )
+    artifact_structure_hash: Mapped[Optional[str]] = mapped_column(
+        String(64),
+        nullable=True,
+        comment="Hash of artifact directory structure (filenames + tree shape)",
+    )
+    artifact_file_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+        comment="Number of files in the artifact",
+    )
+    artifact_total_size: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+        comment="Total byte size of all artifact files",
+    )
     source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     origin: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     origin_source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
@@ -3708,6 +3735,110 @@ class DuplicatePair(Base):
             "ignored": self.ignored,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+# =============================================================================
+# SimilarityCache (SSO-2.2)
+# =============================================================================
+
+
+class SimilarityCache(Base):
+    """Cached pairwise composite similarity score between two collection artifacts.
+
+    Stores precomputed similarity results so that expensive scoring operations
+    are not repeated on every request.  The entry is keyed by the ordered pair
+    ``(source_artifact_uuid, target_artifact_uuid)`` — each direction is stored
+    independently, allowing asymmetric scoring if the underlying algorithm
+    supports it.
+
+    Attributes:
+        source_artifact_uuid: UUID of the artifact being compared from
+        target_artifact_uuid: UUID of the artifact being compared to
+        composite_score: Final weighted composite score in [0.0, 1.0]
+        breakdown_json: Optional JSON-encoded dict of per-dimension scores
+        computed_at: Timestamp when the score was last computed
+
+    Constraints:
+        - Composite primary key on (source_artifact_uuid, target_artifact_uuid)
+        - FK CASCADE DELETE on both UUID columns referencing collection_artifacts.uuid
+
+    Indexes:
+        - idx_similarity_cache_source_score: Fast retrieval of top-N similar
+          artifacts for a given source, ordered by score descending
+    """
+
+    __tablename__ = "similarity_cache"
+
+    # Composite primary key — ordered pair of artifact UUIDs
+    source_artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+        comment="UUID of the source artifact (the 'query' side of the comparison)",
+    )
+    target_artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+        comment="UUID of the target artifact (the 'candidate' side of the comparison)",
+    )
+
+    # Similarity result
+    composite_score: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        comment="Final weighted composite similarity score in [0.0, 1.0]",
+    )
+    breakdown_json: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON-encoded dict of per-dimension scores (e.g. name, tags, text)",
+    )
+
+    # Timestamp for cache invalidation
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        server_default="CURRENT_TIMESTAMP",
+        comment="Timestamp when this score was computed; used for cache invalidation",
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        # Composite index on source + score DESC for efficient top-N lookups
+        Index(
+            "idx_similarity_cache_source_score",
+            "source_artifact_uuid",
+            "composite_score",
+        ),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of SimilarityCache."""
+        return (
+            f"<SimilarityCache("
+            f"source={self.source_artifact_uuid!r}, "
+            f"target={self.target_artifact_uuid!r}, "
+            f"score={self.composite_score!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert SimilarityCache to dictionary for JSON serialization."""
+        breakdown: Optional[Dict[str, Any]] = None
+        if self.breakdown_json:
+            try:
+                breakdown = json.loads(self.breakdown_json)
+            except (ValueError, TypeError):
+                breakdown = None
+
+        return {
+            "source_artifact_uuid": self.source_artifact_uuid,
+            "target_artifact_uuid": self.target_artifact_uuid,
+            "composite_score": self.composite_score,
+            "breakdown": breakdown,
+            "computed_at": self.computed_at.isoformat() if self.computed_at else None,
         }
 
 
