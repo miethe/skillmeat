@@ -2,150 +2,181 @@
 schema_version: 2
 doc_type: progress
 type: progress
-prd: "similarity-scoring-overhaul"
-feature_slug: "similarity-scoring-overhaul"
-prd_ref: "docs/project_plans/PRDs/features/similarity-scoring-overhaul-v1.md"
-plan_ref: "docs/project_plans/implementation_plans/features/similarity-scoring-overhaul-v1.md"
+prd: similarity-scoring-overhaul
+feature_slug: similarity-scoring-overhaul
+prd_ref: docs/project_plans/PRDs/features/similarity-scoring-overhaul-v1.md
+plan_ref: docs/project_plans/implementation_plans/features/similarity-scoring-overhaul-v1.md
 phase: 2
-title: "Schema + Pre-computation Cache"
-status: "planning"
+title: Schema + Pre-computation Cache
+status: completed
 started: null
 completed: null
 commit_refs: []
 pr_refs: []
 overall_progress: 0
-completion_estimate: "on-track"
+completion_estimate: on-track
 total_tasks: 9
-completed_tasks: 0
+completed_tasks: 9
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-owners: ["python-backend-engineer", "data-layer-expert", "ui-engineer-enhanced"]
+owners:
+- python-backend-engineer
+- data-layer-expert
+- ui-engineer-enhanced
 contributors: []
-
-# === TASKS (SOURCE OF TRUTH) ===
 tasks:
-  - id: "SSO-2.1"
-    description: "Add fingerprint columns to CollectionArtifact: artifact_content_hash, artifact_structure_hash, artifact_file_count, artifact_total_size"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["SSO-1.3"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "SSO-2.2"
-    description: "Create SimilarityCache ORM model with source/target UUIDs, composite_score, breakdown_json, computed_at"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["SSO-2.1"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "SSO-2.3"
-    description: "Create SimilarityCacheManager with get_similar(), compute_and_store(), invalidate(), rebuild_all() methods"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SSO-2.2"]
-    estimated_effort: "3 pts"
-    priority: "high"
-
-  - id: "SSO-2.4"
-    description: "Populate fingerprint columns at sync/import time in refresh_single_artifact_cache() path"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SSO-2.2"]
-    estimated_effort: "3 pts"
-    priority: "high"
-
-  - id: "SSO-2.5"
-    description: "Wire cache invalidation into refresh flow: invalidate and rebuild cache after refresh_single_artifact_cache()"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SSO-2.3", "SSO-2.4"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "SSO-2.6"
-    description: "Update similar endpoint to read from cache first, fall back to live computation, return X-Cache headers"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SSO-2.5"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "SSO-2.7"
-    description: "Add FTS5 virtual table migration with artifact_uuid, name, title, description, tags columns"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["SSO-2.2"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "SSO-2.8"
-    description: "Update frontend hook (use-similar-artifacts.ts) and tab to handle cache indicators and invalidation on edit"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SSO-2.6"]
-    estimated_effort: "2 pts"
-    priority: "medium"
-
-  - id: "SSO-2.9"
-    description: "Write Phase 2 tests: test_similarity_cache.py, migration test, content_score test"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SSO-2.6"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-# Parallelization Strategy (computed from dependencies)
+- id: SSO-2.1
+  description: 'Add fingerprint columns to CollectionArtifact: artifact_content_hash,
+    artifact_structure_hash, artifact_file_count, artifact_total_size'
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - SSO-1.3
+  estimated_effort: 2 pts
+  priority: high
+- id: SSO-2.2
+  description: Create SimilarityCache ORM model with source/target UUIDs, composite_score,
+    breakdown_json, computed_at
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - SSO-2.1
+  estimated_effort: 2 pts
+  priority: high
+- id: SSO-2.3
+  description: Create SimilarityCacheManager with get_similar(), compute_and_store(),
+    invalidate(), rebuild_all() methods
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SSO-2.2
+  estimated_effort: 3 pts
+  priority: high
+- id: SSO-2.4
+  description: Populate fingerprint columns at sync/import time in refresh_single_artifact_cache()
+    path
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SSO-2.2
+  estimated_effort: 3 pts
+  priority: high
+- id: SSO-2.5
+  description: 'Wire cache invalidation into refresh flow: invalidate and rebuild
+    cache after refresh_single_artifact_cache()'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SSO-2.3
+  - SSO-2.4
+  estimated_effort: 2 pts
+  priority: high
+- id: SSO-2.6
+  description: Update similar endpoint to read from cache first, fall back to live
+    computation, return X-Cache headers
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SSO-2.5
+  estimated_effort: 2 pts
+  priority: high
+- id: SSO-2.7
+  description: Add FTS5 virtual table migration with artifact_uuid, name, title, description,
+    tags columns
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - SSO-2.2
+  estimated_effort: 2 pts
+  priority: high
+- id: SSO-2.8
+  description: Update frontend hook (use-similar-artifacts.ts) and tab to handle cache
+    indicators and invalidation on edit
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SSO-2.6
+  estimated_effort: 2 pts
+  priority: medium
+- id: SSO-2.9
+  description: 'Write Phase 2 tests: test_similarity_cache.py, migration test, content_score
+    test'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SSO-2.6
+  estimated_effort: 2 pts
+  priority: high
 parallelization:
-  batch_1: ["SSO-2.1"]
-  batch_2: ["SSO-2.2", "SSO-2.7"]
-  batch_3: ["SSO-2.3", "SSO-2.4"]
-  batch_4: ["SSO-2.5"]
-  batch_5: ["SSO-2.6"]
-  batch_6: ["SSO-2.8", "SSO-2.9"]
-  critical_path: ["SSO-2.1", "SSO-2.2", "SSO-2.3", "SSO-2.5", "SSO-2.6", "SSO-2.8"]
-  estimated_total_time: "~2.5 days (18 pts)"
-
-# Critical Blockers
+  batch_1:
+  - SSO-2.1
+  batch_2:
+  - SSO-2.2
+  - SSO-2.7
+  batch_3:
+  - SSO-2.3
+  - SSO-2.4
+  batch_4:
+  - SSO-2.5
+  batch_5:
+  - SSO-2.6
+  batch_6:
+  - SSO-2.8
+  - SSO-2.9
+  critical_path:
+  - SSO-2.1
+  - SSO-2.2
+  - SSO-2.3
+  - SSO-2.5
+  - SSO-2.6
+  - SSO-2.8
+  estimated_total_time: ~2.5 days (18 pts)
 blockers: []
-
-# Success Criteria
 success_criteria:
-  - id: "SC-1"
-    description: "Tab loads in < 200ms from cache for warm cache"
-    status: "pending"
-  - id: "SC-2"
-    description: "Cache rebuilds in < 60s for 1000 artifacts (full rebuild)"
-    status: "pending"
-  - id: "SC-3"
-    description: "Incremental update for single artifact < 1s"
-    status: "pending"
-  - id: "SC-4"
-    description: "_compute_content_score() returns > 0 for artifacts with shared content hashes"
-    status: "pending"
-  - id: "SC-5"
-    description: "FTS5 pre-filter reduces full-score computation from O(n) to O(50) candidates"
-    status: "pending"
-  - id: "SC-6"
-    description: "Alembic migration runs cleanly against existing DB with no data loss"
-    status: "pending"
-  - id: "SC-7"
-    description: "X-Cache response headers present on all /similar responses"
-    status: "pending"
-
-# Files Modified
+- id: SC-1
+  description: Tab loads in < 200ms from cache for warm cache
+  status: pending
+- id: SC-2
+  description: Cache rebuilds in < 60s for 1000 artifacts (full rebuild)
+  status: pending
+- id: SC-3
+  description: Incremental update for single artifact < 1s
+  status: pending
+- id: SC-4
+  description: _compute_content_score() returns > 0 for artifacts with shared content
+    hashes
+  status: pending
+- id: SC-5
+  description: FTS5 pre-filter reduces full-score computation from O(n) to O(50) candidates
+  status: pending
+- id: SC-6
+  description: Alembic migration runs cleanly against existing DB with no data loss
+  status: pending
+- id: SC-7
+  description: X-Cache response headers present on all /similar responses
+  status: pending
 files_modified:
-  - "skillmeat/cache/models.py"
-  - "skillmeat/cache/similarity_cache.py"
-  - "skillmeat/core/similarity.py"
-  - "skillmeat/api/routers/artifacts.py"
-  - "skillmeat/web/hooks/use-similar-artifacts.ts"
-  - "skillmeat/web/components/collection/similar-artifacts-tab.tsx"
-  - "alembic/versions/XXXX_add_similarity_cache.py"
-  - "tests/test_similarity_cache.py"
-  - "tests/test_similarity_integration.py"
+- skillmeat/cache/models.py
+- skillmeat/cache/similarity_cache.py
+- skillmeat/core/similarity.py
+- skillmeat/api/routers/artifacts.py
+- skillmeat/web/hooks/use-similar-artifacts.ts
+- skillmeat/web/components/collection/similar-artifacts-tab.tsx
+- alembic/versions/XXXX_add_similarity_cache.py
+- tests/test_similarity_cache.py
+- tests/test_similarity_integration.py
+progress: 100
+updated: '2026-02-26'
 ---
 
 # Similarity Scoring Overhaul - Phase 2: Schema + Pre-computation Cache
