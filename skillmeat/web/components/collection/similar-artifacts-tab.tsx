@@ -29,10 +29,11 @@
 'use client';
 
 import * as React from 'react';
-import { AlertCircle, Clock, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertCircle, Clock, RefreshCw, Sparkles, Zap, ZapOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MiniArtifactCard } from '@/components/collection/mini-artifact-card';
 import { useSimilarArtifacts } from '@/hooks';
 import type { SimilarArtifact } from '@/types/similarity';
@@ -128,6 +129,55 @@ function CacheAgeIndicator({ cacheStatus, cacheAgeSeconds }: CacheAgeIndicatorPr
       <Clock className="h-3 w-3" aria-hidden="true" />
       cached {formatCacheAge(cacheAgeSeconds)}
     </span>
+  );
+}
+
+// ============================================================================
+// EmbeddingStatusIndicator
+// ============================================================================
+
+interface EmbeddingStatusIndicatorProps {
+  /** Whether any result has a non-null semantic score */
+  embeddingsEnabled: boolean;
+}
+
+/**
+ * Small, non-intrusive indicator showing whether semantic embeddings are active.
+ * Shows a filled lightning bolt when enabled, an outlined one when not installed.
+ * A tooltip provides the human-readable explanation.
+ */
+function EmbeddingStatusIndicator({ embeddingsEnabled }: EmbeddingStatusIndicatorProps) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className={cn(
+              'flex items-center gap-1 text-xs',
+              embeddingsEnabled
+                ? 'text-muted-foreground/60'
+                : 'text-muted-foreground/40'
+            )}
+            aria-label={
+              embeddingsEnabled
+                ? 'Semantic embeddings are enabled'
+                : 'Semantic embeddings are not installed'
+            }
+          >
+            {embeddingsEnabled ? (
+              <Zap className="h-3 w-3" aria-hidden="true" />
+            ) : (
+              <ZapOff className="h-3 w-3" aria-hidden="true" />
+            )}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="left" className="text-xs max-w-[200px]">
+          {embeddingsEnabled
+            ? 'Embeddings: enabled — semantic scores are included in similarity results.'
+            : 'Embeddings: not installed — install sentence-transformers to enable semantic scoring.'}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -375,14 +425,25 @@ function SimilarArtifactsTabContent({
   }
 
   // ---- Results ----
+  // Embeddings are considered enabled when at least one result carries a
+  // non-null semantic_score. If all are null, sentence-transformers is absent.
+  const embeddingsEnabled = items.some(
+    (item) => item.breakdown.semantic_score !== null
+  );
+
   return (
     <div className="flex flex-col gap-2">
-      {/* Cache freshness indicator — only visible on cache HITs */}
-      <div className="flex justify-end">
-        <CacheAgeIndicator
-          cacheStatus={cacheStatus}
-          cacheAgeSeconds={cacheAgeSeconds}
-        />
+      {/* Status row: cache age (left) and embedding indicator (right) */}
+      <div className="flex items-center justify-between">
+        {/* Left spacer so embedding indicator stays right-aligned when no cache indicator */}
+        <span />
+        <div className="flex items-center gap-2">
+          <CacheAgeIndicator
+            cacheStatus={cacheStatus}
+            cacheAgeSeconds={cacheAgeSeconds}
+          />
+          <EmbeddingStatusIndicator embeddingsEnabled={embeddingsEnabled} />
+        </div>
       </div>
 
       <div
