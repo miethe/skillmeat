@@ -14,6 +14,7 @@ import {
   Bot,
   Server,
   Webhook,
+  Boxes,
 } from 'lucide-react';
 import {
   useAddMember,
@@ -58,6 +59,7 @@ const ARTIFACT_TYPES: {
   { value: 'agent', label: 'Agents', icon: Bot },
   { value: 'mcp', label: 'MCP Servers', icon: Server },
   { value: 'hook', label: 'Hooks', icon: Webhook },
+  { value: 'composite', label: 'Composites', icon: Boxes },
 ];
 
 // ---------------------------------------------------------------------------
@@ -209,7 +211,7 @@ function ArtifactTab({ setId, onAdded, existingMemberUuids }: ArtifactTabProps) 
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const addMember = useAddMember();
 
-  const { data: artifactsData, isLoading } = useArtifacts({}, { field: 'name', order: 'asc' });
+  const { data: artifactsData, isLoading } = useArtifacts({ limit: 500 }, { field: 'name', order: 'asc' });
   const artifacts: Artifact[] = artifactsData?.artifacts ?? [];
 
   const filtered = useMemo(() => {
