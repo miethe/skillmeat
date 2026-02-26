@@ -66,6 +66,7 @@ from sqlalchemy import (
     Index,
     Integer,
     JSON,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -3840,6 +3841,107 @@ class SimilarityCache(Base):
             "breakdown": breakdown,
             "computed_at": self.computed_at.isoformat() if self.computed_at else None,
         }
+
+
+# =============================================================================
+# ArtifactEmbedding (SSO-3.3)
+# =============================================================================
+
+
+class ArtifactEmbedding(Base):
+    """Persisted vector embedding for a collection artifact.
+
+    Stores the dense vector representation (embedding) produced by a sentence-
+    transformer model so that embedding generation is not repeated on every
+    similarity-scoring request.  The embedding is serialised as a raw byte blob
+    (numpy ``ndarray.tobytes()`` / ``frombuffer()``).
+
+    NOTE: A file-based embedding cache also exists at ``~/.skillmeat/embeddings.db``
+    (used by ``AnthropicEmbedder`` / ``HaikuEmbedder`` in
+    ``skillmeat/core/scoring/haiku_embedder.py``).  That store is keyed on text
+    hash rather than artifact UUID and is unrelated to this table.  The ORM table
+    is the canonical, artifact-scoped embedding store going forward; the file-based
+    cache is a legacy implementation detail of the (currently unavailable)
+    Anthropic embedder stub.
+
+    Attributes:
+        artifact_uuid: UUID of the collection artifact this embedding belongs to.
+            Acts as the primary key and references ``artifacts.uuid`` with
+            CASCADE DELETE so that removing an artifact automatically removes
+            its embedding row.
+        embedding: Raw bytes of the embedding vector.  Deserialise with
+            ``numpy.frombuffer(embedding, dtype=numpy.float32)``.
+        model_name: Identifier of the model that produced the embedding
+            (e.g. ``"all-MiniLM-L6-v2"``).
+        embedding_dim: Length of the embedding vector (e.g. 384 for
+            ``all-MiniLM-L6-v2``).  Stored explicitly so consumers can
+            deserialise without knowing the model ahead of time.
+        computed_at: Timestamp when the embedding was last computed.  Used for
+            TTL-based invalidation when the underlying artifact content changes.
+
+    Constraints:
+        - Primary key on ``artifact_uuid``
+        - FK CASCADE DELETE on ``artifact_uuid`` referencing ``artifacts.uuid``
+
+    Indexes:
+        - idx_artifact_embeddings_model: Fast lookup of all embeddings produced
+          by a given model (useful for bulk re-embedding when a model is updated)
+    """
+
+    __tablename__ = "artifact_embeddings"
+
+    # Primary key — one embedding row per artifact (per model update cycle)
+    artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+        comment="UUID of the artifact this embedding belongs to",
+    )
+
+    # The vector payload
+    embedding: Mapped[bytes] = mapped_column(
+        LargeBinary,
+        nullable=False,
+        comment=(
+            "Raw float32 bytes of the embedding vector "
+            "(numpy ndarray.tobytes() / frombuffer(dtype=float32))"
+        ),
+    )
+
+    # Model provenance
+    model_name: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        comment="Model that produced this embedding (e.g. 'all-MiniLM-L6-v2')",
+    )
+    embedding_dim: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        comment="Number of dimensions in the embedding vector (e.g. 384)",
+    )
+
+    # Cache-invalidation timestamp
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        server_default="CURRENT_TIMESTAMP",
+        comment="Timestamp when the embedding was computed; used for TTL invalidation",
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        Index("idx_artifact_embeddings_model", "model_name"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of ArtifactEmbedding."""
+        return (
+            f"<ArtifactEmbedding("
+            f"artifact_uuid={self.artifact_uuid!r}, "
+            f"model={self.model_name!r}, "
+            f"dim={self.embedding_dim!r})>"
+        )
 
 
 # =============================================================================

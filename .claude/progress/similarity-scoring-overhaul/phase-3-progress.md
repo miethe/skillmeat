@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 6
-completed_tasks: 1
+completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -40,7 +40,7 @@ tasks:
   priority: high
 - id: SSO-3.2
   description: Add [semantic] optional dependency to pyproject.toml with sentence-transformers>=2.7.0
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -50,7 +50,7 @@ tasks:
 - id: SSO-3.3
   description: Add ArtifactEmbedding ORM model to cache/models.py with artifact_uuid,
     embedding BLOB, model_name, embedding_dim, computed_at
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies:
@@ -138,7 +138,7 @@ files_modified:
 - pyproject.toml
 - alembic/versions/XXXX_add_artifact_embedding.py
 - tests/test_embedder.py
-progress: 16
+progress: 50
 updated: '2026-02-26'
 ---
 
