@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
 import requests
@@ -752,14 +752,14 @@ class ArtifactManager:
     def list_artifacts(
         self,
         collection_name: Optional[str] = None,
-        artifact_type: Optional[ArtifactType] = None,
+        artifact_type: Optional[Union[ArtifactType, List[ArtifactType]]] = None,
         tags: Optional[List[str]] = None,
     ) -> List[Artifact]:
         """List artifacts with optional filters.
 
         Args:
             collection_name: Collection name (uses active if None)
-            artifact_type: Filter by type
+            artifact_type: Filter by type (single or list of ArtifactType)
             tags: Filter by tags (any match)
 
         Returns:
@@ -769,9 +769,13 @@ class ArtifactManager:
 
         artifacts = collection.artifacts
 
-        # Filter by type
+        # Filter by type (supports single value or list)
         if artifact_type:
-            artifacts = [a for a in artifacts if a.type == artifact_type]
+            if isinstance(artifact_type, list):
+                type_set = set(artifact_type)
+                artifacts = [a for a in artifacts if a.type in type_set]
+            else:
+                artifacts = [a for a in artifacts if a.type == artifact_type]
 
         # Filter by tags
         if tags:

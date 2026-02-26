@@ -2024,7 +2024,7 @@ async def list_artifacts(
     ),
     artifact_type: Optional[str] = Query(
         default=None,
-        description="Filter by artifact type (skill, command, agent)",
+        description="Filter by artifact type (skill, command, agent). Supports comma-separated values (e.g., skill,command,agent).",
     ),
     collection: Optional[str] = Query(
         default=None,
@@ -2054,6 +2054,10 @@ async def list_artifacts(
         default=None,
         description="Filter by marketplace import batch ID",
     ),
+    search: Optional[str] = Query(
+        default=None,
+        description="Search artifacts by name or description (case-insensitive substring match)",
+    ),
 ) -> ArtifactListResponse:
     """List all artifacts with filters and pagination.
 
@@ -2064,7 +2068,7 @@ async def list_artifacts(
         token: Authentication token
         limit: Number of items per page
         after: Cursor for next page
-        artifact_type: Optional type filter
+        artifact_type: Optional type filter (comma-separated for multiple types)
         collection: Optional collection filter
         tags: Optional tag filter (comma-separated)
         tools: Optional tools filter (comma-separated)
@@ -2072,6 +2076,7 @@ async def list_artifacts(
         project_path: Project path for drift detection
         has_unlinked: Filter for artifacts with/without unlinked references
         import_id: Filter by marketplace import batch ID
+        search: Optional search string (case-insensitive match on name/description)
 
     Returns:
         Paginated list of artifacts
@@ -2086,19 +2091,23 @@ async def list_artifacts(
         logger.info(
             f"Listing artifacts (limit={limit}, after={after}, "
             f"type={artifact_type}, collection={collection}, tags={tags}, tools={tools}, "
-            f"import_id={import_id})"
+            f"import_id={import_id}, search={search})"
         )
 
         # Parse filters
         type_filter = None
         if artifact_type:
-            try:
-                type_filter = ArtifactType(artifact_type)
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid artifact type: {artifact_type}",
-                )
+            raw_types = [t.strip() for t in artifact_type.split(",") if t.strip()]
+            parsed_types = []
+            for raw in raw_types:
+                try:
+                    parsed_types.append(ArtifactType(raw))
+                except ValueError:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid artifact type: {raw}",
+                    )
+            type_filter = parsed_types if len(parsed_types) > 1 else parsed_types[0]
 
         tag_filter = None
         if tags:
@@ -2193,6 +2202,15 @@ async def list_artifacts(
                 matching_ids = set()
             artifacts = [
                 a for a in artifacts if f"{a.type.value}:{a.name}" in matching_ids
+            ]
+
+        # Search filter (case-insensitive substring match on name and description)
+        if search:
+            search_lower = search.lower()
+            artifacts = [
+                a for a in artifacts
+                if search_lower in a.name.lower()
+                or (a.metadata.description and search_lower in a.metadata.description.lower())
             ]
 
         # Sort artifacts for consistent pagination
