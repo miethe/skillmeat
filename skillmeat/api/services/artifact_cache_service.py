@@ -462,6 +462,23 @@ def refresh_single_artifact_cache(
             except Exception as e:
                 logger.warning(f"Tag ORM sync failed for {artifact_id}: {e}")
 
+        # Invalidate and recompute similarity cache for the updated artifact.
+        # Failure here must NOT fail the overall refresh — it only affects
+        # recommendation quality until the next cache warm-up.
+        try:
+            from skillmeat.cache.similarity_cache import SimilarityCacheManager
+
+            sim_mgr = SimilarityCacheManager()
+            sim_mgr.invalidate(assoc.artifact_uuid, session)
+            sim_mgr.compute_and_store(assoc.artifact_uuid, session)
+        except Exception as sim_exc:
+            logger.warning(
+                "Similarity cache rebuild failed for %s (uuid=%s): %s",
+                artifact_id,
+                assoc.artifact_uuid,
+                sim_exc,
+            )
+
         logger.debug(
             "Refreshed cache for artifact: %s (profile=%s)",
             artifact_id,
