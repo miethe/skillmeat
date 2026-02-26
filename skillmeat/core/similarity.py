@@ -145,10 +145,10 @@ class SimilarityService:
 
     Composite score weights
     ----------------------
-    keyword   0.30
-    content   0.25
-    structure 0.20
-    metadata  0.15
+    metadata  0.30
+    keyword   0.25
+    content   0.20
+    structure 0.15
     semantic  0.10  (redistributed proportionally when unavailable)
 
     Attributes:
@@ -162,10 +162,10 @@ class SimilarityService:
 
     # Composite score weights (must sum to 1.0 when semantic is available)
     _WEIGHTS: dict[str, float] = {
-        "keyword": 0.30,
-        "content": 0.25,
-        "structure": 0.20,
-        "metadata": 0.15,
+        "keyword": 0.25,
+        "metadata": 0.30,
+        "content": 0.20,
+        "structure": 0.15,
         "semantic": 0.10,
     }
 
@@ -887,10 +887,11 @@ class SimilarityService:
     def _compute_composite_score(self, breakdown: ScoreBreakdown) -> float:
         """Compute weighted average of score components.
 
-        Weights: keyword=0.30, content=0.25, structure=0.20, metadata=0.15,
+        Weights: metadata=0.30, keyword=0.25, content=0.20, structure=0.15,
         semantic=0.10.  When ``breakdown.semantic_score`` is ``None`` the
         0.10 semantic weight is redistributed proportionally across the
-        remaining four components.
+        remaining four components (keyword=0.278, metadata=0.333,
+        content=0.222, structure=0.167).
 
         Args:
             breakdown: Per-component score breakdown from MatchAnalyzer.
