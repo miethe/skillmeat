@@ -330,16 +330,33 @@
       "id": "similar-artifacts",
       "name": "Similar Artifacts Detection",
       "icon": "sparkles",
-      "tagline": "Find and consolidate duplicates",
+      "tagline": "Intelligent similarity scoring with caching and optional embeddings",
       "features": [
         {
           "id": "similar-detection",
-          "name": "Similar Artifacts Detection",
-          "description": "Find similar and duplicate artifacts in your collection using fingerprint matching and semantic scoring",
-          "shortDescription": "Find duplicates",
+          "name": "Multi-Dimensional Scoring",
+          "description": "Five-dimension similarity scoring: keyword (25%), metadata with bigram+BM25 (30%), content fingerprints (20%), structure (15%), and optional semantic embeddings (10%)",
+          "shortDescription": "Intelligent scoring",
           "cliCommand": "skillmeat similar",
+          "webPage": "/collection/[id]",
           "since": "0.3.0",
           "highlight": true
+        },
+        {
+          "id": "similarity-cache",
+          "name": "Pre-Computed Cache",
+          "description": "Similarity results pre-computed at sync time with FTS5 pre-filtering. Sub-200ms cached responses with X-Cache headers and cache-age indicators",
+          "shortDescription": "Sub-200ms cached results",
+          "webPage": "/collection/[id]",
+          "since": "0.3.0",
+          "highlight": true
+        },
+        {
+          "id": "semantic-embeddings",
+          "name": "Optional Semantic Embeddings",
+          "description": "Install sentence-transformers via pip install skillmeat[semantic] for cosine-similarity scoring with all-MiniLM-L6-v2 embeddings",
+          "shortDescription": "Optional embeddings",
+          "since": "0.3.0"
         },
         {
           "id": "collection-consolidation",
@@ -348,15 +365,6 @@
           "shortDescription": "Merge duplicates",
           "cliCommand": "skillmeat consolidate",
           "webPage": "/consolidation",
-          "since": "0.3.0",
-          "highlight": true
-        },
-        {
-          "id": "similarity-badges",
-          "name": "Similarity Badges",
-          "description": "Visual similarity indicators on marketplace cards showing match strength and confidence",
-          "shortDescription": "Badge indicators",
-          "webPage": "/collection",
           "since": "0.3.0"
         },
         {

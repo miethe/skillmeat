@@ -1,63 +1,73 @@
 ---
-schema_version: "0.3.1"
+schema_version: 0.3.1
 doc_type: prd
-title: "Similarity Scoring Overhaul"
-status: draft
-created: "2026-02-26"
-updated: "2026-02-26"
+title: Similarity Scoring Overhaul
+status: completed
+created: '2026-02-26'
+updated: '2026-02-26'
 feature_slug: similarity-scoring-overhaul
-feature_version: "v1"
+feature_version: v1
 priority: high
 risk_level: medium
 owner: miethe
-contributors: [claude-opus]
+contributors:
+- claude-opus
 prd_ref: null
 plan_ref: null
 related_documents:
-  - docs/project_plans/SPIKEs/similarity-scoring-overhaul-v1.md
+- docs/project_plans/SPIKEs/similarity-scoring-overhaul-v1.md
 category: product-planning
-tags: [prd, planning, feature, similarity, scoring, embeddings, fts5, caching]
+tags:
+- prd
+- planning
+- feature
+- similarity
+- scoring
+- embeddings
+- fts5
+- caching
 milestone: null
 commit_refs: []
 pr_refs: []
 files_affected:
-  - skillmeat/core/similarity.py
-  - skillmeat/core/scoring/match_analyzer.py
-  - skillmeat/core/scoring/haiku_embedder.py
-  - skillmeat/cache/models.py
-  - skillmeat/cache/refresh.py
-  - skillmeat/api/schemas/artifacts.py
-  - skillmeat/api/routers/artifacts.py
-  - skillmeat/web/components/collection/similar-artifacts-tab.tsx
-problem_statement: >
-  The Similar Artifacts tab produces misleading results because description comparison uses string length
-  rather than content, content/structure hashes are not persisted to the DB, the semantic scorer is a
-  non-functional placeholder, and all scoring is recomputed O(n) live per request with no caching.
-goals:
-  - "Fix scoring accuracy so name and description become primary matching signals"
-  - "Add pre-computation cache so tab loads in <200ms"
-  - "Enable optional local semantic embeddings via sentence-transformers"
-  - "Persist artifact fingerprint fields to CollectionArtifact ORM"
-non_goals:
-  - "PostgreSQL migration"
-  - "Real-time or collaborative scoring"
-  - "Cross-user similarity"
-  - "Full-text search feature"
-success_metrics:
-  - "metadata_score >= 0.6 for artifacts with identical descriptions"
-  - "metadata_score >= 0.4 for artifacts with similar names (bigram overlap)"
-  - "Cached similarity response < 200ms (vs current live O(n) compute)"
-  - "Semantic score shows non-N/A values when sentence-transformers installed"
-dependencies:
-  - "rank_bm25 or SQLite FTS5 (standard library)"
-  - "sentence-transformers>=2.7.0 (optional, Phase 3)"
-  - "Alembic migration chain must be clean for Phase 2"
-risks:
-  - "Phase 2 Alembic migration on existing DBs"
-  - "FTS5 availability in non-standard Python builds"
-  - "BM25 over-scoring domain-common words (skill, tool, command)"
----
+- skillmeat/core/similarity.py
+- skillmeat/core/scoring/match_analyzer.py
+- skillmeat/core/scoring/haiku_embedder.py
+- skillmeat/cache/models.py
+- skillmeat/cache/refresh.py
+- skillmeat/api/schemas/artifacts.py
+- skillmeat/api/routers/artifacts.py
+- skillmeat/web/components/collection/similar-artifacts-tab.tsx
+problem_statement: 'The Similar Artifacts tab produces misleading results because
+  description comparison uses string length rather than content, content/structure
+  hashes are not persisted to the DB, the semantic scorer is a non-functional placeholder,
+  and all scoring is recomputed O(n) live per request with no caching.
 
+  '
+goals:
+- Fix scoring accuracy so name and description become primary matching signals
+- Add pre-computation cache so tab loads in <200ms
+- Enable optional local semantic embeddings via sentence-transformers
+- Persist artifact fingerprint fields to CollectionArtifact ORM
+non_goals:
+- PostgreSQL migration
+- Real-time or collaborative scoring
+- Cross-user similarity
+- Full-text search feature
+success_metrics:
+- metadata_score >= 0.6 for artifacts with identical descriptions
+- metadata_score >= 0.4 for artifacts with similar names (bigram overlap)
+- Cached similarity response < 200ms (vs current live O(n) compute)
+- Semantic score shows non-N/A values when sentence-transformers installed
+dependencies:
+- rank_bm25 or SQLite FTS5 (standard library)
+- sentence-transformers>=2.7.0 (optional, Phase 3)
+- Alembic migration chain must be clean for Phase 2
+risks:
+- Phase 2 Alembic migration on existing DBs
+- FTS5 availability in non-standard Python builds
+- BM25 over-scoring domain-common words (skill, tool, command)
+---
 # Feature Brief & Metadata
 
 **Feature Name:**

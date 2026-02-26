@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Similarity Scoring Overhaul (2026-02-26)
+
+**Phase 1: Scoring Algorithm Fix**
+- Replaced broken string-length-ratio description scoring with character bigram Jaccard and BM25 TF-IDF
+- Rebalanced composite weights: keyword 25%, metadata 30%, content 20%, structure 15%, semantic 10%
+- Added `text_score` field to API similarity breakdown responses
+
+**Phase 2: Pre-computation Cache**
+- New `SimilarityCache` table and `SimilarityCacheManager` for pre-computed similarity scores
+- SQLite FTS5 pre-filtering reduces candidates before full scoring (sub-200ms cached responses)
+- Fingerprint columns on `CollectionArtifact` for content/structure hash persistence
+- Automatic cache invalidation on artifact sync/import
+- `X-Cache` and `X-Cache-Age` response headers on similarity API responses
+- Cache age indicator in web UI Similar Artifacts tab
+
+**Phase 3: Optional Semantic Embeddings**
+- `pip install skillmeat[semantic]` enables sentence-transformer embedding-based scoring
+- `ArtifactEmbedding` ORM model for persistent embedding storage
+- Cosine similarity scoring with `all-MiniLM-L6-v2` embeddings (384 dimensions)
+- Semantic score display and embedding availability indicator in web UI
+- Graceful fallback: system works identically without `[semantic]` extras installed
+
+### Changed
+
+- Artifact fingerprints now computed at sync/import time for cache pre-population
+- Similar artifacts API endpoint is now cache-first with invalidation on mutations
+- Similarity response schema includes granular score breakdown (text, keyword, structure, semantic)
+- `HaikuEmbedder` renamed to `AnthropicEmbedder` (Anthropic does not expose an embedding API)
+
+### Fixed
+
+- Similarity matching no longer uses string-length ratio for descriptions (was nearly random)
+- Metadata scoring no longer penalizes longer descriptions
+- `_compute_content_score()` now returns >0 for artifacts with matching content hashes
+- Semantic scorer no longer returns `None` placeholder — uses real embeddings or clean fallback
+
+---
+
 #### Similar Artifacts — Detection, Comparison & Consolidation (2026-02-25)
 
 **Core Similarity Detection Engine**

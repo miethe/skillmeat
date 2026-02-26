@@ -1,43 +1,68 @@
 ---
 schema_version: 2
 doc_type: implementation_plan
-title: "Implementation Plan: Similarity Scoring Overhaul"
-status: draft
-created: "2026-02-26"
-updated: "2026-02-26"
+title: 'Implementation Plan: Similarity Scoring Overhaul'
+status: completed
+created: '2026-02-26'
+updated: '2026-02-26'
 feature_slug: similarity-scoring-overhaul
-feature_version: "v1"
-prd_ref: "docs/project_plans/PRDs/features/similarity-scoring-overhaul-v1.md"
+feature_version: v1
+prd_ref: docs/project_plans/PRDs/features/similarity-scoring-overhaul-v1.md
 plan_ref: null
-scope: "3 phases fixing broken scoring algorithm, adding pre-computation cache, and optional embedding-based semantic matching"
-effort_estimate: "~5 days (18 tasks)"
-architecture_summary: "Algorithm fixes in core/scoring, schema additions to cache/models, FTS5 pre-filter in SimilarityService, optional sentence-transformers via [semantic] extras"
+scope: 3 phases fixing broken scoring algorithm, adding pre-computation cache, and
+  optional embedding-based semantic matching
+effort_estimate: ~5 days (18 tasks)
+architecture_summary: Algorithm fixes in core/scoring, schema additions to cache/models,
+  FTS5 pre-filter in SimilarityService, optional sentence-transformers via [semantic]
+  extras
 priority: high
 risk_level: medium
-category: "product-planning"
-tags: [implementation, planning, similarity, scoring, cache, embeddings, fts5]
+category: product-planning
+tags:
+- implementation
+- planning
+- similarity
+- scoring
+- cache
+- embeddings
+- fts5
 milestone: null
 owner: null
 contributors: []
 related_documents:
-  - docs/project_plans/SPIKEs/similarity-scoring-overhaul-v1.md
-  - docs/project_plans/PRDs/features/similarity-scoring-overhaul-v1.md
+- docs/project_plans/SPIKEs/similarity-scoring-overhaul-v1.md
+- docs/project_plans/PRDs/features/similarity-scoring-overhaul-v1.md
 files_affected:
-  - skillmeat/core/similarity.py
-  - skillmeat/core/scoring/match_analyzer.py
-  - skillmeat/core/scoring/text_similarity.py
-  - skillmeat/core/scoring/embedder.py
-  - skillmeat/cache/models.py
-  - skillmeat/cache/similarity_cache.py
-  - skillmeat/api/routers/artifacts.py
-  - skillmeat/api/schemas/artifacts.py
-  - skillmeat/web/hooks/use-similar-artifacts.ts
-  - skillmeat/web/components/collection/similar-artifacts-tab.tsx
-  - pyproject.toml
-commit_refs: []
+- skillmeat/core/similarity.py
+- skillmeat/core/scoring/match_analyzer.py
+- skillmeat/core/scoring/text_similarity.py
+- skillmeat/core/scoring/embedder.py
+- skillmeat/cache/models.py
+- skillmeat/cache/similarity_cache.py
+- skillmeat/api/routers/artifacts.py
+- skillmeat/api/schemas/artifacts.py
+- skillmeat/web/hooks/use-similar-artifacts.ts
+- skillmeat/web/components/collection/similar-artifacts-tab.tsx
+- pyproject.toml
+commit_refs:
+- c696f43f  # feat(scoring): replace metadata scoring with bigram + BM25 methods
+- f118e087  # feat(scoring): rebalance composite weights for improved differentiation
+- 080a01d8  # feat(api): add text_score field to SimilarityBreakdownDTO
+- 09d713c9  # feat(web): display text_score in similarity breakdown tooltip
+- acc91f4f  # test(scoring): add tests for text_similarity and match_analyzer
+- 93ad9d0d  # feat(cache): add SimilarityCache model, fingerprint columns, and FTS5 table
+- 01732b00  # feat(cache): add SimilarityCacheManager with FTS5 pre-filtering
+- 98e4c0fc  # feat(scoring): populate fingerprint columns at sync/import time
+- d0f78862  # feat(cache): wire similarity cache invalidation into refresh flow
+- 6979ddd7  # feat(api): add cache-first similar endpoint with X-Cache headers
+- 9f939e14  # feat(web): display cache status and age indicator on similar tab
+- ed683159  # test(cache): add comprehensive SimilarityCacheManager tests
+- 78ac7892  # feat(scoring): add SentenceTransformerEmbedder and rename HaikuEmbedder
+- 56eb8d2b  # feat(cache): add [semantic] extras and ArtifactEmbedding ORM model
+- cbbf0f97  # feat(cache): integrate embedder into SimilarityCacheManager with semantic scoring
+- 98092faf  # feat(web): display semantic scores and add embedding indicator; add Phase 3 tests
 pr_refs: []
 ---
-
 # Implementation Plan: Similarity Scoring Overhaul
 
 **Plan ID**: `IMPL-2026-02-26-SIMILARITY-SCORING-OVERHAUL`
@@ -133,11 +158,11 @@ Phase 2 depends on Phase 1 completion (SimilarityCacheManager uses the fixed sco
 | SSO-1.6 | Write Phase 1 tests | New `tests/test_text_similarity.py`: test `bigram_similarity()` and `bm25_description_similarity()` for identical, partial overlap, empty, and hyphenated inputs. Add/update `tests/test_match_analyzer.py`: verify rebalanced metadata sub-weights produce correct relative rankings. | All new tests pass. Existing `test_match_analyzer.py` tests continue to pass. No regressions. | 2 pts | python-backend-engineer | SSO-1.1, SSO-1.3 |
 
 **Phase 1 Quality Gates:**
-- [ ] Similar artifacts tab shows differentiated, meaningful results — same-type artifacts with related names rank above unrelated ones
-- [ ] Description content matters: artifacts with identical descriptions rank highly regardless of name differences
-- [ ] Name similarity is prominent: `canvas-design` and `canvas-layout` rank higher than unrelated artifacts
-- [ ] All existing similarity tests pass after scoring changes
-- [ ] No new Python package dependencies added in Phase 1
+- [x] Similar artifacts tab shows differentiated, meaningful results — same-type artifacts with related names rank above unrelated ones
+- [x] Description content matters: artifacts with identical descriptions rank highly regardless of name differences
+- [x] Name similarity is prominent: `canvas-design` and `canvas-layout` rank higher than unrelated artifacts
+- [x] All existing similarity tests pass after scoring changes
+- [x] No new Python package dependencies added in Phase 1
 
 ---
 
@@ -168,13 +193,13 @@ Phase 2 depends on Phase 1 completion (SimilarityCacheManager uses the fixed sco
 | SSO-2.9 | Write Phase 2 tests | New `tests/test_similarity_cache.py`: test `SimilarityCacheManager` methods (cache hit, cache miss, invalidation, rebuild). Integration test: cache miss triggers computation and subsequent call is cache hit. Migration test: run migration against a fixture DB and verify schema. Test `_compute_content_score()` returns > 0 when fingerprint columns are populated. | All tests pass. Cache hit/miss behavior verified. Migration runs cleanly on fixture DB. No regressions. | 2 pts | python-backend-engineer | SSO-2.6 |
 
 **Phase 2 Quality Gates:**
-- [ ] Tab loads in < 200ms from cache for warm cache
-- [ ] Cache rebuilds in < 60s for 1000 artifacts (full rebuild)
-- [ ] Incremental update for single artifact < 1s
-- [ ] `_compute_content_score()` returns > 0 for artifacts with shared content hashes
-- [ ] FTS5 pre-filter reduces full-score computation from O(n) to O(50) candidates
-- [ ] Alembic migration runs cleanly against existing DB with no data loss
-- [ ] `X-Cache` response headers present on all `/similar` responses
+- [x] Tab loads in < 200ms from cache for warm cache
+- [x] Cache rebuilds in < 60s for 1000 artifacts (full rebuild)
+- [x] Incremental update for single artifact < 1s
+- [x] `_compute_content_score()` returns > 0 for artifacts with shared content hashes
+- [x] FTS5 pre-filter reduces full-score computation from O(n) to O(50) candidates
+- [x] Alembic migration runs cleanly against existing DB with no data loss
+- [x] `X-Cache` response headers present on all `/similar` responses
 
 ---
 
@@ -201,11 +226,11 @@ Phase 2 depends on Phase 1 completion (SimilarityCacheManager uses the fixed sco
 | SSO-3.6 | Write Phase 3 tests | New `tests/test_embedder.py`: test `SentenceTransformerEmbedder.is_available()` for both install states (mock importlib). Test `get_embedding()` with mock model (do not download real model in CI). Test `AnthropicEmbedder.is_available()` always returns False. Test composite score computation with and without embeddings in `SimilarityCacheManager`. | All tests pass without requiring `sentence_transformers` to be installed. Mocking pattern allows CI to test embedding code paths. No regressions. | 2 pts | python-backend-engineer | SSO-3.4 |
 
 **Phase 3 Quality Gates:**
-- [ ] `pip install skillmeat[semantic]` enables embedding-based scoring without any other changes
-- [ ] `pip install skillmeat` (without extras) works identically to Phase 2
-- [ ] Semantic score shows real percentages in UI when embeddings are enabled
-- [ ] First request after startup incurs model load (~1s), subsequent requests complete < 50ms
-- [ ] Phase 3 tests pass in CI without `sentence_transformers` installed (via mocking)
+- [x] `pip install skillmeat[semantic]` enables embedding-based scoring without any other changes
+- [x] `pip install skillmeat` (without extras) works identically to Phase 2
+- [x] Semantic score shows real percentages in UI when embeddings are enabled
+- [x] First request after startup incurs model load (~1s), subsequent requests complete < 50ms
+- [x] Phase 3 tests pass in CI without `sentence_transformers` installed (via mocking)
 
 ---
 

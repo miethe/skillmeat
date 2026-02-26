@@ -2,7 +2,7 @@
 schema_version: "1.1"
 doc_type: spike
 title: "Similarity Scoring System Overhaul"
-status: draft
+status: completed
 created: 2026-02-26
 updated: 2026-02-26
 feature_slug: similarity-scoring-overhaul

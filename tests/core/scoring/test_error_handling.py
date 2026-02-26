@@ -128,7 +128,7 @@ class TestScoringServiceDegradation:
     def test_semantic_available_with_valid_embedder(self):
         """semantic_available returns True when embedder is configured."""
         with patch(
-            "skillmeat.core.scoring.haiku_embedder.HaikuEmbedder.is_available",
+            "skillmeat.core.scoring.embedder.SentenceTransformerEmbedder.is_available",
             return_value=True,
         ):
             service = ScoringService(enable_semantic=True)
@@ -137,7 +137,7 @@ class TestScoringServiceDegradation:
     def test_semantic_unavailable_without_api_key(self):
         """semantic_available returns False when embedder is unavailable."""
         with patch(
-            "skillmeat.core.scoring.haiku_embedder.HaikuEmbedder.is_available",
+            "skillmeat.core.scoring.embedder.SentenceTransformerEmbedder.is_available",
             return_value=False,
         ):
             service = ScoringService(enable_semantic=True)
@@ -153,7 +153,7 @@ class TestScoringServiceDegradation:
         """Degrades to keyword when embedder unavailable."""
         # Mock embedder as unavailable
         with patch(
-            "skillmeat.core.scoring.haiku_embedder.HaikuEmbedder.is_available",
+            "skillmeat.core.scoring.embedder.SentenceTransformerEmbedder.is_available",
             return_value=False,
         ):
             service = ScoringService(enable_semantic=True, fallback_to_keyword=True)
@@ -406,7 +406,7 @@ class TestDegradationFlags:
         """Degradation flag set when fallback occurs."""
         # Mock unavailable embedder
         with patch(
-            "skillmeat.core.scoring.haiku_embedder.HaikuEmbedder.is_available",
+            "skillmeat.core.scoring.embedder.SentenceTransformerEmbedder.is_available",
             return_value=False,
         ):
             service = ScoringService(enable_semantic=True, fallback_to_keyword=True)

@@ -9,10 +9,10 @@ relatedness, providing more nuanced matching than keyword-based approaches.
 Usage:
     >>> import asyncio
     >>> from skillmeat.core.scoring.semantic_scorer import SemanticScorer
-    >>> from skillmeat.core.scoring.haiku_embedder import HaikuEmbedder
+    >>> from skillmeat.core.scoring.embedder import SentenceTransformerEmbedder
     >>> from skillmeat.core.artifact import ArtifactMetadata
     >>>
-    >>> embedder = HaikuEmbedder()
+    >>> embedder = SentenceTransformerEmbedder()
     >>> scorer = SemanticScorer(embedder)
     >>>
     >>> artifact = ArtifactMetadata(
@@ -53,8 +53,8 @@ class SemanticScorer:
         max_score: Maximum similarity score (0-100, default: 100)
 
     Example:
-        >>> from skillmeat.core.scoring.haiku_embedder import HaikuEmbedder
-        >>> provider = HaikuEmbedder()
+        >>> from skillmeat.core.scoring.embedder import SentenceTransformerEmbedder
+        >>> provider = SentenceTransformerEmbedder()
         >>> scorer = SemanticScorer(provider)
         >>>
         >>> if scorer.is_available():
@@ -79,8 +79,8 @@ class SemanticScorer:
             max_score: Maximum similarity score (default: 100)
 
         Example:
-            >>> from skillmeat.core.scoring.haiku_embedder import HaikuEmbedder
-            >>> embedder = HaikuEmbedder()
+            >>> from skillmeat.core.scoring.embedder import SentenceTransformerEmbedder
+            >>> embedder = SentenceTransformerEmbedder()
             >>> scorer = SemanticScorer(embedder, min_score=20)
         """
         self.provider = provider

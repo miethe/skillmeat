@@ -9,11 +9,13 @@ break the main operation. This ensures that artifact operations succeed even if
 the cache update fails.
 """
 
+import hashlib
 import json
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional
+from pathlib import Path
+from typing import Dict, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -82,6 +84,103 @@ def _get_collection_artifact(
 # Sentinel project_id used for Artifact rows that represent collection-level
 # (non-deployed) artifacts.  Must match the constant in user_collections.py.
 _COLLECTION_ARTIFACTS_PROJECT_ID = "collection_artifacts_global"
+
+
+def compute_artifact_fingerprints(
+    artifact_path: Path,
+) -> Tuple[Optional[str], Optional[str], int, int]:
+    """Compute content/structure fingerprints and file stats for an artifact.
+
+    All four values are derived from the filesystem files under ``artifact_path``.
+    For single-file artifacts (e.g. a ``.md`` command file), the path itself is
+    treated as the only file.
+
+    Args:
+        artifact_path: Absolute path to the artifact directory or single file.
+
+    Returns:
+        A 4-tuple of ``(content_hash, structure_hash, file_count, total_size)``.
+        ``content_hash`` and ``structure_hash`` are 64-char hex SHA-256 strings.
+        Returns ``(None, None, 0, 0)`` if the path does not exist or is not
+        accessible so that the caller can leave the DB columns NULL rather than
+        crash.
+    """
+    if not artifact_path.exists():
+        return None, None, 0, 0
+
+    try:
+        if artifact_path.is_file():
+            files: list[Path] = [artifact_path]
+        else:
+            files = sorted(
+                p for p in artifact_path.rglob("*") if p.is_file()
+            )
+
+        file_count = len(files)
+        total_size = 0
+        content_hasher = hashlib.sha256()
+        rel_paths: list[str] = []
+
+        for file_path in files:
+            size = file_path.stat().st_size
+            total_size += size
+
+            if artifact_path.is_file():
+                rel_path = file_path.name
+            else:
+                rel_path = str(file_path.relative_to(artifact_path))
+            rel_paths.append(rel_path)
+
+            content_hasher.update(rel_path.encode("utf-8"))
+            with open(file_path, "rb") as fh:
+                while True:
+                    chunk = fh.read(8192)
+                    if not chunk:
+                        break
+                    content_hasher.update(chunk)
+
+        # Structure hash: sorted relative file paths only (no content)
+        structure_hasher = hashlib.sha256()
+        for rel_path in sorted(rel_paths):
+            structure_hasher.update(rel_path.encode("utf-8"))
+
+        content_hash = content_hasher.hexdigest()
+        structure_hash = structure_hasher.hexdigest()
+        return content_hash, structure_hash, file_count, total_size
+
+    except Exception as exc:
+        logger.debug(
+            "Failed to compute fingerprints for '%s': %s", artifact_path, exc
+        )
+        return None, None, 0, 0
+
+
+def _resolve_artifact_fs_path(artifact_mgr, artifact) -> Optional[Path]:
+    """Resolve the absolute filesystem path for an artifact.
+
+    Uses ``artifact_mgr.collection_mgr.config.get_collection_path()`` to build
+    the absolute path from the artifact's relative ``path`` attribute.
+
+    Args:
+        artifact_mgr: ArtifactManager instance.
+        artifact: Artifact domain object with a ``.path`` attribute (relative
+                  to collection root) and optional ``.name`` / ``.type``.
+
+    Returns:
+        Absolute ``Path`` if resolution succeeds, ``None`` otherwise.
+    """
+    try:
+        collection_path: Path = (
+            artifact_mgr.collection_mgr.config.get_collection_path(None)
+        )
+        return collection_path / artifact.path
+    except Exception as exc:
+        logger.debug(
+            "Cannot resolve filesystem path for artifact '%s': %s",
+            getattr(artifact, "name", "?"),
+            exc,
+        )
+        return None
 
 
 def _ensure_collection_project_sentinel(session: Session) -> None:
@@ -307,6 +406,14 @@ def refresh_single_artifact_cache(
             logger.warning(f"Artifact not found in file system: {artifact_id}")
             return False
 
+        # Compute fingerprints from the artifact's filesystem files.
+        artifact_fs_path = _resolve_artifact_fs_path(artifact_mgr, file_artifact)
+        content_hash, structure_hash, file_count, total_size = (
+            compute_artifact_fingerprints(artifact_fs_path)
+            if artifact_fs_path is not None
+            else (None, None, 0, 0)
+        )
+
         # Build metadata dict from file artifact
         metadata = {
             "description": (
@@ -334,6 +441,11 @@ def refresh_single_artifact_cache(
             "origin_source": getattr(file_artifact, "origin_source", None),
             "resolved_sha": getattr(file_artifact, "resolved_sha", None),
             "resolved_version": getattr(file_artifact, "resolved_version", None),
+            # Fingerprint fields (SSO-2.4)
+            "artifact_content_hash": content_hash,
+            "artifact_structure_hash": structure_hash,
+            "artifact_file_count": file_count,
+            "artifact_total_size": total_size,
         }
 
         # Delegate to shared upsert
@@ -349,6 +461,23 @@ def refresh_single_artifact_cache(
                 TagService().sync_artifact_tags(assoc.artifact_uuid, file_artifact.tags)
             except Exception as e:
                 logger.warning(f"Tag ORM sync failed for {artifact_id}: {e}")
+
+        # Invalidate and recompute similarity cache for the updated artifact.
+        # Failure here must NOT fail the overall refresh — it only affects
+        # recommendation quality until the next cache warm-up.
+        try:
+            from skillmeat.cache.similarity_cache import SimilarityCacheManager
+
+            sim_mgr = SimilarityCacheManager()
+            sim_mgr.invalidate(assoc.artifact_uuid, session)
+            sim_mgr.compute_and_store(assoc.artifact_uuid, session)
+        except Exception as sim_exc:
+            logger.warning(
+                "Similarity cache rebuild failed for %s (uuid=%s): %s",
+                artifact_id,
+                assoc.artifact_uuid,
+                sim_exc,
+            )
 
         logger.debug(
             "Refreshed cache for artifact: %s (profile=%s)",
@@ -461,6 +590,18 @@ def populate_collection_artifact_from_import(
     # (author, license, tools, version, resolved_sha, resolved_version)
     file_artifact = artifact_mgr.show(entry.name)
 
+    # Compute fingerprints from the artifact's filesystem files (SSO-2.4).
+    artifact_fs_path = (
+        _resolve_artifact_fs_path(artifact_mgr, file_artifact)
+        if file_artifact is not None
+        else None
+    )
+    content_hash, structure_hash, file_count, total_size = (
+        compute_artifact_fingerprints(artifact_fs_path)
+        if artifact_fs_path is not None
+        else (None, None, 0, 0)
+    )
+
     # Combine ImportEntry data (already in memory) with filesystem data
     metadata = {
         "description": entry.description
@@ -500,6 +641,11 @@ def populate_collection_artifact_from_import(
         "resolved_version": (
             getattr(file_artifact, "resolved_version", None) if file_artifact else None
         ),
+        # Fingerprint fields (SSO-2.4)
+        "artifact_content_hash": content_hash,
+        "artifact_structure_hash": structure_hash,
+        "artifact_file_count": file_count,
+        "artifact_total_size": total_size,
     }
 
     result = create_or_update_collection_artifact(

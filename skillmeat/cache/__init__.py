@@ -45,6 +45,7 @@ from skillmeat.cache.collection_cache import (
     CollectionCountCache,
     get_collection_count_cache,
 )
+from skillmeat.cache.similarity_cache import SimilarityCacheManager
 from skillmeat.cache.manager import CacheManager
 from skillmeat.cache.marketplace import MarketplaceCache
 from skillmeat.cache.refresh import (
@@ -79,4 +80,5 @@ __all__ = [
     "ScanUpdateContext",
     "ImportContext",
     "get_collection_count_cache",
+    "SimilarityCacheManager",
 ]

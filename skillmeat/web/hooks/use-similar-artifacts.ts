@@ -20,7 +20,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
-import { apiRequest } from '@/lib/api';
+import { apiRequestWithHeaders } from '@/lib/api';
 import type {
   SimilarArtifactsResponse,
   SimilarArtifactsOptions,
@@ -147,10 +147,27 @@ function registerViewportEntry(
 // API Functions
 // ============================================================================
 
+export interface SimilarArtifactsResult {
+  /** Parsed response body from the similar artifacts endpoint. */
+  response: SimilarArtifactsResponse;
+  /**
+   * Value of the `X-Cache` response header.
+   * - `'HIT'`: response was served from the server-side cache
+   * - `'MISS'`: response was freshly computed
+   * - `null`: header absent (older backend or non-cached endpoint)
+   */
+  cacheStatus: 'HIT' | 'MISS' | null;
+  /**
+   * Value of the `X-Cache-Age` response header in seconds, or `null` if the
+   * header was absent or could not be parsed.
+   */
+  cacheAgeSeconds: number | null;
+}
+
 async function fetchSimilarArtifacts(
   artifactId: string,
   options: Required<Omit<SimilarArtifactsOptions, 'enabled'>>
-): Promise<SimilarArtifactsResponse> {
+): Promise<SimilarArtifactsResult> {
   const params = new URLSearchParams();
 
   params.append('limit', String(options.limit));
@@ -163,9 +180,19 @@ async function fetchSimilarArtifacts(
     params.append('source', options.source);
   }
 
-  return apiRequest<SimilarArtifactsResponse>(
+  const { data, headers } = await apiRequestWithHeaders<SimilarArtifactsResponse>(
     `/artifacts/${encodeURIComponent(artifactId)}/similar?${params.toString()}`
   );
+
+  const rawCacheStatus = headers.get('X-Cache');
+  const cacheStatus: 'HIT' | 'MISS' | null =
+    rawCacheStatus === 'HIT' || rawCacheStatus === 'MISS' ? rawCacheStatus : null;
+
+  const rawCacheAge = headers.get('X-Cache-Age');
+  const parsedAge = rawCacheAge !== null ? parseInt(rawCacheAge, 10) : NaN;
+  const cacheAgeSeconds: number | null = Number.isFinite(parsedAge) ? parsedAge : null;
+
+  return { response: data, cacheStatus, cacheAgeSeconds };
 }
 
 // ============================================================================
@@ -183,7 +210,12 @@ async function fetchSimilarArtifacts(
  *   options.source    → source
  *   options.limit     → limit
  *
- * Stale time: 5 minutes (browsing tier per data-flow-patterns).
+ * Cache metadata:
+ *   `cacheStatus`    — `'HIT' | 'MISS' | null` from `X-Cache` response header
+ *   `cacheAgeSeconds`— seconds from `X-Cache-Age` response header, or `null`
+ *
+ * Stale time: 30 seconds (interactive tier — similarity results update
+ * frequently after artifact edits, per data-flow-patterns).
  * React Query deduplicates requests sharing the same query key, so components
  * subscribed to the same artifactId never issue duplicate network calls.
  */
@@ -193,7 +225,7 @@ export function useSimilarArtifacts(
 ) {
   const { limit = 10, minScore, source, enabled } = options;
 
-  return useQuery({
+  const query = useQuery({
     queryKey: similarArtifactKeys.list(artifactId ?? '', limit, minScore, source),
     queryFn: () =>
       fetchSimilarArtifacts(artifactId!, {
@@ -202,8 +234,17 @@ export function useSimilarArtifacts(
         source: source as SimilaritySource,
       }),
     enabled: !!artifactId && enabled !== false,
-    staleTime: 5 * 60 * 1000, // 5 minutes — browsing tier
+    staleTime: 30 * 1000, // 30 seconds — interactive tier
   });
+
+  return {
+    ...query,
+    // Flatten the response body so callers access `data.items` as before,
+    // while also exposing cache metadata at the top level of the return value.
+    data: query.data?.response,
+    cacheStatus: query.data?.cacheStatus ?? null,
+    cacheAgeSeconds: query.data?.cacheAgeSeconds ?? null,
+  };
 }
 
 // ============================================================================

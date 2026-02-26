@@ -29,10 +29,11 @@
 'use client';
 
 import * as React from 'react';
-import { AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertCircle, Clock, RefreshCw, Sparkles, Zap, ZapOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MiniArtifactCard } from '@/components/collection/mini-artifact-card';
 import { useSimilarArtifacts } from '@/hooks';
 import type { SimilarArtifact } from '@/types/similarity';
@@ -41,6 +42,22 @@ import type { Artifact, ArtifactType } from '@/types/artifact';
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/**
+ * Converts a cache age in seconds to a compact human-readable string.
+ * Examples: 5 → "5s ago", 90 → "1m ago", 7200 → "2h ago"
+ */
+function formatCacheAge(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds}s ago`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
 
 /** Valid artifact types in the ArtifactType union */
 const VALID_ARTIFACT_TYPES: ArtifactType[] = [
@@ -82,6 +99,86 @@ function similarToArtifact(item: SimilarArtifact): Artifact {
     createdAt: '',
     updatedAt: '',
   } as unknown as Artifact;
+}
+
+// ============================================================================
+// CacheAgeIndicator
+// ============================================================================
+
+interface CacheAgeIndicatorProps {
+  cacheStatus: 'HIT' | 'MISS' | null;
+  cacheAgeSeconds: number | null;
+}
+
+/**
+ * Subtle muted indicator shown when results were served from the server cache.
+ * Hidden entirely when `cacheStatus` is `'MISS'` or `null`, or when
+ * `cacheAgeSeconds` is unavailable.
+ */
+function CacheAgeIndicator({ cacheStatus, cacheAgeSeconds }: CacheAgeIndicatorProps) {
+  if (cacheStatus !== 'HIT' || cacheAgeSeconds === null) {
+    return null;
+  }
+
+  return (
+    <span
+      className="flex items-center gap-1 text-xs text-muted-foreground/60"
+      title={`Similarity results cached ${formatCacheAge(cacheAgeSeconds)}`}
+      aria-label={`Cached results from ${formatCacheAge(cacheAgeSeconds)}`}
+    >
+      <Clock className="h-3 w-3" aria-hidden="true" />
+      cached {formatCacheAge(cacheAgeSeconds)}
+    </span>
+  );
+}
+
+// ============================================================================
+// EmbeddingStatusIndicator
+// ============================================================================
+
+interface EmbeddingStatusIndicatorProps {
+  /** Whether any result has a non-null semantic score */
+  embeddingsEnabled: boolean;
+}
+
+/**
+ * Small, non-intrusive indicator showing whether semantic embeddings are active.
+ * Shows a filled lightning bolt when enabled, an outlined one when not installed.
+ * A tooltip provides the human-readable explanation.
+ */
+function EmbeddingStatusIndicator({ embeddingsEnabled }: EmbeddingStatusIndicatorProps) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className={cn(
+              'flex items-center gap-1 text-xs',
+              embeddingsEnabled
+                ? 'text-muted-foreground/60'
+                : 'text-muted-foreground/40'
+            )}
+            aria-label={
+              embeddingsEnabled
+                ? 'Semantic embeddings are enabled'
+                : 'Semantic embeddings are not installed'
+            }
+          >
+            {embeddingsEnabled ? (
+              <Zap className="h-3 w-3" aria-hidden="true" />
+            ) : (
+              <ZapOff className="h-3 w-3" aria-hidden="true" />
+            )}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="left" className="text-xs max-w-[200px]">
+          {embeddingsEnabled
+            ? 'Embeddings: enabled — semantic scores are included in similarity results.'
+            : 'Embeddings: not installed — install sentence-transformers to enable semantic scoring.'}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
 
 // ============================================================================
@@ -308,7 +405,8 @@ function SimilarArtifactsTabContent({
   artifactId,
   onArtifactClick,
 }: SimilarArtifactsTabProps) {
-  const { data, isLoading, isError, refetch } = useSimilarArtifacts(artifactId);
+  const { data, isLoading, isError, refetch, cacheStatus, cacheAgeSeconds } =
+    useSimilarArtifacts(artifactId);
 
   // ---- Loading ----
   if (isLoading) {
@@ -327,27 +425,48 @@ function SimilarArtifactsTabContent({
   }
 
   // ---- Results ----
+  // Embeddings are considered enabled when at least one result carries a
+  // non-null semantic_score. If all are null, sentence-transformers is absent.
+  const embeddingsEnabled = items.some(
+    (item) => item.breakdown.semantic_score !== null
+  );
+
   return (
-    <div
-      className="grid grid-cols-2 gap-3 pb-1 pr-1 sm:grid-cols-3"
-      role="list"
-      aria-label={`${items.length} similar artifact${items.length === 1 ? '' : 's'}`}
-    >
-      {items.map((item) => {
-        const artifact = similarToArtifact(item);
-        return (
-          <div key={item.artifact_id} role="listitem">
-            <MiniArtifactCard
-              artifact={artifact}
-              onClick={() => onArtifactClick?.(item.artifact_id)}
-              showScore
-              similarityScore={item.composite_score}
-              scoreBreakdown={item.breakdown}
-              className="cursor-pointer"
-            />
-          </div>
-        );
-      })}
+    <div className="flex flex-col gap-2">
+      {/* Status row: cache age (left) and embedding indicator (right) */}
+      <div className="flex items-center justify-between">
+        {/* Left spacer so embedding indicator stays right-aligned when no cache indicator */}
+        <span />
+        <div className="flex items-center gap-2">
+          <CacheAgeIndicator
+            cacheStatus={cacheStatus}
+            cacheAgeSeconds={cacheAgeSeconds}
+          />
+          <EmbeddingStatusIndicator embeddingsEnabled={embeddingsEnabled} />
+        </div>
+      </div>
+
+      <div
+        className="grid grid-cols-2 gap-3 pb-1 pr-1 sm:grid-cols-3"
+        role="list"
+        aria-label={`${items.length} similar artifact${items.length === 1 ? '' : 's'}`}
+      >
+        {items.map((item) => {
+          const artifact = similarToArtifact(item);
+          return (
+            <div key={item.artifact_id} role="listitem">
+              <MiniArtifactCard
+                artifact={artifact}
+                onClick={() => onArtifactClick?.(item.artifact_id)}
+                showScore
+                similarityScore={item.composite_score}
+                scoreBreakdown={item.breakdown}
+                className="cursor-pointer"
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

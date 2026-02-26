@@ -5,10 +5,10 @@ and keyword-based scoring with automatic fallback and error handling.
 
 Example:
     >>> from skillmeat.core.scoring.service import ScoringService
-    >>> from skillmeat.core.scoring.haiku_embedder import HaikuEmbedder
+    >>> from skillmeat.core.scoring.embedder import SentenceTransformerEmbedder
     >>>
     >>> # Initialize service
-    >>> embedder = HaikuEmbedder()
+    >>> embedder = SentenceTransformerEmbedder()
     >>> service = ScoringService(embedder=embedder)
     >>>
     >>> # Score artifacts with automatic fallback
@@ -29,7 +29,8 @@ from skillmeat.core.scoring.exceptions import (
     EmbeddingServiceUnavailable,
     ScoringTimeout,
 )
-from skillmeat.core.scoring.haiku_embedder import HaikuEmbedder
+from skillmeat.core.scoring.embedder import SentenceTransformerEmbedder
+from skillmeat.core.scoring.haiku_embedder import AnthropicEmbedder
 from skillmeat.core.scoring.match_analyzer import MatchAnalyzer
 from skillmeat.core.scoring.models import ArtifactScore, ScoringResult
 from skillmeat.core.scoring.semantic_scorer import SemanticScorer
@@ -65,7 +66,7 @@ class ScoringService:
     Example:
         >>> # With semantic scoring enabled
         >>> service = ScoringService(
-        ...     embedder=HaikuEmbedder(),
+        ...     embedder=SentenceTransformerEmbedder(),
         ...     enable_semantic=True,
         ...     fallback_to_keyword=True,
         ... )
@@ -84,7 +85,7 @@ class ScoringService:
 
     def __init__(
         self,
-        embedder: HaikuEmbedder | None = None,
+        embedder: SentenceTransformerEmbedder | AnthropicEmbedder | None = None,
         enable_semantic: bool = True,
         semantic_timeout: float = 5.0,
         fallback_to_keyword: bool = True,
@@ -92,14 +93,14 @@ class ScoringService:
         """Initialize scoring service.
 
         Args:
-            embedder: Embedding provider (defaults to HaikuEmbedder)
+            embedder: Embedding provider (defaults to SentenceTransformerEmbedder)
             enable_semantic: Whether to attempt semantic scoring (default: True)
             semantic_timeout: Timeout for semantic scoring in seconds (default: 5.0)
             fallback_to_keyword: Whether to fall back to keyword on failure (default: True)
 
         Example:
             >>> # With custom embedder
-            >>> embedder = HaikuEmbedder(cache_db="~/.cache/embeddings.db")
+            >>> embedder = SentenceTransformerEmbedder()
             >>> service = ScoringService(embedder=embedder)
             >>>
             >>> # Keyword-only (no embedder needed)
@@ -110,7 +111,7 @@ class ScoringService:
         """
         # Initialize embedder if not provided
         if embedder is None and enable_semantic:
-            embedder = HaikuEmbedder()
+            embedder = SentenceTransformerEmbedder()
 
         # Initialize scorers
         self.semantic_scorer = (

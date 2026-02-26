@@ -83,9 +83,9 @@ class MatchType(str, Enum):
 class ScoreBreakdown:
     """Individual score components from similarity analysis.
 
-    All scores are in the range 0.0–1.0.  ``semantic_score`` is ``None``
-    when the SemanticScorer is unavailable or timed out; the composite
-    score is computed from the remaining components in that case.
+    All scores are in the range 0.0–1.0.  ``semantic_score`` and
+    ``text_score`` are ``None`` when unavailable; the composite score is
+    computed from the remaining components in that case.
 
     Attributes:
         content_score:   Similarity based on raw file-content hashes.
@@ -93,6 +93,10 @@ class ScoreBreakdown:
         metadata_score:  Similarity based on title, description, and tags.
         keyword_score:   Similarity based on keyword/TF-IDF match analysis.
         semantic_score:  Embedding-based semantic similarity (optional).
+        text_score:      Combined text similarity score derived from character
+                         bigram name similarity and BM25-style description
+                         similarity (optional; populated when text_similarity
+                         module is active).
     """
 
     content_score: float = 0.0
@@ -100,6 +104,7 @@ class ScoreBreakdown:
     metadata_score: float = 0.0
     keyword_score: float = 0.0
     semantic_score: Optional[float] = None  # None when SemanticScorer unavailable/timed out
+    text_score: Optional[float] = None  # None until text_similarity module populates it
 
 
 @dataclass
@@ -145,10 +150,10 @@ class SimilarityService:
 
     Composite score weights
     ----------------------
-    keyword   0.30
-    content   0.25
-    structure 0.20
-    metadata  0.15
+    metadata  0.30
+    keyword   0.25
+    content   0.20
+    structure 0.15
     semantic  0.10  (redistributed proportionally when unavailable)
 
     Attributes:
@@ -162,10 +167,10 @@ class SimilarityService:
 
     # Composite score weights (must sum to 1.0 when semantic is available)
     _WEIGHTS: dict[str, float] = {
-        "keyword": 0.30,
-        "content": 0.25,
-        "structure": 0.20,
-        "metadata": 0.15,
+        "keyword": 0.25,
+        "metadata": 0.30,
+        "content": 0.20,
+        "structure": 0.15,
         "semantic": 0.10,
     }
 
@@ -184,18 +189,21 @@ class SimilarityService:
         self._semantic: Optional[object] = None  # SemanticScorer | None
 
         # Attempt to build the SemanticScorer; failures are non-fatal.
+        # Prefer SentenceTransformerEmbedder (local, no API key required).
+        # Falls back cleanly when sentence_transformers is not installed.
         try:
-            from skillmeat.core.scoring.haiku_embedder import HaikuEmbedder
+            from skillmeat.core.scoring.embedder import SentenceTransformerEmbedder
             from skillmeat.core.scoring.semantic_scorer import SemanticScorer
 
-            embedder = HaikuEmbedder()
+            embedder = SentenceTransformerEmbedder()
             scorer = SemanticScorer(embedder)
             if scorer.is_available():
                 self._semantic = scorer
                 logger.debug("SimilarityService: SemanticScorer initialised.")
             else:
                 logger.debug(
-                    "SimilarityService: SemanticScorer unavailable (no API key?)."
+                    "SimilarityService: SemanticScorer unavailable "
+                    "(sentence-transformers not installed?).",
                 )
         except Exception as exc:  # noqa: BLE001
             logger.warning(
@@ -401,19 +409,32 @@ class SimilarityService:
         # 2. Build ArtifactFingerprint for the target.
         target_fp = self._fingerprint_from_row(target_row)
 
-        # Enrich target description from CollectionArtifact if not already set.
-        if not target_fp.description:
+        # Enrich target description and fingerprint fields from CollectionArtifact.
+        # The Artifact row itself never has content/structure hashes — these are
+        # stored on CollectionArtifact (SSO-2.4).
+        target_uuid = getattr(target_row, "uuid", None)
+        if target_uuid and (
+            not target_fp.description
+            or not target_fp.content_hash
+        ):
             from skillmeat.cache.models import CollectionArtifact
 
-            target_uuid = getattr(target_row, "uuid", None)
-            if target_uuid:
-                ca = (
-                    session.query(CollectionArtifact)
-                    .filter(CollectionArtifact.artifact_uuid == str(target_uuid))
-                    .first()
-                )
-                if ca and ca.description:
+            ca = (
+                session.query(CollectionArtifact)
+                .filter(CollectionArtifact.artifact_uuid == str(target_uuid))
+                .first()
+            )
+            if ca:
+                if not target_fp.description and ca.description:
                     target_fp.description = ca.description
+                if not target_fp.content_hash and ca.artifact_content_hash:
+                    target_fp.content_hash = ca.artifact_content_hash
+                if not target_fp.structure_hash and ca.artifact_structure_hash:
+                    target_fp.structure_hash = ca.artifact_structure_hash
+                if not target_fp.file_count and ca.artifact_file_count:
+                    target_fp.file_count = ca.artifact_file_count
+                if not target_fp.total_size and ca.artifact_total_size:
+                    target_fp.total_size = ca.artifact_total_size
 
         # 3. Fetch candidate rows (exclude the target itself).
         candidates = self._fetch_candidates(session, artifact_id, source)
@@ -425,19 +446,30 @@ class SimilarityService:
         for row in candidates:
             candidate_fp = self._fingerprint_from_row(row)
 
-            # Enrich candidate description from CollectionArtifact if not already set.
-            if not candidate_fp.description:
+            # Enrich candidate description and fingerprint fields from CollectionArtifact.
+            row_uuid = getattr(row, "uuid", None)
+            if row_uuid and (
+                not candidate_fp.description
+                or not candidate_fp.content_hash
+            ):
                 from skillmeat.cache.models import CollectionArtifact
 
-                row_uuid = getattr(row, "uuid", None)
-                if row_uuid:
-                    ca = (
-                        session.query(CollectionArtifact)
-                        .filter(CollectionArtifact.artifact_uuid == str(row_uuid))
-                        .first()
-                    )
-                    if ca and ca.description:
+                ca = (
+                    session.query(CollectionArtifact)
+                    .filter(CollectionArtifact.artifact_uuid == str(row_uuid))
+                    .first()
+                )
+                if ca:
+                    if not candidate_fp.description and ca.description:
                         candidate_fp.description = ca.description
+                    if not candidate_fp.content_hash and ca.artifact_content_hash:
+                        candidate_fp.content_hash = ca.artifact_content_hash
+                    if not candidate_fp.structure_hash and ca.artifact_structure_hash:
+                        candidate_fp.structure_hash = ca.artifact_structure_hash
+                    if not candidate_fp.file_count and ca.artifact_file_count:
+                        candidate_fp.file_count = ca.artifact_file_count
+                    if not candidate_fp.total_size and ca.artifact_total_size:
+                        candidate_fp.total_size = ca.artifact_total_size
 
             # 4a. Keyword/content/structure/metadata scores via MatchAnalyzer.compare().
             breakdown = self._analyzer.compare(target_fp, candidate_fp)
@@ -498,10 +530,30 @@ class SimilarityService:
         title: Optional[str] = None
         description: Optional[str] = getattr(row, "description", None)
         tags: List[str] = []
-        content_hash: str = getattr(row, "content_hash", "") or ""
-        total_size: int = getattr(row, "total_size", 0) or 0
-        file_count: int = getattr(row, "file_count", 0) or 0
-        structure_hash: str = getattr(row, "structure_hash", "") or ""
+        # For Artifact rows the content/structure fields live on the joined
+        # CollectionArtifact (populated by SSO-2.4).  Check both column name
+        # variants so this method works for Artifact, CollectionArtifact, and
+        # MarketplaceCatalogEntry rows alike.
+        content_hash: str = (
+            getattr(row, "content_hash", None)
+            or getattr(row, "artifact_content_hash", None)
+            or ""
+        )
+        total_size: int = (
+            getattr(row, "total_size", None)
+            or getattr(row, "artifact_total_size", None)
+            or 0
+        )
+        file_count: int = (
+            getattr(row, "file_count", None)
+            or getattr(row, "artifact_file_count", None)
+            or 0
+        )
+        structure_hash: str = (
+            getattr(row, "structure_hash", None)
+            or getattr(row, "artifact_structure_hash", None)
+            or ""
+        )
         metadata_hash: str = getattr(row, "metadata_hash", "") or ""
 
         # Enrich from artifact_metadata relationship if available (Artifact rows).
@@ -887,10 +939,11 @@ class SimilarityService:
     def _compute_composite_score(self, breakdown: ScoreBreakdown) -> float:
         """Compute weighted average of score components.
 
-        Weights: keyword=0.30, content=0.25, structure=0.20, metadata=0.15,
+        Weights: metadata=0.30, keyword=0.25, content=0.20, structure=0.15,
         semantic=0.10.  When ``breakdown.semantic_score`` is ``None`` the
         0.10 semantic weight is redistributed proportionally across the
-        remaining four components.
+        remaining four components (keyword=0.278, metadata=0.333,
+        content=0.222, structure=0.167).
 
         Args:
             breakdown: Per-component score breakdown from MatchAnalyzer.

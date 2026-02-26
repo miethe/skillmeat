@@ -37,6 +37,7 @@ export type SimilaritySource = 'collection' | 'marketplace' | 'all';
  *
  * All required scores are in the range [0.0, 1.0].
  * semantic_score is null when a semantic/embedding model is unavailable.
+ * text_score is null when the text similarity pipeline is unavailable.
  */
 export interface SimilarityBreakdown {
   /** Content similarity score (file content comparison) */
@@ -47,6 +48,8 @@ export interface SimilarityBreakdown {
   metadata_score: number;
   /** Keyword/TF-IDF similarity score */
   keyword_score: number;
+  /** Text similarity score (full-text analysis); null if unavailable */
+  text_score?: number | null;
   /** Semantic similarity score via embeddings; null if unavailable */
   semantic_score: number | null;
 }

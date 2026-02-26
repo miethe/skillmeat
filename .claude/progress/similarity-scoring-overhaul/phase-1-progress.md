@@ -2,118 +2,137 @@
 schema_version: 2
 doc_type: progress
 type: progress
-prd: "similarity-scoring-overhaul"
-feature_slug: "similarity-scoring-overhaul"
-prd_ref: "docs/project_plans/PRDs/features/similarity-scoring-overhaul-v1.md"
-plan_ref: "docs/project_plans/implementation_plans/features/similarity-scoring-overhaul-v1.md"
+prd: similarity-scoring-overhaul
+feature_slug: similarity-scoring-overhaul
+prd_ref: docs/project_plans/PRDs/features/similarity-scoring-overhaul-v1.md
+plan_ref: docs/project_plans/implementation_plans/features/similarity-scoring-overhaul-v1.md
 phase: 1
-title: "Fix Scoring Algorithm"
-status: "planning"
-started: "2026-02-26"
+title: Fix Scoring Algorithm
+status: completed
+started: '2026-02-26'
 completed: null
 commit_refs: []
 pr_refs: []
 overall_progress: 0
-completion_estimate: "on-track"
+completion_estimate: on-track
 total_tasks: 6
-completed_tasks: 0
+completed_tasks: 6
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-owners: ["python-backend-engineer", "ui-engineer-enhanced"]
+owners:
+- python-backend-engineer
+- ui-engineer-enhanced
 contributors: []
-
-# === TASKS (SOURCE OF TRUTH) ===
 tasks:
-  - id: "SSO-1.1"
-    description: "Create text_similarity.py with bigram_similarity() and bm25_description_similarity() functions"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "SSO-1.2"
-    description: "Fix _compute_metadata_score() with bigram_similarity() for titles and bm25 for descriptions; rebalance sub-weights"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SSO-1.1"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "SSO-1.3"
-    description: "Rebalance composite weights (keyword=0.25, metadata=0.30, content=0.20, structure=0.15, semantic=0.10)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SSO-1.2"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "SSO-1.4"
-    description: "Add text_score optional field to SimilarityBreakdownDTO in API schemas"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SSO-1.3"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "SSO-1.5"
-    description: "Update frontend similar-artifacts-tab.tsx to display text_score in score breakdown"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SSO-1.4"]
-    estimated_effort: "1 pt"
-    priority: "high"
-
-  - id: "SSO-1.6"
-    description: "Write Phase 1 tests: test_text_similarity.py and update test_match_analyzer.py"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SSO-1.1", "SSO-1.3"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-# Parallelization Strategy (computed from dependencies)
+- id: SSO-1.1
+  description: Create text_similarity.py with bigram_similarity() and bm25_description_similarity()
+    functions
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2 pts
+  priority: high
+- id: SSO-1.2
+  description: Fix _compute_metadata_score() with bigram_similarity() for titles and
+    bm25 for descriptions; rebalance sub-weights
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SSO-1.1
+  estimated_effort: 2 pts
+  priority: high
+- id: SSO-1.3
+  description: Rebalance composite weights (keyword=0.25, metadata=0.30, content=0.20,
+    structure=0.15, semantic=0.10)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SSO-1.2
+  estimated_effort: 1 pt
+  priority: high
+- id: SSO-1.4
+  description: Add text_score optional field to SimilarityBreakdownDTO in API schemas
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SSO-1.3
+  estimated_effort: 1 pt
+  priority: high
+- id: SSO-1.5
+  description: Update frontend similar-artifacts-tab.tsx to display text_score in
+    score breakdown
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SSO-1.4
+  estimated_effort: 1 pt
+  priority: high
+- id: SSO-1.6
+  description: 'Write Phase 1 tests: test_text_similarity.py and update test_match_analyzer.py'
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SSO-1.1
+  - SSO-1.3
+  estimated_effort: 2 pts
+  priority: high
 parallelization:
-  batch_1: ["SSO-1.1"]
-  batch_2: ["SSO-1.2"]
-  batch_3: ["SSO-1.3"]
-  batch_4: ["SSO-1.4"]
-  batch_5: ["SSO-1.5", "SSO-1.6"]
-  critical_path: ["SSO-1.1", "SSO-1.2", "SSO-1.3", "SSO-1.4", "SSO-1.5"]
-  estimated_total_time: "~1.5 days (9 pts)"
-
-# Critical Blockers
+  batch_1:
+  - SSO-1.1
+  batch_2:
+  - SSO-1.2
+  batch_3:
+  - SSO-1.3
+  batch_4:
+  - SSO-1.4
+  batch_5:
+  - SSO-1.5
+  - SSO-1.6
+  critical_path:
+  - SSO-1.1
+  - SSO-1.2
+  - SSO-1.3
+  - SSO-1.4
+  - SSO-1.5
+  estimated_total_time: ~1.5 days (9 pts)
 blockers: []
-
-# Success Criteria
 success_criteria:
-  - id: "SC-1"
-    description: "Similar artifacts tab shows differentiated, meaningful results — same-type artifacts with related names rank above unrelated ones"
-    status: "pending"
-  - id: "SC-2"
-    description: "Description content matters: artifacts with identical descriptions rank highly regardless of name differences"
-    status: "pending"
-  - id: "SC-3"
-    description: "Name similarity is prominent: canvas-design and canvas-layout rank higher than unrelated artifacts"
-    status: "pending"
-  - id: "SC-4"
-    description: "All existing similarity tests pass after scoring changes"
-    status: "pending"
-  - id: "SC-5"
-    description: "No new Python package dependencies added in Phase 1"
-    status: "pending"
-
-# Files Modified
+- id: SC-1
+  description: Similar artifacts tab shows differentiated, meaningful results — same-type
+    artifacts with related names rank above unrelated ones
+  status: pending
+- id: SC-2
+  description: 'Description content matters: artifacts with identical descriptions
+    rank highly regardless of name differences'
+  status: pending
+- id: SC-3
+  description: 'Name similarity is prominent: canvas-design and canvas-layout rank
+    higher than unrelated artifacts'
+  status: pending
+- id: SC-4
+  description: All existing similarity tests pass after scoring changes
+  status: pending
+- id: SC-5
+  description: No new Python package dependencies added in Phase 1
+  status: pending
 files_modified:
-  - "skillmeat/core/scoring/text_similarity.py"
-  - "skillmeat/core/scoring/match_analyzer.py"
-  - "skillmeat/core/similarity.py"
-  - "skillmeat/api/schemas/artifacts.py"
-  - "skillmeat/api/routers/artifacts.py"
-  - "skillmeat/web/components/collection/similar-artifacts-tab.tsx"
-  - "tests/test_text_similarity.py"
-  - "tests/test_match_analyzer.py"
+- skillmeat/core/scoring/text_similarity.py
+- skillmeat/core/scoring/match_analyzer.py
+- skillmeat/core/similarity.py
+- skillmeat/api/schemas/artifacts.py
+- skillmeat/api/routers/artifacts.py
+- skillmeat/web/components/collection/similar-artifacts-tab.tsx
+- tests/test_text_similarity.py
+- tests/test_match_analyzer.py
+progress: 100
+updated: '2026-02-26'
 ---
 
 # Similarity Scoring Overhaul - Phase 1: Fix Scoring Algorithm
