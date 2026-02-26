@@ -18,6 +18,7 @@ from typing import List, Optional, Tuple
 
 from skillmeat.core.artifact import ArtifactMetadata
 from skillmeat.core.similarity import ScoreBreakdown
+from skillmeat.core.scoring.text_similarity import bigram_similarity, bm25_description_similarity
 from skillmeat.models import ArtifactFingerprint
 
 # Optional OpenTelemetry integration — works whether or not otel is installed.
@@ -215,10 +216,11 @@ class MatchAnalyzer:
 
         metadata_score
             Weighted combination of:
-            - Tag Jaccard similarity (50 %)
-            - Artifact-type match (25 %)
-            - Title token overlap / Jaccard (15 %)
-            - Description length ratio (10 %)
+            - Tag Jaccard similarity (30 %)
+            - Artifact-type match (15 %)
+            - Title bigram similarity via ``bigram_similarity`` (25 %)
+            - Description BM25 content similarity via ``bm25_description_similarity`` (25 %)
+            - Description length sanity check (5 %)
 
         Args:
             artifact_a: First artifact fingerprint.
@@ -438,10 +440,11 @@ class MatchAnalyzer:
         """Compute metadata similarity in [0, 1].
 
         Weighted combination:
-        - Tag Jaccard similarity        50 %
-        - Artifact-type match           25 %
-        - Title token Jaccard           15 %
-        - Description length ratio      10 %
+        - Tag Jaccard similarity                30 %
+        - Artifact-type match                   15 %
+        - Title bigram similarity               25 %
+        - Description BM25 content similarity   25 %
+        - Description length sanity check        5 %
 
         Args:
             artifact_a: First artifact fingerprint.
@@ -452,34 +455,40 @@ class MatchAnalyzer:
         """
         score = 0.0
 
-        # Tag Jaccard (50 %)
+        # Tag Jaccard (30 %)
         tags_a = set(t.lower() for t in artifact_a.tags) if artifact_a.tags else set()
         tags_b = set(t.lower() for t in artifact_b.tags) if artifact_b.tags else set()
         if tags_a or tags_b:
             union = tags_a | tags_b
             jaccard = len(tags_a & tags_b) / len(union) if union else 0.0
-            score += jaccard * 0.50
+            score += jaccard * 0.30
         # If both are empty, contribute 0 — no information either way.
 
-        # Artifact-type match (25 %)
+        # Artifact-type match (15 %)
         if artifact_a.artifact_type and artifact_b.artifact_type:
             if artifact_a.artifact_type.lower() == artifact_b.artifact_type.lower():
-                score += 0.25
+                score += 0.15
 
-        # Title token Jaccard (15 %)
-        title_a = set(self._tokenize(artifact_a.title or ""))
-        title_b = set(self._tokenize(artifact_b.title or ""))
-        if title_a or title_b:
-            union_t = title_a | title_b
-            title_jaccard = len(title_a & title_b) / len(union_t) if union_t else 0.0
-            score += title_jaccard * 0.15
+        # Title bigram similarity (25 %) — robust to naming convention differences.
+        name_a = artifact_a.title or artifact_a.artifact_name or ""
+        name_b = artifact_b.title or artifact_b.artifact_name or ""
+        if name_a or name_b:
+            score += bigram_similarity(name_a, name_b) * 0.25
 
-        # Description length ratio (10 %)
-        len_a = len(artifact_a.description or "")
-        len_b = len(artifact_b.description or "")
+        # Description BM25 content similarity (25 %) — symmetric average.
+        desc_a = artifact_a.description or ""
+        desc_b = artifact_b.description or ""
+        if desc_a and desc_b:
+            sim_a_to_b = bm25_description_similarity(desc_a, desc_b)
+            sim_b_to_a = bm25_description_similarity(desc_b, desc_a)
+            score += ((sim_a_to_b + sim_b_to_a) / 2.0) * 0.25
+
+        # Description length sanity check (5 %) — penalises very disparate sizes.
+        len_a = len(desc_a)
+        len_b = len(desc_b)
         if len_a > 0 and len_b > 0:
             desc_ratio = min(len_a, len_b) / max(len_a, len_b)
-            score += desc_ratio * 0.10
+            score += desc_ratio * 0.05
 
         return min(1.0, max(0.0, score))
 
