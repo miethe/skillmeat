@@ -83,9 +83,9 @@ class MatchType(str, Enum):
 class ScoreBreakdown:
     """Individual score components from similarity analysis.
 
-    All scores are in the range 0.0–1.0.  ``semantic_score`` is ``None``
-    when the SemanticScorer is unavailable or timed out; the composite
-    score is computed from the remaining components in that case.
+    All scores are in the range 0.0–1.0.  ``semantic_score`` and
+    ``text_score`` are ``None`` when unavailable; the composite score is
+    computed from the remaining components in that case.
 
     Attributes:
         content_score:   Similarity based on raw file-content hashes.
@@ -93,6 +93,10 @@ class ScoreBreakdown:
         metadata_score:  Similarity based on title, description, and tags.
         keyword_score:   Similarity based on keyword/TF-IDF match analysis.
         semantic_score:  Embedding-based semantic similarity (optional).
+        text_score:      Combined text similarity score derived from character
+                         bigram name similarity and BM25-style description
+                         similarity (optional; populated when text_similarity
+                         module is active).
     """
 
     content_score: float = 0.0
@@ -100,6 +104,7 @@ class ScoreBreakdown:
     metadata_score: float = 0.0
     keyword_score: float = 0.0
     semantic_score: Optional[float] = None  # None when SemanticScorer unavailable/timed out
+    text_score: Optional[float] = None  # None until text_similarity module populates it
 
 
 @dataclass

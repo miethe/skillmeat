@@ -1414,6 +1414,15 @@ class SimilarityBreakdownDTO(BaseModel):
         le=1.0,
         description="Semantic similarity score (None if unavailable)",
     )
+    text_score: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Combined text similarity score from character bigram name similarity "
+            "and BM25-style description matching (None if text scoring is unavailable)"
+        ),
+    )
 
 
 class SimilarArtifactDTO(BaseModel):

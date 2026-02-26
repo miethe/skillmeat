@@ -9178,6 +9178,14 @@ async def get_similar_artifacts(
                 metadata_score=result.breakdown.metadata_score,
                 keyword_score=result.breakdown.keyword_score,
                 semantic_score=result.breakdown.semantic_score,
+                # text_score is populated by the text_similarity module (SSO-1.2+).
+                # Fall back to metadata_score as a proxy until that module is active,
+                # ensuring the field is non-null for existing scoring runs.
+                text_score=(
+                    result.breakdown.text_score
+                    if result.breakdown.text_score is not None
+                    else result.breakdown.metadata_score
+                ),
             )
 
             items.append(
