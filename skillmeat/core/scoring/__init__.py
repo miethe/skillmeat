@@ -9,6 +9,7 @@ from .anti_gaming import (
     ViolationType,
 )
 from .context_booster import ContextBooster, ProjectContext
+from .embedder import SentenceTransformerEmbedder
 from .embedding_provider import EmbeddingProvider
 from .exceptions import (
     ArtifactNotFound,
@@ -16,7 +17,7 @@ from .exceptions import (
     ScoringError,
     ScoringTimeout,
 )
-from .haiku_embedder import HaikuEmbedder
+from .haiku_embedder import AnthropicEmbedder, HaikuEmbedder
 from .match_analyzer import MatchAnalyzer
 from .models import ArtifactScore, CommunityScore, ScoringResult, UserRating
 from .quality_scorer import QualityScorer
@@ -45,6 +46,9 @@ __all__ = [
     "ProjectContext",
     # Embedding
     "EmbeddingProvider",
+    "AnthropicEmbedder",
+    "SentenceTransformerEmbedder",
+    # Backward-compat alias
     "HaikuEmbedder",
     # Service
     "ScoringService",

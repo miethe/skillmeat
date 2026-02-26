@@ -189,18 +189,21 @@ class SimilarityService:
         self._semantic: Optional[object] = None  # SemanticScorer | None
 
         # Attempt to build the SemanticScorer; failures are non-fatal.
+        # Prefer SentenceTransformerEmbedder (local, no API key required).
+        # Falls back cleanly when sentence_transformers is not installed.
         try:
-            from skillmeat.core.scoring.haiku_embedder import HaikuEmbedder
+            from skillmeat.core.scoring.embedder import SentenceTransformerEmbedder
             from skillmeat.core.scoring.semantic_scorer import SemanticScorer
 
-            embedder = HaikuEmbedder()
+            embedder = SentenceTransformerEmbedder()
             scorer = SemanticScorer(embedder)
             if scorer.is_available():
                 self._semantic = scorer
                 logger.debug("SimilarityService: SemanticScorer initialised.")
             else:
                 logger.debug(
-                    "SimilarityService: SemanticScorer unavailable (no API key?)."
+                    "SimilarityService: SemanticScorer unavailable "
+                    "(sentence-transformers not installed?).",
                 )
         except Exception as exc:  # noqa: BLE001
             logger.warning(
