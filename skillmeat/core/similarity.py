@@ -406,19 +406,32 @@ class SimilarityService:
         # 2. Build ArtifactFingerprint for the target.
         target_fp = self._fingerprint_from_row(target_row)
 
-        # Enrich target description from CollectionArtifact if not already set.
-        if not target_fp.description:
+        # Enrich target description and fingerprint fields from CollectionArtifact.
+        # The Artifact row itself never has content/structure hashes — these are
+        # stored on CollectionArtifact (SSO-2.4).
+        target_uuid = getattr(target_row, "uuid", None)
+        if target_uuid and (
+            not target_fp.description
+            or not target_fp.content_hash
+        ):
             from skillmeat.cache.models import CollectionArtifact
 
-            target_uuid = getattr(target_row, "uuid", None)
-            if target_uuid:
-                ca = (
-                    session.query(CollectionArtifact)
-                    .filter(CollectionArtifact.artifact_uuid == str(target_uuid))
-                    .first()
-                )
-                if ca and ca.description:
+            ca = (
+                session.query(CollectionArtifact)
+                .filter(CollectionArtifact.artifact_uuid == str(target_uuid))
+                .first()
+            )
+            if ca:
+                if not target_fp.description and ca.description:
                     target_fp.description = ca.description
+                if not target_fp.content_hash and ca.artifact_content_hash:
+                    target_fp.content_hash = ca.artifact_content_hash
+                if not target_fp.structure_hash and ca.artifact_structure_hash:
+                    target_fp.structure_hash = ca.artifact_structure_hash
+                if not target_fp.file_count and ca.artifact_file_count:
+                    target_fp.file_count = ca.artifact_file_count
+                if not target_fp.total_size and ca.artifact_total_size:
+                    target_fp.total_size = ca.artifact_total_size
 
         # 3. Fetch candidate rows (exclude the target itself).
         candidates = self._fetch_candidates(session, artifact_id, source)
@@ -430,19 +443,30 @@ class SimilarityService:
         for row in candidates:
             candidate_fp = self._fingerprint_from_row(row)
 
-            # Enrich candidate description from CollectionArtifact if not already set.
-            if not candidate_fp.description:
+            # Enrich candidate description and fingerprint fields from CollectionArtifact.
+            row_uuid = getattr(row, "uuid", None)
+            if row_uuid and (
+                not candidate_fp.description
+                or not candidate_fp.content_hash
+            ):
                 from skillmeat.cache.models import CollectionArtifact
 
-                row_uuid = getattr(row, "uuid", None)
-                if row_uuid:
-                    ca = (
-                        session.query(CollectionArtifact)
-                        .filter(CollectionArtifact.artifact_uuid == str(row_uuid))
-                        .first()
-                    )
-                    if ca and ca.description:
+                ca = (
+                    session.query(CollectionArtifact)
+                    .filter(CollectionArtifact.artifact_uuid == str(row_uuid))
+                    .first()
+                )
+                if ca:
+                    if not candidate_fp.description and ca.description:
                         candidate_fp.description = ca.description
+                    if not candidate_fp.content_hash and ca.artifact_content_hash:
+                        candidate_fp.content_hash = ca.artifact_content_hash
+                    if not candidate_fp.structure_hash and ca.artifact_structure_hash:
+                        candidate_fp.structure_hash = ca.artifact_structure_hash
+                    if not candidate_fp.file_count and ca.artifact_file_count:
+                        candidate_fp.file_count = ca.artifact_file_count
+                    if not candidate_fp.total_size and ca.artifact_total_size:
+                        candidate_fp.total_size = ca.artifact_total_size
 
             # 4a. Keyword/content/structure/metadata scores via MatchAnalyzer.compare().
             breakdown = self._analyzer.compare(target_fp, candidate_fp)
@@ -503,10 +527,30 @@ class SimilarityService:
         title: Optional[str] = None
         description: Optional[str] = getattr(row, "description", None)
         tags: List[str] = []
-        content_hash: str = getattr(row, "content_hash", "") or ""
-        total_size: int = getattr(row, "total_size", 0) or 0
-        file_count: int = getattr(row, "file_count", 0) or 0
-        structure_hash: str = getattr(row, "structure_hash", "") or ""
+        # For Artifact rows the content/structure fields live on the joined
+        # CollectionArtifact (populated by SSO-2.4).  Check both column name
+        # variants so this method works for Artifact, CollectionArtifact, and
+        # MarketplaceCatalogEntry rows alike.
+        content_hash: str = (
+            getattr(row, "content_hash", None)
+            or getattr(row, "artifact_content_hash", None)
+            or ""
+        )
+        total_size: int = (
+            getattr(row, "total_size", None)
+            or getattr(row, "artifact_total_size", None)
+            or 0
+        )
+        file_count: int = (
+            getattr(row, "file_count", None)
+            or getattr(row, "artifact_file_count", None)
+            or 0
+        )
+        structure_hash: str = (
+            getattr(row, "structure_hash", None)
+            or getattr(row, "artifact_structure_hash", None)
+            or ""
+        )
         metadata_hash: str = getattr(row, "metadata_hash", "") or ""
 
         # Enrich from artifact_metadata relationship if available (Artifact rows).
