@@ -2,7 +2,7 @@
 schema_version: 2
 doc_type: implementation_plan
 title: 'Implementation Plan: Similarity Scoring Overhaul'
-status: in-progress
+status: completed
 created: '2026-02-26'
 updated: '2026-02-26'
 feature_slug: similarity-scoring-overhaul
@@ -47,7 +47,6 @@ files_affected:
 commit_refs: []
 pr_refs: []
 ---
-
 # Implementation Plan: Similarity Scoring Overhaul
 
 **Plan ID**: `IMPL-2026-02-26-SIMILARITY-SCORING-OVERHAUL`
