@@ -570,6 +570,7 @@ def get_composite_aggregates() -> Dict[str, Any]:
 def source_to_response(
     source: MarketplaceSource,
     composite_aggregates: Optional[Dict[str, Any]] = None,
+    counts_by_status: Optional[Dict[str, int]] = None,
 ) -> SourceResponse:
     """Convert MarketplaceSource ORM model to API response.
 
@@ -580,6 +581,11 @@ def source_to_response(
             source contains composite-type artifacts, ``composite_member_count``
             and ``composite_child_types`` are populated on the response.  Pass
             ``None`` to leave those fields null.
+        counts_by_status: Optional pre-computed catalog status counts for this
+            source (from ``CatalogRepository.count_by_status(source_id)``).
+            When provided, ``new_artifact_count``, ``updated_artifact_count``,
+            and ``imported_count`` are populated.  Pass ``None`` to leave them
+            at their defaults (0).
 
     Returns:
         SourceResponse DTO for API.
@@ -592,6 +598,9 @@ def source_to_response(
     if counts_by_type.get("composite", 0) > 0 and composite_aggregates is not None:
         composite_member_count = composite_aggregates.get("member_count")
         composite_child_types = composite_aggregates.get("child_types") or []
+
+    # Resolve status-based counts from pre-computed dict (or default to 0)
+    status_counts = counts_by_status or {}
 
     return SourceResponse(
         id=source.id,
@@ -616,6 +625,9 @@ def source_to_response(
         repo_readme=source.repo_readme,
         tags=source.get_tags_list() or [],
         counts_by_type=counts_by_type,
+        new_artifact_count=status_counts.get("new", 0),
+        updated_artifact_count=status_counts.get("updated", 0),
+        imported_count=status_counts.get("imported", 0),
         single_artifact_mode=source.single_artifact_mode or False,
         single_artifact_type=source.single_artifact_type,
         indexing_enabled=source.indexing_enabled,
@@ -2350,6 +2362,11 @@ async def list_sources(
         # This single query covers all composites across the local DB.
         composite_aggs = get_composite_aggregates()
 
+        # Pre-fetch catalog status counts for all sources in one query (avoid N+1).
+        # Result: {source_id: {status: count}}
+        catalog_repo = MarketplaceCatalogRepository()
+        status_counts_bulk = catalog_repo.count_by_status_bulk()
+
         # Check if any filters are provided
         has_filters = any([artifact_type, tags, trust_level, search])
 
@@ -2386,9 +2403,13 @@ async def list_sources(
             has_more = end_idx < len(filtered_sources)
 
             # Convert ORM models to API responses; pass composite aggregates
-            # so composite-type sources are enriched without N+1 queries.
+            # and status counts so all sources are enriched without N+1 queries.
             items = [
-                source_to_response(source, composite_aggregates=composite_aggs)
+                source_to_response(
+                    source,
+                    composite_aggregates=composite_aggs,
+                    counts_by_status=status_counts_bulk.get(source.id),
+                )
                 for source in page_sources
             ]
 
@@ -2421,9 +2442,14 @@ async def list_sources(
             # Without filters: use repository's paginated query for efficiency
             result = source_repo.list_paginated(limit=limit, cursor=cursor)
 
-            # Convert ORM models to API responses; pass composite aggregates.
+            # Convert ORM models to API responses; pass composite aggregates
+            # and status counts so all sources are enriched without N+1 queries.
             items = [
-                source_to_response(source, composite_aggregates=composite_aggs)
+                source_to_response(
+                    source,
+                    composite_aggregates=composite_aggs,
+                    counts_by_status=status_counts_bulk.get(source.id),
+                )
                 for source in result.items
             ]
 
@@ -2525,7 +2551,9 @@ async def get_source(source_id: str) -> SourceResponse:
                 detail=f"Source with ID '{source_id}' not found",
             )
 
-        return source_to_response(source)
+        catalog_repo = MarketplaceCatalogRepository()
+        status_counts = catalog_repo.count_by_status(source_id)
+        return source_to_response(source, counts_by_status=status_counts)
     except HTTPException:
         raise
     except Exception as e:
