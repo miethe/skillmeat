@@ -2457,6 +2457,43 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
         finally:
             session.close()
 
+    def count_by_status_bulk(self) -> Dict[str, Dict[str, int]]:
+        """Count catalog entries grouped by source_id and status in one query.
+
+        Returns a nested dict ``{source_id: {status: count}}`` covering all
+        sources present in the catalog table.  Callers can then look up any
+        individual source without issuing additional queries, making this
+        suitable for list-endpoint bulk pre-fetching (avoids N+1).
+
+        Returns:
+            Nested dict mapping source_id → (status → count).
+            Sources with no catalog entries are absent from the result.
+
+        Example:
+            >>> bulk = repo.count_by_status_bulk()
+            >>> counts = bulk.get("src-abc", {})
+            >>> new_count = counts.get("new", 0)
+        """
+        session = self._get_session()
+        try:
+            results = session.query(
+                MarketplaceCatalogEntry.source_id,
+                MarketplaceCatalogEntry.status,
+                func.count(MarketplaceCatalogEntry.id).label("count"),
+            ).group_by(
+                MarketplaceCatalogEntry.source_id,
+                MarketplaceCatalogEntry.status,
+            ).all()
+
+            bulk: Dict[str, Dict[str, int]] = {}
+            for source_id, status, count in results:
+                bulk.setdefault(source_id, {})[status] = count
+
+            logger.debug("count_by_status_bulk: %d source entries loaded", len(bulk))
+            return bulk
+        finally:
+            session.close()
+
     def count_by_type(self, source_id: Optional[str] = None) -> Dict[str, int]:
         """Count catalog entries grouped by artifact type.
 

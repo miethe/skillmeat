@@ -1,6 +1,6 @@
 ---
 feature: source-card-zoned-layout
-status: planning
+status: completed
 created: 2026-02-25
 files_affected:
   - skillmeat/web/components/marketplace/source-card.tsx
@@ -99,9 +99,9 @@ For now, frontend handles undefined gracefully (hides badges/progress when no da
 
 ## Tasks
 
-- [ ] TASK-1: Update `GitHubSource` type with optional new fields
-- [ ] TASK-2: Redesign source-card.tsx with fixed zone layout
-- [ ] TASK-3: Add New/Updated badge components in metrics row
-- [ ] TASK-4: Add import progress bar component
-- [ ] TASK-5: Ensure homogenous card heights across all states
-- [ ] TASK-6: Quality gates (typecheck, lint, build)
+- [x] TASK-1: Update `GitHubSource` type with optional new fields
+- [x] TASK-2: Redesign source-card.tsx with fixed zone layout
+- [x] TASK-3: Add New/Updated badge components in metrics row
+- [x] TASK-4: Add import progress bar component
+- [x] TASK-5: Ensure homogenous card heights across all states
+- [x] TASK-6: Quality gates (typecheck, lint, build)

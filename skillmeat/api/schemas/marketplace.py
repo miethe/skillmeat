@@ -1097,6 +1097,24 @@ class SourceResponse(BaseModel):
         default_factory=dict,
         description="Artifact counts by type (e.g., {'skill': 5, 'command': 3})",
     )
+    new_artifact_count: int = Field(
+        default=0,
+        description="Number of newly detected artifacts (status='new')",
+        ge=0,
+        examples=[3],
+    )
+    updated_artifact_count: int = Field(
+        default=0,
+        description="Number of artifacts with upstream changes (status='updated')",
+        ge=0,
+        examples=[2],
+    )
+    imported_count: int = Field(
+        default=0,
+        description="Number of artifacts imported to collection (status='imported')",
+        ge=0,
+        examples=[7],
+    )
     single_artifact_mode: bool = Field(
         default=False,
         description="Whether the source treats the entire repository (or root_hint directory) as a single artifact",
