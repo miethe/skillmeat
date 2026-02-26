@@ -18,7 +18,7 @@
  * ```
  */
 
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Bot,
   Blocks,
@@ -31,7 +31,8 @@ import {
   X,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useDebounce, useArtifacts } from '@/hooks';
+import { useDebounce, useInfiniteArtifacts } from '@/hooks';
+import { mapApiResponseToArtifact } from '@/lib/api/mappers';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 import { cn } from '@/lib/utils';
 
@@ -122,18 +123,24 @@ export function MemberSearchInput({
   const listboxId = useId();
 
   // ---------------------------------------------------------------------------
-  // Data fetching — reuse existing useArtifacts hook with search filter
+  // Data fetching — server-side search via infinite artifacts hook (first page only)
   // ---------------------------------------------------------------------------
 
-  const { data, isLoading, isFetching } = useArtifacts(
-    { search: debouncedQuery || undefined },
-    { field: 'name', order: 'asc' }
-  );
+  const { data, isLoading, isFetching } = useInfiniteArtifacts({
+    limit: 10,
+    search: debouncedQuery || undefined,
+    enabled: debouncedQuery.length >= 1,
+  });
 
-  // Derive visible results — filter already-added members and apply minimum
-  // query length guard on the client side.
+  // Derive visible results — flatten first page, filter already-added members,
+  // and apply minimum query length guard.
   const showingQuery = debouncedQuery.length >= 1;
-  const rawItems: Artifact[] = data?.artifacts ?? [];
+  const rawItems: Artifact[] = useMemo(() => {
+    if (!data?.pages) return [];
+    return data.pages.flatMap((page) =>
+      page.items.map((item) => mapApiResponseToArtifact(item, 'collection'))
+    );
+  }, [data]);
   const results: Artifact[] = showingQuery
     ? rawItems.filter((a) => !excludeIds.includes(a.id))
     : [];

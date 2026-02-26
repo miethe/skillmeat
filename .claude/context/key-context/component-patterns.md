@@ -837,6 +837,82 @@ const canAddMember = (memberId: string, targetSetId: string) => {
 
 ---
 
+## Artifact Picker Pattern
+
+Standard pattern for any UI that browses/selects artifacts (dialogs, dropdowns, pickers).
+
+### Rules
+
+- Use `useInfiniteArtifacts` with server-side filters for any browse/select UI
+- Use `useDebounce(search, 300)` for search inputs to avoid excessive API calls
+- Use `useIntersectionObserver` for scroll-triggered loading in grid/list views
+- Never use `useArtifacts({ limit: N })` where N > 50 for picker UIs
+- Map API responses with `mapApiResponseToArtifact(item, 'collection')`
+
+### Full Dialog (grid with scroll loading)
+
+```tsx
+// Imports
+import { useInfiniteArtifacts, useIntersectionObserver, useDebounce } from '@/hooks';
+import { mapApiResponseToArtifact } from '@/lib/api/mappers';
+
+// Inside component
+const debouncedSearch = useDebounce(search, 300);
+
+const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } =
+  useInfiniteArtifacts({
+    limit: 20,
+    search: debouncedSearch || undefined,
+    artifact_type: selectedTypes.size > 0
+      ? Array.from(selectedTypes).join(',')
+      : undefined,
+  });
+
+const items = useMemo(() => {
+  if (!data?.pages) return [];
+  return data.pages.flatMap((p) =>
+    p.items.map((item) => mapApiResponseToArtifact(item, 'collection'))
+  );
+}, [data]);
+
+const { targetRef, isIntersecting } = useIntersectionObserver({
+  rootMargin: '100px',
+  enabled: !!hasNextPage && !isFetchingNextPage,
+});
+
+useEffect(() => {
+  if (isIntersecting) fetchNextPage();
+}, [isIntersecting, fetchNextPage]);
+
+// JSX: sentinel div at bottom of scroll area
+{hasNextPage && <div ref={targetRef} />}
+```
+
+### Dropdown/Autocomplete (first page only)
+
+```tsx
+const { data, isLoading } = useInfiniteArtifacts({
+  limit: 10,
+  search: debouncedQuery || undefined,
+  enabled: debouncedQuery.length >= 1,
+});
+
+const items = useMemo(() => {
+  if (!data?.pages) return [];
+  return data.pages.flatMap((p) =>
+    p.items.map((item) => mapApiResponseToArtifact(item, 'collection'))
+  );
+}, [data]);
+```
+
+### Reference implementations
+
+- Full dialog: `components/deployment-sets/add-member-dialog.tsx`
+- Dropdown: `components/shared/member-search-input.tsx`
+- Collection page (original): `app/collection/page.tsx`
+
+---
+
 ## Reference Links
 
 - **shadcn/ui Documentation**: https://ui.shadcn.com/

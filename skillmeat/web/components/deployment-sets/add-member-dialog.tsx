@@ -15,16 +15,20 @@ import {
   Server,
   Webhook,
   Boxes,
+  Loader2,
 } from 'lucide-react';
 import {
   useAddMember,
-  useArtifacts,
+  useInfiniteArtifacts,
+  useIntersectionObserver,
+  useDebounce,
   useCollections,
   useDeploymentSetMembers,
   useDeploymentSets,
   useGroups,
   useToast,
 } from '@/hooks';
+import { mapApiResponseToArtifact } from '@/lib/api/mappers';
 import type { DeploymentSet } from '@/types/deployment-sets';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 import type { Group } from '@/types/groups';
@@ -211,16 +215,39 @@ function ArtifactTab({ setId, onAdded, existingMemberUuids }: ArtifactTabProps) 
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const addMember = useAddMember();
 
-  const { data: artifactsData, isLoading } = useArtifacts({ limit: 500 }, { field: 'name', order: 'asc' });
-  const artifacts: Artifact[] = artifactsData?.artifacts ?? [];
+  const debouncedSearch = useDebounce(search, 300);
+
+  const {
+    data: infiniteData,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteArtifacts({
+    limit: 20,
+    search: debouncedSearch || undefined,
+    artifact_type: selectedTypes.size > 0
+      ? Array.from(selectedTypes).join(',')
+      : undefined,
+  });
 
   const filtered = useMemo(() => {
-    return artifacts.filter((a) => {
-      const matchesSearch = a.name.toLowerCase().includes(search.toLowerCase());
-      const matchesType = selectedTypes.size === 0 || selectedTypes.has(a.type as ArtifactType);
-      return matchesSearch && matchesType;
-    });
-  }, [artifacts, search, selectedTypes]);
+    if (!infiniteData?.pages) return [];
+    return infiniteData.pages.flatMap((page) =>
+      page.items.map((item) => mapApiResponseToArtifact(item, 'collection'))
+    );
+  }, [infiniteData]);
+
+  const { targetRef, isIntersecting } = useIntersectionObserver({
+    rootMargin: '100px',
+    enabled: !!hasNextPage && !isFetchingNextPage,
+  });
+
+  useEffect(() => {
+    if (isIntersecting) {
+      fetchNextPage();
+    }
+  }, [isIntersecting, fetchNextPage]);
 
   const toggleType = useCallback((type: ArtifactType) => {
     setSelectedTypes((prev) => {
@@ -281,65 +308,78 @@ function ArtifactTab({ setId, onAdded, existingMemberUuids }: ArtifactTabProps) 
         ) : filtered.length === 0 ? (
           <EmptyState
             message={
-              search || selectedTypes.size > 0
-                ? 'No artifacts match your filters.'
-                : 'No artifacts in your collection.'
+              debouncedSearch || selectedTypes.size > 0
+                ? 'No artifacts match your filters'
+                : 'No artifacts in your collection'
             }
           />
         ) : (
-          <div
-            className="grid grid-cols-2 gap-2 sm:grid-cols-3"
-            role="list"
-            aria-label="Artifacts"
-          >
-            {filtered.map((artifact) => {
-              const isAdding = addingId === artifact.uuid;
-              const isAdded = addedIds.has(artifact.uuid);
-              const isAlreadyMember = existingMemberUuids.has(artifact.uuid);
-              return (
-                <div
-                  key={artifact.uuid}
-                  role="listitem"
-                  className="relative min-w-[180px]"
-                >
-                  <MiniArtifactCard
-                    artifact={artifact}
-                    onClick={isAlreadyMember ? () => {} : () => void handleAdd(artifact)}
-                    className={cn(
-                      'cursor-pointer transition-all',
-                      isAdding && 'cursor-wait opacity-60',
-                      isAdded && 'ring-2 ring-emerald-500 ring-offset-1',
-                      isAlreadyMember && 'opacity-50 cursor-not-allowed pointer-events-none',
+          <>
+            <div
+              className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+              role="list"
+              aria-label="Artifacts"
+            >
+              {filtered.map((artifact) => {
+                const isAdding = addingId === artifact.uuid;
+                const isAdded = addedIds.has(artifact.uuid);
+                const isAlreadyMember = existingMemberUuids.has(artifact.uuid);
+                return (
+                  <div
+                    key={artifact.uuid}
+                    role="listitem"
+                    className="relative min-w-[180px]"
+                  >
+                    <MiniArtifactCard
+                      artifact={artifact}
+                      onClick={isAlreadyMember ? () => {} : () => void handleAdd(artifact)}
+                      className={cn(
+                        'cursor-pointer transition-all',
+                        isAdding && 'cursor-wait opacity-60',
+                        isAdded && 'ring-2 ring-emerald-500 ring-offset-1',
+                        isAlreadyMember && 'opacity-50 cursor-not-allowed pointer-events-none',
+                      )}
+                      aria-label={`Add ${artifact.name} (${artifact.type})`}
+                      aria-disabled={isAdding || isAlreadyMember}
+                    />
+                    {/* "Already Selected" overlay */}
+                    {isAlreadyMember && (
+                      <div
+                        className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-background/50"
+                        aria-hidden="true"
+                      >
+                        <span className="rounded bg-background/80 px-2 py-0.5 text-xs font-medium text-muted-foreground shadow-sm">
+                          Already Selected
+                        </span>
+                      </div>
                     )}
-                    aria-label={`Add ${artifact.name} (${artifact.type})`}
-                    aria-disabled={isAdding || isAlreadyMember}
-                  />
-                  {/* "Already Selected" overlay */}
-                  {isAlreadyMember && (
-                    <div
-                      className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-background/50"
-                      aria-hidden="true"
-                    >
-                      <span className="rounded bg-background/80 px-2 py-0.5 text-xs font-medium text-muted-foreground shadow-sm">
-                        Already Selected
-                      </span>
-                    </div>
-                  )}
-                  {/* Selection checkmark overlay */}
-                  {isAdded && !isAlreadyMember && (
-                    <div
-                      className="pointer-events-none absolute inset-0 flex items-start justify-end rounded-lg bg-emerald-500/10 p-1.5"
-                      aria-hidden="true"
-                    >
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 shadow">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-white" />
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                    {/* Selection checkmark overlay */}
+                    {isAdded && !isAlreadyMember && (
+                      <div
+                        className="pointer-events-none absolute inset-0 flex items-start justify-end rounded-lg bg-emerald-500/10 p-1.5"
+                        aria-hidden="true"
+                      >
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 shadow">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {/* Infinite scroll sentinel */}
+            {hasNextPage && (
+              <div ref={targetRef} className="flex justify-center py-4">
+                {isFetchingNextPage && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading more...
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </ScrollArea>
     </div>
