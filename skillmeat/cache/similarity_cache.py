@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -198,6 +199,30 @@ class SimilarityCacheManager:
             if ca and ca.description:
                 source_fp.description = ca.description
 
+        # Determine whether the SentenceTransformerEmbedder is available for
+        # DB-cached embedding lookups.  When available we compute cosine
+        # similarity directly from stored vectors, which is much faster than
+        # the per-pair SemanticScorer path (no async event loop per pair).
+        try:
+            from skillmeat.core.scoring.embedder import SentenceTransformerEmbedder
+
+            _embedder = SentenceTransformerEmbedder()
+            _use_embedding_cache = _embedder.is_available()
+        except Exception:  # noqa: BLE001
+            _embedder = None  # type: ignore[assignment]
+            _use_embedding_cache = False
+
+        # Pre-compute source embedding once (if embedder is available).
+        source_emb: Optional[List[float]] = None
+        if _use_embedding_cache:
+            source_name = getattr(source_row, "name", "") or ""
+            source_desc = getattr(source_fp, "description", "") or ""
+            source_text = f"{source_name} {source_desc}".strip()
+            if source_text:
+                source_emb = self._get_or_compute_embedding(
+                    artifact_uuid, source_text, session, _embedder
+                )
+
         scored: List[tuple[float, str, ScoreBreakdown]] = []
         for candidate in candidates:
             candidate_fp = svc._fingerprint_from_row(candidate)
@@ -217,7 +242,25 @@ class SimilarityCacheManager:
                         candidate_fp.description = ca.description
 
             breakdown = svc._analyzer.compare(source_fp, candidate_fp)
-            semantic_score = svc._score_semantic_with_timeout(source_fp, candidate_fp)
+
+            # Compute semantic score: prefer DB-cached embedding cosine
+            # similarity when available; fall back to the timeout-guarded
+            # SemanticScorer path otherwise.
+            semantic_score: Optional[float] = None
+            if _use_embedding_cache and source_emb is not None:
+                cand_uuid_str = str(getattr(candidate, "uuid", ""))
+                cand_name = getattr(candidate, "name", "") or ""
+                cand_desc = getattr(candidate_fp, "description", "") or ""
+                cand_text = f"{cand_name} {cand_desc}".strip()
+                if cand_text and cand_uuid_str:
+                    cand_emb = self._get_or_compute_embedding(
+                        cand_uuid_str, cand_text, session, _embedder
+                    )
+                    if cand_emb is not None:
+                        semantic_score = self._cosine_similarity(source_emb, cand_emb)
+            else:
+                semantic_score = svc._score_semantic_with_timeout(source_fp, candidate_fp)
+
             breakdown = ScoreBreakdown(
                 keyword_score=breakdown.keyword_score,
                 content_score=breakdown.content_score,
@@ -431,6 +474,152 @@ class SimilarityCacheManager:
                 exc,
             )
             return None
+
+    def _get_or_compute_embedding(
+        self,
+        artifact_uuid: str,
+        text: str,
+        session: "Session",
+        embedder: object,
+    ) -> Optional[List[float]]:
+        """Return the stored embedding for *artifact_uuid*, computing it if absent.
+
+        Checks the ``artifact_embeddings`` table first.  If a matching row
+        exists and the ``model_name`` matches the current embedder model, the
+        stored bytes are deserialised and returned without re-encoding.
+
+        If no matching row is found (or the model name has changed), the
+        embedder is called synchronously via ``asyncio`` and the result is
+        persisted for future reuse.
+
+        Args:
+            artifact_uuid: UUID of the artifact whose embedding is requested.
+            text:          Text to embed (name + description, pre-joined).
+            session:       Open SQLAlchemy session.
+            embedder:      A ``SentenceTransformerEmbedder`` instance.
+
+        Returns:
+            List of ``float`` values (the embedding vector), or ``None`` when
+            encoding fails or the embedder is unavailable.
+        """
+        from skillmeat.cache.models import ArtifactEmbedding
+
+        model_name: str = getattr(embedder, "MODEL_NAME", "unknown")
+
+        # Try cache hit first.
+        existing: Optional[ArtifactEmbedding] = (
+            session.query(ArtifactEmbedding)
+            .filter(ArtifactEmbedding.artifact_uuid == artifact_uuid)
+            .first()
+        )
+        if existing is not None and existing.model_name == model_name:
+            try:
+                import numpy as np
+
+                vec = np.frombuffer(existing.embedding, dtype=np.float32)
+                return [float(v) for v in vec]
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(
+                    "SimilarityCacheManager._get_or_compute_embedding: "
+                    "failed to deserialise stored embedding for uuid=%s: %s",
+                    artifact_uuid,
+                    exc,
+                )
+                # Fall through to recompute below.
+
+        # Cache miss (or model changed): compute embedding synchronously.
+        import asyncio
+
+        def _run_async() -> Optional[List[float]]:
+            loop = asyncio.new_event_loop()
+            try:
+                return loop.run_until_complete(embedder.get_embedding(text))  # type: ignore[union-attr]
+            finally:
+                loop.close()
+
+        try:
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(_run_async)
+                vector: Optional[List[float]] = future.result(timeout=5.0)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "SimilarityCacheManager._get_or_compute_embedding: "
+                "embedding computation failed for uuid=%s: %s",
+                artifact_uuid,
+                exc,
+            )
+            return None
+
+        if vector is None:
+            return None
+
+        # Serialise and persist.
+        try:
+            import numpy as np
+
+            arr = np.array(vector, dtype=np.float32)
+            blob = arr.tobytes()
+            dim = len(vector)
+
+            if existing is not None:
+                # Update in place (model name changed or prior deserialisation failed).
+                existing.embedding = blob
+                existing.model_name = model_name
+                existing.embedding_dim = dim
+                existing.computed_at = datetime.utcnow()
+            else:
+                new_row = ArtifactEmbedding(
+                    artifact_uuid=artifact_uuid,
+                    embedding=blob,
+                    model_name=model_name,
+                    embedding_dim=dim,
+                    computed_at=datetime.utcnow(),
+                )
+                session.add(new_row)
+
+            session.flush()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "SimilarityCacheManager._get_or_compute_embedding: "
+                "failed to persist embedding for uuid=%s: %s",
+                artifact_uuid,
+                exc,
+            )
+            # Non-fatal: return the computed vector even if storage failed.
+
+        return vector
+
+    @staticmethod
+    def _cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
+        """Compute cosine similarity between two vectors.
+
+        Returns 0.0 for zero vectors (magnitude == 0) or mismatched lengths
+        rather than raising an exception, so a single bad embedding never
+        aborts the entire scoring loop.
+
+        Args:
+            vec_a: First embedding vector.
+            vec_b: Second embedding vector.
+
+        Returns:
+            Cosine similarity in [0.0, 1.0].  Returns 0.0 for degenerate
+            inputs (zero vectors or length mismatch).
+        """
+        if len(vec_a) != len(vec_b) or not vec_a:
+            return 0.0
+
+        dot = sum(a * b for a, b in zip(vec_a, vec_b))
+        mag_a = math.sqrt(sum(a * a for a in vec_a))
+        mag_b = math.sqrt(sum(b * b for b in vec_b))
+
+        if mag_a == 0.0 or mag_b == 0.0:
+            return 0.0
+
+        # Clamp to [0.0, 1.0] — floating-point imprecision can push slightly
+        # past 1.0 for identical vectors.
+        return min(1.0, max(0.0, dot / (mag_a * mag_b)))
 
     @staticmethod
     def _row_to_dict(row: object) -> Dict[str, Any]:

@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 6
-completed_tasks: 3
+completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -61,7 +61,7 @@ tasks:
   description: 'Integrate embedder into SimilarityCacheManager: compute embeddings
     when available, store in ArtifactEmbedding, compute semantic scores, use full
     composite weights'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -138,7 +138,7 @@ files_modified:
 - pyproject.toml
 - alembic/versions/XXXX_add_artifact_embedding.py
 - tests/test_embedder.py
-progress: 50
+progress: 66
 updated: '2026-02-26'
 ---
 
