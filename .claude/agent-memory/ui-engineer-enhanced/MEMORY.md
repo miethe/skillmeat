@@ -9,7 +9,7 @@
 - Artifact types: `skillmeat/web/types/artifact.ts`
 
 ### Type Notes
-- `ArtifactType` is `'skill' | 'command' | 'agent' | 'mcp' | 'hook'` — "composite" is NOT in this union
+- `ArtifactType` is `'skill' | 'command' | 'agent' | 'mcp' | 'hook' | 'composite'` — composite IS in the union (confirmed in `types/artifact.ts` line 14)
 - `Artifact.createdAt` and `Artifact.updatedAt` are required (not optional)
 - `useArtifact(id)` returns `Artifact | null`
 - `useArtifactAssociations(id)` returns `{ data: AssociationsDTO, isLoading, error, refetch }`
