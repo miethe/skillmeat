@@ -236,6 +236,12 @@ export const MiniArtifactCard = React.forwardRef<
                       <span className="text-muted-foreground">Keyword</span>
                       <span className="font-medium">{formatScore(scoreBreakdown.keyword_score)}</span>
                     </div>
+                    {scoreBreakdown.text_score != null && (
+                      <div className="flex justify-between gap-3">
+                        <span className="text-muted-foreground">Text</span>
+                        <span className="font-medium">{formatScore(scoreBreakdown.text_score)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between gap-3">
                       <span className="text-muted-foreground">Semantic</span>
                       <span className="font-medium">{formatScore(scoreBreakdown.semantic_score)}</span>
