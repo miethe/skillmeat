@@ -789,7 +789,7 @@ function DeploymentSetMembersTab({ setId, collectionId }: { setId: string; colle
   // Fetch all artifacts to build a UUID lookup map for artifact-type members.
   // useArtifacts() is already cached at 5min stale time — no extra cost when
   // the collection page has already loaded this data.
-  const { data: artifactsResponse, isLoading: isArtifactsLoading } = useArtifacts();
+  const { data: artifactsResponse, isLoading: isArtifactsLoading } = useArtifacts({ limit: 500 });
 
   // State for the artifact details modal (artifact-type member clicks)
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
