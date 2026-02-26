@@ -1,5 +1,5 @@
 <!-- AUTO-GENERATED: Do not edit directly. See .github/readme/ -->
-<!-- GENERATED: 2026-02-25T22:21:27.285Z -->
+<!-- GENERATED: 2026-02-26T19:00:21.874Z -->
 <!-- VERSION: 0.3.0-beta -->
 
 <!-- BEGIN:hero -->
@@ -247,13 +247,14 @@ _Find anything instantly_
 
 ### Similar Artifacts Detection
 
-_Find and consolidate duplicates_
+_Intelligent similarity scoring with caching and optional embeddings_
 
 | Feature | Description |
 |---------|-------------|
-| **Similar Artifacts Detection** | Find duplicates (`skillmeat similar`) |
-| **Collection Consolidation** | Merge duplicates (`skillmeat consolidate`) |
-| Similarity Badges | Badge indicators |
+| **Multi-Dimensional Scoring** | Intelligent scoring (`skillmeat similar`) |
+| **Pre-Computed Cache** | Sub-200ms cached results |
+| Optional Semantic Embeddings | Optional embeddings |
+| Collection Consolidation | Merge duplicates (`skillmeat consolidate`) |
 | Configurable Scoring | Tunable detection (`skillmeat similar --min-score`) |
 
 ### Versioning &amp; Safety
@@ -445,11 +446,11 @@ skillmeat web start               # Start production servers
 
 </details>
 <details>
-<summary><strong>Similar Artifacts Detection</strong> - Find and consolidate duplicates</summary>
+<summary><strong>Similar Artifacts Detection</strong> - Intelligent similarity scoring with caching and optional embeddings</summary>
 
 | Command | Description |
 |---------|-------------|
-| `skillmeat similar` | Find duplicates |
+| `skillmeat similar` | Intelligent scoring |
 | `skillmeat consolidate` | Merge duplicates |
 | `skillmeat similar --min-score` | Tunable detection |
 

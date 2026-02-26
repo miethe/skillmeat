@@ -2,7 +2,7 @@
 schema_version: 0.3.1
 doc_type: prd
 title: Similarity Scoring Overhaul
-status: inferred_complete
+status: completed
 created: '2026-02-26'
 updated: '2026-02-26'
 feature_slug: similarity-scoring-overhaul

@@ -266,23 +266,32 @@ skillmeat find-duplicates --threshold 0.70
 
 ### Interpreting Results
 
-Duplicate detection analyzes:
-- File structure and organization
-- Content similarity
-- Metadata (names, descriptions, tags)
-- Code patterns and function signatures
+The similarity scoring system computes scores across five dimensions:
+
+- **Keyword Matching** (25%) — Tag overlap and type matching
+- **Metadata Scoring** (30%) — Character bigram similarity on names/titles, BM25 TF-IDF on descriptions, tag overlap, type matching
+- **Content Scoring** (20%) — Content hash comparison and structural fingerprinting
+- **Structure Scoring** (15%) — File count and size similarity
+- **Semantic Scoring** (10%, optional) — Sentence-transformer embeddings (requires `pip install skillmeat[semantic]`)
+
+Results are pre-computed and cached for fast sub-200ms response times. FTS5 pre-filtering narrows candidates before full scoring. The web UI's Similar Artifacts tab shows score breakdowns including Text, Keyword, and Structure components with cache age indicators.
 
 **Output Example:**
 ```
 Group 1: 2 similar artifacts (95% match)
   canvas-v1        (skill, collection: default)
+    - Text: 92%, Keyword: 98%, Structure: 91% (cached 2m ago)
   canvas-redesign  (skill, collection: default)
+    - Text: 92%, Keyword: 98%, Structure: 91% (cached 2m ago)
   Recommendation: Review and consolidate
 
 Group 2: 3 similar artifacts (87% match)
   pdf-reader       (skill)
+    - Text: 85%, Keyword: 89%, Structure: 84% (cached 5m ago)
   pdf-extractor    (skill)
+    - Text: 85%, Keyword: 89%, Structure: 84% (cached 5m ago)
   doc-parser       (command)
+    - Text: 81%, Keyword: 91%, Structure: 78% (cached 5m ago)
   Recommendation: Check for code reuse
 ```
 

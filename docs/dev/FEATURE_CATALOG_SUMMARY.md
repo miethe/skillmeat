@@ -17,6 +17,23 @@ Quick lookup guide for screenshots, feature verification, and UI planning.
 | **Manage** | `/manage` | Entity-focused view | By type tabs, unified modal detail |
 | **Groups** | `/groups` | Group-based browsing | Two-pane layout (sidebar + artifact grid), DnD group assignment, management hub, color/icon metadata |
 
+### Similar Artifacts Detection
+
+**Feature**: Intelligent duplicate and similarity detection with pre-computed caching and optional semantic scoring
+**Status**: Implemented (v0.3.0-beta)
+
+| Component | Description |
+|-----------|-------------|
+| **Similarity Scoring Engine** | Character bigram + BM25 TF-IDF text matching replaces broken string-length-ratio algorithm |
+| **Fingerprint Persistence** | Artifact content/structure metadata persisted to DB: `artifact_content_hash`, `artifact_structure_hash`, `artifact_file_count`, `artifact_total_size` |
+| **Pre-Filter with FTS5** | SQLite FTS5 full-text search pre-filters candidates for fast narrowing before pairwise scoring |
+| **Similarity Cache** | SimilarityCacheManager maintains `similarity_cache` table with pre-computed pair scores, enabling sub-200ms tab loads vs O(n) live computation |
+| **Score Breakdown** | Five-component scoring: Text (30%), Keyword (25%), Metadata (15%), Structure (20%), Semantic (10%) with weighted aggregation |
+| **Optional Embeddings** | Sentence-transformer embeddings for semantic scoring via `[semantic]` extras; degrades gracefully if not installed |
+| **API Enhancements** | `GET /artifacts/{id}/similar` returns SimilarArtifactDTO with score breakdown and cache age; X-Cache headers indicate freshness |
+| **Web UI Display** | Artifact detail modal shows Similar Artifacts tab with score breakdown cards (Text, Keyword, Metadata, Structure, Semantic scores), embedding indicator badge, and sorted results |
+| **Cache Invalidation** | Automatic refresh on artifact update/sync; manual refresh via `POST /cache/refresh` endpoint |
+
 ### Composite Artifacts (Plugins, Stacks, Suites)
 
 **Feature**: Multi-artifact packages with relational model, smart import, deduplication, version pinning
