@@ -29,7 +29,7 @@
 'use client';
 
 import * as React from 'react';
-import { AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertCircle, Clock, RefreshCw, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,6 +41,22 @@ import type { Artifact, ArtifactType } from '@/types/artifact';
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/**
+ * Converts a cache age in seconds to a compact human-readable string.
+ * Examples: 5 → "5s ago", 90 → "1m ago", 7200 → "2h ago"
+ */
+function formatCacheAge(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds}s ago`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
 
 /** Valid artifact types in the ArtifactType union */
 const VALID_ARTIFACT_TYPES: ArtifactType[] = [
@@ -82,6 +98,37 @@ function similarToArtifact(item: SimilarArtifact): Artifact {
     createdAt: '',
     updatedAt: '',
   } as unknown as Artifact;
+}
+
+// ============================================================================
+// CacheAgeIndicator
+// ============================================================================
+
+interface CacheAgeIndicatorProps {
+  cacheStatus: 'HIT' | 'MISS' | null;
+  cacheAgeSeconds: number | null;
+}
+
+/**
+ * Subtle muted indicator shown when results were served from the server cache.
+ * Hidden entirely when `cacheStatus` is `'MISS'` or `null`, or when
+ * `cacheAgeSeconds` is unavailable.
+ */
+function CacheAgeIndicator({ cacheStatus, cacheAgeSeconds }: CacheAgeIndicatorProps) {
+  if (cacheStatus !== 'HIT' || cacheAgeSeconds === null) {
+    return null;
+  }
+
+  return (
+    <span
+      className="flex items-center gap-1 text-xs text-muted-foreground/60"
+      title={`Similarity results cached ${formatCacheAge(cacheAgeSeconds)}`}
+      aria-label={`Cached results from ${formatCacheAge(cacheAgeSeconds)}`}
+    >
+      <Clock className="h-3 w-3" aria-hidden="true" />
+      cached {formatCacheAge(cacheAgeSeconds)}
+    </span>
+  );
 }
 
 // ============================================================================
@@ -308,7 +355,8 @@ function SimilarArtifactsTabContent({
   artifactId,
   onArtifactClick,
 }: SimilarArtifactsTabProps) {
-  const { data, isLoading, isError, refetch } = useSimilarArtifacts(artifactId);
+  const { data, isLoading, isError, refetch, cacheStatus, cacheAgeSeconds } =
+    useSimilarArtifacts(artifactId);
 
   // ---- Loading ----
   if (isLoading) {
@@ -328,26 +376,36 @@ function SimilarArtifactsTabContent({
 
   // ---- Results ----
   return (
-    <div
-      className="grid grid-cols-2 gap-3 pb-1 pr-1 sm:grid-cols-3"
-      role="list"
-      aria-label={`${items.length} similar artifact${items.length === 1 ? '' : 's'}`}
-    >
-      {items.map((item) => {
-        const artifact = similarToArtifact(item);
-        return (
-          <div key={item.artifact_id} role="listitem">
-            <MiniArtifactCard
-              artifact={artifact}
-              onClick={() => onArtifactClick?.(item.artifact_id)}
-              showScore
-              similarityScore={item.composite_score}
-              scoreBreakdown={item.breakdown}
-              className="cursor-pointer"
-            />
-          </div>
-        );
-      })}
+    <div className="flex flex-col gap-2">
+      {/* Cache freshness indicator — only visible on cache HITs */}
+      <div className="flex justify-end">
+        <CacheAgeIndicator
+          cacheStatus={cacheStatus}
+          cacheAgeSeconds={cacheAgeSeconds}
+        />
+      </div>
+
+      <div
+        className="grid grid-cols-2 gap-3 pb-1 pr-1 sm:grid-cols-3"
+        role="list"
+        aria-label={`${items.length} similar artifact${items.length === 1 ? '' : 's'}`}
+      >
+        {items.map((item) => {
+          const artifact = similarToArtifact(item);
+          return (
+            <div key={item.artifact_id} role="listitem">
+              <MiniArtifactCard
+                artifact={artifact}
+                onClick={() => onArtifactClick?.(item.artifact_id)}
+                showScore
+                similarityScore={item.composite_score}
+                scoreBreakdown={item.breakdown}
+                className="cursor-pointer"
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
