@@ -771,6 +771,8 @@ export interface ArtifactFilters {
   tags?: string[];
   /** Tool names to filter artifacts by (multi-select) */
   tools?: string[];
+  /** Override the default fetch limit (default: 100, max: 500) */
+  limit?: number;
 }
 
 export type SortField = 'name' | 'updatedAt' | 'usageCount' | 'confidence';

@@ -274,7 +274,7 @@ async function fetchArtifactsFromApi(
   sort: ArtifactSort
 ): Promise<ArtifactsResponse> {
   const params = new URLSearchParams({
-    limit: DEFAULT_ARTIFACT_LIMIT.toString(),
+    limit: (filters.limit ?? DEFAULT_ARTIFACT_LIMIT).toString(),
   });
 
   if (filters.type && filters.type !== 'all') {
