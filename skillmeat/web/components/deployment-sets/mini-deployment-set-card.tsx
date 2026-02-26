@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { CheckCircle2, FolderOpen, Layers, Layers3 } from 'lucide-react';
+import { DynamicIcon, type IconName } from 'lucide-react/dynamic';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -221,9 +222,13 @@ export function MiniDeploymentSetCard({
       {/* Header row: icon + name + member count badge */}
       <div className="flex items-center gap-1.5">
         {set.icon ? (
-          <span className="shrink-0 text-sm leading-none" aria-hidden="true">
-            {set.icon}
-          </span>
+          /\p{Emoji}/u.test(set.icon) && !/^[a-z-]+$/i.test(set.icon) ? (
+            <span className="shrink-0 text-sm leading-none" aria-hidden="true">
+              {set.icon}
+            </span>
+          ) : (
+            <DynamicIcon name={set.icon as IconName} className="h-4 w-4 shrink-0 text-purple-500/70" aria-hidden="true" />
+          )
         ) : (
           <Layers3
             className="h-4 w-4 shrink-0 text-purple-500/70"

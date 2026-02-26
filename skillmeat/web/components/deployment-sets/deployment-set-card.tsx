@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { Copy, Edit3, Layers3, Rocket, Trash2 } from 'lucide-react';
+import { DynamicIcon, type IconName } from 'lucide-react/dynamic';
 import type { DeploymentSet } from '@/types/deployment-sets';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -81,9 +82,13 @@ export function DeploymentSetCard({ set, onOpen, onEdit, onDelete, onClone, onDe
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             {set.icon ? (
-              <span className="shrink-0 text-base" aria-hidden="true">
-                {set.icon}
-              </span>
+              /\p{Emoji}/u.test(set.icon) && !/^[a-z-]+$/i.test(set.icon) ? (
+                <span className="shrink-0 text-base" aria-hidden="true">
+                  {set.icon}
+                </span>
+              ) : (
+                <DynamicIcon name={set.icon as IconName} className="h-4 w-4 shrink-0" aria-hidden="true" />
+              )
             ) : (
               <Layers3 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             )}
