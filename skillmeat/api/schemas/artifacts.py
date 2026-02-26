@@ -1429,6 +1429,12 @@ class SimilarArtifactDTO(BaseModel):
     source: Optional[str] = Field(
         None, description="Source repository or path"
     )
+    description: Optional[str] = Field(
+        None, description="Description of the similar artifact"
+    )
+    tags: List[str] = Field(
+        default_factory=list, description="Tags associated with the similar artifact"
+    )
     composite_score: float = Field(
         ..., ge=0.0, le=1.0, description="Overall similarity score"
     )

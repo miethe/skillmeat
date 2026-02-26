@@ -978,6 +978,11 @@ export function ArtifactDetailsModal({
     <>
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
         <DialogContent className="flex h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
+          {/* Keyed wrapper: remounts with fade-in animation when artifact changes */}
+          <div
+            key={artifact.id}
+            className="flex min-h-0 flex-1 flex-col animate-in fade-in duration-200"
+          >
           {/* Header */}
           <ModalHeader
             icon={Icon}
@@ -1642,6 +1647,7 @@ export function ArtifactDetailsModal({
               />
             </TabContentWrapper>
           </Tabs>
+          </div>
         </DialogContent>
       </Dialog>
 

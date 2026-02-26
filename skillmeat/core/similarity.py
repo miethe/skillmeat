@@ -210,7 +210,7 @@ class SimilarityService:
         self,
         artifact_id: str,
         limit: int = 10,
-        min_score: float = 0.3,
+        min_score: float = 0.1,
         source: str = "collection",
     ) -> List[SimilarityResult]:
         """Find artifacts similar to the given artifact.
@@ -401,6 +401,20 @@ class SimilarityService:
         # 2. Build ArtifactFingerprint for the target.
         target_fp = self._fingerprint_from_row(target_row)
 
+        # Enrich target description from CollectionArtifact if not already set.
+        if not target_fp.description:
+            from skillmeat.cache.models import CollectionArtifact
+
+            target_uuid = getattr(target_row, "uuid", None)
+            if target_uuid:
+                ca = (
+                    session.query(CollectionArtifact)
+                    .filter(CollectionArtifact.artifact_uuid == str(target_uuid))
+                    .first()
+                )
+                if ca and ca.description:
+                    target_fp.description = ca.description
+
         # 3. Fetch candidate rows (exclude the target itself).
         candidates = self._fetch_candidates(session, artifact_id, source)
         if not candidates:
@@ -410,6 +424,20 @@ class SimilarityService:
         results: List[SimilarityResult] = []
         for row in candidates:
             candidate_fp = self._fingerprint_from_row(row)
+
+            # Enrich candidate description from CollectionArtifact if not already set.
+            if not candidate_fp.description:
+                from skillmeat.cache.models import CollectionArtifact
+
+                row_uuid = getattr(row, "uuid", None)
+                if row_uuid:
+                    ca = (
+                        session.query(CollectionArtifact)
+                        .filter(CollectionArtifact.artifact_uuid == str(row_uuid))
+                        .first()
+                    )
+                    if ca and ca.description:
+                        candidate_fp.description = ca.description
 
             # 4a. Keyword/content/structure/metadata scores via MatchAnalyzer.compare().
             breakdown = self._analyzer.compare(target_fp, candidate_fp)
@@ -471,10 +499,10 @@ class SimilarityService:
         description: Optional[str] = getattr(row, "description", None)
         tags: List[str] = []
         content_hash: str = getattr(row, "content_hash", "") or ""
-        total_size: int = 0
-        file_count: int = 0
-        structure_hash: str = ""
-        metadata_hash: str = ""
+        total_size: int = getattr(row, "total_size", 0) or 0
+        file_count: int = getattr(row, "file_count", 0) or 0
+        structure_hash: str = getattr(row, "structure_hash", "") or ""
+        metadata_hash: str = getattr(row, "metadata_hash", "") or ""
 
         # Enrich from artifact_metadata relationship if available (Artifact rows).
         meta = getattr(row, "artifact_metadata", None)
@@ -493,11 +521,11 @@ class SimilarityService:
         if title is None:
             title = getattr(row, "title", None)
 
-        # MarketplaceCatalogEntry tags are stored as JSON list.
+        # MarketplaceCatalogEntry tags are stored as JSON list; Artifact ORM tags are Tag objects.
         if not tags:
             raw_tags = getattr(row, "tags", None)
             if isinstance(raw_tags, list):
-                tags = [str(t) for t in raw_tags]
+                tags = [getattr(t, "name", str(t)) for t in raw_tags if t]
             elif isinstance(raw_tags, str) and raw_tags:
                 tags = [t.strip() for t in raw_tags.split(",") if t.strip()]
 

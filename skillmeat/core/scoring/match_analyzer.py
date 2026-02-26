@@ -345,7 +345,17 @@ class MatchAnalyzer:
 
         # Average directional scores; score_artifact returns [0, 100].
         avg_raw = (score_a_vs_b + score_b_vs_a) / 2.0
-        return min(1.0, max(0.0, avg_raw / 100.0))
+        normalized = min(1.0, max(0.0, avg_raw / 100.0))
+
+        # Apply token overlap dampening: blend 60% field-weighted score + 40%
+        # Jaccard overlap to prevent saturation from a few shared common words.
+        tokens_a = set(self._tokenize(query_from_a))
+        tokens_b = set(self._tokenize(query_from_b))
+        if tokens_a and tokens_b:
+            jaccard = len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
+            return normalized * 0.6 + jaccard * 0.4
+
+        return normalized
 
     def _compute_content_score(
         self,
@@ -361,15 +371,26 @@ class MatchAnalyzer:
         Returns:
             Content similarity score from 0.0 to 1.0.
         """
-        if artifact_a.content_hash == artifact_b.content_hash:
+        # Both hashes present and identical → true duplicate.
+        if artifact_a.content_hash and artifact_b.content_hash and artifact_a.content_hash == artifact_b.content_hash:
             return 1.0
 
-        # Size-ratio proxy: max 0.5 when hashes differ (partial overlap).
+        # One or both hashes missing → can't determine content similarity from hash.
+        if not artifact_a.content_hash or not artifact_b.content_hash:
+            # Use size ratio as weak proxy, capped at 0.3.
+            if artifact_a.total_size > 0 and artifact_b.total_size > 0:
+                size_ratio = min(artifact_a.total_size, artifact_b.total_size) / max(
+                    artifact_a.total_size, artifact_b.total_size
+                )
+                return min(0.3, size_ratio * 0.3)
+            return 0.0  # No information at all.
+
+        # Hashes differ → size-ratio proxy capped at 0.5.
         if artifact_a.total_size > 0 and artifact_b.total_size > 0:
             size_ratio = min(artifact_a.total_size, artifact_b.total_size) / max(
                 artifact_a.total_size, artifact_b.total_size
             )
-            return min(1.0, max(0.0, size_ratio * 0.5))
+            return min(0.5, size_ratio * 0.5)
 
         return 0.0
 
@@ -387,15 +408,25 @@ class MatchAnalyzer:
         Returns:
             Structure similarity score from 0.0 to 1.0.
         """
-        if artifact_a.structure_hash == artifact_b.structure_hash:
+        # Both hashes present and identical → identical structure.
+        if artifact_a.structure_hash and artifact_b.structure_hash and artifact_a.structure_hash == artifact_b.structure_hash:
             return 1.0
 
-        # File-count ratio proxy: max 0.6 when hashes differ.
+        # One or both hashes missing → can't determine from hash.
+        if not artifact_a.structure_hash or not artifact_b.structure_hash:
+            if artifact_a.file_count > 0 and artifact_b.file_count > 0:
+                count_ratio = min(artifact_a.file_count, artifact_b.file_count) / max(
+                    artifact_a.file_count, artifact_b.file_count
+                )
+                return min(0.3, count_ratio * 0.3)
+            return 0.0
+
+        # Hashes differ → file-count proxy capped at 0.6.
         if artifact_a.file_count > 0 and artifact_b.file_count > 0:
             count_ratio = min(artifact_a.file_count, artifact_b.file_count) / max(
                 artifact_a.file_count, artifact_b.file_count
             )
-            return min(1.0, max(0.0, count_ratio * 0.6))
+            return min(0.6, count_ratio * 0.6)
 
         return 0.0
 

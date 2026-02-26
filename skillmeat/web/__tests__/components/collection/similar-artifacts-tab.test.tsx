@@ -93,6 +93,8 @@ function makeSimilarArtifact(overrides: Partial<SimilarArtifact> = {}): SimilarA
     name: 'canvas-design',
     artifact_type: 'skill',
     source: 'anthropics/skills/canvas-design',
+    description: 'A design skill for canvas workflows',
+    tags: ['design', 'canvas'],
     composite_score: 0.9,
     match_type: 'similar',
     breakdown: {
@@ -301,8 +303,11 @@ describe('SimilarArtifactsTab', () => {
         </Wrapper>
       );
 
-      const listItems = screen.getAllByRole('listitem');
-      expect(listItems).toHaveLength(3);
+      // Each card renders as role="button" inside a role="listitem" wrapper.
+      // Use button count to verify the 3 artifact cards are present without
+      // accidentally counting nested tag-badge listitems.
+      const cards = screen.getAllByRole('button');
+      expect(cards).toHaveLength(3);
     });
 
     it('uses singular label when exactly 1 result', () => {

@@ -9051,7 +9051,7 @@ async def get_similar_artifacts(
         description="Maximum number of similar artifacts to return",
     ),
     min_score: float = Query(
-        default=0.3,
+        default=0.1,
         ge=0.0,
         le=1.0,
         description="Minimum composite similarity score threshold (0.0–1.0)",
@@ -9129,6 +9129,48 @@ async def get_similar_artifacts(
                 row, "artifact_type", ""
             ) or ""
             artifact_source: Optional[str] = getattr(row, "source", None)
+            description: Optional[str] = getattr(row, "description", None)
+
+            # Try artifact_metadata relationship for enriched data (Artifact rows).
+            meta = getattr(row, "artifact_metadata", None)
+            if meta is not None:
+                if not description:
+                    description = getattr(meta, "description", None)
+                # Also check metadata JSON dict (where descriptions are actually stored).
+                if not description:
+                    meta_dict = meta.get_metadata_dict() if hasattr(meta, "get_metadata_dict") else None
+                    if meta_dict:
+                        description = meta_dict.get("description") or None
+                tags_list: List[str] = meta.get_tags_list() if hasattr(meta, "get_tags_list") else []
+            else:
+                raw_tags = getattr(row, "tags", None)
+                if isinstance(raw_tags, list):
+                    tags_list = [getattr(t, "name", str(t)) for t in raw_tags if t]
+                elif isinstance(raw_tags, str) and raw_tags:
+                    tags_list = [t.strip() for t in raw_tags.split(",") if t.strip()]
+                else:
+                    tags_list = []
+
+            # Final fallback: if meta CSV tags were empty, try the ORM relationship.
+            if not tags_list:
+                orm_tags = getattr(row, "tags", None)
+                if isinstance(orm_tags, list) and orm_tags:
+                    tags_list = [getattr(t, "name", str(t)) for t in orm_tags if t]
+
+            # Final fallback: description lives in collection_artifacts table, not
+            # artifacts or artifact_metadata.  Query it by artifact UUID.
+            if not description:
+                from skillmeat.cache.models import CollectionArtifact
+
+                artifact_uuid = getattr(row, "uuid", None)
+                if artifact_uuid:
+                    ca = (
+                        db_session.query(CollectionArtifact)
+                        .filter(CollectionArtifact.artifact_uuid == str(artifact_uuid))
+                        .first()
+                    )
+                    if ca and ca.description:
+                        description = ca.description
 
             breakdown = SimilarityBreakdownDTO(
                 content_score=result.breakdown.content_score,
@@ -9144,6 +9186,8 @@ async def get_similar_artifacts(
                     name=name,
                     artifact_type=artifact_type,
                     source=artifact_source,
+                    description=description,
+                    tags=tags_list,
                     composite_score=result.composite_score,
                     match_type=result.match_type.value,
                     breakdown=breakdown,

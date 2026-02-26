@@ -65,6 +65,10 @@ export interface SimilarArtifact {
   artifact_type: string;
   /** Source repository or path; null for locally-created artifacts */
   source: string | null;
+  /** Human-readable description of the artifact; null when unavailable */
+  description: string | null;
+  /** Categorization tags for the artifact */
+  tags: string[];
   /** Overall similarity score in the range [0.0, 1.0] */
   composite_score: number;
   /** Match strength classification */

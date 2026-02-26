@@ -51,6 +51,10 @@ def _make_artifact_row(name: str, artifact_uuid: str | None = None) -> MagicMock
     row.type = _SKILL_TYPE
     row.artifact_type = _SKILL_TYPE
     row.source = f"github.com/test/{name}"
+    # Pin description and tags to scalar values so Pydantic validation passes.
+    row.description = None
+    row.artifact_metadata = None
+    row.tags = []
     return row
 
 
