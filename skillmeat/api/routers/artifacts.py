@@ -22,6 +22,7 @@ from fastapi import (
     Path,
     Query,
     Request,
+    Response,
     status,
 )
 from sqlalchemy.orm import Session
@@ -9044,6 +9045,7 @@ async def get_similar_artifacts(
     artifact_id: str,
     db_session: DbSessionDep,
     token: TokenDep,
+    response: Response,
     limit: int = Query(
         default=10,
         ge=1,
@@ -9064,16 +9066,24 @@ async def get_similar_artifacts(
 ) -> SimilarArtifactsResponse:
     """Find artifacts similar to the given artifact.
 
-    Resolves the artifact_id (type:name) to its internal UUID, then delegates
-    to SimilarityService which scores candidates using keyword, content,
-    structure, metadata, and (optionally) semantic scorers.
+    Resolves the artifact_id (type:name) to its internal UUID, checks the
+    SimilarityCacheManager for pre-computed results (cache hit), and falls
+    back to live SimilarityService scoring on a cache miss.  Cached results
+    are persisted by compute_and_store() for subsequent requests.
+
+    Response headers:
+        X-Cache:     ``HIT`` when results came from the cache, ``MISS``
+                     when live computation was performed.
+        X-Cache-Age: Seconds since the cached scores were computed.
+                     Only present on cache HITs.
 
     Args:
         artifact_id: Artifact identifier in 'type:name' format.
         db_session:  Injected SQLAlchemy session.
         token:       Authentication token (dependency injection).
+        response:    FastAPI Response object used to set custom headers.
         limit:       Maximum results to return (1–50, default 10).
-        min_score:   Minimum composite score threshold (0.0–1.0, default 0.3).
+        min_score:   Minimum composite score threshold (0.0–1.0, default 0.1).
         source:      Where to search — 'collection', 'marketplace', or 'all'.
 
     Returns:
@@ -9096,7 +9106,7 @@ async def get_similar_artifacts(
         )
 
         # 1. Resolve type:name → UUID.  Artifact.id stores the 'type:name' string;
-        #    SimilarityService expects the hex UUID (Artifact.uuid).
+        #    SimilarityService and SimilarityCacheManager expect the hex UUID.
         artifact_row: Optional[Artifact] = (
             db_session.query(Artifact).filter(Artifact.id == artifact_id).first()
         )
@@ -9109,9 +9119,170 @@ async def get_similar_artifacts(
 
         artifact_uuid: str = str(artifact_row.uuid)
 
-        # 2. Run similarity search.
+        # 2. Try the similarity cache first.  Only the collection source is
+        #    cached — marketplace and cross-source searches always go live.
+        from skillmeat.cache.similarity_cache import SimilarityCacheManager
         from skillmeat.core.similarity import SimilarityService
 
+        cache_mgr = SimilarityCacheManager()
+        cached_rows: List[dict] = []
+        cache_hit = False
+
+        if source == "collection":
+            try:
+                cached_rows = cache_mgr.get_similar(
+                    artifact_uuid, db_session, limit=limit, min_score=min_score
+                )
+                if cached_rows:
+                    cache_hit = True
+                    logger.info(
+                        "Cache HIT for '%s': returning %d cached result(s)",
+                        artifact_id,
+                        len(cached_rows),
+                    )
+            except Exception as cache_err:  # noqa: BLE001
+                logger.warning(
+                    "SimilarityCacheManager.get_similar failed for '%s': %s; "
+                    "falling back to live computation.",
+                    artifact_id,
+                    cache_err,
+                )
+
+        # 3. Set X-Cache response header.
+        response.headers["X-Cache"] = "HIT" if cache_hit else "MISS"
+
+        if cache_hit:
+            # 3a. Add X-Cache-Age from the computed_at timestamp of the first row.
+            computed_at = cached_rows[0].get("computed_at")
+            if computed_at is not None:
+                try:
+                    from datetime import datetime, timezone
+
+                    now_utc = datetime.now(timezone.utc)
+                    # computed_at may be a naive datetime (stored as UTC).
+                    if computed_at.tzinfo is None:
+                        computed_at = computed_at.replace(tzinfo=timezone.utc)
+                    age_seconds = max(0, int((now_utc - computed_at).total_seconds()))
+                    response.headers["X-Cache-Age"] = str(age_seconds)
+                except Exception:  # noqa: BLE001
+                    pass  # Cache-Age is best-effort
+
+            # 3b. Build items from cached dicts — resolve target UUIDs to Artifact rows.
+            import json as _json
+
+            items: List[SimilarArtifactDTO] = []
+            for cached in cached_rows:
+                target_uuid = cached.get("target_artifact_uuid")
+                if not target_uuid:
+                    continue
+
+                target_row: Optional[Artifact] = (
+                    db_session.query(Artifact)
+                    .filter(Artifact.uuid == target_uuid)
+                    .first()
+                )
+                if target_row is None:
+                    continue
+
+                name: str = getattr(target_row, "name", "") or ""
+                artifact_type: str = getattr(target_row, "type", "") or ""
+                artifact_source: Optional[str] = getattr(target_row, "source", None)
+                description: Optional[str] = getattr(target_row, "description", None)
+                tags_list: List[str] = []
+
+                meta = getattr(target_row, "artifact_metadata", None)
+                if meta is not None:
+                    if not description:
+                        description = getattr(meta, "description", None)
+                    if not description:
+                        meta_dict = (
+                            meta.get_metadata_dict()
+                            if hasattr(meta, "get_metadata_dict")
+                            else None
+                        )
+                        if meta_dict:
+                            description = meta_dict.get("description") or None
+                    tags_list = (
+                        meta.get_tags_list() if hasattr(meta, "get_tags_list") else []
+                    )
+                else:
+                    raw_tags = getattr(target_row, "tags", None)
+                    if isinstance(raw_tags, list):
+                        tags_list = [getattr(t, "name", str(t)) for t in raw_tags if t]
+                    elif isinstance(raw_tags, str) and raw_tags:
+                        tags_list = [t.strip() for t in raw_tags.split(",") if t.strip()]
+
+                if not tags_list:
+                    orm_tags = getattr(target_row, "tags", None)
+                    if isinstance(orm_tags, list) and orm_tags:
+                        tags_list = [getattr(t, "name", str(t)) for t in orm_tags if t]
+
+                if not description:
+                    from skillmeat.cache.models import CollectionArtifact
+
+                    ca = (
+                        db_session.query(CollectionArtifact)
+                        .filter(
+                            CollectionArtifact.artifact_uuid == str(target_uuid)
+                        )
+                        .first()
+                    )
+                    if ca and ca.description:
+                        description = ca.description
+
+                # Parse breakdown from cached JSON.
+                breakdown_data: dict = {}
+                raw_breakdown = cached.get("breakdown_json")
+                if raw_breakdown:
+                    try:
+                        breakdown_data = _json.loads(raw_breakdown)
+                    except Exception:  # noqa: BLE001
+                        pass
+
+                composite_score = float(cached.get("composite_score", 0.0))
+                metadata_score = breakdown_data.get("metadata_score", 0.0)
+                text_score_raw = breakdown_data.get("text_score")
+
+                breakdown = SimilarityBreakdownDTO(
+                    content_score=breakdown_data.get("content_score", 0.0),
+                    structure_score=breakdown_data.get("structure_score", 0.0),
+                    metadata_score=metadata_score,
+                    keyword_score=breakdown_data.get("keyword_score", 0.0),
+                    semantic_score=breakdown_data.get("semantic_score"),
+                    text_score=(
+                        text_score_raw
+                        if text_score_raw is not None
+                        else metadata_score
+                    ),
+                )
+
+                # Cached results don't carry match_type — default to "keyword".
+                items.append(
+                    SimilarArtifactDTO(
+                        artifact_id=getattr(target_row, "id", target_uuid),
+                        name=name,
+                        artifact_type=artifact_type,
+                        source=artifact_source,
+                        description=description,
+                        tags=tags_list,
+                        composite_score=composite_score,
+                        match_type="keyword",
+                        breakdown=breakdown,
+                    )
+                )
+
+            logger.info(
+                "Similar artifacts for '%s' (cache HIT): returning %d result(s)",
+                artifact_id,
+                len(items),
+            )
+            return SimilarArtifactsResponse(
+                artifact_id=artifact_id,
+                items=items,
+                total=len(items),
+            )
+
+        # 4. Cache MISS — run live similarity search via SimilarityService.
         service = SimilarityService(session=db_session)
         results = service.find_similar(
             artifact_id=artifact_uuid,
@@ -9120,16 +9291,16 @@ async def get_similar_artifacts(
             source=source,
         )
 
-        # 3. Convert SimilarityResult objects to SimilarArtifactDTO.
-        items: List[SimilarArtifactDTO] = []
+        # 5. Convert SimilarityResult objects to SimilarArtifactDTO.
+        items = []
         for result in results:
             row = result.artifact  # Artifact or MarketplaceCatalogEntry ORM row
-            name: str = getattr(row, "name", "") or ""
-            artifact_type: str = getattr(row, "type", "") or getattr(
+            name = getattr(row, "name", "") or ""
+            artifact_type = getattr(row, "type", "") or getattr(
                 row, "artifact_type", ""
             ) or ""
-            artifact_source: Optional[str] = getattr(row, "source", None)
-            description: Optional[str] = getattr(row, "description", None)
+            artifact_source = getattr(row, "source", None)
+            description = getattr(row, "description", None)
 
             # Try artifact_metadata relationship for enriched data (Artifact rows).
             meta = getattr(row, "artifact_metadata", None)
@@ -9141,7 +9312,7 @@ async def get_similar_artifacts(
                     meta_dict = meta.get_metadata_dict() if hasattr(meta, "get_metadata_dict") else None
                     if meta_dict:
                         description = meta_dict.get("description") or None
-                tags_list: List[str] = meta.get_tags_list() if hasattr(meta, "get_tags_list") else []
+                tags_list = meta.get_tags_list() if hasattr(meta, "get_tags_list") else []
             else:
                 raw_tags = getattr(row, "tags", None)
                 if isinstance(raw_tags, list):
@@ -9162,11 +9333,14 @@ async def get_similar_artifacts(
             if not description:
                 from skillmeat.cache.models import CollectionArtifact
 
-                artifact_uuid = getattr(row, "uuid", None)
-                if artifact_uuid:
+                result_artifact_uuid = getattr(row, "uuid", None)
+                if result_artifact_uuid:
                     ca = (
                         db_session.query(CollectionArtifact)
-                        .filter(CollectionArtifact.artifact_uuid == str(artifact_uuid))
+                        .filter(
+                            CollectionArtifact.artifact_uuid
+                            == str(result_artifact_uuid)
+                        )
                         .first()
                     )
                     if ca and ca.description:
@@ -9203,8 +9377,22 @@ async def get_similar_artifacts(
             )
 
         logger.info(
-            "Similar artifacts for '%s': found %d result(s)", artifact_id, len(items)
+            "Similar artifacts for '%s' (cache MISS): found %d live result(s)",
+            artifact_id,
+            len(items),
         )
+
+        # 6. Persist live results to the cache for future requests (collection source only).
+        if source == "collection":
+            try:
+                cache_mgr.compute_and_store(artifact_uuid, db_session)
+            except Exception as store_err:  # noqa: BLE001
+                logger.warning(
+                    "SimilarityCacheManager.compute_and_store failed for '%s': %s; "
+                    "results will not be cached.",
+                    artifact_id,
+                    store_err,
+                )
 
         return SimilarArtifactsResponse(
             artifact_id=artifact_id,
