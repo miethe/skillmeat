@@ -1,39 +1,49 @@
 ---
 schema_version: 2
 doc_type: implementation_plan
-title: "Implementation Plan: Similarity Scoring Overhaul"
-status: draft
-created: "2026-02-26"
-updated: "2026-02-26"
+title: 'Implementation Plan: Similarity Scoring Overhaul'
+status: in-progress
+created: '2026-02-26'
+updated: '2026-02-26'
 feature_slug: similarity-scoring-overhaul
-feature_version: "v1"
-prd_ref: "docs/project_plans/PRDs/features/similarity-scoring-overhaul-v1.md"
+feature_version: v1
+prd_ref: docs/project_plans/PRDs/features/similarity-scoring-overhaul-v1.md
 plan_ref: null
-scope: "3 phases fixing broken scoring algorithm, adding pre-computation cache, and optional embedding-based semantic matching"
-effort_estimate: "~5 days (18 tasks)"
-architecture_summary: "Algorithm fixes in core/scoring, schema additions to cache/models, FTS5 pre-filter in SimilarityService, optional sentence-transformers via [semantic] extras"
+scope: 3 phases fixing broken scoring algorithm, adding pre-computation cache, and
+  optional embedding-based semantic matching
+effort_estimate: ~5 days (18 tasks)
+architecture_summary: Algorithm fixes in core/scoring, schema additions to cache/models,
+  FTS5 pre-filter in SimilarityService, optional sentence-transformers via [semantic]
+  extras
 priority: high
 risk_level: medium
-category: "product-planning"
-tags: [implementation, planning, similarity, scoring, cache, embeddings, fts5]
+category: product-planning
+tags:
+- implementation
+- planning
+- similarity
+- scoring
+- cache
+- embeddings
+- fts5
 milestone: null
 owner: null
 contributors: []
 related_documents:
-  - docs/project_plans/SPIKEs/similarity-scoring-overhaul-v1.md
-  - docs/project_plans/PRDs/features/similarity-scoring-overhaul-v1.md
+- docs/project_plans/SPIKEs/similarity-scoring-overhaul-v1.md
+- docs/project_plans/PRDs/features/similarity-scoring-overhaul-v1.md
 files_affected:
-  - skillmeat/core/similarity.py
-  - skillmeat/core/scoring/match_analyzer.py
-  - skillmeat/core/scoring/text_similarity.py
-  - skillmeat/core/scoring/embedder.py
-  - skillmeat/cache/models.py
-  - skillmeat/cache/similarity_cache.py
-  - skillmeat/api/routers/artifacts.py
-  - skillmeat/api/schemas/artifacts.py
-  - skillmeat/web/hooks/use-similar-artifacts.ts
-  - skillmeat/web/components/collection/similar-artifacts-tab.tsx
-  - pyproject.toml
+- skillmeat/core/similarity.py
+- skillmeat/core/scoring/match_analyzer.py
+- skillmeat/core/scoring/text_similarity.py
+- skillmeat/core/scoring/embedder.py
+- skillmeat/cache/models.py
+- skillmeat/cache/similarity_cache.py
+- skillmeat/api/routers/artifacts.py
+- skillmeat/api/schemas/artifacts.py
+- skillmeat/web/hooks/use-similar-artifacts.ts
+- skillmeat/web/components/collection/similar-artifacts-tab.tsx
+- pyproject.toml
 commit_refs: []
 pr_refs: []
 ---
