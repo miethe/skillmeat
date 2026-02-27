@@ -786,3 +786,15 @@ export {
   type ExecutionSseEvent,
   type UseExecutionStreamResult,
 } from './use-workflow-executions';
+
+// ============================================================================
+// WORKFLOW BUILDER (1 hook)
+// ============================================================================
+// Local useReducer-based state for the Workflow Builder page (create + edit modes)
+export {
+  useWorkflowBuilder,
+  builderReducer,
+  type BuilderState,
+  type BuilderAction,
+  type UseWorkflowBuilderReturn,
+} from './use-workflow-builder';
