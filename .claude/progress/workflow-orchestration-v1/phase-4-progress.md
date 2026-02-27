@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 11
-completed_tasks: 1
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -29,7 +29,7 @@ tasks:
 - id: CLI-4.2
   description: 'workflow create <path>: read YAML, validate, store in collection +
     DB'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -39,7 +39,7 @@ tasks:
   priority: critical
 - id: CLI-4.3
   description: workflow list [--status] [--tag] [--format table|json]
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -48,7 +48,7 @@ tasks:
   priority: high
 - id: CLI-4.4
   description: 'workflow show <name>: display definition, stages, last execution'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -57,7 +57,7 @@ tasks:
   priority: high
 - id: CLI-4.5
   description: 'workflow validate <path>: validate YAML without importing'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -170,7 +170,7 @@ files_modified:
 schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
-progress: 9
+progress: 45
 updated: '2026-02-27'
 ---
 
