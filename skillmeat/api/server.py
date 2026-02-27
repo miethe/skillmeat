@@ -86,6 +86,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     logger.info("Starting SkillMeat API service...")
 
+    # Initialize session factory singleton before AppState to prevent
+    # concurrent imports from each creating their own sessionmaker instance
+    from skillmeat.cache.models import init_session_factory
+
+    init_session_factory()
+    logger.info("Database session factory initialized")
+
     # Load settings
     settings = get_settings()
     logger.info(f"Environment: {settings.env.value}")

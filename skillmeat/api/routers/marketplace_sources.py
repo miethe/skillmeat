@@ -4286,74 +4286,108 @@ async def import_artifacts(
         # that have embedded children get a CompositeArtifact row created atomically
         # in the same session.  Failure rolls back the skill's DB rows via the outer
         # except handler.
+        #
+        # Lock-reduction: entries are processed in batches of IMPORT_BATCH_SIZE.
+        # Each batch opens its own short transaction so the exclusive SQLite write
+        # lock is held for ~400 ms instead of several seconds for a large import.
+        # If a batch fails the others are still committed (partial success allowed).
         _sca_enabled = (
             os.getenv("SKILL_CONTAINED_ARTIFACTS_ENABLED", "false").lower() == "true"
         )
-        try:
-            ensure_default_collection(session)
-            from skillmeat.api.services.artifact_cache_service import (
-                populate_collection_artifact_from_import,
-            )
 
-            db_added_count = 0
-            for entry in import_result.entries:
-                if entry.status.value != "success":
-                    continue
-                try:
-                    populate_collection_artifact_from_import(
-                        session, artifact_mgr, DEFAULT_COLLECTION_ID, entry
+        from skillmeat.api.services.artifact_cache_service import (
+            populate_collection_artifact_from_import,
+        )
+
+        IMPORT_BATCH_SIZE = 10
+
+        success_entries = [
+            e for e in import_result.entries if e.status.value == "success"
+        ]
+        batches = [
+            success_entries[i : i + IMPORT_BATCH_SIZE]
+            for i in range(0, len(success_entries), IMPORT_BATCH_SIZE)
+        ]
+
+        total_db_added = 0
+
+        for batch_idx, batch_entries in enumerate(batches):
+            try:
+                with transaction_handler.import_transaction(source_id) as ctx:
+                    # Ensure the default collection row exists (idempotent).
+                    # Only required on the first batch; subsequent batches find it.
+                    if batch_idx == 0:
+                        ensure_default_collection(ctx.session)
+
+                    db_added_count = 0
+                    for entry in batch_entries:
+                        try:
+                            populate_collection_artifact_from_import(
+                                ctx.session, artifact_mgr, DEFAULT_COLLECTION_ID, entry
+                            )
+                            db_added_count += 1
+                        except Exception as cache_err:
+                            logger.warning(
+                                f"Cache population failed for "
+                                f"{entry.artifact_type}:{entry.name}: {cache_err}"
+                            )
+                            continue
+
+                        # SCA-P2-03: For skills with embedded artifacts, create a
+                        # CompositeArtifact row atomically within this same session.
+                        if _sca_enabled and entry.artifact_type == "skill":
+                            _wire_skill_composite(
+                                session=ctx.session,
+                                source_id=source_id,
+                                entry=entry,
+                                catalog_repo=catalog_repo,
+                                collection_id=DEFAULT_COLLECTION_ID,
+                            )
+
+                        # For composites, also import child artifacts automatically.
+                        # Children are catalog entries from the same source whose path
+                        # starts with the composite's path (i.e. they live inside the
+                        # composite directory).
+                        if entry.artifact_type == "composite":
+                            try:
+                                _import_composite_children(
+                                    session=ctx.session,
+                                    artifact_mgr=artifact_mgr,
+                                    collection_mgr=collection_mgr,
+                                    catalog_repo=catalog_repo,
+                                    transaction_handler=transaction_handler,
+                                    source_id=source_id,
+                                    source_ref=source.ref,
+                                    composite_entry=entry,
+                                    strategy=strategy,
+                                    populate_fn=populate_collection_artifact_from_import,
+                                )
+                            except Exception as child_err:
+                                logger.warning(
+                                    f"Child import failed for composite "
+                                    f"{entry.name}: {child_err}"
+                                )
+
+                    total_db_added += db_added_count
+                    logger.debug(
+                        f"Import batch {batch_idx + 1}/{len(batches)}: "
+                        f"added {db_added_count} artifacts"
                     )
-                    db_added_count += 1
-                except Exception as cache_err:
-                    logger.warning(
-                        f"Cache population failed for "
-                        f"{entry.artifact_type}:{entry.name}: {cache_err}"
-                    )
-                    continue
+                    # Transaction commits automatically on context-manager exit.
 
-                # SCA-P2-03: For skills with embedded artifacts, create a
-                # CompositeArtifact row atomically within this same session.
-                if _sca_enabled and entry.artifact_type == "skill":
-                    _wire_skill_composite(
-                        session=session,
-                        source_id=source_id,
-                        entry=entry,
-                        catalog_repo=catalog_repo,
-                        collection_id=DEFAULT_COLLECTION_ID,
-                    )
+            except Exception as e:
+                logger.error(
+                    f"Failed to import batch {batch_idx + 1}/{len(batches)} "
+                    f"for source {source_id}: {e}"
+                )
+                # Continue with next batch — partial success is allowed.
+                # File-system import already succeeded regardless.
+                continue
 
-                # For composites, also import child artifacts automatically.
-                # Children are catalog entries from the same source whose path
-                # starts with the composite's path (i.e. they live inside the
-                # composite directory).
-                if entry.artifact_type == "composite":
-                    try:
-                        _import_composite_children(
-                            session=session,
-                            artifact_mgr=artifact_mgr,
-                            collection_mgr=collection_mgr,
-                            catalog_repo=catalog_repo,
-                            transaction_handler=transaction_handler,
-                            source_id=source_id,
-                            source_ref=source.ref,
-                            composite_entry=entry,
-                            strategy=strategy,
-                            populate_fn=populate_collection_artifact_from_import,
-                        )
-                    except Exception as child_err:
-                        logger.warning(
-                            f"Child import failed for composite "
-                            f"{entry.name}: {child_err}"
-                        )
-
-            logger.info(
-                f"Added {db_added_count} artifacts to default database collection "
-                f"with full metadata"
-            )
-        except Exception as e:
-            logger.error(f"Failed to add artifacts to database collection: {e}")
-            session.rollback()
-            # Don't fail the entire import - file-system import already succeeded
+        logger.info(
+            f"Added {total_db_added} artifacts to default database collection "
+            f"with full metadata"
+        )
 
         # Update catalog entry statuses atomically
         with transaction_handler.import_transaction(source_id) as ctx:

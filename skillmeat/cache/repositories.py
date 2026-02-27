@@ -300,7 +300,7 @@ class BaseRepository(Generic[T]):
         )
 
     def _get_session(self) -> Session:
-        """Create a new database session.
+        """Create a new database session using the shared session factory.
 
         Returns:
             SQLAlchemy Session instance
@@ -309,14 +309,9 @@ class BaseRepository(Generic[T]):
             Sessions should be closed after use. Prefer using the
             transaction() context manager for automatic cleanup.
         """
-        from sqlalchemy.orm import sessionmaker
+        from skillmeat.cache.models import get_session
 
-        SessionLocal = sessionmaker(
-            autocommit=False,
-            autoflush=False,
-            bind=self.engine,
-        )
-        return SessionLocal()
+        return get_session(self.db_path)
 
     @contextmanager
     def transaction(self) -> Generator[Session, None, None]:
@@ -892,19 +887,14 @@ class MarketplaceTransactionHandler:
         logger.debug(f"Initialized MarketplaceTransactionHandler: {self.db_path}")
 
     def _get_session(self) -> Session:
-        """Create a new database session.
+        """Create a new database session using the shared session factory.
 
         Returns:
             SQLAlchemy Session instance
         """
-        from sqlalchemy.orm import sessionmaker
+        from skillmeat.cache.models import get_session
 
-        SessionLocal = sessionmaker(
-            autocommit=False,
-            autoflush=False,
-            bind=self.engine,
-        )
-        return SessionLocal()
+        return get_session(self.db_path)
 
     @contextmanager
     def scan_update_transaction(
