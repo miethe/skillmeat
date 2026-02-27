@@ -16,7 +16,7 @@ review = "claude-sonnet-4-6"
 exploration = "claude-haiku-4-5"
 orchestration = "claude-opus-4-6"
 documentation = "claude-haiku-4-5"
-image_generation = "nano-banana-pro"
+image_generation = "nano-banana-2"   # nb2 = Gemini 3.1 Flash Image (default); use nano-banana-pro for max quality
 svg_generation = "gemini-3.1-pro"
 video_generation = "sora-2"
 web_research = "gemini-3.1-pro"
@@ -51,6 +51,15 @@ fast_model = "gemini-3-flash"
 flash_threshold = "simple"
 max_output_tokens = 65536
 chunking_threshold = 32000
+
+[models.nano_banana]
+# nano-banana-2 = Gemini 3.1 Flash Image (fast, cheap ~$0.067/1K image)
+# nano-banana-pro = Gemini 3 Pro Image (highest quality ~$0.134/1K image)
+default_model = "nb2"          # alias: flash, nb2
+quality_model = "pro"          # alias: pro, nb-pro
+default_size = "1K"
+ui_mockup_size = "2K"
+# Usage: nano-banana "prompt" -m nb2 -s 2K -a 16:9 -d assets/ai-gen/{date}/nano-banana-2/
 
 [models.local_llm]
 endpoint = "http://localhost:11434"
