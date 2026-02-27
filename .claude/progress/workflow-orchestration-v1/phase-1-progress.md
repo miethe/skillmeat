@@ -3,13 +3,13 @@ type: progress
 prd: workflow-orchestration-v1
 phase: 1
 title: Schema & Core Logic (SWDL Engine)
-status: planning
+status: pending
 started: null
 completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 13
-completed_tasks: 0
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -21,7 +21,7 @@ tasks:
 - id: SCHEMA-1.1
   description: Pydantic v2 models for SWDL in core/workflow/models.py (WorkflowDefinition,
     StageDefinition, RoleAssignment, etc.)
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -30,7 +30,7 @@ tasks:
   priority: critical
 - id: SCHEMA-1.2
   description: 'YAML/JSON parser: parse_workflow(path) -> WorkflowDefinition'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -39,7 +39,7 @@ tasks:
   priority: critical
 - id: SCHEMA-1.3
   description: Schema defaults application per Schema Spec Section 8
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -48,7 +48,7 @@ tasks:
   priority: high
 - id: EXPR-1.4
   description: Expression parser for ${{ }} syntax in core/workflow/expressions.py
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -77,7 +77,7 @@ tasks:
   priority: critical
 - id: DAG-1.7
   description: 'Dependency graph builder: build_dag(workflow) -> DAG in core/workflow/dag.py'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -202,6 +202,8 @@ files_modified:
 schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
+progress: 38
+updated: '2026-02-27'
 ---
 
 # workflow-orchestration-v1 - Phase 1: Schema & Core Logic (SWDL Engine)
