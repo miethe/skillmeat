@@ -1988,32 +1988,15 @@ profile_root_dir = ".claude"
 collection_sha = "0d20432b0357859633bfb68fd7540c43940c610fb51ad510a4f84a0852c550c2"
 
 [[deployed]]
-artifact_name = "similarity-search-patterns"
+artifact_name = "better-auth"
 artifact_type = "skill"
 from_collection = "default"
-deployed_at = "2026-02-26T10:49:59.646416"
-artifact_path = "skills/similarity-search-patterns"
-content_hash = "2a0fbf9dae26b45bce72c58fc151bf3d6cfce93765d56f0f1f1eeb032b1e9204"
+deployed_at = "2026-02-26T15:10:58.160381"
+artifact_path = "skills/better-auth"
+content_hash = "8fb3fa95f5ba8577a23f65b26f4d1fd1ac4260348d8885e476ef4590c48afb49"
 local_modifications = false
-version_lineage = [
-    "2a0fbf9dae26b45bce72c58fc151bf3d6cfce93765d56f0f1f1eeb032b1e9204",
-]
-merge_base_snapshot = "2a0fbf9dae26b45bce72c58fc151bf3d6cfce93765d56f0f1f1eeb032b1e9204"
+merge_base_snapshot = "8fb3fa95f5ba8577a23f65b26f4d1fd1ac4260348d8885e476ef4590c48afb49"
 deployment_profile_id = "claude_code"
 platform = "claude_code"
 profile_root_dir = ".claude"
-collection_sha = "2a0fbf9dae26b45bce72c58fc151bf3d6cfce93765d56f0f1f1eeb032b1e9204"
-
-[[deployed]]
-artifact_name = "vector-database-engineer"
-artifact_type = "agent"
-from_collection = "default"
-deployed_at = "2026-02-26T10:50:28.843081"
-artifact_path = "agents/dev-team/vector-database-engineer.md"
-content_hash = "228dfc74a5f64d29e523899e6813a676ca7a1b8ff923d11752520dd372ba5b39"
-local_modifications = false
-merge_base_snapshot = "228dfc74a5f64d29e523899e6813a676ca7a1b8ff923d11752520dd372ba5b39"
-deployment_profile_id = "claude_code"
-platform = "claude_code"
-profile_root_dir = ".claude"
-collection_sha = "228dfc74a5f64d29e523899e6813a676ca7a1b8ff923d11752520dd372ba5b39"
+collection_sha = "8fb3fa95f5ba8577a23f65b26f4d1fd1ac4260348d8885e476ef4590c48afb49"
