@@ -3,13 +3,13 @@ type: progress
 prd: workflow-orchestration-v1
 phase: 5
 title: Frontend -- Workflow Library & Builder
-status: planning
+status: completed
 started: null
 completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 26
-completed_tasks: 0
+completed_tasks: 26
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -21,7 +21,7 @@ tasks:
 - id: FE-5.1
   description: TypeScript types in types/workflow.ts (Workflow, WorkflowStage, WorkflowExecution,
     enums)
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -31,7 +31,7 @@ tasks:
 - id: FE-5.2
   description: Workflow query hooks (useWorkflows, useWorkflow, useCreateWorkflow,
     etc.)
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -41,7 +41,7 @@ tasks:
 - id: FE-5.3
   description: Execution query hooks (useWorkflowExecutions, useRunWorkflow, useExecutionStream
     SSE)
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -50,7 +50,7 @@ tasks:
   priority: critical
 - id: FE-5.4
   description: Hook barrel export in hooks/index.ts
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -60,7 +60,7 @@ tasks:
   priority: medium
 - id: FE-5.5
   description: 'Navigation integration: add Workflows section to sidebar'
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -70,7 +70,7 @@ tasks:
 - id: FE-5.6
   description: 'Route structure: create all Next.js route pages as empty shells (7
     routes)'
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -79,7 +79,7 @@ tasks:
   priority: high
 - id: FE-5.7
   description: SlideOverPanel shared component (reusable right-side panel with animation)
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -88,7 +88,7 @@ tasks:
   priority: high
 - id: FE-5.8
   description: ArtifactPicker shared component (searchable popover with type filtering)
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -98,7 +98,7 @@ tasks:
 - id: FE-5.9
   description: ContextModulePicker shared component (multi-select popover for context
     modules)
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -107,7 +107,7 @@ tasks:
   priority: high
 - id: FE-5.10
   description: InlineEdit shared component (click-to-edit text field)
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -116,7 +116,7 @@ tasks:
   priority: medium
 - id: FE-5.11
   description: StatusDot shared component (colored status indicator with pulse)
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -125,7 +125,7 @@ tasks:
   priority: medium
 - id: FE-5.12
   description: WorkflowCard component (name, stage count, tags, actions)
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -134,7 +134,7 @@ tasks:
   priority: high
 - id: FE-5.13
   description: WorkflowListItem component (row layout for list view)
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -143,7 +143,7 @@ tasks:
   priority: medium
 - id: FE-5.14
   description: WorkflowToolbar component (search, filter, sort, view toggle)
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -153,7 +153,7 @@ tasks:
 - id: FE-5.15
   description: 'Workflow Library page: PageHeader, toolbar, card grid/list, empty
     state'
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -164,7 +164,7 @@ tasks:
   priority: critical
 - id: FE-5.16
   description: StageCard component (edit + readonly modes, drag handle, badges)
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -173,7 +173,7 @@ tasks:
   priority: critical
 - id: FE-5.17
   description: StageConnector component (vertical line between stages, hover add button)
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -182,7 +182,7 @@ tasks:
   priority: high
 - id: FE-5.18
   description: StageEditor slide-over form (Basic Info, Roles, Context, Advanced sections)
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -194,7 +194,7 @@ tasks:
 - id: FE-5.19
   description: Builder state management (useReducer with all BuilderAction types,
     isDirty tracking)
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -204,7 +204,7 @@ tasks:
 - id: FE-5.20
   description: '@dnd-kit integration: DndContext, SortableContext, useSortable, keyboard
     DnD, ARIA'
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -215,7 +215,7 @@ tasks:
 - id: FE-5.21
   description: Builder top bar (back button, editable name, unsaved indicator, save
     buttons)
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -224,7 +224,7 @@ tasks:
   priority: high
 - id: FE-5.22
   description: Builder sidebar (metadata, tags, version, global context, settings)
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -234,7 +234,7 @@ tasks:
   priority: high
 - id: FE-5.23
   description: 'Builder page assembly: combine top bar, sidebar, canvas, DnD, add-stage'
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -250,7 +250,7 @@ tasks:
 - id: FE-5.24
   description: 'Workflow Detail page: tabs (Stages, Executions, Settings), read-only
     stage timeline'
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -260,7 +260,7 @@ tasks:
   priority: high
 - id: FE-5.25
   description: 'RunWorkflowDialog: parameter inputs, override sections, Run button'
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -270,7 +270,7 @@ tasks:
 - id: TEST-5.26
   description: 'Component tests: WorkflowCard, StageCard, StageEditor, builder reducer,
     DnD'
-  status: pending
+  status: completed
   assigned_to:
   - frontend-developer
   dependencies:
@@ -371,6 +371,8 @@ files_modified:
 schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
+updated: '2026-02-27'
+progress: 100
 ---
 
 # workflow-orchestration-v1 - Phase 5: Frontend -- Workflow Library & Builder
