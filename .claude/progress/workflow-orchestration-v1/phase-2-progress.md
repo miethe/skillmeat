@@ -3,13 +3,13 @@ type: progress
 prd: workflow-orchestration-v1
 phase: 2
 title: Database + Repository Layer
-status: planning
+status: pending
 started: null
 completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 0
+completed_tasks: 1
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -21,7 +21,7 @@ tasks:
 - id: DB-2.1
   description: Alembic migration for workflows, workflow_stages, workflow_executions,
     execution_steps tables
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies:
@@ -146,6 +146,8 @@ files_modified:
 schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
+updated: '2026-02-27'
+progress: 12
 ---
 
 # workflow-orchestration-v1 - Phase 2: Database + Repository Layer
