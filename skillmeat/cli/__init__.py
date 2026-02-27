@@ -267,14 +267,71 @@ def init(
         sys.exit(1)
 
 
+# ---------------------------------------------------------------------------
+# Workflow list helper (used by cmd_list --type workflow)
+# ---------------------------------------------------------------------------
+
+
+def _list_workflows(tags: bool = False) -> None:
+    """Display all workflow definitions stored in the DB."""
+    try:
+        from skillmeat.cache.workflow_repository import WorkflowRepository
+    except ImportError as exc:
+        console.print(f"[yellow]Workflow support unavailable:[/yellow] {exc}")
+        return
+
+    try:
+        repo = WorkflowRepository()
+        workflows, _ = repo.list(limit=200)
+    except Exception as exc:
+        console.print(f"[red]Error querying workflows:[/red] {exc}")
+        return
+
+    if not workflows:
+        console.print("[yellow]No workflow definitions found[/yellow]")
+        return
+
+    table = Table(title=f"Workflows ({len(workflows)})")
+    table.add_column("Name", style="cyan")
+    table.add_column("Type", style="blue")
+    table.add_column("Version", style="magenta")
+    table.add_column("Status", style="yellow")
+    table.add_column("Description", style="green")
+    if tags:
+        table.add_column("Tags", style="yellow")
+
+    for wf in workflows:
+        import json as _json
+
+        raw_tags: list = []
+        if getattr(wf, "tags_json", None):
+            try:
+                raw_tags = _json.loads(wf.tags_json)
+            except Exception:
+                raw_tags = []
+
+        row = [
+            wf.name or "",
+            "workflow",
+            getattr(wf, "version", "") or "",
+            getattr(wf, "status", "") or "",
+            getattr(wf, "description", "") or "",
+        ]
+        if tags:
+            row.append(", ".join(raw_tags) if raw_tags else "")
+        table.add_row(*row)
+
+    console.print(table)
+
+
 @main.command(name="list")
 @click.option(
     "--type",
     "-t",
     "artifact_type",
-    type=click.Choice(["skill", "command", "agent", "composite", "plugin"]),
+    type=click.Choice(["skill", "command", "agent", "composite", "plugin", "workflow"]),
     default=None,
-    help="Filter by artifact type ('composite' and 'plugin' are aliases for composite artifacts)",
+    help="Filter by artifact type ('composite' and 'plugin' are aliases for composite artifacts; 'workflow' shows workflow definitions)",
 )
 @click.option(
     "--collection",
@@ -308,16 +365,26 @@ def cmd_list(
 
     Shows all artifacts or filtered by type. Composite artifacts (plugins) are
     fetched from the DB cache and displayed with the type label 'plugin'.
+    Workflow definitions are stored separately and only shown when explicitly
+    requested via --type workflow.
 
     Examples:
       skillmeat list                    # List all artifacts (including plugins)
       skillmeat list --type skill       # List only skills
       skillmeat list --type plugin      # List only composite/plugin artifacts
+      skillmeat list --type workflow    # List workflow definitions
       skillmeat list --tags             # Show tags
       skillmeat list --no-cache         # Force fresh read from filesystem
       skillmeat list --cache-status     # Show cache freshness
     """
     try:
+        # ------------------------------------------------------------------
+        # Workflow-only fast path: query the workflow DB and return early
+        # ------------------------------------------------------------------
+        if artifact_type == "workflow":
+            _list_workflows(tags=tags)
+            return
+
         artifact_mgr = ArtifactManager()
 
         # Composite/plugin are aliases — treat both as a composite filter

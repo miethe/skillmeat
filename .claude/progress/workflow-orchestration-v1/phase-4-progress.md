@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 11
-completed_tasks: 9
+completed_tasks: 10
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -109,7 +109,7 @@ tasks:
 - id: CLI-4.10
   description: 'Collection manifest integration: type=workflow in TOML, skillmeat
     list includes workflows'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -170,7 +170,7 @@ files_modified:
 schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
-progress: 81
+progress: 90
 updated: '2026-02-27'
 ---
 
