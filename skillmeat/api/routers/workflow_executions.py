@@ -18,6 +18,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from skillmeat.core.workflow.exceptions import (
+    WorkflowExecutionInvalidStateError,
     WorkflowExecutionNotFoundError,
     WorkflowNotFoundError,
     WorkflowValidationError,
@@ -51,6 +52,16 @@ class WorkflowExecutionStartRequest(BaseModel):
     workflow_id: str
     parameters: Optional[Dict[str, Any]] = None
     overrides: Optional[Dict[str, Any]] = None
+
+
+class GateRejectRequest(BaseModel):
+    """Optional request body for rejecting a gate.
+
+    Attributes:
+        reason: Human-readable explanation for the rejection.  May be omitted.
+    """
+
+    reason: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -468,3 +479,258 @@ async def stream_execution_events(execution_id: str) -> StreamingResponse:
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Control endpoints (pause / resume / cancel / gate approval)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{execution_id}/pause",
+    summary="Pause workflow execution",
+    description="Pause a running workflow execution.  The execution must be in the 'running' state.",
+    status_code=status.HTTP_200_OK,
+)
+async def pause_execution(execution_id: str) -> Dict[str, Any]:
+    """Pause a running workflow execution.
+
+    Args:
+        execution_id: UUID hex string identifying the execution to pause.
+
+    Returns:
+        Updated execution dict (HTTP 200).
+
+    Raises:
+        HTTPException 404: If no execution with ``execution_id`` exists.
+        HTTPException 409: If the execution is not in a pausable state.
+        HTTPException 500: On unexpected errors.
+    """
+    svc = _get_service()
+    try:
+        dto = svc.pause_execution(execution_id)
+    except WorkflowExecutionNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except WorkflowExecutionInvalidStateError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.exception("Unexpected error pausing execution %s", execution_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to pause workflow execution.",
+        ) from exc
+
+    return _dto_to_dict(dto)
+
+
+@router.post(
+    "/{execution_id}/resume",
+    summary="Resume paused workflow execution",
+    description="Resume a paused workflow execution.  The execution must be in the 'paused' state.",
+    status_code=status.HTTP_200_OK,
+)
+async def resume_execution(execution_id: str) -> Dict[str, Any]:
+    """Resume a paused workflow execution.
+
+    Args:
+        execution_id: UUID hex string identifying the execution to resume.
+
+    Returns:
+        Updated execution dict (HTTP 200).
+
+    Raises:
+        HTTPException 404: If no execution with ``execution_id`` exists.
+        HTTPException 409: If the execution is not in a resumable state.
+        HTTPException 500: On unexpected errors.
+    """
+    svc = _get_service()
+    try:
+        dto = svc.resume_execution(execution_id)
+    except WorkflowExecutionNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except WorkflowExecutionInvalidStateError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.exception("Unexpected error resuming execution %s", execution_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to resume workflow execution.",
+        ) from exc
+
+    return _dto_to_dict(dto)
+
+
+@router.post(
+    "/{execution_id}/cancel",
+    summary="Cancel workflow execution",
+    description="Cancel a running or paused workflow execution.",
+    status_code=status.HTTP_200_OK,
+)
+async def cancel_execution(execution_id: str) -> Dict[str, Any]:
+    """Cancel a workflow execution.
+
+    Args:
+        execution_id: UUID hex string identifying the execution to cancel.
+
+    Returns:
+        Updated execution dict (HTTP 200).
+
+    Raises:
+        HTTPException 404: If no execution with ``execution_id`` exists.
+        HTTPException 409: If the execution is already in a terminal state.
+        HTTPException 500: On unexpected errors.
+    """
+    svc = _get_service()
+    try:
+        dto = svc.cancel_execution(execution_id)
+    except WorkflowExecutionNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except WorkflowExecutionInvalidStateError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.exception("Unexpected error cancelling execution %s", execution_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to cancel workflow execution.",
+        ) from exc
+
+    return _dto_to_dict(dto)
+
+
+@router.post(
+    "/{execution_id}/gates/{stage_id}/approve",
+    summary="Approve a gate stage",
+    description=(
+        "Approve a pending gate stage in a workflow execution.  "
+        "The gate step must be in the 'pending' or 'running' state."
+    ),
+    status_code=status.HTTP_200_OK,
+)
+async def approve_gate(execution_id: str, stage_id: str) -> Dict[str, Any]:
+    """Approve a pending gate in a workflow execution.
+
+    Args:
+        execution_id: UUID hex string identifying the execution.
+        stage_id:     Stage identifier (kebab-case) of the gate to approve.
+
+    Returns:
+        Updated step dict (HTTP 200).
+
+    Raises:
+        HTTPException 404: If no execution or gate with the given IDs exists.
+        HTTPException 409: If the gate is not in an approvable state.
+        HTTPException 500: On unexpected errors.
+    """
+    svc = _get_service()
+    try:
+        step_dto = svc.approve_gate(execution_id, stage_id)
+    except WorkflowExecutionNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except WorkflowExecutionInvalidStateError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.exception(
+            "Unexpected error approving gate %s for execution %s",
+            stage_id,
+            execution_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to approve gate.",
+        ) from exc
+
+    from dataclasses import asdict
+
+    raw = asdict(step_dto)
+    for key in ("started_at", "completed_at"):
+        if key in raw and raw[key] is not None:
+            raw[key] = raw[key].isoformat()
+    return raw
+
+
+@router.post(
+    "/{execution_id}/gates/{stage_id}/reject",
+    summary="Reject a gate stage",
+    description=(
+        "Reject a pending gate stage in a workflow execution.  "
+        "An optional rejection reason may be provided in the request body."
+    ),
+    status_code=status.HTTP_200_OK,
+)
+async def reject_gate(
+    execution_id: str,
+    stage_id: str,
+    request: Optional[GateRejectRequest] = None,
+) -> Dict[str, Any]:
+    """Reject a pending gate in a workflow execution.
+
+    Args:
+        execution_id: UUID hex string identifying the execution.
+        stage_id:     Stage identifier (kebab-case) of the gate to reject.
+        request:      Optional body containing a human-readable ``reason``.
+
+    Returns:
+        Updated step dict (HTTP 200).
+
+    Raises:
+        HTTPException 404: If no execution or gate with the given IDs exists.
+        HTTPException 409: If the gate is not in a rejectable state.
+        HTTPException 500: On unexpected errors.
+    """
+    reason: Optional[str] = request.reason if request is not None else None
+
+    svc = _get_service()
+    try:
+        step_dto = svc.reject_gate(execution_id, stage_id, reason)
+    except WorkflowExecutionNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except WorkflowExecutionInvalidStateError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.exception(
+            "Unexpected error rejecting gate %s for execution %s",
+            stage_id,
+            execution_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reject gate.",
+        ) from exc
+
+    from dataclasses import asdict
+
+    raw = asdict(step_dto)
+    for key in ("started_at", "completed_at"):
+        if key in raw and raw[key] is not None:
+            raw[key] = raw[key].isoformat()
+    return raw
