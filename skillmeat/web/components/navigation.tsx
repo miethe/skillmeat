@@ -15,6 +15,7 @@ import {
   Server,
   Store,
   GitBranch,
+  Play,
   Share2,
   Settings,
   Tag,
@@ -22,6 +23,7 @@ import {
   FileCode2,
   Github,
   Book,
+  Workflow,
 } from 'lucide-react';
 import { NavSection } from './nav-section';
 import { CollectionSwitcherWithDialogs } from './collection/collection-switcher-with-dialogs';
@@ -79,6 +81,10 @@ const BASE_NAV_CONFIG = {
     { name: 'Memories', href: '/memories', icon: Brain },
   ],
   marketplaceItems: [{ name: 'Sources', href: '/marketplace/sources', icon: GitBranch }],
+  workflowItems: [
+    { name: 'Library', href: '/workflows', icon: GitBranch },
+    { name: 'Executions', href: '/workflows/executions', icon: Play },
+  ],
   agentContextItems: [
     { name: 'Context Entities', href: '/context-entities', icon: FileCode2 },
     { name: 'Templates', href: '/templates', icon: FileText },
@@ -139,6 +145,12 @@ function buildNavigationConfig(deploymentSetsEnabled: boolean): NavigationConfig
         icon: FileText,
         storageKey: 'agent-context',
         items: BASE_NAV_CONFIG.agentContextItems,
+      },
+      {
+        title: 'Workflows',
+        icon: Workflow,
+        storageKey: 'workflows',
+        items: BASE_NAV_CONFIG.workflowItems,
       },
       {
         title: 'Resources',
