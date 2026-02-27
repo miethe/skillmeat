@@ -24,6 +24,11 @@ from skillmeat.api.schemas.settings import (
     GitHubTokenValidationResponse,
     IndexingModeResponse,
     MessageResponse,
+    SimilarityColorsResponse,
+    SimilarityColorsUpdateRequest,
+    SimilaritySettingsResponse,
+    SimilarityThresholdsResponse,
+    SimilarityThresholdsUpdateRequest,
 )
 from skillmeat.core.github_client import (
     GitHubAuthError,
@@ -630,3 +635,198 @@ async def update_custom_context_config(
 
     # Return updated config
     return CustomContextConfigResponse(**current)
+
+
+# ---------------------------------------------------------------------------
+# Similarity settings endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/similarity",
+    response_model=SimilaritySettingsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get all similarity settings",
+    description="""
+    Returns the current similarity badge configuration: score band thresholds
+    and band colors.  When no custom values have been saved, the SkillMeat
+    defaults are returned.
+    """,
+)
+async def get_similarity_settings(
+    config: ConfigManagerDep,
+) -> SimilaritySettingsResponse:
+    """Return current similarity thresholds and colors.
+
+    Args:
+        config: Configuration manager dependency
+
+    Returns:
+        Combined similarity settings (thresholds + colors)
+    """
+    thresholds = config.get_similarity_thresholds()
+    colors = config.get_similarity_colors()
+    logger.debug("Retrieved similarity settings")
+    return SimilaritySettingsResponse(
+        thresholds=SimilarityThresholdsResponse(**thresholds),
+        colors=SimilarityColorsResponse(**colors),
+    )
+
+
+@router.get(
+    "/similarity/thresholds",
+    response_model=SimilarityThresholdsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get similarity score thresholds",
+    description="""
+    Returns the score band thresholds used to classify a similarity score into
+    high / partial / low / (hidden below floor) bands.
+
+    Default values:
+    - high   ≥ 0.80
+    - partial ≥ 0.55
+    - low    ≥ 0.35
+    - floor  ≥ 0.20  (scores below this are not displayed)
+    """,
+)
+async def get_similarity_thresholds(
+    config: ConfigManagerDep,
+) -> SimilarityThresholdsResponse:
+    """Return current similarity score band thresholds.
+
+    Args:
+        config: Configuration manager dependency
+
+    Returns:
+        Threshold values for each similarity band
+    """
+    thresholds = config.get_similarity_thresholds()
+    logger.debug(f"Retrieved similarity thresholds: {thresholds}")
+    return SimilarityThresholdsResponse(**thresholds)
+
+
+@router.put(
+    "/similarity/thresholds",
+    response_model=SimilarityThresholdsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update similarity score thresholds",
+    description="""
+    Update one or more similarity score band thresholds.
+
+    Only supplied fields are updated; omitted fields retain their stored values.
+    The final merged configuration must satisfy the ordering invariant:
+
+        floor < low < partial < high
+
+    All values must be in [0.0, 1.0].
+    """,
+)
+async def update_similarity_thresholds(
+    request: SimilarityThresholdsUpdateRequest,
+    config: ConfigManagerDep,
+) -> SimilarityThresholdsResponse:
+    """Persist similarity score band threshold overrides.
+
+    Args:
+        request: Partial update with one or more threshold values
+        config: Configuration manager dependency
+
+    Returns:
+        Updated threshold configuration
+
+    Raises:
+        HTTPException 400: If values are out of range or violate ordering
+    """
+    updates = request.model_dump(exclude_none=True)
+    if not updates:
+        # Nothing to update — return current values
+        return SimilarityThresholdsResponse(**config.get_similarity_thresholds())
+
+    try:
+        config.set_similarity_thresholds(updates)
+    except ValueError as exc:
+        logger.warning(f"Invalid similarity threshold update: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+
+    thresholds = config.get_similarity_thresholds()
+    logger.info(f"Updated similarity thresholds: {updates}")
+    return SimilarityThresholdsResponse(**thresholds)
+
+
+@router.get(
+    "/similarity/colors",
+    response_model=SimilarityColorsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get similarity band colors",
+    description="""
+    Returns the CSS hex color assigned to each similarity band.
+
+    Default values:
+    - high    #22c55e (green-500)
+    - partial #eab308 (yellow-500)
+    - low     #f97316 (orange-500)
+    """,
+)
+async def get_similarity_colors(
+    config: ConfigManagerDep,
+) -> SimilarityColorsResponse:
+    """Return current similarity badge color configuration.
+
+    Args:
+        config: Configuration manager dependency
+
+    Returns:
+        Color values for each similarity band
+    """
+    colors = config.get_similarity_colors()
+    logger.debug(f"Retrieved similarity colors: {colors}")
+    return SimilarityColorsResponse(**colors)
+
+
+@router.put(
+    "/similarity/colors",
+    response_model=SimilarityColorsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update similarity band colors",
+    description="""
+    Update one or more similarity badge colors.
+
+    Only supplied fields are updated; omitted fields retain their stored values.
+    All values must be valid CSS hex color strings (3 or 6 hex digits with leading #).
+    """,
+)
+async def update_similarity_colors(
+    request: SimilarityColorsUpdateRequest,
+    config: ConfigManagerDep,
+) -> SimilarityColorsResponse:
+    """Persist similarity badge color overrides.
+
+    Args:
+        request: Partial update with one or more color values
+        config: Configuration manager dependency
+
+    Returns:
+        Updated color configuration
+
+    Raises:
+        HTTPException 400: If any color is not a valid CSS hex string
+    """
+    updates = request.model_dump(exclude_none=True)
+    if not updates:
+        return SimilarityColorsResponse(**config.get_similarity_colors())
+
+    try:
+        config.set_similarity_colors(updates)
+    except ValueError as exc:
+        logger.warning(f"Invalid similarity color update: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+
+    colors = config.get_similarity_colors()
+    logger.info(f"Updated similarity colors: {updates}")
+    return SimilarityColorsResponse(**colors)

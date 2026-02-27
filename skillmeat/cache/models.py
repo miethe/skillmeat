@@ -25,6 +25,8 @@ Models:
     - DeploymentSet: Named, ordered set of artifacts/groups for batch deployment (deployment-sets-v1)
     - DeploymentSetMember: Polymorphic member entry within a DeploymentSet
     - CustomColor: User-defined hex colors for the site-wide color palette registry
+    - DuplicatePair: Persisted record of a similar/duplicate artifact pair with optional ignored flag
+    - SimilarityCache: Cached pairwise composite similarity scores with breakdown JSON (SSO-2.2)
 
 Usage:
     >>> from skillmeat.cache.models import get_session, Project, Artifact
@@ -64,6 +66,7 @@ from sqlalchemy import (
     Index,
     Integer,
     JSON,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -1130,6 +1133,32 @@ class CollectionArtifact(Base):
         Text, nullable=True
     )  # JSON array of deployment paths
     version: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Fingerprint fields for similarity scoring (SSO-2.1)
+    artifact_content_hash: Mapped[Optional[str]] = mapped_column(
+        String(64),
+        nullable=True,
+        comment="SHA-256 hash of artifact file contents — distinct from context-entity content_hash",
+    )
+    artifact_structure_hash: Mapped[Optional[str]] = mapped_column(
+        String(64),
+        nullable=True,
+        comment="Hash of artifact directory structure (filenames + tree shape)",
+    )
+    artifact_file_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+        comment="Number of files in the artifact",
+    )
+    artifact_total_size: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+        comment="Total byte size of all artifact files",
+    )
     source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     origin: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     origin_source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
@@ -3571,6 +3600,348 @@ class CustomColor(Base):
             "name": self.name,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+
+# =============================================================================
+# Similar Artifacts
+# =============================================================================
+
+
+class DuplicatePair(Base):
+    """Persisted record of a similar/duplicate artifact pair.
+
+    Stores the result of pairwise similarity analysis between two collection
+    artifacts.  When users dismiss a suggestion (e.g. "these are not really
+    duplicates") the ``ignored`` flag is set to ``True`` so the pair is
+    excluded from future results without being permanently deleted.
+
+    Attributes:
+        id: Unique record identifier (primary key, UUID hex)
+        artifact1_uuid: UUID of the first artifact in the pair
+        artifact2_uuid: UUID of the second artifact in the pair
+        similarity_score: Normalised similarity score in the range [0.0, 1.0]
+        match_reasons: JSON-encoded list of human-readable reasons for the match
+        ignored: When True the user has dismissed this pair; excluded from UI
+        created_at: Timestamp when the pair was first detected
+        updated_at: Timestamp of the most recent update to this record
+
+    Constraints:
+        - check_duplicate_pair_score: similarity_score must be in [0.0, 1.0]
+        - uq_duplicate_pair_artifacts: (artifact1_uuid, artifact2_uuid) is UNIQUE
+          so the same ordered pair cannot be inserted twice
+
+    Indexes:
+        - idx_duplicate_pairs_artifact1: Fast lookup by artifact1_uuid
+        - idx_duplicate_pairs_artifact2: Fast lookup by artifact2_uuid
+        - idx_duplicate_pairs_ignored: Filter on ignored flag efficiently
+    """
+
+    __tablename__ = "duplicate_pairs"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Pair members — reference collection_artifacts by UUID
+    artifact1_uuid: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        comment="UUID of the first artifact in the similar pair",
+    )
+    artifact2_uuid: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        comment="UUID of the second artifact in the similar pair",
+    )
+
+    # Similarity data
+    similarity_score: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        comment="Normalised similarity score in the range [0.0, 1.0]",
+    )
+    match_reasons: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        default="[]",
+        server_default="[]",
+        comment="JSON-encoded list of human-readable match reason strings",
+    )
+
+    # User-controlled dismissal flag
+    ignored: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+        comment="True when the user has dismissed this pair from the UI",
+    )
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        CheckConstraint(
+            "similarity_score >= 0.0 AND similarity_score <= 1.0",
+            name="check_duplicate_pair_score",
+        ),
+        UniqueConstraint(
+            "artifact1_uuid",
+            "artifact2_uuid",
+            name="uq_duplicate_pair_artifacts",
+        ),
+        Index("idx_duplicate_pairs_artifact1", "artifact1_uuid"),
+        Index("idx_duplicate_pairs_artifact2", "artifact2_uuid"),
+        Index("idx_duplicate_pairs_ignored", "ignored"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of DuplicatePair."""
+        return (
+            f"<DuplicatePair(id={self.id!r}, "
+            f"artifact1={self.artifact1_uuid!r}, "
+            f"artifact2={self.artifact2_uuid!r}, "
+            f"score={self.similarity_score!r}, "
+            f"ignored={self.ignored!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert DuplicatePair to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the duplicate pair
+        """
+        import json as _json
+
+        reasons: List[str] = []
+        if self.match_reasons:
+            try:
+                reasons = _json.loads(self.match_reasons)
+            except (ValueError, TypeError):
+                reasons = []
+
+        return {
+            "id": self.id,
+            "artifact1_uuid": self.artifact1_uuid,
+            "artifact2_uuid": self.artifact2_uuid,
+            "similarity_score": self.similarity_score,
+            "match_reasons": reasons,
+            "ignored": self.ignored,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+# =============================================================================
+# SimilarityCache (SSO-2.2)
+# =============================================================================
+
+
+class SimilarityCache(Base):
+    """Cached pairwise composite similarity score between two collection artifacts.
+
+    Stores precomputed similarity results so that expensive scoring operations
+    are not repeated on every request.  The entry is keyed by the ordered pair
+    ``(source_artifact_uuid, target_artifact_uuid)`` — each direction is stored
+    independently, allowing asymmetric scoring if the underlying algorithm
+    supports it.
+
+    Attributes:
+        source_artifact_uuid: UUID of the artifact being compared from
+        target_artifact_uuid: UUID of the artifact being compared to
+        composite_score: Final weighted composite score in [0.0, 1.0]
+        breakdown_json: Optional JSON-encoded dict of per-dimension scores
+        computed_at: Timestamp when the score was last computed
+
+    Constraints:
+        - Composite primary key on (source_artifact_uuid, target_artifact_uuid)
+        - FK CASCADE DELETE on both UUID columns referencing collection_artifacts.uuid
+
+    Indexes:
+        - idx_similarity_cache_source_score: Fast retrieval of top-N similar
+          artifacts for a given source, ordered by score descending
+    """
+
+    __tablename__ = "similarity_cache"
+
+    # Composite primary key — ordered pair of artifact UUIDs
+    source_artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+        comment="UUID of the source artifact (the 'query' side of the comparison)",
+    )
+    target_artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+        comment="UUID of the target artifact (the 'candidate' side of the comparison)",
+    )
+
+    # Similarity result
+    composite_score: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        comment="Final weighted composite similarity score in [0.0, 1.0]",
+    )
+    breakdown_json: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON-encoded dict of per-dimension scores (e.g. name, tags, text)",
+    )
+
+    # Timestamp for cache invalidation
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        server_default="CURRENT_TIMESTAMP",
+        comment="Timestamp when this score was computed; used for cache invalidation",
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        # Composite index on source + score DESC for efficient top-N lookups
+        Index(
+            "idx_similarity_cache_source_score",
+            "source_artifact_uuid",
+            "composite_score",
+        ),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of SimilarityCache."""
+        return (
+            f"<SimilarityCache("
+            f"source={self.source_artifact_uuid!r}, "
+            f"target={self.target_artifact_uuid!r}, "
+            f"score={self.composite_score!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert SimilarityCache to dictionary for JSON serialization."""
+        breakdown: Optional[Dict[str, Any]] = None
+        if self.breakdown_json:
+            try:
+                breakdown = json.loads(self.breakdown_json)
+            except (ValueError, TypeError):
+                breakdown = None
+
+        return {
+            "source_artifact_uuid": self.source_artifact_uuid,
+            "target_artifact_uuid": self.target_artifact_uuid,
+            "composite_score": self.composite_score,
+            "breakdown": breakdown,
+            "computed_at": self.computed_at.isoformat() if self.computed_at else None,
+        }
+
+
+# =============================================================================
+# ArtifactEmbedding (SSO-3.3)
+# =============================================================================
+
+
+class ArtifactEmbedding(Base):
+    """Persisted vector embedding for a collection artifact.
+
+    Stores the dense vector representation (embedding) produced by a sentence-
+    transformer model so that embedding generation is not repeated on every
+    similarity-scoring request.  The embedding is serialised as a raw byte blob
+    (numpy ``ndarray.tobytes()`` / ``frombuffer()``).
+
+    NOTE: A file-based embedding cache also exists at ``~/.skillmeat/embeddings.db``
+    (used by ``AnthropicEmbedder`` / ``HaikuEmbedder`` in
+    ``skillmeat/core/scoring/haiku_embedder.py``).  That store is keyed on text
+    hash rather than artifact UUID and is unrelated to this table.  The ORM table
+    is the canonical, artifact-scoped embedding store going forward; the file-based
+    cache is a legacy implementation detail of the (currently unavailable)
+    Anthropic embedder stub.
+
+    Attributes:
+        artifact_uuid: UUID of the collection artifact this embedding belongs to.
+            Acts as the primary key and references ``artifacts.uuid`` with
+            CASCADE DELETE so that removing an artifact automatically removes
+            its embedding row.
+        embedding: Raw bytes of the embedding vector.  Deserialise with
+            ``numpy.frombuffer(embedding, dtype=numpy.float32)``.
+        model_name: Identifier of the model that produced the embedding
+            (e.g. ``"all-MiniLM-L6-v2"``).
+        embedding_dim: Length of the embedding vector (e.g. 384 for
+            ``all-MiniLM-L6-v2``).  Stored explicitly so consumers can
+            deserialise without knowing the model ahead of time.
+        computed_at: Timestamp when the embedding was last computed.  Used for
+            TTL-based invalidation when the underlying artifact content changes.
+
+    Constraints:
+        - Primary key on ``artifact_uuid``
+        - FK CASCADE DELETE on ``artifact_uuid`` referencing ``artifacts.uuid``
+
+    Indexes:
+        - idx_artifact_embeddings_model: Fast lookup of all embeddings produced
+          by a given model (useful for bulk re-embedding when a model is updated)
+    """
+
+    __tablename__ = "artifact_embeddings"
+
+    # Primary key — one embedding row per artifact (per model update cycle)
+    artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+        comment="UUID of the artifact this embedding belongs to",
+    )
+
+    # The vector payload
+    embedding: Mapped[bytes] = mapped_column(
+        LargeBinary,
+        nullable=False,
+        comment=(
+            "Raw float32 bytes of the embedding vector "
+            "(numpy ndarray.tobytes() / frombuffer(dtype=float32))"
+        ),
+    )
+
+    # Model provenance
+    model_name: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        comment="Model that produced this embedding (e.g. 'all-MiniLM-L6-v2')",
+    )
+    embedding_dim: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        comment="Number of dimensions in the embedding vector (e.g. 384)",
+    )
+
+    # Cache-invalidation timestamp
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        server_default="CURRENT_TIMESTAMP",
+        comment="Timestamp when the embedding was computed; used for TTL invalidation",
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        Index("idx_artifact_embeddings_model", "model_name"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of ArtifactEmbedding."""
+        return (
+            f"<ArtifactEmbedding("
+            f"artifact_uuid={self.artifact_uuid!r}, "
+            f"model={self.model_name!r}, "
+            f"dim={self.embedding_dim!r})>"
+        )
 
 
 # =============================================================================

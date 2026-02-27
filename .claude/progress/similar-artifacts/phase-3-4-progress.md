@@ -1,211 +1,200 @@
 ---
-# === PROGRESS TRACKING: SIMILAR-ARTIFACTS PHASES 3-4 ===
-# Marketplace Tab + Similarity Badges & Settings
-# Source of truth for task assignments, status, and parallelization strategy
-
-# Metadata: Identification and Classification
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "similar-artifacts"
-feature_slug: "similar-artifacts"
-prd_ref: "docs/project_plans/PRDs/features/similar-artifacts-v1.md"
-plan_ref: "docs/project_plans/implementation_plans/features/similar-artifacts-v1.md"
+prd: similar-artifacts
+feature_slug: similar-artifacts
+prd_ref: docs/project_plans/PRDs/features/similar-artifacts-v1.md
+plan_ref: docs/project_plans/implementation_plans/features/similar-artifacts-v1.md
 phase: 3
-title: "Marketplace Tab + Similarity Badges & Settings"
-status: "planning"
-started: "2026-02-25"
+title: Marketplace Tab + Similarity Badges & Settings
+status: completed
+started: '2026-02-25'
 completed: null
 commit_refs: []
 pr_refs: []
-
-# Overall Progress: Status and Estimates
 overall_progress: 0
-completion_estimate: "on-track"
-
-# Task Counts: Machine-readable task state
+completion_estimate: on-track
 total_tasks: 11
-completed_tasks: 0
+completed_tasks: 11
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-# Ownership: Primary and secondary agents
-owners: ["ui-engineer-enhanced", "python-backend-engineer"]
-contributors: ["frontend-developer"]
-
-# === TASKS (SOURCE OF TRUTH) ===
-# Machine-readable task definitions with assignments and dependencies
-# Update using: python .claude/skills/artifact-tracking/scripts/update-status.py -f FILE -t TASK-X -s [pending|in_progress|complete|blocked|at-risk]
-
+owners:
+- ui-engineer-enhanced
+- python-backend-engineer
+contributors:
+- frontend-developer
 tasks:
-  # PHASE 3: Similar Artifacts Tab — Marketplace (3 pts total)
-  - id: "SA-P3-001"
-    description: "Identify marketplace artifact detail panel"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "0.5pt"
-    priority: "high"
-
-  - id: "SA-P3-002"
-    description: "Add Similar tab to marketplace detail panel"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SA-P3-001"]
-    estimated_effort: "1.5pt"
-    priority: "high"
-
-  - id: "SA-P3-003"
-    description: "E2E test — marketplace Similar tab"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["SA-P3-002"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-  # PHASE 4: Marketplace Similarity Badges + Settings (8 pts total)
-  - id: "SA-P4-001"
-    description: "Similarity settings storage (backend)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "1pt"
-    priority: "high"
-
-  - id: "SA-P4-002"
-    description: "useSimilaritySettings hook"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["SA-P4-001"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-  - id: "SA-P4-003"
-    description: "SimilaritySettings sub-tab component"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SA-P4-002"]
-    estimated_effort: "3pt"
-    priority: "high"
-
-  - id: "SA-P4-004"
-    description: "Register Similarity sub-tab in Settings page"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["SA-P4-003"]
-    estimated_effort: "0.5pt"
-    priority: "high"
-
-  - id: "SA-P4-005"
-    description: "SimilarityBadge component"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SA-P4-002"]
-    estimated_effort: "2pt"
-    priority: "high"
-
-  - id: "SA-P4-006"
-    description: "SourceCard — badge integration with lazy loading"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SA-P4-005"]
-    estimated_effort: "2pt"
-    priority: "high"
-
-  - id: "SA-P4-007"
-    description: "Badge batch query optimization"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["SA-P4-006"]
-    estimated_effort: "1.5pt"
-    priority: "medium"
-
-  - id: "SA-P4-008"
-    description: "E2E test — marketplace badge"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["SA-P4-006"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-# Parallelization Strategy (computed from dependencies)
+- id: SA-P3-001
+  description: Identify marketplace artifact detail panel
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 0.5pt
+  priority: high
+- id: SA-P3-002
+  description: Add Similar tab to marketplace detail panel
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SA-P3-001
+  estimated_effort: 1.5pt
+  priority: high
+- id: SA-P3-003
+  description: E2E test — marketplace Similar tab
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - SA-P3-002
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P4-001
+  description: Similarity settings storage (backend)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P4-002
+  description: useSimilaritySettings hook
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - SA-P4-001
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P4-003
+  description: SimilaritySettings sub-tab component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SA-P4-002
+  estimated_effort: 3pt
+  priority: high
+- id: SA-P4-004
+  description: Register Similarity sub-tab in Settings page
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - SA-P4-003
+  estimated_effort: 0.5pt
+  priority: high
+- id: SA-P4-005
+  description: SimilarityBadge component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SA-P4-002
+  estimated_effort: 2pt
+  priority: high
+- id: SA-P4-006
+  description: SourceCard — badge integration with lazy loading
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SA-P4-005
+  estimated_effort: 2pt
+  priority: high
+- id: SA-P4-007
+  description: Badge batch query optimization
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - SA-P4-006
+  estimated_effort: 1.5pt
+  priority: medium
+- id: SA-P4-008
+  description: E2E test — marketplace badge
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - SA-P4-006
+  estimated_effort: 1pt
+  priority: high
 parallelization:
   batch_1:
-    - "SA-P3-001"
-    - "SA-P4-001"
+  - SA-P3-001
+  - SA-P4-001
   batch_2:
-    - "SA-P3-002"
-    - "SA-P4-002"
+  - SA-P3-002
+  - SA-P4-002
   batch_3:
-    - "SA-P3-003"
-    - "SA-P4-003"
-    - "SA-P4-005"
+  - SA-P3-003
+  - SA-P4-003
+  - SA-P4-005
   batch_4:
-    - "SA-P4-004"
-    - "SA-P4-006"
+  - SA-P4-004
+  - SA-P4-006
   batch_5:
-    - "SA-P4-007"
-    - "SA-P4-008"
+  - SA-P4-007
+  - SA-P4-008
   critical_path:
-    - "SA-P4-001"
-    - "SA-P4-002"
-    - "SA-P4-005"
-    - "SA-P4-006"
-    - "SA-P4-007"
-  estimated_total_time: "3-5 days"
-
-# Critical Blockers: For immediate visibility
+  - SA-P4-001
+  - SA-P4-002
+  - SA-P4-005
+  - SA-P4-006
+  - SA-P4-007
+  estimated_total_time: 3-5 days
 blockers: []
-
-# Success Criteria: Acceptance conditions for phase completion
 success_criteria:
-  - id: "SC-1"
-    description: "Similar tab visible in marketplace artifact detail panel"
-    status: "pending"
-  - id: "SC-2"
-    description: "SimilarityBadge renders with correct color and aria-label for each threshold range"
-    status: "pending"
-  - id: "SC-3"
-    description: "No badge rendered when score below floor threshold"
-    status: "pending"
-  - id: "SC-4"
-    description: "Threshold settings persist across page reload"
-    status: "pending"
-  - id: "SC-5"
-    description: "WCAG 2.1 AA contrast verified on all badge color variants"
-    status: "pending"
-  - id: "SC-6"
-    description: "Badge lazy-loads via IntersectionObserver (not on page render)"
-    status: "pending"
-  - id: "SC-7"
-    description: "No N+1 per-card API calls; viewport batch strategy in place"
-    status: "pending"
-  - id: "SC-8"
-    description: "Settings > Appearance > Similarity sub-tab renders and persists changes"
-    status: "pending"
-  - id: "SC-9"
-    description: "E2E test passes for marketplace Similar tab"
-    status: "pending"
-  - id: "SC-10"
-    description: "E2E test passes for marketplace badge"
-    status: "pending"
-  - id: "SC-11"
-    description: "task-completion-validator sign-off"
-    status: "pending"
-
-# Files Modified: What's being changed in this phase
+- id: SC-1
+  description: Similar tab visible in marketplace artifact detail panel
+  status: pending
+- id: SC-2
+  description: SimilarityBadge renders with correct color and aria-label for each
+    threshold range
+  status: pending
+- id: SC-3
+  description: No badge rendered when score below floor threshold
+  status: pending
+- id: SC-4
+  description: Threshold settings persist across page reload
+  status: pending
+- id: SC-5
+  description: WCAG 2.1 AA contrast verified on all badge color variants
+  status: pending
+- id: SC-6
+  description: Badge lazy-loads via IntersectionObserver (not on page render)
+  status: pending
+- id: SC-7
+  description: No N+1 per-card API calls; viewport batch strategy in place
+  status: pending
+- id: SC-8
+  description: Settings > Appearance > Similarity sub-tab renders and persists changes
+  status: pending
+- id: SC-9
+  description: E2E test passes for marketplace Similar tab
+  status: pending
+- id: SC-10
+  description: E2E test passes for marketplace badge
+  status: pending
+- id: SC-11
+  description: task-completion-validator sign-off
+  status: pending
 files_modified:
-  - "skillmeat/web/hooks/similarity.ts"
-  - "skillmeat/web/types/similarity.ts"
-  - "skillmeat/web/components/marketplace/similarity-badge.tsx"
-  - "skillmeat/web/components/marketplace/source-card.tsx"
-  - "skillmeat/web/app/settings/components/similarity-settings.tsx"
-  - "skillmeat/web/app/settings/page.tsx"
-  - "skillmeat/web/__tests__/marketplace/similarity-badge.test.tsx"
-  - "skillmeat/web/__tests__/e2e/marketplace-similar-tab.e2e.ts"
-  - "skillmeat/web/__tests__/e2e/marketplace-badge.e2e.ts"
-
+- skillmeat/web/hooks/similarity.ts
+- skillmeat/web/types/similarity.ts
+- skillmeat/web/components/marketplace/similarity-badge.tsx
+- skillmeat/web/components/marketplace/source-card.tsx
+- skillmeat/web/app/settings/components/similarity-settings.tsx
+- skillmeat/web/app/settings/page.tsx
+- skillmeat/web/__tests__/marketplace/similarity-badge.test.tsx
+- skillmeat/web/__tests__/e2e/marketplace-similar-tab.e2e.ts
+- skillmeat/web/__tests__/e2e/marketplace-badge.e2e.ts
+progress: 100
+updated: '2026-02-25'
 ---
 
 # similar-artifacts - Phase 3-4: Marketplace Tab + Similarity Badges & Settings

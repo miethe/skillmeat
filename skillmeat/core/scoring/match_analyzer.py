@@ -14,9 +14,21 @@ Example:
 
 import re
 from collections import Counter
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from skillmeat.core.artifact import ArtifactMetadata
+from skillmeat.core.similarity import ScoreBreakdown
+from skillmeat.core.scoring.text_similarity import bigram_similarity, bm25_description_similarity
+from skillmeat.models import ArtifactFingerprint
+
+# Optional OpenTelemetry integration — works whether or not otel is installed.
+try:
+    from opentelemetry import trace as _otel_trace
+
+    _tracer = _otel_trace.get_tracer(__name__)
+except ImportError:  # pragma: no cover
+    _otel_trace = None  # type: ignore[assignment]
+    _tracer = None  # type: ignore[assignment]
 
 
 # Field weights for scoring (must sum to 1.0)
@@ -171,6 +183,314 @@ class MatchAnalyzer:
         # Sort by score descending
         scored.sort(key=lambda x: x[2], reverse=True)
         return scored
+
+    def compare(
+        self,
+        artifact_a: ArtifactFingerprint,
+        artifact_b: ArtifactFingerprint,
+    ) -> ScoreBreakdown:
+        """Compare two artifacts and return a per-component score breakdown.
+
+        Computes four independent similarity dimensions and returns them in a
+        ``ScoreBreakdown``.  ``semantic_score`` is always ``None`` — that
+        component is owned by ``SemanticScorer`` and filled in downstream.
+
+        Score components
+        ----------------
+        keyword_score
+            Symmetric TF-IDF keyword similarity: both artifacts' combined text
+            (name + title + tags + description) is scored against the other's
+            fields using the existing ``_score_field`` pipeline.  The two
+            directional scores are averaged and normalised to [0, 1].
+
+        content_score
+            Hash-based content similarity.  Exact ``content_hash`` match → 1.0.
+            Otherwise a size-ratio proxy captures partial overlap:
+            ``min(size_a, size_b) / max(size_a, size_b)`` scaled by 0.5 as an
+            upper bound when hashes differ.
+
+        structure_score
+            Hash-based structural similarity.  Exact ``structure_hash`` → 1.0.
+            Otherwise the file-count ratio provides a structural approximation
+            (``min / max``), scaled by 0.6 as the upper bound.
+
+        metadata_score
+            Weighted combination of:
+            - Tag Jaccard similarity (30 %)
+            - Artifact-type match (15 %)
+            - Title bigram similarity via ``bigram_similarity`` (25 %)
+            - Description BM25 content similarity via ``bm25_description_similarity`` (25 %)
+            - Description length sanity check (5 %)
+
+        Args:
+            artifact_a: First artifact fingerprint.
+            artifact_b: Second artifact fingerprint.
+
+        Returns:
+            ``ScoreBreakdown`` with all fields populated except
+            ``semantic_score`` (which is ``None``).
+
+        Example:
+            >>> from skillmeat.models import ArtifactFingerprint
+            >>> from pathlib import Path
+            >>> a = ArtifactFingerprint(
+            ...     artifact_path=Path("/a"), artifact_name="canvas",
+            ...     artifact_type="skill", content_hash="abc", metadata_hash="x",
+            ...     structure_hash="s1", title="Canvas Design", tags=["design"],
+            ...     file_count=3, total_size=1024,
+            ... )
+            >>> b = ArtifactFingerprint(
+            ...     artifact_path=Path("/b"), artifact_name="canvas-v2",
+            ...     artifact_type="skill", content_hash="abc", metadata_hash="x",
+            ...     structure_hash="s1", title="Canvas Design V2", tags=["design"],
+            ...     file_count=3, total_size=1024,
+            ... )
+            >>> analyzer = MatchAnalyzer()
+            >>> breakdown = analyzer.compare(a, b)
+            >>> assert 0.0 <= breakdown.keyword_score <= 1.0
+            >>> assert breakdown.content_score == 1.0  # identical content hash
+            >>> assert breakdown.semantic_score is None
+        """
+        from skillmeat.observability.tracing import trace_operation
+
+        artifact_a_id = artifact_a.artifact_name
+        artifact_b_id = artifact_b.artifact_name
+
+        # OTel span (no-op when opentelemetry is not installed).
+        otel_span = (
+            _tracer.start_span("match_analyzer.compare")
+            if _tracer is not None
+            else None
+        )
+        if otel_span is not None:
+            otel_span.set_attribute("artifact_a_id", artifact_a_id)
+            otel_span.set_attribute("artifact_b_id", artifact_b_id)
+
+        with trace_operation(
+            "match_analyzer.compare",
+            artifact_a_id=artifact_a_id,
+            artifact_b_id=artifact_b_id,
+        ):
+            result = ScoreBreakdown(
+                keyword_score=self._compute_keyword_score(artifact_a, artifact_b),
+                content_score=self._compute_content_score(artifact_a, artifact_b),
+                structure_score=self._compute_structure_score(artifact_a, artifact_b),
+                metadata_score=self._compute_metadata_score(artifact_a, artifact_b),
+                semantic_score=None,
+            )
+
+        if otel_span is not None:
+            otel_span.end()
+
+        return result
+
+    # ------------------------------------------------------------------
+    # Private helpers for compare()
+    # ------------------------------------------------------------------
+
+    def _artifact_combined_text(self, artifact: ArtifactFingerprint) -> str:
+        """Return all text fields of a fingerprint joined as a single string.
+
+        Args:
+            artifact: Artifact fingerprint whose text fields are combined.
+
+        Returns:
+            Space-joined string of name, title, tags, and description.
+        """
+        parts = [artifact.artifact_name]
+        if artifact.title:
+            parts.append(artifact.title)
+        if artifact.tags:
+            parts.extend(artifact.tags)
+        if artifact.description:
+            parts.append(artifact.description)
+        return " ".join(parts)
+
+    def _compute_keyword_score(
+        self,
+        artifact_a: ArtifactFingerprint,
+        artifact_b: ArtifactFingerprint,
+    ) -> float:
+        """Compute symmetric TF-IDF keyword similarity in [0, 1].
+
+        Each artifact's combined text is used as the "query" against the
+        other's individual fields.  The raw field-weighted score from
+        ``score_artifact`` lives in [0, 100]; dividing by 100 and averaging
+        the two directional scores yields a symmetric score in [0, 1].
+
+        Args:
+            artifact_a: First artifact fingerprint.
+            artifact_b: Second artifact fingerprint.
+
+        Returns:
+            Keyword similarity score from 0.0 to 1.0.
+        """
+        # Build lightweight ArtifactMetadata proxies from fingerprints so we
+        # can reuse the existing score_artifact() pipeline without duplication.
+        meta_a = ArtifactMetadata(
+            title=artifact_a.title or "",
+            description=artifact_a.description or "",
+            tags=list(artifact_a.tags),
+        )
+        meta_b = ArtifactMetadata(
+            title=artifact_b.title or "",
+            description=artifact_b.description or "",
+            tags=list(artifact_b.tags),
+        )
+
+        query_from_a = self._artifact_combined_text(artifact_a)
+        query_from_b = self._artifact_combined_text(artifact_b)
+
+        # Score A's text against B's fields, and B's text against A's fields.
+        score_a_vs_b = self.score_artifact(query_from_a, meta_b, artifact_b.artifact_name)
+        score_b_vs_a = self.score_artifact(query_from_b, meta_a, artifact_a.artifact_name)
+
+        # Average directional scores; score_artifact returns [0, 100].
+        avg_raw = (score_a_vs_b + score_b_vs_a) / 2.0
+        normalized = min(1.0, max(0.0, avg_raw / 100.0))
+
+        # Apply token overlap dampening: blend 60% field-weighted score + 40%
+        # Jaccard overlap to prevent saturation from a few shared common words.
+        tokens_a = set(self._tokenize(query_from_a))
+        tokens_b = set(self._tokenize(query_from_b))
+        if tokens_a and tokens_b:
+            jaccard = len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
+            return normalized * 0.6 + jaccard * 0.4
+
+        return normalized
+
+    def _compute_content_score(
+        self,
+        artifact_a: ArtifactFingerprint,
+        artifact_b: ArtifactFingerprint,
+    ) -> float:
+        """Compute content similarity in [0, 1] using hash + size proxy.
+
+        Args:
+            artifact_a: First artifact fingerprint.
+            artifact_b: Second artifact fingerprint.
+
+        Returns:
+            Content similarity score from 0.0 to 1.0.
+        """
+        # Both hashes present and identical → true duplicate.
+        if artifact_a.content_hash and artifact_b.content_hash and artifact_a.content_hash == artifact_b.content_hash:
+            return 1.0
+
+        # One or both hashes missing → can't determine content similarity from hash.
+        if not artifact_a.content_hash or not artifact_b.content_hash:
+            # Use size ratio as weak proxy, capped at 0.3.
+            if artifact_a.total_size > 0 and artifact_b.total_size > 0:
+                size_ratio = min(artifact_a.total_size, artifact_b.total_size) / max(
+                    artifact_a.total_size, artifact_b.total_size
+                )
+                return min(0.3, size_ratio * 0.3)
+            return 0.0  # No information at all.
+
+        # Hashes differ → size-ratio proxy capped at 0.5.
+        if artifact_a.total_size > 0 and artifact_b.total_size > 0:
+            size_ratio = min(artifact_a.total_size, artifact_b.total_size) / max(
+                artifact_a.total_size, artifact_b.total_size
+            )
+            return min(0.5, size_ratio * 0.5)
+
+        return 0.0
+
+    def _compute_structure_score(
+        self,
+        artifact_a: ArtifactFingerprint,
+        artifact_b: ArtifactFingerprint,
+    ) -> float:
+        """Compute structural similarity in [0, 1] using hash + file-count proxy.
+
+        Args:
+            artifact_a: First artifact fingerprint.
+            artifact_b: Second artifact fingerprint.
+
+        Returns:
+            Structure similarity score from 0.0 to 1.0.
+        """
+        # Both hashes present and identical → identical structure.
+        if artifact_a.structure_hash and artifact_b.structure_hash and artifact_a.structure_hash == artifact_b.structure_hash:
+            return 1.0
+
+        # One or both hashes missing → can't determine from hash.
+        if not artifact_a.structure_hash or not artifact_b.structure_hash:
+            if artifact_a.file_count > 0 and artifact_b.file_count > 0:
+                count_ratio = min(artifact_a.file_count, artifact_b.file_count) / max(
+                    artifact_a.file_count, artifact_b.file_count
+                )
+                return min(0.3, count_ratio * 0.3)
+            return 0.0
+
+        # Hashes differ → file-count proxy capped at 0.6.
+        if artifact_a.file_count > 0 and artifact_b.file_count > 0:
+            count_ratio = min(artifact_a.file_count, artifact_b.file_count) / max(
+                artifact_a.file_count, artifact_b.file_count
+            )
+            return min(0.6, count_ratio * 0.6)
+
+        return 0.0
+
+    def _compute_metadata_score(
+        self,
+        artifact_a: ArtifactFingerprint,
+        artifact_b: ArtifactFingerprint,
+    ) -> float:
+        """Compute metadata similarity in [0, 1].
+
+        Weighted combination:
+        - Tag Jaccard similarity                30 %
+        - Artifact-type match                   15 %
+        - Title bigram similarity               25 %
+        - Description BM25 content similarity   25 %
+        - Description length sanity check        5 %
+
+        Args:
+            artifact_a: First artifact fingerprint.
+            artifact_b: Second artifact fingerprint.
+
+        Returns:
+            Metadata similarity score from 0.0 to 1.0.
+        """
+        score = 0.0
+
+        # Tag Jaccard (30 %)
+        tags_a = set(t.lower() for t in artifact_a.tags) if artifact_a.tags else set()
+        tags_b = set(t.lower() for t in artifact_b.tags) if artifact_b.tags else set()
+        if tags_a or tags_b:
+            union = tags_a | tags_b
+            jaccard = len(tags_a & tags_b) / len(union) if union else 0.0
+            score += jaccard * 0.30
+        # If both are empty, contribute 0 — no information either way.
+
+        # Artifact-type match (15 %)
+        if artifact_a.artifact_type and artifact_b.artifact_type:
+            if artifact_a.artifact_type.lower() == artifact_b.artifact_type.lower():
+                score += 0.15
+
+        # Title bigram similarity (25 %) — robust to naming convention differences.
+        name_a = artifact_a.title or artifact_a.artifact_name or ""
+        name_b = artifact_b.title or artifact_b.artifact_name or ""
+        if name_a or name_b:
+            score += bigram_similarity(name_a, name_b) * 0.25
+
+        # Description BM25 content similarity (25 %) — symmetric average.
+        desc_a = artifact_a.description or ""
+        desc_b = artifact_b.description or ""
+        if desc_a and desc_b:
+            sim_a_to_b = bm25_description_similarity(desc_a, desc_b)
+            sim_b_to_a = bm25_description_similarity(desc_b, desc_a)
+            score += ((sim_a_to_b + sim_b_to_a) / 2.0) * 0.25
+
+        # Description length sanity check (5 %) — penalises very disparate sizes.
+        len_a = len(desc_a)
+        len_b = len(desc_b)
+        if len_a > 0 and len_b > 0:
+            desc_ratio = min(len_a, len_b) / max(len_a, len_b)
+            score += desc_ratio * 0.05
+
+        return min(1.0, max(0.0, score))
 
     def _tokenize(self, text: str) -> List[str]:
         """Tokenize text into normalized terms.

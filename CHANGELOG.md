@@ -9,6 +9,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Similarity Scoring Overhaul (2026-02-26)
+
+**Phase 1: Scoring Algorithm Fix**
+- Replaced broken string-length-ratio description scoring with character bigram Jaccard and BM25 TF-IDF
+- Rebalanced composite weights: keyword 25%, metadata 30%, content 20%, structure 15%, semantic 10%
+- Added `text_score` field to API similarity breakdown responses
+
+**Phase 2: Pre-computation Cache**
+- New `SimilarityCache` table and `SimilarityCacheManager` for pre-computed similarity scores
+- SQLite FTS5 pre-filtering reduces candidates before full scoring (sub-200ms cached responses)
+- Fingerprint columns on `CollectionArtifact` for content/structure hash persistence
+- Automatic cache invalidation on artifact sync/import
+- `X-Cache` and `X-Cache-Age` response headers on similarity API responses
+- Cache age indicator in web UI Similar Artifacts tab
+
+**Phase 3: Optional Semantic Embeddings**
+- `pip install skillmeat[semantic]` enables sentence-transformer embedding-based scoring
+- `ArtifactEmbedding` ORM model for persistent embedding storage
+- Cosine similarity scoring with `all-MiniLM-L6-v2` embeddings (384 dimensions)
+- Semantic score display and embedding availability indicator in web UI
+- Graceful fallback: system works identically without `[semantic]` extras installed
+
+### Changed
+
+- Artifact fingerprints now computed at sync/import time for cache pre-population
+- Similar artifacts API endpoint is now cache-first with invalidation on mutations
+- Similarity response schema includes granular score breakdown (text, keyword, structure, semantic)
+- `HaikuEmbedder` renamed to `AnthropicEmbedder` (Anthropic does not expose an embedding API)
+
+### Fixed
+
+- Similarity matching no longer uses string-length ratio for descriptions (was nearly random)
+- Metadata scoring no longer penalizes longer descriptions
+- `_compute_content_score()` now returns >0 for artifacts with matching content hashes
+- Semantic scorer no longer returns `None` placeholder — uses real embeddings or clean fallback
+
+---
+
+#### Similar Artifacts — Detection, Comparison & Consolidation (2026-02-25)
+
+**Core Similarity Detection Engine**
+- New similarity detection service with semantic text matching and duplicate pair analysis
+- Backend DuplicatePair model and database migration for tracking duplicate artifact relationships
+- Similarity scoring using MatchAnalyzer with configurable thresholds
+- Semantic similarity fallback for robustness when direct matching unavailable
+- OpenAPI specification and integration test suite for similarity API
+
+**Similar Artifacts Tab — Collection & Marketplace**
+- New "Similar" tab in artifact detail modal (collection and marketplace contexts) showing detected duplicates and similar items
+- Tab displays artifact name, type, similarity score, and rich preview card with navigation
+- Lazy-loaded similarity results with error boundary and loading/empty states
+- Frontend React hook (`useSimilarArtifacts`) with React Query integration and error handling
+- E2E Playwright tests for Similar tab UX (loading, results display, navigation)
+
+**Similarity Settings — Marketplace Customization**
+- New Similarity Settings sub-tab in marketplace modal for configuring similarity detection behavior
+- Toggles to enable/disable similarity detection and auto-complete during browsing
+- Persistent settings storage via API and frontend state management
+- Similarity badges in marketplace SourceCard with lazy loading and batch query optimization
+- Badge displays similarity score and click to view similar items
+- E2E marketplace tests for badge rendering and similarity workflow
+
+**Collection Consolidation View & API**
+- New consolidation page (`/consolidate`) for identifying and merging duplicate artifacts
+- Cluster detection groups similar artifacts by semantic similarity
+- ConsolidationClusterDetail component with preview cards, metadata comparison, and action buttons
+- RESTful consolidation API endpoints for listing clusters and proposing merges
+- Batch merge and replace operations with atomic transaction support
+- Auto-snapshot gating: consolidation actions automatically snapshot artifacts before merge/replace
+
+**CLI Integration**
+- New `similar` command showing similar artifacts for a given item with score and type filtering
+- New `consolidate` command with interactive wizard for reviewing and merging similar artifact clusters
+- Non-interactive mode (`--yes`, `--dry-run`) for automation and CI workflows
+- CLI unit and integration tests for both commands
+- Ignored pair management: mark artifact pairs as "not duplicates" to exclude from consolidation recommendations
+
+**Testing & Quality**
+- Comprehensive Playwright E2E tests for consolidation merge/replace with snapshot verification
+- Backend integration tests for consolidation API (cluster grouping, merge operations, ignored pairs)
+- CLI tests covering interactive mode, non-interactive mode, and error handling
+- Type definitions and TypeScript support across all frontend components
+
 #### Site-Wide Color & Icon Management (2026-02-25)
 
 **Custom Colors API**

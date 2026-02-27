@@ -82,6 +82,9 @@ dev = [
     "mypy>=0.950",
     "httpx>=0.25.0",
 ]
+semantic = [
+    "sentence-transformers>=2.7.0",
+]
 
 [project.scripts]
 skillmeat = "skillmeat.cli:main"

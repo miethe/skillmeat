@@ -2,290 +2,299 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "similar-artifacts"
-feature_slug: "similar-artifacts"
-prd_ref: "docs/project_plans/PRDs/features/similar-artifacts-v1.md"
-plan_ref: "docs/project_plans/implementation_plans/features/similar-artifacts-v1.md"
+prd: similar-artifacts
+feature_slug: similar-artifacts
+prd_ref: docs/project_plans/PRDs/features/similar-artifacts-v1.md
+plan_ref: docs/project_plans/implementation_plans/features/similar-artifacts-v1.md
 phase: 5
 phase_6_included: true
-title: "Phase 5-6: Collection Consolidation View + CLI Integration"
-status: "planning"
-started: "2026-02-25"
+title: 'Phase 5-6: Collection Consolidation View + CLI Integration'
+status: completed
+started: '2026-02-25'
 completed: null
 commit_refs: []
 pr_refs: []
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 18
-completed_tasks: 0
+completed_tasks: 18
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer", "ui-engineer-enhanced"]
-contributors: ["backend-architect", "frontend-developer"]
-
+owners:
+- python-backend-engineer
+- ui-engineer-enhanced
+contributors:
+- backend-architect
+- frontend-developer
 tasks:
-  # Phase 5: Collection Consolidation View
-  - id: "SA-P5-001"
-    description: "SimilarityService — cluster grouping"
-    status: "pending"
-    assigned_to: ["backend-architect", "python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2pts"
-    priority: "high"
-
-  - id: "SA-P5-002"
-    description: "Repository — ignored pair methods"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "1pt"
-    priority: "high"
-
-  - id: "SA-P5-003"
-    description: "Consolidation clusters API endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SA-P5-001"]
-    estimated_effort: "2pts"
-    priority: "high"
-
-  - id: "SA-P5-004"
-    description: "Consolidation skip action endpoint"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SA-P5-002"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-  - id: "SA-P5-005"
-    description: "useConsolidationClusters hook"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["SA-P5-003", "SA-P5-004"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-  - id: "SA-P5-006"
-    description: "Consolidation page route"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["SA-P5-005"]
-    estimated_effort: "0.5pt"
-    priority: "medium"
-
-  - id: "SA-P5-007"
-    description: "ConsolidationClusterList component"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SA-P5-005"]
-    estimated_effort: "2pts"
-    priority: "high"
-
-  - id: "SA-P5-008"
-    description: "ConsolidationClusterDetail component"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SA-P5-007"]
-    estimated_effort: "3pts"
-    priority: "critical"
-
-  - id: "SA-P5-009"
-    description: "Auto-snapshot gate for merge/replace"
-    status: "pending"
-    assigned_to: ["python-backend-engineer", "backend-architect"]
-    dependencies: ["SA-P5-008"]
-    estimated_effort: "2pts"
-    priority: "critical"
-
-  - id: "SA-P5-010"
-    description: "Un-ignore management UI"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SA-P5-007"]
-    estimated_effort: "1pt"
-    priority: "medium"
-
-  - id: "SA-P5-011"
-    description: "Collection page toolbar button"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["SA-P5-006"]
-    estimated_effort: "0.5pt"
-    priority: "medium"
-
-  - id: "SA-P5-012"
-    description: "E2E test — consolidation merge"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["SA-P5-009"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-  - id: "SA-P5-013"
-    description: "Integration tests — consolidation API"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SA-P5-003", "SA-P5-004"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-  # Phase 6: CLI Integration
-  - id: "SA-P6-001"
-    description: "skillmeat similar CLI command"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "2pts"
-    priority: "high"
-
-  - id: "SA-P6-002"
-    description: "skillmeat consolidate — interactive wizard"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SA-P5-001"]
-    estimated_effort: "2pts"
-    priority: "high"
-
-  - id: "SA-P6-003"
-    description: "skillmeat consolidate — non-interactive mode"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SA-P6-002"]
-    estimated_effort: "1pt"
-    priority: "medium"
-
-  - id: "SA-P6-004"
-    description: "Unit tests — CLI commands"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SA-P6-001", "SA-P6-002", "SA-P6-003"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-  - id: "SA-P6-005"
-    description: "Manual smoke test — help strings"
-    status: "pending"
-    assigned_to: ["orchestrator"]
-    dependencies: ["SA-P6-001", "SA-P6-002"]
-    estimated_effort: "0pts"
-    priority: "medium"
-
+- id: SA-P5-001
+  description: SimilarityService — cluster grouping
+  status: completed
+  assigned_to:
+  - backend-architect
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2pts
+  priority: high
+- id: SA-P5-002
+  description: Repository — ignored pair methods
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P5-003
+  description: Consolidation clusters API endpoint
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SA-P5-001
+  estimated_effort: 2pts
+  priority: high
+- id: SA-P5-004
+  description: Consolidation skip action endpoint
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SA-P5-002
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P5-005
+  description: useConsolidationClusters hook
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - SA-P5-003
+  - SA-P5-004
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P5-006
+  description: Consolidation page route
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - SA-P5-005
+  estimated_effort: 0.5pt
+  priority: medium
+- id: SA-P5-007
+  description: ConsolidationClusterList component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SA-P5-005
+  estimated_effort: 2pts
+  priority: high
+- id: SA-P5-008
+  description: ConsolidationClusterDetail component
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SA-P5-007
+  estimated_effort: 3pts
+  priority: critical
+- id: SA-P5-009
+  description: Auto-snapshot gate for merge/replace
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  - backend-architect
+  dependencies:
+  - SA-P5-008
+  estimated_effort: 2pts
+  priority: critical
+- id: SA-P5-010
+  description: Un-ignore management UI
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SA-P5-007
+  estimated_effort: 1pt
+  priority: medium
+- id: SA-P5-011
+  description: Collection page toolbar button
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - SA-P5-006
+  estimated_effort: 0.5pt
+  priority: medium
+- id: SA-P5-012
+  description: E2E test — consolidation merge
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - SA-P5-009
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P5-013
+  description: Integration tests — consolidation API
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SA-P5-003
+  - SA-P5-004
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P6-001
+  description: skillmeat similar CLI command
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 2pts
+  priority: high
+- id: SA-P6-002
+  description: skillmeat consolidate — interactive wizard
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SA-P5-001
+  estimated_effort: 2pts
+  priority: high
+- id: SA-P6-003
+  description: skillmeat consolidate — non-interactive mode
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SA-P6-002
+  estimated_effort: 1pt
+  priority: medium
+- id: SA-P6-004
+  description: Unit tests — CLI commands
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SA-P6-001
+  - SA-P6-002
+  - SA-P6-003
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P6-005
+  description: Manual smoke test — help strings
+  status: completed
+  assigned_to:
+  - orchestrator
+  dependencies:
+  - SA-P6-001
+  - SA-P6-002
+  estimated_effort: 0pts
+  priority: medium
 parallelization:
   batch_1:
-    - "SA-P5-001"
-    - "SA-P5-002"
-    - "SA-P6-001"
+  - SA-P5-001
+  - SA-P5-002
+  - SA-P6-001
   batch_2:
-    - "SA-P5-003"
-    - "SA-P5-004"
-    - "SA-P6-002"
+  - SA-P5-003
+  - SA-P5-004
+  - SA-P6-002
   batch_3:
-    - "SA-P5-005"
-    - "SA-P5-013"
-    - "SA-P6-003"
+  - SA-P5-005
+  - SA-P5-013
+  - SA-P6-003
   batch_4:
-    - "SA-P5-006"
-    - "SA-P5-007"
-    - "SA-P6-004"
+  - SA-P5-006
+  - SA-P5-007
+  - SA-P6-004
   batch_5:
-    - "SA-P5-008"
-    - "SA-P5-010"
-    - "SA-P5-011"
-    - "SA-P6-005"
+  - SA-P5-008
+  - SA-P5-010
+  - SA-P5-011
+  - SA-P6-005
   batch_6:
-    - "SA-P5-009"
+  - SA-P5-009
   batch_7:
-    - "SA-P5-012"
+  - SA-P5-012
   critical_path:
-    - "SA-P5-001"
-    - "SA-P5-003"
-    - "SA-P5-005"
-    - "SA-P5-007"
-    - "SA-P5-008"
-    - "SA-P5-009"
-    - "SA-P5-012"
-  estimated_total_time: "6-8 days"
-
+  - SA-P5-001
+  - SA-P5-003
+  - SA-P5-005
+  - SA-P5-007
+  - SA-P5-008
+  - SA-P5-009
+  - SA-P5-012
+  estimated_total_time: 6-8 days
 blockers: []
-
 success_criteria:
-  - id: "SC-P5-1"
-    description: "GET /api/v1/artifacts/consolidation/clusters returns correct paginated clusters"
-    status: "pending"
-
-  - id: "SC-P5-2"
-    description: "Ignored pairs excluded from cluster list by default; toggle reveals them"
-    status: "pending"
-
-  - id: "SC-P5-3"
-    description: "Merge and Replace actions abort if auto-snapshot fails (never destructive without snapshot)"
-    status: "pending"
-
-  - id: "SC-P5-4"
-    description: "Skip marks pair ignored; un-ignore restores to active list"
-    status: "pending"
-
-  - id: "SC-P5-5"
-    description: "Consolidation page accessible from Collection page toolbar"
-    status: "pending"
-
-  - id: "SC-P5-6"
-    description: "E2E merge test passes with auto-snapshot verification"
-    status: "pending"
-
-  - id: "SC-P5-7"
-    description: "Integration tests for cluster and ignore/unignore endpoints pass"
-    status: "pending"
-
-  - id: "SC-P5-8"
-    description: "WCAG 2.1 AA contrast on all cluster table and detail view elements"
-    status: "pending"
-
-  - id: "SC-P6-1"
-    description: "skillmeat similar <artifact> exits 0 and renders Rich table"
-    status: "pending"
-
-  - id: "SC-P6-2"
-    description: "skillmeat similar --help and skillmeat consolidate --help render all options"
-    status: "pending"
-
-  - id: "SC-P6-3"
-    description: "skillmeat consolidate --non-interactive exits 0 with valid JSON"
-    status: "pending"
-
-  - id: "SC-P6-4"
-    description: "Non-TTY auto-detected; falls back to non-interactive with stderr warning"
-    status: "pending"
-
-  - id: "SC-P6-5"
-    description: "Auto-snapshot fires before Merge/Replace in interactive wizard"
-    status: "pending"
-
-  - id: "SC-P6-6"
-    description: "Unit tests pass using Click's CliRunner with mocked SimilarityService"
-    status: "pending"
-
-  - id: "SC-P6-7"
-    description: "task-completion-validator sign-off"
-    status: "pending"
-
+- id: SC-P5-1
+  description: GET /api/v1/artifacts/consolidation/clusters returns correct paginated
+    clusters
+  status: pending
+- id: SC-P5-2
+  description: Ignored pairs excluded from cluster list by default; toggle reveals
+    them
+  status: pending
+- id: SC-P5-3
+  description: Merge and Replace actions abort if auto-snapshot fails (never destructive
+    without snapshot)
+  status: pending
+- id: SC-P5-4
+  description: Skip marks pair ignored; un-ignore restores to active list
+  status: pending
+- id: SC-P5-5
+  description: Consolidation page accessible from Collection page toolbar
+  status: pending
+- id: SC-P5-6
+  description: E2E merge test passes with auto-snapshot verification
+  status: pending
+- id: SC-P5-7
+  description: Integration tests for cluster and ignore/unignore endpoints pass
+  status: pending
+- id: SC-P5-8
+  description: WCAG 2.1 AA contrast on all cluster table and detail view elements
+  status: pending
+- id: SC-P6-1
+  description: skillmeat similar <artifact> exits 0 and renders Rich table
+  status: pending
+- id: SC-P6-2
+  description: skillmeat similar --help and skillmeat consolidate --help render all
+    options
+  status: pending
+- id: SC-P6-3
+  description: skillmeat consolidate --non-interactive exits 0 with valid JSON
+  status: pending
+- id: SC-P6-4
+  description: Non-TTY auto-detected; falls back to non-interactive with stderr warning
+  status: pending
+- id: SC-P6-5
+  description: Auto-snapshot fires before Merge/Replace in interactive wizard
+  status: pending
+- id: SC-P6-6
+  description: Unit tests pass using Click's CliRunner with mocked SimilarityService
+  status: pending
+- id: SC-P6-7
+  description: task-completion-validator sign-off
+  status: pending
 files_modified:
-  - "skillmeat/core/similarity.py"
-  - "skillmeat/cache/repositories.py"
-  - "skillmeat/api/routers/artifacts.py"
-  - "skillmeat/api/schemas/artifacts.py"
-  - "skillmeat/api/openapi.json"
-  - "skillmeat/web/hooks/similarity.ts"
-  - "skillmeat/web/app/collection/consolidate/page.tsx"
-  - "skillmeat/web/components/consolidation/consolidation-cluster-list.tsx"
-  - "skillmeat/web/components/consolidation/consolidation-cluster-detail.tsx"
-  - "skillmeat/cli.py"
-  - "tests/test_consolidation_api.py"
-  - "tests/test_cli_similar.py"
+- skillmeat/core/similarity.py
+- skillmeat/cache/repositories.py
+- skillmeat/api/routers/artifacts.py
+- skillmeat/api/schemas/artifacts.py
+- skillmeat/api/openapi.json
+- skillmeat/web/hooks/similarity.ts
+- skillmeat/web/app/collection/consolidate/page.tsx
+- skillmeat/web/components/consolidation/consolidation-cluster-list.tsx
+- skillmeat/web/components/consolidation/consolidation-cluster-detail.tsx
+- skillmeat/cli.py
+- tests/test_consolidation_api.py
+- tests/test_cli_similar.py
+progress: 100
+updated: '2026-02-25'
 ---
 
 # Similar Artifacts - Phase 5-6: Collection Consolidation View + CLI Integration

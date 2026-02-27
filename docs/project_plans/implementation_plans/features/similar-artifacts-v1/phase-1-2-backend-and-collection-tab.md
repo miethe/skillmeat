@@ -1,38 +1,37 @@
 ---
-title: "Similar Artifacts — Phase 1–2: Core Similarity Engine + Collection Tab"
+title: 'Similar Artifacts — Phase 1–2: Core Similarity Engine + Collection Tab'
 schema_version: 2
 doc_type: phase_plan
-status: draft
+status: inferred_complete
 created: 2026-02-25
 updated: 2026-02-25
 feature_slug: similar-artifacts
 feature_version: v1
 phase: 1
-phase_title: "Core Similarity Engine + Collection Tab"
+phase_title: Core Similarity Engine + Collection Tab
 prd_ref: docs/project_plans/PRDs/features/similar-artifacts-v1.md
 plan_ref: docs/project_plans/implementation_plans/features/similar-artifacts-v1.md
 entry_criteria:
-  - "PRD approved"
-  - "Branch feat/similar-artifacts created from main"
+- PRD approved
+- Branch feat/similar-artifacts created from main
 exit_criteria:
-  - "All Phase 1 and Phase 2 tasks marked completed"
-  - "SimilarityService unit tests pass at ≥80% coverage"
-  - "GET /api/v1/artifacts/{id}/similar returns correct DTO list with score breakdown"
-  - "Similar tab renders in ArtifactDetailsModal on known-similar artifact pair"
-  - "task-completion-validator sign-off"
+- All Phase 1 and Phase 2 tasks marked completed
+- SimilarityService unit tests pass at ≥80% coverage
+- GET /api/v1/artifacts/{id}/similar returns correct DTO list with score breakdown
+- Similar tab renders in ArtifactDetailsModal on known-similar artifact pair
+- task-completion-validator sign-off
 priority: medium
 risk_level: medium
 category: product-planning
 tags:
-  - phase-plan
-  - backend
-  - service-layer
-  - api-layer
-  - database
-  - frontend
-  - similar-artifacts
+- phase-plan
+- backend
+- service-layer
+- api-layer
+- database
+- frontend
+- similar-artifacts
 ---
-
 # Phase 1–2: Core Similarity Engine + Collection Tab
 
 **Parent Plan**: [similar-artifacts-v1.md](../similar-artifacts-v1.md)

@@ -1,9 +1,9 @@
 """Demo of semantic scoring with embeddings.
 
-This example demonstrates how to use the SemanticScorer with HaikuEmbedder
+This example demonstrates how to use the SemanticScorer with SentenceTransformerEmbedder
 to compute semantic similarity between queries and artifacts.
 
-Note: This requires ANTHROPIC_API_KEY environment variable to be set.
+Note: This requires the sentence-transformers package to be installed.
       Without it, the scorer will gracefully degrade and return None,
       allowing fallback to keyword-based matching.
 
@@ -15,7 +15,7 @@ import asyncio
 import os
 
 from skillmeat.core.artifact import ArtifactMetadata
-from skillmeat.core.scoring import HaikuEmbedder, SemanticScorer
+from skillmeat.core.scoring import SentenceTransformerEmbedder, SemanticScorer
 
 
 async def main():
@@ -32,7 +32,7 @@ async def main():
         print("This allows graceful fallback to keyword matching.\n")
 
     # Initialize embedder and scorer
-    embedder = HaikuEmbedder()
+    embedder = SentenceTransformerEmbedder()
     scorer = SemanticScorer(embedder)
 
     print(f"Embedder available: {embedder.is_available()}")
@@ -97,7 +97,9 @@ async def main():
     # Demonstrate graceful degradation
     print("\nGraceful Degradation Test:")
     print("-" * 60)
-    unavailable_embedder = HaikuEmbedder(api_key=None)  # Force unavailable
+    # AnthropicEmbedder always returns is_available=False (no Anthropic embedding API)
+    from skillmeat.core.scoring import AnthropicEmbedder
+    unavailable_embedder = AnthropicEmbedder()  # Always unavailable
     unavailable_scorer = SemanticScorer(unavailable_embedder)
 
     score = await unavailable_scorer.score_artifact(query, artifacts[0])

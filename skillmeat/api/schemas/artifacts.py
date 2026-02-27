@@ -1391,3 +1391,201 @@ class ArtifactTagsUpdate(BaseModel):
                 "tags": ["productivity", "ai_tools", "automation"],
             }
         }
+
+
+class SimilarityBreakdownDTO(BaseModel):
+    """Score breakdown for a similarity match."""
+
+    content_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Content similarity score"
+    )
+    structure_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Structure similarity score"
+    )
+    metadata_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Metadata similarity score"
+    )
+    keyword_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Keyword/TF-IDF similarity score"
+    )
+    semantic_score: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Semantic similarity score (None if unavailable)",
+    )
+    text_score: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Combined text similarity score from character bigram name similarity "
+            "and BM25-style description matching (None if text scoring is unavailable)"
+        ),
+    )
+
+
+class SimilarArtifactDTO(BaseModel):
+    """A similar artifact with similarity score and breakdown."""
+
+    artifact_id: str = Field(
+        ..., description="Unique identifier of the similar artifact"
+    )
+    name: str = Field(..., description="Display name of the similar artifact")
+    artifact_type: str = Field(
+        ..., description="Type of the artifact (skill, command, etc.)"
+    )
+    source: Optional[str] = Field(
+        None, description="Source repository or path"
+    )
+    description: Optional[str] = Field(
+        None, description="Description of the similar artifact"
+    )
+    tags: List[str] = Field(
+        default_factory=list, description="Tags associated with the similar artifact"
+    )
+    composite_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Overall similarity score"
+    )
+    match_type: str = Field(
+        ...,
+        description="Match classification: exact, near_duplicate, similar, related",
+    )
+    breakdown: SimilarityBreakdownDTO = Field(
+        ..., description="Individual score components"
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class SimilarArtifactsResponse(BaseModel):
+    """Response for the GET /api/v1/artifacts/{id}/similar endpoint."""
+
+    artifact_id: str = Field(
+        ..., description="Canonical identifier of the source artifact"
+    )
+    items: List[SimilarArtifactDTO] = Field(
+        ..., description="Similar artifacts ordered by composite score descending"
+    )
+    total: int = Field(..., description="Total number of similar artifacts returned")
+
+
+class ArtifactSummaryDTO(BaseModel):
+    """Minimal artifact summary used inside a consolidation cluster."""
+
+    artifact_id: str = Field(
+        ..., description="Artifact UUID (hex string) identifying this artifact"
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class SimilarityClusterDTO(BaseModel):
+    """A group of similar artifacts identified for potential consolidation.
+
+    Produced by ``GET /api/v1/artifacts/consolidation/clusters``.
+    Each cluster is derived from transitive union-find grouping of
+    ``DuplicatePair`` records whose score exceeds ``min_score``.
+    """
+
+    artifacts: List[str] = Field(
+        ...,
+        description=(
+            "List of artifact UUIDs (hex strings) that belong to this cluster, "
+            "sorted deterministically."
+        ),
+    )
+    max_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Highest pairwise similarity score in the cluster"
+    )
+    artifact_type: str = Field(
+        ..., description="Dominant artifact type among cluster members (e.g. 'skill')"
+    )
+    pair_count: int = Field(
+        ..., ge=0, description="Number of qualifying similarity pairs within this cluster"
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class ConsolidationClustersResponse(BaseModel):
+    """Response for the GET /api/v1/artifacts/consolidation/clusters endpoint."""
+
+    clusters: List[SimilarityClusterDTO] = Field(
+        ..., description="Consolidation clusters ordered by max_score descending"
+    )
+    next_cursor: Optional[str] = Field(
+        None,
+        description=(
+            "Opaque cursor for the next page of results. ``null`` when no further "
+            "pages are available."
+        ),
+    )
+
+
+class ConsolidationActionRequest(BaseModel):
+    """Request body for consolidation merge/replace cluster actions.
+
+    Used by ``POST /api/v1/artifacts/consolidation/clusters/{cluster_id}/merge``
+    and ``POST /api/v1/artifacts/consolidation/clusters/{cluster_id}/replace``.
+    """
+
+    primary_artifact_uuid: str = Field(
+        ...,
+        description=(
+            "UUID (hex string) of the artifact to treat as the authoritative primary "
+            "during the consolidation action. All other cluster members are secondaries."
+        ),
+    )
+    collection_name: Optional[str] = Field(
+        None,
+        description=(
+            "Name of the collection to operate on. Uses the active collection when "
+            "``null``."
+        ),
+    )
+
+
+class ConsolidationActionResponse(BaseModel):
+    """Response for consolidation merge/replace cluster actions.
+
+    Returned by both the merge and replace endpoints after a successful
+    destructive action.  A snapshot is always created before any data is
+    modified; the snapshot ID is included so the caller can surface a rollback
+    option to the user.
+    """
+
+    action: str = Field(
+        ...,
+        description="The action that was performed: ``'merge'`` or ``'replace'``.",
+    )
+    cluster_id: str = Field(
+        ..., description="The cluster identifier that was acted upon."
+    )
+    primary_artifact_uuid: str = Field(
+        ..., description="UUID of the artifact that was kept as primary."
+    )
+    removed_artifact_uuids: List[str] = Field(
+        ...,
+        description="UUIDs of artifacts that were removed during the action.",
+    )
+    pairs_resolved: int = Field(
+        ...,
+        description="Number of DuplicatePair records marked as resolved.",
+    )
+    snapshot_id: str = Field(
+        ...,
+        description=(
+            "ID of the auto-snapshot created before the destructive action. "
+            "Can be used for rollback if needed."
+        ),
+    )

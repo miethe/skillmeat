@@ -72,3 +72,6 @@ export * from './path-tags';
 
 // Deployment sets (DS-009)
 export * from './deployment-sets';
+
+// Similar artifacts (feat/similar-artifacts)
+export * from './similarity';

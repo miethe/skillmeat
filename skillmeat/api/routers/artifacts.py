@@ -22,6 +22,7 @@ from fastapi import (
     Path,
     Query,
     Request,
+    Response,
     status,
 )
 from sqlalchemy.orm import Session
@@ -56,6 +57,9 @@ from skillmeat.api.schemas.artifacts import (
     ArtifactUpstreamResponse,
     ArtifactVersionInfo,
     ConflictInfo,
+    ConsolidationActionRequest,
+    ConsolidationActionResponse,
+    ConsolidationClustersResponse,
     CreateLinkedArtifactRequest,
     DeploymentStatistics,
     FileDiff,
@@ -67,6 +71,10 @@ from skillmeat.api.schemas.artifacts import (
     MergeDeployDetails,
     MergeFileAction,
     ProjectDeploymentInfo,
+    SimilarArtifactDTO,
+    SimilarArtifactsResponse,
+    SimilarityBreakdownDTO,
+    SimilarityClusterDTO,
     VersionGraphNodeResponse,
     VersionGraphResponse,
 )
@@ -8783,4 +8791,1082 @@ async def get_artifact_associations(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get associations: {str(e)}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Consolidation endpoints (fixed paths — registered before /{artifact_id}/*)
+# to prevent FastAPI from matching "consolidation" as an artifact_id value.
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/consolidation/clusters",
+    response_model=ConsolidationClustersResponse,
+    summary="List consolidation clusters",
+    description=(
+        "Returns groups of similar artifacts identified for potential consolidation. "
+        "Clusters are formed by union-find grouping of DuplicatePair records whose "
+        "similarity_score meets the min_score threshold, then paginated via cursor."
+    ),
+    responses={
+        200: {"description": "Successfully retrieved consolidation clusters"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_consolidation_clusters(
+    db_session: DbSessionDep,
+    token: TokenDep,
+    min_score: float = Query(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Minimum similarity score threshold (0.0–1.0, default 0.5)",
+    ),
+    limit: int = Query(
+        default=20,
+        ge=1,
+        le=100,
+        description="Maximum number of clusters to return per page (1–100, default 20)",
+    ),
+    cursor: Optional[str] = Query(
+        default=None,
+        description="Opaque pagination cursor returned by a previous call",
+    ),
+) -> ConsolidationClustersResponse:
+    """Return paginated consolidation clusters for deduplication review.
+
+    Loads non-ignored DuplicatePair records that meet the min_score threshold,
+    groups them using union-find clustering, and returns a sorted, paginated
+    result.  Use ``next_cursor`` from the response to fetch subsequent pages.
+
+    Args:
+        db_session: Injected SQLAlchemy session.
+        token:      Authentication token (dependency injection).
+        min_score:  Minimum pairwise similarity score (0.0–1.0, default 0.5).
+        limit:      Page size (1–100, default 20).
+        cursor:     Opaque cursor from a previous page, or ``None`` for the first page.
+
+    Returns:
+        ConsolidationClustersResponse with clusters and optional next_cursor.
+
+    Raises:
+        HTTPException 500: On unexpected errors.
+
+    Example:
+        GET /api/v1/artifacts/consolidation/clusters?min_score=0.7&limit=10
+    """
+    try:
+        logger.info(
+            "Getting consolidation clusters (min_score=%.2f, limit=%d, cursor=%r)",
+            min_score,
+            limit,
+            cursor,
+        )
+
+        from skillmeat.core.similarity import SimilarityService
+
+        service = SimilarityService(session=db_session)
+        result = service.get_consolidation_clusters(
+            min_score=min_score,
+            limit=limit,
+            cursor=cursor,
+        )
+
+        clusters: List[SimilarityClusterDTO] = [
+            SimilarityClusterDTO(
+                artifacts=cluster["artifacts"],
+                max_score=cluster["max_score"],
+                artifact_type=cluster["artifact_type"],
+                pair_count=cluster["pair_count"],
+            )
+            for cluster in result["clusters"]
+        ]
+
+        logger.info(
+            "Consolidation clusters: returned %d cluster(s), next_cursor=%r",
+            len(clusters),
+            result["next_cursor"],
+        )
+
+        return ConsolidationClustersResponse(
+            clusters=clusters,
+            next_cursor=result["next_cursor"],
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed to get consolidation clusters: %s",
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get consolidation clusters: {str(e)}",
+        )
+
+
+@router.post(
+    "/consolidation/pairs/{pair_id}/ignore",
+    summary="Ignore a duplicate pair",
+    description=(
+        "Marks the specified DuplicatePair as ignored so it is excluded from "
+        "consolidation cluster results.  Idempotent: calling this on an already-"
+        "ignored pair still returns 200."
+    ),
+    responses={
+        200: {"description": "Pair successfully marked as ignored"},
+        404: {"model": ErrorResponse, "description": "Pair not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+    status_code=status.HTTP_200_OK,
+)
+async def ignore_duplicate_pair(
+    pair_id: str,
+    token: TokenDep,
+) -> dict:
+    """Mark a DuplicatePair as ignored (consolidation skip action).
+
+    Args:
+        pair_id: Primary key (UUID hex string) of the DuplicatePair record.
+        token:   Authentication token (dependency injection).
+
+    Returns:
+        JSON object ``{"pair_id": "<id>", "ignored": true}``.
+
+    Raises:
+        HTTPException 404: If no pair with ``pair_id`` exists.
+        HTTPException 500: On unexpected database errors.
+
+    Example:
+        POST /api/v1/artifacts/consolidation/pairs/abc123/ignore
+    """
+    try:
+        logger.info("Marking duplicate pair %r as ignored", pair_id)
+
+        from skillmeat.cache.repositories import DuplicatePairRepository
+
+        repo = DuplicatePairRepository()
+        found = repo.mark_pair_ignored(pair_id)
+
+        if not found:
+            logger.info("Duplicate pair not found: %r", pair_id)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Duplicate pair '{pair_id}' not found",
+            )
+
+        logger.info("Duplicate pair %r marked as ignored", pair_id)
+        return {"pair_id": pair_id, "ignored": True}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed to ignore duplicate pair '%s': %s",
+            pair_id,
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to ignore duplicate pair: {str(e)}",
+        )
+
+
+@router.delete(
+    "/consolidation/pairs/{pair_id}/ignore",
+    summary="Unignore a duplicate pair",
+    description=(
+        "Clears the ignored flag on the specified DuplicatePair, making it "
+        "visible again in consolidation cluster results.  Idempotent: calling "
+        "this on a pair that is already active still returns 200."
+    ),
+    responses={
+        200: {"description": "Pair ignore flag successfully cleared"},
+        404: {"model": ErrorResponse, "description": "Pair not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+    status_code=status.HTTP_200_OK,
+)
+async def unignore_duplicate_pair(
+    pair_id: str,
+    token: TokenDep,
+) -> dict:
+    """Clear the ignored flag on a DuplicatePair (undo consolidation skip).
+
+    Args:
+        pair_id: Primary key (UUID hex string) of the DuplicatePair record.
+        token:   Authentication token (dependency injection).
+
+    Returns:
+        JSON object ``{"pair_id": "<id>", "ignored": false}``.
+
+    Raises:
+        HTTPException 404: If no pair with ``pair_id`` exists.
+        HTTPException 500: On unexpected database errors.
+
+    Example:
+        DELETE /api/v1/artifacts/consolidation/pairs/abc123/ignore
+    """
+    try:
+        logger.info("Clearing ignored flag on duplicate pair %r", pair_id)
+
+        from skillmeat.cache.repositories import DuplicatePairRepository
+
+        repo = DuplicatePairRepository()
+        found = repo.unmark_pair_ignored(pair_id)
+
+        if not found:
+            logger.info("Duplicate pair not found: %r", pair_id)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Duplicate pair '{pair_id}' not found",
+            )
+
+        logger.info("Duplicate pair %r ignore flag cleared", pair_id)
+        return {"pair_id": pair_id, "ignored": False}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed to unignore duplicate pair '%s': %s",
+            pair_id,
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to unignore duplicate pair: {str(e)}",
+        )
+
+
+@router.get(
+    "/{artifact_id}/similar",
+    response_model=SimilarArtifactsResponse,
+    summary="Find similar artifacts",
+    description=(
+        "Returns artifacts similar to the specified artifact, ranked by composite "
+        "similarity score. The artifact_id must be in 'type:name' format "
+        "(e.g. 'skill:canvas-design')."
+    ),
+    responses={
+        200: {"description": "Successfully retrieved similar artifacts"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_similar_artifacts(
+    artifact_id: str,
+    db_session: DbSessionDep,
+    token: TokenDep,
+    response: Response,
+    limit: int = Query(
+        default=10,
+        ge=1,
+        le=50,
+        description="Maximum number of similar artifacts to return",
+    ),
+    min_score: float = Query(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="Minimum composite similarity score threshold (0.0–1.0)",
+    ),
+    source: str = Query(
+        default="collection",
+        pattern="^(collection|marketplace|all)$",
+        description="Search scope: 'collection', 'marketplace', or 'all'",
+    ),
+) -> SimilarArtifactsResponse:
+    """Find artifacts similar to the given artifact.
+
+    Resolves the artifact_id (type:name) to its internal UUID, checks the
+    SimilarityCacheManager for pre-computed results (cache hit), and falls
+    back to live SimilarityService scoring on a cache miss.  Cached results
+    are persisted by compute_and_store() for subsequent requests.
+
+    Response headers:
+        X-Cache:     ``HIT`` when results came from the cache, ``MISS``
+                     when live computation was performed.
+        X-Cache-Age: Seconds since the cached scores were computed.
+                     Only present on cache HITs.
+
+    Args:
+        artifact_id: Artifact identifier in 'type:name' format.
+        db_session:  Injected SQLAlchemy session.
+        token:       Authentication token (dependency injection).
+        response:    FastAPI Response object used to set custom headers.
+        limit:       Maximum results to return (1–50, default 10).
+        min_score:   Minimum composite score threshold (0.0–1.0, default 0.1).
+        source:      Where to search — 'collection', 'marketplace', or 'all'.
+
+    Returns:
+        SimilarArtifactsResponse with items ordered by composite score descending.
+
+    Raises:
+        HTTPException 404: If the artifact does not exist in the DB cache.
+        HTTPException 500: On unexpected errors.
+
+    Example:
+        GET /api/v1/artifacts/skill:canvas-design/similar?limit=5&min_score=0.5&source=collection
+    """
+    try:
+        logger.info(
+            "Finding similar artifacts for '%s' (limit=%d, min_score=%.2f, source=%s)",
+            artifact_id,
+            limit,
+            min_score,
+            source,
+        )
+
+        # 1. Resolve type:name → UUID.  Artifact.id stores the 'type:name' string;
+        #    SimilarityService and SimilarityCacheManager expect the hex UUID.
+        artifact_row: Optional[Artifact] = (
+            db_session.query(Artifact).filter(Artifact.id == artifact_id).first()
+        )
+        if artifact_row is None:
+            logger.info("Artifact not found in DB cache: '%s'", artifact_id)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        artifact_uuid: str = str(artifact_row.uuid)
+
+        # 2. Try the similarity cache first.  Only the collection source is
+        #    cached — marketplace and cross-source searches always go live.
+        from skillmeat.cache.similarity_cache import SimilarityCacheManager
+        from skillmeat.core.similarity import SimilarityService
+
+        cache_mgr = SimilarityCacheManager()
+        cached_rows: List[dict] = []
+        cache_hit = False
+
+        if source == "collection":
+            try:
+                cached_rows = cache_mgr.get_similar(
+                    artifact_uuid, db_session, limit=limit, min_score=min_score
+                )
+                if cached_rows:
+                    cache_hit = True
+                    logger.info(
+                        "Cache HIT for '%s': returning %d cached result(s)",
+                        artifact_id,
+                        len(cached_rows),
+                    )
+            except Exception as cache_err:  # noqa: BLE001
+                logger.warning(
+                    "SimilarityCacheManager.get_similar failed for '%s': %s; "
+                    "falling back to live computation.",
+                    artifact_id,
+                    cache_err,
+                )
+
+        # 3. Set X-Cache response header.
+        response.headers["X-Cache"] = "HIT" if cache_hit else "MISS"
+
+        if cache_hit:
+            # 3a. Add X-Cache-Age from the computed_at timestamp of the first row.
+            computed_at = cached_rows[0].get("computed_at")
+            if computed_at is not None:
+                try:
+                    from datetime import datetime, timezone
+
+                    now_utc = datetime.now(timezone.utc)
+                    # computed_at may be a naive datetime (stored as UTC).
+                    if computed_at.tzinfo is None:
+                        computed_at = computed_at.replace(tzinfo=timezone.utc)
+                    age_seconds = max(0, int((now_utc - computed_at).total_seconds()))
+                    response.headers["X-Cache-Age"] = str(age_seconds)
+                except Exception:  # noqa: BLE001
+                    pass  # Cache-Age is best-effort
+
+            # 3b. Build items from cached dicts — resolve target UUIDs to Artifact rows.
+            import json as _json
+
+            items: List[SimilarArtifactDTO] = []
+            for cached in cached_rows:
+                target_uuid = cached.get("target_artifact_uuid")
+                if not target_uuid:
+                    continue
+
+                target_row: Optional[Artifact] = (
+                    db_session.query(Artifact)
+                    .filter(Artifact.uuid == target_uuid)
+                    .first()
+                )
+                if target_row is None:
+                    continue
+
+                name: str = getattr(target_row, "name", "") or ""
+                artifact_type: str = getattr(target_row, "type", "") or ""
+                artifact_source: Optional[str] = getattr(target_row, "source", None)
+                description: Optional[str] = getattr(target_row, "description", None)
+                tags_list: List[str] = []
+
+                meta = getattr(target_row, "artifact_metadata", None)
+                if meta is not None:
+                    if not description:
+                        description = getattr(meta, "description", None)
+                    if not description:
+                        meta_dict = (
+                            meta.get_metadata_dict()
+                            if hasattr(meta, "get_metadata_dict")
+                            else None
+                        )
+                        if meta_dict:
+                            description = meta_dict.get("description") or None
+                    tags_list = (
+                        meta.get_tags_list() if hasattr(meta, "get_tags_list") else []
+                    )
+                else:
+                    raw_tags = getattr(target_row, "tags", None)
+                    if isinstance(raw_tags, list):
+                        tags_list = [getattr(t, "name", str(t)) for t in raw_tags if t]
+                    elif isinstance(raw_tags, str) and raw_tags:
+                        tags_list = [t.strip() for t in raw_tags.split(",") if t.strip()]
+
+                if not tags_list:
+                    orm_tags = getattr(target_row, "tags", None)
+                    if isinstance(orm_tags, list) and orm_tags:
+                        tags_list = [getattr(t, "name", str(t)) for t in orm_tags if t]
+
+                if not description:
+                    from skillmeat.cache.models import CollectionArtifact
+
+                    ca = (
+                        db_session.query(CollectionArtifact)
+                        .filter(
+                            CollectionArtifact.artifact_uuid == str(target_uuid)
+                        )
+                        .first()
+                    )
+                    if ca and ca.description:
+                        description = ca.description
+
+                # Parse breakdown from cached JSON.
+                breakdown_data: dict = {}
+                raw_breakdown = cached.get("breakdown_json")
+                if raw_breakdown:
+                    try:
+                        breakdown_data = _json.loads(raw_breakdown)
+                    except Exception:  # noqa: BLE001
+                        pass
+
+                composite_score = float(cached.get("composite_score", 0.0))
+                metadata_score = breakdown_data.get("metadata_score", 0.0)
+                text_score_raw = breakdown_data.get("text_score")
+
+                breakdown = SimilarityBreakdownDTO(
+                    content_score=breakdown_data.get("content_score", 0.0),
+                    structure_score=breakdown_data.get("structure_score", 0.0),
+                    metadata_score=metadata_score,
+                    keyword_score=breakdown_data.get("keyword_score", 0.0),
+                    semantic_score=breakdown_data.get("semantic_score"),
+                    text_score=(
+                        text_score_raw
+                        if text_score_raw is not None
+                        else metadata_score
+                    ),
+                )
+
+                # Cached results don't carry match_type — default to "keyword".
+                items.append(
+                    SimilarArtifactDTO(
+                        artifact_id=getattr(target_row, "id", target_uuid),
+                        name=name,
+                        artifact_type=artifact_type,
+                        source=artifact_source,
+                        description=description,
+                        tags=tags_list,
+                        composite_score=composite_score,
+                        match_type="keyword",
+                        breakdown=breakdown,
+                    )
+                )
+
+            logger.info(
+                "Similar artifacts for '%s' (cache HIT): returning %d result(s)",
+                artifact_id,
+                len(items),
+            )
+            return SimilarArtifactsResponse(
+                artifact_id=artifact_id,
+                items=items,
+                total=len(items),
+            )
+
+        # 4. Cache MISS — run live similarity search via SimilarityService.
+        service = SimilarityService(session=db_session)
+        results = service.find_similar(
+            artifact_id=artifact_uuid,
+            limit=limit,
+            min_score=min_score,
+            source=source,
+        )
+
+        # 5. Convert SimilarityResult objects to SimilarArtifactDTO.
+        items = []
+        for result in results:
+            row = result.artifact  # Artifact or MarketplaceCatalogEntry ORM row
+            name = getattr(row, "name", "") or ""
+            artifact_type = getattr(row, "type", "") or getattr(
+                row, "artifact_type", ""
+            ) or ""
+            artifact_source = getattr(row, "source", None)
+            description = getattr(row, "description", None)
+
+            # Try artifact_metadata relationship for enriched data (Artifact rows).
+            meta = getattr(row, "artifact_metadata", None)
+            if meta is not None:
+                if not description:
+                    description = getattr(meta, "description", None)
+                # Also check metadata JSON dict (where descriptions are actually stored).
+                if not description:
+                    meta_dict = meta.get_metadata_dict() if hasattr(meta, "get_metadata_dict") else None
+                    if meta_dict:
+                        description = meta_dict.get("description") or None
+                tags_list = meta.get_tags_list() if hasattr(meta, "get_tags_list") else []
+            else:
+                raw_tags = getattr(row, "tags", None)
+                if isinstance(raw_tags, list):
+                    tags_list = [getattr(t, "name", str(t)) for t in raw_tags if t]
+                elif isinstance(raw_tags, str) and raw_tags:
+                    tags_list = [t.strip() for t in raw_tags.split(",") if t.strip()]
+                else:
+                    tags_list = []
+
+            # Final fallback: if meta CSV tags were empty, try the ORM relationship.
+            if not tags_list:
+                orm_tags = getattr(row, "tags", None)
+                if isinstance(orm_tags, list) and orm_tags:
+                    tags_list = [getattr(t, "name", str(t)) for t in orm_tags if t]
+
+            # Final fallback: description lives in collection_artifacts table, not
+            # artifacts or artifact_metadata.  Query it by artifact UUID.
+            if not description:
+                from skillmeat.cache.models import CollectionArtifact
+
+                result_artifact_uuid = getattr(row, "uuid", None)
+                if result_artifact_uuid:
+                    ca = (
+                        db_session.query(CollectionArtifact)
+                        .filter(
+                            CollectionArtifact.artifact_uuid
+                            == str(result_artifact_uuid)
+                        )
+                        .first()
+                    )
+                    if ca and ca.description:
+                        description = ca.description
+
+            breakdown = SimilarityBreakdownDTO(
+                content_score=result.breakdown.content_score,
+                structure_score=result.breakdown.structure_score,
+                metadata_score=result.breakdown.metadata_score,
+                keyword_score=result.breakdown.keyword_score,
+                semantic_score=result.breakdown.semantic_score,
+                # text_score is populated by the text_similarity module (SSO-1.2+).
+                # Fall back to metadata_score as a proxy until that module is active,
+                # ensuring the field is non-null for existing scoring runs.
+                text_score=(
+                    result.breakdown.text_score
+                    if result.breakdown.text_score is not None
+                    else result.breakdown.metadata_score
+                ),
+            )
+
+            items.append(
+                SimilarArtifactDTO(
+                    artifact_id=result.artifact_id,
+                    name=name,
+                    artifact_type=artifact_type,
+                    source=artifact_source,
+                    description=description,
+                    tags=tags_list,
+                    composite_score=result.composite_score,
+                    match_type=result.match_type.value,
+                    breakdown=breakdown,
+                )
+            )
+
+        logger.info(
+            "Similar artifacts for '%s' (cache MISS): found %d live result(s)",
+            artifact_id,
+            len(items),
+        )
+
+        # 6. Persist live results to the cache for future requests (collection source only).
+        if source == "collection":
+            try:
+                cache_mgr.compute_and_store(artifact_uuid, db_session)
+            except Exception as store_err:  # noqa: BLE001
+                logger.warning(
+                    "SimilarityCacheManager.compute_and_store failed for '%s': %s; "
+                    "results will not be cached.",
+                    artifact_id,
+                    store_err,
+                )
+
+        return SimilarArtifactsResponse(
+            artifact_id=artifact_id,
+            items=items,
+            total=len(items),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed to find similar artifacts for '%s': %s",
+            artifact_id,
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to find similar artifacts: {str(e)}",
+        )
+
+
+def _create_auto_snapshot_for_consolidation(
+    cluster_id: str,
+    action: str,
+) -> str:
+    """Create an auto-snapshot before a destructive consolidation action.
+
+    Args:
+        cluster_id: Cluster identifier (used in snapshot message).
+        action: Action name (``'merge'`` or ``'replace'``).
+
+    Returns:
+        Snapshot ID string.
+
+    Raises:
+        RuntimeError: If snapshot creation fails for any reason.
+    """
+    from skillmeat.core.version import VersionManager
+
+    version_mgr = VersionManager()
+    snapshot = version_mgr.auto_snapshot(
+        message=f"Before consolidation {action}: cluster {cluster_id}",
+    )
+    return snapshot.id
+
+
+@router.post(
+    "/consolidation/clusters/{cluster_id}/merge",
+    response_model=ConsolidationActionResponse,
+    summary="Merge consolidation cluster (secondary into primary)",
+    description=(
+        "Merges all secondary artifacts in the cluster into the primary artifact, "
+        "then removes the secondaries from the collection.  An auto-snapshot is "
+        "always created before any data is modified.  If the snapshot step fails "
+        "the action is aborted and a 500 is returned — the collection is never "
+        "modified without a confirmed snapshot."
+    ),
+    responses={
+        200: {"description": "Merge completed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request parameters"},
+        404: {"model": ErrorResponse, "description": "Cluster or primary artifact not found"},
+        500: {"model": ErrorResponse, "description": "Snapshot failed or internal error"},
+    },
+    status_code=status.HTTP_200_OK,
+)
+async def merge_consolidation_cluster(
+    cluster_id: str,
+    request: ConsolidationActionRequest,
+    artifact_mgr: ArtifactManagerDep,
+    token: TokenDep,
+) -> ConsolidationActionResponse:
+    """Merge secondary artifacts into the primary for a consolidation cluster.
+
+    The endpoint:
+    1. Creates an auto-snapshot (aborts with HTTP 500 if this fails).
+    2. Resolves the cluster members from ``DuplicatePair`` records.
+    3. Removes each secondary artifact from the collection.
+    4. Marks all pairs in the cluster as resolved (ignored).
+
+    Args:
+        cluster_id: Opaque cluster identifier (used in snapshot message).
+        request:     Request body with ``primary_artifact_uuid`` and optional
+                     ``collection_name``.
+        artifact_mgr: Injected ArtifactManager.
+        token:        Authentication token (dependency injection).
+
+    Returns:
+        ConsolidationActionResponse describing what was done.
+
+    Raises:
+        HTTPException 500: If the auto-snapshot fails (action is aborted).
+        HTTPException 404: If the primary artifact UUID is not found.
+        HTTPException 500: On unexpected errors during the merge.
+
+    Example:
+        POST /api/v1/artifacts/consolidation/clusters/abc123/merge
+        {"primary_artifact_uuid": "deadbeef...", "collection_name": null}
+    """
+    # --- Step 1: Auto-snapshot (mandatory gate) ---
+    try:
+        snapshot_id = _create_auto_snapshot_for_consolidation(cluster_id, "merge")
+        logger.info(
+            "Auto-snapshot created before merge of cluster %r: snapshot_id=%r",
+            cluster_id,
+            snapshot_id,
+        )
+    except Exception as snap_err:
+        logger.error(
+            "Snapshot failed before merge of cluster %r: %s",
+            cluster_id,
+            snap_err,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Snapshot failed — action aborted",
+        )
+
+    # --- Step 2: Resolve cluster members ---
+    try:
+        from skillmeat.cache.models import DuplicatePair
+        from skillmeat.cache.repositories import DuplicatePairRepository
+
+        primary_uuid = request.primary_artifact_uuid
+
+        with get_session() as session:
+            # Validate primary artifact exists
+            primary_art = (
+                session.query(Artifact)
+                .filter(Artifact.uuid == primary_uuid)
+                .first()
+            )
+            if primary_art is None:
+                logger.warning(
+                    "Merge cluster %r: primary artifact UUID %r not found",
+                    cluster_id,
+                    primary_uuid,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Primary artifact '{primary_uuid}' not found",
+                )
+
+            # Collect all UUIDs in the cluster via DuplicatePair records
+            pairs = (
+                session.query(DuplicatePair)
+                .filter(
+                    DuplicatePair.ignored.is_(False),
+                    (DuplicatePair.artifact1_uuid == primary_uuid)
+                    | (DuplicatePair.artifact2_uuid == primary_uuid),
+                )
+                .all()
+            )
+
+            secondary_uuids: List[str] = []
+            for pair in pairs:
+                other = (
+                    pair.artifact2_uuid
+                    if pair.artifact1_uuid == primary_uuid
+                    else pair.artifact1_uuid
+                )
+                if other not in secondary_uuids:
+                    secondary_uuids.append(other)
+
+            pair_ids = [pair.id for pair in pairs]
+
+        logger.info(
+            "Merge cluster %r: primary=%r, secondaries=%r",
+            cluster_id,
+            primary_uuid,
+            secondary_uuids,
+        )
+
+        # --- Step 3: Remove each secondary artifact from the collection ---
+        removed_uuids: List[str] = []
+        with get_session() as session:
+            for sec_uuid in secondary_uuids:
+                sec_art = (
+                    session.query(Artifact)
+                    .filter(Artifact.uuid == sec_uuid)
+                    .first()
+                )
+                if sec_art is None:
+                    logger.warning(
+                        "Merge cluster %r: secondary artifact UUID %r not found, skipping",
+                        cluster_id,
+                        sec_uuid,
+                    )
+                    continue
+
+                try:
+                    from skillmeat.core.enums import ArtifactType as CoreArtifactType
+
+                    art_type = CoreArtifactType(sec_art.artifact_type)
+                    artifact_mgr.remove(
+                        artifact_name=sec_art.name,
+                        artifact_type=art_type,
+                        collection_name=request.collection_name,
+                    )
+                    removed_uuids.append(sec_uuid)
+                    logger.info(
+                        "Merge cluster %r: removed secondary artifact %r (%r)",
+                        cluster_id,
+                        sec_art.name,
+                        sec_uuid,
+                    )
+                except Exception as rm_err:
+                    logger.warning(
+                        "Merge cluster %r: could not remove secondary %r: %s",
+                        cluster_id,
+                        sec_uuid,
+                        rm_err,
+                    )
+
+        # --- Step 4: Mark pairs as resolved (ignored) ---
+        repo = DuplicatePairRepository()
+        pairs_resolved = 0
+        for pid in pair_ids:
+            if repo.mark_pair_ignored(pid):
+                pairs_resolved += 1
+
+        logger.info(
+            "Merge cluster %r completed: removed=%d, pairs_resolved=%d",
+            cluster_id,
+            len(removed_uuids),
+            pairs_resolved,
+        )
+
+        return ConsolidationActionResponse(
+            action="merge",
+            cluster_id=cluster_id,
+            primary_artifact_uuid=primary_uuid,
+            removed_artifact_uuids=removed_uuids,
+            pairs_resolved=pairs_resolved,
+            snapshot_id=snapshot_id,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Merge cluster %r failed: %s",
+            cluster_id,
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to merge consolidation cluster: {str(e)}",
+        )
+
+
+@router.post(
+    "/consolidation/clusters/{cluster_id}/replace",
+    response_model=ConsolidationActionResponse,
+    summary="Replace consolidation cluster (keep primary, discard secondaries)",
+    description=(
+        "Keeps the primary artifact unchanged and discards all secondary artifacts "
+        "in the cluster.  An auto-snapshot is always created before any data is "
+        "modified.  If the snapshot step fails the action is aborted and a 500 is "
+        "returned — the collection is never modified without a confirmed snapshot."
+    ),
+    responses={
+        200: {"description": "Replace completed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request parameters"},
+        404: {"model": ErrorResponse, "description": "Cluster or primary artifact not found"},
+        500: {"model": ErrorResponse, "description": "Snapshot failed or internal error"},
+    },
+    status_code=status.HTTP_200_OK,
+)
+async def replace_consolidation_cluster(
+    cluster_id: str,
+    request: ConsolidationActionRequest,
+    artifact_mgr: ArtifactManagerDep,
+    token: TokenDep,
+) -> ConsolidationActionResponse:
+    """Keep the primary artifact and discard all secondaries in the cluster.
+
+    Unlike merge, no content from the secondaries is incorporated — the primary
+    is kept exactly as-is while the secondaries are deleted from the collection.
+
+    The endpoint:
+    1. Creates an auto-snapshot (aborts with HTTP 500 if this fails).
+    2. Resolves the cluster members from ``DuplicatePair`` records.
+    3. Removes each secondary artifact from the collection.
+    4. Marks all pairs in the cluster as resolved (ignored).
+
+    Args:
+        cluster_id: Opaque cluster identifier (used in snapshot message).
+        request:     Request body with ``primary_artifact_uuid`` and optional
+                     ``collection_name``.
+        artifact_mgr: Injected ArtifactManager.
+        token:        Authentication token (dependency injection).
+
+    Returns:
+        ConsolidationActionResponse describing what was done.
+
+    Raises:
+        HTTPException 500: If the auto-snapshot fails (action is aborted).
+        HTTPException 404: If the primary artifact UUID is not found.
+        HTTPException 500: On unexpected errors during the replace.
+
+    Example:
+        POST /api/v1/artifacts/consolidation/clusters/abc123/replace
+        {"primary_artifact_uuid": "deadbeef...", "collection_name": null}
+    """
+    # --- Step 1: Auto-snapshot (mandatory gate) ---
+    try:
+        snapshot_id = _create_auto_snapshot_for_consolidation(cluster_id, "replace")
+        logger.info(
+            "Auto-snapshot created before replace of cluster %r: snapshot_id=%r",
+            cluster_id,
+            snapshot_id,
+        )
+    except Exception as snap_err:
+        logger.error(
+            "Snapshot failed before replace of cluster %r: %s",
+            cluster_id,
+            snap_err,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Snapshot failed — action aborted",
+        )
+
+    # --- Step 2: Resolve cluster members ---
+    try:
+        from skillmeat.cache.models import DuplicatePair
+        from skillmeat.cache.repositories import DuplicatePairRepository
+
+        primary_uuid = request.primary_artifact_uuid
+
+        with get_session() as session:
+            # Validate primary artifact exists
+            primary_art = (
+                session.query(Artifact)
+                .filter(Artifact.uuid == primary_uuid)
+                .first()
+            )
+            if primary_art is None:
+                logger.warning(
+                    "Replace cluster %r: primary artifact UUID %r not found",
+                    cluster_id,
+                    primary_uuid,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Primary artifact '{primary_uuid}' not found",
+                )
+
+            # Collect all UUIDs in the cluster via DuplicatePair records
+            pairs = (
+                session.query(DuplicatePair)
+                .filter(
+                    DuplicatePair.ignored.is_(False),
+                    (DuplicatePair.artifact1_uuid == primary_uuid)
+                    | (DuplicatePair.artifact2_uuid == primary_uuid),
+                )
+                .all()
+            )
+
+            secondary_uuids: List[str] = []
+            for pair in pairs:
+                other = (
+                    pair.artifact2_uuid
+                    if pair.artifact1_uuid == primary_uuid
+                    else pair.artifact1_uuid
+                )
+                if other not in secondary_uuids:
+                    secondary_uuids.append(other)
+
+            pair_ids = [pair.id for pair in pairs]
+
+        logger.info(
+            "Replace cluster %r: primary=%r, secondaries=%r",
+            cluster_id,
+            primary_uuid,
+            secondary_uuids,
+        )
+
+        # --- Step 3: Remove each secondary artifact from the collection ---
+        removed_uuids: List[str] = []
+        with get_session() as session:
+            for sec_uuid in secondary_uuids:
+                sec_art = (
+                    session.query(Artifact)
+                    .filter(Artifact.uuid == sec_uuid)
+                    .first()
+                )
+                if sec_art is None:
+                    logger.warning(
+                        "Replace cluster %r: secondary artifact UUID %r not found, skipping",
+                        cluster_id,
+                        sec_uuid,
+                    )
+                    continue
+
+                try:
+                    from skillmeat.core.enums import ArtifactType as CoreArtifactType
+
+                    art_type = CoreArtifactType(sec_art.artifact_type)
+                    artifact_mgr.remove(
+                        artifact_name=sec_art.name,
+                        artifact_type=art_type,
+                        collection_name=request.collection_name,
+                    )
+                    removed_uuids.append(sec_uuid)
+                    logger.info(
+                        "Replace cluster %r: removed secondary artifact %r (%r)",
+                        cluster_id,
+                        sec_art.name,
+                        sec_uuid,
+                    )
+                except Exception as rm_err:
+                    logger.warning(
+                        "Replace cluster %r: could not remove secondary %r: %s",
+                        cluster_id,
+                        sec_uuid,
+                        rm_err,
+                    )
+
+        # --- Step 4: Mark pairs as resolved (ignored) ---
+        repo = DuplicatePairRepository()
+        pairs_resolved = 0
+        for pid in pair_ids:
+            if repo.mark_pair_ignored(pid):
+                pairs_resolved += 1
+
+        logger.info(
+            "Replace cluster %r completed: removed=%d, pairs_resolved=%d",
+            cluster_id,
+            len(removed_uuids),
+            pairs_resolved,
+        )
+
+        return ConsolidationActionResponse(
+            action="replace",
+            cluster_id=cluster_id,
+            primary_artifact_uuid=primary_uuid,
+            removed_artifact_uuids=removed_uuids,
+            pairs_resolved=pairs_resolved,
+            snapshot_id=snapshot_id,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Replace cluster %r failed: %s",
+            cluster_id,
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to replace consolidation cluster: {str(e)}",
         )

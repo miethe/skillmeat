@@ -146,6 +146,10 @@ export interface GitHubSource {
   // Composite/plugin aggregate fields (null when source has no composite artifacts)
   composite_member_count?: number | null; // Total child-artifact membership edges across composites
   composite_child_types?: string[] | null; // Deduplicated list of child artifact types
+  // New/Updated badge counts (computed by backend, optional until implemented)
+  new_artifact_count?: number;
+  updated_artifact_count?: number;
+  imported_count?: number;
 }
 
 export interface GitHubSourceListResponse {

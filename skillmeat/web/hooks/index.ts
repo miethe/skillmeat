@@ -522,6 +522,32 @@ export { useAnalyticsStream } from './useAnalyticsStream';
 export { useArtifactHistory, getArtifactHistoryId, artifactHistoryKeys } from './useArtifactHistory';
 
 // ============================================================================
+// SIMILARITY (7 hooks)
+// ============================================================================
+// Similar artifact detection by content, structure, metadata, and semantics
+export {
+  similarArtifactKeys,
+  useSimilarArtifacts,
+  useDebouncedSimilarArtifacts,
+} from './use-similar-artifacts';
+
+// Similarity score thresholds, score-band color settings, and consolidation clusters
+export {
+  similaritySettingsKeys,
+  useSimilaritySettings,
+  consolidationKeys,
+  useConsolidationClusters,
+  useIgnorePair,
+  useUnignorePair,
+  type SimilarityThresholds,
+  type SimilarityColors,
+  type SimilaritySettings,
+  type ConsolidationCluster,
+  type ConsolidationClustersResponse,
+  type ConsolidationClustersOptions,
+} from './similarity';
+
+// ============================================================================
 // SSE (1 hook)
 // ============================================================================
 // Server-sent events for real-time data streaming

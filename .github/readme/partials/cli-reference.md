@@ -22,6 +22,8 @@ SkillMeat provides a comprehensive CLI with 116+ commands organized into functio
 | `sync preview` | Preview changes before applying |
 | `search <query>` | Search across all projects and collections |
 | `find-duplicates` | Find similar or duplicate artifacts |
+| `similar <artifact>` | Find similar artifacts with options: --limit, --min-score, --source |
+| `consolidate` | Interactive duplicate consolidation wizard (options: --min-score, --limit, --non-interactive, --output) |
 
 ### Advanced Features
 

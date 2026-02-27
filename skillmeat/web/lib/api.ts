@@ -97,3 +97,53 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   trace('request:success', { url, status: response.status });
   return body as T;
 }
+
+export interface ApiResponseWithHeaders<T> {
+  data: T;
+  headers: Headers;
+}
+
+/**
+ * Like `apiRequest`, but also returns the raw response Headers object.
+ *
+ * Use this when callers need to inspect response headers (e.g., X-Cache,
+ * X-Cache-Age, X-RateLimit-*). For standard requests that only need the
+ * response body, prefer `apiRequest`.
+ */
+export async function apiRequestWithHeaders<T>(
+  path: string,
+  init?: RequestInit
+): Promise<ApiResponseWithHeaders<T>> {
+  const requestInit: RequestInit = {
+    ...init,
+    headers: buildApiHeaders(init?.headers),
+  };
+
+  const url = buildApiUrl(path);
+  trace('request:start', { url, method: requestInit.method || 'GET' });
+
+  const response = await fetch(url, requestInit);
+
+  // Handle 204 No Content
+  if (response.status === 204) {
+    trace('request:success', { url, status: response.status });
+    return { data: undefined as T, headers: response.headers };
+  }
+
+  const contentType = response.headers.get('content-type');
+  const isJson = contentType?.includes('application/json');
+  const body = isJson ? await response.json() : undefined;
+
+  if (!response.ok) {
+    trace('request:error', {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      body,
+    });
+    throw new ApiError('Request failed', response.status, body);
+  }
+
+  trace('request:success', { url, status: response.status });
+  return { data: body as T, headers: response.headers };
+}

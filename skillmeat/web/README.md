@@ -11,6 +11,7 @@ Next.js 15 App Router web interface for SkillMeat collection manager.
 - ESLint and Prettier configured
 - Responsive design with mobile-first approach
 - Integration with FastAPI backend
+- Collection Consolidation View for detecting and merging duplicate artifacts
 
 ## Prerequisites
 
@@ -74,13 +75,21 @@ cp .env.example .env.local
 ```
 skillmeat/web/
 ├── app/                    # Next.js App Router pages
+│   ├── collection/        # Collection management pages
+│   │   └── consolidate/   # Collection Consolidation View
 │   ├── layout.tsx         # Root layout with header and navigation
 │   ├── page.tsx           # Dashboard home page
 │   └── globals.css        # Global styles and Tailwind CSS
 ├── components/            # React components
 │   ├── ui/               # shadcn/ui components
+│   ├── consolidation/    # Consolidation feature components
 │   ├── header.tsx        # Header component
 │   └── navigation.tsx    # Navigation sidebar
+├── hooks/                 # Custom React hooks
+│   ├── useConsolidationClusters.ts     # Consolidation cluster queries
+│   ├── useIgnorePair.ts                # Ignore pair mutations
+│   ├── useUnignorePair.ts              # Unignore pair mutations
+│   └── index.ts          # Barrel export (canonical import point)
 ├── lib/                   # Utility functions
 │   └── utils.ts          # cn() for className merging
 ├── public/               # Static assets

@@ -1,12 +1,12 @@
 """Settings API schemas for configuration management.
 
 Provides Pydantic models for settings-related API endpoints,
-including GitHub token management.
+including GitHub token management and similarity badge configuration.
 """
 
-from typing import Optional
+from typing import Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class GitHubTokenRequest(BaseModel):
@@ -112,4 +112,147 @@ class MessageResponse(BaseModel):
     message: str = Field(
         description="Human-readable message describing the operation result",
         examples=["GitHub token configured successfully"],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Similarity settings schemas
+# ---------------------------------------------------------------------------
+
+_THRESHOLD_KEYS = frozenset({"high", "partial", "low", "floor"})
+_COLOR_KEYS = frozenset({"high", "partial", "low"})
+
+
+class SimilarityThresholdsResponse(BaseModel):
+    """Current similarity score band thresholds.
+
+    Each value is a float in [0.0, 1.0] representing the *minimum* cosine
+    similarity score required to fall into that band.  The floor threshold
+    acts as a lower cutoff — scores below it are not displayed.
+
+    Ordering invariant: floor < low < partial < high.
+    """
+
+    high: float = Field(
+        description="Minimum score for the 'high' similarity band",
+        examples=[0.80],
+    )
+    partial: float = Field(
+        description="Minimum score for the 'partial' similarity band",
+        examples=[0.55],
+    )
+    low: float = Field(
+        description="Minimum score for the 'low' similarity band",
+        examples=[0.35],
+    )
+    floor: float = Field(
+        description="Minimum score to display at all (results below this are hidden)",
+        examples=[0.20],
+    )
+
+
+class SimilarityThresholdsUpdateRequest(BaseModel):
+    """Partial update for similarity score thresholds.
+
+    Only the supplied keys are updated; omitted keys retain their current values.
+    All supplied values must be floats in [0.0, 1.0] and the resulting
+    merged thresholds must satisfy: floor < low < partial < high.
+    """
+
+    high: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Minimum score for the 'high' similarity band",
+        examples=[0.80],
+    )
+    partial: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Minimum score for the 'partial' similarity band",
+        examples=[0.55],
+    )
+    low: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Minimum score for the 'low' similarity band",
+        examples=[0.35],
+    )
+    floor: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Minimum score to display at all",
+        examples=[0.20],
+    )
+
+
+class SimilarityColorsResponse(BaseModel):
+    """Current similarity band color configuration.
+
+    Each value is a CSS hex color string (e.g. '#22c55e').
+    """
+
+    high: str = Field(
+        description="CSS hex color for the 'high' similarity band",
+        examples=["#22c55e"],
+    )
+    partial: str = Field(
+        description="CSS hex color for the 'partial' similarity band",
+        examples=["#eab308"],
+    )
+    low: str = Field(
+        description="CSS hex color for the 'low' similarity band",
+        examples=["#f97316"],
+    )
+
+
+class SimilarityColorsUpdateRequest(BaseModel):
+    """Partial update for similarity band colors.
+
+    Only the supplied keys are updated; omitted keys retain their current values.
+    All supplied values must be valid CSS hex color strings.
+    """
+
+    high: Optional[str] = Field(
+        default=None,
+        description="CSS hex color for the 'high' band (e.g. '#22c55e')",
+        examples=["#22c55e"],
+    )
+    partial: Optional[str] = Field(
+        default=None,
+        description="CSS hex color for the 'partial' band (e.g. '#eab308')",
+        examples=["#eab308"],
+    )
+    low: Optional[str] = Field(
+        default=None,
+        description="CSS hex color for the 'low' band (e.g. '#f97316')",
+        examples=["#f97316"],
+    )
+
+    @field_validator("high", "partial", "low", mode="before")
+    @classmethod
+    def validate_hex_color(cls, v: Optional[str]) -> Optional[str]:
+        """Validate that color values are CSS hex strings."""
+        import re
+
+        if v is None:
+            return v
+        if not re.match(r"^#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?$", v):
+            raise ValueError(
+                f"Color must be a CSS hex string (e.g. '#22c55e'), got {v!r}"
+            )
+        return v
+
+
+class SimilaritySettingsResponse(BaseModel):
+    """Combined similarity settings: thresholds and colors."""
+
+    thresholds: SimilarityThresholdsResponse = Field(
+        description="Score band threshold configuration"
+    )
+    colors: SimilarityColorsResponse = Field(
+        description="Score band color configuration"
     )

@@ -1,38 +1,37 @@
 ---
-title: "Similar Artifacts — Phase 3–4: Marketplace Tab + Similarity Badges & Settings"
+title: 'Similar Artifacts — Phase 3–4: Marketplace Tab + Similarity Badges & Settings'
 schema_version: 2
 doc_type: phase_plan
-status: draft
+status: inferred_complete
 created: 2026-02-25
 updated: 2026-02-25
 feature_slug: similar-artifacts
 feature_version: v1
 phase: 3
-phase_title: "Marketplace Tab + Similarity Badges & Settings"
+phase_title: Marketplace Tab + Similarity Badges & Settings
 prd_ref: docs/project_plans/PRDs/features/similar-artifacts-v1.md
 plan_ref: docs/project_plans/implementation_plans/features/similar-artifacts-v1.md
 entry_criteria:
-  - "Phase 1 complete: GET /api/v1/artifacts/{id}/similar endpoint merged"
-  - "Phase 2 complete: SimilarArtifactsTab component stable and tested"
+- 'Phase 1 complete: GET /api/v1/artifacts/{id}/similar endpoint merged'
+- 'Phase 2 complete: SimilarArtifactsTab component stable and tested'
 exit_criteria:
-  - "All Phase 3 and Phase 4 tasks marked completed"
-  - "SimilarArtifactsTab visible in marketplace artifact detail panel (Phase 3)"
-  - "SimilarityBadge renders on SourceCard with correct color and aria-label (Phase 4)"
-  - "Threshold settings persist and badge updates immediately after change (Phase 4)"
-  - "Marketplace badge E2E test passes"
-  - "task-completion-validator sign-off"
+- All Phase 3 and Phase 4 tasks marked completed
+- SimilarArtifactsTab visible in marketplace artifact detail panel (Phase 3)
+- SimilarityBadge renders on SourceCard with correct color and aria-label (Phase 4)
+- Threshold settings persist and badge updates immediately after change (Phase 4)
+- Marketplace badge E2E test passes
+- task-completion-validator sign-off
 priority: medium
 risk_level: medium
 category: product-planning
 tags:
-  - phase-plan
-  - frontend
-  - marketplace
-  - badges
-  - settings
-  - similar-artifacts
+- phase-plan
+- frontend
+- marketplace
+- badges
+- settings
+- similar-artifacts
 ---
-
 # Phase 3–4: Marketplace Tab + Similarity Badges & Settings
 
 **Parent Plan**: [similar-artifacts-v1.md](../similar-artifacts-v1.md)

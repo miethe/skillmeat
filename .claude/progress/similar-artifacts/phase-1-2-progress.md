@@ -2,242 +2,290 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "similar-artifacts"
-feature_slug: "similar-artifacts"
-prd_ref: "docs/project_plans/PRDs/features/similar-artifacts-v1.md"
-plan_ref: "docs/project_plans/implementation_plans/features/similar-artifacts-v1.md"
+prd: similar-artifacts
+feature_slug: similar-artifacts
+prd_ref: docs/project_plans/PRDs/features/similar-artifacts-v1.md
+plan_ref: docs/project_plans/implementation_plans/features/similar-artifacts-v1.md
 phase: 1
-title: "Core Similarity Engine + Collection Tab"
-status: "planning"
-started: "2026-02-25"
+title: Core Similarity Engine + Collection Tab
+status: completed
+started: '2026-02-25'
 completed: null
 commit_refs: []
 pr_refs: []
 overall_progress: 0
-completion_estimate: "on-track"
+completion_estimate: on-track
 total_tasks: 18
-completed_tasks: 0
+completed_tasks: 18
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
 owners:
-  - "python-backend-engineer"
-  - "backend-architect"
+- python-backend-engineer
+- backend-architect
 contributors:
-  - "data-layer-expert"
-  - "openapi-expert"
-  - "ui-engineer-enhanced"
-  - "frontend-developer"
-
+- data-layer-expert
+- openapi-expert
+- ui-engineer-enhanced
+- frontend-developer
 tasks:
-  # === PHASE 1: CORE SIMILARITY ENGINE ===
-
-  # Batch 1: No dependencies
-  - id: "SA-P1-001"
-    description: "DuplicatePair.ignored migration - Add ignored boolean column to DuplicatePair model"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "1pt"
-    priority: "high"
-
-  - id: "SA-P1-002"
-    description: "SimilarityResult dataclass - Define SimilarityResult and ScoreBreakdown dataclasses"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    estimated_effort: "1pt"
-    priority: "high"
-
-  # Batch 2: Depends on SA-P1-002
-  - id: "SA-P1-003"
-    description: "MatchAnalyzer.compare() helper - Add compare(artifact_a, artifact_b) method"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SA-P1-002"]
-    estimated_effort: "2pts"
-    priority: "high"
-
-  - id: "SA-P1-005"
-    description: "Pydantic schemas - Add SimilarArtifactDTO and SimilarityBreakdownDTO"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SA-P1-002"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-  # Batch 3: Depends on SA-P1-002, SA-P1-003
-  - id: "SA-P1-004"
-    description: "SimilarityService core - Implement similarity matching, filtering, and ranking logic"
-    status: "pending"
-    assigned_to: ["backend-architect", "python-backend-engineer"]
-    dependencies: ["SA-P1-002", "SA-P1-003"]
-    estimated_effort: "5pts"
-    priority: "critical"
-
-  # Batch 4: Depends on SA-P1-004/SA-P1-005
-  - id: "SA-P1-006"
-    description: "API endpoint - Implement GET /api/v1/artifacts/{id}/similar"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SA-P1-004", "SA-P1-005"]
-    estimated_effort: "2pts"
-    priority: "high"
-
-  - id: "SA-P1-007"
-    description: "OpenTelemetry instrumentation - Add OTel spans to SimilarityService and MatchAnalyzer"
-    status: "pending"
-    assigned_to: ["backend-architect"]
-    dependencies: ["SA-P1-004"]
-    estimated_effort: "1pt"
-    priority: "medium"
-
-  - id: "SA-P1-008"
-    description: "Unit tests - SimilarityService - Comprehensive test coverage for similarity logic"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SA-P1-004"]
-    estimated_effort: "2pts"
-    priority: "high"
-
-  # Batch 5: Depends on SA-P1-006
-  - id: "SA-P1-009"
-    description: "Integration tests - similar endpoint - End-to-end API tests"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["SA-P1-006", "SA-P1-008"]
-    estimated_effort: "2pts"
-    priority: "high"
-
-  - id: "SA-P1-010"
-    description: "OpenAPI spec update - Update skillmeat/api/openapi.json with endpoint and schemas"
-    status: "pending"
-    assigned_to: ["openapi-expert"]
-    dependencies: ["SA-P1-006"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-  # === PHASE 2: FRONTEND COLLECTION TAB ===
-
-  # Batch 6: Depends on SA-P1-010
-  - id: "SA-P2-001"
-    description: "TypeScript types - Generate types from OpenAPI spec for frontend consumption"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["SA-P1-010"]
-    estimated_effort: "0.5pt"
-    priority: "high"
-
-  # Batch 7: Depends on SA-P2-001
-  - id: "SA-P2-002"
-    description: "useSimilarArtifacts hook - Create custom hook for fetching and managing similar artifacts"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["SA-P2-001"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-  - id: "SA-P2-003"
-    description: "MiniArtifactCard - showScore prop - Extend MiniArtifactCard to display similarity score"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SA-P2-001"]
-    estimated_effort: "2pts"
-    priority: "high"
-
-  # Batch 8: Depends on SA-P2-002, SA-P2-003
-  - id: "SA-P2-004"
-    description: "SimilarArtifactsTab component - Main collection tab with list and filtering"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SA-P2-002", "SA-P2-003"]
-    estimated_effort: "3pts"
-    priority: "critical"
-
-  # Batch 9: Depends on SA-P2-004
-  - id: "SA-P2-005"
-    description: "ArtifactDetailsModal tab registration - Register SimilarArtifactsTab in modal"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["SA-P2-004"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-  - id: "SA-P2-006"
-    description: "Error state handling - Empty, loading, and error states for similar tab"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["SA-P2-004"]
-    estimated_effort: "0.5pt"
-    priority: "medium"
-
-  - id: "SA-P2-007"
-    description: "Component tests - SimilarArtifactsTab and MiniArtifactCard with score rendering"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["SA-P2-004", "SA-P2-003"]
-    estimated_effort: "1pt"
-    priority: "high"
-
-  # Batch 10: Depends on SA-P2-005
-  - id: "SA-P2-008"
-    description: "E2E test - Similar tab - Playwright test for full user workflow"
-    status: "pending"
-    assigned_to: ["frontend-developer"]
-    dependencies: ["SA-P2-005"]
-    estimated_effort: "1pt"
-    priority: "high"
-
+- id: SA-P1-001
+  description: DuplicatePair.ignored migration - Add ignored boolean column to DuplicatePair
+    model
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P1-002
+  description: SimilarityResult dataclass - Define SimilarityResult and ScoreBreakdown
+    dataclasses
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P1-003
+  description: MatchAnalyzer.compare() helper - Add compare(artifact_a, artifact_b)
+    method
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SA-P1-002
+  estimated_effort: 2pts
+  priority: high
+- id: SA-P1-005
+  description: Pydantic schemas - Add SimilarArtifactDTO and SimilarityBreakdownDTO
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SA-P1-002
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P1-004
+  description: SimilarityService core - Implement similarity matching, filtering,
+    and ranking logic
+  status: completed
+  assigned_to:
+  - backend-architect
+  - python-backend-engineer
+  dependencies:
+  - SA-P1-002
+  - SA-P1-003
+  estimated_effort: 5pts
+  priority: critical
+- id: SA-P1-006
+  description: API endpoint - Implement GET /api/v1/artifacts/{id}/similar
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SA-P1-004
+  - SA-P1-005
+  estimated_effort: 2pts
+  priority: high
+- id: SA-P1-007
+  description: OpenTelemetry instrumentation - Add OTel spans to SimilarityService
+    and MatchAnalyzer
+  status: completed
+  assigned_to:
+  - backend-architect
+  dependencies:
+  - SA-P1-004
+  estimated_effort: 1pt
+  priority: medium
+- id: SA-P1-008
+  description: Unit tests - SimilarityService - Comprehensive test coverage for similarity
+    logic
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SA-P1-004
+  estimated_effort: 2pts
+  priority: high
+- id: SA-P1-009
+  description: Integration tests - similar endpoint - End-to-end API tests
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - SA-P1-006
+  - SA-P1-008
+  estimated_effort: 2pts
+  priority: high
+- id: SA-P1-010
+  description: OpenAPI spec update - Update skillmeat/api/openapi.json with endpoint
+    and schemas
+  status: completed
+  assigned_to:
+  - openapi-expert
+  dependencies:
+  - SA-P1-006
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P2-001
+  description: TypeScript types - Generate types from OpenAPI spec for frontend consumption
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - SA-P1-010
+  estimated_effort: 0.5pt
+  priority: high
+- id: SA-P2-002
+  description: useSimilarArtifacts hook - Create custom hook for fetching and managing
+    similar artifacts
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - SA-P2-001
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P2-003
+  description: MiniArtifactCard - showScore prop - Extend MiniArtifactCard to display
+    similarity score
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SA-P2-001
+  estimated_effort: 2pts
+  priority: high
+- id: SA-P2-004
+  description: SimilarArtifactsTab component - Main collection tab with list and filtering
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SA-P2-002
+  - SA-P2-003
+  estimated_effort: 3pts
+  priority: critical
+- id: SA-P2-005
+  description: ArtifactDetailsModal tab registration - Register SimilarArtifactsTab
+    in modal
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - SA-P2-004
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P2-006
+  description: Error state handling - Empty, loading, and error states for similar
+    tab
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - SA-P2-004
+  estimated_effort: 0.5pt
+  priority: medium
+- id: SA-P2-007
+  description: Component tests - SimilarArtifactsTab and MiniArtifactCard with score
+    rendering
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - SA-P2-004
+  - SA-P2-003
+  estimated_effort: 1pt
+  priority: high
+- id: SA-P2-008
+  description: E2E test - Similar tab - Playwright test for full user workflow
+  status: completed
+  assigned_to:
+  - frontend-developer
+  dependencies:
+  - SA-P2-005
+  estimated_effort: 1pt
+  priority: high
 parallelization:
-  batch_1: ["SA-P1-001", "SA-P1-002"]
-  batch_2: ["SA-P1-003", "SA-P1-005"]
-  batch_3: ["SA-P1-004"]
-  batch_4: ["SA-P1-006", "SA-P1-007", "SA-P1-008"]
-  batch_5: ["SA-P1-009", "SA-P1-010"]
-  batch_6: ["SA-P2-001"]
-  batch_7: ["SA-P2-002", "SA-P2-003"]
-  batch_8: ["SA-P2-004"]
-  batch_9: ["SA-P2-005", "SA-P2-006", "SA-P2-007"]
-  batch_10: ["SA-P2-008"]
-  critical_path: ["SA-P1-002", "SA-P1-003", "SA-P1-004", "SA-P1-006", "SA-P1-010", "SA-P2-001", "SA-P2-002", "SA-P2-004", "SA-P2-005", "SA-P2-008"]
-  estimated_total_time: "22pts (optimal parallel execution)"
-
+  batch_1:
+  - SA-P1-001
+  - SA-P1-002
+  batch_2:
+  - SA-P1-003
+  - SA-P1-005
+  batch_3:
+  - SA-P1-004
+  batch_4:
+  - SA-P1-006
+  - SA-P1-007
+  - SA-P1-008
+  batch_5:
+  - SA-P1-009
+  - SA-P1-010
+  batch_6:
+  - SA-P2-001
+  batch_7:
+  - SA-P2-002
+  - SA-P2-003
+  batch_8:
+  - SA-P2-004
+  batch_9:
+  - SA-P2-005
+  - SA-P2-006
+  - SA-P2-007
+  batch_10:
+  - SA-P2-008
+  critical_path:
+  - SA-P1-002
+  - SA-P1-003
+  - SA-P1-004
+  - SA-P1-006
+  - SA-P1-010
+  - SA-P2-001
+  - SA-P2-002
+  - SA-P2-004
+  - SA-P2-005
+  - SA-P2-008
+  estimated_total_time: 22pts (optimal parallel execution)
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "SimilarityService calculates pairwise similarity scores across all artifacts"
-    status: "pending"
-  - id: "SC-2"
-    description: "GET /api/v1/artifacts/{id}/similar returns ranked similar artifacts with scores"
-    status: "pending"
-  - id: "SC-3"
-    description: "All unit and integration tests pass with >80% coverage"
-    status: "pending"
-  - id: "SC-4"
-    description: "SimilarArtifactsTab renders in artifact details modal with filtering and sorting"
-    status: "pending"
-  - id: "SC-5"
-    description: "E2E tests verify similar artifacts discovery workflow end-to-end"
-    status: "pending"
-  - id: "SC-6"
-    description: "OpenAPI spec reflects all new endpoints and schemas"
-    status: "pending"
-
+- id: SC-1
+  description: SimilarityService calculates pairwise similarity scores across all
+    artifacts
+  status: pending
+- id: SC-2
+  description: GET /api/v1/artifacts/{id}/similar returns ranked similar artifacts
+    with scores
+  status: pending
+- id: SC-3
+  description: All unit and integration tests pass with >80% coverage
+  status: pending
+- id: SC-4
+  description: SimilarArtifactsTab renders in artifact details modal with filtering
+    and sorting
+  status: pending
+- id: SC-5
+  description: E2E tests verify similar artifacts discovery workflow end-to-end
+  status: pending
+- id: SC-6
+  description: OpenAPI spec reflects all new endpoints and schemas
+  status: pending
 files_modified:
-  - "skillmeat/cache/models.py"
-  - "skillmeat/core/similarity.py"
-  - "skillmeat/core/scoring/match_analyzer.py"
-  - "skillmeat/api/schemas/artifacts.py"
-  - "skillmeat/api/routers/artifacts.py"
-  - "skillmeat/api/openapi.json"
-  - "tests/test_similarity_service.py"
-  - "tests/test_api_similar.py"
-  - "skillmeat/web/components/artifact/similar-artifacts-tab.tsx"
-  - "skillmeat/web/hooks/use-similar-artifacts.ts"
-  - "skillmeat/web/__tests__/similar-artifacts-tab.test.tsx"
-  - "skillmeat/web/e2e/similar-artifacts.spec.ts"
-
+- skillmeat/cache/models.py
+- skillmeat/core/similarity.py
+- skillmeat/core/scoring/match_analyzer.py
+- skillmeat/api/schemas/artifacts.py
+- skillmeat/api/routers/artifacts.py
+- skillmeat/api/openapi.json
+- tests/test_similarity_service.py
+- tests/test_api_similar.py
+- skillmeat/web/components/artifact/similar-artifacts-tab.tsx
+- skillmeat/web/hooks/use-similar-artifacts.ts
+- skillmeat/web/__tests__/similar-artifacts-tab.test.tsx
+- skillmeat/web/e2e/similar-artifacts.spec.ts
+updated: '2026-02-25'
+progress: 100
 ---
 
 # similar-artifacts - Phase 1-2: Core Similarity Engine + Collection Tab

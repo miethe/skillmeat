@@ -40,6 +40,7 @@ import { ScoreBadge } from '@/components/ScoreBadge';
 import {
   GitBranch,
   GitCommit,
+  GitCompare,
   Calendar,
   Download,
   ExternalLink,
@@ -78,6 +79,7 @@ import {
   CompositePreview,
   type CompositePreviewData,
 } from '@/components/import/composite-preview';
+import { SimilarArtifactsTab } from '@/components/collection/similar-artifacts-tab';
 
 interface CatalogEntryModalProps {
   entry: CatalogEntry | null;
@@ -366,7 +368,7 @@ export function CatalogEntryModal({
   onNavigateToDeployment,
 }: CatalogEntryModalProps) {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'contents' | 'tags' | 'collections' | 'deployments' | 'plugin'
+    'overview' | 'contents' | 'tags' | 'collections' | 'deployments' | 'plugin' | 'similar'
   >('overview');
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -809,7 +811,7 @@ export function CatalogEntryModal({
             value={activeTab}
             onValueChange={(value) =>
               setActiveTab(
-                value as 'overview' | 'contents' | 'tags' | 'collections' | 'deployments' | 'plugin'
+                value as 'overview' | 'contents' | 'tags' | 'collections' | 'deployments' | 'plugin' | 'similar'
               )
             }
             className="flex h-full min-h-0 flex-1 flex-col px-6"
@@ -835,6 +837,13 @@ export function CatalogEntryModal({
               >
                 <Tag className="mr-2 h-4 w-4" aria-hidden="true" />
                 Suggested Tags
+              </TabsTrigger>
+              <TabsTrigger
+                value="similar"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+              >
+                <GitCompare className="mr-2 h-4 w-4" aria-hidden="true" />
+                Similar
               </TabsTrigger>
               {isComposite && (
                 <TabsTrigger
@@ -1405,6 +1414,34 @@ export function CatalogEntryModal({
                 </div>
               </TabsContent>
             )}
+
+            {/* Similar Tab — always visible; requires import_id for API query */}
+            <TabsContent
+              value="similar"
+              className="mt-0 min-h-0 flex-1 overflow-y-auto py-4"
+            >
+              {entry.import_id ? (
+                <SimilarArtifactsTab artifactId={entry.import_id} />
+              ) : (
+                <div
+                  className="flex flex-col items-center justify-center gap-3 py-10 text-center"
+                  aria-label="Similar artifacts unavailable"
+                >
+                  <GitCompare
+                    className="h-8 w-8 text-muted-foreground/40"
+                    aria-hidden="true"
+                  />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Import to discover similar artifacts
+                    </p>
+                    <p className="text-xs text-muted-foreground/70">
+                      Once this artifact is added to your collection, similar items will appear here.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
 
           {/* Action Buttons */}

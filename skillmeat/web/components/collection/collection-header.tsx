@@ -1,6 +1,7 @@
 'use client';
 
-import { MoreVertical, Edit, Trash2, FolderPlus } from 'lucide-react';
+import Link from 'next/link';
+import { MoreVertical, Edit, Trash2, FolderPlus, Layers } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -55,30 +56,48 @@ export function CollectionHeader({
           {description && <p className="text-sm text-muted-foreground">{description}</p>}
         </div>
 
-        {/* Actions dropdown - only show for single collection */}
-        {!isAllCollections && collection && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Collection actions">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEdit} disabled={!onEdit}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Collection
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={onDelete}
-                disabled={!onDelete}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Collection
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        {/* Right-side actions */}
+        <div className="flex items-center gap-2">
+          {/* Consolidate button — always visible in collection views */}
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+          >
+            <Link
+              href="/collection/consolidate"
+              aria-label="Consolidate collection to manage similar artifacts"
+            >
+              <Layers className="mr-2 h-4 w-4" aria-hidden="true" />
+              Consolidate
+            </Link>
+          </Button>
+
+          {/* Actions dropdown - only show for single collection */}
+          {!isAllCollections && collection && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Collection actions">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onEdit} disabled={!onEdit}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Collection
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={onDelete}
+                  disabled={!onDelete}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Collection
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
     </div>
   );

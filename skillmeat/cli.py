@@ -11140,6 +11140,472 @@ def compliance_history(publisher):
 
 
 # ====================
+# Similarity Commands
+# ====================
+
+
+@main.command()
+@click.argument("artifact")
+@click.option(
+    "--limit",
+    "-l",
+    type=int,
+    default=10,
+    help="Maximum number of results to return (default: 10)",
+)
+@click.option(
+    "--min-score",
+    "-m",
+    type=float,
+    default=0.3,
+    help="Minimum similarity score threshold 0.0–1.0 (default: 0.3)",
+)
+@click.option(
+    "--source",
+    "-s",
+    type=click.Choice(["collection", "marketplace", "all"]),
+    default="collection",
+    help="Where to search for similar artifacts (default: collection)",
+)
+def similar(artifact: str, limit: int, min_score: float, source: str):
+    """Find artifacts similar to a given artifact.
+
+    ARTIFACT may be a name (e.g. canvas-design), a type:name ID
+    (e.g. skill:canvas-design), or a UUID hex string.
+
+    Results are ranked by similarity score and classified as exact,
+    near_duplicate, similar, or related.
+
+    \b
+    Examples:
+      skillmeat similar canvas-design
+      skillmeat similar skill:canvas-design --limit 5
+      skillmeat similar my-agent --source marketplace
+      skillmeat similar my-skill --min-score 0.5 --source all
+    """
+    # Use a plain console that respects TTY state so piped output has no ANSI codes.
+    is_tty = sys.stdout.isatty()
+    out = Console(force_terminal=is_tty, legacy_windows=False)
+
+    try:
+        from skillmeat.cache.models import Artifact, get_session
+        from skillmeat.core.similarity import SimilarityService
+
+        # ----------------------------------------------------------------
+        # 1. Resolve the user-supplied identifier to an Artifact UUID.
+        # ----------------------------------------------------------------
+        session = get_session()
+        try:
+            target_row: Optional[Artifact] = None
+
+            # Case 1: looks like a UUID hex (32 hex chars, no colon).
+            if len(artifact) == 32 and ":" not in artifact:
+                target_row = (
+                    session.query(Artifact)
+                    .filter(Artifact.uuid == artifact)
+                    .first()
+                )
+
+            # Case 2: type:name composite ID.
+            if target_row is None and ":" in artifact:
+                target_row = (
+                    session.query(Artifact)
+                    .filter(Artifact.id == artifact)
+                    .first()
+                )
+
+            # Case 3: bare name — search by name across all types.
+            if target_row is None:
+                rows = (
+                    session.query(Artifact)
+                    .filter(Artifact.name == artifact)
+                    .all()
+                )
+                if len(rows) == 1:
+                    target_row = rows[0]
+                elif len(rows) > 1:
+                    out.print(
+                        f"[yellow]Ambiguous artifact name '[bold]{artifact}[/bold]' "
+                        f"matches {len(rows)} artifacts.[/yellow]"
+                    )
+                    out.print(
+                        "[dim]Use the type:name format (e.g. skill:canvas-design) "
+                        "to be specific.[/dim]"
+                    )
+                    for row in rows:
+                        out.print(f"  [cyan]{row.id}[/cyan]")
+                    sys.exit(1)
+
+            if target_row is None:
+                out.print(
+                    f"[red]Artifact '[bold]{artifact}[/bold]' not found.[/red]"
+                )
+                out.print(
+                    "[dim]Run [bold]skillmeat list[/bold] to see available artifacts.[/dim]"
+                )
+                sys.exit(1)
+
+            artifact_uuid = target_row.uuid
+            artifact_display = target_row.id  # type:name for display
+            artifact_type_str = target_row.type
+        finally:
+            session.close()
+
+        # ----------------------------------------------------------------
+        # 2. Run similarity search.
+        # ----------------------------------------------------------------
+        svc = SimilarityService()
+        results = svc.find_similar(
+            artifact_id=artifact_uuid,
+            limit=limit,
+            min_score=min_score,
+            source=source,
+        )
+
+        # ----------------------------------------------------------------
+        # 3. Render results.
+        # ----------------------------------------------------------------
+        if not results:
+            out.print(
+                f"[dim]No similar artifacts found for [bold]{artifact_display}[/bold] "
+                f"(source: {source}, min-score: {min_score}).[/dim]"
+            )
+            return
+
+        # Match-type colour mapping.
+        match_type_styles = {
+            "exact": "bright_green",
+            "near_duplicate": "green",
+            "similar": "yellow",
+            "related": "dim",
+        }
+
+        table = Table(
+            title=f"Similar to [bold]{artifact_display}[/bold] ({source})",
+            show_header=True,
+            header_style="bold cyan",
+        )
+        table.add_column("#", justify="right", width=3, style="dim")
+        table.add_column("Name", style="cyan", no_wrap=True)
+        table.add_column("Type", style="green", width=12)
+        table.add_column("Score %", justify="right", width=8)
+        table.add_column("Match Type", width=14)
+
+        for rank, result in enumerate(results, start=1):
+            score_pct = f"{result.composite_score * 100:.1f}%"
+            match_type_val = result.match_type.value  # e.g. "near_duplicate"
+            match_style = match_type_styles.get(match_type_val, "")
+
+            # Derive display name: prefer type:name from artifact_id field.
+            name_parts = result.artifact_id.split(":", 1)
+            display_name = name_parts[-1]  # bare name portion
+            row_type = getattr(result.artifact, "type", "") or (
+                name_parts[0] if len(name_parts) == 2 else artifact_type_str
+            )
+
+            table.add_row(
+                str(rank),
+                display_name,
+                row_type,
+                score_pct,
+                f"[{match_style}]{match_type_val}[/{match_style}]",
+            )
+
+        out.print(table)
+        out.print(
+            f"\n[dim]Showing {len(results)} result(s) | "
+            f"min-score: {min_score} | source: {source}[/dim]"
+        )
+
+    except SystemExit:
+        raise
+    except Exception as e:
+        out.print(f"[red]Error:[/red] {e}", err=True)
+        logger.exception("Failed to find similar artifacts")
+        sys.exit(1)
+
+
+@main.command()
+@click.option(
+    "--min-score",
+    "-m",
+    type=float,
+    default=0.5,
+    help="Minimum similarity score threshold 0.0–1.0 (default: 0.5)",
+)
+@click.option(
+    "--limit",
+    "-l",
+    type=int,
+    default=20,
+    help="Maximum number of clusters to review (default: 20)",
+)
+@click.option(
+    "--non-interactive",
+    "-n",
+    is_flag=True,
+    default=False,
+    help="Output cluster data to stdout and exit without prompting.",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Choice(["json", "text"]),
+    default="json",
+    help="Output format for non-interactive mode: json (default) or text.",
+)
+def consolidate(min_score: float, limit: int, non_interactive: bool, output: str):
+    """Interactively consolidate duplicate or similar artifacts.
+
+    Fetches consolidation clusters (groups of similar artifacts) and
+    presents each one for review. For each cluster you can merge,
+    replace, skip, or quit.
+
+    Auto-snapshot is taken before any destructive action (merge/replace).
+    If the snapshot fails the action is aborted.
+
+    \b
+    Examples:
+      skillmeat consolidate
+      skillmeat consolidate --min-score 0.7
+      skillmeat consolidate --limit 5
+      skillmeat consolidate --non-interactive
+      skillmeat consolidate -n --output text
+    """
+    is_tty = sys.stdin.isatty()
+    out = Console(force_terminal=sys.stdout.isatty(), legacy_windows=False)
+
+    # ------------------------------------------------------------------
+    # Non-interactive mode: explicit flag or auto-detected non-TTY stdin.
+    # ------------------------------------------------------------------
+    if non_interactive or not is_tty:
+        if not non_interactive and not is_tty:
+            # Auto-detected non-TTY: warn on stderr before outputting data.
+            sys.stderr.write(
+                "Warning: non-interactive mode auto-enabled (stdin is not a TTY)\n"
+            )
+        try:
+            from skillmeat.core.similarity import SimilarityService
+
+            svc = SimilarityService()
+            page = svc.get_consolidation_clusters(min_score=min_score, limit=limit)
+            clusters = page.get("clusters", [])
+
+            if output == "json":
+                import json as _json
+
+                cluster_data = []
+                for cluster in clusters:
+                    artifact_ids = cluster.get("artifacts", [])
+                    cluster_data.append(
+                        {
+                            "artifact_ids": artifact_ids,
+                            "names": cluster.get("names", []),
+                            "scores": cluster.get("scores", []),
+                            "max_score": cluster.get("max_score", 0.0),
+                            "artifact_type": cluster.get("artifact_type", ""),
+                            "pair_count": cluster.get("pair_count", 0),
+                        }
+                    )
+                result = {
+                    "clusters": cluster_data,
+                    "total_count": len(cluster_data),
+                }
+                sys.stdout.write(_json.dumps(result) + "\n")
+            else:
+                # Text mode: human-readable summary.
+                if not clusters:
+                    sys.stdout.write(
+                        f"No consolidation clusters found (min-score: {min_score})\n"
+                    )
+                else:
+                    sys.stdout.write(
+                        f"Consolidation clusters: {len(clusters)} found\n\n"
+                    )
+                    for i, cluster in enumerate(clusters, start=1):
+                        artifact_ids = cluster.get("artifacts", [])
+                        max_score = cluster.get("max_score", 0.0)
+                        artifact_type = cluster.get("artifact_type", "mixed") or "mixed"
+                        pair_count = cluster.get("pair_count", 0)
+                        names = cluster.get("names", [])
+                        sys.stdout.write(
+                            f"Cluster {i}: score={max_score:.2f}  "
+                            f"type={artifact_type}  pairs={pair_count}\n"
+                        )
+                        for j, aid in enumerate(artifact_ids):
+                            name = names[j] if j < len(names) else ""
+                            label = "PRIMARY" if j == 0 else f"    [{j + 1}]"
+                            name_part = f"  ({name})" if name else ""
+                            sys.stdout.write(f"  {label}  {aid}{name_part}\n")
+                        sys.stdout.write("\n")
+        except Exception as e:
+            sys.stderr.write(f"Error: {e}\n")
+            logger.exception("Failed to list consolidation clusters")
+            sys.exit(1)
+        return
+
+    # ------------------------------------------------------------------
+    # Interactive (TTY) mode.
+    # ------------------------------------------------------------------
+    try:
+        from skillmeat.cache.repositories import DuplicatePairRepository
+        from skillmeat.core.similarity import SimilarityService
+
+        svc = SimilarityService()
+        page = svc.get_consolidation_clusters(min_score=min_score, limit=limit)
+        clusters = page.get("clusters", [])
+
+        if not clusters:
+            out.print(
+                f"[green]No consolidation clusters found "
+                f"(min-score: {min_score}, limit: {limit}).[/green]"
+            )
+            out.print("[dim]Your collection looks clean![/dim]")
+            return
+
+        total = len(clusters)
+        out.print(
+            f"\n[bold cyan]Consolidation Wizard[/bold cyan] — "
+            f"[dim]{total} cluster(s) to review[/dim]\n"
+        )
+
+        pair_repo = DuplicatePairRepository()
+
+        def _auto_snapshot() -> bool:
+            """Create a safety snapshot before a destructive action.
+
+            Returns True on success, False on failure.
+            """
+            try:
+                version_mgr = VersionManager()
+                version_mgr.create_snapshot(
+                    message="Auto-snapshot before consolidate action"
+                )
+                return True
+            except Exception as snap_exc:  # noqa: BLE001
+                logger.warning(
+                    "consolidate: auto-snapshot failed: %s", snap_exc
+                )
+                return False
+
+        for idx, cluster in enumerate(clusters, start=1):
+            artifact_uuids = cluster.get("artifacts", [])
+            max_score = cluster.get("max_score", 0.0)
+            artifact_type = cluster.get("artifact_type", "")
+            pair_count = cluster.get("pair_count", 0)
+
+            # Build panel content.
+            panel_lines = [
+                f"[bold]Cluster {idx}/{total}[/bold]  "
+                f"score=[yellow]{max_score:.2f}[/yellow]  "
+                f"type=[cyan]{artifact_type or 'mixed'}[/cyan]  "
+                f"pairs={pair_count}",
+                "",
+            ]
+            for pos, uuid_val in enumerate(artifact_uuids, start=1):
+                prefix = "[green]PRIMARY[/green]" if pos == 1 else f"  [{pos}]  "
+                panel_lines.append(f"  {prefix}  {uuid_val}")
+
+            panel_body = "\n".join(panel_lines)
+            out.print(
+                Panel(
+                    panel_body,
+                    title=f"[bold]Cluster {idx} of {total}[/bold]",
+                    border_style="cyan",
+                    expand=False,
+                )
+            )
+
+            # Prompt for action.
+            action = click.prompt(
+                "Action",
+                type=click.Choice(["merge", "replace", "skip", "quit"]),
+                default="skip",
+                show_choices=True,
+            )
+
+            if action == "quit":
+                out.print("\n[dim]Consolidation wizard exited.[/dim]")
+                return
+
+            if action == "skip":
+                # Mark all pairs in this cluster as ignored.
+                ignored_count = 0
+                for i in range(len(artifact_uuids)):
+                    for j in range(i + 1, len(artifact_uuids)):
+                        # DuplicatePair IDs are not directly surfaced by the
+                        # cluster dict, so we look them up by the pair repo.
+                        # For now we attempt to mark by a synthetic pair key;
+                        # full pair-id resolution requires SA-P5-009.
+                        pair_id = f"{artifact_uuids[i]}:{artifact_uuids[j]}"
+                        try:
+                            pair_repo.mark_pair_ignored(pair_id)
+                            ignored_count += 1
+                        except Exception:  # noqa: BLE001
+                            pass  # Pair ID format mismatch is non-fatal here.
+                out.print(
+                    f"[dim]Skipped cluster {idx} "
+                    f"({ignored_count} pair(s) marked ignored).[/dim]"
+                )
+                continue
+
+            if action in ("merge", "replace"):
+                # Safety snapshot gate.
+                out.print("[dim]Creating safety snapshot...[/dim]")
+                if not _auto_snapshot():
+                    out.print(
+                        "[red]Snapshot failed — action aborted.[/red]"
+                    )
+                    continue
+
+                if action == "merge":
+                    # SA-P5-009: full merge implementation is pending.
+                    # Stub: log intent and emit a warning.
+                    out.print(
+                        f"[yellow]Merge of cluster {idx} is not yet fully "
+                        f"implemented (pending SA-P5-009). "
+                        f"Snapshot was created; no files changed.[/yellow]"
+                    )
+                    logger.warning(
+                        "consolidate: merge action for cluster %d skipped "
+                        "(SA-P5-009 not yet implemented).",
+                        idx,
+                    )
+                elif action == "replace":
+                    # SA-P5-009: full replace implementation is pending.
+                    # Stub: keep primary, discard secondary (log intent only).
+                    primary = artifact_uuids[0] if artifact_uuids else "unknown"
+                    secondaries = artifact_uuids[1:]
+                    out.print(
+                        f"[yellow]Replace of cluster {idx} is not yet fully "
+                        f"implemented (pending SA-P5-009). "
+                        f"Would keep [bold]{primary}[/bold] and discard: "
+                        f"{', '.join(secondaries)}. "
+                        f"Snapshot was created; no files changed.[/yellow]"
+                    )
+                    logger.warning(
+                        "consolidate: replace action for cluster %d skipped "
+                        "(SA-P5-009 not yet implemented). "
+                        "primary=%s secondaries=%s",
+                        idx,
+                        primary,
+                        secondaries,
+                    )
+
+        out.print(
+            f"\n[green]Consolidation wizard complete.[/green] "
+            f"Reviewed {total} cluster(s).\n"
+        )
+
+    except SystemExit:
+        raise
+    except Exception as e:
+        out.print(f"[red]Error:[/red] {e}", err=True)
+        logger.exception("Failed to run consolidation wizard")
+        sys.exit(1)
+
+
+# ====================
 # Context Entity Management Commands
 # ====================
 
