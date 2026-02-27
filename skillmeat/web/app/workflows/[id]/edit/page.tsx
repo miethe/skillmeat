@@ -1,36 +1,79 @@
+'use client';
+
 /**
  * Edit Workflow Page
  *
- * Form to modify an existing workflow's definition and configuration.
- * Placeholder shell — full implementation in Phase 5/6.
+ * Fetches an existing workflow by id and renders WorkflowBuilderView in edit
+ * mode. Shows a loading skeleton while the query is in-flight and an inline
+ * error message if the workflow cannot be loaded.
  *
- * Next.js 15: params is a Promise — must be awaited.
+ * Next.js 15 note: params is a Promise in Server Components, but this file is
+ * 'use client' so we unwrap it via useParams() instead of awaiting props.
  */
 
-import { Pencil } from 'lucide-react';
-import { PageHeader } from '@/components/shared/page-header';
+import { useParams } from 'next/navigation';
+import { AlertCircle } from 'lucide-react';
+import {
+  WorkflowBuilderView,
+  WorkflowBuilderSkeleton,
+} from '@/components/workflow/workflow-builder-view';
+import { useWorkflow } from '@/hooks';
+import { cn } from '@/lib/utils';
 
-interface EditWorkflowPageProps {
-  params: Promise<{ id: string }>;
+// ============================================================================
+// Error state
+// ============================================================================
+
+interface ErrorStateProps {
+  message?: string;
 }
 
-export default async function EditWorkflowPage({ params }: EditWorkflowPageProps) {
-  const { id } = await params;
-
+function ErrorState({ message }: ErrorStateProps) {
   return (
-    <div className="space-y-6 p-6">
-      <PageHeader
-        title="Edit Workflow"
-        description={`Editing workflow: ${id}`}
-        icon={<Pencil className="h-6 w-6" />}
+    <div
+      className={cn(
+        'flex h-screen flex-col items-center justify-center gap-4',
+        'bg-background text-center px-6',
+      )}
+      role="alert"
+    >
+      <AlertCircle
+        className="h-10 w-10 text-destructive/70"
+        aria-hidden="true"
       />
-      <div className="flex items-center justify-center rounded-lg border border-dashed py-24 text-center">
-        <div className="space-y-2">
-          <Pencil className="mx-auto h-10 w-10 text-muted-foreground/40" aria-hidden="true" />
-          <p className="text-sm text-muted-foreground">Edit Workflow form — coming soon</p>
-          <p className="font-mono text-xs text-muted-foreground/60">{id}</p>
-        </div>
+      <div className="space-y-1">
+        <p className="text-sm font-medium text-foreground">
+          Failed to load workflow
+        </p>
+        {message && (
+          <p className="text-xs text-muted-foreground">{message}</p>
+        )}
       </div>
     </div>
   );
+}
+
+// ============================================================================
+// Page component
+// ============================================================================
+
+export default function EditWorkflowPage() {
+  const params = useParams<{ id: string }>();
+  const id = params?.id ?? '';
+
+  const { data: workflow, isLoading, isError, error } = useWorkflow(id);
+
+  if (isLoading) {
+    return <WorkflowBuilderSkeleton />;
+  }
+
+  if (isError || !workflow) {
+    return (
+      <ErrorState
+        message={error instanceof Error ? error.message : undefined}
+      />
+    );
+  }
+
+  return <WorkflowBuilderView existingWorkflow={workflow} />;
 }
