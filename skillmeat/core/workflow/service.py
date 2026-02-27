@@ -42,14 +42,16 @@ from typing import Any, Dict, List, Optional
 import yaml
 from pydantic import ValidationError
 
-from skillmeat.cache.models import Workflow, WorkflowStage
-from skillmeat.cache.workflow_repository import WorkflowRepository
+from skillmeat.core.workflow.dag import build_dag
 from skillmeat.core.workflow.exceptions import (
+    WorkflowCycleError,
     WorkflowNotFoundError,
     WorkflowParseError,
     WorkflowValidationError,
 )
 from skillmeat.core.workflow.models import WorkflowDefinition
+from skillmeat.core.workflow.planner import ExecutionPlan, generate_plan
+from skillmeat.core.workflow.validator import ValidationResult, validate_expressions
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +184,7 @@ def _build_workflow_orm(
     yaml_content: str,
     project_id: Optional[str] = None,
     workflow_id: Optional[str] = None,
-) -> Workflow:
+) -> "Workflow":
     """Construct an unsaved ``Workflow`` ORM instance from a parsed definition.
 
     Args:
@@ -194,6 +196,8 @@ def _build_workflow_orm(
     Returns:
         Unsaved ``Workflow`` ORM instance.
     """
+    from skillmeat.cache.models import Workflow  # noqa: PLC0415 — lazy import avoids circular
+
     meta = definition.workflow
     now = datetime.utcnow()
 
@@ -231,7 +235,7 @@ def _build_workflow_orm(
 
 def _build_stage_orms(
     definition: WorkflowDefinition, workflow_id: str
-) -> List[WorkflowStage]:
+) -> "List[WorkflowStage]":
     """Decompose all stages from a definition into ``WorkflowStage`` ORM instances.
 
     Args:
@@ -241,6 +245,8 @@ def _build_stage_orms(
     Returns:
         Ordered list of unsaved ``WorkflowStage`` instances.
     """
+    from skillmeat.cache.models import WorkflowStage  # noqa: PLC0415 — lazy import avoids circular
+
     stages: List[WorkflowStage] = []
     now = datetime.utcnow()
 
@@ -291,7 +297,7 @@ def _build_stage_orms(
     return stages
 
 
-def _stage_orm_to_dto(stage: WorkflowStage) -> StageDTO:
+def _stage_orm_to_dto(stage: "WorkflowStage") -> StageDTO:
     """Convert a ``WorkflowStage`` ORM instance to a ``StageDTO``.
 
     Args:
@@ -345,7 +351,7 @@ def _stage_orm_to_dto(stage: WorkflowStage) -> StageDTO:
     )
 
 
-def _workflow_orm_to_dto(workflow: Workflow) -> WorkflowDTO:
+def _workflow_orm_to_dto(workflow: "Workflow") -> WorkflowDTO:
     """Convert a ``Workflow`` ORM instance (with loaded stages) to a ``WorkflowDTO``.
 
     Args:
@@ -435,6 +441,8 @@ class WorkflowService:
             db_path: Optional path to the SQLite database file.  Uses the
                 default ``~/.skillmeat/cache/cache.db`` when ``None``.
         """
+        from skillmeat.cache.workflow_repository import WorkflowRepository  # noqa: PLC0415 — lazy import avoids circular
+
         self.repo = WorkflowRepository(db_path=db_path)
         logger.info("WorkflowService initialised")
 
@@ -672,6 +680,8 @@ class WorkflowService:
                 f"Workflow not found: {workflow_id!r}", workflow_id=workflow_id
             )
 
+        from skillmeat.cache.models import Workflow, WorkflowStage  # noqa: PLC0415 — lazy import avoids circular
+
         copy_id = uuid.uuid4().hex
         now = datetime.utcnow()
 
@@ -733,3 +743,237 @@ class WorkflowService:
             copy_name,
         )
         return _workflow_orm_to_dto(created)
+
+    # =========================================================================
+    # Validation & Planning
+    # =========================================================================
+
+    def validate(
+        self,
+        workflow_id_or_yaml: str,
+        is_yaml: bool = False,
+    ) -> ValidationResult:
+        """Validate a workflow definition through all static analysis passes.
+
+        Runs four validation passes in sequence, accumulating all findings into
+        a single ``ValidationResult`` so that callers receive a complete picture
+        without the process stopping at the first error:
+
+        1. **Schema validation** — Pydantic model parse (catches type errors,
+           missing required fields, and enum violations).
+        2. **Expression validation** — static ``${{ }}`` reference checks
+           (unknown stages, undeclared parameters, missing output keys).
+        3. **DAG validation** — unknown ``depends_on`` references and cycle
+           detection.
+        4. **Artifact resolution** — verifies that every ``roles.primary.artifact``
+           and ``roles.tools`` entry follows the ``<type>:<name>`` format expected
+           by the execution engine.
+
+        Args:
+            workflow_id_or_yaml: When ``is_yaml=False`` (default), the DB primary
+                key of a persisted workflow to fetch and validate.  When
+                ``is_yaml=True``, a raw YAML string to parse and validate in-memory
+                without any DB interaction.
+            is_yaml: If ``True``, treat ``workflow_id_or_yaml`` as a YAML string.
+                If ``False`` (default), treat it as a workflow ID to look up.
+
+        Returns:
+            A ``ValidationResult`` whose ``valid`` flag is ``True`` when no errors
+            were found.  ``errors`` and ``warnings`` carry all discovered issues as
+            ``ValidationIssue`` instances with ``category``, ``message``,
+            ``stage_id``, and ``field`` attributes.
+
+        Raises:
+            WorkflowNotFoundError: If ``is_yaml=False`` and no workflow with the
+                given ID exists in the database.
+
+        Example::
+
+            svc = WorkflowService()
+
+            # Validate a persisted workflow by ID
+            result = svc.validate("abc123")
+            if not result.valid:
+                for err in result.errors:
+                    print(err)
+
+            # Validate a YAML string without persisting
+            result = svc.validate(yaml_text, is_yaml=True)
+        """
+        # ------------------------------------------------------------------
+        # Pass 1: Schema validation (parse YAML or fetch from DB).
+        # ------------------------------------------------------------------
+        result = ValidationResult()
+        definition: Optional[WorkflowDefinition] = None
+
+        if is_yaml:
+            try:
+                definition = _parse_yaml_string(workflow_id_or_yaml)
+            except WorkflowParseError as exc:
+                result.add_error(
+                    category="schema",
+                    message=f"YAML parse error: {exc.message}",
+                )
+                return result  # Cannot proceed without a parseable definition.
+            except WorkflowValidationError as exc:
+                for detail in exc.details:
+                    result.add_error(category="schema", message=detail)
+                # Schema errors are blocking — expression/DAG passes require a
+                # valid Pydantic model.
+                return result
+        else:
+            workflow_orm = self.repo.get_with_stages(workflow_id_or_yaml)
+            if workflow_orm is None:
+                raise WorkflowNotFoundError(
+                    f"Workflow not found: {workflow_id_or_yaml!r}",
+                    workflow_id=workflow_id_or_yaml,
+                )
+            try:
+                definition = _parse_yaml_string(workflow_orm.definition_yaml)
+            except WorkflowParseError as exc:
+                result.add_error(
+                    category="schema",
+                    message=f"Stored definition parse error: {exc.message}",
+                )
+                return result
+            except WorkflowValidationError as exc:
+                for detail in exc.details:
+                    result.add_error(category="schema", message=detail)
+                return result
+
+        # ------------------------------------------------------------------
+        # Pass 2 + 3: DAG build (validates depends_on refs + cycles) then
+        # expression validation (requires a valid DAG).
+        # ------------------------------------------------------------------
+        dag = None
+        try:
+            dag = build_dag(definition)
+        except WorkflowValidationError as exc:
+            result.add_error(category="dag", message=str(exc))
+        except WorkflowCycleError as exc:
+            result.add_error(category="dag", message=str(exc))
+
+        if dag is not None:
+            expr_result = validate_expressions(definition, dag)
+            result.errors.extend(expr_result.errors)
+            result.warnings.extend(expr_result.warnings)
+            if expr_result.errors:
+                result.valid = False
+
+        # ------------------------------------------------------------------
+        # Pass 4: Artifact reference format validation.
+        # ------------------------------------------------------------------
+        for stage in definition.stages:
+            if stage.roles is not None:
+                primary_ref = stage.roles.primary.artifact
+                if primary_ref and ":" not in primary_ref:
+                    result.add_error(
+                        category="artifact",
+                        message=(
+                            f"roles.primary.artifact {primary_ref!r} must follow "
+                            f"the '<type>:<name>' format (e.g. 'agent:researcher-v1')"
+                        ),
+                        stage_id=stage.id,
+                        field="roles.primary.artifact",
+                    )
+                for tool_ref in stage.roles.tools:
+                    if ":" not in tool_ref:
+                        result.add_error(
+                            category="artifact",
+                            message=(
+                                f"roles.tools entry {tool_ref!r} must follow "
+                                f"the '<type>:<name>' format (e.g. 'skill:web-search')"
+                            ),
+                            stage_id=stage.id,
+                            field="roles.tools",
+                        )
+
+        logger.info(
+            "WorkflowService.validate: id_or_yaml=%r is_yaml=%s valid=%s "
+            "errors=%d warnings=%d",
+            workflow_id_or_yaml[:40] if is_yaml else workflow_id_or_yaml,
+            is_yaml,
+            result.valid,
+            len(result.errors),
+            len(result.warnings),
+        )
+        return result
+
+    def plan(
+        self,
+        workflow_id: str,
+        parameters: Optional[Dict[str, Any]] = None,
+    ) -> ExecutionPlan:
+        """Generate a static execution plan for a persisted workflow.
+
+        Validates the workflow first and raises if any blocking errors are found.
+        On success, resolves parameters (merging caller values with declared
+        defaults), builds the dependency DAG, computes parallel execution batches
+        via topological sort, and returns a fully-populated ``ExecutionPlan``.
+
+        Args:
+            workflow_id:  DB primary key of the workflow to plan.
+            parameters:   Caller-supplied parameter values (merged with workflow
+                          defaults).  Missing non-required parameters receive their
+                          declared defaults.  ``None`` is treated as an empty dict.
+
+        Returns:
+            An ``ExecutionPlan`` containing:
+
+            - ``workflow_id`` / ``workflow_name`` / ``workflow_version``
+            - ``parameters`` — fully merged parameter dict
+            - ``batches`` — ordered list of ``ExecutionBatch`` objects, each
+              containing ``ExecutionPlanStage`` entries that can run concurrently
+            - ``estimated_timeout_seconds`` — rough sequential sum of per-batch
+              max stage timeouts
+            - ``validation`` — the ``ValidationResult`` from the pre-plan
+              validation pass (always ``valid=True`` at this point)
+
+        Raises:
+            WorkflowNotFoundError: If no workflow with ``workflow_id`` exists.
+            WorkflowValidationError: If the workflow definition has blocking
+                validation errors (schema, DAG, expression, or artifact issues).
+
+        Example::
+
+            svc = WorkflowService()
+            plan = svc.plan("abc123", parameters={"feature_name": "auth-v2"})
+            print(plan.format_text())
+        """
+        # Fetch the stored definition YAML.
+        workflow_orm = self.repo.get_with_stages(workflow_id)
+        if workflow_orm is None:
+            raise WorkflowNotFoundError(
+                f"Workflow not found: {workflow_id!r}", workflow_id=workflow_id
+            )
+
+        # Pre-plan validation — raise on any blocking errors.
+        validation_result = self.validate(workflow_id, is_yaml=False)
+        if not validation_result.valid:
+            error_summary = "; ".join(
+                str(e) for e in validation_result.errors[:5]
+            )
+            raise WorkflowValidationError(
+                f"Workflow '{workflow_id}' failed validation "
+                f"({len(validation_result.errors)} error(s)): {error_summary}",
+                details=[str(e) for e in validation_result.errors],
+            )
+
+        # Parse the stored YAML into a WorkflowDefinition for the planner.
+        definition = _parse_yaml_string(workflow_orm.definition_yaml)
+
+        # Delegate to planner — generate_plan handles parameter merging,
+        # DAG build, expression validation, batch computation, and timeout
+        # estimation internally.
+        params: Dict[str, Any] = parameters if parameters is not None else {}
+        execution_plan = generate_plan(definition, params)
+
+        logger.info(
+            "WorkflowService.plan: id=%s batches=%d stages=%d "
+            "estimated_timeout_s=%d",
+            workflow_id,
+            len(execution_plan.batches),
+            sum(len(b.stages) for b in execution_plan.batches),
+            execution_plan.estimated_timeout_seconds,
+        )
+        return execution_plan
