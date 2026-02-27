@@ -59,6 +59,7 @@ from .routers import (
     tags,
     user_collections,
     versions,
+    workflow_executions,
     workflows,
 )
 from .middleware import ObservabilityMiddleware, RateLimitMiddleware
@@ -411,6 +412,11 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(versions.router, prefix=settings.api_prefix, tags=["versions"])
     app.include_router(
         workflows.router, prefix=settings.api_prefix, tags=["workflows"]
+    )
+    app.include_router(
+        workflow_executions.router,
+        prefix=settings.api_prefix,
+        tags=["workflow-executions"],
     )
 
     # Root endpoint

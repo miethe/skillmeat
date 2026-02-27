@@ -37,6 +37,7 @@ from . import (
     tags,
     user_collections,
     versions,
+    workflow_executions,
     workflows,
 )
 
@@ -74,5 +75,6 @@ __all__ = [
     "tags",
     "user_collections",
     "versions",
+    "workflow_executions",
     "workflows",
 ]
