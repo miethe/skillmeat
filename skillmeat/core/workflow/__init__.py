@@ -41,9 +41,11 @@ from skillmeat.core.workflow.exceptions import (
     WorkflowArtifactError,
     WorkflowCycleError,
     WorkflowError,
+    WorkflowNotFoundError,
     WorkflowParseError,
     WorkflowValidationError,
 )
+from skillmeat.core.workflow.service import StageDTO, WorkflowDTO, WorkflowService
 from skillmeat.core.workflow.models import (
     ContextBinding,
     ErrorPolicy,
@@ -100,6 +102,11 @@ __all__ = [
     "WorkflowValidationError",
     "WorkflowCycleError",
     "WorkflowArtifactError",
+    "WorkflowNotFoundError",
+    # Service + DTOs
+    "WorkflowService",
+    "WorkflowDTO",
+    "StageDTO",
     # Parser
     "parse_workflow",
     # Defaults

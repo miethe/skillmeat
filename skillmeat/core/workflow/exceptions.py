@@ -162,3 +162,26 @@ class WorkflowArtifactError(WorkflowError):
         if self.stage_id is not None:
             parts.append(f"  Stage: {self.stage_id!r}")
         return "\n".join(parts)
+
+
+class WorkflowNotFoundError(WorkflowError):
+    """Raised when a requested workflow does not exist in the database.
+
+    Attributes:
+        message:     Human-readable description.
+        workflow_id: The identifier that was looked up.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        workflow_id: Optional[str] = None,
+    ) -> None:
+        super().__init__(message)
+        self.workflow_id = workflow_id
+
+    def __str__(self) -> str:
+        parts = [self.message]
+        if self.workflow_id is not None:
+            parts.append(f"  Workflow ID: {self.workflow_id!r}")
+        return "\n".join(parts)
