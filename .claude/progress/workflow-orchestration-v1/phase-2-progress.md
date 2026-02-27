@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 3
+completed_tasks: 6
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -51,7 +51,7 @@ tasks:
 - id: REPO-2.4
   description: 'WorkflowRepository: CRUD + list with filters (status, tags, search),
     cursor pagination, find_by_name'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -61,7 +61,7 @@ tasks:
 - id: REPO-2.5
   description: 'WorkflowExecutionRepository: CRUD + list with filters (workflow_id,
     status, date range), cursor pagination'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -71,7 +71,7 @@ tasks:
 - id: REPO-2.6
   description: 'ExecutionStepRepository: CRUD + list by execution_id, update status/outputs/logs,
     bulk updates'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -147,7 +147,7 @@ schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
 updated: '2026-02-27'
-progress: 37
+progress: 75
 ---
 
 # workflow-orchestration-v1 - Phase 2: Database + Repository Layer
