@@ -171,9 +171,10 @@ def _build_default_error_policy(
     Returns:
         A new :class:`ErrorPolicy` appropriate for the stage type.
     """
-    inherited_retry: RetryPolicy | None = None
     if global_error_policy is not None and global_error_policy.default_retry is not None:
-        inherited_retry = _apply_retry_defaults(global_error_policy.default_retry)
+        inherited_retry: RetryPolicy = _apply_retry_defaults(global_error_policy.default_retry)
+    else:
+        inherited_retry = DEFAULT_RETRY_POLICY
 
     timeout = (
         DEFAULT_GATE_STAGE_TIMEOUT if stage_type == "gate" else DEFAULT_AGENT_STAGE_TIMEOUT

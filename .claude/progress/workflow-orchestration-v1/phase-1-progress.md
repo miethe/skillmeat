@@ -3,13 +3,13 @@ type: progress
 prd: workflow-orchestration-v1
 phase: 1
 title: Schema & Core Logic (SWDL Engine)
-status: pending
+status: completed
 started: null
 completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 13
-completed_tasks: 10
+completed_tasks: 13
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -115,7 +115,7 @@ tasks:
 - id: TEST-1.11
   description: Parser unit tests (YAML/JSON, defaults, validation errors, all Schema
     Spec examples)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -126,7 +126,7 @@ tasks:
 - id: TEST-1.12
   description: Expression unit tests (parsing, evaluation, static validation, built-in
     functions)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -137,7 +137,7 @@ tasks:
 - id: TEST-1.13
   description: DAG unit tests (construction, cycle detection, batch computation, plan
     generation)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -202,7 +202,7 @@ files_modified:
 schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
-progress: 76
+progress: 100
 updated: '2026-02-27'
 ---
 
