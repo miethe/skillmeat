@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 1
+completed_tasks: 2
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -31,7 +31,7 @@ tasks:
 - id: DB-2.2
   description: 'SQLAlchemy ORM models: Workflow, WorkflowStage, WorkflowExecution,
     ExecutionStep'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -147,7 +147,7 @@ schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
 updated: '2026-02-27'
-progress: 12
+progress: 25
 ---
 
 # workflow-orchestration-v1 - Phase 2: Database + Repository Layer
