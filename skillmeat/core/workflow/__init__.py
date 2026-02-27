@@ -41,11 +41,13 @@ from skillmeat.core.workflow.exceptions import (
     WorkflowArtifactError,
     WorkflowCycleError,
     WorkflowError,
+    WorkflowExecutionInvalidStateError,
     WorkflowExecutionNotFoundError,
     WorkflowNotFoundError,
     WorkflowParseError,
     WorkflowValidationError,
 )
+from skillmeat.core.workflow.context_service import WorkflowContextService
 from skillmeat.core.workflow.execution_service import (
     ExecutionStepDTO,
     WorkflowExecutionDTO,
@@ -110,10 +112,13 @@ __all__ = [
     "WorkflowArtifactError",
     "WorkflowNotFoundError",
     "WorkflowExecutionNotFoundError",
+    "WorkflowExecutionInvalidStateError",
     # Service + DTOs
     "WorkflowService",
     "WorkflowDTO",
     "StageDTO",
+    # Context service
+    "WorkflowContextService",
     # Execution service + DTOs
     "WorkflowExecutionService",
     "WorkflowExecutionDTO",

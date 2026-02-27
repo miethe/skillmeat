@@ -37,6 +37,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from skillmeat.core.workflow.exceptions import (
+    WorkflowExecutionInvalidStateError,
     WorkflowExecutionNotFoundError,
     WorkflowNotFoundError,
 )
@@ -990,11 +991,17 @@ class WorkflowExecutionService:
                 "message": f"Stage '{stage_name}' dispatched (stub — real dispatch is future work)",
             }
             completed_at = datetime.utcnow()
+            # SVC-3.7: validate, serialize, and persist the stage output.
+            # _validate_and_serialize_output also calls _update_step with
+            # the final outputs, so we pass completed_at separately first
+            # to record the timestamp before the output write.
             self._update_step(
                 step_id,
                 status="completed",
                 completed_at=completed_at,
-                outputs=stub_output,
+            )
+            final_output = self._validate_and_serialize_output(
+                step_id, stub_output, stage
             )
             self._emit_event(
                 execution_id,
@@ -1003,7 +1010,7 @@ class WorkflowExecutionService:
                     "execution_id": execution_id,
                     "step_id": step_id,
                     "stage_id": stage_id,
-                    "output": stub_output,
+                    "output": final_output,
                 },
             )
             logger.info(
@@ -1127,22 +1134,20 @@ class WorkflowExecutionService:
     def pause_execution(self, execution_id: str) -> WorkflowExecutionDTO:
         """Pause a running execution.
 
-        Sets the execution status to ``"paused"`` and signals the execution
-        loop to stop before the next batch.
-
-        NOTE: Full pause/resume semantics (persisting current batch position
-        so execution can resume mid-workflow) are deferred to SVC-3.6.
-        This stub sets the status and signals the cancellation flag so the
-        loop exits cleanly between batches.
+        Validates that the execution is currently in the ``"running"`` state,
+        then transitions it to ``"paused"`` and signals the execution loop to
+        stop before the start of the next batch.
 
         Args:
             execution_id: Primary key of the execution to pause.
 
         Returns:
-            Updated ``WorkflowExecutionDTO``.
+            Updated ``WorkflowExecutionDTO`` with ``status="paused"``.
 
         Raises:
             WorkflowExecutionNotFoundError: If the execution does not exist.
+            WorkflowExecutionInvalidStateError: If the execution is not in
+                the ``"running"`` state.
         """
         # Lazy imports — circular-import guard.
         from skillmeat.cache.models import get_session  # noqa: PLC0415
@@ -1153,12 +1158,22 @@ class WorkflowExecutionService:
         session = get_session(self._db_path)
         try:
             repo = WorkflowExecutionRepository(session)
-            updated = repo.update_status(execution_id, status="paused")
-            if updated is None:
+            execution = repo.get(execution_id)
+            if execution is None:
                 raise WorkflowExecutionNotFoundError(
                     f"WorkflowExecution not found: {execution_id!r}",
                     execution_id=execution_id,
                 )
+            if execution.status != "running":
+                raise WorkflowExecutionInvalidStateError(
+                    f"Cannot pause execution {execution_id!r}: "
+                    f"expected status 'running', got {execution.status!r}",
+                    execution_id=execution_id,
+                    current_status=execution.status,
+                    expected_status="running",
+                )
+            execution.status = "paused"
+            repo.update(execution)
             session.commit()
         except Exception:
             session.rollback()
@@ -1178,20 +1193,27 @@ class WorkflowExecutionService:
     def resume_execution(self, execution_id: str) -> WorkflowExecutionDTO:
         """Resume a paused execution.
 
-        Sets the execution status back to ``"running"``.
+        Validates that the execution is currently in the ``"paused"`` state,
+        clears the cancellation flag so a subsequent call to
+        :meth:`run_execution` can re-enter the batch loop, and transitions
+        the execution status to ``"running"``.
 
-        NOTE: This stub only transitions the status field.  Actually
-        re-entering the batch loop from the correct position is deferred to
-        SVC-3.6.
+        The actual re-run of the batch loop must be triggered by the caller
+        — this method returns a DTO with ``status="running"`` so the API
+        layer can re-invoke :meth:`run_execution` in a background thread.
 
         Args:
             execution_id: Primary key of the execution to resume.
 
         Returns:
-            Updated ``WorkflowExecutionDTO``.
+            Updated ``WorkflowExecutionDTO`` with ``status="running"``.  The
+            caller is responsible for re-invoking :meth:`run_execution` to
+            continue the batch loop.
 
         Raises:
             WorkflowExecutionNotFoundError: If the execution does not exist.
+            WorkflowExecutionInvalidStateError: If the execution is not in
+                the ``"paused"`` state.
         """
         # Lazy imports — circular-import guard.
         from skillmeat.cache.models import get_session  # noqa: PLC0415
@@ -1202,12 +1224,22 @@ class WorkflowExecutionService:
         session = get_session(self._db_path)
         try:
             repo = WorkflowExecutionRepository(session)
-            updated = repo.update_status(execution_id, status="running")
-            if updated is None:
+            execution = repo.get(execution_id)
+            if execution is None:
                 raise WorkflowExecutionNotFoundError(
                     f"WorkflowExecution not found: {execution_id!r}",
                     execution_id=execution_id,
                 )
+            if execution.status != "paused":
+                raise WorkflowExecutionInvalidStateError(
+                    f"Cannot resume execution {execution_id!r}: "
+                    f"expected status 'paused', got {execution.status!r}",
+                    execution_id=execution_id,
+                    current_status=execution.status,
+                    expected_status="paused",
+                )
+            execution.status = "running"
+            repo.update(execution)
             session.commit()
         except Exception:
             session.rollback()
@@ -1215,37 +1247,56 @@ class WorkflowExecutionService:
         finally:
             session.close()
 
+        # Clear the cancellation flag so the batch loop can re-enter.
+        # If no flag exists (the previous run_execution already cleaned it up),
+        # register a fresh one so the caller's run_execution call will work.
+        with self._cancel_flags_lock:
+            flag = self._cancel_flags.get(execution_id)
+            if flag is not None:
+                flag.clear()
+            # Do not create a new flag here — run_execution creates one when
+            # it is called by the caller after this method returns.
+
         logger.info("resume_execution: execution_id=%s resumed", execution_id)
         return self.get_execution(execution_id)
 
     def cancel_execution(self, execution_id: str) -> WorkflowExecutionDTO:
-        """Cancel a running or paused execution.
+        """Cancel a running, paused, or waiting execution.
 
-        Sets the execution status to ``"cancelled"``, signals the loop to
-        stop, and marks all ``"pending"`` steps as ``"cancelled"``.
+        Works from any active state (``"running"``, ``"paused"``,
+        ``"waiting_for_approval"``).  The method:
+
+        1. Signals the in-memory cancellation flag to interrupt the batch
+           loop between batches.
+        2. Marks all ``"pending"``, ``"running"``, and
+           ``"waiting_for_approval"`` steps as ``"cancelled"``.
+        3. Sets the execution status to ``"cancelled"`` with
+           ``completed_at = now()``.
+        4. Emits an ``"execution_cancelled"`` SSE event.
 
         Args:
             execution_id: Primary key of the execution to cancel.
 
         Returns:
-            Updated ``WorkflowExecutionDTO``.
+            Updated ``WorkflowExecutionDTO`` with ``status="cancelled"``.
 
         Raises:
             WorkflowExecutionNotFoundError: If the execution does not exist.
         """
         # Lazy imports — circular-import guard.
-        from skillmeat.cache.models import ExecutionStep  # noqa: PLC0415
         from skillmeat.cache.models import get_session  # noqa: PLC0415
         from skillmeat.cache.workflow_execution_repository import (  # noqa: PLC0415
             WorkflowExecutionRepository,
         )
 
-        # Signal the loop to exit between batches.
+        # Signal the in-memory loop to exit between batches (best-effort;
+        # the flag may not exist if the execution is not currently looping).
         with self._cancel_flags_lock:
             flag = self._cancel_flags.get(execution_id)
         if flag is not None:
             flag.set()
 
+        _cancellable_step_statuses = ("pending", "running", "waiting_for_approval")
         now = datetime.utcnow()
         session = get_session(self._db_path)
         try:
@@ -1257,9 +1308,9 @@ class WorkflowExecutionService:
                     execution_id=execution_id,
                 )
 
-            # Cancel all pending/running steps.
+            # Cancel all active steps in a single DB round-trip.
             for step in execution.steps or []:
-                if step.status in ("pending", "running"):
+                if step.status in _cancellable_step_statuses:
                     step.status = "cancelled"
                     step.completed_at = now
                     step.updated_at = now
@@ -1272,8 +1323,232 @@ class WorkflowExecutionService:
         finally:
             session.close()
 
+        self._emit_event(
+            execution_id,
+            "execution_cancelled",
+            {"execution_id": execution_id},
+        )
         logger.info("cancel_execution: execution_id=%s cancelled", execution_id)
         return self.get_execution(execution_id)
+
+    def approve_gate(
+        self, execution_id: str, stage_id: str
+    ) -> ExecutionStepDTO:
+        """Approve a gate step that is waiting for external approval.
+
+        Finds the ``ExecutionStep`` whose ``stage_id_ref`` matches *stage_id*
+        within *execution_id*, validates it is in the
+        ``"waiting_for_approval"`` state, marks it as ``"completed"``, and
+        emits a ``"gate_approved"`` SSE event.
+
+        Args:
+            execution_id: Primary key of the parent execution.
+            stage_id:     Stage identifier from the SWDL definition that
+                          corresponds to the gate step to approve.
+
+        Returns:
+            Updated ``ExecutionStepDTO`` with ``status="completed"``.
+
+        Raises:
+            WorkflowExecutionNotFoundError: If the execution does not exist.
+            WorkflowExecutionInvalidStateError: If no step for *stage_id*
+                exists in this execution, or if the matching step is not in
+                the ``"waiting_for_approval"`` state.
+        """
+        # Lazy imports — circular-import guard.
+        from skillmeat.cache.models import ExecutionStep  # noqa: PLC0415
+        from skillmeat.cache.models import get_session  # noqa: PLC0415
+        from skillmeat.cache.workflow_execution_repository import (  # noqa: PLC0415
+            WorkflowExecutionRepository,
+        )
+
+        now = datetime.utcnow()
+        session = get_session(self._db_path)
+        try:
+            repo = WorkflowExecutionRepository(session)
+            execution = repo.get_with_steps(execution_id)
+            if execution is None:
+                raise WorkflowExecutionNotFoundError(
+                    f"WorkflowExecution not found: {execution_id!r}",
+                    execution_id=execution_id,
+                )
+
+            # Locate the step for this stage_id.
+            matching_step: Optional[ExecutionStep] = None
+            for step in execution.steps or []:
+                if step.stage_id_ref == stage_id:
+                    matching_step = step
+                    break
+
+            if matching_step is None:
+                raise WorkflowExecutionInvalidStateError(
+                    f"No step for stage {stage_id!r} found in execution "
+                    f"{execution_id!r}",
+                    execution_id=execution_id,
+                )
+
+            if matching_step.status != "waiting_for_approval":
+                raise WorkflowExecutionInvalidStateError(
+                    f"Cannot approve gate for stage {stage_id!r} in execution "
+                    f"{execution_id!r}: step is in state "
+                    f"{matching_step.status!r}, expected 'waiting_for_approval'",
+                    execution_id=execution_id,
+                    current_status=matching_step.status,
+                    expected_status="waiting_for_approval",
+                )
+
+            matching_step.status = "completed"
+            matching_step.completed_at = now
+            matching_step.updated_at = now
+            session.commit()
+            session.refresh(matching_step)
+            step_dto = _step_orm_to_dto(matching_step)
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+        self._emit_event(
+            execution_id,
+            "gate_approved",
+            {
+                "execution_id": execution_id,
+                "step_id": step_dto.id,
+                "stage_id": stage_id,
+            },
+        )
+        logger.info(
+            "approve_gate: execution_id=%s stage=%r approved",
+            execution_id,
+            stage_id,
+        )
+        return step_dto
+
+    def reject_gate(
+        self,
+        execution_id: str,
+        stage_id: str,
+        reason: Optional[str] = None,
+    ) -> ExecutionStepDTO:
+        """Reject a gate step that is waiting for external approval.
+
+        Finds the ``ExecutionStep`` for *stage_id*, validates it is in the
+        ``"waiting_for_approval"`` state, marks it as ``"failed"`` (storing
+        *reason* in ``error_message``), emits a ``"gate_rejected"`` SSE
+        event, and applies the stage's implicit error policy (default: halt
+        the execution by cancelling remaining active steps and marking the
+        execution as ``"failed"``).
+
+        Args:
+            execution_id: Primary key of the parent execution.
+            stage_id:     Stage identifier for the gate to reject.
+            reason:       Optional human-readable rejection reason stored in
+                          the step's ``error_message`` field.
+
+        Returns:
+            Updated ``ExecutionStepDTO`` with ``status="failed"``.
+
+        Raises:
+            WorkflowExecutionNotFoundError: If the execution does not exist.
+            WorkflowExecutionInvalidStateError: If no step for *stage_id*
+                exists, or if the matching step is not waiting for approval.
+        """
+        # Lazy imports — circular-import guard.
+        from skillmeat.cache.models import ExecutionStep  # noqa: PLC0415
+        from skillmeat.cache.models import get_session  # noqa: PLC0415
+        from skillmeat.cache.workflow_execution_repository import (  # noqa: PLC0415
+            WorkflowExecutionRepository,
+        )
+
+        now = datetime.utcnow()
+        error_message = reason or "Gate rejected"
+        session = get_session(self._db_path)
+        try:
+            repo = WorkflowExecutionRepository(session)
+            execution = repo.get_with_steps(execution_id)
+            if execution is None:
+                raise WorkflowExecutionNotFoundError(
+                    f"WorkflowExecution not found: {execution_id!r}",
+                    execution_id=execution_id,
+                )
+
+            # Locate the step for this stage_id.
+            matching_step: Optional[ExecutionStep] = None
+            for step in execution.steps or []:
+                if step.stage_id_ref == stage_id:
+                    matching_step = step
+                    break
+
+            if matching_step is None:
+                raise WorkflowExecutionInvalidStateError(
+                    f"No step for stage {stage_id!r} found in execution "
+                    f"{execution_id!r}",
+                    execution_id=execution_id,
+                )
+
+            if matching_step.status != "waiting_for_approval":
+                raise WorkflowExecutionInvalidStateError(
+                    f"Cannot reject gate for stage {stage_id!r} in execution "
+                    f"{execution_id!r}: step is in state "
+                    f"{matching_step.status!r}, expected 'waiting_for_approval'",
+                    execution_id=execution_id,
+                    current_status=matching_step.status,
+                    expected_status="waiting_for_approval",
+                )
+
+            matching_step.status = "failed"
+            matching_step.completed_at = now
+            matching_step.updated_at = now
+            matching_step.error_message = error_message
+
+            # Apply halt error policy by default: cancel remaining active steps
+            # and mark the execution as failed.
+            _active_step_statuses = ("pending", "running", "waiting_for_approval")
+            for step in execution.steps or []:
+                if step.id != matching_step.id and step.status in _active_step_statuses:
+                    step.status = "cancelled"
+                    step.completed_at = now
+                    step.updated_at = now
+
+            repo.update_status(
+                execution_id,
+                status="failed",
+                completed_at=now,
+                error_message=f"Gate '{stage_id}' rejected: {error_message}",
+            )
+            session.commit()
+            session.refresh(matching_step)
+            step_dto = _step_orm_to_dto(matching_step)
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+        # Signal the in-memory loop to exit.
+        with self._cancel_flags_lock:
+            flag = self._cancel_flags.get(execution_id)
+        if flag is not None:
+            flag.set()
+
+        self._emit_event(
+            execution_id,
+            "gate_rejected",
+            {
+                "execution_id": execution_id,
+                "step_id": step_dto.id,
+                "stage_id": stage_id,
+                "reason": error_message,
+            },
+        )
+        logger.info(
+            "reject_gate: execution_id=%s stage=%r rejected — %s",
+            execution_id,
+            stage_id,
+            error_message,
+        )
+        return step_dto
 
     # =========================================================================
     # SSE event emission (stub — consumed by API-3.13)
@@ -1419,3 +1694,111 @@ class WorkflowExecutionService:
             raise
         finally:
             session.close()
+
+    def _validate_and_serialize_output(
+        self,
+        step_id: str,
+        output: Dict[str, Any],
+        stage: "ExecutionPlanStage",  # noqa: F821
+    ) -> Dict[str, Any]:
+        """Validate and serialize the output produced by a completed stage.
+
+        This is the SVC-3.7 handoff validation hook.  It is called by
+        :meth:`_execute_stage` immediately after successful stage completion.
+
+        Behaviour:
+
+        1. **Output contract validation** — if the stage declares an output
+           contract (via the ``outputs`` list on ``ExecutionPlanStage``),
+           validate that all declared output fields are present in *output*.
+           Fields not present log a warning but do not fail the stage
+           (non-blocking contract check for this phase).
+        2. **Serialisation** — serialise the output as JSON (default handoff
+           format) to verify it is serialisable.  Falls back to a ``raw``
+           wrapper for non-serialisable values.
+        3. **Summary condensation** — if the stage config includes
+           ``summarize_output: true`` (checked via a ``config`` attribute on
+           the stage, if present), truncate the serialised output to 500
+           characters and append ``"[summarized]"``.  This is a stub
+           implementation; real summarisation via LLM prompts is deferred to
+           a future iteration.
+        4. **Persist** — write the (possibly condensed) serialised output
+           back to the ``ExecutionStep.outputs_json`` field via
+           :meth:`_update_step`.
+
+        Args:
+            step_id: ``ExecutionStep`` primary key for the completed step.
+            output:  Raw output dict returned by the stage dispatcher.
+            stage:   Resolved ``ExecutionPlanStage`` from the plan.
+
+        Returns:
+            The validated (and possibly summarised) output dict.  Callers
+            can use the returned dict for downstream stage input resolution.
+        """
+        stage_id = stage.stage_id
+
+        # ------------------------------------------------------------------
+        # 1. Output contract validation (non-blocking)
+        # ------------------------------------------------------------------
+        # ``stage.outputs`` contains the list of declared output field names.
+        declared_outputs = stage.outputs or []
+        if declared_outputs:
+            missing_fields = [f for f in declared_outputs if f not in output]
+            if missing_fields:
+                logger.warning(
+                    "_validate_and_serialize_output: stage=%r missing declared "
+                    "output fields %r (non-blocking)",
+                    stage_id,
+                    missing_fields,
+                )
+
+        # ------------------------------------------------------------------
+        # 2. Serialisation (JSON — default handoff format)
+        # ------------------------------------------------------------------
+        try:
+            serialised = json.dumps(output)
+            validated_output = output
+        except (TypeError, ValueError) as exc:
+            logger.warning(
+                "_validate_and_serialize_output: stage=%r output not "
+                "JSON-serialisable (%s), wrapping as raw string",
+                stage_id,
+                exc,
+            )
+            validated_output = {"raw": str(output)}
+            serialised = json.dumps(validated_output)
+
+        # ------------------------------------------------------------------
+        # 3. Summary condensation (stub)
+        # ------------------------------------------------------------------
+        # Check for ``summarize_output`` in the stage's extra config dict.
+        # ``ExecutionPlanStage`` does not yet carry a ``config`` attribute;
+        # when it does, this branch activates automatically.
+        _summarize: bool = False
+        stage_config: Any = getattr(stage, "config", None)
+        if isinstance(stage_config, dict):
+            _summarize = bool(stage_config.get("summarize_output", False))
+
+        if _summarize and len(serialised) > 500:
+            truncated = serialised[:500] + " [summarized]"
+            logger.debug(
+                "_validate_and_serialize_output: stage=%r output condensed "
+                "(%d → 500 chars)",
+                stage_id,
+                len(serialised),
+            )
+            validated_output = {"summary": truncated}
+
+        # ------------------------------------------------------------------
+        # 4. Persist serialised output back to the ExecutionStep record
+        # ------------------------------------------------------------------
+        if step_id:
+            self._update_step(step_id, status="completed", outputs=validated_output)
+
+        logger.debug(
+            "_validate_and_serialize_output: stage=%r output validated "
+            "and persisted (step_id=%r)",
+            stage_id,
+            step_id,
+        )
+        return validated_output

@@ -7,11 +7,14 @@ only handles HTTP concerns (routing, status codes, error translation).
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from skillmeat.core.workflow.exceptions import (
@@ -290,3 +293,178 @@ async def get_execution(execution_id: str) -> Dict[str, Any]:
         ) from exc
 
     return _dto_to_dict(dto)
+
+
+@router.get(
+    "/{execution_id}/stream",
+    summary="Stream workflow execution events (SSE)",
+    description=(
+        "Stream real-time Server-Sent Events for a running workflow execution. "
+        "The stream emits stage lifecycle events and closes with an "
+        "``execution_completed`` event once the execution reaches a terminal state "
+        "(completed, failed, or cancelled). "
+        "Returns 404 immediately if the execution does not exist."
+    ),
+)
+async def stream_execution_events(execution_id: str) -> StreamingResponse:
+    """Stream SSE events for a workflow execution.
+
+    Polls ``WorkflowExecutionService.get_events()`` on a 0.5-second interval,
+    forwarding any new events to the client in SSE format.  The stream closes
+    automatically when the execution reaches a terminal status.
+
+    SSE event types emitted:
+
+    - ``stage_started``        — ``{"stage_id": str, "stage_name": str}``
+    - ``stage_completed``      — ``{"stage_id": str, "duration_seconds": float}``
+    - ``stage_failed``         — ``{"stage_id": str, "error": str}``
+    - ``stage_skipped``        — ``{"stage_id": str}``
+    - ``log_line``             — ``{"stage_id": str, "message": str}``
+    - ``execution_completed``  — ``{"status": str}`` (terminal, closes stream)
+
+    Args:
+        execution_id: UUID hex string identifying the execution to stream.
+
+    Returns:
+        ``StreamingResponse`` with ``text/event-stream`` content type.
+
+    Raises:
+        HTTPException 404: If no execution with ``execution_id`` exists.
+    """
+    # Validate that the execution exists before opening the stream.
+    # This provides an immediate 404 rather than a silent empty stream.
+    svc = _get_service()
+    try:
+        svc.get_execution(execution_id)
+    except WorkflowExecutionNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.exception(
+            "Unexpected error pre-validating execution %s for SSE stream",
+            execution_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to open event stream.",
+        ) from exc
+
+    # Terminal statuses that close the stream.
+    _TERMINAL_STATUSES = frozenset({"completed", "failed", "cancelled"})
+
+    async def event_generator():
+        """Async generator that yields SSE-formatted event strings."""
+        last_seq: int = 0
+        loop = asyncio.get_event_loop()
+
+        while True:
+            # ---------------------------------------------------------------
+            # Fetch new events since last_seq (sync call → thread executor)
+            # ---------------------------------------------------------------
+            try:
+                events: List[Dict[str, Any]] = await loop.run_in_executor(
+                    None,
+                    lambda: _get_service().get_events(execution_id, after_seq=last_seq),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "stream_execution_events: error fetching events for %s: %s",
+                    execution_id,
+                    exc,
+                )
+                events = []
+
+            for event in events:
+                last_seq = event["seq"] + 1
+                event_type: str = event.get("type", "message")
+                event_data: Dict[str, Any] = event.get("data", {})
+
+                # Normalise event data to match the documented SSE payload shapes.
+                # The execution service stores richer payloads; we surface the
+                # keys that the SSE contract specifies.
+                payload: Dict[str, Any]
+                if event_type == "stage_started":
+                    payload = {
+                        "stage_id": event_data.get("stage_id", event_data.get("step_id", "")),
+                        "stage_name": event_data.get("stage_name", event_data.get("stage_id", "")),
+                    }
+                elif event_type == "stage_completed":
+                    payload = {
+                        "stage_id": event_data.get("stage_id", event_data.get("step_id", "")),
+                        "duration_seconds": event_data.get("duration_seconds", 0.0),
+                    }
+                elif event_type == "stage_failed":
+                    payload = {
+                        "stage_id": event_data.get("stage_id", event_data.get("step_id", "")),
+                        "error": event_data.get("error", event_data.get("error_message", "")),
+                    }
+                elif event_type == "log_line":
+                    payload = {
+                        "stage_id": event_data.get("stage_id", ""),
+                        "message": event_data.get("message", ""),
+                    }
+                elif event_type in ("execution_completed", "execution_failed"):
+                    # Normalise both terminal types to "execution_completed" with
+                    # the actual status so clients need only listen to one event.
+                    event_type = "execution_completed"
+                    payload = {
+                        "status": event_data.get("status", "completed"),
+                    }
+                else:
+                    # Pass through unknown event types unchanged.
+                    payload = event_data
+
+                yield f"event: {event_type}\n"
+                yield f"data: {json.dumps(payload)}\n\n"
+
+            # ---------------------------------------------------------------
+            # Check whether the execution has reached a terminal state.
+            # ---------------------------------------------------------------
+            try:
+                exec_dto = await loop.run_in_executor(
+                    None,
+                    lambda: _get_service().get_execution(execution_id),
+                )
+                current_status: str = exec_dto.status
+            except WorkflowExecutionNotFoundError:
+                # Execution disappeared — close stream.
+                logger.warning(
+                    "stream_execution_events: execution %s not found during poll — closing stream",
+                    execution_id,
+                )
+                yield "event: execution_completed\n"
+                yield f"data: {json.dumps({'status': 'unknown'})}\n\n"
+                break
+            except Exception as exc:
+                logger.warning(
+                    "stream_execution_events: error checking status for %s: %s — "
+                    "will retry on next poll",
+                    execution_id,
+                    exc,
+                )
+                current_status = ""
+
+            if current_status in _TERMINAL_STATUSES:
+                # Emit terminal event and close the stream.
+                yield "event: execution_completed\n"
+                yield f"data: {json.dumps({'status': current_status})}\n\n"
+                logger.info(
+                    "stream_execution_events: execution %s reached terminal status=%s — closing stream",
+                    execution_id,
+                    current_status,
+                )
+                break
+
+            # Poll interval — yield control back to the event loop.
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )

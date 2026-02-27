@@ -210,3 +210,40 @@ class WorkflowExecutionNotFoundError(WorkflowError):
         if self.execution_id is not None:
             parts.append(f"  Execution ID: {self.execution_id!r}")
         return "\n".join(parts)
+
+
+class WorkflowExecutionInvalidStateError(WorkflowError):
+    """Raised when an execution control operation is invoked on an execution
+    that is in an incompatible lifecycle state.
+
+    For example, trying to pause an execution that is already completed, or
+    trying to resume an execution that is not in the ``"paused"`` state.
+
+    Attributes:
+        message:        Human-readable description.
+        execution_id:   The execution identifier.
+        current_status: The current (invalid) status of the execution.
+        expected_status: The status that was expected for the operation.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        execution_id: Optional[str] = None,
+        current_status: Optional[str] = None,
+        expected_status: Optional[str] = None,
+    ) -> None:
+        super().__init__(message)
+        self.execution_id = execution_id
+        self.current_status = current_status
+        self.expected_status = expected_status
+
+    def __str__(self) -> str:
+        parts = [self.message]
+        if self.execution_id is not None:
+            parts.append(f"  Execution ID: {self.execution_id!r}")
+        if self.current_status is not None:
+            parts.append(f"  Current status: {self.current_status!r}")
+        if self.expected_status is not None:
+            parts.append(f"  Expected status: {self.expected_status!r}")
+        return "\n".join(parts)
