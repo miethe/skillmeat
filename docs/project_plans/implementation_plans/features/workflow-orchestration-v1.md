@@ -16,9 +16,9 @@ tags:
 - automation
 - agents
 created: 2026-02-06
-updated: 2026-02-06
+updated: '2026-02-27'
 category: product-planning
-status: planned
+status: in-progress
 related:
 - /docs/project_plans/PRDs/features/workflow-orchestration-v1.md
 - /docs/project_plans/specs/workflow-orchestration-schema-spec.md

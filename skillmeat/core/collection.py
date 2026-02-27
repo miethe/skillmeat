@@ -382,6 +382,7 @@ class CollectionManager:
         (collection_path / "skills").mkdir(exist_ok=True)
         (collection_path / "commands").mkdir(exist_ok=True)
         (collection_path / "agents").mkdir(exist_ok=True)
+        (collection_path / "workflows").mkdir(exist_ok=True)
 
         # Create empty collection
         collection = self.manifest_mgr.create_empty(collection_path, name)
