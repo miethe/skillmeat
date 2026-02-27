@@ -27,9 +27,11 @@ import logging
 from datetime import datetime
 from typing import List, Optional, Tuple
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from skillmeat.cache.models import WorkflowExecution
+from skillmeat.cache.repositories import ConstraintError, RepositoryError
 
 logger = logging.getLogger(__name__)
 
@@ -76,16 +78,31 @@ class WorkflowExecutionRepository:
         Returns:
             The same instance, now attached to the session (primary key
             populated after flush).
+
+        Raises:
+            ConstraintError: If a unique/foreign-key constraint is violated.
+            RepositoryError: On any other database error.
         """
-        self.session.add(execution)
-        self.session.flush()
-        logger.debug(
-            "Created WorkflowExecution id=%r workflow_id=%r status=%r",
-            execution.id,
-            execution.workflow_id,
-            execution.status,
-        )
-        return execution
+        try:
+            self.session.add(execution)
+            self.session.flush()
+            logger.debug(
+                "Created WorkflowExecution id=%r workflow_id=%r status=%r",
+                execution.id,
+                execution.workflow_id,
+                execution.status,
+            )
+            return execution
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise ConstraintError(
+                f"Failed to create WorkflowExecution (constraint violation): {exc}"
+            ) from exc
+        except Exception as exc:
+            self.session.rollback()
+            raise RepositoryError(
+                f"Failed to create WorkflowExecution: {exc}"
+            ) from exc
 
     def get(self, execution_id: str) -> Optional[WorkflowExecution]:
         """Return a ``WorkflowExecution`` by primary key, or ``None``.
@@ -136,14 +153,29 @@ class WorkflowExecutionRepository:
 
         Returns:
             The same instance after flushing.
+
+        Raises:
+            ConstraintError: If a constraint is violated during the flush.
+            RepositoryError: On any other database error.
         """
-        self.session.flush()
-        logger.debug(
-            "Updated WorkflowExecution id=%r status=%r",
-            execution.id,
-            execution.status,
-        )
-        return execution
+        try:
+            self.session.flush()
+            logger.debug(
+                "Updated WorkflowExecution id=%r status=%r",
+                execution.id,
+                execution.status,
+            )
+            return execution
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise ConstraintError(
+                f"Failed to update WorkflowExecution (constraint violation): {exc}"
+            ) from exc
+        except Exception as exc:
+            self.session.rollback()
+            raise RepositoryError(
+                f"Failed to update WorkflowExecution: {exc}"
+            ) from exc
 
     def delete(self, execution_id: str) -> bool:
         """Delete a ``WorkflowExecution`` row by primary key.
@@ -156,6 +188,9 @@ class WorkflowExecutionRepository:
 
         Returns:
             ``True`` if a row was deleted, ``False`` if not found.
+
+        Raises:
+            RepositoryError: On any database error during the delete flush.
         """
         execution = self.get(execution_id)
         if execution is None:
@@ -164,10 +199,16 @@ class WorkflowExecutionRepository:
             )
             return False
 
-        self.session.delete(execution)
-        self.session.flush()
-        logger.debug("Deleted WorkflowExecution id=%r", execution_id)
-        return True
+        try:
+            self.session.delete(execution)
+            self.session.flush()
+            logger.debug("Deleted WorkflowExecution id=%r", execution_id)
+            return True
+        except Exception as exc:
+            self.session.rollback()
+            raise RepositoryError(
+                f"Failed to delete WorkflowExecution {execution_id!r}: {exc}"
+            ) from exc
 
     # ------------------------------------------------------------------
     # Query
@@ -370,3 +411,48 @@ class WorkflowExecutionRepository:
             status,
         )
         return execution
+
+    def save(self, execution: WorkflowExecution) -> WorkflowExecution:
+        """Flush pending changes for this object without committing.
+
+        Intended for use when the caller controls the transaction boundary
+        (e.g. inside a
+        :class:`~skillmeat.cache.workflow_transaction.WorkflowTransactionManager`
+        context or a FastAPI dependency-injected session).
+
+        Flushes only the provided instance so that any auto-generated values
+        are reflected before the caller continues.
+
+        Args:
+            execution: A tracked :class:`WorkflowExecution` instance with
+                unsaved mutations.
+
+        Returns:
+            The same instance after the flush and refresh.
+
+        Raises:
+            ConstraintError: If a constraint is violated during the flush.
+            RepositoryError: On any other database error.
+
+        Example::
+
+            exec = repo.get("exec-abc")
+            exec.status = "running"
+            repo.save(exec)
+            # ... more repository work in the same transaction ...
+            session.commit()
+        """
+        try:
+            self.session.flush([execution])
+            self.session.refresh(execution)
+            return execution
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise ConstraintError(
+                f"Failed to save WorkflowExecution (constraint violation): {exc}"
+            ) from exc
+        except Exception as exc:
+            self.session.rollback()
+            raise RepositoryError(
+                f"Failed to save WorkflowExecution: {exc}"
+            ) from exc

@@ -428,3 +428,38 @@ class WorkflowRepository(BaseRepository[Workflow]):
             return count > 0
         finally:
             session.close()
+
+    def save(self, workflow: Workflow) -> Workflow:
+        """Persist an updated Workflow, committing the change immediately.
+
+        ``WorkflowRepository`` uses the session-per-operation convention (each
+        mutating method opens, commits, and closes its own session), so this
+        method is a semantic alias for :meth:`update` rather than a bare flush.
+        The commit is performed internally — the caller does **not** need to
+        commit separately.
+
+        This matches the interface of the ``save()`` methods on the
+        session-injected sibling repositories
+        (:class:`~skillmeat.cache.workflow_execution_repository.WorkflowExecutionRepository`
+        and
+        :class:`~skillmeat.cache.execution_step_repository.ExecutionStepRepository`),
+        providing a uniform surface for service-layer code that works across
+        repository types.
+
+        Args:
+            workflow: A :class:`Workflow` instance with updated field values.
+
+        Returns:
+            The refreshed instance after the merge and commit.
+
+        Raises:
+            ConstraintError: If a unique constraint is violated.
+            RepositoryError: On any other database error.
+
+        Example::
+
+            wf = repo.get("abc123")
+            wf.status = "active"
+            updated = repo.save(wf)
+        """
+        return self.update(workflow)

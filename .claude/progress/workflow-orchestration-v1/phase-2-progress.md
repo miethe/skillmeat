@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 6
+completed_tasks: 7
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -81,7 +81,7 @@ tasks:
 - id: REPO-2.7
   description: 'Transaction handling: rollback/error handling, atomic state changes,
     optimistic locking'
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies:
@@ -147,7 +147,7 @@ schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
 updated: '2026-02-27'
-progress: 75
+progress: 87
 ---
 
 # workflow-orchestration-v1 - Phase 2: Database + Repository Layer

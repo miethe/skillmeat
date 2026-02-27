@@ -43,7 +43,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from skillmeat.cache.models import ExecutionStep
-from skillmeat.cache.repositories import ConstraintError, NotFoundError
+from skillmeat.cache.repositories import ConstraintError, NotFoundError, RepositoryError
 
 logger = logging.getLogger(__name__)
 
@@ -180,15 +180,24 @@ class ExecutionStepRepository:
 
         Returns:
             ``True`` if a row was deleted, ``False`` if the ID was not found.
+
+        Raises:
+            RepositoryError: On any database error during the delete flush.
         """
         step = self.session.get(ExecutionStep, step_id)
         if step is None:
             logger.debug("ExecutionStep id=%s not found for deletion", step_id)
             return False
-        self.session.delete(step)
-        self.session.flush()
-        logger.debug("Deleted ExecutionStep id=%s", step_id)
-        return True
+        try:
+            self.session.delete(step)
+            self.session.flush()
+            logger.debug("Deleted ExecutionStep id=%s", step_id)
+            return True
+        except Exception as exc:
+            self.session.rollback()
+            raise RepositoryError(
+                f"Failed to delete ExecutionStep {step_id!r}: {exc}"
+            ) from exc
 
     # ------------------------------------------------------------------
     # Query
@@ -283,9 +292,15 @@ class ExecutionStepRepository:
         if error_message is not None:
             step.error_message = error_message
 
-        self.session.flush()
-        logger.debug("Updated status of ExecutionStep id=%s to %s", step_id, status)
-        return step
+        try:
+            self.session.flush()
+            logger.debug("Updated status of ExecutionStep id=%s to %s", step_id, status)
+            return step
+        except Exception as exc:
+            self.session.rollback()
+            raise RepositoryError(
+                f"Failed to update_status ExecutionStep {step_id!r}: {exc}"
+            ) from exc
 
     def update_outputs(
         self,
@@ -315,9 +330,15 @@ class ExecutionStepRepository:
         if logs_json is not None:
             step.logs_json = logs_json
 
-        self.session.flush()
-        logger.debug("Updated outputs for ExecutionStep id=%s", step_id)
-        return step
+        try:
+            self.session.flush()
+            logger.debug("Updated outputs for ExecutionStep id=%s", step_id)
+            return step
+        except Exception as exc:
+            self.session.rollback()
+            raise RepositoryError(
+                f"Failed to update_outputs ExecutionStep {step_id!r}: {exc}"
+            ) from exc
 
     def append_log(self, step_id: str, log_entry: str) -> Optional[ExecutionStep]:
         """Append a single log string to the step's ``logs_json`` array.
@@ -342,11 +363,17 @@ class ExecutionStepRepository:
         current.append(log_entry)
         step.logs_json = json.dumps(current)
 
-        self.session.flush()
-        logger.debug(
-            "Appended log entry to ExecutionStep id=%s (total=%d)", step_id, len(current)
-        )
-        return step
+        try:
+            self.session.flush()
+            logger.debug(
+                "Appended log entry to ExecutionStep id=%s (total=%d)", step_id, len(current)
+            )
+            return step
+        except Exception as exc:
+            self.session.rollback()
+            raise RepositoryError(
+                f"Failed to append_log ExecutionStep {step_id!r}: {exc}"
+            ) from exc
 
     def bulk_update_status(
         self,
@@ -365,19 +392,25 @@ class ExecutionStepRepository:
         if not step_ids:
             return 0
 
-        updated = (
-            self.session.query(ExecutionStep)
-            .filter(ExecutionStep.id.in_(step_ids))
-            .update(
-                {"status": status, "updated_at": datetime.utcnow()},
-                synchronize_session="fetch",
+        try:
+            updated = (
+                self.session.query(ExecutionStep)
+                .filter(ExecutionStep.id.in_(step_ids))
+                .update(
+                    {"status": status, "updated_at": datetime.utcnow()},
+                    synchronize_session="fetch",
+                )
             )
-        )
-        self.session.flush()
-        logger.debug(
-            "bulk_update_status: set %d step(s) to %s", updated, status
-        )
-        return updated
+            self.session.flush()
+            logger.debug(
+                "bulk_update_status: set %d step(s) to %s", updated, status
+            )
+            return updated
+        except Exception as exc:
+            self.session.rollback()
+            raise RepositoryError(
+                f"Failed to bulk_update_status ExecutionStep(s): {exc}"
+            ) from exc
 
     def count_by_status(self, execution_id: str) -> Dict[str, int]:
         """Return a status-keyed count dict for all steps in an execution.
@@ -409,3 +442,53 @@ class ExecutionStepRepository:
             counts[row_status] = row_count
 
         return counts
+
+    # ------------------------------------------------------------------
+    # Transaction helper
+    # ------------------------------------------------------------------
+
+    def save(self, step: ExecutionStep) -> ExecutionStep:
+        """Flush pending changes for this object without committing.
+
+        Intended for use when the caller controls the transaction boundary
+        (e.g. inside a
+        :class:`~skillmeat.cache.workflow_transaction.WorkflowTransactionManager`
+        context or a FastAPI dependency-injected session).
+
+        Flushes only the provided instance so that any auto-generated values
+        (e.g. ``updated_at`` set by ``onupdate``) are reflected before the
+        caller continues.
+
+        Args:
+            step: A tracked :class:`ExecutionStep` instance with unsaved
+                mutations.
+
+        Returns:
+            The same instance after the flush and refresh.
+
+        Raises:
+            ConstraintError: If a constraint is violated during the flush.
+            RepositoryError: On any other database error.
+
+        Example::
+
+            step = repo.get("step-abc")
+            step.status = "running"
+            repo.save(step)
+            # ... more repository work in the same transaction ...
+            session.commit()
+        """
+        try:
+            self.session.flush([step])
+            self.session.refresh(step)
+            return step
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise ConstraintError(
+                f"Failed to save ExecutionStep (constraint violation): {exc}"
+            ) from exc
+        except Exception as exc:
+            self.session.rollback()
+            raise RepositoryError(
+                f"Failed to save ExecutionStep: {exc}"
+            ) from exc
