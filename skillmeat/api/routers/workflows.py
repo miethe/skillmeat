@@ -68,6 +68,28 @@ class WorkflowDuplicateRequest(BaseModel):
     new_name: Optional[str] = None
 
 
+class WorkflowValidateRequest(BaseModel):
+    """Optional request body for the validate endpoint.
+
+    Attributes:
+        parameters: Optional parameter values (reserved for future use; not
+                    currently consumed by the static validation pass).
+    """
+
+    parameters: Optional[Dict[str, Any]] = None
+
+
+class WorkflowPlanRequest(BaseModel):
+    """Optional request body for the plan endpoint.
+
+    Attributes:
+        parameters: Caller-supplied parameter values merged with workflow
+                    defaults before the execution plan is generated.
+    """
+
+    parameters: Optional[Dict[str, Any]] = None
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -372,3 +394,120 @@ async def duplicate_workflow(
         ) from exc
 
     return _dto_to_dict(dto)
+
+
+@router.post(
+    "/{workflow_id}/validate",
+    summary="Validate workflow",
+    description=(
+        "Run all static analysis passes against a persisted workflow definition "
+        "and return the full validation result.  Always returns HTTP 200; "
+        "``is_valid`` in the body indicates whether the definition is error-free."
+    ),
+    status_code=status.HTTP_200_OK,
+)
+async def validate_workflow(
+    workflow_id: str,
+    request: Optional[WorkflowValidateRequest] = None,
+) -> Dict[str, Any]:
+    """Validate a persisted workflow through all static analysis passes.
+
+    Runs schema, DAG, expression, and artifact-reference validation and
+    returns the accumulated result.  An invalid workflow is **not** an HTTP
+    error — callers should inspect ``is_valid`` in the response body.
+
+    Args:
+        workflow_id: UUID hex string identifying the workflow.
+        request:     Optional JSON body (currently unused; reserved for
+                     future parameter-aware validation).
+
+    Returns:
+        Validation result dict with keys ``is_valid``, ``errors``, and
+        ``warnings`` (HTTP 200).
+
+    Raises:
+        HTTPException 404: If no workflow with ``workflow_id`` exists.
+        HTTPException 500: On unexpected errors.
+    """
+    svc = _get_service()
+    try:
+        result = svc.validate(workflow_id, is_yaml=False)
+    except WorkflowNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.exception("Unexpected error validating workflow %s", workflow_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to validate workflow.",
+        ) from exc
+
+    result_dict = asdict(result)
+    # Rename ``valid`` → ``is_valid`` for a cleaner public API surface.
+    result_dict["is_valid"] = result_dict.pop("valid")
+    return result_dict
+
+
+@router.post(
+    "/{workflow_id}/plan",
+    summary="Generate execution plan",
+    description=(
+        "Validate and generate a static execution plan for a persisted workflow. "
+        "The plan describes which stages run in parallel, resolved parameters, "
+        "and an estimated total timeout."
+    ),
+    status_code=status.HTTP_200_OK,
+)
+async def plan_workflow(
+    workflow_id: str,
+    request: Optional[WorkflowPlanRequest] = None,
+) -> Dict[str, Any]:
+    """Generate a static execution plan for a persisted workflow.
+
+    Validates the workflow first; if validation fails a 422 is returned.
+    On success, resolves parameters and returns a fully-populated execution
+    plan as a plain dict.
+
+    Args:
+        workflow_id: UUID hex string identifying the workflow.
+        request:     Optional JSON body with ``parameters`` to merge with
+                     the workflow's declared defaults.
+
+    Returns:
+        Execution plan dict (HTTP 200).
+
+    Raises:
+        HTTPException 404: If no workflow with ``workflow_id`` exists.
+        HTTPException 422: If the workflow definition has validation errors.
+        HTTPException 500: On unexpected errors.
+    """
+    parameters: Optional[Dict[str, Any]] = None
+    if request is not None:
+        parameters = request.parameters
+
+    svc = _get_service()
+    try:
+        execution_plan = svc.plan(workflow_id, parameters=parameters)
+    except WorkflowNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except WorkflowValidationError as exc:
+        logger.warning(
+            "Workflow validation failed during plan for %s: %s", workflow_id, exc
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.exception("Unexpected error generating plan for workflow %s", workflow_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate execution plan.",
+        ) from exc
+
+    return asdict(execution_plan)

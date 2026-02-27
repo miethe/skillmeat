@@ -7,10 +7,12 @@ still discriminating on sub-types when needed.
 Hierarchy::
 
     WorkflowError
-    ├── WorkflowParseError       -- file load / YAML / JSON parse failures
-    ├── WorkflowValidationError  -- Pydantic schema / contract validation failures
-    ├── WorkflowCycleError       -- cycle detected in the stage dependency DAG
-    └── WorkflowArtifactError    -- missing or unresolvable artifact reference
+    ├── WorkflowParseError              -- file load / YAML / JSON parse failures
+    ├── WorkflowValidationError         -- Pydantic schema / contract validation failures
+    ├── WorkflowCycleError              -- cycle detected in the stage dependency DAG
+    ├── WorkflowArtifactError           -- missing or unresolvable artifact reference
+    ├── WorkflowNotFoundError           -- workflow record not found in the database
+    └── WorkflowExecutionNotFoundError  -- execution record not found in the database
 """
 
 from __future__ import annotations
@@ -184,4 +186,27 @@ class WorkflowNotFoundError(WorkflowError):
         parts = [self.message]
         if self.workflow_id is not None:
             parts.append(f"  Workflow ID: {self.workflow_id!r}")
+        return "\n".join(parts)
+
+
+class WorkflowExecutionNotFoundError(WorkflowError):
+    """Raised when a requested workflow execution does not exist in the database.
+
+    Attributes:
+        message:      Human-readable description.
+        execution_id: The execution identifier that was looked up.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        execution_id: Optional[str] = None,
+    ) -> None:
+        super().__init__(message)
+        self.execution_id = execution_id
+
+    def __str__(self) -> str:
+        parts = [self.message]
+        if self.execution_id is not None:
+            parts.append(f"  Execution ID: {self.execution_id!r}")
         return "\n".join(parts)
