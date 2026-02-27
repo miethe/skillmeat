@@ -14537,6 +14537,15 @@ def _uninstall_shell_completion(shell: str) -> Optional[str]:
 
 
 # ====================
+# Workflow Command Group
+# ====================
+
+from skillmeat.cli.workflow import workflow_cli  # noqa: E402
+
+main.add_command(workflow_cli, name="workflow")
+
+
+# ====================
 # Entry Point
 # ====================
 
