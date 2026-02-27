@@ -3,13 +3,13 @@ type: progress
 prd: workflow-orchestration-v1
 phase: 3
 title: Service + API Layer
-status: planning
+status: completed
 started: null
 completed: null
-overall_progress: 0
+overall_progress: 100
 completion_estimate: on-track
 total_tasks: 17
-completed_tasks: 0
+completed_tasks: 17
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -21,7 +21,7 @@ tasks:
 - id: SVC-3.1
   description: 'WorkflowService CRUD: create (from YAML), get, list, update, delete,
     duplicate'
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -31,7 +31,7 @@ tasks:
   priority: critical
 - id: SVC-3.2
   description: 'WorkflowService validate: schema + expression + DAG + artifact resolution'
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -43,7 +43,7 @@ tasks:
 - id: SVC-3.3
   description: 'WorkflowService plan: resolve params, build DAG, compute batches,
     resolve artifacts'
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -54,7 +54,7 @@ tasks:
 - id: SVC-3.4
   description: 'WorkflowExecutionService run: create execution record, snapshot workflow,
     start loop'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -65,7 +65,7 @@ tasks:
 - id: SVC-3.5
   description: 'WorkflowExecutionService stage executor: batch processing, parallel
     stages, retries, timeouts, conditionals, gates'
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -75,7 +75,7 @@ tasks:
   priority: critical
 - id: SVC-3.6
   description: 'WorkflowExecutionService controls: pause, resume, cancel operations'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -85,7 +85,7 @@ tasks:
 - id: SVC-3.7
   description: 'WorkflowExecutionService handoff: output validation, serialization,
     summary prompts'
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -95,7 +95,7 @@ tasks:
 - id: SVC-3.8
   description: 'WorkflowContextService: integrate ContextModuleService and ContextPackerService
     for per-stage context injection'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -105,7 +105,7 @@ tasks:
 - id: API-3.9
   description: 'Workflow CRUD router: GET list, POST create, GET/{id}, PUT/{id}, DELETE/{id},
     POST/{id}/duplicate'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -114,7 +114,7 @@ tasks:
   priority: critical
 - id: API-3.10
   description: 'Workflow operations router: POST/{id}/validate, POST/{id}/plan'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -125,7 +125,7 @@ tasks:
 - id: API-3.11
   description: 'Execution CRUD router: POST run, GET list all, GET by workflow_id,
     GET/{run_id}'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -134,7 +134,7 @@ tasks:
   priority: critical
 - id: API-3.12
   description: 'Execution controls router: POST pause/resume/cancel, POST gates/{stage_id}/approve|reject'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -143,7 +143,7 @@ tasks:
   priority: high
 - id: API-3.13
   description: 'SSE streaming endpoint: GET /workflows/{id}/executions/{run_id}/stream'
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -152,7 +152,7 @@ tasks:
   priority: high
 - id: API-3.14
   description: Pydantic request/response schemas in api/schemas/workflow.py
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -162,7 +162,7 @@ tasks:
 - id: API-3.15
   description: 'OpenAPI documentation: update openapi.json with all endpoints and
     examples'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -172,7 +172,7 @@ tasks:
 - id: TEST-3.16
   description: API integration tests for all endpoints (CRUD, validate, plan, run,
     controls, SSE)
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -182,7 +182,7 @@ tasks:
 - id: TEST-3.17
   description: 'E2E service test: create -> validate -> plan -> run -> complete (mock
     dispatch)'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -260,6 +260,10 @@ files_modified:
 schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
+progress: 100
+updated: '2026-02-27'
+commit_refs:
+- 4b95fa44
 ---
 
 # workflow-orchestration-v1 - Phase 3: Service + API Layer

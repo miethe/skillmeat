@@ -88,6 +88,15 @@ session.query(Artifact.id, CollectionArtifact.source, ...)
 - File extension list: `.md .py .yaml .yml .json .toml .txt .sh .ts .tsx .jsx .js .css`
 - Test file: `tests/api/test_marketplace_sources.py` → `TestFileServingPathResolution`
 
+### WorkflowService / WorkflowExecutionService Session Global (get_session)
+- `get_session(db_path)` in `models.py` only calls `init_session_factory()` when module-level `SessionLocal is None`
+- Between tests using different `tmp_path` db files, `SessionLocal` retains the first test's engine → FK violations on the second test
+- Fix: reset `SessionLocal = None` before each test via `autouse=True` fixture
+- `WorkflowExecutionService` (uses `get_session`) does NOT call `create_tables` — tables only exist if `WorkflowService` (BaseRepository) was instantiated first
+- Fix: always instantiate `WorkflowService(db_path=...)` before `WorkflowExecutionService` in tests to ensure tables are created
+- `plan.workflow_id` = SWDL `workflow.id` field (kebab-case string from YAML), NOT the DB UUID primary key (`workflow.id` from DTO)
+- Test file: `tests/test_workflow_e2e.py`
+
 ### Alembic Migration Table Existence Checks
 - When migrations create new tables (via `op.create_table()`), failure occurs if tables already exist (e.g., from `Base.metadata.create_all()`)
 - Solution: Use `sqlalchemy.inspect()` to check table existence before creating:
