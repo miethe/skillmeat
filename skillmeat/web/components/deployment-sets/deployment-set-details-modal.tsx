@@ -35,6 +35,7 @@ import {
   ChevronRight,
   Package,
 } from 'lucide-react';
+import { DynamicIcon, type IconName } from 'lucide-react/dynamic';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Tabs } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -308,13 +309,21 @@ function DeploymentSetOverviewTab({ deploymentSet }: { deploymentSet: Deployment
               />
             )}
             {deploymentSet.icon && (
-              <span
-                className="text-base leading-none"
-                aria-label={`Icon: ${deploymentSet.icon}`}
-                role="img"
-              >
-                {deploymentSet.icon}
-              </span>
+              /\p{Emoji}/u.test(deploymentSet.icon) && !/^[a-z-]+$/i.test(deploymentSet.icon) ? (
+                <span
+                  className="text-base leading-none"
+                  aria-label={`Icon: ${deploymentSet.icon}`}
+                  role="img"
+                >
+                  {deploymentSet.icon}
+                </span>
+              ) : (
+                <DynamicIcon
+                  name={deploymentSet.icon as IconName}
+                  className="h-4 w-4 shrink-0"
+                  aria-label={`Icon: ${deploymentSet.icon}`}
+                />
+              )
             )}
           </div>
         </div>
@@ -780,7 +789,7 @@ function DeploymentSetMembersTab({ setId, collectionId }: { setId: string; colle
   // Fetch all artifacts to build a UUID lookup map for artifact-type members.
   // useArtifacts() is already cached at 5min stale time — no extra cost when
   // the collection page has already loaded this data.
-  const { data: artifactsResponse, isLoading: isArtifactsLoading } = useArtifacts();
+  const { data: artifactsResponse, isLoading: isArtifactsLoading } = useArtifacts({ limit: 500 });
 
   // State for the artifact details modal (artifact-type member clicks)
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);

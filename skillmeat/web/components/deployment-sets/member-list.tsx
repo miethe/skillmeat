@@ -258,7 +258,7 @@ interface MemberGridProps {
 
 function MemberGrid({ members, setId, onArtifactClick, onSetClick, onGroupClick }: MemberGridProps) {
   // Fetch all artifacts to build a UUID lookup map — already cached by the collection page
-  const { data: artifactsResponse } = useArtifacts();
+  const { data: artifactsResponse } = useArtifacts({ limit: 500 });
 
   const artifactByUuid = useMemo<Record<string, Artifact>>(() => {
     const artifacts = artifactsResponse?.artifacts ?? [];
