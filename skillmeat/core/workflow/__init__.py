@@ -24,6 +24,13 @@ from this package for convenience.
 """
 
 from skillmeat.core.workflow.dag import Batch, DAG, DAGNode, build_dag, compute_execution_batches
+from skillmeat.core.workflow.planner import (
+    ExecutionBatch,
+    ExecutionPlan,
+    ExecutionPlanStage,
+    format_plan_text,
+    generate_plan,
+)
 from skillmeat.core.workflow.expressions import (
     ExpressionContext,
     ExpressionError,
@@ -67,6 +74,12 @@ from skillmeat.core.workflow.validator import (
 )
 
 __all__ = [
+    # Planner
+    "ExecutionBatch",
+    "ExecutionPlan",
+    "ExecutionPlanStage",
+    "format_plan_text",
+    "generate_plan",
     # Expression engine
     "ExpressionContext",
     "ExpressionError",
