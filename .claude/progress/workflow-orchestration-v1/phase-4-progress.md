@@ -3,13 +3,13 @@ type: progress
 prd: workflow-orchestration-v1
 phase: 4
 title: CLI Commands
-status: pending
+status: completed
 started: null
 completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 11
-completed_tasks: 10
+completed_tasks: 11
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -119,7 +119,7 @@ tasks:
   priority: high
 - id: TEST-4.11
   description: CLI unit tests for all commands with mocked services
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -170,7 +170,7 @@ files_modified:
 schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
-progress: 90
+progress: 100
 updated: '2026-02-27'
 ---
 
