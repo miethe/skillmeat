@@ -27,6 +27,7 @@ import {
   type UseMutationResult,
 } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import {
   fetchWorkflowExecutions,
@@ -183,14 +184,24 @@ export function useRunWorkflow(): UseMutationResult<
 }
 
 // ---------------------------------------------------------------------------
+// Optimistic update context type
+// ---------------------------------------------------------------------------
+
+/** Rollback context returned from onMutate for error recovery. */
+interface OptimisticRollbackContext {
+  previous: WorkflowExecution | undefined;
+}
+
+// ---------------------------------------------------------------------------
 // usePauseExecution — mutation: pause a running execution
 // ---------------------------------------------------------------------------
 
 /**
  * Mutation to pause a running workflow execution.
  *
- * On success, updates the detail cache directly and invalidates list queries
- * so status filters stay accurate.
+ * Applies an optimistic status update to `paused` immediately on mutate,
+ * rolling back to the previous cached data on error. Invalidates both the
+ * detail and list queries on settled to reconcile with server truth.
  *
  * @example
  * ```tsx
@@ -198,17 +209,48 @@ export function useRunWorkflow(): UseMutationResult<
  * pause.mutate(executionId);
  * ```
  */
-export function usePauseExecution(): UseMutationResult<WorkflowExecution, Error, string> {
+export function usePauseExecution(): UseMutationResult<
+  WorkflowExecution,
+  Error,
+  string,
+  OptimisticRollbackContext
+> {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: pauseExecution,
-    onSuccess: (data) => {
-      queryClient.setQueryData(executionKeys.detail(data.id), data);
-      queryClient.invalidateQueries({ queryKey: executionKeys.lists() });
+    onMutate: async (runId) => {
+      // Cancel any in-flight refetches so they don't overwrite the optimistic update.
+      await queryClient.cancelQueries({ queryKey: executionKeys.detail(runId) });
+
+      // Snapshot current cached data for rollback.
+      const previous = queryClient.getQueryData<WorkflowExecution>(
+        executionKeys.detail(runId)
+      );
+
+      // Apply optimistic update.
+      queryClient.setQueryData<WorkflowExecution>(
+        executionKeys.detail(runId),
+        (old) => (old ? { ...old, status: 'paused' as ExecutionStatus } : old)
+      );
+
+      return { previous };
     },
-    onError: (error) => {
+    onError: (error, runId, context) => {
+      // Roll back to the snapshot on failure.
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(executionKeys.detail(runId), context.previous);
+      }
       console.error('[workflow-executions] Pause failed:', error);
+      toast.error('Failed to pause execution', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+        duration: 5000,
+      });
+    },
+    onSettled: (_data, _error, runId) => {
+      // Always reconcile with server truth after the mutation settles.
+      queryClient.invalidateQueries({ queryKey: executionKeys.detail(runId) });
+      queryClient.invalidateQueries({ queryKey: executionKeys.lists() });
     },
   });
 }
@@ -220,23 +262,58 @@ export function usePauseExecution(): UseMutationResult<WorkflowExecution, Error,
 /**
  * Mutation to resume a paused workflow execution.
  *
+ * Applies an optimistic status update to `running` immediately on mutate,
+ * rolling back to the previous cached data on error. Invalidates both the
+ * detail and list queries on settled to reconcile with server truth.
+ *
  * @example
  * ```tsx
  * const resume = useResumeExecution();
  * resume.mutate(executionId);
  * ```
  */
-export function useResumeExecution(): UseMutationResult<WorkflowExecution, Error, string> {
+export function useResumeExecution(): UseMutationResult<
+  WorkflowExecution,
+  Error,
+  string,
+  OptimisticRollbackContext
+> {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: resumeExecution,
-    onSuccess: (data) => {
-      queryClient.setQueryData(executionKeys.detail(data.id), data);
-      queryClient.invalidateQueries({ queryKey: executionKeys.lists() });
+    onMutate: async (runId) => {
+      // Cancel any in-flight refetches so they don't overwrite the optimistic update.
+      await queryClient.cancelQueries({ queryKey: executionKeys.detail(runId) });
+
+      // Snapshot current cached data for rollback.
+      const previous = queryClient.getQueryData<WorkflowExecution>(
+        executionKeys.detail(runId)
+      );
+
+      // Apply optimistic update.
+      queryClient.setQueryData<WorkflowExecution>(
+        executionKeys.detail(runId),
+        (old) => (old ? { ...old, status: 'running' as ExecutionStatus } : old)
+      );
+
+      return { previous };
     },
-    onError: (error) => {
+    onError: (error, runId, context) => {
+      // Roll back to the snapshot on failure.
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(executionKeys.detail(runId), context.previous);
+      }
       console.error('[workflow-executions] Resume failed:', error);
+      toast.error('Failed to resume execution', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+        duration: 5000,
+      });
+    },
+    onSettled: (_data, _error, runId) => {
+      // Always reconcile with server truth after the mutation settles.
+      queryClient.invalidateQueries({ queryKey: executionKeys.detail(runId) });
+      queryClient.invalidateQueries({ queryKey: executionKeys.lists() });
     },
   });
 }
@@ -248,23 +325,58 @@ export function useResumeExecution(): UseMutationResult<WorkflowExecution, Error
 /**
  * Mutation to cancel a running or paused workflow execution.
  *
+ * Applies an optimistic status update to `cancelled` immediately on mutate,
+ * rolling back to the previous cached data on error. Invalidates both the
+ * detail and list queries on settled to reconcile with server truth.
+ *
  * @example
  * ```tsx
  * const cancel = useCancelExecution();
  * cancel.mutate(executionId);
  * ```
  */
-export function useCancelExecution(): UseMutationResult<WorkflowExecution, Error, string> {
+export function useCancelExecution(): UseMutationResult<
+  WorkflowExecution,
+  Error,
+  string,
+  OptimisticRollbackContext
+> {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: cancelExecution,
-    onSuccess: (data) => {
-      queryClient.setQueryData(executionKeys.detail(data.id), data);
-      queryClient.invalidateQueries({ queryKey: executionKeys.lists() });
+    onMutate: async (runId) => {
+      // Cancel any in-flight refetches so they don't overwrite the optimistic update.
+      await queryClient.cancelQueries({ queryKey: executionKeys.detail(runId) });
+
+      // Snapshot current cached data for rollback.
+      const previous = queryClient.getQueryData<WorkflowExecution>(
+        executionKeys.detail(runId)
+      );
+
+      // Apply optimistic update.
+      queryClient.setQueryData<WorkflowExecution>(
+        executionKeys.detail(runId),
+        (old) => (old ? { ...old, status: 'cancelled' as ExecutionStatus } : old)
+      );
+
+      return { previous };
     },
-    onError: (error) => {
+    onError: (error, runId, context) => {
+      // Roll back to the snapshot on failure.
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(executionKeys.detail(runId), context.previous);
+      }
       console.error('[workflow-executions] Cancel failed:', error);
+      toast.error('Failed to cancel execution', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+        duration: 5000,
+      });
+    },
+    onSettled: (_data, _error, runId) => {
+      // Always reconcile with server truth after the mutation settles.
+      queryClient.invalidateQueries({ queryKey: executionKeys.detail(runId) });
+      queryClient.invalidateQueries({ queryKey: executionKeys.lists() });
     },
   });
 }
