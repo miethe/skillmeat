@@ -75,3 +75,6 @@ export * from './deployment-sets';
 
 // Similar artifacts (feat/similar-artifacts)
 export * from './similarity';
+
+// Workflow orchestration types
+export * from './workflow';
