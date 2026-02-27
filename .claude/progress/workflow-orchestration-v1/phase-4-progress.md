@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 11
-completed_tasks: 5
+completed_tasks: 9
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -68,7 +68,7 @@ tasks:
 - id: CLI-4.6
   description: 'workflow plan <name> [--param key=val]: generate and display execution
     plan'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -79,7 +79,7 @@ tasks:
 - id: CLI-4.7
   description: 'workflow run <name> [--param key=val] [--dry-run]: execute with Rich
     live display'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -89,7 +89,7 @@ tasks:
   priority: critical
 - id: CLI-4.8
   description: 'workflow runs [<run_id>] [--logs] [--status]: list/show run details'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -98,7 +98,7 @@ tasks:
   priority: medium
 - id: CLI-4.9
   description: 'workflow approve/cancel: gate approval and execution cancellation'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -170,7 +170,7 @@ files_modified:
 schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
-progress: 45
+progress: 81
 updated: '2026-02-27'
 ---
 
