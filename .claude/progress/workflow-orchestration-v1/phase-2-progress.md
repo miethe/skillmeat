@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 8
-completed_tasks: 2
+completed_tasks: 3
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -41,7 +41,7 @@ tasks:
 - id: DB-2.3
   description: Indexes and constraints (status+updated_at, workflow_id+status, UNIQUE
     name, CHECK enums)
-  status: pending
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies:
@@ -147,7 +147,7 @@ schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
 updated: '2026-02-27'
-progress: 25
+progress: 37
 ---
 
 # workflow-orchestration-v1 - Phase 2: Database + Repository Layer

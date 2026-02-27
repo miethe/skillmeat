@@ -616,6 +616,50 @@ def upgrade() -> None:
         ["stage_id_ref"],
     )
 
+    # -------------------------------------------------------------------------
+    # Additional composite indexes for query optimization
+    # -------------------------------------------------------------------------
+
+    # workflow_stages: look up a specific stage by its SWDL ref within a workflow
+    op.create_index(
+        "idx_workflow_stages_workflow_stage_ref",
+        "workflow_stages",
+        ["workflow_id", "stage_id_ref"],
+    )
+
+    # workflow_executions: fetch all executions for a workflow filtered by status
+    op.create_index(
+        "idx_workflow_executions_workflow_status",
+        "workflow_executions",
+        ["workflow_id", "status"],
+    )
+
+    # workflow_executions: scan all running executions ordered by last update
+    op.create_index(
+        "idx_workflow_executions_status_updated",
+        "workflow_executions",
+        ["status", "updated_at"],
+    )
+
+    # execution_steps: find all steps in an execution filtered by status
+    op.create_index(
+        "idx_execution_steps_execution_status",
+        "execution_steps",
+        ["execution_id", "status"],
+    )
+
+    # execution_steps: look up a specific stage's step within an execution
+    op.create_index(
+        "idx_execution_steps_stage_ref",
+        "execution_steps",
+        ["execution_id", "stage_id_ref"],
+    )
+
+    # -------------------------------------------------------------------------
+    # Unique constraint — workflow names must be globally unique
+    # -------------------------------------------------------------------------
+    op.create_unique_constraint("uq_workflow_name", "workflows", ["name"])
+
 
 def downgrade() -> None:
     """Drop execution_steps, workflow_executions, workflow_stages, workflows.
@@ -624,6 +668,14 @@ def downgrade() -> None:
     constraints.  All workflow definitions, stage records, execution history,
     and step detail will be permanently lost.
     """
+    # Drop additional composite indexes and unique constraint (reverse order)
+    op.drop_constraint("uq_workflow_name", "workflows", type_="unique")
+    op.drop_index("idx_execution_steps_stage_ref", "execution_steps")
+    op.drop_index("idx_execution_steps_execution_status", "execution_steps")
+    op.drop_index("idx_workflow_executions_status_updated", "workflow_executions")
+    op.drop_index("idx_workflow_executions_workflow_status", "workflow_executions")
+    op.drop_index("idx_workflow_stages_workflow_stage_ref", "workflow_stages")
+
     # Drop leaf table first (FK references workflow_executions)
     op.drop_index("idx_execution_steps_stage_id_ref", "execution_steps")
     op.drop_index("idx_execution_steps_execution_id", "execution_steps")
