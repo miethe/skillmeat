@@ -23,7 +23,7 @@ All public models, exceptions, the parser, and DAG builder are exported
 from this package for convenience.
 """
 
-from skillmeat.core.workflow.dag import DAG, DAGNode, build_dag
+from skillmeat.core.workflow.dag import Batch, DAG, DAGNode, build_dag, compute_execution_batches
 from skillmeat.core.workflow.expressions import (
     ExpressionContext,
     ExpressionError,
@@ -60,16 +60,27 @@ from skillmeat.core.workflow.models import (
     WorkflowUIMetadata,
 )
 from skillmeat.core.workflow.parser import parse_workflow
+from skillmeat.core.workflow.validator import (
+    ValidationIssue,
+    ValidationResult,
+    validate_expressions,
+)
 
 __all__ = [
     # Expression engine
     "ExpressionContext",
     "ExpressionError",
     "ExpressionParser",
+    # Expression validator
+    "ValidationIssue",
+    "ValidationResult",
+    "validate_expressions",
     # DAG builder
+    "Batch",
     "DAG",
     "DAGNode",
     "build_dag",
+    "compute_execution_batches",
     # Exceptions
     "WorkflowError",
     "WorkflowParseError",

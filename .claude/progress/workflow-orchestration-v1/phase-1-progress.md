@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 13
-completed_tasks: 5
+completed_tasks: 9
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -57,7 +57,7 @@ tasks:
   priority: critical
 - id: EXPR-1.5
   description: 'Built-in functions: length(), contains(), toJSON(), fromJSON()'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -67,7 +67,7 @@ tasks:
 - id: EXPR-1.6
   description: Static expression validation (reference checking against depends_on
     and output contracts)
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -86,7 +86,7 @@ tasks:
   priority: critical
 - id: DAG-1.8
   description: Cycle detection with WorkflowCycleError and descriptive cycle path
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -95,7 +95,7 @@ tasks:
   priority: critical
 - id: DAG-1.9
   description: Parallel batch computation via topological sort
-  status: pending
+  status: completed
   assigned_to:
   - backend-architect
   dependencies:
@@ -202,7 +202,7 @@ files_modified:
 schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
-progress: 38
+progress: 69
 updated: '2026-02-27'
 ---
 
