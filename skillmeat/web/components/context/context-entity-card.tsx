@@ -183,9 +183,8 @@ export function ContextEntityCard({
   tokenCount,
   onAutoLoadToggle,
 }: ContextEntityCardProps) {
-  // Normalise entity type to lowercase and look up config from the central map
-  const normalizedType = entity.entity_type?.toLowerCase() ?? '';
-  const config = getEntityTypeConfig(normalizedType);
+  // Look up display config from the central map (handles null/casing internally).
+  const config = getEntityTypeConfig(entity.entity_type);
 
   const Icon = resolveIcon(config.icon);
 
@@ -231,35 +230,7 @@ export function ContextEntityCard({
         }
       }}
     >
-      {/* Hover Actions — bottom-left, above action bar */}
-      {(onEdit || onDelete) && (
-        <div className="absolute bottom-14 left-2 flex gap-1 rounded-md bg-background/80 p-0.5 opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
-          {onEdit && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={handleEdit}
-              aria-label={`Edit ${entity.name}`}
-            >
-              <Pencil className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          )}
-          {onDelete && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-destructive hover:text-destructive"
-              onClick={handleDelete}
-              aria-label={`Delete ${entity.name}`}
-            >
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          )}
-        </div>
-      )}
-
-      {/* Scrollable card content */}
+      {/* Card content */}
       <div className="flex-1 space-y-3 p-4">
         {/* Header: Name + Type Badge + Auto-load */}
         <div className="flex items-start justify-between gap-2">
@@ -353,22 +324,51 @@ export function ContextEntityCard({
         )}
       </div>
 
-      {/* Footer: Action Buttons — pinned to bottom */}
+      {/* Footer: Action Bar — pinned to bottom */}
       <div
-        className="flex items-center justify-end gap-2 border-t p-2"
+        className="flex items-center justify-between gap-2 border-t p-2"
         onClick={(e) => e.stopPropagation()}
       >
-        {onDeploy && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDeploy}
-            aria-label={`Deploy ${entity.name} to project`}
-          >
-            <Rocket className="mr-1 h-4 w-4" aria-hidden="true" />
-            Deploy
-          </Button>
-        )}
+        {/* Left: Edit/Delete (visible on hover) */}
+        <div className="flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+          {onEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleEdit}
+              aria-label={`Edit ${entity.name}`}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          )}
+          {onDelete && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-destructive hover:text-destructive"
+              onClick={handleDelete}
+              aria-label={`Delete ${entity.name}`}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          )}
+        </div>
+
+        {/* Right: Deploy */}
+        <div className="flex gap-2">
+          {onDeploy && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDeploy}
+              aria-label={`Deploy ${entity.name} to project`}
+            >
+              <Rocket className="mr-1 h-4 w-4" aria-hidden="true" />
+              Deploy
+            </Button>
+          )}
+        </div>
       </div>
     </Card>
   );

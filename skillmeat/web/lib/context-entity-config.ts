@@ -83,8 +83,19 @@ export const DEFAULT_ENTITY_TYPE_CONFIG: ContextEntityTypeConfig = {
 
 /**
  * Returns the display configuration for a given entity type string.
+ * Tries exact match first, then lowercase, then uppercase enum-style (e.g. "RULE_FILE").
  * Falls back to `DEFAULT_ENTITY_TYPE_CONFIG` for unrecognised types.
  */
-export function getEntityTypeConfig(entityType: string): ContextEntityTypeConfig {
-  return CONTEXT_ENTITY_TYPE_CONFIG[entityType] ?? DEFAULT_ENTITY_TYPE_CONFIG;
+export function getEntityTypeConfig(entityType: string | undefined | null): ContextEntityTypeConfig {
+  if (!entityType) return DEFAULT_ENTITY_TYPE_CONFIG;
+
+  // Exact match (most common — API returns lowercase snake_case)
+  const exact = CONTEXT_ENTITY_TYPE_CONFIG[entityType];
+  if (exact) return exact;
+
+  // Try lowercase (handles any casing from API)
+  const lower = CONTEXT_ENTITY_TYPE_CONFIG[entityType.toLowerCase()];
+  if (lower) return lower;
+
+  return DEFAULT_ENTITY_TYPE_CONFIG;
 }

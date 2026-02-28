@@ -22,6 +22,19 @@ function buildUrl(path: string): string {
 }
 
 /**
+ * Normalise a single context entity from the API response.
+ * The backend may return `type` (Pydantic alias) instead of `entity_type`,
+ * so we ensure the frontend always sees `entity_type`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeEntity(raw: any): ContextEntity {
+  if (raw.entity_type === undefined && raw.type !== undefined) {
+    raw.entity_type = raw.type;
+  }
+  return raw as ContextEntity;
+}
+
+/**
  * Fetch context entities with optional filtering
  */
 export async function fetchContextEntities(
@@ -57,7 +70,12 @@ export async function fetchContextEntities(
     throw new Error(errorBody.detail || `Failed to fetch context entities: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  // Normalise items in case the API returns `type` instead of `entity_type`
+  if (data.items) {
+    data.items = data.items.map(normalizeEntity);
+  }
+  return data;
 }
 
 /**
@@ -71,7 +89,7 @@ export async function fetchContextEntity(id: string): Promise<ContextEntity> {
     throw new Error(errorBody.detail || `Failed to fetch context entity: ${response.statusText}`);
   }
 
-  return response.json();
+  return normalizeEntity(await response.json());
 }
 
 /**
@@ -91,7 +109,7 @@ export async function createContextEntity(
     throw new Error(errorBody.detail || `Failed to create context entity: ${response.statusText}`);
   }
 
-  return response.json();
+  return normalizeEntity(await response.json());
 }
 
 /**
@@ -112,7 +130,7 @@ export async function updateContextEntity(
     throw new Error(errorBody.detail || `Failed to update context entity: ${response.statusText}`);
   }
 
-  return response.json();
+  return normalizeEntity(await response.json());
 }
 
 /**
