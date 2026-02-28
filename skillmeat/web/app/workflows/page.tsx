@@ -15,6 +15,8 @@ import { PageHeader } from '@/components/shared/page-header';
 import { WorkflowCard, WorkflowCardSkeleton } from '@/components/workflow/workflow-card';
 import { WorkflowListItem, WorkflowListItemSkeleton } from '@/components/workflow/workflow-list-item';
 import { WorkflowToolbar } from '@/components/workflow/workflow-toolbar';
+import { WorkflowDetailModal } from '@/components/workflow/workflow-detail-modal';
+import { ExecutionDetailModal } from '@/components/workflow/execution-detail-modal';
 import { Button } from '@/components/ui/button';
 import { useWorkflows, useDeleteWorkflow, useDuplicateWorkflow } from '@/hooks';
 import type { WorkflowFilters } from '@/types/workflow';
@@ -41,6 +43,11 @@ export default function WorkflowsPage() {
   const [filters, setFilters] = useState<WorkflowFilters>(DEFAULT_FILTERS);
   const [view, setView] = useState<'grid' | 'list'>('grid');
 
+  // Modal state
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
+  const [executionWorkflowId, setExecutionWorkflowId] = useState<string>('');
+
   // ── Data ─────────────────────────────────────────────────────────────────
   const { data, isLoading, isError } = useWorkflows(filters);
   const workflows = data?.items ?? [];
@@ -58,6 +65,30 @@ export default function WorkflowsPage() {
 
   const handleClearFilters = useCallback(() => {
     setFilters(DEFAULT_FILTERS);
+  }, []);
+
+  const handleWorkflowClick = useCallback((workflowId: string) => {
+    setSelectedWorkflowId(workflowId);
+  }, []);
+
+  const handleCloseWorkflowModal = useCallback(() => {
+    setSelectedWorkflowId(null);
+  }, []);
+
+  const handleExecutionClick = useCallback((executionId: string) => {
+    // Find which workflow this execution belongs to (it's the currently open workflow)
+    setSelectedExecutionId(executionId);
+    setExecutionWorkflowId(selectedWorkflowId ?? '');
+  }, [selectedWorkflowId]);
+
+  const handleCloseExecutionModal = useCallback(() => {
+    setSelectedExecutionId(null);
+  }, []);
+
+  const handleExecutionWorkflowClick = useCallback((workflowId: string) => {
+    // Close execution modal and open workflow modal
+    setSelectedExecutionId(null);
+    setSelectedWorkflowId(workflowId);
   }, []);
 
   const handleRun = useCallback((workflowId: string, workflowName: string) => {
@@ -171,6 +202,7 @@ export default function WorkflowsPage() {
           <WorkflowCard
             key={workflow.id}
             workflow={workflow}
+            onClick={() => handleWorkflowClick(workflow.id)}
             onRun={() => handleRun(workflow.id, workflow.name)}
             onEdit={() => handleEdit(workflow.id)}
             onDuplicate={() => handleDuplicate(workflow.id)}
@@ -189,6 +221,7 @@ export default function WorkflowsPage() {
             <WorkflowListItem
               key={workflow.id}
               workflow={workflow}
+              onClick={() => handleWorkflowClick(workflow.id)}
               onRun={() => handleRun(workflow.id, workflow.name)}
               onEdit={() => handleEdit(workflow.id)}
               onDuplicate={() => handleDuplicate(workflow.id)}
@@ -248,6 +281,22 @@ export default function WorkflowsPage() {
         {!isLoading && !isError && !isEmpty && view === 'grid' && renderGrid()}
         {!isLoading && !isError && !isEmpty && view === 'list' && renderList()}
       </main>
+
+      {/* Detail Modals */}
+      <WorkflowDetailModal
+        workflowId={selectedWorkflowId}
+        open={selectedWorkflowId !== null}
+        onClose={handleCloseWorkflowModal}
+        onExecutionClick={handleExecutionClick}
+      />
+
+      <ExecutionDetailModal
+        executionId={selectedExecutionId}
+        workflowId={executionWorkflowId}
+        open={selectedExecutionId !== null}
+        onClose={handleCloseExecutionModal}
+        onWorkflowClick={handleExecutionWorkflowClick}
+      />
     </div>
   );
 }

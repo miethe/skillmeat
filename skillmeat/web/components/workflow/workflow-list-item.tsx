@@ -83,6 +83,11 @@ export interface WorkflowListItemProps {
   onDuplicate?: () => void;
   /** Triggered when Delete is selected from the overflow menu. */
   onDelete?: () => void;
+  /**
+   * When provided, clicking the row (or the name) calls this handler instead
+   * of navigating to the workflow detail page. Action buttons are unaffected.
+   */
+  onClick?: () => void;
   /** Optional className override for the row container. */
   className?: string;
 }
@@ -98,8 +103,9 @@ export interface WorkflowListItemProps {
  * displays: name (link) + status badge, stage count, up to 2 tags with
  * overflow, last-run time, updated date, and action buttons.
  *
- * Clicking the workflow name navigates to the detail page. Action buttons
- * stop propagation so they never trigger navigation.
+ * Clicking the workflow name (or row when `onClick` is provided) navigates
+ * to the detail page, or calls `onClick` when provided. Action buttons
+ * stop propagation so they never trigger navigation or onClick.
  *
  * Accessibility:
  * - Row root is an `<li>` with `role="row"` semantics handled by the parent.
@@ -119,6 +125,7 @@ export interface WorkflowListItemProps {
  *       onEdit={() => router.push(`/workflows/${wf.id}/edit`)}
  *       onDuplicate={() => duplicateWorkflow(wf.id)}
  *       onDelete={() => deleteWorkflow(wf.id)}
+ *       onClick={() => openWorkflowModal(wf.id)}
  *     />
  *   ))}
  * </ul>
@@ -131,6 +138,7 @@ export function WorkflowListItem({
   onEdit,
   onDuplicate,
   onDelete,
+  onClick,
   className,
 }: WorkflowListItemProps) {
   const { id, name, status, stages, tags, updatedAt } = workflow;
@@ -148,9 +156,23 @@ export function WorkflowListItem({
   return (
     <li
       aria-label={`Workflow: ${name}`}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+      tabIndex={onClick ? 0 : undefined}
+      role={onClick ? 'button' : undefined}
       className={cn(
         'group flex items-center gap-4 border-b px-4 py-3 last:border-b-0',
         'transition-colors duration-150 hover:bg-muted/50',
+        onClick && 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
         className
       )}
     >
@@ -166,19 +188,30 @@ export function WorkflowListItem({
           <GitBranch className="h-4 w-4" />
         </div>
 
-        {/* Name link */}
-        <Link
-          href={`/workflows/${id}`}
-          className={cn(
-            'min-w-0 truncate text-sm font-medium text-foreground',
-            'hover:text-indigo-600 dark:hover:text-indigo-400',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded'
-          )}
-          aria-label={`View details for ${name}`}
-          onClick={stopProp}
-        >
-          {name}
-        </Link>
+        {/* Name — link when no onClick, plain text when row handles the click */}
+        {onClick ? (
+          <span
+            className={cn(
+              'min-w-0 truncate text-sm font-medium text-foreground',
+              'hover:text-indigo-600 dark:hover:text-indigo-400'
+            )}
+          >
+            {name}
+          </span>
+        ) : (
+          <Link
+            href={`/workflows/${id}`}
+            className={cn(
+              'min-w-0 truncate text-sm font-medium text-foreground',
+              'hover:text-indigo-600 dark:hover:text-indigo-400',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded'
+            )}
+            aria-label={`View details for ${name}`}
+            onClick={stopProp}
+          >
+            {name}
+          </Link>
+        )}
 
         {/* Status badge — inline with name */}
         <Badge

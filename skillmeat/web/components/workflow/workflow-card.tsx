@@ -78,6 +78,11 @@ export interface WorkflowCardProps {
   onDuplicate?: () => void;
   /** Triggered when Delete is selected from the overflow menu. */
   onDelete?: () => void;
+  /**
+   * When provided, clicking the card body calls this handler instead of
+   * navigating to the workflow detail page. Action buttons are unaffected.
+   */
+  onClick?: () => void;
   /** Optional className override for the outer card. */
   className?: string;
 }
@@ -90,8 +95,9 @@ export interface WorkflowCardProps {
  * WorkflowCard
  *
  * Compact grid card summarising a workflow definition. Clicking the card
- * body navigates to the workflow detail page. Action buttons (Run, Edit,
- * three-dot menu) stop propagation so they don't trigger navigation.
+ * body navigates to the workflow detail page, or calls `onClick` when
+ * provided. Action buttons (Run, Edit, three-dot menu) stop propagation
+ * so they don't trigger navigation or the onClick handler.
  *
  * Accessibility: the card root is an `<article>` with an accessible label.
  * Action buttons carry explicit aria-labels. Tags are rendered as a list.
@@ -105,6 +111,7 @@ export interface WorkflowCardProps {
  *   onEdit={() => router.push(`/workflows/${workflow.id}/edit`)}
  *   onDuplicate={() => duplicateWorkflow(workflow.id)}
  *   onDelete={() => deleteWorkflow(workflow.id)}
+ *   onClick={() => openWorkflowModal(workflow.id)}
  * />
  * ```
  */
@@ -115,6 +122,7 @@ export function WorkflowCard({
   onEdit,
   onDuplicate,
   onDelete,
+  onClick,
   className,
 }: WorkflowCardProps) {
   const { id, name, status, stages, tags, updatedAt } = workflow;
@@ -138,86 +146,176 @@ export function WorkflowCard({
         className
       )}
     >
-      {/* Card body — entire area is a navigation target */}
-      <Link
-        href={`/workflows/${id}`}
-        className="block p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-xl"
-        aria-label={`View details for ${name}`}
-      >
-        {/* Header: icon + name + status badge */}
-        <div className="flex items-start gap-3">
-          {/* Workflow icon container */}
-          <div
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-500 dark:bg-indigo-500/15 dark:text-indigo-400"
-            aria-hidden="true"
-          >
-            <GitBranch className="h-5 w-5" />
+      {/* Card body — navigation target or onClick handler */}
+      {onClick ? (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={onClick}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onClick();
+            }
+          }}
+          className="block cursor-pointer p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-xl"
+          aria-label={`View details for ${name}`}
+        >
+          {/* Header: icon + name + status badge */}
+          <div className="flex items-start gap-3">
+            {/* Workflow icon container */}
+            <div
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-500 dark:bg-indigo-500/15 dark:text-indigo-400"
+              aria-hidden="true"
+            >
+              <GitBranch className="h-5 w-5" />
+            </div>
+
+            {/* Name + status */}
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base font-semibold leading-snug text-foreground line-clamp-2">
+                {name}
+              </h3>
+            </div>
+
+            {/* Status badge — top-right */}
+            <Badge
+              variant="outline"
+              className={cn('flex-shrink-0 text-xs font-medium', statusCfg.className)}
+            >
+              {statusCfg.label}
+            </Badge>
           </div>
 
-          {/* Name + status */}
-          <div className="min-w-0 flex-1">
-            <h3 className="text-base font-semibold leading-snug text-foreground line-clamp-2">
-              {name}
-            </h3>
-          </div>
+          {/* Metadata row: stage count + last run */}
+          <p className="mt-3 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {stageCount} {stageCount === 1 ? 'stage' : 'stages'}
+            </span>
+            {' | '}
+            <span className="inline-flex items-center gap-1">
+              <Clock className="inline h-3 w-3 align-middle" aria-hidden="true" />
+              {formatLastRun(lastRunAt)}
+            </span>
+          </p>
 
-          {/* Status badge — top-right */}
-          <Badge
-            variant="outline"
-            className={cn('flex-shrink-0 text-xs font-medium', statusCfg.className)}
-          >
-            {statusCfg.label}
-          </Badge>
+          {/* Tags */}
+          {tags.length > 0 && (
+            <ul
+              role="list"
+              aria-label="Tags"
+              className="mt-3 flex flex-wrap gap-1.5"
+            >
+              {visibleTags.map((tag) => (
+                <li key={tag} role="listitem">
+                  <Badge
+                    variant="outline"
+                    className="text-[11px] font-normal px-2 py-0.5 text-muted-foreground"
+                  >
+                    {tag}
+                  </Badge>
+                </li>
+              ))}
+              {overflowCount > 0 && (
+                <li role="listitem">
+                  <Badge
+                    variant="outline"
+                    className="text-[11px] font-normal px-2 py-0.5 text-muted-foreground"
+                  >
+                    +{overflowCount} more
+                  </Badge>
+                </li>
+              )}
+            </ul>
+          )}
+
+          {/* Footer metadata: created by / updated */}
+          <p className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
+            <CalendarDays className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+            <span>Updated {formatUpdated(updatedAt)}</span>
+          </p>
         </div>
+      ) : (
+        <Link
+          href={`/workflows/${id}`}
+          className="block p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-xl"
+          aria-label={`View details for ${name}`}
+        >
+          {/* Header: icon + name + status badge */}
+          <div className="flex items-start gap-3">
+            {/* Workflow icon container */}
+            <div
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-500 dark:bg-indigo-500/15 dark:text-indigo-400"
+              aria-hidden="true"
+            >
+              <GitBranch className="h-5 w-5" />
+            </div>
 
-        {/* Metadata row: stage count + last run */}
-        <p className="mt-3 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">
-            {stageCount} {stageCount === 1 ? 'stage' : 'stages'}
-          </span>
-          {' | '}
-          <span className="inline-flex items-center gap-1">
-            <Clock className="inline h-3 w-3 align-middle" aria-hidden="true" />
-            {formatLastRun(lastRunAt)}
-          </span>
-        </p>
+            {/* Name + status */}
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base font-semibold leading-snug text-foreground line-clamp-2">
+                {name}
+              </h3>
+            </div>
 
-        {/* Tags */}
-        {tags.length > 0 && (
-          <ul
-            role="list"
-            aria-label="Tags"
-            className="mt-3 flex flex-wrap gap-1.5"
-          >
-            {visibleTags.map((tag) => (
-              <li key={tag} role="listitem">
-                <Badge
-                  variant="outline"
-                  className="text-[11px] font-normal px-2 py-0.5 text-muted-foreground"
-                >
-                  {tag}
-                </Badge>
-              </li>
-            ))}
-            {overflowCount > 0 && (
-              <li role="listitem">
-                <Badge
-                  variant="outline"
-                  className="text-[11px] font-normal px-2 py-0.5 text-muted-foreground"
-                >
-                  +{overflowCount} more
-                </Badge>
-              </li>
-            )}
-          </ul>
-        )}
+            {/* Status badge — top-right */}
+            <Badge
+              variant="outline"
+              className={cn('flex-shrink-0 text-xs font-medium', statusCfg.className)}
+            >
+              {statusCfg.label}
+            </Badge>
+          </div>
 
-        {/* Footer metadata: created by / updated */}
-        <p className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
-          <CalendarDays className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
-          <span>Updated {formatUpdated(updatedAt)}</span>
-        </p>
-      </Link>
+          {/* Metadata row: stage count + last run */}
+          <p className="mt-3 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {stageCount} {stageCount === 1 ? 'stage' : 'stages'}
+            </span>
+            {' | '}
+            <span className="inline-flex items-center gap-1">
+              <Clock className="inline h-3 w-3 align-middle" aria-hidden="true" />
+              {formatLastRun(lastRunAt)}
+            </span>
+          </p>
+
+          {/* Tags */}
+          {tags.length > 0 && (
+            <ul
+              role="list"
+              aria-label="Tags"
+              className="mt-3 flex flex-wrap gap-1.5"
+            >
+              {visibleTags.map((tag) => (
+                <li key={tag} role="listitem">
+                  <Badge
+                    variant="outline"
+                    className="text-[11px] font-normal px-2 py-0.5 text-muted-foreground"
+                  >
+                    {tag}
+                  </Badge>
+                </li>
+              ))}
+              {overflowCount > 0 && (
+                <li role="listitem">
+                  <Badge
+                    variant="outline"
+                    className="text-[11px] font-normal px-2 py-0.5 text-muted-foreground"
+                  >
+                    +{overflowCount} more
+                  </Badge>
+                </li>
+              )}
+            </ul>
+          )}
+
+          {/* Footer metadata: created by / updated */}
+          <p className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
+            <CalendarDays className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+            <span>Updated {formatUpdated(updatedAt)}</span>
+          </p>
+        </Link>
+      )}
 
       {/* Action bar — sits below the link so clicks don't navigate */}
       <div
