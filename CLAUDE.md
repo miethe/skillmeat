@@ -389,7 +389,8 @@ SkillMeat's memory system stores project-level development knowledge (patterns, 
 skillmeat/
 ├── cli.py              # Click-based CLI (collection, web commands)
 ├── core/               # Business logic (artifact, deployment, sync, discovery, analytics)
-│   └── github_client.py # Centralized GitHub API client wrapper
+│   ├── github_client.py # Centralized GitHub API client wrapper
+│   └── workflow/       # Workflow orchestration engine (SWDL parser, validator, executor)
 ├── cache/              # SQLAlchemy ORM, repositories, Alembic migrations
 ├── api/                # FastAPI backend → See skillmeat/api/CLAUDE.md
 ├── web/                # Next.js 15 frontend → See skillmeat/web/CLAUDE.md

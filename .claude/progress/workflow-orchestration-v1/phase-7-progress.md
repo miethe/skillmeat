@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 14
-completed_tasks: 8
+completed_tasks: 13
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -61,7 +61,7 @@ tasks:
   priority: critical
 - id: TEST-7.5
   description: 'Performance benchmarks: list <300ms, plan <1s, parse <200ms, SSE <500ms'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -81,7 +81,7 @@ tasks:
 - id: TEST-7.7
   description: 'WCAG 2.1 AA accessibility audit: all new pages (Library, Builder,
     Detail, Dashboard)'
-  status: pending
+  status: completed
   assigned_to:
   - ui-engineer-enhanced
   dependencies:
@@ -101,7 +101,7 @@ tasks:
 - id: DOC-7.9
   description: 'SWDL authoring guide: how to write workflow YAML, expression syntax,
     examples'
-  status: pending
+  status: completed
   assigned_to:
   - documentation-writer
   dependencies:
@@ -111,7 +111,7 @@ tasks:
 - id: DOC-7.10
   description: 'CLI command reference: all skillmeat workflow commands with usage
     and examples'
-  status: pending
+  status: completed
   assigned_to:
   - documentation-writer
   dependencies:
@@ -120,7 +120,7 @@ tasks:
   priority: medium
 - id: DOC-7.11
   description: 'Web UI user guide: creating workflows, running, monitoring executions'
-  status: pending
+  status: completed
   assigned_to:
   - documentation-writer
   dependencies:
@@ -214,7 +214,7 @@ files_modified:
 schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
-progress: 57
+progress: 92
 updated: '2026-02-27'
 ---
 

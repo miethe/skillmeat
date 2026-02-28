@@ -104,6 +104,7 @@ uvicorn skillmeat.api.server:app --workers 4 --host 0.0.0.0 --port 8080
 | `enable_auto_discovery` | `true` | Artifact auto-discovery feature |
 | `enable_auto_population` | `true` | Auto-populate GitHub metadata |
 | `discovery_cache_ttl` | `3600` | Cache TTL in seconds |
+| `workflow_engine_enabled` | `true` | Enable workflow orchestration engine |
 
 **Environment Variables** (prefix `SKILLMEAT_`):
 
@@ -156,7 +157,7 @@ async def list_artifacts(
 
 **Pattern**: One router per domain. All registered in `server.py` with `/api/v1/` prefix.
 
-### Available Routers (25 total)
+### Available Routers (27 total)
 
 | Router | Prefix | Purpose |
 |--------|--------|---------|
@@ -182,6 +183,8 @@ async def list_artifacts(
 | `settings` | `/api/v1/settings` | User settings |
 | `config` | `/api/v1/config` | Configuration endpoints |
 | `project_templates` | `/api/v1/project-templates` | Project templates |
+| `workflows` | `/api/v1/workflows` | Workflow definition management |
+| `workflow_executions` | `/api/v1/workflow-executions` | Workflow execution runtime |
 | `cache` | `/api/v1/cache` | Cache management |
 | `health` | `/health` | Health checks |
 
@@ -245,6 +248,7 @@ class ArtifactResponse(BaseModel):
 - `settings.py`, `config.py`, `project_template.py`, `mcp.py`
 - `bundles.py`, `match.py`, `merge.py`, `ratings.py`
 - `discovery.py`, `drift.py`, `errors.py`, `scoring.py`, `cache.py`, `common.py`
+- `workflows.py`, `workflow_executions.py` (workflow orchestration)
 
 See actual files for complete schema definitions.
 

@@ -1,5 +1,5 @@
 <!-- AUTO-GENERATED: Do not edit directly. See .github/readme/ -->
-<!-- GENERATED: 2026-02-26T19:00:21.874Z -->
+<!-- GENERATED: 2026-02-28T03:27:01.125Z -->
 <!-- VERSION: 0.3.0-beta -->
 
 <!-- BEGIN:hero -->
@@ -163,7 +163,7 @@ For complete documentation, see the [Quickstart Guide](docs/user/quickstart.md) 
 <!-- BEGIN:features -->
 ## Features
 
-> **116+ CLI commands** | **160+ API endpoints** | **25 web pages**
+> **125+ CLI commands** | **175+ API endpoints** | **28 web pages**
 
 ### Collection Management
 
@@ -312,6 +312,21 @@ _Multi-artifact packages with smart import_
 | Plugin Deployment | Deploy plugins (`skillmeat deploy`) |
 | Composite Bundle Export | Export as bundle (`skillmeat export`) |
 
+### Workflow Orchestration Engine
+
+_Design, validate, and execute multi-step agentic workflows_
+
+| Feature | Description |
+|---------|-------------|
+| **Workflow Builder** | Visual workflow design (`skillmeat workflow create`) |
+| Workflow Validation | Schema &amp; cycle validation (`skillmeat workflow validate`) |
+| Execution Planning | Smart execution planning (`skillmeat workflow plan`) |
+| **Workflow Execution** | Execute with tracking (`skillmeat workflow run`) |
+| Execution Dashboard | Real-time monitoring |
+| **Workflow Library** | Saved workflows browser |
+| Workflow Versioning | Version history &amp; rollback (`skillmeat workflow show`) |
+| Workflow Export | Export as YAML/JSON (`skillmeat workflow export`) |
+
 ### Three-Way Interface
 
 _CLI + Web UI + API_
@@ -342,7 +357,7 @@ SkillMeat manages multiple artifact types for Claude Code:
 <!-- BEGIN:cli-reference -->
 ## CLI Reference
 
-SkillMeat provides **116+ commands** across **23 command groups**.
+SkillMeat provides **125+ commands** across **24 command groups**.
 
 ### Quick Reference
 
@@ -360,6 +375,7 @@ SkillMeat provides **116+ commands** across **23 command groups**.
 | **Context Entities** | &#x60;skillmeat context&#x60;, &#x60;skillmeat context deploy&#x60; |
 | **Team Collaboration** | &#x60;skillmeat bundle create&#x60;, &#x60;skillmeat vault&#x60;, &#x60;skillmeat sign&#x60; |
 | **Composite Artifacts** | &#x60;skillmeat add&#x60;, &#x60;skillmeat deploy&#x60;, &#x60;skillmeat export&#x60; |
+| **Workflow Orchestration Engine** | &#x60;skillmeat workflow create&#x60;, &#x60;skillmeat workflow validate&#x60;, &#x60;skillmeat workflow plan&#x60;, &#x60;skillmeat workflow run&#x60;, &#x60;skillmeat workflow show&#x60;, &#x60;skillmeat workflow export&#x60; |
 | **Three-Way Interface** | &#x60;skillmeat --help&#x60;, &#x60;skillmeat web dev&#x60; |
 
 ### Core Commands
@@ -502,6 +518,19 @@ skillmeat web start               # Start production servers
 | `skillmeat add` | One-click plugin import |
 | `skillmeat deploy` | Deploy plugins |
 | `skillmeat export` | Export as bundle |
+
+</details>
+<details>
+<summary><strong>Workflow Orchestration Engine</strong> - Design, validate, and execute multi-step agentic workflows</summary>
+
+| Command | Description |
+|---------|-------------|
+| `skillmeat workflow create` | Visual workflow design |
+| `skillmeat workflow validate` | Schema &amp; cycle validation |
+| `skillmeat workflow plan` | Smart execution planning |
+| `skillmeat workflow run` | Execute with tracking |
+| `skillmeat workflow show` | Version history &amp; rollback |
+| `skillmeat workflow export` | Export as YAML/JSON |
 
 </details>
 <details>
