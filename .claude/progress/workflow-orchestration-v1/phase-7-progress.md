@@ -3,13 +3,13 @@ type: progress
 prd: workflow-orchestration-v1
 phase: 7
 title: Integration, Testing & Documentation
-status: pending
+status: completed
 started: null
 completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 14
-completed_tasks: 13
+completed_tasks: 14
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -147,7 +147,7 @@ tasks:
   priority: medium
 - id: DEPLOY-7.14
   description: 'README update: include workflow features per doc policy'
-  status: pending
+  status: completed
   assigned_to:
   - documentation-writer
   dependencies:
@@ -214,7 +214,7 @@ files_modified:
 schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
-progress: 92
+progress: 100
 updated: '2026-02-27'
 ---
 
