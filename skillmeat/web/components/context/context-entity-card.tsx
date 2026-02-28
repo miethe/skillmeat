@@ -4,6 +4,9 @@
  * Displays a context entity with type badge, category, auto-load indicator,
  * path pattern, and action buttons. Follows the unified card style with
  * colored left border accents based on entity type.
+ *
+ * Type display properties (colours, icons, labels) are driven by
+ * `lib/context-entity-config.ts` — edit that file to change per-type styling.
  */
 
 'use client';
@@ -13,9 +16,9 @@ import {
   FileText,
   Settings,
   BookOpen,
-  FileCode,
-  ListTodo,
-  Eye,
+  Shield,
+  Clock,
+  File,
   Rocket,
   Pencil,
   Trash2,
@@ -28,84 +31,59 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import type { ContextEntity, ContextEntityType } from '@/types/context-entity';
+import {
+  getEntityTypeConfig,
+  type ContextEntityTypeConfig,
+} from '@/lib/context-entity-config';
+import type { ContextEntity } from '@/types/context-entity';
 
 // ============================================================================
-// Type Configuration
+// Icon resolver
 // ============================================================================
 
-interface TypeConfig {
-  icon: React.ElementType;
-  label: string;
-  borderColor: string;
-  bgColor: string;
-  badgeClassName: string;
+/** Maps icon name strings from ContextEntityTypeConfig to real Lucide components. */
+function resolveIcon(iconName: ContextEntityTypeConfig['icon']): React.ElementType {
+  switch (iconName) {
+    case 'settings':
+      return Settings;
+    case 'file-text':
+      return FileText;
+    case 'shield':
+      return Shield;
+    case 'book-open':
+      return BookOpen;
+    case 'clock':
+      return Clock;
+    case 'file':
+    default:
+      return File;
+  }
 }
-
-const typeConfig: Record<ContextEntityType, TypeConfig> = {
-  project_config: {
-    icon: Settings,
-    label: 'Config',
-    borderColor: 'border-l-blue-500',
-    bgColor: 'bg-blue-500/[0.02] dark:bg-blue-500/[0.03]',
-    badgeClassName: 'border-blue-500 text-blue-700 bg-blue-50 dark:bg-blue-950',
-  },
-  spec_file: {
-    icon: FileText,
-    label: 'Spec',
-    borderColor: 'border-l-purple-500',
-    bgColor: 'bg-purple-500/[0.02] dark:bg-purple-500/[0.03]',
-    badgeClassName: 'border-purple-500 text-purple-700 bg-purple-50 dark:bg-purple-950',
-  },
-  rule_file: {
-    icon: FileCode,
-    label: 'Rule',
-    borderColor: 'border-l-orange-500',
-    bgColor: 'bg-orange-500/[0.02] dark:bg-orange-500/[0.03]',
-    badgeClassName: 'border-orange-500 text-orange-700 bg-orange-50 dark:bg-orange-950',
-  },
-  context_file: {
-    icon: BookOpen,
-    label: 'Context',
-    borderColor: 'border-l-green-500',
-    bgColor: 'bg-green-500/[0.02] dark:bg-green-500/[0.03]',
-    badgeClassName: 'border-green-500 text-green-700 bg-green-50 dark:bg-green-950',
-  },
-  progress_template: {
-    icon: ListTodo,
-    label: 'Progress',
-    borderColor: 'border-l-yellow-500',
-    bgColor: 'bg-yellow-500/[0.02] dark:bg-yellow-500/[0.03]',
-    badgeClassName: 'border-yellow-500 text-yellow-700 bg-yellow-50 dark:bg-yellow-950',
-  },
-};
-
-// Default config for unknown entity types
-const defaultConfig: TypeConfig = {
-  icon: FileText,
-  label: 'Entity',
-  borderColor: 'border-l-gray-500',
-  bgColor: 'bg-gray-500/[0.02] dark:bg-gray-500/[0.03]',
-  badgeClassName: 'border-gray-500 text-gray-700 bg-gray-50 dark:bg-gray-950',
-};
 
 // ============================================================================
 // Sub-components
 // ============================================================================
 
 interface TypeBadgeProps {
-  config: TypeConfig;
+  config: ContextEntityTypeConfig;
 }
 
 function TypeBadge({ config }: TypeBadgeProps) {
-  const Icon = config.icon;
+  const Icon = resolveIcon(config.icon);
 
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge variant="outline" className={cn('gap-1 text-xs', config.badgeClassName)}>
-            <Icon className="h-3 w-3" />
+          <Badge
+            variant="outline"
+            className={cn(
+              'gap-1 rounded-full text-xs font-medium border-transparent',
+              config.bgClass,
+              config.textClass
+            )}
+          >
+            <Icon className="h-3 w-3" aria-hidden="true" />
             {config.label}
           </Badge>
         </TooltipTrigger>
@@ -205,21 +183,11 @@ export function ContextEntityCard({
   tokenCount,
   onAutoLoadToggle,
 }: ContextEntityCardProps) {
-  // Normalize entity type to lowercase and lookup config
-  const normalizedType = (entity.entity_type?.toLowerCase() || '') as ContextEntityType;
-  const config = typeConfig[normalizedType] || defaultConfig;
+  // Normalise entity type to lowercase and look up config from the central map
+  const normalizedType = entity.entity_type?.toLowerCase() ?? '';
+  const config = getEntityTypeConfig(normalizedType);
 
-  // Warn developers if using fallback config
-  if (!typeConfig[normalizedType] && entity.entity_type) {
-    console.warn(`Unknown entity type: ${entity.entity_type}, using default config`);
-  }
-
-  const Icon = config.icon;
-
-  const handlePreview = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onPreview?.(entity);
-  };
+  const Icon = resolveIcon(config.icon);
 
   const handleDeploy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -247,15 +215,52 @@ export function ContextEntityCard({
   return (
     <Card
       className={cn(
-        'group relative border-l-4',
-        config.borderColor,
-        config.bgColor,
-        'transition-shadow duration-200 hover:shadow-md'
+        'group relative flex min-h-[220px] cursor-pointer flex-col border-l-4',
+        config.borderClass,
+        config.cardBgClass,
+        'transition-shadow duration-200 hover:shadow-md hover:ring-1 hover:ring-border'
       )}
       role="article"
-      aria-label={`Context entity: ${entity.name}`}
+      aria-label={`Context entity: ${entity.name}. Click to preview.`}
+      onClick={() => onPreview?.(entity)}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPreview?.(entity);
+        }
+      }}
     >
-      <div className="space-y-3 p-4">
+      {/* Hover Actions — bottom-left, above action bar */}
+      {(onEdit || onDelete) && (
+        <div className="absolute bottom-14 left-2 flex gap-1 rounded-md bg-background/80 p-0.5 opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+          {onEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleEdit}
+              aria-label={`Edit ${entity.name}`}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          )}
+          {onDelete && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-destructive hover:text-destructive"
+              onClick={handleDelete}
+              aria-label={`Delete ${entity.name}`}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Scrollable card content */}
+      <div className="flex-1 space-y-3 p-4">
         {/* Header: Name + Type Badge + Auto-load */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
@@ -272,34 +277,6 @@ export function ContextEntityCard({
             <AutoLoadIndicator autoLoad={entity.auto_load} />
           </div>
         </div>
-
-        {/* Hover Actions */}
-        {(onEdit || onDelete) && (
-          <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
-            {onEdit && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={handleEdit}
-                aria-label={`Edit ${entity.name}`}
-              >
-                <Pencil className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            )}
-            {onDelete && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive hover:text-destructive"
-                onClick={handleDelete}
-                aria-label={`Delete ${entity.name}`}
-              >
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            )}
-          </div>
-        )}
 
         {/* Description */}
         {entity.description && (
@@ -338,7 +315,10 @@ export function ContextEntityCard({
 
         {/* Auto-load Toggle */}
         {onAutoLoadToggle && (
-          <div className="flex items-center justify-between border-t pt-2">
+          <div
+            className="flex items-center justify-between border-t pt-2"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center gap-2">
               <label
                 htmlFor={`auto-load-${entity.id}`}
@@ -371,32 +351,24 @@ export function ContextEntityCard({
             </span>
           </div>
         )}
+      </div>
 
-        {/* Footer: Action Buttons */}
-        <div className="flex items-center justify-end gap-2 border-t pt-2">
-          {onPreview && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handlePreview}
-              aria-label={`Preview ${entity.name}`}
-            >
-              <Eye className="mr-1 h-4 w-4" aria-hidden="true" />
-              Preview
-            </Button>
-          )}
-          {onDeploy && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDeploy}
-              aria-label={`Deploy ${entity.name} to project`}
-            >
-              <Rocket className="mr-1 h-4 w-4" aria-hidden="true" />
-              Deploy
-            </Button>
-          )}
-        </div>
+      {/* Footer: Action Buttons — pinned to bottom */}
+      <div
+        className="flex items-center justify-end gap-2 border-t p-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {onDeploy && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleDeploy}
+            aria-label={`Deploy ${entity.name} to project`}
+          >
+            <Rocket className="mr-1 h-4 w-4" aria-hidden="true" />
+            Deploy
+          </Button>
+        )}
       </div>
     </Card>
   );

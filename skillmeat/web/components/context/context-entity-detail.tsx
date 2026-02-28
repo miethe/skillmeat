@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FileText, Calendar, Tag, Eye, EyeOff, Edit, Upload, Loader2 } from 'lucide-react';
+import { FileText, Calendar, Tag, Eye, EyeOff, Edit, Upload, Loader2, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -19,9 +19,11 @@ import type { ContextEntity, ContextEntityType } from '@/types/context-entity';
 interface ContextEntityDetailProps {
   entity: ContextEntity | null;
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  /** Called when the modal should close */
+  onClose: () => void;
   onDeploy?: (entity: ContextEntity) => void;
   onEdit?: (entity: ContextEntity) => void;
+  onDelete?: (entity: ContextEntity) => Promise<void>;
   /** Show token count in metadata */
   showTokenCount?: boolean;
   /** Estimated token count for this entity */
@@ -84,9 +86,10 @@ function formatDate(dateString: string): string {
 export function ContextEntityDetail({
   entity,
   open,
-  onOpenChange,
+  onClose,
   onDeploy,
   onEdit,
+  onDelete,
   showTokenCount = false,
   tokenCount,
 }: ContextEntityDetailProps) {
@@ -100,7 +103,7 @@ export function ContextEntityDetail({
   } = useContextEntityContent(open ? entity?.id : undefined);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
       <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col overflow-hidden p-0">
         {!entity ? (
           <div className="p-6">
@@ -329,6 +332,17 @@ export function ContextEntityDetail({
                     </Button>
                   )}
                 </div>
+                {onDelete && (
+                  <Button
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => onDelete(entity)}
+                    aria-label={`Delete ${entity.name}`}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Delete
+                  </Button>
+                )}
               </div>
             </div>
           </>
