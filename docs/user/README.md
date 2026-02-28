@@ -31,6 +31,8 @@ tags:
 - Memory & Context overview: `docs/user/guides/memory-context-system.md`
 - Memory Inbox guide: `docs/user/guides/memory-inbox.md`
 - Context Modules guide: `docs/user/guides/context-modules.md`
+- Workflow CLI Reference: `docs/user/guides/workflow-cli-reference.md`
+- Workflow Authoring Guide: `docs/user/guides/workflow-authoring.md`
 - Release notes: `docs/user/release-notes/`
 - Examples: `docs/user/examples.md`
 

@@ -9025,7 +9025,7 @@
           "config"
         ],
         "summary": "Get backend feature flags",
-        "description": "Returns the current state of backend feature flags so the frontend can\n    conditionally render features that depend on backend capabilities.\n\n    Features gated by these flags:\n    - **deployment_sets_enabled**: Controls visibility of Deployment Sets UI and nav item.\n      When False, the `/api/v1/deployment-sets` endpoints return 404.\n    - **composite_artifacts_enabled**: Controls composite artifact detection UI.\n    - **memory_context_enabled**: Controls Memory & Context Intelligence System UI.",
+        "description": "Returns the current state of backend feature flags so the frontend can\n    conditionally render features that depend on backend capabilities.\n\n    Features gated by these flags:\n    - **deployment_sets_enabled**: Controls visibility of Deployment Sets UI and nav item.\n      When False, the `/api/v1/deployment-sets` endpoints return 404.\n    - **composite_artifacts_enabled**: Controls composite artifact detection UI.\n    - **memory_context_enabled**: Controls Memory & Context Intelligence System UI.\n    - **workflow_engine_enabled**: Controls Workflow Orchestration Engine UI.\n      When False, the `/api/v1/workflows` and `/api/v1/workflow-executions` endpoints\n      return 404 and CLI workflow commands display a coming-soon message.",
         "operationId": "get_feature_flags_api_v1_config_feature_flags_get",
         "responses": {
           "200": {
@@ -21546,6 +21546,24 @@
                     "additionalProperties": true
                   },
                   "title": "Response List Workflows Api V1 Workflows Get"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Paginated list of workflows",
+                    "value": [
+                      {
+                        "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                        "name": "Deploy Skill Workflow",
+                        "description": "Validates and deploys a skill artifact to a project",
+                        "version": "1.0",
+                        "status": "active",
+                        "project_id": null,
+                        "stage_count": 3,
+                        "created_at": "2026-02-27T10:00:00",
+                        "updated_at": "2026-02-27T10:00:00"
+                      }
+                    ]
+                  }
                 }
               }
             }
@@ -21576,6 +21594,15 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/WorkflowCreateRequest"
+              },
+              "examples": {
+                "default": {
+                  "summary": "Create a 3-stage deploy workflow",
+                  "value": {
+                    "yaml_content": "id: deploy-skill\nname: Deploy Skill Workflow\ndescription: Validates and deploys a skill artifact to a project\nversion: \"1.0\"\nparameters:\n  - name: artifact_id\n    type: string\n    required: true\n    description: Artifact identifier (type:name)\n  - name: project_id\n    type: string\n    required: true\nstages:\n  - id: validate\n    name: Validate Artifact\n    type: skill\n    artifact: skill:validator\n    depends_on: []\n  - id: approve\n    name: Manual Approval Gate\n    type: gate\n    depends_on: [validate]\n  - id: deploy\n    name: Deploy to Project\n    type: skill\n    artifact: skill:deployer\n    depends_on: [approve]\n",
+                    "project_id": null
+                  }
+                }
               }
             }
           }
@@ -21589,6 +21616,38 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Create Workflow Api V1 Workflows Post"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Newly created workflow",
+                    "value": {
+                      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                      "name": "Deploy Skill Workflow",
+                      "description": "Validates and deploys a skill artifact to a project",
+                      "version": "1.0",
+                      "status": "active",
+                      "project_id": null,
+                      "stages": [
+                        {
+                          "id": "validate",
+                          "name": "Validate Artifact",
+                          "type": "skill"
+                        },
+                        {
+                          "id": "approve",
+                          "name": "Manual Approval Gate",
+                          "type": "gate"
+                        },
+                        {
+                          "id": "deploy",
+                          "name": "Deploy to Project",
+                          "type": "skill"
+                        }
+                      ],
+                      "created_at": "2026-02-27T10:00:00",
+                      "updated_at": "2026-02-27T10:00:00"
+                    }
+                  }
                 }
               }
             }
@@ -21635,6 +21694,36 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Get Workflow Api V1 Workflows  Workflow Id  Get"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Workflow with full stage list",
+                    "value": {
+                      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                      "name": "Deploy Skill Workflow",
+                      "version": "1.0",
+                      "status": "active",
+                      "stages": [
+                        {
+                          "id": "validate",
+                          "name": "Validate Artifact",
+                          "type": "skill"
+                        },
+                        {
+                          "id": "approve",
+                          "name": "Manual Approval Gate",
+                          "type": "gate"
+                        },
+                        {
+                          "id": "deploy",
+                          "name": "Deploy to Project",
+                          "type": "skill"
+                        }
+                      ],
+                      "created_at": "2026-02-27T10:00:00",
+                      "updated_at": "2026-02-27T10:00:00"
+                    }
+                  }
                 }
               }
             }
@@ -21645,6 +21734,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workflow or execution not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -21676,6 +21775,14 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/WorkflowUpdateRequest"
+              },
+              "examples": {
+                "default": {
+                  "summary": "Replace YAML definition",
+                  "value": {
+                    "yaml_content": "id: deploy-skill\nname: Deploy Skill Workflow\ndescription: Validates and deploys a skill artifact to a project\nversion: \"1.0\"\nparameters:\n  - name: artifact_id\n    type: string\n    required: true\n    description: Artifact identifier (type:name)\n  - name: project_id\n    type: string\n    required: true\nstages:\n  - id: validate\n    name: Validate Artifact\n    type: skill\n    artifact: skill:validator\n    depends_on: []\n  - id: approve\n    name: Manual Approval Gate\n    type: gate\n    depends_on: [validate]\n  - id: deploy\n    name: Deploy to Project\n    type: skill\n    artifact: skill:deployer\n    depends_on: [approve]\n"
+                  }
+                }
               }
             }
           }
@@ -21699,6 +21806,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workflow or execution not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -21734,6 +21851,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workflow or execution not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -21774,6 +21901,14 @@
                   }
                 ],
                 "title": "Request"
+              },
+              "examples": {
+                "default": {
+                  "summary": "Duplicate with custom name",
+                  "value": {
+                    "new_name": "Deploy Skill Workflow (staging)"
+                  }
+                }
               }
             }
           }
@@ -21797,6 +21932,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workflow or execution not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -21850,6 +21995,18 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Validate Workflow Api V1 Workflows  Workflow Id  Validate Post"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Validation result (always 200)",
+                    "value": {
+                      "is_valid": true,
+                      "errors": [],
+                      "warnings": [
+                        "Stage 'deploy' has no timeout configured"
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -21860,6 +22017,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workflow or execution not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -21900,6 +22067,17 @@
                   }
                 ],
                 "title": "Request"
+              },
+              "examples": {
+                "default": {
+                  "summary": "Generate plan with parameter overrides",
+                  "value": {
+                    "parameters": {
+                      "artifact_id": "skill:frontend-design",
+                      "project_id": "my-project"
+                    }
+                  }
+                }
               }
             }
           }
@@ -21913,6 +22091,36 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Plan Workflow Api V1 Workflows  Workflow Id  Plan Post"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Execution plan with parallel stage groups",
+                    "value": {
+                      "workflow_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                      "stages": [
+                        {
+                          "id": "validate",
+                          "name": "Validate Artifact",
+                          "parallel_group": 0
+                        },
+                        {
+                          "id": "approve",
+                          "name": "Manual Approval Gate",
+                          "parallel_group": 1
+                        },
+                        {
+                          "id": "deploy",
+                          "name": "Deploy to Project",
+                          "parallel_group": 2
+                        }
+                      ],
+                      "resolved_parameters": {
+                        "artifact_id": "skill:frontend-design",
+                        "project_id": "my-project"
+                      },
+                      "estimated_timeout_seconds": 300
+                    }
+                  }
                 }
               }
             }
@@ -21923,6 +22131,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workflow or execution not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -21945,6 +22163,19 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/WorkflowExecutionStartRequest"
+              },
+              "examples": {
+                "default": {
+                  "summary": "Start execution with parameter overrides",
+                  "value": {
+                    "workflow_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                    "parameters": {
+                      "artifact_id": "skill:frontend-design",
+                      "project_id": "my-project"
+                    },
+                    "overrides": null
+                  }
+                }
               }
             }
           }
@@ -21958,6 +22189,35 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Start Execution Api V1 Workflow Executions Post"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Created execution record",
+                    "value": {
+                      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                      "workflow_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                      "status": "running",
+                      "steps": [
+                        {
+                          "id": "step-1",
+                          "stage_id": "validate",
+                          "status": "pending"
+                        },
+                        {
+                          "id": "step-2",
+                          "stage_id": "approve",
+                          "status": "pending"
+                        },
+                        {
+                          "id": "step-3",
+                          "stage_id": "deploy",
+                          "status": "pending"
+                        }
+                      ],
+                      "started_at": "2026-02-27T10:05:00",
+                      "completed_at": null
+                    }
+                  }
                 }
               }
             }
@@ -21968,6 +22228,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workflow or execution not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -22059,6 +22329,20 @@
                     "additionalProperties": true
                   },
                   "title": "Response List Executions Api V1 Workflow Executions Get"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Paginated execution list",
+                    "value": [
+                      {
+                        "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                        "workflow_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                        "status": "completed",
+                        "started_at": "2026-02-27T10:05:00",
+                        "completed_at": "2026-02-27T10:08:30"
+                      }
+                    ]
+                  }
                 }
               }
             }
@@ -22083,7 +22367,7 @@
           "workflow-executions"
         ],
         "summary": "List executions by workflow",
-        "description": "Return all executions for a specific workflow, ordered by start time (descending).",
+        "description": "Return all executions for a specific workflow, ordered by start time (descending). Returns an empty list if no executions exist for the given workflow ID.",
         "operationId": "list_executions_by_workflow_api_v1_workflow_executions_by_workflow__workflow_id__get",
         "parameters": [
           {
@@ -22135,6 +22419,20 @@
                     "additionalProperties": true
                   },
                   "title": "Response List Executions By Workflow Api V1 Workflow Executions By Workflow  Workflow Id  Get"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Executions for a workflow (may be empty list)",
+                    "value": [
+                      {
+                        "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                        "workflow_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                        "status": "completed",
+                        "started_at": "2026-02-27T10:05:00",
+                        "completed_at": "2026-02-27T10:08:30"
+                      }
+                    ]
+                  }
                 }
               }
             }
@@ -22181,6 +22479,41 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Get Execution Api V1 Workflow Executions  Execution Id  Get"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Execution with step details",
+                    "value": {
+                      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                      "workflow_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                      "status": "running",
+                      "steps": [
+                        {
+                          "id": "step-1",
+                          "stage_id": "validate",
+                          "status": "completed",
+                          "started_at": "2026-02-27T10:05:00",
+                          "completed_at": "2026-02-27T10:05:30"
+                        },
+                        {
+                          "id": "step-2",
+                          "stage_id": "approve",
+                          "status": "running",
+                          "started_at": "2026-02-27T10:05:31",
+                          "completed_at": null
+                        },
+                        {
+                          "id": "step-3",
+                          "stage_id": "deploy",
+                          "status": "pending",
+                          "started_at": null,
+                          "completed_at": null
+                        }
+                      ],
+                      "started_at": "2026-02-27T10:05:00",
+                      "completed_at": null
+                    }
+                  }
                 }
               }
             }
@@ -22191,6 +22524,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workflow or execution not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -22236,6 +22579,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Workflow or execution not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
+                }
+              }
+            }
           }
         }
       }
@@ -22269,6 +22622,17 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Pause Execution Api V1 Workflow Executions  Execution Id  Pause Post"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Paused execution",
+                    "value": {
+                      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                      "status": "paused",
+                      "started_at": "2026-02-27T10:05:00",
+                      "completed_at": null
+                    }
+                  }
                 }
               }
             }
@@ -22279,6 +22643,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workflow or execution not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Execution is not in the required state for this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -22315,6 +22699,17 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Resume Execution Api V1 Workflow Executions  Execution Id  Resume Post"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Resumed execution",
+                    "value": {
+                      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                      "status": "running",
+                      "started_at": "2026-02-27T10:05:00",
+                      "completed_at": null
+                    }
+                  }
                 }
               }
             }
@@ -22325,6 +22720,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workflow or execution not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Execution is not in the required state for this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -22361,6 +22776,17 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Cancel Execution Api V1 Workflow Executions  Execution Id  Cancel Post"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Cancelled execution",
+                    "value": {
+                      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                      "status": "cancelled",
+                      "started_at": "2026-02-27T10:05:00",
+                      "completed_at": "2026-02-27T10:06:00"
+                    }
+                  }
                 }
               }
             }
@@ -22371,6 +22797,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workflow or execution not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Execution is not in the required state for this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -22416,6 +22862,18 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Approve Gate Api V1 Workflow Executions  Execution Id  Gates  Stage Id  Approve Post"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Approved gate step",
+                    "value": {
+                      "id": "step-2",
+                      "stage_id": "approve",
+                      "status": "completed",
+                      "started_at": "2026-02-27T10:05:31",
+                      "completed_at": "2026-02-27T10:06:00"
+                    }
+                  }
                 }
               }
             }
@@ -22426,6 +22884,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workflow or execution not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Execution is not in the required state for this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -22475,6 +22953,14 @@
                   }
                 ],
                 "title": "Request"
+              },
+              "examples": {
+                "default": {
+                  "summary": "Reject with reason",
+                  "value": {
+                    "reason": "Artifact failed security review \u2014 please update and retry."
+                  }
+                }
               }
             }
           }
@@ -22488,6 +22974,18 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Reject Gate Api V1 Workflow Executions  Execution Id  Gates  Stage Id  Reject Post"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Rejected gate step",
+                    "value": {
+                      "id": "step-2",
+                      "stage_id": "approve",
+                      "status": "failed",
+                      "started_at": "2026-02-27T10:05:31",
+                      "completed_at": "2026-02-27T10:06:10"
+                    }
+                  }
                 }
               }
             }
@@ -22498,6 +22996,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workflow or execution not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Execution is not in the required state for this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -35237,20 +35755,27 @@
             "type": "boolean",
             "title": "Memory Context Enabled",
             "description": "Whether the Memory & Context Intelligence System is enabled. Covers memory items, context modules, and context packing."
+          },
+          "workflow_engine_enabled": {
+            "type": "boolean",
+            "title": "Workflow Engine Enabled",
+            "description": "Whether the Workflow Orchestration Engine is enabled. When False, all /api/v1/workflows and /api/v1/workflow-executions endpoints return 404 and CLI workflow commands display a coming-soon message."
           }
         },
         "type": "object",
         "required": [
           "composite_artifacts_enabled",
           "deployment_sets_enabled",
-          "memory_context_enabled"
+          "memory_context_enabled",
+          "workflow_engine_enabled"
         ],
         "title": "FeatureFlagsResponse",
-        "description": "Response model for backend feature flags.\n\nExposes feature flag state to the frontend so the UI can conditionally\nrender features that depend on backend capabilities. Frontend components\nshould gate visibility and routing on these flags.\n\nAttributes:\n    composite_artifacts_enabled: Whether composite artifact detection is active.\n    deployment_sets_enabled: Whether the deployment sets feature is active.\n        When False, all /api/v1/deployment-sets endpoints return 404.\n    memory_context_enabled: Whether the Memory & Context Intelligence System\n        (memory items, context modules, context packing) is active.",
+        "description": "Response model for backend feature flags.\n\nExposes feature flag state to the frontend so the UI can conditionally\nrender features that depend on backend capabilities. Frontend components\nshould gate visibility and routing on these flags.\n\nAttributes:\n    composite_artifacts_enabled: Whether composite artifact detection is active.\n    deployment_sets_enabled: Whether the deployment sets feature is active.\n        When False, all /api/v1/deployment-sets endpoints return 404.\n    memory_context_enabled: Whether the Memory & Context Intelligence System\n        (memory items, context modules, context packing) is active.\n    workflow_engine_enabled: Whether the Workflow Orchestration Engine is active.\n        When False, all /api/v1/workflows and /api/v1/workflow-executions\n        endpoints return 404 and CLI workflow commands show a coming-soon message.",
         "example": {
           "composite_artifacts_enabled": true,
           "deployment_sets_enabled": true,
-          "memory_context_enabled": true
+          "memory_context_enabled": true,
+          "workflow_engine_enabled": true
         }
       },
       "FileDiff": {
@@ -48167,6 +48692,19 @@
         ],
         "title": "CollectionArtifactsResponse",
         "description": "Paginated response for collection artifacts.\n\nWhen include_groups=true query parameter is used, each artifact's\ngroups field will be populated with group membership information."
+      },
+      "HTTPError": {
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "string",
+            "description": "Human-readable error message."
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "HTTPError"
       }
     },
     "securitySchemes": {
