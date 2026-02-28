@@ -182,6 +182,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.warning(f"Could not ensure default collection or migrate artifacts: {e}")
 
+    # Seed built-in entity type configurations (idempotent)
+    try:
+        from skillmeat.cache.models import get_session
+        from skillmeat.cache.seed_entity_types import seed_builtin_entity_types
+
+        seed_session = get_session()
+        try:
+            inserted = seed_builtin_entity_types(seed_session)
+            seed_session.commit()
+            if inserted:
+                logger.info(
+                    f"Entity type seeding: {inserted} built-in type(s) inserted"
+                )
+            else:
+                logger.debug("Entity type seeding: all built-in types already present")
+        except Exception:
+            seed_session.rollback()
+            raise
+        finally:
+            seed_session.close()
+    except Exception as e:
+        logger.warning(f"Could not seed built-in entity type configs: {e}")
+
     logger.info(f"SkillMeat API v{skillmeat_version} started successfully")
 
     yield

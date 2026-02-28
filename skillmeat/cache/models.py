@@ -4193,6 +4193,120 @@ class ExecutionStep(Base):
         )
 
 
+class EntityTypeConfig(Base):
+    """Configuration for a context entity type.
+
+    Stores the definition of each built-in (and future user-defined) context
+    entity type. The five built-in types mirror the validators in
+    ``skillmeat/core/validators/context_entity.py`` and the defaults defined in
+    ``skillmeat/core/platform_defaults.py``.
+
+    Attributes:
+        id: Auto-incrementing integer primary key.
+        slug: Machine-readable unique identifier (e.g. "skill", "command").
+        display_name: Human-readable name shown in the UI.
+        description: Optional long-form description of this entity type.
+        icon: Optional icon identifier for UI rendering.
+        path_prefix: Default filesystem path prefix for this type
+                     (e.g. ".claude/skills").
+        required_frontmatter_keys: JSON list of frontmatter keys that MUST be
+                                   present in files of this type.
+        optional_frontmatter_keys: JSON list of frontmatter keys that MAY be
+                                   present.
+        validation_rules: JSON object of additional validation config.
+        content_template: Default Markdown template used when creating a new
+                          entity of this type.
+        is_builtin: ``True`` for the five shipped types; ``False`` for any
+                    user-created types (protected from deletion when ``True``).
+        sort_order: Display ordering in the UI (ascending).
+        created_at: Row creation timestamp (UTC).
+        updated_at: Row last-modified timestamp (UTC).
+
+    Indexes:
+        - idx_entity_type_configs_slug (UNIQUE): Fast lookup by slug.
+        - idx_entity_type_configs_sort_order: Ordered listing in the UI.
+        - idx_entity_type_configs_is_builtin: Filter built-in vs custom types.
+    """
+
+    __tablename__ = "entity_type_configs"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # Identity fields
+    slug: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    display_name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    icon: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Path configuration
+    path_prefix: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Frontmatter schema — stored as JSON arrays/objects
+    required_frontmatter_keys: Mapped[Optional[Any]] = mapped_column(
+        JSON, nullable=True
+    )
+    optional_frontmatter_keys: Mapped[Optional[Any]] = mapped_column(
+        JSON, nullable=True
+    )
+    validation_rules: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+
+    # Content template
+    content_template: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Metadata
+    is_builtin: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="1"
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Table-level constraints and extra indexes
+    __table_args__ = (
+        Index("idx_entity_type_configs_sort_order", "sort_order"),
+        Index("idx_entity_type_configs_is_builtin", "is_builtin"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of EntityTypeConfig."""
+        return (
+            f"<EntityTypeConfig(id={self.id!r}, slug={self.slug!r}, "
+            f"display_name={self.display_name!r}, is_builtin={self.is_builtin!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert EntityTypeConfig to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the entity type config.
+        """
+        return {
+            "id": self.id,
+            "slug": self.slug,
+            "display_name": self.display_name,
+            "description": self.description,
+            "icon": self.icon,
+            "path_prefix": self.path_prefix,
+            "required_frontmatter_keys": self.required_frontmatter_keys,
+            "optional_frontmatter_keys": self.optional_frontmatter_keys,
+            "validation_rules": self.validation_rules,
+            "content_template": self.content_template,
+            "is_builtin": self.is_builtin,
+            "sort_order": self.sort_order,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
 # =============================================================================
 # Database Engine and Session Setup
 # =============================================================================

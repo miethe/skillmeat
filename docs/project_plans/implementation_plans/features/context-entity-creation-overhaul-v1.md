@@ -1,53 +1,68 @@
 ---
-title: "Implementation Plan: Context Entity Creation Overhaul"
+title: 'Implementation Plan: Context Entity Creation Overhaul'
 schema_version: 2
 doc_type: implementation_plan
-status: draft
+status: in-progress
 created: 2026-02-28
-updated: 2026-02-28
+updated: '2026-02-28'
 feature_slug: context-entity-creation-overhaul
 feature_version: v1
 prd_ref: docs/project_plans/PRDs/features/context-entity-creation-overhaul-v1.md
 plan_ref: null
-scope: "Migrate entity type definitions from hardcoded Python to DB config, build Settings UI for type management, overhaul the creation form with platform awareness and content templates, add multi-select categories, and enable user-defined custom entity types."
-effort_estimate: "58 pts"
-architecture_summary: "DB-backed EntityTypeConfig + ContextEntityCategory tables feed a refactored backend validator and new Settings API endpoints; the creation form is rebuilt to consume entity type configs for template injection, inline hints, and platform-driven path derivation; content assembly at deploy time keeps stored content platform-agnostic."
+scope: Migrate entity type definitions from hardcoded Python to DB config, build Settings
+  UI for type management, overhaul the creation form with platform awareness and content
+  templates, add multi-select categories, and enable user-defined custom entity types.
+effort_estimate: 58 pts
+architecture_summary: DB-backed EntityTypeConfig + ContextEntityCategory tables feed
+  a refactored backend validator and new Settings API endpoints; the creation form
+  is rebuilt to consume entity type configs for template injection, inline hints,
+  and platform-driven path derivation; content assembly at deploy time keeps stored
+  content platform-agnostic.
 related_documents:
-  - docs/project_plans/PRDs/features/context-entity-creation-overhaul-v1.md
-  - docs/project_plans/PRDs/features/enhanced-platform-profiles-v1.md
-  - docs/project_plans/PRDs/features/agent-context-entities-v1.md
+- docs/project_plans/PRDs/features/context-entity-creation-overhaul-v1.md
+- docs/project_plans/PRDs/features/enhanced-platform-profiles-v1.md
+- docs/project_plans/PRDs/features/agent-context-entities-v1.md
 owner: null
 contributors: []
 priority: high
 risk_level: medium-high
 category: product-planning
-tags: [implementation, planning, context-entities, platform-aware, settings, creation-flow]
+tags:
+- implementation
+- planning
+- context-entities
+- platform-aware
+- settings
+- creation-flow
 milestone: null
 commit_refs: []
 pr_refs: []
 files_affected:
-  - skillmeat/cache/models.py
-  - skillmeat/cache/migrations/versions/
-  - skillmeat/core/validators/context_entity.py
-  - skillmeat/core/platform_defaults.py
-  - skillmeat/api/routers/context_entities.py
-  - skillmeat/api/routers/settings.py
-  - skillmeat/api/schemas/context_entity.py
-  - skillmeat/api/schemas/platform_defaults.py
-  - skillmeat/web/app/settings/page.tsx
-  - skillmeat/web/app/settings/components/
-  - skillmeat/web/components/context/context-entity-editor.tsx
-  - skillmeat/web/types/context-entity.ts
-  - skillmeat/web/lib/api/context-entities.ts
-  - skillmeat/web/components/settings/platform-defaults-settings.tsx
+- skillmeat/cache/models.py
+- skillmeat/cache/migrations/versions/
+- skillmeat/core/validators/context_entity.py
+- skillmeat/core/platform_defaults.py
+- skillmeat/api/routers/context_entities.py
+- skillmeat/api/routers/settings.py
+- skillmeat/api/schemas/context_entity.py
+- skillmeat/api/schemas/platform_defaults.py
+- skillmeat/web/app/settings/page.tsx
+- skillmeat/web/app/settings/components/
+- skillmeat/web/components/context/context-entity-editor.tsx
+- skillmeat/web/types/context-entity.ts
+- skillmeat/web/lib/api/context-entities.ts
+- skillmeat/web/components/settings/platform-defaults-settings.tsx
 phases:
-  - "Phase 1: Entity Type Configuration Backend"
-  - "Phase 2: Entity Type Settings UI"
-  - "Phase 3: Enhanced Creation Form"
-  - "Phase 4: Modular Content Architecture"
-  - "Phase 5: Custom Entity Types"
-  - "Phase 6: Integration and Polish"
-test_strategy: "Unit tests for DB seeding idempotency, validator cache TTL, and fallback paths; integration tests for all new settings API endpoints (CRUD round-trips); E2E tests for spec_file first-attempt success, custom type lifecycle, and multi-platform deploy flow."
+- 'Phase 1: Entity Type Configuration Backend'
+- 'Phase 2: Entity Type Settings UI'
+- 'Phase 3: Enhanced Creation Form'
+- 'Phase 4: Modular Content Architecture'
+- 'Phase 5: Custom Entity Types'
+- 'Phase 6: Integration and Polish'
+test_strategy: Unit tests for DB seeding idempotency, validator cache TTL, and fallback
+  paths; integration tests for all new settings API endpoints (CRUD round-trips);
+  E2E tests for spec_file first-attempt success, custom type lifecycle, and multi-platform
+  deploy flow.
 ---
 
 # Implementation Plan: Context Entity Creation Overhaul

@@ -2,87 +2,119 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "context-entity-creation-overhaul"
-feature_slug: "context-entity-creation-overhaul"
-prd_ref: "docs/project_plans/PRDs/features/context-entity-creation-overhaul-v1.md"
-plan_ref: "docs/project_plans/implementation_plans/features/context-entity-creation-overhaul-v1.md"
+prd: context-entity-creation-overhaul
+feature_slug: context-entity-creation-overhaul
+prd_ref: docs/project_plans/PRDs/features/context-entity-creation-overhaul-v1.md
+plan_ref: docs/project_plans/implementation_plans/features/context-entity-creation-overhaul-v1.md
 phase: 1
-title: "Entity Type Configuration Backend"
-status: "planning"
-started: "2026-02-28"
+title: Entity Type Configuration Backend
+status: in_progress
+started: '2026-02-28'
 completed: null
 commit_refs: []
 pr_refs: []
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 4
 completed_tasks: 0
-in_progress_tasks: 0
+in_progress_tasks: 1
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["data-layer-expert", "python-backend-engineer"]
+owners:
+- data-layer-expert
+- python-backend-engineer
 contributors: []
-
 tasks:
-  - id: "CECO-1.1"
-    description: "Add EntityTypeConfig SQLAlchemy model, Alembic migration creating entity_type_configs table, and idempotent seeding logic for 5 built-in rows from platform_defaults.py and context_entity.py"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "3 pts"
-    priority: "critical"
-
-  - id: "CECO-1.2"
-    description: "Refactor validate_context_entity() to load type config from DB with 60s in-memory TTL; preserve hardcoded dispatch map as fallback when entity_type_config_enabled=false or DB unavailable"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CECO-1.1"]
-    estimated_effort: "3 pts"
-    priority: "critical"
-
-  - id: "CECO-1.3"
-    description: "Add GET /api/v1/settings/entity-type-configs returning all EntityTypeConfig rows as DTOs with EntityTypeConfigResponse Pydantic schema; register sub-route in settings.py"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CECO-1.1"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "CECO-1.4"
-    description: "Update POST /context-entities and PUT /context-entities/{id} validation error responses to include field and hint keys in 400 detail payload"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CECO-1.2"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
+- id: CECO-1.1
+  description: Add EntityTypeConfig SQLAlchemy model, Alembic migration creating entity_type_configs
+    table, and idempotent seeding logic for 5 built-in rows from platform_defaults.py
+    and context_entity.py
+  status: in_progress
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 3 pts
+  priority: critical
+- id: CECO-1.2
+  description: Refactor validate_context_entity() to load type config from DB with
+    60s in-memory TTL; preserve hardcoded dispatch map as fallback when entity_type_config_enabled=false
+    or DB unavailable
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CECO-1.1
+  estimated_effort: 3 pts
+  priority: critical
+- id: CECO-1.3
+  description: Add GET /api/v1/settings/entity-type-configs returning all EntityTypeConfig
+    rows as DTOs with EntityTypeConfigResponse Pydantic schema; register sub-route
+    in settings.py
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CECO-1.1
+  estimated_effort: 2 pts
+  priority: high
+- id: CECO-1.4
+  description: Update POST /context-entities and PUT /context-entities/{id} validation
+    error responses to include field and hint keys in 400 detail payload
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CECO-1.2
+  estimated_effort: 2 pts
+  priority: high
 parallelization:
-  batch_1: ["CECO-1.1"]
-  batch_2: ["CECO-1.2", "CECO-1.3"]
-  batch_3: ["CECO-1.4"]
-  critical_path: ["CECO-1.1", "CECO-1.2", "CECO-1.4"]
-  estimated_total_time: "5-7 days"
-
+  batch_1:
+  - CECO-1.1
+  batch_2:
+  - CECO-1.2
+  - CECO-1.3
+  batch_3:
+  - CECO-1.4
+  critical_path:
+  - CECO-1.1
+  - CECO-1.2
+  - CECO-1.4
+  estimated_total_time: 5-7 days
 blockers: []
-
 success_criteria:
-  - { id: "SC-1.1", description: "entity_type_configs table exists in DB after migration", status: "pending" }
-  - { id: "SC-1.2", description: "5 built-in type rows seeded; seeding is idempotent (run twice → still 5 rows)", status: "pending" }
-  - { id: "SC-1.3", description: "Existing Artifact rows with context entity types survive migration unchanged", status: "pending" }
-  - { id: "SC-1.4", description: "validate_context_entity() uses DB config when flag enabled; hardcoded dispatch map when disabled", status: "pending" }
-  - { id: "SC-1.5", description: "GET /settings/entity-type-configs returns 200 with all 5 configs", status: "pending" }
-  - { id: "SC-1.6", description: "400 errors from POST /context-entities include field + hint keys", status: "pending" }
-  - { id: "SC-1.7", description: "Unit tests: seeding idempotency, cache TTL, fallback path, error hint shapes", status: "pending" }
-
+- id: SC-1.1
+  description: entity_type_configs table exists in DB after migration
+  status: pending
+- id: SC-1.2
+  description: 5 built-in type rows seeded; seeding is idempotent (run twice → still
+    5 rows)
+  status: pending
+- id: SC-1.3
+  description: Existing Artifact rows with context entity types survive migration
+    unchanged
+  status: pending
+- id: SC-1.4
+  description: validate_context_entity() uses DB config when flag enabled; hardcoded
+    dispatch map when disabled
+  status: pending
+- id: SC-1.5
+  description: GET /settings/entity-type-configs returns 200 with all 5 configs
+  status: pending
+- id: SC-1.6
+  description: 400 errors from POST /context-entities include field + hint keys
+  status: pending
+- id: SC-1.7
+  description: 'Unit tests: seeding idempotency, cache TTL, fallback path, error hint
+    shapes'
+  status: pending
 files_modified:
-  - "skillmeat/cache/models.py"
-  - "skillmeat/cache/migrations/versions/"
-  - "skillmeat/core/validators/context_entity.py"
-  - "skillmeat/api/routers/settings.py"
-  - "skillmeat/api/schemas/context_entity.py"
+- skillmeat/cache/models.py
+- skillmeat/cache/migrations/versions/
+- skillmeat/core/validators/context_entity.py
+- skillmeat/api/routers/settings.py
+- skillmeat/api/schemas/context_entity.py
+progress: 0
+updated: '2026-02-28'
 ---
 
 # Context Entity Creation Overhaul - Phase 1: Entity Type Configuration Backend
