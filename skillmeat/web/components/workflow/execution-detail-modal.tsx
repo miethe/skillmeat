@@ -312,6 +312,7 @@ function StageRow({ stage }: { stage: StageExecution }) {
 function ExecutionSkeleton() {
   return (
     <div className="space-y-4 p-6" aria-label="Loading execution details" aria-busy="true">
+      <DialogTitle className="sr-only">Execution details</DialogTitle>
       {/* Header */}
       <div className="space-y-2">
         <Skeleton className="h-5 w-48" />

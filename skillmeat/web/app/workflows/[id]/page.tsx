@@ -39,6 +39,7 @@ import {
   AlertCircle,
   CalendarDays,
   RefreshCw,
+  ChevronRight,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -58,6 +59,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import { TabNavigation } from '@/components/shared/tab-navigation';
 import { StageCard } from '@/components/workflow/stage-card';
 import { StageConnector } from '@/components/workflow/stage-connector';
+import { ExecutionDetailModal } from '@/components/workflow/execution-detail-modal';
 
 import { useWorkflow, useWorkflowExecutions } from '@/hooks';
 import type {
@@ -322,7 +324,13 @@ function StagesTab({ workflow }: { workflow: Workflow }) {
 // Executions tab
 // ============================================================================
 
-function ExecutionsTab({ workflowId }: { workflowId: string }) {
+function ExecutionsTab({
+  workflowId,
+  onExecutionClick,
+}: {
+  workflowId: string;
+  onExecutionClick?: (executionId: string) => void;
+}) {
   const { data: executions, isLoading, error, refetch } = useWorkflowExecutions({
     workflowId,
     sortBy: 'started_at',
@@ -375,61 +383,81 @@ function ExecutionsTab({ workflowId }: { workflowId: string }) {
     );
   }
 
+  const isClickable = !!onExecutionClick;
+
   return (
     <div className="py-4">
       <ul className="space-y-2" aria-label="Workflow execution history">
         {executions.map((execution: WorkflowExecution) => {
           const meta = EXECUTION_STATUS_META[execution.status];
           return (
-            <li
-              key={execution.id}
-              className="flex items-center gap-4 rounded-lg border bg-card px-4 py-3 text-sm transition-colors hover:bg-muted/40"
-            >
-              {/* Status icon */}
-              <ExecutionStatusIcon status={execution.status} />
-
-              {/* Status label + trigger */}
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={cn('font-medium', meta.colorClass)}>{meta.label}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {execution.trigger}
-                  </Badge>
-                </div>
-                {execution.errorMessage && (
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {execution.errorMessage}
-                  </p>
+            <li key={execution.id}>
+              <button
+                type="button"
+                onClick={isClickable ? () => onExecutionClick(execution.id) : undefined}
+                disabled={!isClickable}
+                className={cn(
+                  'relative w-full flex items-center gap-4 rounded-lg border bg-card px-4 py-3 text-left text-sm transition-colors',
+                  isClickable
+                    ? 'cursor-pointer hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1'
+                    : 'cursor-default'
                 )}
-              </div>
-
-              {/* Timing */}
-              <div
-                className="flex flex-col items-end gap-0.5 text-xs text-muted-foreground shrink-0"
-                aria-label={`Started ${execution.startedAt ? new Date(execution.startedAt).toLocaleString() : 'unknown'}`}
+                aria-label={`Execution ${meta.label}, started ${formatRelativeTime(execution.startedAt)}, duration ${formatDuration(execution.durationMs)}${isClickable ? '. Click to view details.' : ''}`}
               >
-                <span className="flex items-center gap-1">
-                  <CalendarDays className="h-3 w-3" aria-hidden="true" />
-                  {formatRelativeTime(execution.startedAt)}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" aria-hidden="true" />
-                  {formatDuration(execution.durationMs)}
-                </span>
-              </div>
+                {/* Status icon */}
+                <ExecutionStatusIcon status={execution.status} />
 
-              {/* Progress bar — shown for running executions */}
-              {execution.status === 'running' && (
-                <div
-                  className="absolute bottom-0 left-0 right-0 h-0.5 overflow-hidden rounded-b-lg bg-muted"
-                  aria-hidden="true"
-                >
-                  <div
-                    className="h-full bg-blue-500 transition-all duration-300"
-                    style={{ width: `${execution.progressPct}%` }}
-                  />
+                {/* Status label + trigger */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={cn('font-medium', meta.colorClass)}>{meta.label}</span>
+                    <Badge variant="outline" className="text-xs">
+                      {execution.trigger}
+                    </Badge>
+                  </div>
+                  {execution.errorMessage && (
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {execution.errorMessage}
+                    </p>
+                  )}
                 </div>
-              )}
+
+                {/* Timing */}
+                <div
+                  className="flex flex-col items-end gap-0.5 text-xs text-muted-foreground shrink-0"
+                  aria-label={`Started ${execution.startedAt ? new Date(execution.startedAt).toLocaleString() : 'unknown'}`}
+                >
+                  <span className="flex items-center gap-1">
+                    <CalendarDays className="h-3 w-3" aria-hidden="true" />
+                    {formatRelativeTime(execution.startedAt)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" aria-hidden="true" />
+                    {formatDuration(execution.durationMs)}
+                  </span>
+                </div>
+
+                {/* Chevron affordance when clickable */}
+                {isClickable && (
+                  <ChevronRight
+                    className="h-4 w-4 shrink-0 text-muted-foreground/50"
+                    aria-hidden="true"
+                  />
+                )}
+
+                {/* Progress bar — shown for running executions */}
+                {execution.status === 'running' && (
+                  <div
+                    className="absolute bottom-0 left-0 right-0 h-0.5 overflow-hidden rounded-b-lg bg-muted"
+                    aria-hidden="true"
+                  >
+                    <div
+                      className="h-full bg-blue-500 transition-all duration-300"
+                      style={{ width: `${execution.progressPct}%` }}
+                    />
+                  </div>
+                )}
+              </button>
             </li>
           );
         })}
@@ -633,6 +661,7 @@ export default function WorkflowDetailPage() {
   const id = typeof params.id === 'string' ? params.id : (params.id?.[0] ?? '');
 
   const [activeTab, setActiveTab] = React.useState('stages');
+  const [selectedExecutionId, setSelectedExecutionId] = React.useState<string | null>(null);
 
   const {
     data: workflow,
@@ -759,7 +788,10 @@ export default function WorkflowDetailPage() {
 
         {/* Executions tab */}
         <TabsContent value="executions" role="tabpanel" aria-label="Execution history">
-          <ExecutionsTab workflowId={workflow.id} />
+          <ExecutionsTab
+            workflowId={workflow.id}
+            onExecutionClick={(execId) => setSelectedExecutionId(execId)}
+          />
         </TabsContent>
 
         {/* Settings tab */}
@@ -767,6 +799,13 @@ export default function WorkflowDetailPage() {
           <SettingsTab workflow={workflow} />
         </TabsContent>
       </Tabs>
+
+      <ExecutionDetailModal
+        executionId={selectedExecutionId}
+        workflowId={id}
+        open={selectedExecutionId !== null}
+        onClose={() => setSelectedExecutionId(null)}
+      />
     </div>
   );
 }

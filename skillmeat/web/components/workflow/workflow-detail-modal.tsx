@@ -223,6 +223,7 @@ function ModalSkeleton() {
       aria-busy="true"
       aria-label="Loading workflow detail"
     >
+      <DialogTitle className="sr-only">Workflow details</DialogTitle>
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">
@@ -967,6 +968,7 @@ export function WorkflowDetailModal({
           <ModalSkeleton />
         ) : error || (!isLoading && !workflow && workflowId) ? (
           <div className="p-6">
+            <DialogTitle className="sr-only">Workflow details</DialogTitle>
             <ModalError
               workflowId={workflowId ?? ''}
               onRetry={() => refetch()}
