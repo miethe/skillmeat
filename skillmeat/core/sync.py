@@ -174,8 +174,10 @@ class SyncManager:
                 )
                 continue
 
-            # Compute current collection SHA
-            collection_sha = self._compute_artifact_hash(collection_artifact["path"])
+            # Compute current collection SHA.
+            # Use _compute_content_hash to support both file-based artifacts
+            # (e.g. workflows stored as YAML files) and directory-based artifacts.
+            collection_sha = self._compute_content_hash(collection_artifact["path"])
 
             # Compute current project SHA (check if project has local modifications)
             project_artifact_path = self._get_project_artifact_path(
@@ -183,7 +185,7 @@ class SyncManager:
             )
             current_project_sha = deployed.content_hash  # Default to deployed SHA
             if project_artifact_path and project_artifact_path.exists():
-                current_project_sha = self._compute_artifact_hash(project_artifact_path)
+                current_project_sha = self._compute_content_hash(project_artifact_path)
 
             # Three-way conflict detection:
             # - deployed.content_hash is the "base" (what was deployed)
@@ -253,7 +255,7 @@ class SyncManager:
         # Check for new artifacts in collection not yet deployed
         for artifact in collection_artifacts:
             if not self._is_deployed(artifact, deployments):
-                collection_sha = self._compute_artifact_hash(artifact["path"])
+                collection_sha = self._compute_content_hash(artifact["path"])
                 drift_results.append(
                     DriftDetectionResult(
                         artifact_name=artifact["name"],
@@ -311,6 +313,32 @@ class SyncManager:
 
         return hasher.hexdigest()
 
+    def _compute_content_hash(self, path: Path) -> str:
+        """Compute SHA-256 hash of a file or directory.
+
+        Delegates to ``_compute_artifact_hash`` for directories.  For single
+        files (e.g. workflow YAML) hashes the file content directly.
+
+        Args:
+            path: Path to a file or directory.
+
+        Returns:
+            SHA-256 hash as hexadecimal string.
+
+        Raises:
+            ValueError: If the path does not exist.
+        """
+        if not path.exists():
+            raise ValueError(f"Path does not exist: {path}")
+        if path.is_file():
+            hasher = hashlib.sha256()
+            try:
+                hasher.update(path.read_bytes())
+            except (PermissionError, OSError) as exc:
+                logger.warning(f"Could not read {redact_path(path)}: {exc}")
+            return hasher.hexdigest()
+        return self._compute_artifact_hash(path)
+
     def _load_deployment_metadata(self, project_path: Path) -> List[Deployment]:
         """Load deployment metadata using unified tracker.
 
@@ -361,14 +389,18 @@ class SyncManager:
         # Load existing deployments
         deployments = self._load_deployment_metadata(project_path)
 
-        # Compute hash
-        # Convert artifact type to plural form for directory name
+        # Compute hash.
+        # Workflows are single YAML files; all other artifact types are directories.
         artifact_type_plural = self._get_artifact_type_plural(artifact_type)
-        artifact_path = collection_path / artifact_type_plural / artifact_name
+        if artifact_type == "workflow":
+            # Collection stores workflows as <name>.yaml files.
+            artifact_path = collection_path / artifact_type_plural / f"{artifact_name}.yaml"
+        else:
+            artifact_path = collection_path / artifact_type_plural / artifact_name
         if not artifact_path.exists():
             raise ValueError(f"Artifact path does not exist: {artifact_path}")
 
-        sha = self._compute_artifact_hash(artifact_path)
+        sha = self._compute_content_hash(artifact_path)
 
         # Determine artifact path within .claude/
         if artifact_type == "skill":
@@ -385,6 +417,9 @@ class SyncManager:
             # Plugins (and their composite parent type) are deployed as directories
             # under .claude/plugins/<name>/ — consistent with the collection layout.
             relative_artifact_path = Path(f"plugins/{artifact_name}")
+        elif artifact_type == "workflow":
+            # Workflows are single YAML files stored under .claude/workflows/<name>.yaml
+            relative_artifact_path = Path(f"workflows/{artifact_name}.yaml")
         else:
             raise ValueError(f"Unknown artifact type: {artifact_type}")
 
@@ -453,6 +488,22 @@ class SyncManager:
                                 "type": "skill",
                                 "path": skill_path,
                                 "version": self._get_artifact_version(skill_path),
+                            }
+                        )
+
+            # Scan workflow YAML files from the collection.
+            # Workflows are single YAML files stored as workflows/<name>.yaml.
+            workflows_dir = collection_path / "workflows"
+            if workflows_dir.exists():
+                for wf_path in workflows_dir.iterdir():
+                    if wf_path.is_file() and wf_path.suffix in (".yaml", ".yml"):
+                        # Use stem (filename without extension) as the workflow name.
+                        artifacts.append(
+                            {
+                                "name": wf_path.stem,
+                                "type": "workflow",
+                                "path": wf_path,
+                                "version": "unknown",
                             }
                         )
 
@@ -541,6 +592,8 @@ class SyncManager:
             # Generic composite key (ArtifactType.COMPOSITE) also maps to plugins/
             # for v1, since PLUGIN is the only supported composite variant.
             "composite": "plugins",
+            # Workflows are YAML files stored under "workflows/" in the collection.
+            "workflow": "workflows",
         }
         return plural_map.get(artifact_type, artifact_type + "s")
 
@@ -1109,8 +1162,13 @@ class SyncManager:
         # Convert type to plural for directory name
         artifact_type_plural = self._get_artifact_type_plural(artifact_type)
 
-        # Check in .claude directory
-        artifact_path = project_path / ".claude" / artifact_type_plural / artifact_name
+        # Workflows are single YAML files; other artifacts are directories.
+        if artifact_type == "workflow":
+            artifact_path = (
+                project_path / ".claude" / artifact_type_plural / f"{artifact_name}.yaml"
+            )
+        else:
+            artifact_path = project_path / ".claude" / artifact_type_plural / artifact_name
         if artifact_path.exists():
             return artifact_path
 
@@ -1828,6 +1886,245 @@ class SyncManager:
         except Exception as e:
             # Never fail sync due to analytics
             logger.debug(f"Failed to record sync analytics: {e}")
+
+    # -------------------------------------------------------------------------
+    # Workflow DB cache sync
+    # -------------------------------------------------------------------------
+
+    def sync_workflows_with_db(
+        self,
+        collection_name: Optional[str] = None,
+        db_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Sync workflow YAML files in the collection against the DB cache.
+
+        Scans ``~/.skillmeat/collection/<name>/workflows/`` for ``*.yaml`` /
+        ``*.yml`` files and reconciles them with the ``workflows`` table via
+        ``WorkflowService``:
+
+        - **New**: YAML file present on disk but no matching DB row →
+          ``WorkflowService.create()`` is called.
+        - **Updated**: YAML file hash differs from the stored
+          ``definition_hash`` → ``WorkflowService.update()`` is called.
+        - **Deleted**: DB row whose name matches no on-disk YAML →
+          ``WorkflowService.delete()`` is called (row removed from cache).
+
+        The method is deliberately *resilient*: individual workflow failures
+        are logged but do not abort the overall sync.  The caller receives a
+        summary dict so it can report outcomes to the user.
+
+        Args:
+            collection_name: Name of the collection to scan.  When ``None``,
+                uses the first collection returned by the collection manager;
+                if no collection manager is attached, raises ``ValueError``.
+            db_path: Optional path to the SQLite DB file.  Passed through to
+                ``WorkflowService``.  Uses the default cache path when omitted.
+
+        Returns:
+            A summary dict with the following keys:
+
+            .. code-block:: python
+
+                {
+                    "created": ["wf-a", ...],   # newly inserted
+                    "updated": ["wf-b", ...],   # definition refreshed
+                    "deleted": ["wf-c", ...],   # removed from DB
+                    "errors":  {"wf-d": "..."},  # name → error message
+                    "unchanged": ["wf-e", ...], # already up-to-date
+                }
+
+        Raises:
+            ValueError: If no collection manager is available and
+                ``collection_name`` was not supplied, or the collection path
+                cannot be resolved.
+        """
+        from skillmeat.core.workflow.service import WorkflowService
+        from skillmeat.core.workflow.exceptions import (
+            WorkflowNotFoundError,
+            WorkflowParseError,
+            WorkflowValidationError,
+        )
+
+        summary: Dict[str, Any] = {
+            "created": [],
+            "updated": [],
+            "deleted": [],
+            "errors": {},
+            "unchanged": [],
+        }
+
+        # ------------------------------------------------------------------
+        # 1. Resolve collection path
+        # ------------------------------------------------------------------
+        if collection_name is None:
+            if not self.collection_mgr:
+                raise ValueError(
+                    "No collection manager provided and no collection_name given. "
+                    "Cannot resolve workflow directory."
+                )
+            # Try the default/active collection.
+            try:
+                active = self.collection_mgr.get_active_collection()
+                collection_name = active.name if active else "default"
+            except Exception:
+                collection_name = "default"
+
+        if self.collection_mgr:
+            try:
+                collection_path = self.collection_mgr.config.get_collection_path(
+                    collection_name
+                )
+            except Exception as exc:
+                raise ValueError(
+                    f"Could not resolve path for collection '{collection_name}': {exc}"
+                ) from exc
+        else:
+            raise ValueError(
+                "Cannot sync workflows without a collection manager. "
+                "Pass collection_path explicitly or initialize SyncManager with a "
+                "collection_manager."
+            )
+
+        workflows_dir = collection_path / "workflows"
+        logger.info(
+            "sync_workflows_with_db: scanning %s (collection=%s)",
+            redact_path(workflows_dir),
+            collection_name,
+        )
+
+        # ------------------------------------------------------------------
+        # 2. Discover on-disk workflow YAML files
+        # ------------------------------------------------------------------
+        disk_workflows: Dict[str, Path] = {}  # stem → path
+        if workflows_dir.exists():
+            for wf_file in sorted(workflows_dir.iterdir()):
+                if wf_file.is_file() and wf_file.suffix in (".yaml", ".yml"):
+                    disk_workflows[wf_file.stem] = wf_file
+
+        logger.debug(
+            "sync_workflows_with_db: found %d on-disk workflow(s)", len(disk_workflows)
+        )
+
+        # ------------------------------------------------------------------
+        # 3. Load existing DB workflows (name → WorkflowDTO)
+        # ------------------------------------------------------------------
+        svc = WorkflowService(db_path=db_path)
+        try:
+            existing_dtos = svc.list(limit=10000)
+        except Exception as exc:
+            logger.error("sync_workflows_with_db: failed to list DB workflows: %s", exc)
+            existing_dtos = []
+
+        db_by_name: Dict[str, Any] = {dto.name: dto for dto in existing_dtos}
+
+        # ------------------------------------------------------------------
+        # 4. Create or update workflows that are on disk
+        # ------------------------------------------------------------------
+        for wf_name, wf_path in disk_workflows.items():
+            try:
+                yaml_content = wf_path.read_text(encoding="utf-8")
+                disk_hash = hashlib.sha256(yaml_content.encode("utf-8")).hexdigest()
+            except OSError as exc:
+                logger.warning(
+                    "sync_workflows_with_db: cannot read %s: %s",
+                    redact_path(wf_path),
+                    exc,
+                )
+                summary["errors"][wf_name] = str(exc)
+                continue
+
+            if wf_name not in db_by_name:
+                # New workflow — insert into DB.
+                try:
+                    svc.create(yaml_content=yaml_content)
+                    summary["created"].append(wf_name)
+                    logger.info(
+                        "sync_workflows_with_db: created workflow %r from %s",
+                        wf_name,
+                        redact_path(wf_path),
+                    )
+                except (WorkflowParseError, WorkflowValidationError) as exc:
+                    logger.warning(
+                        "sync_workflows_with_db: skipped %r (parse/validation error): %s",
+                        wf_name,
+                        exc,
+                    )
+                    summary["errors"][wf_name] = str(exc)
+                except Exception as exc:
+                    logger.error(
+                        "sync_workflows_with_db: failed to create %r: %s", wf_name, exc
+                    )
+                    summary["errors"][wf_name] = str(exc)
+            else:
+                # Existing workflow — check if definition hash changed.
+                dto = db_by_name[wf_name]
+                from skillmeat.core.workflow.service import _sha256 as _wf_sha256
+
+                db_hash = _wf_sha256(dto.definition)
+                if db_hash == disk_hash:
+                    summary["unchanged"].append(wf_name)
+                    logger.debug(
+                        "sync_workflows_with_db: %r unchanged (hash=%s…)",
+                        wf_name,
+                        disk_hash[:12],
+                    )
+                else:
+                    try:
+                        svc.update(dto.id, yaml_content)
+                        summary["updated"].append(wf_name)
+                        logger.info(
+                            "sync_workflows_with_db: updated workflow %r (id=%s)",
+                            wf_name,
+                            dto.id,
+                        )
+                    except (WorkflowParseError, WorkflowValidationError) as exc:
+                        logger.warning(
+                            "sync_workflows_with_db: skipped update of %r "
+                            "(parse/validation error): %s",
+                            wf_name,
+                            exc,
+                        )
+                        summary["errors"][wf_name] = str(exc)
+                    except Exception as exc:
+                        logger.error(
+                            "sync_workflows_with_db: failed to update %r: %s",
+                            wf_name,
+                            exc,
+                        )
+                        summary["errors"][wf_name] = str(exc)
+
+        # ------------------------------------------------------------------
+        # 5. Delete DB workflows that no longer exist on disk
+        # ------------------------------------------------------------------
+        for db_name, dto in db_by_name.items():
+            if db_name not in disk_workflows:
+                try:
+                    svc.delete(dto.id)
+                    summary["deleted"].append(db_name)
+                    logger.info(
+                        "sync_workflows_with_db: deleted stale workflow %r (id=%s)",
+                        db_name,
+                        dto.id,
+                    )
+                except WorkflowNotFoundError:
+                    # Already gone — nothing to do.
+                    pass
+                except Exception as exc:
+                    logger.error(
+                        "sync_workflows_with_db: failed to delete %r: %s", db_name, exc
+                    )
+                    summary["errors"][db_name] = str(exc)
+
+        logger.info(
+            "sync_workflows_with_db: done — created=%d updated=%d deleted=%d "
+            "unchanged=%d errors=%d",
+            len(summary["created"]),
+            len(summary["updated"]),
+            len(summary["deleted"]),
+            len(summary["unchanged"]),
+            len(summary["errors"]),
+        )
+        return summary
 
     def validate_plugin_deployment_platform(self, platform: str) -> None:
         """Raise an error when a plugin deployment is requested on an unsupported platform.

@@ -409,6 +409,16 @@ class WorkflowExecutionService:
                 workflow_id,
                 len(step_orms),
             )
+            logger.info(
+                "execution.started",
+                extra={
+                    "event": "execution.started",
+                    "execution_id": execution_id,
+                    "workflow_id": workflow_id,
+                    "workflow_name": workflow_dto.name,
+                    "trigger": "manual",
+                },
+            )
             return _execution_orm_to_dto(saved)
         except Exception:
             session.rollback()
@@ -604,10 +614,36 @@ class WorkflowExecutionService:
                 final_status,
             )
             if final_status == "completed":
+                _completed_steps = sum(
+                    1
+                    for batch in plan.batches
+                    for _ in batch.stages
+                )
+                logger.info(
+                    "execution.completed",
+                    extra={
+                        "event": "execution.completed",
+                        "execution_id": execution_id,
+                        "workflow_id": plan.workflow_id,
+                        "workflow_name": plan.workflow_name,
+                        "total_duration_ms": None,
+                        "stages_completed": _completed_steps,
+                    },
+                )
                 self._emit_event(
                     execution_id,
                     "execution_completed",
                     {"execution_id": execution_id},
+                )
+            elif final_status == "cancelled":
+                logger.info(
+                    "execution.cancelled",
+                    extra={
+                        "event": "execution.cancelled",
+                        "execution_id": execution_id,
+                        "workflow_id": plan.workflow_id,
+                        "cancelled_by": "user",
+                    },
                 )
         finally:
             # Clean up cancellation flag.
@@ -851,6 +887,16 @@ class WorkflowExecutionService:
             stage_id,
             stage_type,
         )
+        logger.info(
+            "execution.stage_started",
+            extra={
+                "event": "execution.stage_started",
+                "execution_id": execution_id,
+                "workflow_id": None,
+                "stage_id": stage_id,
+                "stage_name": stage_name,
+            },
+        )
 
         # ---------------------------------------------------------------
         # Step 2: Evaluate condition
@@ -1018,6 +1064,20 @@ class WorkflowExecutionService:
                 execution_id,
                 stage_id,
             )
+            _completed_at_ms = int(
+                (completed_at - now).total_seconds() * 1000
+            ) if completed_at > now else 0
+            logger.info(
+                "execution.stage_completed",
+                extra={
+                    "event": "execution.stage_completed",
+                    "execution_id": execution_id,
+                    "workflow_id": None,
+                    "stage_id": stage_id,
+                    "stage_name": stage_name,
+                    "duration_ms": _completed_at_ms,
+                },
+            )
 
         # ---------------------------------------------------------------
         # Step 4: Timeout watchdog + retry loop
@@ -1098,6 +1158,17 @@ class WorkflowExecutionService:
                     "execution_id": execution_id,
                     "step_id": step_id,
                     "stage_id": stage_id,
+                    "error": str(last_exc),
+                },
+            )
+            logger.error(
+                "execution.stage_failed",
+                extra={
+                    "event": "execution.stage_failed",
+                    "execution_id": execution_id,
+                    "workflow_id": None,
+                    "stage_id": stage_id,
+                    "stage_name": stage_name,
                     "error": str(last_exc),
                 },
             )
@@ -1423,6 +1494,15 @@ class WorkflowExecutionService:
             execution_id,
             stage_id,
         )
+        logger.info(
+            "execution.gate_approved",
+            extra={
+                "event": "execution.gate_approved",
+                "execution_id": execution_id,
+                "workflow_id": None,
+                "stage_id": stage_id,
+            },
+        )
         return step_dto
 
     def reject_gate(
@@ -1547,6 +1627,16 @@ class WorkflowExecutionService:
             execution_id,
             stage_id,
             error_message,
+        )
+        logger.info(
+            "execution.gate_rejected",
+            extra={
+                "event": "execution.gate_rejected",
+                "execution_id": execution_id,
+                "workflow_id": None,
+                "stage_id": stage_id,
+                "reason": error_message,
+            },
         )
         return step_dto
 

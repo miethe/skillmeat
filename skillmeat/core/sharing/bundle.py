@@ -295,6 +295,7 @@ _TYPE_TO_SUBDIR: Dict[str, str] = {
     "mcp": "mcp",
     "mcp_server": "mcp",
     "composite": "composites",
+    "workflow": "workflows",
 }
 
 #: Single-file artifact types (stored as ``<name>.md`` rather than a directory).

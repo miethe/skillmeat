@@ -460,7 +460,26 @@ class BundleImporter:
             artifact_name = artifact_data["name"]
             artifact_type = ArtifactType(artifact_data["type"])
 
-            # Check if exists
+            if artifact_type == ArtifactType.WORKFLOW:
+                # Workflows live in DB — check for name collision there
+                existing_wf = self._find_existing_workflow(artifact_name)
+                if existing_wf is not None:
+                    # Represent the collision as a synthetic Artifact for the
+                    # shared conflict-resolution machinery
+                    synthetic = Artifact(
+                        name=artifact_name,
+                        type=ArtifactType.WORKFLOW,
+                        path=f"workflows/{artifact_name}",
+                        origin="local",
+                        metadata=ArtifactMetadata(),
+                        added=existing_wf.created_at,
+                    )
+                    conflicts.append((synthetic, artifact_data))
+                else:
+                    non_conflicts.append(artifact_data)
+                continue
+
+            # Check if exists in filesystem collection
             existing = collection.find_artifact(artifact_name, artifact_type)
 
             if existing:
@@ -469,6 +488,27 @@ class BundleImporter:
                 non_conflicts.append(artifact_data)
 
         return conflicts, non_conflicts
+
+    def _find_existing_workflow(self, workflow_name: str):
+        """Return the first WorkflowDTO whose name matches *workflow_name*, or None.
+
+        Args:
+            workflow_name: Workflow name to search for.
+
+        Returns:
+            WorkflowDTO if found, None otherwise.
+        """
+        try:
+            from skillmeat.core.workflow.service import WorkflowService
+
+            svc = WorkflowService()
+            workflows = svc.list(limit=500)
+            for wf in workflows:
+                if wf.name == workflow_name:
+                    return wf
+        except Exception as exc:
+            logger.debug("_find_existing_workflow: could not query DB: %s", exc)
+        return None
 
     def _import_artifact(
         self,
@@ -491,6 +531,11 @@ class BundleImporter:
         artifact_name = artifact_data["name"]
         artifact_type = ArtifactType(artifact_data["type"])
         artifact_path_rel = artifact_data["path"]
+
+        # --- Workflow: DB-backed, no filesystem copy needed ---
+        if artifact_type == ArtifactType.WORKFLOW:
+            self._import_workflow_artifact(artifact_data, bundle_dir, console)
+            return
 
         # Source path in bundle
         source_path = bundle_dir / artifact_path_rel
@@ -558,6 +603,66 @@ class BundleImporter:
             f"  [green]Imported:[/green] {artifact_type.value}/{artifact_name}"
         )
 
+    def _import_workflow_artifact(
+        self,
+        artifact_data: dict,
+        bundle_dir: Path,
+        console: Console,
+    ) -> None:
+        """Import a workflow artifact from a bundle into the DB via WorkflowService.
+
+        Reads ``WORKFLOW.yaml`` from the extracted bundle directory and calls
+        ``WorkflowService.create()`` to persist the definition.
+
+        Args:
+            artifact_data: Artifact data from bundle manifest.
+            bundle_dir: Extracted bundle root directory.
+            console: Rich console for progress output.
+
+        Raises:
+            ValueError: If WORKFLOW.yaml cannot be found or parsing fails.
+        """
+        from skillmeat.core.workflow.service import WorkflowService
+        from skillmeat.core.workflow.exceptions import (
+            WorkflowParseError,
+            WorkflowValidationError,
+        )
+
+        artifact_name = artifact_data["name"]
+        artifact_path_rel = artifact_data["path"]
+        source_dir = bundle_dir / artifact_path_rel
+
+        # Locate WORKFLOW.yaml in the bundle
+        yaml_path = source_dir / "WORKFLOW.yaml"
+        if not yaml_path.exists():
+            raise ValueError(
+                f"Workflow bundle artifact '{artifact_name}' missing WORKFLOW.yaml "
+                f"at '{yaml_path}'"
+            )
+
+        try:
+            yaml_content = yaml_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ValueError(
+                f"Could not read WORKFLOW.yaml for '{artifact_name}': {exc}"
+            ) from exc
+
+        try:
+            svc = WorkflowService()
+            dto = svc.create(yaml_content=yaml_content)
+        except (WorkflowParseError, WorkflowValidationError) as exc:
+            raise ValueError(
+                f"Workflow '{artifact_name}' definition is invalid: {exc}"
+            ) from exc
+
+        console.print(
+            f"  [green]Imported:[/green] workflow/{artifact_name} "
+            f"(db id: {dto.id})"
+        )
+        logger.info(
+            "Imported workflow '%s' from bundle (db id=%s)", artifact_name, dto.id
+        )
+
     def _apply_conflict_resolution(
         self,
         decision: ConflictDecision,
@@ -608,16 +713,32 @@ class BundleImporter:
             )
 
         elif decision.resolution == ConflictResolution.MERGE:
-            # Remove existing, then import
-            self.artifact_mgr.remove(
-                decision.artifact_name,
-                decision.artifact_type,
-                collection.name,
-            )
-            # Reload collection after removal
-            collection = self.collection_mgr.load_collection(collection.name)
+            if decision.artifact_type == ArtifactType.WORKFLOW:
+                # Workflows are DB-backed: delete existing record, then re-import
+                existing_wf = self._find_existing_workflow(decision.artifact_name)
+                if existing_wf is not None:
+                    try:
+                        from skillmeat.core.workflow.service import WorkflowService
 
-            # Import
+                        WorkflowService().delete(existing_wf.id)
+                    except Exception as exc:
+                        logger.warning(
+                            "Could not delete existing workflow '%s' (id=%s): %s",
+                            decision.artifact_name,
+                            existing_wf.id,
+                            exc,
+                        )
+            else:
+                # Remove existing filesystem artifact, then import
+                self.artifact_mgr.remove(
+                    decision.artifact_name,
+                    decision.artifact_type,
+                    collection.name,
+                )
+                # Reload collection after removal
+                collection = self.collection_mgr.load_collection(collection.name)
+
+            # Import (handles both workflow and filesystem paths)
             self._import_artifact(artifact_data, bundle_dir, collection, console)
             result.merged_count += 1
             result.artifacts.append(

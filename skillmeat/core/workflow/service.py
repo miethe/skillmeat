@@ -50,6 +50,11 @@ from skillmeat.core.workflow.exceptions import (
     WorkflowValidationError,
 )
 from skillmeat.core.workflow.models import WorkflowDefinition
+from skillmeat.core.workflow.overrides import (
+    WorkflowOverrideError,
+    apply_overrides,
+    load_project_overrides,
+)
 from skillmeat.core.workflow.planner import ExecutionPlan, generate_plan
 from skillmeat.core.workflow.validator import ValidationResult, validate_expressions
 
@@ -509,6 +514,16 @@ class WorkflowService:
             project_id,
             len(stage_orms),
         )
+        logger.info(
+            "workflow.created",
+            extra={
+                "event": "workflow.created",
+                "workflow_id": created.id,
+                "workflow_name": created.name,
+                "version": created.version,
+                "project_id": project_id,
+            },
+        )
         return _workflow_orm_to_dto(created)
 
     def get(self, workflow_id: str) -> WorkflowDTO:
@@ -632,6 +647,15 @@ class WorkflowService:
             updated.name,
             len(new_stages),
         )
+        logger.info(
+            "workflow.updated",
+            extra={
+                "event": "workflow.updated",
+                "workflow_id": updated.id,
+                "workflow_name": updated.name,
+                "version": updated.version,
+            },
+        )
         return _workflow_orm_to_dto(updated)
 
     def delete(self, workflow_id: str) -> None:
@@ -646,12 +670,25 @@ class WorkflowService:
         Raises:
             WorkflowNotFoundError: If no workflow with the given ID exists.
         """
+        # Fetch name before deletion for structured log context.
+        _workflow_for_log = self.repo.get_with_stages(workflow_id)
+        _workflow_name_for_log: Optional[str] = (
+            _workflow_for_log.name if _workflow_for_log is not None else None
+        )
         deleted = self.repo.delete(workflow_id)
         if not deleted:
             raise WorkflowNotFoundError(
                 f"Workflow not found: {workflow_id!r}", workflow_id=workflow_id
             )
         logger.info("WorkflowService.delete: id=%s", workflow_id)
+        logger.info(
+            "workflow.deleted",
+            extra={
+                "event": "workflow.deleted",
+                "workflow_id": workflow_id,
+                "workflow_name": _workflow_name_for_log,
+            },
+        )
 
     def duplicate(
         self,
@@ -741,6 +778,15 @@ class WorkflowService:
             workflow_id,
             copy_id,
             copy_name,
+        )
+        logger.info(
+            "workflow.duplicated",
+            extra={
+                "event": "workflow.duplicated",
+                "source_workflow_id": workflow_id,
+                "new_workflow_id": copy_id,
+                "new_name": copy_name,
+            },
         )
         return _workflow_orm_to_dto(created)
 
@@ -897,12 +943,33 @@ class WorkflowService:
             len(result.errors),
             len(result.warnings),
         )
+        _validate_wf_id: Optional[str] = None if is_yaml else workflow_id_or_yaml
+        if result.valid:
+            logger.info(
+                "workflow.validated",
+                extra={
+                    "event": "workflow.validated",
+                    "workflow_id": _validate_wf_id,
+                    "is_valid": True,
+                    "issue_count": len(result.errors) + len(result.warnings),
+                },
+            )
+        else:
+            logger.warning(
+                "workflow.validation_failed",
+                extra={
+                    "event": "workflow.validation_failed",
+                    "workflow_id": _validate_wf_id,
+                    "errors": [str(e) for e in result.errors],
+                },
+            )
         return result
 
     def plan(
         self,
         workflow_id: str,
         parameters: Optional[Dict[str, Any]] = None,
+        project_path: Optional[Path] = None,
     ) -> ExecutionPlan:
         """Generate a static execution plan for a persisted workflow.
 
@@ -911,11 +978,21 @@ class WorkflowService:
         defaults), builds the dependency DAG, computes parallel execution batches
         via topological sort, and returns a fully-populated ``ExecutionPlan``.
 
+        If ``project_path`` is supplied and a ``.skillmeat-workflow-overrides.yaml``
+        file exists in that directory, project-level overrides are loaded and
+        applied to the workflow definition **before** planning.  The base
+        workflow stored in the database is **not** modified.
+
         Args:
             workflow_id:  DB primary key of the workflow to plan.
             parameters:   Caller-supplied parameter values (merged with workflow
                           defaults).  Missing non-required parameters receive their
                           declared defaults.  ``None`` is treated as an empty dict.
+            project_path: Optional filesystem path to the project root.  When
+                          supplied the engine looks for
+                          ``.skillmeat-workflow-overrides.yaml`` and applies any
+                          override block that matches the workflow's SWDL ``id``
+                          field.
 
         Returns:
             An ``ExecutionPlan`` containing:
@@ -933,12 +1010,21 @@ class WorkflowService:
             WorkflowNotFoundError: If no workflow with ``workflow_id`` exists.
             WorkflowValidationError: If the workflow definition has blocking
                 validation errors (schema, DAG, expression, or artifact issues).
+            WorkflowOverrideError: If the override file is present but cannot
+                be parsed or references protected structural fields.
 
         Example::
 
             svc = WorkflowService()
             plan = svc.plan("abc123", parameters={"feature_name": "auth-v2"})
             print(plan.format_text())
+
+            # With project overrides:
+            plan = svc.plan(
+                "abc123",
+                parameters={"feature_name": "auth-v2"},
+                project_path=Path("/path/to/project"),
+            )
         """
         # Fetch the stored definition YAML.
         workflow_orm = self.repo.get_with_stages(workflow_id)
@@ -962,6 +1048,28 @@ class WorkflowService:
         # Parse the stored YAML into a WorkflowDefinition for the planner.
         definition = _parse_yaml_string(workflow_orm.definition_yaml)
 
+        # Apply project-level overrides when a project path is provided.
+        # Overrides are applied to the raw dict, then re-parsed so that
+        # Pydantic validates the merged result.
+        if project_path is not None:
+            # The SWDL workflow id is definition.workflow.id (kebab-case string),
+            # not the DB primary key (workflow_id).
+            swdl_id = definition.workflow.id
+            overrides = load_project_overrides(project_path, workflow_id=swdl_id)
+            if overrides:
+                logger.info(
+                    "WorkflowService.plan: applying project overrides for "
+                    "workflow SWDL id=%r from %s",
+                    swdl_id,
+                    project_path,
+                )
+                import yaml as _yaml  # noqa: PLC0415 — local import; yaml already a dep
+                raw_dict = _yaml.safe_load(workflow_orm.definition_yaml)
+                merged_dict = apply_overrides(raw_dict, overrides)
+                # Re-parse so Pydantic validates the merged structure.
+                merged_yaml = _yaml.dump(merged_dict, default_flow_style=False)
+                definition = _parse_yaml_string(merged_yaml)
+
         # Delegate to planner — generate_plan handles parameter merging,
         # DAG build, expression validation, batch computation, and timeout
         # estimation internally.
@@ -970,10 +1078,11 @@ class WorkflowService:
 
         logger.info(
             "WorkflowService.plan: id=%s batches=%d stages=%d "
-            "estimated_timeout_s=%d",
+            "estimated_timeout_s=%d project_path=%s",
             workflow_id,
             len(execution_plan.batches),
             sum(len(b.stages) for b in execution_plan.batches),
             execution_plan.estimated_timeout_seconds,
+            project_path,
         )
         return execution_plan

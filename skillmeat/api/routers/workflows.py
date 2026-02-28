@@ -11,9 +11,10 @@ import logging
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
+from skillmeat.api.config import APISettings, get_settings
 from skillmeat.core.workflow.exceptions import (
     WorkflowNotFoundError,
     WorkflowParseError,
@@ -23,9 +24,32 @@ from skillmeat.core.workflow.service import WorkflowService
 
 logger = logging.getLogger(__name__)
 
+
+def require_workflow_engine(
+    settings: APISettings = Depends(get_settings),
+) -> None:
+    """Dependency that raises 404 when the workflow engine feature flag is disabled.
+
+    Add this as a router-level or route-level dependency to gate all workflow
+    endpoints behind the ``SKILLMEAT_WORKFLOW_ENGINE_ENABLED`` setting.
+
+    Args:
+        settings: Injected API settings (supports dependency_overrides in tests).
+
+    Raises:
+        HTTPException: 404 Not Found when ``workflow_engine_enabled`` is False.
+    """
+    if not settings.workflow_engine_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workflow engine is not enabled",
+        )
+
+
 router = APIRouter(
     prefix="/workflows",
     tags=["workflows"],
+    dependencies=[Depends(require_workflow_engine)],
 )
 
 

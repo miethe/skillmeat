@@ -7,6 +7,7 @@ the group skeleton so the command is loadable and self-documenting today.
 
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 from datetime import datetime
@@ -17,6 +18,37 @@ from rich.console import Console
 from rich.table import Table
 
 console = Console(force_terminal=True, legacy_windows=False)
+
+
+# ---------------------------------------------------------------------------
+# Feature-flag guard
+# ---------------------------------------------------------------------------
+
+
+def _workflow_engine_enabled() -> bool:
+    """Return True when the workflow engine feature flag is enabled.
+
+    Reads the ``SKILLMEAT_WORKFLOW_ENGINE_ENABLED`` environment variable first
+    (mirrors ``APISettings``), then falls back to the ``APISettings`` singleton
+    so the check works without starting the API server.
+
+    Returns:
+        True when the workflow engine is enabled (the default).
+    """
+    env_val = os.environ.get("SKILLMEAT_WORKFLOW_ENGINE_ENABLED", "").strip().lower()
+    if env_val in ("0", "false", "no", "off"):
+        return False
+    if env_val in ("1", "true", "yes", "on"):
+        return True
+
+    # Fall back to the API settings singleton (reads .env, config, etc.)
+    try:
+        from skillmeat.api.config import get_settings
+
+        return get_settings().workflow_engine_enabled
+    except Exception:
+        # If the API settings layer is unavailable, default to enabled.
+        return True
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +126,16 @@ def workflow_cli(ctx: click.Context, debug: bool) -> None:
     """
     ctx.ensure_object(dict)
     ctx.obj["workflow_debug"] = debug
+
+    # Feature-flag guard — applied at the group level so every subcommand
+    # is gated automatically without repeating the check in each handler.
+    # Allow ``--help`` to pass through so users can still see the command tree.
+    if ctx.invoked_subcommand is not None and not _workflow_engine_enabled():
+        console.print(
+            "[yellow]Workflow engine is coming soon.[/yellow] "
+            "Enable it by setting SKILLMEAT_WORKFLOW_ENGINE_ENABLED=true."
+        )
+        sys.exit(0)
 
 
 # ---------------------------------------------------------------------------

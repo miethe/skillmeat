@@ -13,10 +13,11 @@ import logging
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from skillmeat.api.routers.workflows import require_workflow_engine
 from skillmeat.core.workflow.exceptions import (
     WorkflowExecutionInvalidStateError,
     WorkflowExecutionNotFoundError,
@@ -30,6 +31,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/workflow-executions",
     tags=["workflow-executions"],
+    dependencies=[Depends(require_workflow_engine)],
 )
 
 
