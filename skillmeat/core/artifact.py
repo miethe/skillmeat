@@ -521,6 +521,8 @@ class ArtifactManager:
             artifact_storage_path = collection_path / "agents" / f"{artifact_name}.md"
         elif artifact_type == ArtifactType.COMPOSITE:
             artifact_storage_path = collection_path / "composites" / artifact_name
+        elif artifact_type == ArtifactType.WORKFLOW:
+            artifact_storage_path = collection_path / "workflows" / artifact_name
         else:
             raise ValueError(f"Unsupported artifact type: {artifact_type}")
 
@@ -641,6 +643,8 @@ class ArtifactManager:
             artifact_storage_path = collection_path / "agents" / f"{artifact_name}.md"
         elif artifact_type == ArtifactType.COMPOSITE:
             artifact_storage_path = collection_path / "composites" / artifact_name
+        elif artifact_type == ArtifactType.WORKFLOW:
+            artifact_storage_path = collection_path / "workflows" / artifact_name
         else:
             raise ValueError(f"Unsupported artifact type: {artifact_type}")
 

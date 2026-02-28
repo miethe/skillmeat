@@ -114,6 +114,9 @@ class FeatureFlagsResponse(BaseModel):
             When False, all /api/v1/deployment-sets endpoints return 404.
         memory_context_enabled: Whether the Memory & Context Intelligence System
             (memory items, context modules, context packing) is active.
+        workflow_engine_enabled: Whether the Workflow Orchestration Engine is active.
+            When False, all /api/v1/workflows and /api/v1/workflow-executions
+            endpoints return 404 and CLI workflow commands show a coming-soon message.
     """
 
     composite_artifacts_enabled: bool = Field(
@@ -134,6 +137,13 @@ class FeatureFlagsResponse(BaseModel):
             "Covers memory items, context modules, and context packing."
         )
     )
+    workflow_engine_enabled: bool = Field(
+        description=(
+            "Whether the Workflow Orchestration Engine is enabled. "
+            "When False, all /api/v1/workflows and /api/v1/workflow-executions "
+            "endpoints return 404 and CLI workflow commands display a coming-soon message."
+        )
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -143,5 +153,6 @@ class FeatureFlagsResponse(BaseModel):
                 "composite_artifacts_enabled": True,
                 "deployment_sets_enabled": True,
                 "memory_context_enabled": True,
+                "workflow_engine_enabled": True,
             }
         }

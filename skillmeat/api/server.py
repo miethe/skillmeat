@@ -59,6 +59,8 @@ from .routers import (
     tags,
     user_collections,
     versions,
+    workflow_executions,
+    workflows,
 )
 from .middleware import ObservabilityMiddleware, RateLimitMiddleware
 
@@ -83,6 +85,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     # Startup
     logger.info("Starting SkillMeat API service...")
+
+    # Initialize session factory singleton before AppState to prevent
+    # concurrent imports from each creating their own sessionmaker instance
+    from skillmeat.cache.models import init_session_factory
+
+    init_session_factory()
+    logger.info("Database session factory initialized")
 
     # Load settings
     settings = get_settings()
@@ -408,6 +417,14 @@ def create_app(settings: APISettings = None) -> FastAPI:
     )
     app.include_router(tags.router, prefix=settings.api_prefix, tags=["tags"])
     app.include_router(versions.router, prefix=settings.api_prefix, tags=["versions"])
+    app.include_router(
+        workflows.router, prefix=settings.api_prefix, tags=["workflows"]
+    )
+    app.include_router(
+        workflow_executions.router,
+        prefix=settings.api_prefix,
+        tags=["workflow-executions"],
+    )
 
     # Root endpoint
     @app.get(

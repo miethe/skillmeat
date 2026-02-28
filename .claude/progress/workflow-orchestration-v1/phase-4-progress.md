@@ -3,13 +3,13 @@ type: progress
 prd: workflow-orchestration-v1
 phase: 4
 title: CLI Commands
-status: planning
+status: completed
 started: null
 completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 11
-completed_tasks: 0
+completed_tasks: 11
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -19,7 +19,7 @@ contributors: []
 tasks:
 - id: CLI-4.1
   description: Create 'skillmeat workflow' Click command group
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -29,7 +29,7 @@ tasks:
 - id: CLI-4.2
   description: 'workflow create <path>: read YAML, validate, store in collection +
     DB'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -39,7 +39,7 @@ tasks:
   priority: critical
 - id: CLI-4.3
   description: workflow list [--status] [--tag] [--format table|json]
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -48,7 +48,7 @@ tasks:
   priority: high
 - id: CLI-4.4
   description: 'workflow show <name>: display definition, stages, last execution'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -57,7 +57,7 @@ tasks:
   priority: high
 - id: CLI-4.5
   description: 'workflow validate <path>: validate YAML without importing'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -68,7 +68,7 @@ tasks:
 - id: CLI-4.6
   description: 'workflow plan <name> [--param key=val]: generate and display execution
     plan'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -79,7 +79,7 @@ tasks:
 - id: CLI-4.7
   description: 'workflow run <name> [--param key=val] [--dry-run]: execute with Rich
     live display'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -89,7 +89,7 @@ tasks:
   priority: critical
 - id: CLI-4.8
   description: 'workflow runs [<run_id>] [--logs] [--status]: list/show run details'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -98,7 +98,7 @@ tasks:
   priority: medium
 - id: CLI-4.9
   description: 'workflow approve/cancel: gate approval and execution cancellation'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -109,7 +109,7 @@ tasks:
 - id: CLI-4.10
   description: 'Collection manifest integration: type=workflow in TOML, skillmeat
     list includes workflows'
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -119,7 +119,7 @@ tasks:
   priority: high
 - id: TEST-4.11
   description: CLI unit tests for all commands with mocked services
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -170,6 +170,8 @@ files_modified:
 schema_version: 2
 doc_type: progress
 feature_slug: workflow-orchestration-v1
+progress: 100
+updated: '2026-02-27'
 ---
 
 # workflow-orchestration-v1 - Phase 4: CLI Commands

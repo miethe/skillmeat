@@ -9,6 +9,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Workflow Orchestration Engine (2026-02-27)
+
+**Phase 0: Foundation**
+- Feature branch setup with database migration planning
+- Directory structure and configuration for workflow subsystem
+
+**Phase 1: Core Engine**
+- SWDL (SkillMeat Workflow Definition Language) schema parser and validator with full JSON Schema support
+- Expression engine for guard conditions with variable substitution and boolean logic
+- DAG construction with topological sort and cycle detection for workflow stage dependencies
+- Execution planner generating optimized batched execution plans with parallel stage support
+
+**Phase 2: Data Layer**
+- Workflow, WorkflowStage, WorkflowExecution ORM models with Alembic migrations
+- Repository pattern (WorkflowRepository, WorkflowStageRepository, WorkflowExecutionRepository) with full CRUD operations
+
+**Phase 3: Service & API Layer**
+- WorkflowService (CRUD, validate, plan, duplicate operations)
+- WorkflowExecutionService (start execution, cancel, gate approve/reject)
+- WorkflowContextService for context module management and variable resolution
+- 14+ REST API endpoints for workflows, stages, and executions
+- Server-Sent Events (SSE) for real-time execution monitoring with heartbeat and backpressure handling
+- OpenAPI specification with example requests/responses
+
+**Phase 4: CLI**
+- 9 `skillmeat workflow` subcommands: create, validate, plan, run, list, show, delete, export, status
+- Interactive workflow creation with SWDL syntax validation
+- Real-time execution status monitoring from command line
+- JSON and YAML export support for workflow definitions
+
+**Phase 5: Frontend — Workflow Builder**
+- Workflow Library page with grid/list views, full-text search, and filtering by type/status/tags
+- Workflow Builder with drag-and-drop stage reordering using @dnd-kit
+- Workflow Detail page with tabs (overview, stages, executions, settings)
+- Stage editor with guard condition visual editor
+- Real-time validation feedback with SWDL schema error display
+
+**Phase 6: Frontend — Execution Dashboard**
+- Real-time execution monitoring with SSE streaming and auto-refresh
+- Stage timeline with progress indicators and status badges (pending, running, success, failed, blocked)
+- Log viewer with streaming support, full-text search, filtering by level
+- Gate approval/rejection UI with comment support and audit logging
+- Execution history and retry functionality
+
+**Phase 7: Integration, Testing & Documentation**
+- Bundle system integration (export/import workflows as shareable packages)
+- Collection sync for workflows with upstream tracking
+- Project overrides via `.skillmeat-workflow-overrides.yaml` for environment-specific customization
+- Feature flag (WORKFLOW_ENGINE_ENABLED) for controlled rollout
+- Structured lifecycle logging with 14 distinct event types (created, started, completed, etc.)
+- Comprehensive test suite: 31 integration tests, 53 E2E tests, 6 performance benchmarks, 48 accessibility audit checks
+- User guides: SWDL authoring guide, CLI reference, Web UI guide with screenshots
+- API documentation with request/response examples
+
+---
+
 #### Similarity Scoring Overhaul (2026-02-26)
 
 **Phase 1: Scoring Algorithm Fix**

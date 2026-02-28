@@ -17,8 +17,10 @@ references:
   - skillmeat/api/routers/context_sync.py
   - skillmeat/api/routers/analytics.py
   - skillmeat/api/routers/custom_colors.py
+  - skillmeat/api/routers/workflows.py
+  - skillmeat/api/routers/workflow_executions.py
   - skillmeat/api/routers/health.py
-last_verified: 2026-02-25
+last_verified: 2026-02-27
 ---
 
 # API Endpoint Mapping
@@ -346,6 +348,164 @@ offset: int = Query(0, ge=0)
 | `/api/v1/analytics/usage` | GET | UsageAnalyticsResponse | `@router.get("/usage", response_model=UsageAnalyticsResponse` | ~97 |
 | `/api/v1/analytics/deployments` | GET | DeploymentAnalyticsResponse | `@router.get("/deployments", response_model=DeploymentAnalyticsResponse` | ~209 |
 | `/api/v1/analytics/artifacts` | GET | ArtifactAnalyticsResponse | `@router.get("/artifacts", response_model=ArtifactAnalyticsResponse` | ~380 |
+
+## Workflows API
+
+**Router**: `skillmeat/api/routers/workflows.py`
+**Base**: `/api/v1/workflows`
+**Feature Flag**: `WORKFLOW_ENGINE_ENABLED` — returns 404 when disabled
+**Purpose**: Define and manage workflow definitions (SWDL format)
+
+| Endpoint | Method | Response Model | Decorator Pattern | Status |
+|----------|--------|----------------|-------------------|--------|
+| `/api/v1/workflows` | GET | List[Dict] | `@router.get("", status_code=status.HTTP_200_OK` | Active |
+| `/api/v1/workflows` | POST | Dict | `@router.post("", status_code=status.HTTP_201_CREATED` | Active |
+| `/api/v1/workflows/{workflow_id}` | GET | Dict | `@router.get("/{workflow_id}", status_code=status.HTTP_200_OK` | Active |
+| `/api/v1/workflows/{workflow_id}` | PUT | Dict | `@router.put("/{workflow_id}", status_code=status.HTTP_200_OK` | Active |
+| `/api/v1/workflows/{workflow_id}` | DELETE | None (204) | `@router.delete("/{workflow_id}", status_code=status.HTTP_204_NO_CONTENT` | Active |
+| `/api/v1/workflows/{workflow_id}/duplicate` | POST | Dict | `@router.post("/{workflow_id}/duplicate", status_code=status.HTTP_201_CREATED` | Active |
+| `/api/v1/workflows/{workflow_id}/validate` | POST | Dict | `@router.post("/{workflow_id}/validate", status_code=status.HTTP_200_OK` | Active |
+| `/api/v1/workflows/{workflow_id}/plan` | POST | Dict | `@router.post("/{workflow_id}/plan", status_code=status.HTTP_200_OK` | Active |
+
+**Key Operations**:
+- List & Browse: `GET /`, `GET /{workflow_id}`
+- Create & Manage: `POST /`, `PUT /{workflow_id}`, `DELETE /{workflow_id}`
+- Duplication: `POST /{workflow_id}/duplicate`
+- Validation: `POST /{workflow_id}/validate` (always HTTP 200; check `is_valid` in response)
+- Planning: `POST /{workflow_id}/plan` (generates execution plan)
+
+**Query Parameters** (list endpoint):
+```python
+project_id: Optional[str] = None  # Filter by owning project
+skip: int = 0                     # Offset (0-based)
+limit: int = 50                   # Page size (1-200)
+```
+
+**Request Bodies**:
+
+**Create Workflow** (POST /):
+```json
+{
+  "yaml_content": "...",      # Raw YAML string (SWDL format)
+  "project_id": "optional"    # Optional project scope
+}
+```
+
+**Update Workflow** (PUT /{workflow_id}):
+```json
+{
+  "yaml_content": "..."  # New YAML content
+}
+```
+
+**Duplicate Workflow** (POST /{workflow_id}/duplicate):
+```json
+{
+  "new_name": "optional"  # Optional copy name
+}
+```
+
+**Plan Workflow** (POST /{workflow_id}/plan):
+```json
+{
+  "parameters": { }  # Optional parameter values
+}
+```
+
+## Workflow Executions API
+
+**Router**: `skillmeat/api/routers/workflow_executions.py`
+**Base**: `/api/v1/workflow-executions`
+**Feature Flag**: `WORKFLOW_ENGINE_ENABLED` — returns 404 when disabled
+**Purpose**: Runtime execution of workflows with real-time streaming
+
+| Endpoint | Method | Response Model | Decorator Pattern | Status |
+|----------|--------|----------------|-------------------|--------|
+| `/api/v1/workflow-executions` | POST | Dict | `@router.post("", status_code=status.HTTP_201_CREATED` | Active |
+| `/api/v1/workflow-executions` | GET | List[Dict] | `@router.get("", status_code=status.HTTP_200_OK` | Active |
+| `/api/v1/workflow-executions/by-workflow/{workflow_id}` | GET | List[Dict] | `@router.get("/by-workflow/{workflow_id}", status_code=status.HTTP_200_OK` | Active |
+| `/api/v1/workflow-executions/{execution_id}` | GET | Dict | `@router.get("/{execution_id}", status_code=status.HTTP_200_OK` | Active |
+| `/api/v1/workflow-executions/{execution_id}/stream` | GET | StreamingResponse (SSE) | `@router.get("/{execution_id}/stream", media_type=text/event-stream` | Active |
+| `/api/v1/workflow-executions/{execution_id}/pause` | POST | Dict | `@router.post("/{execution_id}/pause", status_code=status.HTTP_200_OK` | Active |
+| `/api/v1/workflow-executions/{execution_id}/resume` | POST | Dict | `@router.post("/{execution_id}/resume", status_code=status.HTTP_200_OK` | Active |
+| `/api/v1/workflow-executions/{execution_id}/cancel` | POST | Dict | `@router.post("/{execution_id}/cancel", status_code=status.HTTP_200_OK` | Active |
+| `/api/v1/workflow-executions/{execution_id}/gates/{stage_id}/approve` | POST | Dict | `@router.post("/{execution_id}/gates/{stage_id}/approve", status_code=status.HTTP_200_OK` | Active |
+| `/api/v1/workflow-executions/{execution_id}/gates/{stage_id}/reject` | POST | Dict | `@router.post("/{execution_id}/gates/{stage_id}/reject", status_code=status.HTTP_200_OK` | Active |
+
+**Key Operations**:
+- Start Execution: `POST /` (creates new execution, returns 201)
+- List & Browse: `GET /`, `GET /by-workflow/{workflow_id}`, `GET /{execution_id}`
+- Stream Events: `GET /{execution_id}/stream` (Server-Sent Events for real-time updates)
+- Control: `POST /{execution_id}/pause`, `POST /{execution_id}/resume`, `POST /{execution_id}/cancel`
+- Gates: `POST /{execution_id}/gates/{stage_id}/approve`, `POST /{execution_id}/gates/{stage_id}/reject`
+
+**Query Parameters** (list endpoints):
+```python
+workflow_id: Optional[str] = None  # Filter by parent workflow
+status: Optional[str] = None       # Filter by execution status (query param name: 'status')
+skip: int = 0                      # Offset (0-based)
+limit: int = 50                    # Page size (1-200)
+```
+
+**Request Bodies**:
+
+**Start Execution** (POST /):
+```json
+{
+  "workflow_id": "...",          # UUID of workflow to execute
+  "parameters": { },             # Optional parameter overrides
+  "overrides": { }               # Optional execution-level overrides
+}
+```
+
+**Approve Gate** (POST /{execution_id}/gates/{stage_id}/approve):
+```
+No request body required
+```
+
+**Reject Gate** (POST /{execution_id}/gates/{stage_id}/reject):
+```json
+{
+  "reason": "optional"  # Optional rejection reason
+}
+```
+
+**SSE Event Types** (from `/stream` endpoint):
+
+```
+event: stage_started
+data: { "stage_id": string, "stage_name": string }
+
+event: stage_completed
+data: { "stage_id": string, "duration_seconds": float }
+
+event: stage_failed
+data: { "stage_id": string, "error": string }
+
+event: stage_skipped
+data: { "stage_id": string }
+
+event: log_line
+data: { "stage_id": string, "message": string }
+
+event: execution_completed
+data: { "status": "completed|failed|cancelled" }
+```
+
+**Execution Statuses**:
+- `running` — Currently executing
+- `paused` — Paused by user
+- `completed` — All stages completed successfully
+- `failed` — One or more stages failed
+- `cancelled` — Cancelled by user
+
+**Step Statuses**:
+- `pending` — Waiting to execute
+- `running` — Currently executing
+- `completed` — Executed successfully
+- `failed` — Execution failed
+- `skipped` — Skipped (e.g., conditional skip)
+- `rejected` — Gate rejected (gates only)
 
 ## Health API
 

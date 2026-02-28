@@ -254,6 +254,68 @@ class BundleBuilder:
         logging.info(f"Added {count} artifact(s) to bundle")
         return count
 
+    def add_workflow(
+        self,
+        workflow_name: str,
+        yaml_content: str,
+        version: str = "unknown",
+        description: str = "",
+        custom_scope: Optional[str] = None,
+    ) -> None:
+        """Add a workflow to the bundle from its YAML definition string.
+
+        Workflows are DB-backed (not filesystem-backed), so this method accepts
+        the YAML content directly rather than resolving a filesystem path.
+
+        Args:
+            workflow_name: Identifier name for the workflow (used as bundle path)
+            yaml_content: Raw YAML content of the workflow definition (SWDL format)
+            version: Workflow version string (default: "unknown")
+            description: Human-readable description for bundle metadata
+            custom_scope: Override scope (default: "user")
+
+        Raises:
+            ValueError: If workflow already added to bundle
+        """
+        import hashlib
+
+        artifact_key = f"workflow::{workflow_name}"
+        if artifact_key in self._artifact_paths:
+            raise ValueError(
+                f"Workflow '{workflow_name}' already added to bundle"
+            )
+
+        # Compute hash of the YAML content
+        content_hash = "sha256:" + hashlib.sha256(yaml_content.encode("utf-8")).hexdigest()
+
+        scope = custom_scope or "user"
+        bundle_path = f"artifacts/workflow/{workflow_name}/"
+        yaml_filename = "WORKFLOW.yaml"
+
+        bundle_artifact = BundleArtifact(
+            type=ArtifactType.WORKFLOW.value,
+            name=workflow_name,
+            version=version,
+            scope=scope,
+            path=bundle_path,
+            files=[yaml_filename],
+            hash=content_hash,
+            metadata={
+                "description": description,
+                "content": yaml_content,  # store inline for workflow artifacts
+            },
+        )
+
+        self._artifacts.append(bundle_artifact)
+        # Use sentinel None path — workflow content lives in metadata["content"]
+        self._artifact_paths[artifact_key] = None  # type: ignore[assignment]
+        self._workflow_yaml: Dict[str, str] = getattr(self, "_workflow_yaml", {})
+        self._workflow_yaml[workflow_name] = yaml_content
+
+        logging.info(
+            f"Added workflow '{workflow_name}' to bundle (hash: {content_hash[:15]}...)"
+        )
+
     def add_dependency(self, dependency: str) -> None:
         """Add bundle dependency.
 
@@ -325,8 +387,16 @@ class BundleBuilder:
         if not self._artifacts:
             raise BundleValidationError("Bundle must contain at least one artifact")
 
-        # Validate all artifact files exist
+        # Validate all artifact files exist (skip workflow artifacts — DB-backed)
         for artifact in self._artifacts:
+            if artifact.type == ArtifactType.WORKFLOW.value:
+                # Workflow content is stored inline in metadata["content"]
+                if "content" not in artifact.metadata:
+                    raise BundleValidationError(
+                        f"Workflow artifact '{artifact.name}' missing YAML content"
+                    )
+                continue
+
             artifact_key = f"{artifact.type}::{artifact.name}"
             artifact_path = self._artifact_paths[artifact_key]
 
@@ -381,6 +451,17 @@ class BundleBuilder:
 
             # Copy artifacts to temp workspace
             for artifact in self._artifacts:
+                if artifact.type == ArtifactType.WORKFLOW.value:
+                    # Workflow: write YAML content directly (no filesystem source)
+                    yaml_content = artifact.metadata.get("content", "")
+                    dest_dir = temp_path / artifact.path
+                    dest_dir.mkdir(parents=True, exist_ok=True)
+                    (dest_dir / "WORKFLOW.yaml").write_text(yaml_content, encoding="utf-8")
+                    logging.debug(
+                        f"Wrote workflow '{artifact.name}' YAML to {artifact.path}"
+                    )
+                    continue
+
                 artifact_key = f"{artifact.type}::{artifact.name}"
                 source_path = self._artifact_paths[artifact_key]
                 dest_path = temp_path / artifact.path

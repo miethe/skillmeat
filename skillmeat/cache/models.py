@@ -3945,6 +3945,255 @@ class ArtifactEmbedding(Base):
 
 
 # =============================================================================
+# Workflow ORM Models
+# =============================================================================
+
+
+class Workflow(Base):
+    """Workflow definition parsed from SWDL YAML."""
+
+    __tablename__ = "workflows"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Core fields
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    version: Mapped[str] = mapped_column(String, nullable=False, default="1.0.0")
+    status: Mapped[str] = mapped_column(String, nullable=False, default="draft")
+    definition_yaml: Mapped[str] = mapped_column(Text, nullable=False)
+    definition_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # JSON-serialised fields (stored as Text)
+    tags_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    global_context_module_ids_json: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
+    config_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_policy_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    hooks_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ui_metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Authoring metadata
+    created_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    stages: Mapped[List["WorkflowStage"]] = relationship(
+        "WorkflowStage",
+        back_populates="workflow",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    executions: Mapped[List["WorkflowExecution"]] = relationship(
+        "WorkflowExecution",
+        back_populates="workflow",
+        cascade="save-update, merge",
+        lazy="selectin",
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of Workflow."""
+        return (
+            f"<Workflow(id={self.id!r}, name={self.name!r}, "
+            f"version={self.version!r}, status={self.status!r})>"
+        )
+
+
+class WorkflowStage(Base):
+    """Individual stage definition belonging to a Workflow."""
+
+    __tablename__ = "workflow_stages"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Foreign key
+    workflow_id: Mapped[str] = mapped_column(
+        String, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Core fields
+    stage_id_ref: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    condition: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    stage_type: Mapped[str] = mapped_column(String, nullable=False, default="agent")
+
+    # JSON-serialised fields (stored as Text)
+    depends_on_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    roles_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    inputs_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    outputs_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    context_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_policy_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    handoff_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    gate_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ui_metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    workflow: Mapped["Workflow"] = relationship(
+        "Workflow",
+        back_populates="stages",
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of WorkflowStage."""
+        return (
+            f"<WorkflowStage(id={self.id!r}, workflow_id={self.workflow_id!r}, "
+            f"stage_id_ref={self.stage_id_ref!r}, order_index={self.order_index!r})>"
+        )
+
+
+class WorkflowExecution(Base):
+    """Runtime execution record for a Workflow invocation."""
+
+    __tablename__ = "workflow_executions"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Foreign key (no CASCADE — executions are preserved after workflow deletion)
+    workflow_id: Mapped[str] = mapped_column(
+        String, ForeignKey("workflows.id"), nullable=False
+    )
+
+    # Snapshot of workflow identity at execution time
+    workflow_name: Mapped[str] = mapped_column(String, nullable=False)
+    workflow_version: Mapped[str] = mapped_column(String, nullable=False)
+    workflow_definition_hash: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True
+    )
+
+    # Execution state
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    trigger: Mapped[str] = mapped_column(String, nullable=False, default="manual")
+
+    # JSON-serialised fields (stored as Text)
+    parameters_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    overrides_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Timing
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Error tracking
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    workflow: Mapped["Workflow"] = relationship(
+        "Workflow",
+        back_populates="executions",
+    )
+    steps: Mapped[List["ExecutionStep"]] = relationship(
+        "ExecutionStep",
+        back_populates="execution",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of WorkflowExecution."""
+        return (
+            f"<WorkflowExecution(id={self.id!r}, workflow_id={self.workflow_id!r}, "
+            f"status={self.status!r})>"
+        )
+
+
+class ExecutionStep(Base):
+    """Per-stage execution record within a WorkflowExecution."""
+
+    __tablename__ = "execution_steps"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Foreign key
+    execution_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("workflow_executions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    # Stage identity snapshot
+    stage_id_ref: Mapped[str] = mapped_column(String, nullable=False)
+    stage_name: Mapped[str] = mapped_column(String, nullable=False)
+
+    # Execution state
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    agent_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # JSON-serialised fields (stored as Text)
+    context_consumed_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    inputs_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    outputs_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    logs_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Error tracking
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Timing
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    duration_seconds: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    execution: Mapped["WorkflowExecution"] = relationship(
+        "WorkflowExecution",
+        back_populates="steps",
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of ExecutionStep."""
+        return (
+            f"<ExecutionStep(id={self.id!r}, execution_id={self.execution_id!r}, "
+            f"stage_id_ref={self.stage_id_ref!r}, status={self.status!r})>"
+        )
+
+
+# =============================================================================
 # Database Engine and Session Setup
 # =============================================================================
 

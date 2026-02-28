@@ -208,6 +208,15 @@ class APISettings(BaseSettings):
         description="Enable Memory & Context Intelligence System (memory items, context modules, context packing)",
     )
 
+    # Workflow Orchestration Engine feature flag
+    workflow_engine_enabled: bool = Field(
+        default=True,
+        description="Enable Workflow Orchestration Engine. "
+        "When disabled, all /api/v1/workflows and /api/v1/workflow-executions endpoints return 404 "
+        "and CLI workflow commands display a 'coming soon' message. "
+        "Configurable via SKILLMEAT_WORKFLOW_ENGINE_ENABLED env var.",
+    )
+
     memory_auto_extract: bool = Field(
         default=False,
         description="Enable automatic memory extraction from conversations (Phase 5 feature)",

@@ -16,9 +16,9 @@ tags:
 - automation
 - agents
 created: 2026-02-06
-updated: 2026-02-06
+updated: '2026-02-27'
 category: product-planning
-status: planned
+status: completed
 related:
 - /docs/project_plans/PRDs/features/workflow-orchestration-v1.md
 - /docs/project_plans/specs/workflow-orchestration-schema-spec.md
@@ -28,6 +28,7 @@ schema_version: 2
 doc_type: implementation_plan
 feature_slug: workflow-orchestration
 prd_ref: orchestration
+phase_2_status: completed
 ---
 # Implementation Plan: Workflow Orchestration Engine
 
@@ -372,6 +373,16 @@ skillmeat workflow cancel <run_id>                    # Cancel running workflow
 
 This is the largest frontend phase. It creates the Workflow Library page, the Workflow Builder with @dnd-kit drag-and-drop, and all supporting components. See the UI/UX Design Spec for detailed wireframes, component specs, and interaction patterns.
 
+> **Design Pre-Work Assets** — Generated 2026-02-27. Reference index: `.claude/worknotes/workflow-orchestration-v1/phase5-design-references.md`
+>
+> | Task | Reference Image | TSX Scaffold (starting point) |
+> |------|----------------|-------------------------------|
+> | FE-5.12 WorkflowCard | `assets/ai-gen/2026-02-27/nano-banana-2/workflow-card-grid.png` | `assets/ai-gen/2026-02-27/gemini-3.1-pro/workflow-card-scaffold.tsx` |
+> | FE-5.16 StageCard | `assets/ai-gen/2026-02-27/nano-banana-2/stage-card-both-modes.png` | `assets/ai-gen/2026-02-27/gemini-3.1-pro/stage-card-scaffold.tsx` |
+> | FE-5.18 StageEditor | `assets/ai-gen/2026-02-27/nano-banana-2/stage-editor-slide-over.png` | `assets/ai-gen/2026-02-27/gemini-3.1-pro/stage-editor-scaffold.tsx` |
+>
+> Scaffolds are **starting points only** — review against reference image before delegating. Provide both paths in the task prompt to `ui-engineer-enhanced`.
+
 ### 5.1 Foundation (Types, Hooks, Navigation)
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Subagent(s) | Dependencies |
@@ -397,7 +408,7 @@ This is the largest frontend phase. It creates the Workflow Library page, the Wo
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Subagent(s) | Dependencies |
 |---------|-----------|-------------|---------------------|----------|-------------|--------------|
-| FE-5.12 | WorkflowCard | Create `components/workflow/workflow-card.tsx` per UI Spec Section 3.1 | Shows name, stage count, last run time, tags (max 3 + overflow), created by, action buttons (Run, Edit, menu); hover shadow lift; click navigates to detail | 2 pts | ui-engineer-enhanced | FE-5.2 |
+| FE-5.12 | WorkflowCard | Create `components/workflow/workflow-card.tsx` per UI Spec Section 3.1. **Design ref**: `assets/ai-gen/2026-02-27/nano-banana-2/workflow-card-grid.png`. **Scaffold**: `assets/ai-gen/2026-02-27/gemini-3.1-pro/workflow-card-scaffold.tsx` | Shows name, stage count, last run time, tags (max 3 + overflow), created by, action buttons (Run, Edit, menu); hover shadow lift; click navigates to detail | 2 pts | ui-engineer-enhanced | FE-5.2 |
 | FE-5.13 | WorkflowListItem | Create `components/workflow/workflow-list-item.tsx` per UI Spec Section 3.1 | Row layout with name, metadata columns, tags, inline actions; truncation on name; hover highlight | 1 pt | frontend-developer | FE-5.12 |
 | FE-5.14 | WorkflowToolbar | Create `components/workflow/workflow-toolbar.tsx` per UI Spec Section 3.1 | Search input, tag filter, sort dropdown, grid/list view toggle; URL-driven state per UI Spec Section 6.6 | 1 pt | frontend-developer | FE-5.12 |
 | FE-5.15 | Workflow Library Page | Implement `app/workflows/page.tsx` with PageHeader, toolbar, card grid/list, empty state per UI Spec Section 3.1 | PageHeader with title, description, "+ New Workflow" button; grid/list toggle; search/filter/sort working; empty state when no workflows; 3-column grid on desktop, 1-column on mobile | 2 pts | ui-engineer-enhanced | FE-5.12, FE-5.13, FE-5.14 |
@@ -406,9 +417,9 @@ This is the largest frontend phase. It creates the Workflow Library page, the Wo
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Subagent(s) | Dependencies |
 |---------|-----------|-------------|---------------------|----------|-------------|--------------|
-| FE-5.16 | StageCard | Create `components/workflow/stage-card.tsx` with edit and readonly modes per UI Spec Section 3.2 | Edit mode: drag handle, stage number badge, inline-editable title, agent/tools/context summary rows, edit and delete buttons; Readonly mode: no drag/edit/delete; both modes use correct styling | 2 pts | ui-engineer-enhanced | FE-5.10 |
+| FE-5.16 | StageCard | Create `components/workflow/stage-card.tsx` with edit and readonly modes per UI Spec Section 3.2. **Design ref**: `assets/ai-gen/2026-02-27/nano-banana-2/stage-card-both-modes.png`. **Scaffold**: `assets/ai-gen/2026-02-27/gemini-3.1-pro/stage-card-scaffold.tsx` | Edit mode: drag handle, stage number badge, inline-editable title, agent/tools/context summary rows, edit and delete buttons; Readonly mode: no drag/edit/delete; both modes use correct styling | 2 pts | ui-engineer-enhanced | FE-5.10 |
 | FE-5.17 | StageConnector | Create `components/workflow/stage-connector.tsx` per UI Spec Section 3.2 | Sequential connector: vertical line between stages; hover reveals "+" add button; parallel branch connector: split/merge visual with dashed lines | 1 pt | frontend-developer | FE-5.16 |
-| FE-5.18 | StageEditor | Create `components/workflow/stage-editor.tsx` as a SlideOverPanel form per UI Spec Section 3.2 | Four sections: Basic Info (name, description, execution mode), Roles (ArtifactPicker for agent + tools), Context Policy (ContextModulePicker, inherit toggle), Advanced (timeout, retry, failure action); saves stage on Save button | 3 pts | ui-engineer-enhanced | FE-5.7, FE-5.8, FE-5.9 |
+| FE-5.18 | StageEditor | Create `components/workflow/stage-editor.tsx` as a SlideOverPanel form per UI Spec Section 3.2. **Design ref**: `assets/ai-gen/2026-02-27/nano-banana-2/stage-editor-slide-over.png`. **Scaffold**: `assets/ai-gen/2026-02-27/gemini-3.1-pro/stage-editor-scaffold.tsx` | Four sections: Basic Info (name, description, execution mode), Roles (ArtifactPicker for agent + tools), Context Policy (ContextModulePicker, inherit toggle), Advanced (timeout, retry, failure action); saves stage on Save button | 3 pts | ui-engineer-enhanced | FE-5.7, FE-5.8, FE-5.9 |
 | FE-5.19 | Builder State Management | Implement `useReducer`-based builder state per UI Spec Section 6.4 with all BuilderAction types | All actions work: SET_NAME, SET_DESCRIPTION, ADD_STAGE, UPDATE_STAGE, REMOVE_STAGE, REORDER_STAGES, SELECT_STAGE, TOGGLE_EDITOR, MARK_SAVED, LOAD_WORKFLOW; isDirty tracking accurate | 2 pts | frontend-developer | FE-5.16 |
 | FE-5.20 | Drag-and-Drop Integration | Integrate @dnd-kit with stage list: DndContext, SortableContext, useSortable on each StageCard per UI Spec Section 5.1 | Drag via handle lifts card with shadow; drop indicators between stages; keyboard DnD (Space to pick up, arrows to move, Space to drop); stage numbers recalculate after reorder; ARIA announcements for screen readers | 3 pts | ui-engineer-enhanced | FE-5.16, FE-5.19 |
 | FE-5.21 | Builder Top Bar | Implement sticky builder header per UI Spec Section 3.2 with back button, editable workflow name, unsaved indicator, Save Draft and Save & Close buttons | Sticky below global header; inline-editable name; amber dot when dirty; Save Draft calls mutation and marks saved; Save & Close saves then navigates to detail | 1 pt | frontend-developer | FE-5.19 |
@@ -445,21 +456,31 @@ This is the largest frontend phase. It creates the Workflow Library page, the Wo
 **Dependencies**: Phase 3 API (SSE endpoint), Phase 5 shared components
 **Assigned Subagent(s)**: ui-engineer-enhanced, frontend-developer
 
+> **Design Pre-Work Assets** — Generated 2026-02-27. Reference index: `.claude/worknotes/workflow-orchestration-v1/phase5-design-references.md`
+>
+> | Task | Reference Image | TSX Scaffold (starting point) |
+> |------|----------------|-------------------------------|
+> | FE-6.1 StageTimeline | `assets/ai-gen/2026-02-27/nano-banana-2/stage-timeline-all-statuses.png` | `assets/ai-gen/2026-02-27/gemini-3.1-pro/stage-timeline-scaffold.tsx` |
+> | FE-6.5 LogViewer | `assets/ai-gen/2026-02-27/nano-banana-2/log-viewer-panel.png` | `assets/ai-gen/2026-02-27/gemini-3.1-pro/log-viewer-scaffold.tsx` |
+> | FE-6.6 Execution Dashboard | `assets/ai-gen/2026-02-27/nano-banana-2/execution-dashboard-layout.png` | `assets/ai-gen/2026-02-27/gemini-3.1-pro/execution-dashboard-scaffold.tsx` |
+>
+> The dashboard scaffold contains inline stubs for `ExecutionHeader`, `ExecutionProgress`, and `ExecutionDetail` — split these into separate files when implementing FE-6.2, FE-6.3, FE-6.4. Provide both paths in the task prompt to `ui-engineer-enhanced`.
+
 ### 6.1 Execution Components
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Subagent(s) | Dependencies |
 |---------|-----------|-------------|---------------------|----------|-------------|--------------|
-| FE-6.1 | StageTimeline | Create `components/workflow/stage-timeline.tsx` -- vertical timeline column per UI Spec Section 3.4 with selectable nodes | Each node shows: status circle (color + icon), stage name, status text + duration; click selects node and highlights; running stage has spinning icon; `aria-current="step"` on active stage; J/K keyboard navigation | 2 pts | ui-engineer-enhanced | FE-5.11 |
+| FE-6.1 | StageTimeline | Create `components/workflow/stage-timeline.tsx` -- vertical timeline column per UI Spec Section 3.4 with selectable nodes. **Design ref**: `assets/ai-gen/2026-02-27/nano-banana-2/stage-timeline-all-statuses.png`. **Scaffold**: `assets/ai-gen/2026-02-27/gemini-3.1-pro/stage-timeline-scaffold.tsx` | Each node shows: status circle (color + icon), stage name, status text + duration; click selects node and highlights; running stage has spinning icon; `aria-current="step"` on active stage; J/K keyboard navigation | 2 pts | ui-engineer-enhanced | FE-5.11 |
 | FE-6.2 | ExecutionHeader | Create `components/workflow/execution-header.tsx` per UI Spec Section 3.4 | Shows workflow name (link), run ID, started timestamp, status badge; action buttons change by state: Running (Pause, Cancel), Paused (Resume, Cancel), Completed/Failed (Re-run) | 1 pt | frontend-developer | FE-5.11 |
 | FE-6.3 | ExecutionProgress | Create `components/workflow/execution-progress.tsx` per UI Spec Section 3.4 | Progress bar using shadcn Progress; shows "N of M stages complete"; animated fill; indeterminate state when initializing | 1 pt | frontend-developer | FE-6.2 |
 | FE-6.4 | ExecutionDetail | Create `components/workflow/execution-detail.tsx` -- right panel per UI Spec Section 3.4 | Shows: stage name + status badge, agent & tools (artifact badges), timing (started, duration with live counter, ended), context consumed (module list with sizes), log viewer | 2 pts | ui-engineer-enhanced | FE-6.1 |
-| FE-6.5 | LogViewer | Create `components/workflow/log-viewer.tsx` per UI Spec Section 3.4 | Monospace font; auto-scrolls to bottom when live; "scroll to bottom" button when user scrolls up; error lines highlighted in red; empty state: "Waiting for logs..."; max-height with scroll; `role="log"` with `aria-live="polite"` | 2 pts | ui-engineer-enhanced | FE-6.4 |
+| FE-6.5 | LogViewer | Create `components/workflow/log-viewer.tsx` per UI Spec Section 3.4. **Design ref**: `assets/ai-gen/2026-02-27/nano-banana-2/log-viewer-panel.png`. **Scaffold**: `assets/ai-gen/2026-02-27/gemini-3.1-pro/log-viewer-scaffold.tsx` | Monospace font; auto-scrolls to bottom when live; "scroll to bottom" button when user scrolls up; error lines highlighted in red; empty state: "Waiting for logs..."; max-height with scroll; `role="log"` with `aria-live="polite"` | 2 pts | ui-engineer-enhanced | FE-6.4 |
 
 ### 6.2 Execution Pages
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Subagent(s) | Dependencies |
 |---------|-----------|-------------|---------------------|----------|-------------|--------------|
-| FE-6.6 | Execution Dashboard Page | Assemble `app/workflows/[id]/executions/[runId]/page.tsx` with header, progress bar, split layout (timeline + detail) per UI Spec Section 3.4 | Split layout: timeline column (w-72) + detail panel; selecting timeline node shows detail; SSE events update timeline and detail in real-time; pause/resume/cancel controls work; mobile: stacked layout | 3 pts | ui-engineer-enhanced | FE-6.1 through FE-6.5, FE-5.3 |
+| FE-6.6 | Execution Dashboard Page | Assemble `app/workflows/[id]/executions/[runId]/page.tsx` with header, progress bar, split layout (timeline + detail) per UI Spec Section 3.4. **Design ref**: `assets/ai-gen/2026-02-27/nano-banana-2/execution-dashboard-layout.png`. **Scaffold**: `assets/ai-gen/2026-02-27/gemini-3.1-pro/execution-dashboard-scaffold.tsx` (contains inline stubs for FE-6.2/6.3/6.4 — split into separate files) | Split layout: timeline column (w-72) + detail panel; selecting timeline node shows detail; SSE events update timeline and detail in real-time; pause/resume/cancel controls work; mobile: stacked layout | 3 pts | ui-engineer-enhanced | FE-6.1 through FE-6.5, FE-5.3 |
 | FE-6.7 | SSE Integration | Integrate `useExecutionStream` hook with dashboard state: update stage statuses, append logs, trigger completion | SSE events update UI in real-time; connection reopens on drop; falls back to 30s polling if SSE unavailable; status transitions trigger toast notifications | 2 pts | frontend-developer | FE-6.6, API-3.13 |
 | FE-6.8 | Execution List Pages | Implement `/workflows/executions/page.tsx` (all executions) and `/workflows/[id]/executions/page.tsx` (filtered by workflow) | Table with columns: run ID, workflow name, status badge, started, duration, trigger; filter by status; sort by date; click navigates to dashboard | 2 pts | frontend-developer | FE-5.3 |
 | FE-6.9 | Optimistic Updates | Implement optimistic UI updates per UI Spec Section 6.5: pause/resume/cancel update immediately, roll back on error | Status badge updates instantly on control actions; error triggers rollback + error toast; run button navigates immediately with "Initializing..." status | 1 pt | frontend-developer | FE-6.6 |

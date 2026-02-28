@@ -584,6 +584,82 @@
       ]
     },
     {
+      "id": "workflow",
+      "name": "Workflow Orchestration Engine",
+      "icon": "zap",
+      "tagline": "Design, validate, and execute multi-step agentic workflows",
+      "features": [
+        {
+          "id": "workflow-builder",
+          "name": "Workflow Builder",
+          "description": "Drag-and-drop visual editor for designing complex multi-step agentic workflows with node composition, branching, and parameter binding",
+          "shortDescription": "Visual workflow design",
+          "cliCommand": "skillmeat workflow create",
+          "webPage": "/workflows/builder",
+          "since": "0.5.0",
+          "highlight": true
+        },
+        {
+          "id": "workflow-validation",
+          "name": "Workflow Validation",
+          "description": "Validate workflow schemas, detect cycles, and check agent/MCP compatibility before execution",
+          "shortDescription": "Schema & cycle validation",
+          "cliCommand": "skillmeat workflow validate",
+          "since": "0.5.0"
+        },
+        {
+          "id": "workflow-planning",
+          "name": "Execution Planning",
+          "description": "Generate optimized execution plans with dependency resolution, parallelization strategy, and resource estimation",
+          "shortDescription": "Smart execution planning",
+          "cliCommand": "skillmeat workflow plan",
+          "since": "0.5.0"
+        },
+        {
+          "id": "workflow-execution",
+          "name": "Workflow Execution",
+          "description": "Execute workflows with real-time execution tracking, variable interpolation, and conditional branching",
+          "shortDescription": "Execute with tracking",
+          "cliCommand": "skillmeat workflow run",
+          "since": "0.5.0",
+          "highlight": true
+        },
+        {
+          "id": "execution-dashboard",
+          "name": "Execution Dashboard",
+          "description": "Real-time execution monitoring with timeline visualization, live logs, and execution metrics",
+          "shortDescription": "Real-time monitoring",
+          "webPage": "/executions",
+          "since": "0.5.0"
+        },
+        {
+          "id": "workflow-library",
+          "name": "Workflow Library",
+          "description": "Browse, search, and manage saved workflows with version history and sharing support",
+          "shortDescription": "Saved workflows browser",
+          "webPage": "/workflows",
+          "since": "0.5.0",
+          "highlight": true
+        },
+        {
+          "id": "workflow-versioning",
+          "name": "Workflow Versioning",
+          "description": "Version control for workflows with snapshots, comparisons, and rollback capabilities",
+          "shortDescription": "Version history & rollback",
+          "cliCommand": "skillmeat workflow show",
+          "since": "0.5.0"
+        },
+        {
+          "id": "workflow-export",
+          "name": "Workflow Export",
+          "description": "Export workflows as YAML, JSON, or packaged bundles for sharing and distribution",
+          "shortDescription": "Export as YAML/JSON",
+          "cliCommand": "skillmeat workflow export",
+          "since": "0.5.0"
+        }
+      ]
+    },
+    {
       "id": "interface",
       "name": "Three-Way Interface",
       "icon": "layout",
@@ -663,10 +739,10 @@
     }
   ],
   "stats": {
-    "totalCommands": 116,
-    "commandGroups": 23,
-    "webPages": 25,
-    "apiEndpoints": 160,
-    "modals": 40
+    "totalCommands": 125,
+    "commandGroups": 24,
+    "webPages": 28,
+    "apiEndpoints": 175,
+    "modals": 45
   }
 }

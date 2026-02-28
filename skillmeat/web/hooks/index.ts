@@ -751,3 +751,59 @@ export {
   type DndAnimPhase,
   type DndAnimState,
 } from './use-dnd-animations';
+
+// ============================================================================
+// WORKFLOWS (9 hooks)
+// ============================================================================
+// Workflow definition CRUD, validation, and execution plan generation
+export {
+  workflowKeys,
+  useWorkflows,
+  useWorkflow,
+  useCreateWorkflow,
+  useUpdateWorkflow,
+  useDeleteWorkflow,
+  useDuplicateWorkflow,
+  useValidateWorkflow,
+  usePlanWorkflow,
+} from './use-workflows';
+
+// ============================================================================
+// WORKFLOW EXECUTIONS (10 hooks)
+// ============================================================================
+// Execution lifecycle control, gate approvals, and real-time SSE streaming
+export {
+  executionKeys,
+  useWorkflowExecutions,
+  useWorkflowExecution,
+  useRunWorkflow,
+  usePauseExecution,
+  useResumeExecution,
+  useCancelExecution,
+  useBatchPauseExecutions,
+  useBatchResumeExecutions,
+  useBatchCancelExecutions,
+  useApproveGate,
+  useRejectGate,
+  useExecutionStream,
+  type ExecutionSseEvent,
+  type UseExecutionStreamResult,
+} from './use-workflow-executions';
+
+// Multi-select state management for the All Executions page
+export {
+  useExecutionSelection,
+  type UseExecutionSelectionReturn,
+} from './use-execution-selection';
+
+// ============================================================================
+// WORKFLOW BUILDER (1 hook)
+// ============================================================================
+// Local useReducer-based state for the Workflow Builder page (create + edit modes)
+export {
+  useWorkflowBuilder,
+  builderReducer,
+  type BuilderState,
+  type BuilderAction,
+  type UseWorkflowBuilderReturn,
+} from './use-workflow-builder';

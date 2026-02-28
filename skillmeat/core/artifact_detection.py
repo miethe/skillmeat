@@ -111,6 +111,7 @@ class ArtifactType(str, Enum):
     AGENT = "agent"
     HOOK = "hook"
     MCP = "mcp"
+    WORKFLOW = "workflow"
 
     # Composite artifact types (composite-artifact-infrastructure-v1)
     COMPOSITE = "composite"
@@ -125,7 +126,7 @@ class ArtifactType(str, Enum):
     @classmethod
     def primary_types(cls) -> List["ArtifactType"]:
         """Return list of primary (deployable, single-artifact) types."""
-        return [cls.SKILL, cls.COMMAND, cls.AGENT, cls.HOOK, cls.MCP]
+        return [cls.SKILL, cls.COMMAND, cls.AGENT, cls.HOOK, cls.MCP, cls.WORKFLOW]
 
     @classmethod
     def composite_types(cls) -> List["ArtifactType"]:
@@ -480,6 +481,14 @@ ARTIFACT_SIGNATURES: Dict[ArtifactType, ArtifactSignature] = {
         manifest_names={".mcp.json", "mcp.json"},
         allowed_nesting=False,
     ),
+    ArtifactType.WORKFLOW: ArtifactSignature(
+        artifact_type=ArtifactType.WORKFLOW,
+        container_names={"workflows", "workflow", "claude-workflows"},
+        is_directory=True,  # Workflows are directory-based artifacts
+        requires_manifest=True,
+        manifest_names={"WORKFLOW.yaml", "WORKFLOW.json", "workflow.yaml", "workflow.json"},
+        allowed_nesting=False,
+    ),
     ArtifactType.COMPOSITE: ArtifactSignature(
         artifact_type=ArtifactType.COMPOSITE,
         container_names={"composites", "composite", "plugins", "plugin", "claude-composites"},
@@ -497,6 +506,7 @@ CONTAINER_ALIASES: Dict[ArtifactType, Set[str]] = {
     ArtifactType.AGENT: {"agents", "agent", "subagents", "claude-agents"},
     ArtifactType.HOOK: {"hooks", "hook", "claude-hooks"},
     ArtifactType.MCP: {"mcp", "mcp-servers", "servers", "mcp_servers", "claude-mcp"},
+    ArtifactType.WORKFLOW: {"workflows", "workflow", "claude-workflows"},
     ArtifactType.COMPOSITE: {"composites", "composite", "plugins", "plugin", "claude-composites"},
 }
 
@@ -513,6 +523,7 @@ MANIFEST_FILES: Dict[ArtifactType, Set[str]] = {
     ArtifactType.AGENT: {"AGENT.md", "agent.md"},
     ArtifactType.HOOK: {"settings.json"},
     ArtifactType.MCP: {".mcp.json", "mcp.json"},
+    ArtifactType.WORKFLOW: {"WORKFLOW.yaml", "WORKFLOW.json", "workflow.yaml", "workflow.json"},
     ArtifactType.COMPOSITE: {"COMPOSITE.md", "composite.md", "PLUGIN.md", "plugin.md"},
 }
 
@@ -523,6 +534,7 @@ CANONICAL_CONTAINERS: Dict[ArtifactType, str] = {
     ArtifactType.AGENT: "agents",
     ArtifactType.HOOK: "hooks",
     ArtifactType.MCP: "mcp",
+    ArtifactType.WORKFLOW: "workflows",
     ArtifactType.COMPOSITE: "composites",
 }
 

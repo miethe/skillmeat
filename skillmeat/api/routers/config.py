@@ -95,6 +95,9 @@ async def get_detection_patterns() -> DetectionPatternsResponse:
       When False, the `/api/v1/deployment-sets` endpoints return 404.
     - **composite_artifacts_enabled**: Controls composite artifact detection UI.
     - **memory_context_enabled**: Controls Memory & Context Intelligence System UI.
+    - **workflow_engine_enabled**: Controls Workflow Orchestration Engine UI.
+      When False, the `/api/v1/workflows` and `/api/v1/workflow-executions` endpoints
+      return 404 and CLI workflow commands display a coming-soon message.
     """,
 )
 async def get_feature_flags(settings: SettingsDep) -> FeatureFlagsResponse:
@@ -113,4 +116,5 @@ async def get_feature_flags(settings: SettingsDep) -> FeatureFlagsResponse:
         composite_artifacts_enabled=settings.composite_artifacts_enabled,
         deployment_sets_enabled=settings.deployment_sets_enabled,
         memory_context_enabled=settings.memory_context_enabled,
+        workflow_engine_enabled=settings.workflow_engine_enabled,
     )
