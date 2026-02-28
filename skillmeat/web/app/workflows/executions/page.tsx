@@ -438,7 +438,7 @@ export default function AllExecutionsPage() {
                       Trigger
                     </span>
                   </TableHead>
-                  <TableHead className="text-xs text-muted-foreground text-right pr-4">
+                  <TableHead className="w-24 text-xs text-muted-foreground">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -527,7 +527,7 @@ export default function AllExecutionsPage() {
 
                         {/* Actions */}
                         <TableCell
-                          className="pr-4 text-right"
+                          className="w-24"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <ExecutionRowActions execution={execution} />
