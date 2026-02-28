@@ -6,11 +6,12 @@ including GitHub Personal Access Token configuration.
 
 import logging
 import re
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, status
 
 from skillmeat.api.dependencies import ConfigManagerDep
+from skillmeat.api.schemas.entity_type_config import EntityTypeConfigResponse
 from skillmeat.api.schemas.platform_defaults import (
     AllPlatformDefaultsResponse,
     CustomContextConfigResponse,
@@ -30,6 +31,7 @@ from skillmeat.api.schemas.settings import (
     SimilarityThresholdsResponse,
     SimilarityThresholdsUpdateRequest,
 )
+from skillmeat.cache.models import EntityTypeConfig, get_session
 from skillmeat.core.github_client import (
     GitHubAuthError,
     GitHubClientWrapper,
@@ -830,3 +832,46 @@ async def update_similarity_colors(
     colors = config.get_similarity_colors()
     logger.info(f"Updated similarity colors: {updates}")
     return SimilarityColorsResponse(**colors)
+
+
+# ---------------------------------------------------------------------------
+# Entity type configuration endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/entity-type-configs",
+    response_model=List[EntityTypeConfigResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List all entity type configurations",
+    description="""
+    Returns all ``EntityTypeConfig`` rows ordered by ``sort_order``.
+
+    Built-in types (skill, command, agent, mcp, hook) are always present.
+    User-created custom types are included when they have been added.
+    """,
+)
+async def list_entity_type_configs() -> List[EntityTypeConfigResponse]:
+    """Return all entity type configurations ordered by sort_order.
+
+    Returns:
+        List of entity type configuration records, ascending by sort_order.
+
+    Raises:
+        HTTPException 500: If the database query fails unexpectedly.
+    """
+    session = get_session()
+    try:
+        configs = (
+            session.query(EntityTypeConfig)
+            .order_by(EntityTypeConfig.sort_order)
+            .all()
+        )
+        logger.debug(f"Retrieved {len(configs)} entity type configs")
+        return [EntityTypeConfigResponse.model_validate(c) for c in configs]
+    except Exception as exc:
+        logger.exception(f"Failed to list entity type configs: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve entity type configurations.",
+        ) from exc

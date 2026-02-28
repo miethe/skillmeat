@@ -16,8 +16,8 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 4
-completed_tasks: 0
-in_progress_tasks: 1
+completed_tasks: 1
+in_progress_tasks: 2
 blocked_tasks: 0
 at_risk_tasks: 0
 owners:
@@ -29,7 +29,7 @@ tasks:
   description: Add EntityTypeConfig SQLAlchemy model, Alembic migration creating entity_type_configs
     table, and idempotent seeding logic for 5 built-in rows from platform_defaults.py
     and context_entity.py
-  status: in_progress
+  status: completed
   assigned_to:
   - data-layer-expert
   dependencies: []
@@ -39,7 +39,7 @@ tasks:
   description: Refactor validate_context_entity() to load type config from DB with
     60s in-memory TTL; preserve hardcoded dispatch map as fallback when entity_type_config_enabled=false
     or DB unavailable
-  status: pending
+  status: in_progress
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -50,7 +50,7 @@ tasks:
   description: Add GET /api/v1/settings/entity-type-configs returning all EntityTypeConfig
     rows as DTOs with EntityTypeConfigResponse Pydantic schema; register sub-route
     in settings.py
-  status: pending
+  status: in_progress
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -113,7 +113,7 @@ files_modified:
 - skillmeat/core/validators/context_entity.py
 - skillmeat/api/routers/settings.py
 - skillmeat/api/schemas/context_entity.py
-progress: 0
+progress: 25
 updated: '2026-02-28'
 ---
 

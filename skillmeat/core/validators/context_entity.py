@@ -9,17 +9,127 @@ Entity Types:
 - RuleFile: .claude/rules/ files (markdown with path scope comments)
 - ContextFile: .claude/context/ files (YAML frontmatter with references + markdown)
 - ProgressTemplate: .claude/progress/ files (YAML frontmatter + markdown hybrid)
+
+DB-backed validation:
+When ENTITY_TYPE_CONFIG_ENABLED is True, entity type configuration is loaded
+from the ``entity_type_configs`` DB table with a 60-second in-memory TTL cache.
+Falls back to the hardcoded dispatch map on DB errors or when the flag is False.
+
+Call ``invalidate_entity_type_cache()`` to force immediate cache refresh after
+writing to the ``entity_type_configs`` table.
 """
 
+import logging
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 import yaml
 
 from skillmeat.core.path_resolver import DEFAULT_PROFILE_ROOTS
 from skillmeat.core.validators.context_path_validator import validate_context_path
+
+logger = logging.getLogger(__name__)
+
+# =============================================================================
+# Feature flag
+# =============================================================================
+
+#: Set to True to enable DB-backed entity type config loading with TTL cache.
+#: When False (default), the hardcoded dispatch map is always used.
+ENTITY_TYPE_CONFIG_ENABLED: bool = False
+
+# =============================================================================
+# TTL cache for EntityTypeConfig rows
+# =============================================================================
+
+_CACHE_TTL_SECONDS: int = 60
+
+# Cache state — keyed by slug, value is the EntityTypeConfig row as a dict.
+# None means the cache has never been populated.
+_entity_type_cache: Optional[Dict[str, Any]] = None
+_entity_type_cache_loaded_at: float = 0.0
+
+
+def invalidate_entity_type_cache() -> None:
+    """Immediately invalidate the in-memory entity type cache.
+
+    Call this after writing to the ``entity_type_configs`` table so the next
+    call to ``validate_context_entity`` reloads from the DB.
+    """
+    global _entity_type_cache, _entity_type_cache_loaded_at
+    _entity_type_cache = None
+    _entity_type_cache_loaded_at = 0.0
+    logger.debug("entity_type_cache: invalidated")
+
+
+def _is_cache_fresh() -> bool:
+    """Return True if the cache is populated and within the TTL window."""
+    if _entity_type_cache is None:
+        return False
+    return (time.time() - _entity_type_cache_loaded_at) < _CACHE_TTL_SECONDS
+
+
+def _load_entity_type_cache() -> Optional[Dict[str, Any]]:
+    """Load all EntityTypeConfig rows from the DB into a slug-keyed dict.
+
+    Returns None on any DB error, which triggers fallback to hardcoded validators.
+    """
+    global _entity_type_cache, _entity_type_cache_loaded_at
+
+    try:
+        # Import here to avoid circular imports at module load time.
+        from skillmeat.cache.models import EntityTypeConfig, get_session  # noqa: PLC0415
+
+        session = get_session()
+        try:
+            rows = session.query(EntityTypeConfig).all()
+            cache: Dict[str, Any] = {}
+            for row in rows:
+                cache[row.slug] = {
+                    "slug": row.slug,
+                    "display_name": row.display_name,
+                    "path_prefix": row.path_prefix,
+                    "required_frontmatter_keys": row.required_frontmatter_keys or [],
+                    "optional_frontmatter_keys": row.optional_frontmatter_keys or [],
+                    "validation_rules": row.validation_rules or {},
+                }
+            _entity_type_cache = cache
+            _entity_type_cache_loaded_at = time.time()
+            logger.debug(
+                "entity_type_cache: loaded %d type(s) from DB", len(cache)
+            )
+            return cache
+        finally:
+            session.close()
+    except Exception as exc:
+        logger.warning(
+            "entity_type_cache: DB load failed, falling back to hardcoded validators: %s",
+            exc,
+        )
+        return None
+
+
+def _get_entity_type_config(entity_type: str) -> Optional[Dict[str, Any]]:
+    """Return the DB config dict for entity_type, or None if unavailable.
+
+    Respects the 60-second TTL cache.  Returns None on cache miss or DB error.
+    """
+    if not _is_cache_fresh():
+        cache = _load_entity_type_cache()
+    else:
+        cache = _entity_type_cache
+
+    if cache is None:
+        return None
+    return cache.get(entity_type)
+
+
+# =============================================================================
+# Data classes
+# =============================================================================
 
 
 @dataclass
@@ -38,6 +148,11 @@ class ValidationError:
 
     def __str__(self) -> str:
         return f"[{self.severity.upper()}] {self.field}: {self.message}"
+
+
+# =============================================================================
+# Shared helpers
+# =============================================================================
 
 
 def _validate_path_security(
@@ -134,6 +249,104 @@ def _extract_frontmatter(content: str) -> tuple[Optional[Dict], str]:
         return frontmatter, remaining_content
     except yaml.YAMLError:
         return None, content
+
+
+# =============================================================================
+# DB-backed validation path
+# =============================================================================
+
+
+def _validate_from_db_config(
+    config: Dict[str, Any],
+    content: str,
+    path: str,
+    allowed_prefixes: Optional[Sequence[str]] = None,
+) -> List[str]:
+    """Run validation using an EntityTypeConfig dict loaded from DB.
+
+    Implements the generic validation logic driven by the config's
+    ``required_frontmatter_keys``, ``validation_rules``, and ``path_prefix``.
+
+    Args:
+        config: Dict with keys ``path_prefix``, ``required_frontmatter_keys``,
+                ``validation_rules`` (as loaded by ``_get_entity_type_config``).
+        content: File content to validate.
+        path: File path to validate.
+        allowed_prefixes: Optional path prefix whitelist.
+
+    Returns:
+        List of error messages (empty if valid).
+    """
+    errors: List[str] = []
+
+    # Path security
+    path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
+    errors.extend(path_errors)
+
+    rules: Dict[str, Any] = config.get("validation_rules") or {}
+    path_prefix: Optional[str] = config.get("path_prefix")
+
+    # Enforce path prefix when the rule requires it
+    if rules.get("path_prefix_required") and path_prefix:
+        # Build candidate prefixes from allowed_prefixes roots + config path_prefix
+        suffix = path_prefix.lstrip("/").rstrip("/") + "/"
+        candidate_prefixes = _entity_prefixes(suffix, allowed_prefixes=allowed_prefixes)
+        # Also accept the raw path_prefix itself (for tests that supply absolute paths)
+        candidate_prefixes.append(path_prefix.rstrip("/") + "/")
+        if not any(path.startswith(p) for p in candidate_prefixes):
+            errors.append(
+                f"Path must start with one of: {', '.join(candidate_prefixes)}"
+            )
+
+    # Content empty check
+    if not content or not content.strip():
+        errors.append("Content cannot be empty")
+        return errors
+
+    min_len: int = rules.get("min_content_length", 0)
+    frontmatter_required: bool = bool(rules.get("frontmatter_required", False))
+
+    # Extract frontmatter
+    frontmatter, remaining = _extract_frontmatter(content)
+
+    if frontmatter_required and frontmatter is None:
+        errors.append("YAML frontmatter is required but not found")
+        return errors
+
+    # Validate required frontmatter keys
+    required_keys: List[str] = config.get("required_frontmatter_keys") or []
+    if frontmatter is not None:
+        for key in required_keys:
+            if key not in frontmatter:
+                errors.append(f"Frontmatter must include '{key}' field")
+
+        # Special rule: references must be a list
+        if rules.get("references_must_be_list") and "references" in frontmatter:
+            if not isinstance(frontmatter.get("references"), list):
+                errors.append("'references' field must be a list")
+
+        # Special rule: type field must equal a specific value
+        type_must_equal: Optional[str] = rules.get("type_must_equal")
+        if type_must_equal is not None and "type" in frontmatter:
+            if frontmatter.get("type") != type_must_equal:
+                errors.append(
+                    f"Frontmatter 'type' field must be '{type_must_equal}'"
+                )
+
+    # Check content after frontmatter is not empty (when frontmatter was present)
+    if frontmatter is not None and not remaining.strip():
+        errors.append("Markdown content after frontmatter cannot be empty")
+
+    # Minimum length check (on full stripped content)
+    if min_len > 0 and len(content.strip()) < min_len:
+        errors.append("Content too short to be valid markdown")
+
+    return errors
+
+
+# =============================================================================
+# Hardcoded validators (fallback path)
+# =============================================================================
 
 
 def validate_project_config(
@@ -396,6 +609,22 @@ def validate_progress_template(
     return errors
 
 
+# Hardcoded dispatch map — used when ENTITY_TYPE_CONFIG_ENABLED is False or
+# when the DB is unavailable.
+_HARDCODED_VALIDATORS = {
+    "project_config": validate_project_config,
+    "spec_file": validate_spec_file,
+    "rule_file": validate_rule_file,
+    "context_file": validate_context_file,
+    "progress_template": validate_progress_template,
+}
+
+
+# =============================================================================
+# Public entry point
+# =============================================================================
+
+
 def validate_context_entity(
     entity_type: str,
     content: str,
@@ -404,11 +633,19 @@ def validate_context_entity(
 ) -> List[str]:
     """Unified validation function for all context entity types.
 
+    When ``ENTITY_TYPE_CONFIG_ENABLED`` is True, loads configuration from the
+    ``entity_type_configs`` DB table (60-second in-memory TTL cache) and
+    delegates to ``_validate_from_db_config``.
+
+    Falls back to the hardcoded dispatch map when the flag is False or when the
+    DB query fails (with a WARNING log).
+
     Args:
         entity_type: Type of entity ("project_config", "spec_file", "rule_file",
                      "context_file", "progress_template")
         content: File content to validate
         path: File path (for path validation and type checking)
+        allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
         List of error messages (empty if valid)
@@ -416,19 +653,26 @@ def validate_context_entity(
     Raises:
         ValueError: If entity_type is not recognized
     """
-    validators = {
-        "project_config": validate_project_config,
-        "spec_file": validate_spec_file,
-        "rule_file": validate_rule_file,
-        "context_file": validate_context_file,
-        "progress_template": validate_progress_template,
-    }
+    # ------------------------------------------------------------------
+    # DB-backed path
+    # ------------------------------------------------------------------
+    if ENTITY_TYPE_CONFIG_ENABLED:
+        db_config = _get_entity_type_config(entity_type)
+        if db_config is not None:
+            return _validate_from_db_config(
+                db_config, content, path, allowed_prefixes=allowed_prefixes
+            )
+        # _get_entity_type_config already logged the warning on DB failure.
+        # Fall through to hardcoded validators.
 
-    validator = validators.get(entity_type)
+    # ------------------------------------------------------------------
+    # Hardcoded fallback path
+    # ------------------------------------------------------------------
+    validator = _HARDCODED_VALIDATORS.get(entity_type)
     if validator is None:
         raise ValueError(
             f"Unknown entity type: {entity_type}. "
-            f"Must be one of: {', '.join(validators.keys())}"
+            f"Must be one of: {', '.join(_HARDCODED_VALIDATORS.keys())}"
         )
 
     return validator(content, path, allowed_prefixes=allowed_prefixes)
