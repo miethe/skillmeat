@@ -18,10 +18,70 @@
 
 import type {
   WorkflowExecution,
+  StageExecution,
   ExecutionFilters,
   RunWorkflowRequest,
   GateRejectRequest,
 } from '@/types/workflow';
+
+// ---------------------------------------------------------------------------
+// Field mappers (snake_case backend → camelCase frontend)
+// ---------------------------------------------------------------------------
+
+function computeDurationMs(startedAt?: string, completedAt?: string): number | undefined {
+  if (!startedAt || !completedAt) return undefined;
+  const diff = new Date(completedAt).getTime() - new Date(startedAt).getTime();
+  return diff >= 0 ? diff : undefined;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapStep(raw: Record<string, any>): StageExecution {
+  const startedAt: string | undefined = raw.started_at ?? undefined;
+  const completedAt: string | undefined = raw.completed_at ?? undefined;
+  return {
+    id: raw.id,
+    stageId: raw.stage_id,
+    stageName: raw.stage_name,
+    stageType: raw.stage_type,
+    batchIndex: raw.batch_index,
+    status: raw.status,
+    startedAt,
+    completedAt,
+    durationMs: computeDurationMs(startedAt, completedAt),
+    errorMessage: raw.error_message ?? undefined,
+    agentUsed: undefined,
+    logs: [],
+    outputs: {},
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapExecution(raw: Record<string, any>): WorkflowExecution {
+  const startedAt: string | undefined = raw.started_at ?? undefined;
+  const completedAt: string | undefined = raw.completed_at ?? undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stages: StageExecution[] = (raw.steps ?? []).map((s: Record<string, any>) => mapStep(s));
+
+  const runningIndex = stages.findIndex((s) => s.status === 'running');
+  const completedCount = stages.filter((s) => s.status === 'completed').length;
+  const progressPct = stages.length > 0 ? (completedCount / stages.length) * 100 : 0;
+
+  return {
+    id: raw.id,
+    workflowId: raw.workflow_id,
+    workflowName: undefined,
+    status: raw.status,
+    trigger: 'manual',
+    parameters: raw.parameters ?? undefined,
+    startedAt,
+    completedAt,
+    durationMs: computeDurationMs(startedAt, completedAt),
+    stages,
+    currentStageIndex: runningIndex,
+    progressPct,
+    errorMessage: raw.error_message ?? undefined,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Config
@@ -82,7 +142,9 @@ export async function fetchWorkflowExecutions(
     throw new Error(`Failed to fetch workflow executions: ${msg}`);
   }
 
-  return response.json();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data: Record<string, any>[] = await response.json();
+  return data.map(mapExecution);
 }
 
 // ---------------------------------------------------------------------------
@@ -102,7 +164,7 @@ export async function fetchWorkflowExecution(id: string): Promise<WorkflowExecut
     throw new Error(`Failed to fetch workflow execution ${id}: ${msg}`);
   }
 
-  return response.json();
+  return mapExecution(await response.json());
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +200,7 @@ export async function runWorkflow(
     throw new Error(`Failed to start workflow execution: ${msg}`);
   }
 
-  return response.json();
+  return mapExecution(await response.json());
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +223,7 @@ export async function pauseExecution(id: string): Promise<WorkflowExecution> {
     throw new Error(`Failed to pause execution ${id}: ${msg}`);
   }
 
-  return response.json();
+  return mapExecution(await response.json());
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +246,7 @@ export async function resumeExecution(id: string): Promise<WorkflowExecution> {
     throw new Error(`Failed to resume execution ${id}: ${msg}`);
   }
 
-  return response.json();
+  return mapExecution(await response.json());
 }
 
 // ---------------------------------------------------------------------------
@@ -207,7 +269,7 @@ export async function cancelExecution(id: string): Promise<WorkflowExecution> {
     throw new Error(`Failed to cancel execution ${id}: ${msg}`);
   }
 
-  return response.json();
+  return mapExecution(await response.json());
 }
 
 // ---------------------------------------------------------------------------
