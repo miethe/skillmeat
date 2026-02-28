@@ -17,6 +17,13 @@ Falls back to the hardcoded dispatch map on DB errors or when the flag is False.
 
 Call ``invalidate_entity_type_cache()`` to force immediate cache refresh after
 writing to the ``entity_type_configs`` table.
+
+Error format:
+All validators return a list of dicts with ``field`` and ``hint`` keys::
+
+    [{"field": "content", "hint": "Add frontmatter with 'title' key"}]
+
+Valid ``field`` values: ``content``, ``path_pattern``, ``frontmatter``, ``type``.
 """
 
 import logging
@@ -25,6 +32,9 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
+
+# Type alias for structured validation errors returned by all validators.
+ValidationErrorDict = Dict[str, str]
 
 import yaml
 
@@ -158,7 +168,7 @@ class ValidationError:
 def _validate_path_security(
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Validate path for security issues.
 
     Prevents path traversal attacks by checking for:
@@ -168,11 +178,13 @@ def _validate_path_security(
 
     Args:
         path: File path to validate
+        allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
-        List of error messages (empty if valid)
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).
     """
-    errors = []
+    errors: List[ValidationErrorDict] = []
 
     try:
         validate_context_path(
@@ -182,7 +194,7 @@ def _validate_path_security(
             else [f"{root.rstrip('/')}/" for root in DEFAULT_PROFILE_ROOTS],
         )
     except ValueError as exc:
-        errors.append(str(exc))
+        errors.append({"field": "path_pattern", "hint": str(exc)})
 
     return errors
 
@@ -261,7 +273,7 @@ def _validate_from_db_config(
     content: str,
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Run validation using an EntityTypeConfig dict loaded from DB.
 
     Implements the generic validation logic driven by the config's
@@ -275,9 +287,10 @@ def _validate_from_db_config(
         allowed_prefixes: Optional path prefix whitelist.
 
     Returns:
-        List of error messages (empty if valid).
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).
     """
-    errors: List[str] = []
+    errors: List[ValidationErrorDict] = []
 
     # Path security
     path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
@@ -294,13 +307,14 @@ def _validate_from_db_config(
         # Also accept the raw path_prefix itself (for tests that supply absolute paths)
         candidate_prefixes.append(path_prefix.rstrip("/") + "/")
         if not any(path.startswith(p) for p in candidate_prefixes):
-            errors.append(
-                f"Path must start with one of: {', '.join(candidate_prefixes)}"
-            )
+            errors.append({
+                "field": "path_pattern",
+                "hint": f"Path must start with one of: {', '.join(candidate_prefixes)}",
+            })
 
     # Content empty check
     if not content or not content.strip():
-        errors.append("Content cannot be empty")
+        errors.append({"field": "content", "hint": "Content cannot be empty"})
         return errors
 
     min_len: int = rules.get("min_content_length", 0)
@@ -310,7 +324,10 @@ def _validate_from_db_config(
     frontmatter, remaining = _extract_frontmatter(content)
 
     if frontmatter_required and frontmatter is None:
-        errors.append("YAML frontmatter is required but not found")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "YAML frontmatter is required but not found",
+        })
         return errors
 
     # Validate required frontmatter keys
@@ -318,28 +335,41 @@ def _validate_from_db_config(
     if frontmatter is not None:
         for key in required_keys:
             if key not in frontmatter:
-                errors.append(f"Frontmatter must include '{key}' field")
+                errors.append({
+                    "field": "frontmatter",
+                    "hint": f"Frontmatter must include '{key}' field",
+                })
 
         # Special rule: references must be a list
         if rules.get("references_must_be_list") and "references" in frontmatter:
             if not isinstance(frontmatter.get("references"), list):
-                errors.append("'references' field must be a list")
+                errors.append({
+                    "field": "frontmatter",
+                    "hint": "'references' field must be a list",
+                })
 
         # Special rule: type field must equal a specific value
         type_must_equal: Optional[str] = rules.get("type_must_equal")
         if type_must_equal is not None and "type" in frontmatter:
             if frontmatter.get("type") != type_must_equal:
-                errors.append(
-                    f"Frontmatter 'type' field must be '{type_must_equal}'"
-                )
+                errors.append({
+                    "field": "type",
+                    "hint": f"Frontmatter 'type' field must be '{type_must_equal}'",
+                })
 
     # Check content after frontmatter is not empty (when frontmatter was present)
     if frontmatter is not None and not remaining.strip():
-        errors.append("Markdown content after frontmatter cannot be empty")
+        errors.append({
+            "field": "content",
+            "hint": "Markdown content after frontmatter cannot be empty",
+        })
 
     # Minimum length check (on full stripped content)
     if min_len > 0 and len(content.strip()) < min_len:
-        errors.append("Content too short to be valid markdown")
+        errors.append({
+            "field": "content",
+            "hint": "Content too short to be valid markdown",
+        })
 
     return errors
 
@@ -353,7 +383,7 @@ def validate_project_config(
     content: str,
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Validate ProjectConfig entity (CLAUDE.md).
 
     Requirements:
@@ -365,11 +395,13 @@ def validate_project_config(
     Args:
         content: File content
         path: File path (for path validation)
+        allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
-        List of error messages (empty if valid)
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).
     """
-    errors = []
+    errors: List[ValidationErrorDict] = []
 
     # Validate path security
     path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
@@ -377,7 +409,7 @@ def validate_project_config(
 
     # Must not be empty
     if not content or not content.strip():
-        errors.append("Content cannot be empty")
+        errors.append({"field": "content", "hint": "Content cannot be empty"})
         return errors
 
     # Extract frontmatter (optional, just validate if present)
@@ -389,7 +421,10 @@ def validate_project_config(
 
     # Basic markdown validation: should have some text
     if len(content.strip()) < 10:
-        errors.append("Content too short to be valid markdown")
+        errors.append({
+            "field": "content",
+            "hint": "Content too short to be valid markdown",
+        })
 
     return errors
 
@@ -398,7 +433,7 @@ def validate_spec_file(
     content: str,
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Validate SpecFile entity (.claude/specs/).
 
     Requirements:
@@ -410,11 +445,13 @@ def validate_spec_file(
     Args:
         content: File content
         path: File path
+        allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
-        List of error messages (empty if valid)
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).
     """
-    errors = []
+    errors: List[ValidationErrorDict] = []
 
     # Validate path security
     path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
@@ -423,27 +460,39 @@ def validate_spec_file(
     # Path must start with {profile_root}/specs/
     prefixes = _entity_prefixes("specs/", allowed_prefixes=allowed_prefixes)
     if not any(path.startswith(prefix) for prefix in prefixes):
-        errors.append(f"Path must start with one of: {', '.join(prefixes)}")
+        errors.append({
+            "field": "path_pattern",
+            "hint": f"Path must start with one of: {', '.join(prefixes)}",
+        })
 
     # Must not be empty
     if not content or not content.strip():
-        errors.append("Content cannot be empty")
+        errors.append({"field": "content", "hint": "Content cannot be empty"})
         return errors
 
     # Extract frontmatter (REQUIRED)
     frontmatter, remaining = _extract_frontmatter(content)
 
     if frontmatter is None:
-        errors.append("YAML frontmatter is required but not found")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "YAML frontmatter is required but not found — add frontmatter with 'title' key",
+        })
         return errors
 
     # Must have 'title' field
     if "title" not in frontmatter:
-        errors.append("Frontmatter must include 'title' field")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "Frontmatter must include 'title' field",
+        })
 
     # Validate remaining content is not empty
     if not remaining.strip():
-        errors.append("Markdown content after frontmatter cannot be empty")
+        errors.append({
+            "field": "content",
+            "hint": "Markdown content after frontmatter cannot be empty",
+        })
 
     return errors
 
@@ -452,7 +501,7 @@ def validate_rule_file(
     content: str,
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Validate RuleFile entity (.claude/rules/).
 
     Requirements:
@@ -463,11 +512,13 @@ def validate_rule_file(
     Args:
         content: File content
         path: File path
+        allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
-        List of error messages (empty if valid)
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).
     """
-    errors = []
+    errors: List[ValidationErrorDict] = []
 
     # Validate path security
     path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
@@ -476,11 +527,14 @@ def validate_rule_file(
     # Path must start with {profile_root}/rules/
     prefixes = _entity_prefixes("rules/", allowed_prefixes=allowed_prefixes)
     if not any(path.startswith(prefix) for prefix in prefixes):
-        errors.append(f"Path must start with one of: {', '.join(prefixes)}")
+        errors.append({
+            "field": "path_pattern",
+            "hint": f"Path must start with one of: {', '.join(prefixes)}",
+        })
 
     # Must not be empty
     if not content or not content.strip():
-        errors.append("Content cannot be empty")
+        errors.append({"field": "content", "hint": "Content cannot be empty"})
         return errors
 
     # Check for path scope comment (optional but recommended)
@@ -493,7 +547,10 @@ def validate_rule_file(
 
     # Basic markdown validation
     if len(content.strip()) < 10:
-        errors.append("Content too short to be valid markdown")
+        errors.append({
+            "field": "content",
+            "hint": "Content too short to be valid markdown",
+        })
 
     return errors
 
@@ -502,7 +559,7 @@ def validate_context_file(
     content: str,
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Validate ContextFile entity (.claude/context/).
 
     Requirements:
@@ -513,11 +570,13 @@ def validate_context_file(
     Args:
         content: File content
         path: File path
+        allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
-        List of error messages (empty if valid)
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).
     """
-    errors = []
+    errors: List[ValidationErrorDict] = []
 
     # Validate path security
     path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
@@ -526,29 +585,44 @@ def validate_context_file(
     # Path must start with {profile_root}/context/
     prefixes = _entity_prefixes("context/", allowed_prefixes=allowed_prefixes)
     if not any(path.startswith(prefix) for prefix in prefixes):
-        errors.append(f"Path must start with one of: {', '.join(prefixes)}")
+        errors.append({
+            "field": "path_pattern",
+            "hint": f"Path must start with one of: {', '.join(prefixes)}",
+        })
 
     # Must not be empty
     if not content or not content.strip():
-        errors.append("Content cannot be empty")
+        errors.append({"field": "content", "hint": "Content cannot be empty"})
         return errors
 
     # Extract frontmatter (REQUIRED)
     frontmatter, remaining = _extract_frontmatter(content)
 
     if frontmatter is None:
-        errors.append("YAML frontmatter is required but not found")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "YAML frontmatter is required but not found — add frontmatter with 'references' list",
+        })
         return errors
 
     # Must have 'references' field as a list
     if "references" not in frontmatter:
-        errors.append("Frontmatter must include 'references' field")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "Frontmatter must include 'references' field",
+        })
     elif not isinstance(frontmatter.get("references"), list):
-        errors.append("'references' field must be a list")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "'references' field must be a list",
+        })
 
     # Validate remaining content is not empty
     if not remaining.strip():
-        errors.append("Markdown content after frontmatter cannot be empty")
+        errors.append({
+            "field": "content",
+            "hint": "Markdown content after frontmatter cannot be empty",
+        })
 
     return errors
 
@@ -557,7 +631,7 @@ def validate_progress_template(
     content: str,
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Validate ProgressTemplate entity (.claude/progress/).
 
     Requirements:
@@ -569,11 +643,13 @@ def validate_progress_template(
     Args:
         content: File content
         path: File path
+        allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
-        List of error messages (empty if valid)
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).
     """
-    errors = []
+    errors: List[ValidationErrorDict] = []
 
     # Validate path security
     path_errors = _validate_path_security(path, allowed_prefixes=allowed_prefixes)
@@ -582,29 +658,44 @@ def validate_progress_template(
     # Path must start with {profile_root}/progress/
     prefixes = _entity_prefixes("progress/", allowed_prefixes=allowed_prefixes)
     if not any(path.startswith(prefix) for prefix in prefixes):
-        errors.append(f"Path must start with one of: {', '.join(prefixes)}")
+        errors.append({
+            "field": "path_pattern",
+            "hint": f"Path must start with one of: {', '.join(prefixes)}",
+        })
 
     # Must not be empty
     if not content or not content.strip():
-        errors.append("Content cannot be empty")
+        errors.append({"field": "content", "hint": "Content cannot be empty"})
         return errors
 
     # Extract frontmatter (REQUIRED)
     frontmatter, remaining = _extract_frontmatter(content)
 
     if frontmatter is None:
-        errors.append("YAML frontmatter is required but not found")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "YAML frontmatter is required but not found — add frontmatter with 'type: progress'",
+        })
         return errors
 
     # Must have 'type: progress' field
     if "type" not in frontmatter:
-        errors.append("Frontmatter must include 'type' field")
+        errors.append({
+            "field": "frontmatter",
+            "hint": "Frontmatter must include 'type' field",
+        })
     elif frontmatter.get("type") != "progress":
-        errors.append("Frontmatter 'type' field must be 'progress'")
+        errors.append({
+            "field": "type",
+            "hint": "Frontmatter 'type' field must be 'progress'",
+        })
 
     # Validate remaining content is not empty
     if not remaining.strip():
-        errors.append("Markdown content after frontmatter cannot be empty")
+        errors.append({
+            "field": "content",
+            "hint": "Markdown content after frontmatter cannot be empty",
+        })
 
     return errors
 
@@ -630,7 +721,7 @@ def validate_context_entity(
     content: str,
     path: str,
     allowed_prefixes: Optional[Sequence[str]] = None,
-) -> List[str]:
+) -> List[ValidationErrorDict]:
     """Unified validation function for all context entity types.
 
     When ``ENTITY_TYPE_CONFIG_ENABLED`` is True, loads configuration from the
@@ -648,7 +739,9 @@ def validate_context_entity(
         allowed_prefixes: Optional sequence of allowed path prefixes
 
     Returns:
-        List of error messages (empty if valid)
+        List of structured error dicts with ``field`` and ``hint`` keys
+        (empty if valid).  Valid ``field`` values are: ``content``,
+        ``path_pattern``, ``frontmatter``, ``type``.
 
     Raises:
         ValueError: If entity_type is not recognized

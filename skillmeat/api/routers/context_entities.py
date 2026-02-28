@@ -399,7 +399,7 @@ async def create_context_entity(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
+            detail=[{"field": "path_pattern", "hint": str(exc)}],
         ) from exc
 
     # Validate content using validators from TASK-1.3
@@ -413,7 +413,7 @@ async def create_context_entity(
     if validation_errors:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Content validation failed: {'; '.join(validation_errors)}",
+            detail=validation_errors,
         )
 
     # Compute content hash
@@ -643,7 +643,7 @@ async def update_context_entity(
             except ValueError as exc:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=str(exc),
+                    detail=[{"field": "path_pattern", "hint": str(exc)}],
                 ) from exc
             artifact.path_pattern = request.path_pattern
         if request.description is not None:
@@ -671,7 +671,7 @@ async def update_context_entity(
                 session.rollback()
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Content validation failed: {'; '.join(validation_errors)}",
+                    detail=validation_errors,
                 )
 
         # Recompute content hash if content changed
