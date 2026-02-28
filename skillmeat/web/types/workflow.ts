@@ -779,6 +779,37 @@ export interface GateRejectRequest {
   reason?: string;
 }
 
+/**
+ * Request body for batch execution control endpoints.
+ *
+ * POST /api/v1/workflow-executions/batch/pause
+ * POST /api/v1/workflow-executions/batch/resume
+ * POST /api/v1/workflow-executions/batch/cancel
+ */
+export interface BatchExecutionRequest {
+  executionIds: string[];
+}
+
+/**
+ * Per-execution result within a BatchExecutionResponse.
+ */
+export interface BatchExecutionResult {
+  executionId: string;
+  success: boolean;
+  status?: ExecutionStatus;
+  error?: string;
+}
+
+/**
+ * Response from a batch execution control endpoint.
+ * Summarises how many executions were successfully acted on and how many failed.
+ */
+export interface BatchExecutionResponse {
+  results: BatchExecutionResult[];
+  succeeded: number;
+  failed: number;
+}
+
 // ============================================================================
 // Response Types
 // ============================================================================

@@ -22,6 +22,8 @@ import type {
   ExecutionFilters,
   RunWorkflowRequest,
   GateRejectRequest,
+  BatchExecutionResponse,
+  ExecutionStatus,
 } from '@/types/workflow';
 
 // ---------------------------------------------------------------------------
@@ -331,4 +333,94 @@ export async function rejectGate(
   }
 
   return response.json();
+}
+
+// ---------------------------------------------------------------------------
+// Batch helpers
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapBatchResponse(raw: Record<string, any>): BatchExecutionResponse {
+  return {
+    results: (raw.results ?? []).map((r: Record<string, any>) => ({
+      executionId: r.execution_id,
+      success: r.success,
+      status: r.status as ExecutionStatus | undefined,
+      error: r.error ?? undefined,
+    })),
+    succeeded: raw.succeeded ?? 0,
+    failed: raw.failed ?? 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Batch: pause
+// ---------------------------------------------------------------------------
+
+/**
+ * Pause multiple running executions in a single request.
+ *
+ * POST /api/v1/workflow-executions/batch/pause
+ */
+export async function batchPauseExecutions(executionIds: string[]): Promise<BatchExecutionResponse> {
+  const response = await fetch(buildUrl('/workflow-executions/batch/pause'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ execution_ids: executionIds }),
+  });
+
+  if (!response.ok) {
+    const msg = await extractErrorMessage(response);
+    throw new Error(`Failed to batch pause executions: ${msg}`);
+  }
+
+  return mapBatchResponse(await response.json());
+}
+
+// ---------------------------------------------------------------------------
+// Batch: resume
+// ---------------------------------------------------------------------------
+
+/**
+ * Resume multiple paused executions in a single request.
+ *
+ * POST /api/v1/workflow-executions/batch/resume
+ */
+export async function batchResumeExecutions(executionIds: string[]): Promise<BatchExecutionResponse> {
+  const response = await fetch(buildUrl('/workflow-executions/batch/resume'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ execution_ids: executionIds }),
+  });
+
+  if (!response.ok) {
+    const msg = await extractErrorMessage(response);
+    throw new Error(`Failed to batch resume executions: ${msg}`);
+  }
+
+  return mapBatchResponse(await response.json());
+}
+
+// ---------------------------------------------------------------------------
+// Batch: cancel
+// ---------------------------------------------------------------------------
+
+/**
+ * Cancel multiple running or paused executions in a single request.
+ *
+ * POST /api/v1/workflow-executions/batch/cancel
+ */
+export async function batchCancelExecutions(executionIds: string[]): Promise<BatchExecutionResponse> {
+  const response = await fetch(buildUrl('/workflow-executions/batch/cancel'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ execution_ids: executionIds }),
+  });
+
+  if (!response.ok) {
+    const msg = await extractErrorMessage(response);
+    throw new Error(`Failed to batch cancel executions: ${msg}`);
+  }
+
+  return mapBatchResponse(await response.json());
 }

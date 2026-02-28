@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from skillmeat.api.routers.workflows import require_workflow_engine
 from skillmeat.core.workflow.exceptions import (
@@ -64,6 +64,47 @@ class GateRejectRequest(BaseModel):
     """
 
     reason: Optional[str] = None
+
+
+class BatchExecutionRequest(BaseModel):
+    """Request body for a batch control operation.
+
+    Attributes:
+        execution_ids: List of execution UUID hex strings to operate on.
+                       Must contain at least 1 and at most 50 entries.
+    """
+
+    execution_ids: List[str] = Field(..., min_length=1, max_length=50)
+
+
+class BatchExecutionResult(BaseModel):
+    """Per-item result within a batch control response.
+
+    Attributes:
+        execution_id: The execution UUID hex string this result refers to.
+        success:      Whether the operation succeeded for this execution.
+        status:       New execution status string if the operation succeeded.
+        error:        Human-readable error message if the operation failed.
+    """
+
+    execution_id: str
+    success: bool
+    status: Optional[str] = None
+    error: Optional[str] = None
+
+
+class BatchExecutionResponse(BaseModel):
+    """Response body for a batch control operation.
+
+    Attributes:
+        results:   Per-item results in the same order as the request IDs.
+        succeeded: Count of executions that were successfully controlled.
+        failed:    Count of executions for which the operation failed.
+    """
+
+    results: List[BatchExecutionResult]
+    succeeded: int
+    failed: int
 
 
 # ---------------------------------------------------------------------------
@@ -736,3 +777,230 @@ async def reject_gate(
         if key in raw and raw[key] is not None:
             raw[key] = raw[key].isoformat()
     return raw
+
+
+# ---------------------------------------------------------------------------
+# Batch control endpoints (pause / resume / cancel)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/batch/pause",
+    summary="Batch pause workflow executions",
+    description=(
+        "Pause multiple workflow executions in a single request. "
+        "Returns per-item success/failure results rather than failing the whole "
+        "request on partial errors."
+    ),
+    response_model=BatchExecutionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def batch_pause_executions(
+    request: BatchExecutionRequest,
+) -> BatchExecutionResponse:
+    """Pause multiple running workflow executions.
+
+    Iterates through each requested execution ID and attempts to pause it
+    individually.  Errors on individual items do not abort the batch.
+
+    Args:
+        request: JSON body containing a list of execution UUID hex strings.
+
+    Returns:
+        ``BatchExecutionResponse`` with per-item results and aggregate counts
+        (HTTP 200).
+    """
+    svc = _get_service()
+    results: List[BatchExecutionResult] = []
+    succeeded = 0
+    failed = 0
+
+    for exec_id in request.execution_ids:
+        try:
+            dto = svc.pause_execution(exec_id)
+            results.append(
+                BatchExecutionResult(
+                    execution_id=exec_id,
+                    success=True,
+                    status=dto.status,
+                )
+            )
+            succeeded += 1
+        except WorkflowExecutionNotFoundError:
+            results.append(
+                BatchExecutionResult(
+                    execution_id=exec_id,
+                    success=False,
+                    error="Execution not found",
+                )
+            )
+            failed += 1
+        except WorkflowExecutionInvalidStateError as exc:
+            results.append(
+                BatchExecutionResult(
+                    execution_id=exec_id,
+                    success=False,
+                    error=f"Invalid state: {exc}",
+                )
+            )
+            failed += 1
+        except Exception:
+            logger.exception("Unexpected error pausing execution %s", exec_id)
+            results.append(
+                BatchExecutionResult(
+                    execution_id=exec_id,
+                    success=False,
+                    error="Unexpected error",
+                )
+            )
+            failed += 1
+
+    return BatchExecutionResponse(results=results, succeeded=succeeded, failed=failed)
+
+
+@router.post(
+    "/batch/resume",
+    summary="Batch resume workflow executions",
+    description=(
+        "Resume multiple paused workflow executions in a single request. "
+        "Returns per-item success/failure results rather than failing the whole "
+        "request on partial errors."
+    ),
+    response_model=BatchExecutionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def batch_resume_executions(
+    request: BatchExecutionRequest,
+) -> BatchExecutionResponse:
+    """Resume multiple paused workflow executions.
+
+    Iterates through each requested execution ID and attempts to resume it
+    individually.  Errors on individual items do not abort the batch.
+
+    Args:
+        request: JSON body containing a list of execution UUID hex strings.
+
+    Returns:
+        ``BatchExecutionResponse`` with per-item results and aggregate counts
+        (HTTP 200).
+    """
+    svc = _get_service()
+    results: List[BatchExecutionResult] = []
+    succeeded = 0
+    failed = 0
+
+    for exec_id in request.execution_ids:
+        try:
+            dto = svc.resume_execution(exec_id)
+            results.append(
+                BatchExecutionResult(
+                    execution_id=exec_id,
+                    success=True,
+                    status=dto.status,
+                )
+            )
+            succeeded += 1
+        except WorkflowExecutionNotFoundError:
+            results.append(
+                BatchExecutionResult(
+                    execution_id=exec_id,
+                    success=False,
+                    error="Execution not found",
+                )
+            )
+            failed += 1
+        except WorkflowExecutionInvalidStateError as exc:
+            results.append(
+                BatchExecutionResult(
+                    execution_id=exec_id,
+                    success=False,
+                    error=f"Invalid state: {exc}",
+                )
+            )
+            failed += 1
+        except Exception:
+            logger.exception("Unexpected error resuming execution %s", exec_id)
+            results.append(
+                BatchExecutionResult(
+                    execution_id=exec_id,
+                    success=False,
+                    error="Unexpected error",
+                )
+            )
+            failed += 1
+
+    return BatchExecutionResponse(results=results, succeeded=succeeded, failed=failed)
+
+
+@router.post(
+    "/batch/cancel",
+    summary="Batch cancel workflow executions",
+    description=(
+        "Cancel multiple workflow executions in a single request. "
+        "Returns per-item success/failure results rather than failing the whole "
+        "request on partial errors."
+    ),
+    response_model=BatchExecutionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def batch_cancel_executions(
+    request: BatchExecutionRequest,
+) -> BatchExecutionResponse:
+    """Cancel multiple workflow executions.
+
+    Iterates through each requested execution ID and attempts to cancel it
+    individually.  Errors on individual items do not abort the batch.
+
+    Args:
+        request: JSON body containing a list of execution UUID hex strings.
+
+    Returns:
+        ``BatchExecutionResponse`` with per-item results and aggregate counts
+        (HTTP 200).
+    """
+    svc = _get_service()
+    results: List[BatchExecutionResult] = []
+    succeeded = 0
+    failed = 0
+
+    for exec_id in request.execution_ids:
+        try:
+            dto = svc.cancel_execution(exec_id)
+            results.append(
+                BatchExecutionResult(
+                    execution_id=exec_id,
+                    success=True,
+                    status=dto.status,
+                )
+            )
+            succeeded += 1
+        except WorkflowExecutionNotFoundError:
+            results.append(
+                BatchExecutionResult(
+                    execution_id=exec_id,
+                    success=False,
+                    error="Execution not found",
+                )
+            )
+            failed += 1
+        except WorkflowExecutionInvalidStateError as exc:
+            results.append(
+                BatchExecutionResult(
+                    execution_id=exec_id,
+                    success=False,
+                    error=f"Invalid state: {exc}",
+                )
+            )
+            failed += 1
+        except Exception:
+            logger.exception("Unexpected error cancelling execution %s", exec_id)
+            results.append(
+                BatchExecutionResult(
+                    execution_id=exec_id,
+                    success=False,
+                    error="Unexpected error",
+                )
+            )
+            failed += 1
+
+    return BatchExecutionResponse(results=results, succeeded=succeeded, failed=failed)

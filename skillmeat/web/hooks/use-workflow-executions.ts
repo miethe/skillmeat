@@ -38,6 +38,9 @@ import {
   cancelExecution,
   approveGate,
   rejectGate,
+  batchPauseExecutions,
+  batchResumeExecutions,
+  batchCancelExecutions,
 } from '@/lib/api/workflow-executions';
 import type {
   WorkflowExecution,
@@ -45,6 +48,7 @@ import type {
   RunWorkflowRequest,
   GateRejectRequest,
   ExecutionStatus,
+  BatchExecutionResponse,
 } from '@/types/workflow';
 import { isTerminalExecutionStatus } from '@/types/workflow';
 
@@ -190,6 +194,48 @@ export function useRunWorkflow(): UseMutationResult<
 /** Rollback context returned from onMutate for error recovery. */
 interface OptimisticRollbackContext {
   previous: WorkflowExecution | undefined;
+  previousLists?: [readonly unknown[], unknown][];
+}
+
+// ---------------------------------------------------------------------------
+// Cache update helper — applies a status patch to executions in list caches
+// ---------------------------------------------------------------------------
+
+/**
+ * Update the status of specific executions in a list/filtered cache entry.
+ * Handles both plain array and future paginated envelope shapes.
+ */
+function updateExecutionsInCache(
+  cacheData: unknown,
+  executionIds: Set<string>,
+  newStatus: ExecutionStatus
+): unknown {
+  if (!cacheData) return cacheData;
+
+  // Plain array (current backend shape)
+  if (Array.isArray(cacheData)) {
+    return cacheData.map((exec: WorkflowExecution) =>
+      executionIds.has(exec.id) ? { ...exec, status: newStatus } : exec
+    );
+  }
+
+  // Paginated envelope shape (future): { items: WorkflowExecution[], total, skip, limit }
+  if (
+    typeof cacheData === 'object' &&
+    cacheData !== null &&
+    'items' in cacheData &&
+    Array.isArray((cacheData as { items: unknown }).items)
+  ) {
+    const envelope = cacheData as { items: WorkflowExecution[]; [key: string]: unknown };
+    return {
+      ...envelope,
+      items: envelope.items.map((exec) =>
+        executionIds.has(exec.id) ? { ...exec, status: newStatus } : exec
+      ),
+    };
+  }
+
+  return cacheData;
 }
 
 // ---------------------------------------------------------------------------
@@ -222,24 +268,41 @@ export function usePauseExecution(): UseMutationResult<
     onMutate: async (runId) => {
       // Cancel any in-flight refetches so they don't overwrite the optimistic update.
       await queryClient.cancelQueries({ queryKey: executionKeys.detail(runId) });
+      await queryClient.cancelQueries({ queryKey: executionKeys.lists() });
 
       // Snapshot current cached data for rollback.
       const previous = queryClient.getQueryData<WorkflowExecution>(
         executionKeys.detail(runId)
       );
+      const previousLists = queryClient.getQueriesData<unknown>({
+        queryKey: executionKeys.lists(),
+      }) as [readonly unknown[], unknown][];
 
-      // Apply optimistic update.
+      // Apply optimistic update to detail cache.
       queryClient.setQueryData<WorkflowExecution>(
         executionKeys.detail(runId),
         (old) => (old ? { ...old, status: 'paused' as ExecutionStatus } : old)
       );
 
-      return { previous };
+      // Apply optimistic update to all list caches.
+      const idSet = new Set([runId]);
+      queryClient.setQueriesData(
+        { queryKey: executionKeys.lists() },
+        (old) => updateExecutionsInCache(old, idSet, 'paused')
+      );
+
+      return { previous, previousLists };
     },
     onError: (error, runId, context) => {
-      // Roll back to the snapshot on failure.
+      // Roll back detail cache.
       if (context?.previous !== undefined) {
         queryClient.setQueryData(executionKeys.detail(runId), context.previous);
+      }
+      // Roll back list caches.
+      if (context?.previousLists) {
+        for (const [key, data] of context.previousLists) {
+          queryClient.setQueryData(key, data);
+        }
       }
       console.error('[workflow-executions] Pause failed:', error);
       toast.error('Failed to pause execution', {
@@ -285,24 +348,41 @@ export function useResumeExecution(): UseMutationResult<
     onMutate: async (runId) => {
       // Cancel any in-flight refetches so they don't overwrite the optimistic update.
       await queryClient.cancelQueries({ queryKey: executionKeys.detail(runId) });
+      await queryClient.cancelQueries({ queryKey: executionKeys.lists() });
 
       // Snapshot current cached data for rollback.
       const previous = queryClient.getQueryData<WorkflowExecution>(
         executionKeys.detail(runId)
       );
+      const previousLists = queryClient.getQueriesData<unknown>({
+        queryKey: executionKeys.lists(),
+      }) as [readonly unknown[], unknown][];
 
-      // Apply optimistic update.
+      // Apply optimistic update to detail cache.
       queryClient.setQueryData<WorkflowExecution>(
         executionKeys.detail(runId),
         (old) => (old ? { ...old, status: 'running' as ExecutionStatus } : old)
       );
 
-      return { previous };
+      // Apply optimistic update to all list caches.
+      const idSet = new Set([runId]);
+      queryClient.setQueriesData(
+        { queryKey: executionKeys.lists() },
+        (old) => updateExecutionsInCache(old, idSet, 'running')
+      );
+
+      return { previous, previousLists };
     },
     onError: (error, runId, context) => {
-      // Roll back to the snapshot on failure.
+      // Roll back detail cache.
       if (context?.previous !== undefined) {
         queryClient.setQueryData(executionKeys.detail(runId), context.previous);
+      }
+      // Roll back list caches.
+      if (context?.previousLists) {
+        for (const [key, data] of context.previousLists) {
+          queryClient.setQueryData(key, data);
+        }
       }
       console.error('[workflow-executions] Resume failed:', error);
       toast.error('Failed to resume execution', {
@@ -348,24 +428,41 @@ export function useCancelExecution(): UseMutationResult<
     onMutate: async (runId) => {
       // Cancel any in-flight refetches so they don't overwrite the optimistic update.
       await queryClient.cancelQueries({ queryKey: executionKeys.detail(runId) });
+      await queryClient.cancelQueries({ queryKey: executionKeys.lists() });
 
       // Snapshot current cached data for rollback.
       const previous = queryClient.getQueryData<WorkflowExecution>(
         executionKeys.detail(runId)
       );
+      const previousLists = queryClient.getQueriesData<unknown>({
+        queryKey: executionKeys.lists(),
+      }) as [readonly unknown[], unknown][];
 
-      // Apply optimistic update.
+      // Apply optimistic update to detail cache.
       queryClient.setQueryData<WorkflowExecution>(
         executionKeys.detail(runId),
         (old) => (old ? { ...old, status: 'cancelled' as ExecutionStatus } : old)
       );
 
-      return { previous };
+      // Apply optimistic update to all list caches.
+      const idSet = new Set([runId]);
+      queryClient.setQueriesData(
+        { queryKey: executionKeys.lists() },
+        (old) => updateExecutionsInCache(old, idSet, 'cancelled')
+      );
+
+      return { previous, previousLists };
     },
     onError: (error, runId, context) => {
-      // Roll back to the snapshot on failure.
+      // Roll back detail cache.
       if (context?.previous !== undefined) {
         queryClient.setQueryData(executionKeys.detail(runId), context.previous);
+      }
+      // Roll back list caches.
+      if (context?.previousLists) {
+        for (const [key, data] of context.previousLists) {
+          queryClient.setQueryData(key, data);
+        }
       }
       console.error('[workflow-executions] Cancel failed:', error);
       toast.error('Failed to cancel execution', {
@@ -376,6 +473,177 @@ export function useCancelExecution(): UseMutationResult<
     onSettled: (_data, _error, runId) => {
       // Always reconcile with server truth after the mutation settles.
       queryClient.invalidateQueries({ queryKey: executionKeys.detail(runId) });
+      queryClient.invalidateQueries({ queryKey: executionKeys.lists() });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Batch rollback context
+// ---------------------------------------------------------------------------
+
+/** Rollback context for batch mutations — only list caches are optimistically updated. */
+interface BatchOptimisticRollbackContext {
+  previousLists: [readonly unknown[], unknown][];
+}
+
+// ---------------------------------------------------------------------------
+// useBatchPauseExecutions — mutation: pause multiple executions
+// ---------------------------------------------------------------------------
+
+/**
+ * Mutation to pause multiple running workflow executions via a single batch API call.
+ *
+ * Optimistically updates all matching executions in the list cache to `paused`,
+ * rolling back on error. Invalidates list queries on settled.
+ *
+ * @example
+ * ```tsx
+ * const batchPause = useBatchPauseExecutions();
+ * batchPause.mutate(['id-1', 'id-2']);
+ * ```
+ */
+export function useBatchPauseExecutions(): UseMutationResult<
+  BatchExecutionResponse,
+  Error,
+  string[],
+  BatchOptimisticRollbackContext
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: batchPauseExecutions,
+    onMutate: async (executionIds) => {
+      await queryClient.cancelQueries({ queryKey: executionKeys.lists() });
+
+      const previousLists = queryClient.getQueriesData<unknown>({
+        queryKey: executionKeys.lists(),
+      }) as [readonly unknown[], unknown][];
+
+      const idSet = new Set(executionIds);
+      queryClient.setQueriesData(
+        { queryKey: executionKeys.lists() },
+        (old) => updateExecutionsInCache(old, idSet, 'paused')
+      );
+
+      return { previousLists };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousLists) {
+        for (const [key, data] of context.previousLists) {
+          queryClient.setQueryData(key, data);
+        }
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: executionKeys.lists() });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// useBatchResumeExecutions — mutation: resume multiple executions
+// ---------------------------------------------------------------------------
+
+/**
+ * Mutation to resume multiple paused workflow executions via a single batch API call.
+ *
+ * Optimistically updates all matching executions in the list cache to `running`,
+ * rolling back on error. Invalidates list queries on settled.
+ *
+ * @example
+ * ```tsx
+ * const batchResume = useBatchResumeExecutions();
+ * batchResume.mutate(['id-1', 'id-2']);
+ * ```
+ */
+export function useBatchResumeExecutions(): UseMutationResult<
+  BatchExecutionResponse,
+  Error,
+  string[],
+  BatchOptimisticRollbackContext
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: batchResumeExecutions,
+    onMutate: async (executionIds) => {
+      await queryClient.cancelQueries({ queryKey: executionKeys.lists() });
+
+      const previousLists = queryClient.getQueriesData<unknown>({
+        queryKey: executionKeys.lists(),
+      }) as [readonly unknown[], unknown][];
+
+      const idSet = new Set(executionIds);
+      queryClient.setQueriesData(
+        { queryKey: executionKeys.lists() },
+        (old) => updateExecutionsInCache(old, idSet, 'running')
+      );
+
+      return { previousLists };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousLists) {
+        for (const [key, data] of context.previousLists) {
+          queryClient.setQueryData(key, data);
+        }
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: executionKeys.lists() });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// useBatchCancelExecutions — mutation: cancel multiple executions
+// ---------------------------------------------------------------------------
+
+/**
+ * Mutation to cancel multiple running or paused workflow executions via a single batch API call.
+ *
+ * Optimistically updates all matching executions in the list cache to `cancelled`,
+ * rolling back on error. Invalidates list queries on settled.
+ *
+ * @example
+ * ```tsx
+ * const batchCancel = useBatchCancelExecutions();
+ * batchCancel.mutate(['id-1', 'id-2']);
+ * ```
+ */
+export function useBatchCancelExecutions(): UseMutationResult<
+  BatchExecutionResponse,
+  Error,
+  string[],
+  BatchOptimisticRollbackContext
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: batchCancelExecutions,
+    onMutate: async (executionIds) => {
+      await queryClient.cancelQueries({ queryKey: executionKeys.lists() });
+
+      const previousLists = queryClient.getQueriesData<unknown>({
+        queryKey: executionKeys.lists(),
+      }) as [readonly unknown[], unknown][];
+
+      const idSet = new Set(executionIds);
+      queryClient.setQueriesData(
+        { queryKey: executionKeys.lists() },
+        (old) => updateExecutionsInCache(old, idSet, 'cancelled')
+      );
+
+      return { previousLists };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousLists) {
+        for (const [key, data] of context.previousLists) {
+          queryClient.setQueryData(key, data);
+        }
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: executionKeys.lists() });
     },
   });

@@ -6,6 +6,12 @@
  * Global list of all workflow execution runs across all workflows.
  * Filterable by status, sortable by started date, with skeleton loading
  * and empty states.
+ *
+ * Features:
+ * - Per-row quick action buttons (cancel, pause, resume, re-run)
+ * - Multi-select checkboxes with hover-reveal behavior
+ * - Select All / Clear Selection controls
+ * - Floating bulk action bar for batch operations
  */
 
 import { useState, useCallback } from 'react';
@@ -24,6 +30,7 @@ import {
 import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -41,6 +48,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useWorkflowExecutions } from '@/hooks';
+import { useExecutionSelection } from '@/hooks/use-execution-selection';
+import { ExecutionRowActions } from '@/components/workflow/execution-row-actions';
+import { ExecutionBulkActions } from '@/components/workflow/execution-bulk-actions';
 import type { ExecutionFilters, ExecutionStatus } from '@/types/workflow';
 import { EXECUTION_STATUS_META } from '@/types/workflow';
 
@@ -140,11 +150,16 @@ function StatusBadge({ status }: { status: ExecutionStatus }) {
   );
 }
 
-function TableSkeleton() {
+function TableSkeleton({ showCheckbox }: { showCheckbox?: boolean }) {
   return (
     <>
       {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
         <TableRow key={i} className="border-border/40">
+          {showCheckbox && (
+            <TableCell className="w-10">
+              <Skeleton className="h-4 w-4 rounded-sm" />
+            </TableCell>
+          )}
           <TableCell>
             <Skeleton className="h-4 w-20" />
           </TableCell>
@@ -162,6 +177,9 @@ function TableSkeleton() {
           </TableCell>
           <TableCell>
             <Skeleton className="h-4 w-16" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-8 w-20" />
           </TableCell>
         </TableRow>
       ))}
@@ -189,6 +207,18 @@ export default function AllExecutionsPage() {
   // ── Data ──────────────────────────────────────────────────────────────────
   const { data: executions, isLoading, isError } = useWorkflowExecutions(filters);
   const rows = executions ?? [];
+
+  // ── Selection ─────────────────────────────────────────────────────────────
+  const {
+    isSelected,
+    toggleSelection,
+    selectAll,
+    clearSelection,
+    hasSelection,
+    selectedCount,
+    selectedExecutions,
+    isAllSelected,
+  } = useExecutionSelection(rows);
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const isEmpty = !isLoading && !isError && rows.length === 0;
@@ -271,8 +301,35 @@ export default function AllExecutionsPage() {
           </Button>
         )}
 
+        {/* Select All / Clear Selection — visible when items selected */}
+        {hasSelection && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              {selectedCount} selected
+            </span>
+            {!isAllSelected && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={selectAll}
+                className="h-8 text-xs text-muted-foreground hover:text-foreground px-2"
+              >
+                Select all ({rows.length})
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearSelection}
+              className="h-8 text-xs text-muted-foreground hover:text-foreground px-2"
+            >
+              Clear selection
+            </Button>
+          </div>
+        )}
+
         {/* Row count */}
-        {!isLoading && !isError && rows.length > 0 && (
+        {!isLoading && !isError && rows.length > 0 && !hasSelection && (
           <span className="ml-auto font-mono text-xs text-muted-foreground">
             {rows.length} run{rows.length !== 1 ? 's' : ''}
           </span>
@@ -336,6 +393,20 @@ export default function AllExecutionsPage() {
             <Table>
               <TableHeader>
                 <TableRow className="border-border/40 bg-muted/20 hover:bg-muted/20">
+                  {/* Checkbox column */}
+                  <TableHead className="w-10 pl-4">
+                    {rows.length > 0 && (
+                      <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={(checked) =>
+                          checked ? selectAll() : clearSelection()
+                        }
+                        aria-label={isAllSelected ? 'Deselect all executions' : 'Select all executions'}
+                        className="data-[state=checked]:border-primary"
+                      />
+                    )}
+                  </TableHead>
+
                   <TableHead className="w-[100px] font-mono text-xs text-muted-foreground">
                     Run ID
                   </TableHead>
@@ -367,71 +438,114 @@ export default function AllExecutionsPage() {
                       Trigger
                     </span>
                   </TableHead>
+                  <TableHead className="text-xs text-muted-foreground text-right pr-4">
+                    Actions
+                  </TableHead>
                 </TableRow>
               </TableHeader>
 
               <TableBody>
-                {isLoading && <TableSkeleton />}
+                {isLoading && <TableSkeleton showCheckbox />}
 
                 {!isLoading &&
-                  rows.map((execution) => (
-                    <TableRow
-                      key={execution.id}
-                      className="cursor-pointer border-border/30 transition-colors hover:bg-muted/40"
-                      onClick={() => handleRowClick(execution.workflowId, execution.id)}
-                      role="link"
-                      aria-label={`View execution ${truncateId(execution.id)} for ${execution.workflowName ?? 'workflow'}`}
-                    >
-                      {/* Run ID */}
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        <span className="rounded bg-muted/50 px-1.5 py-0.5">
-                          {truncateId(execution.id)}
-                        </span>
-                      </TableCell>
+                  rows.map((execution) => {
+                    const selected = isSelected(execution.id);
 
-                      {/* Workflow name */}
-                      <TableCell>
-                        {execution.workflowName ? (
-                          <Link
-                            href={`/workflows/${execution.workflowId}`}
-                            className="text-sm font-medium hover:text-primary hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {execution.workflowName}
-                          </Link>
-                        ) : (
-                          <span className="font-mono text-xs text-muted-foreground">
-                            {truncateId(execution.workflowId)}
+                    return (
+                      <TableRow
+                        key={execution.id}
+                        className={`group cursor-pointer border-border/30 transition-colors hover:bg-muted/40 ${
+                          selected ? 'bg-muted/25' : ''
+                        }`}
+                        onClick={() =>
+                          handleRowClick(execution.workflowId, execution.id)
+                        }
+                        role="link"
+                        aria-label={`View execution ${truncateId(execution.id)} for ${execution.workflowName ?? 'workflow'}`}
+                        aria-selected={selected}
+                      >
+                        {/* Checkbox */}
+                        <TableCell
+                          className="pl-4 w-10"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Checkbox
+                            checked={selected}
+                            onCheckedChange={() => toggleSelection(execution.id)}
+                            aria-label={`Select execution ${truncateId(execution.id)}`}
+                            className={`transition-opacity ${
+                              hasSelection
+                                ? 'opacity-100'
+                                : 'opacity-0 group-hover:opacity-100'
+                            }`}
+                          />
+                        </TableCell>
+
+                        {/* Run ID */}
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          <span className="rounded bg-muted/50 px-1.5 py-0.5">
+                            {truncateId(execution.id)}
                           </span>
-                        )}
-                      </TableCell>
+                        </TableCell>
 
-                      {/* Status */}
-                      <TableCell>
-                        <StatusBadge status={execution.status} />
-                      </TableCell>
+                        {/* Workflow name */}
+                        <TableCell>
+                          {execution.workflowName ? (
+                            <Link
+                              href={`/workflows/${execution.workflowId}`}
+                              className="text-sm font-medium hover:text-primary hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {execution.workflowName}
+                            </Link>
+                          ) : (
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {truncateId(execution.workflowId)}
+                            </span>
+                          )}
+                        </TableCell>
 
-                      {/* Started */}
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatRelativeTime(execution.startedAt)}
-                      </TableCell>
+                        {/* Status */}
+                        <TableCell>
+                          <StatusBadge status={execution.status} />
+                        </TableCell>
 
-                      {/* Duration */}
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {formatDuration(execution.durationMs)}
-                      </TableCell>
+                        {/* Started */}
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatRelativeTime(execution.startedAt)}
+                        </TableCell>
 
-                      {/* Trigger */}
-                      <TableCell className="text-xs text-muted-foreground">
-                        {TRIGGER_LABELS[execution.trigger] ?? execution.trigger}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        {/* Duration */}
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {formatDuration(execution.durationMs)}
+                        </TableCell>
+
+                        {/* Trigger */}
+                        <TableCell className="text-xs text-muted-foreground">
+                          {TRIGGER_LABELS[execution.trigger] ?? execution.trigger}
+                        </TableCell>
+
+                        {/* Actions */}
+                        <TableCell
+                          className="pr-4 text-right"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExecutionRowActions execution={execution} />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
               </TableBody>
             </Table>
           </div>
         )}
       </main>
+
+      {/* Floating bulk action bar */}
+      <ExecutionBulkActions
+        selectedExecutions={selectedExecutions}
+        onClearSelection={clearSelection}
+      />
     </div>
   );
 }

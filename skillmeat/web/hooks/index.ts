@@ -780,12 +780,21 @@ export {
   usePauseExecution,
   useResumeExecution,
   useCancelExecution,
+  useBatchPauseExecutions,
+  useBatchResumeExecutions,
+  useBatchCancelExecutions,
   useApproveGate,
   useRejectGate,
   useExecutionStream,
   type ExecutionSseEvent,
   type UseExecutionStreamResult,
 } from './use-workflow-executions';
+
+// Multi-select state management for the All Executions page
+export {
+  useExecutionSelection,
+  type UseExecutionSelectionReturn,
+} from './use-execution-selection';
 
 // ============================================================================
 // WORKFLOW BUILDER (1 hook)
