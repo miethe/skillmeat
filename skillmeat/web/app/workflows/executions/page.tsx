@@ -117,7 +117,8 @@ function formatDuration(ms?: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-function truncateId(id: string): string {
+function truncateId(id?: string | null): string {
+  if (!id) return '—';
   return id.length > 8 ? id.slice(0, 8) : id;
 }
 
