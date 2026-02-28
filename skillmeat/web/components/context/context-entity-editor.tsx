@@ -23,7 +23,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { MarkdownEditor } from '@/components/editor/markdown-editor';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useCreateContextEntity, useUpdateContextEntity } from '@/hooks';
+import { useCreateContextEntity, useUpdateContextEntity, useContextEntityContent } from '@/hooks';
 
 /**
  * Props for ContextEntityEditor component
@@ -129,18 +129,23 @@ export function ContextEntityEditor({
   onSuccess,
   isLoading: externalIsLoading = false,
 }: ContextEntityEditorProps) {
-  const [markdownContent, setMarkdownContent] = useState<string>(
-    entity?.content_hash || initialContent
-  );
+  const [markdownContent, setMarkdownContent] = useState<string>(initialContent);
+  const [contentInitialized, setContentInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Determine if we're in edit mode
   const isEditMode = !!entity;
 
+  // Fetch actual content when editing an existing entity
+  const {
+    data: fetchedContent,
+    isLoading: isContentLoading,
+  } = useContextEntityContent(open && isEditMode ? entity?.id : undefined);
+
   // Mutations
   const createEntity = useCreateContextEntity();
   const updateEntity = useUpdateContextEntity();
-  const isLoading = externalIsLoading || createEntity.isPending || updateEntity.isPending;
+  const isLoading = externalIsLoading || createEntity.isPending || updateEntity.isPending || isContentLoading;
 
   // Form setup with react-hook-form
   const {
@@ -157,16 +162,25 @@ export function ContextEntityEditor({
       category: entity?.category || '',
       auto_load: entity?.auto_load || false,
       version: entity?.version || '',
-      content: entity?.content_hash || initialContent,
+      content: initialContent,
     },
   });
 
-  // Update markdown content when entity changes
+  // Initialize markdown content from fetched content once available
   useEffect(() => {
-    if (entity?.content_hash) {
-      setMarkdownContent(entity.content_hash);
+    if (fetchedContent && !contentInitialized) {
+      setMarkdownContent(fetchedContent);
+      setContentInitialized(true);
     }
-  }, [entity?.content_hash]);
+  }, [fetchedContent, contentInitialized]);
+
+  // Reset initialization flag when dialog closes or entity changes
+  useEffect(() => {
+    if (!open) {
+      setContentInitialized(false);
+      setMarkdownContent(initialContent);
+    }
+  }, [open, initialContent]);
 
   // Form submission
   const onSubmit = async (data: FormData) => {
@@ -412,12 +426,23 @@ export function ContextEntityEditor({
                 <span className="ml-1 text-destructive">*</span>
               </Label>
               <div className="flex-1 overflow-hidden">
-                <MarkdownEditor
-                  initialContent={markdownContent}
-                  onChange={setMarkdownContent}
-                  readOnly={isLoading}
-                  className="h-full"
-                />
+                {isEditMode && isContentLoading ? (
+                  <div
+                    className="flex h-full items-center justify-center rounded-md border bg-muted/50"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+                    <span className="ml-2 text-sm text-muted-foreground">Loading content...</span>
+                  </div>
+                ) : (
+                  <MarkdownEditor
+                    initialContent={markdownContent}
+                    onChange={setMarkdownContent}
+                    readOnly={isLoading}
+                    className="h-full"
+                  />
+                )}
               </div>
               <p id="content-help" className="text-xs text-muted-foreground">
                 Markdown content for this context entity

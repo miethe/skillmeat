@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FileText, Calendar, Tag, Eye, EyeOff, Edit, Upload, X, Loader2 } from 'lucide-react';
+import { FileText, Calendar, Tag, Eye, EyeOff, Edit, Upload, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -98,12 +98,6 @@ export function ContextEntityDetail({
     isLoading: isContentLoading,
     error: contentError,
   } = useContextEntityContent(open ? entity?.id : undefined);
-
-  const handleClose = () => {
-    onOpenChange(false);
-    // Reset state when closing
-    setShowRawContent(false);
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -335,10 +329,6 @@ export function ContextEntityDetail({
                     </Button>
                   )}
                 </div>
-                <Button variant="ghost" onClick={handleClose} aria-label="Close dialog">
-                  <X className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Close
-                </Button>
               </div>
             </div>
           </>
