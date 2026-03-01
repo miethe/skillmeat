@@ -174,6 +174,44 @@ All hooks must comply with the canonical data flow principles. See root `CLAUDE.
 **Install**: `pnpm dlx shadcn@latest add [component]`
 **Rule**: Never modify `ui/` files - compose new components instead
 
+### Entity Settings & Configuration Hooks
+
+**Entity Type Configs Hook** (`useEntityTypeConfigs`):
+- **Query stale time**: 5 minutes (standard browsing)
+- **Purpose**: List, create, update, and delete entity type configurations
+- **Related queries**: `queryKey: ['entity-type-configs']`
+- **Mutations**: `createEntityTypeConfig`, `updateEntityTypeConfig`, `deleteEntityTypeConfig`
+- **Invalidation**: On mutation, invalidates `['entity-type-configs']` query key
+
+**Entity Categories Hook** (`useEntityCategories`):
+- **Query stale time**: 5 minutes (standard browsing)
+- **Purpose**: List available entity categories for multi-select in creation/edit forms
+- **Related queries**: `queryKey: ['entity-categories']`
+- **Mutations**: `createEntityCategory`
+- **Invalidation**: On mutation, invalidates `['entity-categories']` query key
+
+**Import**: `import { useEntityTypeConfigs, useEntityCategories } from '@/hooks'`
+
+### Entity Settings Components
+
+**Location**: `components/app/settings/`
+
+**EntityTypeConfigList** - Displays table of entity type configurations:
+- Lists all custom entity types
+- Supports create, edit, delete operations
+- Features platform multi-select (UI, Claude, Marketplace, etc.)
+
+**EntityTypeConfigForm** - Modal form for creating/editing entity type configs:
+- Name and slug fields
+- Platform multi-select checkboxes
+- Field configuration (name, type, optional)
+- Validation and error handling
+
+**Category Combobox** - Reusable select component:
+- Autocomplete category selection
+- Multi-select support in creation form v2
+- Used in entity creation workflow
+
 ### Static Assets
 
 | Asset | Location          | Used In                 |
@@ -277,6 +315,20 @@ Props:
 Diff queries load with scope awareness: primary (active) tab loads immediately, secondary tabs prefetch after primary data arrives. Upstream query gates on `hasValidUpstreamSource()` check. Stale times follow the interactive/monitoring standard (30s).
 
 **Implementation patterns**: `.claude/context/key-context/sync-diff-patterns.md`
+
+---
+
+## Feature Flags (Active)
+
+These flags control optional features and are marked for cleanup after Phase 6 completion:
+
+| Flag | Purpose | Cleanup Target |
+|------|---------|-----------------|
+| `entity_types_settings_tab` | Enable entity type configuration management in Settings | Post-Phase 6 |
+| `creation_form_v2` | Enable new entity creation form with multi-select platforms and categories | Post-Phase 6 |
+| `modular_content_architecture` | Enable content assembly engine and entity category associations | Post-Phase 6 |
+
+These flags should be unified with the feature flag system after Phase 6 stabilization.
 
 ---
 

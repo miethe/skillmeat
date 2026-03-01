@@ -1,8 +1,8 @@
 """Unit tests for the DB-backed context entity validator (CECO-1.2 / CECO-1.4).
 
 Covers:
-- Hardcoded fallback path (flag off)
-- DB-backed path (flag on, mock DB)
+- Hardcoded fallback path (DB unavailable)
+- DB-backed path (mock DB)
 - Fallback on DB error
 - TTL cache expiry
 - Immediate cache invalidation
@@ -19,7 +19,6 @@ import pytest
 
 import skillmeat.core.validators.context_entity as validator_module
 from skillmeat.core.validators.context_entity import (
-    ENTITY_TYPE_CONFIG_ENABLED,
     invalidate_entity_type_cache,
     validate_context_entity,
     _get_entity_type_config,
@@ -82,12 +81,9 @@ def _stub_db_rows(rows: List[Dict[str, Any]]):
 
 @pytest.fixture(autouse=True)
 def clean_cache():
-    """Always start each test with a clean cache and flag=False."""
+    """Always start each test with a clean cache."""
     _reset_cache()
-    original_flag = validator_module.ENTITY_TYPE_CONFIG_ENABLED
-    validator_module.ENTITY_TYPE_CONFIG_ENABLED = False
     yield
-    validator_module.ENTITY_TYPE_CONFIG_ENABLED = original_flag
     _reset_cache()
 
 
@@ -96,51 +92,51 @@ def clean_cache():
 # ---------------------------------------------------------------------------
 
 class TestHardcodedFallback:
-    """Validator uses hardcoded dispatch map when flag is False."""
+    """Validator uses hardcoded dispatch map when DB is unavailable."""
 
-    def test_flag_off_uses_hardcoded_project_config(self):
-        assert not validator_module.ENTITY_TYPE_CONFIG_ENABLED
+    def test_db_unavailable_uses_hardcoded_project_config(self):
+        """When cache is empty and DB load returns None, hardcoded validators run."""
         content = "# My Project\n\nThis is a project config."
-        errors = validate_context_entity(
-            "project_config", content, ".claude/CLAUDE.md",
-            allowed_prefixes=[".claude/"],
-        )
-        assert errors == []
-
-    def test_flag_off_uses_hardcoded_spec_file_missing_title(self):
-        assert not validator_module.ENTITY_TYPE_CONFIG_ENABLED
-        content = "---\nfoo: bar\n---\n\nSome content."
-        errors = validate_context_entity(
-            "spec_file", content, ".claude/specs/my-spec.md",
-            allowed_prefixes=[".claude/"],
-        )
-        hints = _hints(errors)
-        assert any("title" in h for h in hints)
-
-    def test_flag_off_uses_hardcoded_context_file_missing_references(self):
-        content = "---\ntitle: foo\n---\n\nSome context."
-        errors = validate_context_entity(
-            "context_file", content, ".claude/context/my-ctx.md",
-            allowed_prefixes=[".claude/"],
-        )
-        hints = _hints(errors)
-        assert any("references" in h for h in hints)
-
-    def test_flag_off_unknown_type_raises_value_error(self):
-        with pytest.raises(ValueError, match="Unknown entity type"):
-            validate_context_entity("nonexistent_type", "content", ".claude/x.md")
-
-    def test_flag_off_does_not_hit_db(self):
-        """No DB import should occur when flag is off."""
         with patch.object(
-            validator_module, "_load_entity_type_cache"
-        ) as mock_load:
-            content = "# Config\n\nThis is my config file."
-            validate_context_entity(
+            validator_module, "_load_entity_type_cache", return_value=None
+        ):
+            errors = validate_context_entity(
                 "project_config", content, ".claude/CLAUDE.md",
                 allowed_prefixes=[".claude/"],
             )
-            mock_load.assert_not_called()
+        assert errors == []
+
+    def test_db_unavailable_uses_hardcoded_spec_file_missing_title(self):
+        content = "---\nfoo: bar\n---\n\nSome content."
+        with patch.object(
+            validator_module, "_load_entity_type_cache", return_value=None
+        ):
+            errors = validate_context_entity(
+                "spec_file", content, ".claude/specs/my-spec.md",
+                allowed_prefixes=[".claude/"],
+            )
+        hints = _hints(errors)
+        assert any("title" in h for h in hints)
+
+    def test_db_unavailable_uses_hardcoded_context_file_missing_references(self):
+        content = "---\ntitle: foo\n---\n\nSome context."
+        with patch.object(
+            validator_module, "_load_entity_type_cache", return_value=None
+        ):
+            errors = validate_context_entity(
+                "context_file", content, ".claude/context/my-ctx.md",
+                allowed_prefixes=[".claude/"],
+            )
+        hints = _hints(errors)
+        assert any("references" in h for h in hints)
+
+    def test_db_unavailable_unknown_type_raises_value_error(self):
+        """Type not in DB and not in hardcoded map raises ValueError."""
+        with patch.object(
+            validator_module, "_load_entity_type_cache", return_value=None
+        ):
+            with pytest.raises(ValueError, match="Unknown entity type"):
+                validate_context_entity("nonexistent_type", "content", ".claude/x.md")
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +186,7 @@ CONTEXT_FILE_DB_CONFIG: Dict[str, Any] = {
 
 
 class TestDBBackedValidation:
-    """Validator uses DB config when flag is True and DB is available."""
+    """Validator uses DB config when DB is available."""
 
     def _patch_session(self, rows):
         """Patch get_session to return a mock session yielding *rows*."""
@@ -202,8 +198,7 @@ class TestDBBackedValidation:
         )
 
     def test_uses_db_config_for_spec_file_valid(self):
-        """DB-backed cache drives validation when flag is on and cache is warm."""
-        validator_module.ENTITY_TYPE_CONFIG_ENABLED = True
+        """DB-backed cache drives validation when cache is warm."""
         # Directly populate the cache to avoid triggering the full import chain.
         validator_module._entity_type_cache = {
             "spec_file": {
@@ -230,7 +225,6 @@ class TestDBBackedValidation:
         assert errors == []
 
     def test_db_config_detects_missing_required_key(self):
-        validator_module.ENTITY_TYPE_CONFIG_ENABLED = True
         validator_module._entity_type_cache = {
             "spec_file": {
                 "slug": "spec_file",
@@ -257,7 +251,6 @@ class TestDBBackedValidation:
         assert any("title" in h for h in hints)
 
     def test_db_config_validates_progress_type_field(self):
-        validator_module.ENTITY_TYPE_CONFIG_ENABLED = True
         validator_module._entity_type_cache = {"progress_template": PROGRESS_DB_CONFIG.copy()}
         validator_module._entity_type_cache_loaded_at = time.time()
 
@@ -283,7 +276,6 @@ class TestDBBackedValidation:
         assert errors_ok == []
 
     def test_db_config_validates_references_must_be_list(self):
-        validator_module.ENTITY_TYPE_CONFIG_ENABLED = True
         validator_module._entity_type_cache = {
             "context_file": CONTEXT_FILE_DB_CONFIG.copy()
         }
@@ -302,7 +294,6 @@ class TestDBBackedValidation:
 
     def test_db_config_unknown_type_falls_through_to_hardcoded(self):
         """Type not in DB cache falls through to hardcoded validators."""
-        validator_module.ENTITY_TYPE_CONFIG_ENABLED = True
         # Cache populated but without "project_config"
         validator_module._entity_type_cache = {}
         validator_module._entity_type_cache_loaded_at = time.time()
@@ -319,7 +310,6 @@ class TestDBBackedValidation:
 
     def test_db_config_unknown_type_not_in_hardcoded_raises(self):
         """Type not in DB cache and not in hardcoded map raises ValueError."""
-        validator_module.ENTITY_TYPE_CONFIG_ENABLED = True
         validator_module._entity_type_cache = {}
         validator_module._entity_type_cache_loaded_at = time.time()
 
@@ -335,7 +325,6 @@ class TestDBErrorFallback:
     """Validator falls back to hardcoded validators when DB query fails."""
 
     def test_falls_back_on_db_import_error(self):
-        validator_module.ENTITY_TYPE_CONFIG_ENABLED = True
         _reset_cache()
 
         # Simulate DB load failure by making get_session raise
@@ -360,13 +349,7 @@ class TestDBErrorFallback:
 
     def test_falls_back_on_session_query_error(self, caplog):
         """DB session query exception triggers fallback with WARNING log."""
-        import logging
-
-        validator_module.ENTITY_TYPE_CONFIG_ENABLED = True
         _reset_cache()
-
-        mock_session = MagicMock()
-        mock_session.query.side_effect = RuntimeError("DB connection failed")
 
         with patch(
             "skillmeat.core.validators.context_entity._load_entity_type_cache",
@@ -432,7 +415,6 @@ class TestTTLCache:
 
     def test_stale_cache_triggers_reload(self):
         """Stale cache triggers _load_entity_type_cache on next access."""
-        validator_module.ENTITY_TYPE_CONFIG_ENABLED = True
         validator_module._entity_type_cache = {"spec_file": {"slug": "stale"}}
         validator_module._entity_type_cache_loaded_at = time.time() - 61
 
@@ -449,7 +431,6 @@ class TestTTLCache:
 
     def test_fresh_cache_does_not_trigger_reload(self):
         """Fresh cache does NOT call _load_entity_type_cache."""
-        validator_module.ENTITY_TYPE_CONFIG_ENABLED = True
         validator_module._entity_type_cache = {
             "spec_file": {"slug": "spec_file", "path_prefix": ".claude/specs"}
         }

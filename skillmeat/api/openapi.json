@@ -20082,6 +20082,364 @@
         }
       }
     },
+    "/api/v1/settings/entity-type-configs": {
+      "get": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "List all entity type configurations",
+        "description": "Returns all ``EntityTypeConfig`` rows ordered by ``sort_order``.\n\n    Built-in types (skill, command, agent, mcp, hook) are always present.\n    User-created custom types are included when they have been added.",
+        "operationId": "list_entity_type_configs_api_v1_settings_entity_type_configs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EntityTypeConfigResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Entity Type Configs Api V1 Settings Entity Type Configs Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "Create a new entity type configuration",
+        "description": "Create a custom entity type configuration.\n\n    The ``slug`` must be unique across all entity type configurations.\n    Returns 409 Conflict if a configuration with the same slug already exists.\n\n    After a successful write the in-memory validator cache is invalidated so\n    that the next validation call reloads from the DB.",
+        "operationId": "create_entity_type_config_api_v1_settings_entity_type_configs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntityTypeConfigCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityTypeConfigResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/entity-type-configs/{slug}": {
+      "put": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "Update an entity type configuration",
+        "description": "Update one or more fields on an existing entity type configuration.\n\n    Only supplied (non-``null``) fields are updated; others remain unchanged.\n    Built-in types may be updated.\n\n    After a successful write the in-memory validator cache is invalidated so\n    that the next validation call reloads from the DB.",
+        "operationId": "update_entity_type_config_api_v1_settings_entity_type_configs__slug__put",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntityTypeConfigUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityTypeConfigResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "Delete an entity type configuration",
+        "description": "Delete a custom entity type configuration by slug.\n\n    The five built-in types (``project_config``, ``spec_file``, ``rule_file``,\n    ``context_file``, ``progress_template``) cannot be deleted; attempting to do\n    so returns 409 Conflict.\n\n    After a successful deletion the in-memory validator cache is invalidated so\n    that the next validation call reloads from the DB.",
+        "operationId": "delete_entity_type_config_api_v1_settings_entity_type_configs__slug__delete",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/entity-categories": {
+      "get": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "List entity categories",
+        "description": "Returns all ``ContextEntityCategory`` rows ordered by ``sort_order``.\n\n    Optionally filter by ``entity_type_slug`` and/or ``platform``.",
+        "operationId": "list_entity_categories_api_v1_settings_entity_categories_get",
+        "parameters": [
+          {
+            "name": "entity_type_slug",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Type Slug"
+            }
+          },
+          {
+            "name": "platform",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Platform"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContextEntityCategoryResponse"
+                  },
+                  "title": "Response List Entity Categories Api V1 Settings Entity Categories Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "Create a new entity category",
+        "description": "Create a new ``ContextEntityCategory``.\n\n    If ``slug`` is omitted it is auto-generated from ``name`` using\n    a simple slugification rule (lowercase, hyphens).\n\n    Returns 409 Conflict if a category with the same slug already exists.",
+        "operationId": "create_entity_category_api_v1_settings_entity_categories_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContextEntityCategoryCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextEntityCategoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/entity-categories/{category_id}": {
+      "put": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "Update an entity category",
+        "description": "Update one or more fields on an existing ``ContextEntityCategory``.\n\n    Only supplied (non-``null``) fields are updated; others remain unchanged.\n\n    Returns 409 Conflict if the new slug collides with an existing row.",
+        "operationId": "update_entity_category_api_v1_settings_entity_categories__category_id__put",
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Category Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContextEntityCategoryUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextEntityCategoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "settings",
+          "settings"
+        ],
+        "summary": "Delete an entity category",
+        "description": "Delete an entity category by integer ID.\n\n    Returns 409 Conflict if the category has one or more artifact\n    associations (i.e. artifacts are still tagged with this category).\n    Disassociate all artifacts first, then retry.",
+        "operationId": "delete_entity_category_api_v1_settings_entity_categories__category_id__delete",
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Category Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/colors": {
       "get": {
         "tags": [
@@ -21546,24 +21904,6 @@
                     "additionalProperties": true
                   },
                   "title": "Response List Workflows Api V1 Workflows Get"
-                },
-                "examples": {
-                  "default": {
-                    "summary": "Paginated list of workflows",
-                    "value": [
-                      {
-                        "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                        "name": "Deploy Skill Workflow",
-                        "description": "Validates and deploys a skill artifact to a project",
-                        "version": "1.0",
-                        "status": "active",
-                        "project_id": null,
-                        "stage_count": 3,
-                        "created_at": "2026-02-27T10:00:00",
-                        "updated_at": "2026-02-27T10:00:00"
-                      }
-                    ]
-                  }
                 }
               }
             }
@@ -21594,15 +21934,6 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/WorkflowCreateRequest"
-              },
-              "examples": {
-                "default": {
-                  "summary": "Create a 3-stage deploy workflow",
-                  "value": {
-                    "yaml_content": "id: deploy-skill\nname: Deploy Skill Workflow\ndescription: Validates and deploys a skill artifact to a project\nversion: \"1.0\"\nparameters:\n  - name: artifact_id\n    type: string\n    required: true\n    description: Artifact identifier (type:name)\n  - name: project_id\n    type: string\n    required: true\nstages:\n  - id: validate\n    name: Validate Artifact\n    type: skill\n    artifact: skill:validator\n    depends_on: []\n  - id: approve\n    name: Manual Approval Gate\n    type: gate\n    depends_on: [validate]\n  - id: deploy\n    name: Deploy to Project\n    type: skill\n    artifact: skill:deployer\n    depends_on: [approve]\n",
-                    "project_id": null
-                  }
-                }
               }
             }
           }
@@ -21616,38 +21947,6 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Create Workflow Api V1 Workflows Post"
-                },
-                "examples": {
-                  "default": {
-                    "summary": "Newly created workflow",
-                    "value": {
-                      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                      "name": "Deploy Skill Workflow",
-                      "description": "Validates and deploys a skill artifact to a project",
-                      "version": "1.0",
-                      "status": "active",
-                      "project_id": null,
-                      "stages": [
-                        {
-                          "id": "validate",
-                          "name": "Validate Artifact",
-                          "type": "skill"
-                        },
-                        {
-                          "id": "approve",
-                          "name": "Manual Approval Gate",
-                          "type": "gate"
-                        },
-                        {
-                          "id": "deploy",
-                          "name": "Deploy to Project",
-                          "type": "skill"
-                        }
-                      ],
-                      "created_at": "2026-02-27T10:00:00",
-                      "updated_at": "2026-02-27T10:00:00"
-                    }
-                  }
                 }
               }
             }
@@ -21694,36 +21993,6 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Get Workflow Api V1 Workflows  Workflow Id  Get"
-                },
-                "examples": {
-                  "default": {
-                    "summary": "Workflow with full stage list",
-                    "value": {
-                      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                      "name": "Deploy Skill Workflow",
-                      "version": "1.0",
-                      "status": "active",
-                      "stages": [
-                        {
-                          "id": "validate",
-                          "name": "Validate Artifact",
-                          "type": "skill"
-                        },
-                        {
-                          "id": "approve",
-                          "name": "Manual Approval Gate",
-                          "type": "gate"
-                        },
-                        {
-                          "id": "deploy",
-                          "name": "Deploy to Project",
-                          "type": "skill"
-                        }
-                      ],
-                      "created_at": "2026-02-27T10:00:00",
-                      "updated_at": "2026-02-27T10:00:00"
-                    }
-                  }
                 }
               }
             }
@@ -21734,16 +22003,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Workflow or execution not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -21775,14 +22034,6 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/WorkflowUpdateRequest"
-              },
-              "examples": {
-                "default": {
-                  "summary": "Replace YAML definition",
-                  "value": {
-                    "yaml_content": "id: deploy-skill\nname: Deploy Skill Workflow\ndescription: Validates and deploys a skill artifact to a project\nversion: \"1.0\"\nparameters:\n  - name: artifact_id\n    type: string\n    required: true\n    description: Artifact identifier (type:name)\n  - name: project_id\n    type: string\n    required: true\nstages:\n  - id: validate\n    name: Validate Artifact\n    type: skill\n    artifact: skill:validator\n    depends_on: []\n  - id: approve\n    name: Manual Approval Gate\n    type: gate\n    depends_on: [validate]\n  - id: deploy\n    name: Deploy to Project\n    type: skill\n    artifact: skill:deployer\n    depends_on: [approve]\n"
-                  }
-                }
               }
             }
           }
@@ -21806,16 +22057,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Workflow or execution not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -21851,16 +22092,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Workflow or execution not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -21901,14 +22132,6 @@
                   }
                 ],
                 "title": "Request"
-              },
-              "examples": {
-                "default": {
-                  "summary": "Duplicate with custom name",
-                  "value": {
-                    "new_name": "Deploy Skill Workflow (staging)"
-                  }
-                }
               }
             }
           }
@@ -21932,16 +22155,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Workflow or execution not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -21995,18 +22208,6 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Validate Workflow Api V1 Workflows  Workflow Id  Validate Post"
-                },
-                "examples": {
-                  "default": {
-                    "summary": "Validation result (always 200)",
-                    "value": {
-                      "is_valid": true,
-                      "errors": [],
-                      "warnings": [
-                        "Stage 'deploy' has no timeout configured"
-                      ]
-                    }
-                  }
                 }
               }
             }
@@ -22017,16 +22218,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Workflow or execution not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -22067,17 +22258,6 @@
                   }
                 ],
                 "title": "Request"
-              },
-              "examples": {
-                "default": {
-                  "summary": "Generate plan with parameter overrides",
-                  "value": {
-                    "parameters": {
-                      "artifact_id": "skill:frontend-design",
-                      "project_id": "my-project"
-                    }
-                  }
-                }
               }
             }
           }
@@ -22091,36 +22271,6 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Plan Workflow Api V1 Workflows  Workflow Id  Plan Post"
-                },
-                "examples": {
-                  "default": {
-                    "summary": "Execution plan with parallel stage groups",
-                    "value": {
-                      "workflow_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                      "stages": [
-                        {
-                          "id": "validate",
-                          "name": "Validate Artifact",
-                          "parallel_group": 0
-                        },
-                        {
-                          "id": "approve",
-                          "name": "Manual Approval Gate",
-                          "parallel_group": 1
-                        },
-                        {
-                          "id": "deploy",
-                          "name": "Deploy to Project",
-                          "parallel_group": 2
-                        }
-                      ],
-                      "resolved_parameters": {
-                        "artifact_id": "skill:frontend-design",
-                        "project_id": "my-project"
-                      },
-                      "estimated_timeout_seconds": 300
-                    }
-                  }
                 }
               }
             }
@@ -22131,16 +22281,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Workflow or execution not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -22163,19 +22303,6 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/WorkflowExecutionStartRequest"
-              },
-              "examples": {
-                "default": {
-                  "summary": "Start execution with parameter overrides",
-                  "value": {
-                    "workflow_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                    "parameters": {
-                      "artifact_id": "skill:frontend-design",
-                      "project_id": "my-project"
-                    },
-                    "overrides": null
-                  }
-                }
               }
             }
           }
@@ -22189,35 +22316,6 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Start Execution Api V1 Workflow Executions Post"
-                },
-                "examples": {
-                  "default": {
-                    "summary": "Created execution record",
-                    "value": {
-                      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-                      "workflow_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                      "status": "running",
-                      "steps": [
-                        {
-                          "id": "step-1",
-                          "stage_id": "validate",
-                          "status": "pending"
-                        },
-                        {
-                          "id": "step-2",
-                          "stage_id": "approve",
-                          "status": "pending"
-                        },
-                        {
-                          "id": "step-3",
-                          "stage_id": "deploy",
-                          "status": "pending"
-                        }
-                      ],
-                      "started_at": "2026-02-27T10:05:00",
-                      "completed_at": null
-                    }
-                  }
                 }
               }
             }
@@ -22228,16 +22326,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Workflow or execution not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -22329,20 +22417,6 @@
                     "additionalProperties": true
                   },
                   "title": "Response List Executions Api V1 Workflow Executions Get"
-                },
-                "examples": {
-                  "default": {
-                    "summary": "Paginated execution list",
-                    "value": [
-                      {
-                        "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-                        "workflow_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                        "status": "completed",
-                        "started_at": "2026-02-27T10:05:00",
-                        "completed_at": "2026-02-27T10:08:30"
-                      }
-                    ]
-                  }
                 }
               }
             }
@@ -22367,7 +22441,7 @@
           "workflow-executions"
         ],
         "summary": "List executions by workflow",
-        "description": "Return all executions for a specific workflow, ordered by start time (descending). Returns an empty list if no executions exist for the given workflow ID.",
+        "description": "Return all executions for a specific workflow, ordered by start time (descending).",
         "operationId": "list_executions_by_workflow_api_v1_workflow_executions_by_workflow__workflow_id__get",
         "parameters": [
           {
@@ -22419,20 +22493,135 @@
                     "additionalProperties": true
                   },
                   "title": "Response List Executions By Workflow Api V1 Workflow Executions By Workflow  Workflow Id  Get"
-                },
-                "examples": {
-                  "default": {
-                    "summary": "Executions for a workflow (may be empty list)",
-                    "value": [
-                      {
-                        "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-                        "workflow_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                        "status": "completed",
-                        "started_at": "2026-02-27T10:05:00",
-                        "completed_at": "2026-02-27T10:08:30"
-                      }
-                    ]
-                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflow-executions/batch/pause": {
+      "post": {
+        "tags": [
+          "workflow-executions",
+          "workflow-executions"
+        ],
+        "summary": "Batch pause workflow executions",
+        "description": "Pause multiple workflow executions in a single request. Returns per-item success/failure results rather than failing the whole request on partial errors.",
+        "operationId": "batch_pause_executions_api_v1_workflow_executions_batch_pause_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchExecutionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchExecutionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflow-executions/batch/resume": {
+      "post": {
+        "tags": [
+          "workflow-executions",
+          "workflow-executions"
+        ],
+        "summary": "Batch resume workflow executions",
+        "description": "Resume multiple paused workflow executions in a single request. Returns per-item success/failure results rather than failing the whole request on partial errors.",
+        "operationId": "batch_resume_executions_api_v1_workflow_executions_batch_resume_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchExecutionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchExecutionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflow-executions/batch/cancel": {
+      "post": {
+        "tags": [
+          "workflow-executions",
+          "workflow-executions"
+        ],
+        "summary": "Batch cancel workflow executions",
+        "description": "Cancel multiple workflow executions in a single request. Returns per-item success/failure results rather than failing the whole request on partial errors.",
+        "operationId": "batch_cancel_executions_api_v1_workflow_executions_batch_cancel_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchExecutionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchExecutionResponse"
                 }
               }
             }
@@ -22479,41 +22668,6 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Get Execution Api V1 Workflow Executions  Execution Id  Get"
-                },
-                "examples": {
-                  "default": {
-                    "summary": "Execution with step details",
-                    "value": {
-                      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-                      "workflow_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                      "status": "running",
-                      "steps": [
-                        {
-                          "id": "step-1",
-                          "stage_id": "validate",
-                          "status": "completed",
-                          "started_at": "2026-02-27T10:05:00",
-                          "completed_at": "2026-02-27T10:05:30"
-                        },
-                        {
-                          "id": "step-2",
-                          "stage_id": "approve",
-                          "status": "running",
-                          "started_at": "2026-02-27T10:05:31",
-                          "completed_at": null
-                        },
-                        {
-                          "id": "step-3",
-                          "stage_id": "deploy",
-                          "status": "pending",
-                          "started_at": null,
-                          "completed_at": null
-                        }
-                      ],
-                      "started_at": "2026-02-27T10:05:00",
-                      "completed_at": null
-                    }
-                  }
                 }
               }
             }
@@ -22524,16 +22678,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Workflow or execution not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -22579,16 +22723,6 @@
                 }
               }
             }
-          },
-          "404": {
-            "description": "Workflow or execution not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
-                }
-              }
-            }
           }
         }
       }
@@ -22622,17 +22756,6 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Pause Execution Api V1 Workflow Executions  Execution Id  Pause Post"
-                },
-                "examples": {
-                  "default": {
-                    "summary": "Paused execution",
-                    "value": {
-                      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-                      "status": "paused",
-                      "started_at": "2026-02-27T10:05:00",
-                      "completed_at": null
-                    }
-                  }
                 }
               }
             }
@@ -22643,26 +22766,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Workflow or execution not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Execution is not in the required state for this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -22699,17 +22802,6 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Resume Execution Api V1 Workflow Executions  Execution Id  Resume Post"
-                },
-                "examples": {
-                  "default": {
-                    "summary": "Resumed execution",
-                    "value": {
-                      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-                      "status": "running",
-                      "started_at": "2026-02-27T10:05:00",
-                      "completed_at": null
-                    }
-                  }
                 }
               }
             }
@@ -22720,26 +22812,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Workflow or execution not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Execution is not in the required state for this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -22776,17 +22848,6 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Cancel Execution Api V1 Workflow Executions  Execution Id  Cancel Post"
-                },
-                "examples": {
-                  "default": {
-                    "summary": "Cancelled execution",
-                    "value": {
-                      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-                      "status": "cancelled",
-                      "started_at": "2026-02-27T10:05:00",
-                      "completed_at": "2026-02-27T10:06:00"
-                    }
-                  }
                 }
               }
             }
@@ -22797,26 +22858,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Workflow or execution not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Execution is not in the required state for this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -22862,18 +22903,6 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Approve Gate Api V1 Workflow Executions  Execution Id  Gates  Stage Id  Approve Post"
-                },
-                "examples": {
-                  "default": {
-                    "summary": "Approved gate step",
-                    "value": {
-                      "id": "step-2",
-                      "stage_id": "approve",
-                      "status": "completed",
-                      "started_at": "2026-02-27T10:05:31",
-                      "completed_at": "2026-02-27T10:06:00"
-                    }
-                  }
                 }
               }
             }
@@ -22884,26 +22913,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Workflow or execution not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Execution is not in the required state for this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -22953,14 +22962,6 @@
                   }
                 ],
                 "title": "Request"
-              },
-              "examples": {
-                "default": {
-                  "summary": "Reject with reason",
-                  "value": {
-                    "reason": "Artifact failed security review \u2014 please update and retry."
-                  }
-                }
               }
             }
           }
@@ -22974,18 +22975,6 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Reject Gate Api V1 Workflow Executions  Execution Id  Gates  Stage Id  Reject Post"
-                },
-                "examples": {
-                  "default": {
-                    "summary": "Rejected gate step",
-                    "value": {
-                      "id": "step-2",
-                      "stage_id": "approve",
-                      "status": "failed",
-                      "started_at": "2026-02-27T10:05:31",
-                      "completed_at": "2026-02-27T10:06:10"
-                    }
-                  }
                 }
               }
             }
@@ -22996,26 +22985,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Workflow or execution not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Execution is not in the required state for this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPError"
                 }
               }
             }
@@ -26118,6 +26087,93 @@
           "succeeded": 2,
           "total": 3
         }
+      },
+      "BatchExecutionRequest": {
+        "properties": {
+          "execution_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Execution Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_ids"
+        ],
+        "title": "BatchExecutionRequest",
+        "description": "Request body for a batch control operation.\n\nAttributes:\n    execution_ids: List of execution UUID hex strings to operate on.\n                   Must contain at least 1 and at most 50 entries."
+      },
+      "BatchExecutionResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/BatchExecutionResult"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "succeeded": {
+            "type": "integer",
+            "title": "Succeeded"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results",
+          "succeeded",
+          "failed"
+        ],
+        "title": "BatchExecutionResponse",
+        "description": "Response body for a batch control operation.\n\nAttributes:\n    results:   Per-item results in the same order as the request IDs.\n    succeeded: Count of executions that were successfully controlled.\n    failed:    Count of executions for which the operation failed."
+      },
+      "BatchExecutionResult": {
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_id",
+          "success"
+        ],
+        "title": "BatchExecutionResult",
+        "description": "Per-item result within a batch control response.\n\nAttributes:\n    execution_id: The execution UUID hex string this result refers to.\n    success:      Whether the operation succeeded for this execution.\n    status:       New execution status string if the operation succeeded.\n    error:        Human-readable error message if the operation failed."
       },
       "Body_import_bundle_api_v1_bundles_import_post": {
         "properties": {
@@ -30649,6 +30705,254 @@
         "title": "ConsolidationClustersResponse",
         "description": "Response for the GET /api/v1/artifacts/consolidation/clusters endpoint."
       },
+      "ContextEntityCategoryCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "entity_type_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Type Slug"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ContextEntityCategoryCreateRequest",
+        "description": "Request schema for creating a new entity category.\n\nAttributes:\n    name: Human-readable label shown in the UI (required).\n    slug: URL-safe machine identifier.  Auto-generated from *name* when\n          omitted.  Must contain only lowercase letters, digits, and\n          hyphens.\n    description: Optional longer description of the category's purpose.\n    color: Optional hex colour code for UI badge rendering (e.g.\n           ``\"#3B82F6\"``).\n    entity_type_slug: When set, restrict this category to artifacts of\n                      this entity type slug (e.g. ``\"skill\"``).\n    platform: When set, restrict this category to artifacts targeting this\n              platform (e.g. ``\"github-actions\"``).\n    sort_order: Ascending display order in the UI.  Defaults to ``0``."
+      },
+      "ContextEntityCategoryResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "entity_type_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Type Slug"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order"
+          },
+          "is_builtin": {
+            "type": "boolean",
+            "title": "Is Builtin"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "sort_order",
+          "is_builtin",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ContextEntityCategoryResponse",
+        "description": "Response schema for a single entity category.\n\nMirrors the ``ContextEntityCategory`` ORM model defined in\n``skillmeat/cache/models.py``.\n\nAttributes:\n    id: Auto-incrementing integer primary key.\n    name: Human-readable label shown in the UI.\n    slug: URL-safe machine identifier.\n    description: Optional longer description of the category.\n    color: Optional hex colour code for UI badge rendering.\n    entity_type_slug: Optional entity type scope filter.\n    platform: Optional platform scope filter.\n    sort_order: Ascending display order in the UI.\n    is_builtin: ``True`` for system-seeded categories.\n    created_at: Row creation timestamp (UTC).\n    updated_at: Row last-modified timestamp (UTC)."
+      },
+      "ContextEntityCategoryUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "entity_type_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Type Slug"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
+          }
+        },
+        "type": "object",
+        "title": "ContextEntityCategoryUpdateRequest",
+        "description": "Request schema for updating an existing entity category.\n\nAll fields are optional; only supplied (non-``None``) fields are updated.\n\nAttributes:\n    name: Human-readable label shown in the UI.\n    slug: URL-safe machine identifier.  Must contain only lowercase\n          letters, digits, and hyphens.\n    description: Optional longer description.\n    color: Optional hex colour code for UI badge rendering.\n    entity_type_slug: When set, restrict this category to a specific\n                      entity type slug.\n    platform: When set, restrict this category to a specific platform.\n    sort_order: Ascending display order in the UI."
+      },
       "ContextEntityCreateRequest": {
         "properties": {
           "name": {
@@ -30767,6 +31071,27 @@
             ],
             "title": "Target Platforms",
             "description": "Optional deployment platform restrictions (null means deployable on all platforms)"
+          },
+          "category_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Ids",
+            "description": "Optional list of ContextEntityCategory IDs to associate with this entity",
+            "examples": [
+              [
+                1,
+                3
+              ]
+            ]
           }
         },
         "type": "object",
@@ -30781,6 +31106,10 @@
         "example": {
           "auto_load": true,
           "category": "web",
+          "category_ids": [
+            1,
+            3
+          ],
           "content": "# Web API Patterns\n\nFollow REST conventions...",
           "deployment_profile_id": "claude_code",
           "description": "API client conventions for web frontend",
@@ -31103,6 +31432,20 @@
               "abc123def456..."
             ]
           },
+          "category_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Category Ids",
+            "description": "IDs of entity categories associated with this entity",
+            "examples": [
+              [
+                1,
+                3
+              ]
+            ]
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -31306,6 +31649,27 @@
             ],
             "title": "Target Platforms",
             "description": "Updated platform restrictions"
+          },
+          "category_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Ids",
+            "description": "When provided, replaces all existing category associations with these category IDs. Pass an empty list to clear all associations.",
+            "examples": [
+              [
+                2,
+                4
+              ]
+            ]
           }
         },
         "type": "object",
@@ -35412,6 +35776,389 @@
         "title": "EnterpriseReliabilityMetrics",
         "description": "Reliability metrics derived from sync/deploy/update outcomes."
       },
+      "EntityTypeConfigCreateRequest": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "path_prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path Prefix"
+          },
+          "required_frontmatter_keys": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Frontmatter Keys"
+          },
+          "example_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Example Path"
+          },
+          "content_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Template"
+          },
+          "applicable_platforms": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applicable Platforms"
+          },
+          "frontmatter_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frontmatter Schema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "label"
+        ],
+        "title": "EntityTypeConfigCreateRequest",
+        "description": "Request schema for creating a new entity type configuration.\n\nAttributes:\n    slug: Machine-readable unique identifier for the new type.\n          Must match ``^[a-z][a-z0-9_]{0,63}$``.  Reserved built-in\n          slugs (``skill``, ``command``, ``agent``, ``mcp_server``,\n          ``hook``) are rejected with a validation error.\n    label: Human-readable display name shown in the UI.\n    description: Optional long-form description of this entity type.\n    icon: Optional icon identifier for UI rendering.\n    path_prefix: Default filesystem path prefix for this type.\n    required_frontmatter_keys: Frontmatter keys that MUST be present.\n    example_path: An example path illustrating this entity type.\n    content_template: Default Markdown template for new entities.\n    applicable_platforms: Optional list of platform slugs this type\n        applies to.  ``None`` (the default) means all platforms.\n    frontmatter_schema: Optional JSON Schema subset for validating\n        custom type frontmatter.  Accepted keys: ``required`` (list of\n        strings) and ``properties`` (dict of key \u2192 type descriptor)."
+      },
+      "EntityTypeConfigResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "path_prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path Prefix"
+          },
+          "required_frontmatter_keys": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Frontmatter Keys"
+          },
+          "optional_frontmatter_keys": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Optional Frontmatter Keys"
+          },
+          "validation_rules": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Rules"
+          },
+          "content_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Template"
+          },
+          "applicable_platforms": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applicable Platforms"
+          },
+          "frontmatter_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frontmatter Schema"
+          },
+          "is_builtin": {
+            "type": "boolean",
+            "title": "Is Builtin"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "display_name",
+          "is_builtin",
+          "sort_order",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "EntityTypeConfigResponse",
+        "description": "Response schema for a single entity type configuration.\n\nMirrors the ``EntityTypeConfig`` ORM model defined in\n``skillmeat/cache/models.py``.\n\nAttributes:\n    id: Auto-incrementing integer primary key.\n    slug: Machine-readable unique identifier (e.g. \"skill\", \"command\").\n    display_name: Human-readable name shown in the UI.\n    description: Optional long-form description of this entity type.\n    icon: Optional icon identifier for UI rendering.\n    path_prefix: Default filesystem path prefix for this type\n                 (e.g. \".claude/skills\").\n    required_frontmatter_keys: JSON list of frontmatter keys that MUST be\n                               present in files of this type.\n    optional_frontmatter_keys: JSON list of frontmatter keys that MAY be\n                               present.\n    validation_rules: JSON object of additional validation configuration.\n    content_template: Default Markdown template used when creating a new\n                      entity of this type.\n    applicable_platforms: List of platform slugs this type applies to.\n                          ``None`` means applicable to all platforms.\n    frontmatter_schema: JSON Schema subset for custom type frontmatter\n                        validation.  ``None`` means no structured\n                        schema validation.\n    is_builtin: ``True`` for the five shipped types; ``False`` for any\n                user-created types.\n    sort_order: Display ordering in the UI (ascending).\n    created_at: Row creation timestamp (UTC).\n    updated_at: Row last-modified timestamp (UTC)."
+      },
+      "EntityTypeConfigUpdateRequest": {
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "path_prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path Prefix"
+          },
+          "required_frontmatter_keys": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Frontmatter Keys"
+          },
+          "example_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Example Path"
+          },
+          "content_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Template"
+          },
+          "applicable_platforms": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applicable Platforms"
+          },
+          "frontmatter_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frontmatter Schema"
+          }
+        },
+        "type": "object",
+        "title": "EntityTypeConfigUpdateRequest",
+        "description": "Request schema for updating an existing entity type configuration.\n\nAll fields are optional; only supplied fields are updated.\n\nAttributes:\n    label: Human-readable display name shown in the UI.\n    description: Optional long-form description of this entity type.\n    icon: Optional icon identifier for UI rendering.\n    path_prefix: Default filesystem path prefix for this type.\n    required_frontmatter_keys: Frontmatter keys that MUST be present.\n    example_path: An example path illustrating this entity type.\n    content_template: Default Markdown template for new entities.\n    applicable_platforms: Optional list of platform slugs this type\n        applies to.  ``None`` leaves the existing value unchanged.\n    frontmatter_schema: Optional JSON Schema subset for validating\n        custom type frontmatter.  ``None`` leaves the existing value\n        unchanged."
+      },
       "ErrorReasonCode": {
         "type": "string",
         "enum": [
@@ -35760,6 +36507,12 @@
             "type": "boolean",
             "title": "Workflow Engine Enabled",
             "description": "Whether the Workflow Orchestration Engine is enabled. When False, all /api/v1/workflows and /api/v1/workflow-executions endpoints return 404 and CLI workflow commands display a coming-soon message."
+          },
+          "modular_content_architecture": {
+            "type": "boolean",
+            "title": "Modular Content Architecture",
+            "description": "Whether the Modular Content Architecture is enabled (CECO-4.1). When True, context entity create/update endpoints store platform-agnostic core_content separately and assemble platform-specific content at deploy time.",
+            "default": false
           }
         },
         "type": "object",
@@ -48692,19 +49445,6 @@
         ],
         "title": "CollectionArtifactsResponse",
         "description": "Paginated response for collection artifacts.\n\nWhen include_groups=true query parameter is used, each artifact's\ngroups field will be populated with group membership information."
-      },
-      "HTTPError": {
-        "type": "object",
-        "properties": {
-          "detail": {
-            "type": "string",
-            "description": "Human-readable error message."
-          }
-        },
-        "required": [
-          "detail"
-        ],
-        "title": "HTTPError"
       }
     },
     "securitySchemes": {

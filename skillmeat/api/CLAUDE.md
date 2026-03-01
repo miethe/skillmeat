@@ -180,7 +180,7 @@ async def list_artifacts(
 | `match` | `/api/v1/match` | Artifact matching |
 | `merge` | `/api/v1/merge` | Artifact merging |
 | `ratings` | `/api/v1/ratings` | Artifact ratings |
-| `settings` | `/api/v1/settings` | User settings |
+| `settings` | `/api/v1/settings` | User settings, entity type configs, entity categories |
 | `config` | `/api/v1/config` | Configuration endpoints |
 | `project_templates` | `/api/v1/project-templates` | Project templates |
 | `workflows` | `/api/v1/workflows` | Workflow definition management |
@@ -213,6 +213,22 @@ async def delete_artifact(artifact_id: str, ...): ...
 ```
 
 See `.claude/context/key-context/router-patterns.md` for layer contract and HTTP patterns.
+
+### Settings Router Endpoints
+
+The `settings` router includes endpoints for managing entity type configurations and categories:
+
+**Entity Type Configs**:
+- `GET /api/v1/settings/entity-type-configs` - List all entity type configurations
+- `POST /api/v1/settings/entity-type-configs` - Create new entity type config
+- `PUT /api/v1/settings/entity-type-configs/{slug}` - Update entity type config by slug
+- `DELETE /api/v1/settings/entity-type-configs/{slug}` - Delete entity type config
+
+**Entity Categories**:
+- `GET /api/v1/settings/entity-categories` - List all entity categories
+- `POST /api/v1/settings/entity-categories` - Create new entity category
+
+These endpoints support multi-select entity categories via the `entity_category_associations` join table.
 
 ---
 

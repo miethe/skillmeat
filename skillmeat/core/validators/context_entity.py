@@ -1,9 +1,9 @@
 """Context entity validation module.
 
-Provides validators for all 5 context entity types with security considerations
-for path traversal prevention and content validation.
+Provides validators for all 5 built-in context entity types plus custom
+entity types defined in the ``entity_type_configs`` DB table.
 
-Entity Types:
+Entity Types (built-in):
 - ProjectConfig: CLAUDE.md files (markdown with optional frontmatter)
 - SpecFile: .claude/specs/ files (YAML frontmatter + markdown)
 - RuleFile: .claude/rules/ files (markdown with path scope comments)
@@ -11,9 +11,12 @@ Entity Types:
 - ProgressTemplate: .claude/progress/ files (YAML frontmatter + markdown hybrid)
 
 DB-backed validation:
-When ENTITY_TYPE_CONFIG_ENABLED is True, entity type configuration is loaded
-from the ``entity_type_configs`` DB table with a 60-second in-memory TTL cache.
-Falls back to the hardcoded dispatch map on DB errors or when the flag is False.
+Entity type configuration is loaded from the ``entity_type_configs`` DB table
+with a 60-second in-memory TTL cache.  On any DB error the validator falls back
+to the hardcoded dispatch map (built-in types only) with a WARNING log.
+
+Custom entity types (those not in the hardcoded map) are only available when
+the DB is reachable and the type has a row in ``entity_type_configs``.
 
 Call ``invalidate_entity_type_cache()`` to force immediate cache refresh after
 writing to the ``entity_type_configs`` table.
@@ -49,14 +52,6 @@ from skillmeat.core.path_resolver import DEFAULT_PROFILE_ROOTS
 from skillmeat.core.validators.context_path_validator import validate_context_path
 
 logger = logging.getLogger(__name__)
-
-# =============================================================================
-# Feature flag
-# =============================================================================
-
-#: Set to True to enable DB-backed entity type config loading with TTL cache.
-#: When False (default), the hardcoded dispatch map is always used.
-ENTITY_TYPE_CONFIG_ENABLED: bool = False
 
 # =============================================================================
 # TTL cache for EntityTypeConfig rows
@@ -740,8 +735,7 @@ def validate_progress_template(
     return errors
 
 
-# Hardcoded dispatch map — used when ENTITY_TYPE_CONFIG_ENABLED is False or
-# when the DB is unavailable.
+# Hardcoded dispatch map — used as fallback when the DB is unavailable.
 _HARDCODED_VALIDATORS = {
     "project_config": validate_project_config,
     "spec_file": validate_spec_file,
@@ -764,18 +758,18 @@ def validate_context_entity(
 ) -> List[ValidationErrorDict]:
     """Unified validation function for all context entity types.
 
-    When ``ENTITY_TYPE_CONFIG_ENABLED`` is True, loads configuration from the
-    ``entity_type_configs`` DB table (60-second in-memory TTL cache) and
-    delegates to ``_validate_from_db_config``.
+    Loads entity type configuration from the ``entity_type_configs`` DB table
+    (60-second in-memory TTL cache) and delegates to
+    ``_validate_from_db_config``.
 
-    Falls back to the hardcoded dispatch map when the flag is False or when the
-    DB query fails (with a WARNING log).
+    Falls back to the hardcoded dispatch map when the DB query fails (with a
+    WARNING log).  Custom entity types are only available when the DB is
+    reachable; built-in types are always available via the hardcoded fallback.
 
     Args:
         entity_type: Type of entity ("project_config", "spec_file", "rule_file",
                      "context_file", "progress_template", or any custom slug
-                     present in the ``entity_type_configs`` table when
-                     ``ENTITY_TYPE_CONFIG_ENABLED`` is True).
+                     present in the ``entity_type_configs`` DB table).
         content: File content to validate
         path: File path (for path validation and type checking)
         allowed_prefixes: Optional sequence of allowed path prefixes
@@ -790,25 +784,22 @@ def validate_context_entity(
         ``frontmatter`` field and a descriptive ``hint``.
 
     Raises:
-        ValueError: If entity_type is not recognized (hardcoded fallback path only;
-                    DB-backed path returns an empty error list for unknown types
-                    that have a DB row, and falls through to raise ValueError
-                    for types not in either the DB or the hardcoded map).
+        ValueError: If entity_type is not recognized by either the DB cache or
+                    the hardcoded fallback map.
     """
     # ------------------------------------------------------------------
-    # DB-backed path
+    # DB-backed path (always attempted first)
     # ------------------------------------------------------------------
-    if ENTITY_TYPE_CONFIG_ENABLED:
-        db_config = _get_entity_type_config(entity_type)
-        if db_config is not None:
-            return _validate_from_db_config(
-                db_config, content, path, allowed_prefixes=allowed_prefixes
-            )
-        # _get_entity_type_config already logged the warning on DB failure.
-        # Fall through to hardcoded validators.
+    db_config = _get_entity_type_config(entity_type)
+    if db_config is not None:
+        return _validate_from_db_config(
+            db_config, content, path, allowed_prefixes=allowed_prefixes
+        )
+    # _get_entity_type_config returns None on DB failure (warning already logged)
+    # or when the type simply has no row in the DB.  Fall through to hardcoded.
 
     # ------------------------------------------------------------------
-    # Hardcoded fallback path
+    # Hardcoded fallback path (built-in types only)
     # ------------------------------------------------------------------
     validator = _HARDCODED_VALIDATORS.get(entity_type)
     if validator is None:
