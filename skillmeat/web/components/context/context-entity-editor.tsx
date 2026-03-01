@@ -178,47 +178,29 @@ function derivePathPattern(config: EntityTypeConfig | null, platforms: string[])
 
   const prefix = config.path_prefix?.replace(/\/$/, '') || '.claude';
 
-  // Support {PLATFORM} token in path_prefix — replace with platform slug
+  // Support {PLATFORM} token in path_prefix — always keep token visible to indicate dynamic path
   if (prefix.includes('{PLATFORM}')) {
-    const firstPlatform = platforms.length > 0 ? platforms[0] : undefined;
-    if (!firstPlatform) {
-      // Strip the token placeholder gracefully
+    if (platforms.length === 0) {
+      // Strip the token placeholder gracefully when no platform selected
       return `${prefix.replace(/\/?\{PLATFORM\}/g, '')}/`;
     }
-    if (platforms.length > 1) {
-      // Multi-platform: show parameterized pattern
-      return `{PLATFORM_PATTERN}/`;
-    }
-    return `${prefix.replace('{PLATFORM}', firstPlatform)}/`;
+    // Always show parameterized pattern with {PLATFORM} token
+    return `${prefix}/`;
   }
 
   if (platforms.length === 0) {
     return `${prefix}/`;
   }
 
-  // When multiple platforms are selected, show a parameterized template pattern
-  if (platforms.length > 1) {
-    // Derive the sub-path after the root dir (e.g. "rules" from ".claude/rules")
-    const prefixParts = prefix.split('/');
-    const subPath = prefixParts.length > 1 ? prefixParts.slice(1).join('/') : null;
-    const pathSegment = subPath ? `${subPath}/{filename}` : '{filename}';
-    return `{PLATFORM_PATTERN}/${pathSegment}`;
-  }
-
-  // Use the first platform to build a concrete suggestion
-  const firstPlatform = platforms[0];
-  const platformOpt = PLATFORM_OPTIONS.find((p) => p.value === firstPlatform);
-  if (!platformOpt) return `${prefix}/`;
-
-  // Replace the root segment of the prefix with the platform root
+  // Always show parameterized pattern so users see the {PLATFORM} token
+  // Derive the sub-path after the root dir (e.g. "rules" from ".claude/rules")
   const prefixParts = prefix.split('/');
-  if (prefixParts.length > 1) {
-    // e.g. ".claude/skills" → ".cursor/skills"
-    prefixParts[0] = platformOpt.rootDir;
-    return `${prefixParts.join('/')}/`;
+  const subPath = prefixParts.length > 1 ? prefixParts.slice(1).join('/') : null;
+  if (subPath) {
+    return `{PLATFORM}/${subPath}/`;
   }
 
-  return `${platformOpt.rootDir}/`;
+  return `{PLATFORM}/`;
 }
 
 /**
@@ -229,7 +211,7 @@ function resolvePerPlatformPaths(
   config: EntityTypeConfig | null,
   platforms: string[],
 ): Array<{ label: string; path: string }> {
-  if (!config || platforms.length <= 1) return [];
+  if (!config || platforms.length === 0) return [];
 
   const prefix = config.path_prefix?.replace(/\/$/, '') || '.claude';
 
@@ -841,7 +823,7 @@ function V2FormFields({
                 aria-required="true"
                 aria-invalid={!!errors.path_pattern}
                 aria-describedby={errors.path_pattern ? 'path-pattern-error path_pattern-help' : 'path_pattern-help'}
-                className={isMultiPlatform ? 'pr-8' : undefined}
+                className={perPlatformPaths.length > 0 ? 'pr-8' : undefined}
                 onChange={(e) => {
                   // Detect manual edit — mark as no longer auto-derived
                   onPathPatternEdit();
@@ -849,7 +831,7 @@ function V2FormFields({
                   register('path_pattern').onChange(e);
                 }}
               />
-              {isMultiPlatform && perPlatformPaths.length > 0 && (
+              {perPlatformPaths.length > 0 && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -878,9 +860,10 @@ function V2FormFields({
               )}
             </div>
             <p id="path_pattern-help" className="text-xs text-muted-foreground">
-              {isMultiPlatform
+              {perPlatformPaths.length > 0
                 ? <>
-                    Pattern applies across platforms. Hover the <HelpCircle className="inline h-3 w-3 align-middle" aria-hidden="true" /> icon to see each resolved path.
+                    {isMultiPlatform ? 'Pattern applies across platforms.' : 'Path is resolved per platform.'}{' '}
+                    Hover the <HelpCircle className="inline h-3 w-3 align-middle" aria-hidden="true" /> icon to see the resolved path{isMultiPlatform ? 's' : ''}.
                   </>
                 : <>
                     Example:{' '}
