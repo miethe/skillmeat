@@ -2,81 +2,115 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "context-entity-creation-overhaul"
-feature_slug: "context-entity-creation-overhaul"
-prd_ref: "docs/project_plans/PRDs/features/context-entity-creation-overhaul-v1.md"
-plan_ref: "docs/project_plans/implementation_plans/features/context-entity-creation-overhaul-v1.md"
+prd: context-entity-creation-overhaul
+feature_slug: context-entity-creation-overhaul
+prd_ref: docs/project_plans/PRDs/features/context-entity-creation-overhaul-v1.md
+plan_ref: docs/project_plans/implementation_plans/features/context-entity-creation-overhaul-v1.md
 phase: 2
-title: "Entity Type Settings UI"
-status: "planning"
+title: Entity Type Settings UI
+status: completed
 started: null
 completed: null
 commit_refs: []
 pr_refs: []
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 3
-completed_tasks: 0
+completed_tasks: 3
 in_progress_tasks: 0
-blocked_tasks: 3
+blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer", "ui-engineer-enhanced"]
+owners:
+- python-backend-engineer
+- ui-engineer-enhanced
 contributors: []
-
 tasks:
-  - id: "CECO-2.1"
-    description: "Add POST/PUT/DELETE /api/v1/settings/entity-type-configs CRUD endpoints; EntityTypeConfigCreateRequest schema with slug validation; block deletion of 5 built-in slugs; invalidate in-memory validator cache on write"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["CECO-1.1", "CECO-1.3"]
-    estimated_effort: "4 pts"
-    priority: "critical"
-
-  - id: "CECO-2.2"
-    description: "Add content_template text column to EntityTypeConfig model via additive Alembic migration; update EntityTypeConfigResponse and EntityTypeConfigCreateRequest; populate 5 built-in templates from existing validator logic"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: ["CECO-1.1", "CECO-2.1"]
-    estimated_effort: "2 pts"
-    priority: "high"
-
-  - id: "CECO-2.3"
-    description: "Add Entity Types tab to settings/page.tsx behind entity_types_settings_tab flag; build EntityTypeConfigList and EntityTypeConfigForm components; connect to CRUD API via new hooks; inline template editor; built-in types read-only (template editable only)"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["CECO-2.1", "CECO-2.2"]
-    estimated_effort: "5 pts"
-    priority: "high"
-
+- id: CECO-2.1
+  description: Add POST/PUT/DELETE /api/v1/settings/entity-type-configs CRUD endpoints;
+    EntityTypeConfigCreateRequest schema with slug validation; block deletion of 5
+    built-in slugs; invalidate in-memory validator cache on write
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - CECO-1.1
+  - CECO-1.3
+  estimated_effort: 4 pts
+  priority: critical
+- id: CECO-2.2
+  description: Add content_template text column to EntityTypeConfig model via additive
+    Alembic migration; update EntityTypeConfigResponse and EntityTypeConfigCreateRequest;
+    populate 5 built-in templates from existing validator logic
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies:
+  - CECO-1.1
+  - CECO-2.1
+  estimated_effort: 2 pts
+  priority: high
+- id: CECO-2.3
+  description: Add Entity Types tab to settings/page.tsx behind entity_types_settings_tab
+    flag; build EntityTypeConfigList and EntityTypeConfigForm components; connect
+    to CRUD API via new hooks; inline template editor; built-in types read-only (template
+    editable only)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - CECO-2.1
+  - CECO-2.2
+  estimated_effort: 5 pts
+  priority: high
 parallelization:
-  batch_1: ["CECO-2.1", "CECO-2.2"]
-  batch_2: ["CECO-2.3"]
-  critical_path: ["CECO-2.1", "CECO-2.2", "CECO-2.3"]
-  estimated_total_time: "4-5 days"
-
+  batch_1:
+  - CECO-2.1
+  - CECO-2.2
+  batch_2:
+  - CECO-2.3
+  critical_path:
+  - CECO-2.1
+  - CECO-2.2
+  - CECO-2.3
+  estimated_total_time: 4-5 days
 blockers: []
-
 success_criteria:
-  - { id: "SC-2.1", description: "POST/PUT/DELETE /settings/entity-type-configs return correct status codes", status: "pending" }
-  - { id: "SC-2.2", description: "Built-in type deletion returns 409; custom type deletion returns 204", status: "pending" }
-  - { id: "SC-2.3", description: "content_template present in all API responses; migration additive", status: "pending" }
-  - { id: "SC-2.4", description: "Settings tab renders; list, create, edit, delete flows operational", status: "pending" }
-  - { id: "SC-2.5", description: "Built-in type template is editable; built-in type non-template fields are read-only", status: "pending" }
-  - { id: "SC-2.6", description: "Integration tests: CRUD round-trip for custom type; built-in type protection", status: "pending" }
-  - { id: "SC-2.7", description: "TypeScript types for EntityTypeConfigResponse generated/aligned from API schema", status: "pending" }
-
+- id: SC-2.1
+  description: POST/PUT/DELETE /settings/entity-type-configs return correct status
+    codes
+  status: pending
+- id: SC-2.2
+  description: Built-in type deletion returns 409; custom type deletion returns 204
+  status: pending
+- id: SC-2.3
+  description: content_template present in all API responses; migration additive
+  status: pending
+- id: SC-2.4
+  description: Settings tab renders; list, create, edit, delete flows operational
+  status: pending
+- id: SC-2.5
+  description: Built-in type template is editable; built-in type non-template fields
+    are read-only
+  status: pending
+- id: SC-2.6
+  description: 'Integration tests: CRUD round-trip for custom type; built-in type
+    protection'
+  status: pending
+- id: SC-2.7
+  description: TypeScript types for EntityTypeConfigResponse generated/aligned from
+    API schema
+  status: pending
 files_modified:
-  - "skillmeat/cache/models.py"
-  - "skillmeat/cache/migrations/versions/"
-  - "skillmeat/api/routers/settings.py"
-  - "skillmeat/api/schemas/context_entity.py"
-  - "skillmeat/web/app/settings/page.tsx"
-  - "skillmeat/web/app/settings/components/"
-  - "skillmeat/web/lib/api/context-entities.ts"
-  - "skillmeat/web/types/context-entity.ts"
+- skillmeat/cache/models.py
+- skillmeat/cache/migrations/versions/
+- skillmeat/api/routers/settings.py
+- skillmeat/api/schemas/context_entity.py
+- skillmeat/web/app/settings/page.tsx
+- skillmeat/web/app/settings/components/
+- skillmeat/web/lib/api/context-entities.ts
+- skillmeat/web/types/context-entity.ts
+updated: '2026-02-28'
+progress: 100
 ---
 
 # Context Entity Creation Overhaul - Phase 2: Entity Type Settings UI
