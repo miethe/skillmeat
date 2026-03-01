@@ -196,3 +196,87 @@ export interface ContextEntityDeployResponse {
   deployed_profiles: string[];
   message: string;
 }
+
+// ============================================================================
+// Entity Type Config Types
+// ============================================================================
+
+/**
+ * Represents an entity type configuration from the API.
+ * Mirrors EntityTypeConfigResponse Pydantic schema.
+ */
+export interface EntityTypeConfig {
+  /** Auto-incrementing integer primary key */
+  id: number;
+  /** Machine-readable unique identifier (e.g. "skill", "command") */
+  slug: string;
+  /** Human-readable name shown in the UI */
+  display_name: string;
+  /** Optional long-form description */
+  description?: string;
+  /** Optional icon identifier for UI rendering */
+  icon?: string;
+  /** Default filesystem path prefix (e.g. ".claude/skills") */
+  path_prefix?: string;
+  /** Frontmatter keys that MUST be present */
+  required_frontmatter_keys?: string[];
+  /** Frontmatter keys that MAY be present */
+  optional_frontmatter_keys?: string[];
+  /** Additional validation configuration */
+  validation_rules?: Record<string, unknown>;
+  /** Default Markdown template used when creating a new entity */
+  content_template?: string;
+  /** True for the five shipped types; false for user-created types */
+  is_builtin: boolean;
+  /** Display ordering in the UI (ascending) */
+  sort_order: number;
+  /** Row creation timestamp (UTC) */
+  created_at: string;
+  /** Row last-modified timestamp (UTC) */
+  updated_at: string;
+}
+
+/**
+ * Request to create a new entity type configuration.
+ * Mirrors EntityTypeConfigCreateRequest Pydantic schema.
+ * Slug must match ^[a-z][a-z0-9_]{0,63}$
+ */
+export interface EntityTypeConfigCreate {
+  /** Machine-readable unique identifier — must match ^[a-z][a-z0-9_]{0,63}$ */
+  slug: string;
+  /** Human-readable display name */
+  label: string;
+  /** Optional long-form description */
+  description?: string;
+  /** Optional icon identifier */
+  icon?: string;
+  /** Default filesystem path prefix */
+  path_prefix?: string;
+  /** Frontmatter keys that MUST be present */
+  required_frontmatter_keys?: string[];
+  /** An example path illustrating this entity type */
+  example_path?: string;
+  /** Default Markdown content template */
+  content_template?: string;
+}
+
+/**
+ * Request to update an existing entity type configuration.
+ * All fields are optional; only supplied fields are updated.
+ */
+export interface EntityTypeConfigUpdate {
+  /** Updated human-readable display name */
+  label?: string;
+  /** Updated description */
+  description?: string;
+  /** Updated icon identifier */
+  icon?: string;
+  /** Updated filesystem path prefix */
+  path_prefix?: string;
+  /** Updated required frontmatter keys */
+  required_frontmatter_keys?: string[];
+  /** Updated example path */
+  example_path?: string;
+  /** Updated content template */
+  content_template?: string;
+}

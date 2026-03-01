@@ -9,6 +9,9 @@ import type {
   ContextEntityListResponse,
   ContextEntityDeployRequest,
   ContextEntityDeployResponse,
+  EntityTypeConfig,
+  EntityTypeConfigCreate,
+  EntityTypeConfigUpdate,
 } from '@/types/context-entity';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -185,4 +188,87 @@ export async function deployContextEntity(
   }
 
   return response.json();
+}
+
+// ============================================================================
+// Entity Type Config API Methods
+// ============================================================================
+
+/**
+ * Fetch all entity type configurations
+ */
+export async function fetchEntityTypeConfigs(): Promise<EntityTypeConfig[]> {
+  const response = await fetch(buildUrl('/settings/entity-type-configs'));
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to fetch entity type configs: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Create a new entity type configuration
+ */
+export async function createEntityTypeConfig(
+  data: EntityTypeConfigCreate
+): Promise<EntityTypeConfig> {
+  const response = await fetch(buildUrl('/settings/entity-type-configs'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to create entity type config: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Update an existing entity type configuration by slug
+ */
+export async function updateEntityTypeConfig(
+  slug: string,
+  data: EntityTypeConfigUpdate
+): Promise<EntityTypeConfig> {
+  const response = await fetch(buildUrl(`/settings/entity-type-configs/${slug}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to update entity type config: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete an entity type configuration by slug
+ */
+export async function deleteEntityTypeConfig(slug: string): Promise<void> {
+  const response = await fetch(buildUrl(`/settings/entity-type-configs/${slug}`), {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to delete entity type config: ${response.statusText}`
+    );
+  }
+
+  // DELETE returns 204 No Content
 }

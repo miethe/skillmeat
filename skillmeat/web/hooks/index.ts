@@ -479,6 +479,18 @@ export {
 } from './use-context-entities';
 
 // ============================================================================
+// ENTITY TYPE CONFIGS (4 hooks)
+// ============================================================================
+// Entity type configuration CRUD (built-in and custom entity type definitions)
+export {
+  entityTypeConfigKeys,
+  useEntityTypeConfigs,
+  useCreateEntityTypeConfig,
+  useUpdateEntityTypeConfig,
+  useDeleteEntityTypeConfig,
+} from './use-entity-type-configs';
+
+// ============================================================================
 // CONTEXT SYNC (5 hooks)
 // ============================================================================
 // Context synchronization, change tracking, and conflict resolution
