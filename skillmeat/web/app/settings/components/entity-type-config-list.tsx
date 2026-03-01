@@ -247,9 +247,18 @@ function EntityTypeConfigRow({ config, onEdit, onDelete }: EntityTypeConfigRowPr
 
   return (
     <TableRow>
-      {/* Icon */}
-      <TableCell aria-label={`Icon for ${config.display_name}`}>
-        <EntityTypeIcon iconName={config.icon} />
+      {/* Icon + Color */}
+      <TableCell aria-label={`Icon and color for ${config.display_name}`}>
+        <div className="flex items-center gap-2">
+          <EntityTypeIcon iconName={config.icon} />
+          {config.color && (
+            <span
+              className="h-3 w-3 rounded-full shrink-0"
+              style={{ backgroundColor: config.color }}
+              aria-label={`Color: ${config.color}`}
+            />
+          )}
+        </div>
       </TableCell>
 
       {/* Name */}

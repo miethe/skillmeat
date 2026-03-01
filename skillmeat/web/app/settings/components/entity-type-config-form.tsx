@@ -16,8 +16,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useCreateEntityTypeConfig, useUpdateEntityTypeConfig } from '@/hooks';
+import { useCreateEntityTypeConfig, useUpdateEntityTypeConfig, useEntityTypeConfigs } from '@/hooks';
 import { useToast } from '@/hooks';
+import { ENTITY_TYPE_DEFAULT_COLORS } from '@/lib/color-constants';
 import type { EntityTypeConfig, EntityTypeConfigCreate, EntityTypeConfigUpdate } from '@/types/context-entity';
 import { IconPicker } from '@/components/shared/icon-picker';
 import { ColorSelector } from '@/components/shared/color-selector';
@@ -158,6 +159,24 @@ function TagInput({ value, onChange, placeholder, disabled, id }: TagInputProps)
 }
 
 // ---------------------------------------------------------------------------
+// Color helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Get a unique default color for a new entity type based on existing colors.
+ */
+function getNextDefaultColor(existingColors: string[]): string {
+  const normalizedExisting = new Set(existingColors.map(c => c.toLowerCase()));
+  for (const color of ENTITY_TYPE_DEFAULT_COLORS) {
+    if (!normalizedExisting.has(color.toLowerCase())) {
+      return color;
+    }
+  }
+  // Cycle through if all used
+  return ENTITY_TYPE_DEFAULT_COLORS[existingColors.length % ENTITY_TYPE_DEFAULT_COLORS.length] ?? '#3b82f6';
+}
+
+// ---------------------------------------------------------------------------
 // Form state
 // ---------------------------------------------------------------------------
 
@@ -233,6 +252,7 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
   const createConfig = useCreateEntityTypeConfig();
   const updateConfig = useUpdateEntityTypeConfig();
   const { toast } = useToast();
+  const { data: existingConfigs } = useEntityTypeConfigs();
 
   const [form, setForm] = React.useState<FormState>(() => buildInitialState(editingConfig));
   const [slugError, setSlugError] = React.useState<string | undefined>();
@@ -242,11 +262,19 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
   // Reinitialise form when the dialog opens with a different config
   React.useEffect(() => {
     if (open) {
-      setForm(buildInitialState(editingConfig));
+      const initial = buildInitialState(editingConfig);
+      // For new entities, assign a unique default color based on existing configs
+      if (!editingConfig && existingConfigs) {
+        const usedColors = existingConfigs
+          .map(c => c.color)
+          .filter((c): c is string => Boolean(c));
+        initial.color = getNextDefaultColor(usedColors);
+      }
+      setForm(initial);
       setSlugError(undefined);
       setSchemaError(undefined);
     }
-  }, [open, editingConfig]);
+  }, [open, editingConfig, existingConfigs]);
 
   const setField = React.useCallback(
     <K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -469,19 +497,17 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
           </div>
 
           {/* Color */}
-          {!isBuiltin && (
-            <div className="space-y-2">
-              <Label>Color</Label>
-              <ColorSelector
-                value={form.color || '#3B82F6'}
-                onChange={(hex) => setField('color', hex)}
-                disabled={fieldsReadOnly}
-              />
-              <p className="text-xs text-muted-foreground">
-                Color for entity type indicators on cards. Leave at default to use the built-in palette.
-              </p>
-            </div>
-          )}
+          <div className="space-y-2">
+            <Label>Color</Label>
+            <ColorSelector
+              value={form.color || '#3B82F6'}
+              onChange={(hex) => setField('color', hex)}
+              disabled={false}
+            />
+            <p className="text-xs text-muted-foreground">
+              Color for entity type indicators on cards.
+            </p>
+          </div>
 
           {/* Required frontmatter keys */}
           <div className="space-y-1.5">

@@ -32,6 +32,25 @@ export const PRESET_COLORS: ColorOption[] = [
   { hex: '#f43f5e', name: 'Rose' },
 ];
 
+/**
+ * Extended palette for unique entity type default colors.
+ * 12 distinct hues that cycle for newly created entity types.
+ */
+export const ENTITY_TYPE_DEFAULT_COLORS: string[] = [
+  '#3b82f6', // Blue
+  '#22c55e', // Green
+  '#f59e0b', // Amber
+  '#f43f5e', // Rose
+  '#8b5cf6', // Violet
+  '#06b6d4', // Cyan
+  '#f97316', // Orange
+  '#ec4899', // Pink
+  '#14b8a6', // Teal
+  '#84cc16', // Lime
+  '#6366f1', // Indigo
+  '#a855f7', // Purple
+];
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
