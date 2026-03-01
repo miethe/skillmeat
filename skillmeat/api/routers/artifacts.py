@@ -10,6 +10,7 @@ import json
 import logging
 import shutil
 import time
+import aiofiles
 from datetime import datetime, timezone
 from pathlib import Path as PathLib
 from typing import Annotated, Dict, Iterator, List, Optional
@@ -6056,18 +6057,18 @@ async def get_artifact_file_content(
         mime_type, _ = mimetypes.guess_type(str(full_path))
 
         # Check if file is binary
-        def is_binary_file(path: Path) -> bool:
+        async def is_binary_file(path: Path) -> bool:
             """Check if file is binary by reading first 8KB."""
             try:
-                with open(path, "rb") as f:
-                    chunk = f.read(8192)
+                async with aiofiles.open(path, "rb") as f:
+                    chunk = await f.read(8192)
                     return b"\x00" in chunk
             except Exception:
                 return True
 
         # Read file content
         try:
-            if is_binary_file(full_path):
+            if await is_binary_file(full_path):
                 # For binary files, return a placeholder
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -6075,8 +6076,8 @@ async def get_artifact_file_content(
                 )
 
             # Read text file
-            with open(full_path, "r", encoding="utf-8") as f:
-                content = f.read()
+            async with aiofiles.open(full_path, "r", encoding="utf-8") as f:
+                content = await f.read()
 
         except UnicodeDecodeError:
             raise HTTPException(
