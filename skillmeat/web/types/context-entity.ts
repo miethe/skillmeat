@@ -53,6 +53,8 @@ export interface ContextEntity {
   target_platforms?: Platform[];
   /** SHA-256 hash of content (for change detection) */
   content_hash?: string;
+  /** IDs of entity categories associated with this entity */
+  category_ids?: number[];
   /** Timestamp when entity was created (ISO 8601) */
   created_at: string;
   /** Timestamp when entity was last updated (ISO 8601) */
@@ -103,6 +105,8 @@ export interface CreateContextEntityRequest {
   deployment_profile_id?: string;
   /** Optional platform restrictions */
   target_platforms?: Platform[];
+  /** Optional list of ContextEntityCategory IDs to associate */
+  category_ids?: number[];
 }
 
 /**
@@ -132,6 +136,8 @@ export interface UpdateContextEntityRequest {
   deployment_profile_id?: string;
   /** Updated platform restrictions */
   target_platforms?: Platform[];
+  /** When provided, replaces all existing category associations */
+  category_ids?: number[];
 }
 
 /**

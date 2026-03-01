@@ -491,6 +491,18 @@ export {
 } from './use-entity-type-configs';
 
 // ============================================================================
+// ENTITY CATEGORIES (2 hooks)
+// ============================================================================
+// Entity category CRUD for multi-select categorisation in the creation form
+export {
+  entityCategoryKeys,
+  useEntityCategories,
+  useCreateEntityCategory,
+  type EntityCategory,
+  type EntityCategoryCreateRequest,
+} from './use-entity-categories';
+
+// ============================================================================
 // CONTEXT SYNC (5 hooks)
 // ============================================================================
 // Context synchronization, change tracking, and conflict resolution

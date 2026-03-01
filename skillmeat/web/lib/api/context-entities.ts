@@ -272,3 +272,82 @@ export async function deleteEntityTypeConfig(slug: string): Promise<void> {
 
   // DELETE returns 204 No Content
 }
+
+// ============================================================================
+// Entity Category API Methods
+// ============================================================================
+
+export interface EntityCategory {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  color?: string;
+  entity_type_slug?: string;
+  platform?: string;
+  sort_order: number;
+  is_builtin: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EntityCategoryCreateRequest {
+  name: string;
+  slug?: string;
+  description?: string;
+  color?: string;
+  entity_type_slug?: string;
+  platform?: string;
+  sort_order?: number;
+}
+
+export interface EntityCategoryFilters {
+  entity_type_slug?: string;
+  platform?: string;
+}
+
+/**
+ * Fetch all entity categories with optional filters
+ */
+export async function fetchEntityCategories(
+  filters?: EntityCategoryFilters
+): Promise<EntityCategory[]> {
+  const params = new URLSearchParams();
+  if (filters?.entity_type_slug) params.set('entity_type_slug', filters.entity_type_slug);
+  if (filters?.platform) params.set('platform', filters.platform);
+
+  const qs = params.toString();
+  const url = buildUrl(`/settings/entity-categories${qs ? `?${qs}` : ''}`);
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to fetch entity categories: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Create a new entity category
+ */
+export async function createEntityCategory(
+  data: EntityCategoryCreateRequest
+): Promise<EntityCategory> {
+  const response = await fetch(buildUrl('/settings/entity-categories'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to create entity category: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}

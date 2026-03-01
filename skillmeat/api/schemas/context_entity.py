@@ -107,6 +107,11 @@ class ContextEntityCreateRequest(BaseModel):
         default=None,
         description="Optional deployment platform restrictions (null means deployable on all platforms)",
     )
+    category_ids: Optional[List[int]] = Field(
+        default=None,
+        description="Optional list of ContextEntityCategory IDs to associate with this entity",
+        examples=[[1, 3]],
+    )
 
     @field_validator("path_pattern")
     @classmethod
@@ -143,6 +148,7 @@ class ContextEntityCreateRequest(BaseModel):
                 "version": "1.0.0",
                 "deployment_profile_id": "claude_code",
                 "target_platforms": ["claude_code", "codex"],
+                "category_ids": [1, 3],
             }
         }
 
@@ -204,6 +210,14 @@ class ContextEntityUpdateRequest(BaseModel):
     target_platforms: Optional[List[Platform]] = Field(
         default=None,
         description="Updated platform restrictions",
+    )
+    category_ids: Optional[List[int]] = Field(
+        default=None,
+        description=(
+            "When provided, replaces all existing category associations with these category IDs. "
+            "Pass an empty list to clear all associations."
+        ),
+        examples=[[2, 4]],
     )
 
     @field_validator("path_pattern")
@@ -295,6 +309,11 @@ class ContextEntityResponse(BaseModel):
         default=None,
         description="SHA-256 hash of content (for change detection)",
         examples=["abc123def456..."],
+    )
+    category_ids: List[int] = Field(
+        default_factory=list,
+        description="IDs of entity categories associated with this entity",
+        examples=[[1, 3]],
     )
     created_at: datetime = Field(
         description="Timestamp when entity was created",

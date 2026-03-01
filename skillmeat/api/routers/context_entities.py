@@ -49,7 +49,7 @@ from skillmeat.core.validators.context_path_validator import (
     validate_context_path,
 )
 
-from skillmeat.cache.models import Artifact, Project, get_session
+from skillmeat.cache.models import Artifact, ArtifactCategoryAssociation, Project, get_session
 from skillmeat.cache.repositories import DeploymentProfileRepository
 
 logger = logging.getLogger(__name__)
@@ -99,9 +99,59 @@ def _as_target_platforms(raw: Optional[List[str]]) -> Optional[List[str]]:
     return [str(item) for item in raw]
 
 
+def _sync_category_associations(
+    session,
+    artifact_uuid: str,
+    category_ids: List[int],
+) -> None:
+    """Replace all category associations for an artifact.
+
+    Deletes existing ``ArtifactCategoryAssociation`` rows for *artifact_uuid*,
+    then inserts new rows for each ID in *category_ids*.  Silently ignores
+    category IDs that do not exist in the ``entity_categories`` table.
+
+    Args:
+        session: Active SQLAlchemy session.
+        artifact_uuid: The ``Artifact.uuid`` field (hex UUID).
+        category_ids: Ordered list of ``ContextEntityCategory.id`` values to
+                      associate with the artifact.  An empty list removes all
+                      existing associations.
+    """
+    # Remove existing associations
+    session.query(ArtifactCategoryAssociation).filter(
+        ArtifactCategoryAssociation.artifact_uuid == artifact_uuid
+    ).delete(synchronize_session=False)
+
+    # Insert new associations
+    for cat_id in category_ids:
+        assoc = ArtifactCategoryAssociation(
+            artifact_uuid=artifact_uuid,
+            category_id=cat_id,
+        )
+        session.add(assoc)
+
+
 def _empty_deployed_to() -> dict:
     # Phase 3 adds response shape; deployment aggregation wiring is added separately.
     return {}
+
+
+def _get_category_ids(session, artifact_uuid: str) -> List[int]:
+    """Return the ordered list of category IDs associated with an artifact.
+
+    Args:
+        session: Active SQLAlchemy session.
+        artifact_uuid: The ``Artifact.uuid`` hex field.
+
+    Returns:
+        Sorted list of ``ContextEntityCategory.id`` values.
+    """
+    rows = (
+        session.query(ArtifactCategoryAssociation)
+        .filter(ArtifactCategoryAssociation.artifact_uuid == artifact_uuid)
+        .all()
+    )
+    return sorted(row.category_id for row in rows)
 
 
 def _profile_platform(profile: object) -> str:
@@ -314,6 +364,7 @@ async def list_context_entities(
                 target_platforms=_as_target_platforms(artifact.target_platforms),
                 deployed_to=_empty_deployed_to(),
                 content_hash=artifact.content_hash,
+                category_ids=_get_category_ids(session, artifact.uuid),
                 created_at=artifact.created_at,
                 updated_at=artifact.updated_at,
             )
@@ -445,6 +496,12 @@ async def create_context_entity(
         )
 
         session.add(artifact)
+        session.flush()  # Flush so artifact.uuid is populated before associations
+
+        # Write category associations when category_ids provided
+        if request.category_ids is not None:
+            _sync_category_associations(session, artifact.uuid, request.category_ids)
+
         session.commit()
         session.refresh(artifact)
 
@@ -465,6 +522,7 @@ async def create_context_entity(
             target_platforms=_as_target_platforms(artifact.target_platforms),
             deployed_to=_empty_deployed_to(),
             content_hash=artifact.content_hash,
+            category_ids=_get_category_ids(session, artifact.uuid),
             created_at=artifact.created_at,
             updated_at=artifact.updated_at,
         )
@@ -554,6 +612,7 @@ async def get_context_entity(entity_id: str) -> ContextEntityResponse:
             target_platforms=_as_target_platforms(artifact.target_platforms),
             deployed_to=_empty_deployed_to(),
             content_hash=artifact.content_hash,
+            category_ids=_get_category_ids(session, artifact.uuid),
             created_at=artifact.created_at,
             updated_at=artifact.updated_at,
         )
@@ -658,6 +717,8 @@ async def update_context_entity(
             artifact.target_platforms = [
                 platform.value for platform in request.target_platforms
             ]
+        if request.category_ids is not None:
+            _sync_category_associations(session, artifact.uuid, request.category_ids)
 
         # Validate content if changed or type changed
         if content_changed or request.entity_type is not None:
@@ -695,6 +756,7 @@ async def update_context_entity(
             target_platforms=_as_target_platforms(artifact.target_platforms),
             deployed_to=_empty_deployed_to(),
             content_hash=artifact.content_hash,
+            category_ids=_get_category_ids(session, artifact.uuid),
             created_at=artifact.created_at,
             updated_at=artifact.updated_at,
         )

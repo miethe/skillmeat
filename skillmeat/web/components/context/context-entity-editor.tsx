@@ -40,6 +40,9 @@ import {
   useUpdateContextEntity,
   useContextEntityContent,
   useEntityTypeConfigs,
+  useEntityCategories,
+  useCreateEntityCategory,
+  type EntityCategory,
 } from '@/hooks';
 
 // ============================================================================
@@ -75,7 +78,6 @@ interface FormData {
   entity_type: ContextEntityType;
   path_pattern: string;
   description?: string;
-  category?: string;
   auto_load: boolean;
   version?: string;
   content: string;
@@ -264,6 +266,189 @@ function PlatformMultiSelect({ value, onChange, disabled }: PlatformMultiSelectP
   );
 }
 
+// ============================================================================
+// Category multi-select with inline create
+// ============================================================================
+
+interface CategoryMultiSelectProps {
+  value: number[];
+  onChange: (value: number[]) => void;
+  disabled?: boolean;
+}
+
+function CategoryMultiSelect({ value, onChange, disabled }: CategoryMultiSelectProps) {
+  const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+
+  const { data: categories = [] } = useEntityCategories();
+  const createCategory = useCreateEntityCategory();
+
+  const selectedCategories = value.map((id) => categories.find((c) => c.id === id)).filter(
+    (c): c is EntityCategory => c !== undefined
+  );
+
+  const toggle = (id: number) => {
+    if (value.includes(id)) {
+      onChange(value.filter((v) => v !== id));
+    } else {
+      onChange([...value, id]);
+    }
+  };
+
+  const removeChip = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(value.filter((v) => v !== id));
+  };
+
+  const filteredCategories = categories.filter((c) =>
+    c.name.toLowerCase().includes(inputValue.toLowerCase())
+  );
+
+  const exactMatch = categories.some(
+    (c) => c.name.toLowerCase() === inputValue.toLowerCase()
+  );
+
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && inputValue.trim() && !exactMatch) {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        const newCategory = await createCategory.mutateAsync({ name: inputValue.trim() });
+        onChange([...value, newCategory.id]);
+        setInputValue('');
+      } catch {
+        // Ignore — error will surface via the mutation state if needed
+      }
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          role="combobox"
+          aria-expanded={open}
+          aria-label="Select categories"
+          aria-haspopup="listbox"
+          disabled={disabled}
+          className={[
+            'flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
+            'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+          ].join(' ')}
+        >
+          {selectedCategories.length === 0 ? (
+            <span className="text-muted-foreground">Select or create categories…</span>
+          ) : (
+            selectedCategories.map((cat) => (
+              <Badge
+                key={cat.id}
+                variant="secondary"
+                className="gap-0.5 pr-1 text-xs"
+                style={cat.color ? { backgroundColor: `${cat.color}20`, borderColor: cat.color } : undefined}
+              >
+                {cat.name}
+                <button
+                  type="button"
+                  aria-label={`Remove ${cat.name}`}
+                  onClick={(e) => removeChip(cat.id, e)}
+                  className="ml-0.5 rounded-full hover:bg-destructive/20"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))
+          )}
+          <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0" align="start">
+        <Command>
+          <CommandInput
+            placeholder="Search or create category…"
+            value={inputValue}
+            onValueChange={setInputValue}
+            onKeyDown={handleKeyDown}
+          />
+          <CommandList>
+            {filteredCategories.length === 0 && !inputValue && (
+              <CommandEmpty>No categories yet. Type to create one.</CommandEmpty>
+            )}
+            {filteredCategories.length === 0 && inputValue && (
+              <CommandEmpty>
+                {createCategory.isPending ? (
+                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Creating &ldquo;{inputValue}&rdquo;…
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    Press Enter to create &ldquo;{inputValue}&rdquo;
+                  </span>
+                )}
+              </CommandEmpty>
+            )}
+            {filteredCategories.length > 0 && (
+              <CommandGroup>
+                {filteredCategories.map((cat) => {
+                  const selected = value.includes(cat.id);
+                  return (
+                    <CommandItem
+                      key={cat.id}
+                      value={cat.name}
+                      onSelect={() => toggle(cat.id)}
+                    >
+                      <Check
+                        className={['mr-2 h-4 w-4', selected ? 'opacity-100' : 'opacity-0'].join(' ')}
+                        aria-hidden="true"
+                      />
+                      <span>{cat.name}</span>
+                      {cat.color && (
+                        <span
+                          className="ml-auto h-3 w-3 rounded-full border"
+                          style={{ backgroundColor: cat.color }}
+                          aria-hidden="true"
+                        />
+                      )}
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            )}
+            {inputValue && !exactMatch && filteredCategories.length > 0 && (
+              <CommandGroup>
+                <CommandItem
+                  value={`__create__${inputValue}`}
+                  onSelect={async () => {
+                    try {
+                      const newCategory = await createCategory.mutateAsync({ name: inputValue.trim() });
+                      onChange([...value, newCategory.id]);
+                      setInputValue('');
+                    } catch {
+                      // Ignore
+                    }
+                  }}
+                  disabled={createCategory.isPending}
+                >
+                  {createCategory.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <span className="mr-2 text-xs font-medium text-muted-foreground">+</span>
+                  )}
+                  <span className="text-sm">
+                    Create &ldquo;{inputValue}&rdquo;
+                  </span>
+                </CommandItem>
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 /** Inline validation hints panel — shows required frontmatter keys + description */
 interface EntityTypeHintsPanelProps {
   config: EntityTypeConfig | null;
@@ -332,6 +517,8 @@ interface V2FormFieldsProps {
   onPlatformsChange: (platforms: string[]) => void;
   pathPatternDerived: boolean;
   onPathPatternEdit: () => void;
+  selectedCategoryIds: number[];
+  onCategoryIdsChange: (ids: number[]) => void;
 }
 
 function V2FormFields({
@@ -346,6 +533,8 @@ function V2FormFields({
   onPlatformsChange,
   pathPatternDerived,
   onPathPatternEdit,
+  selectedCategoryIds,
+  onCategoryIdsChange,
 }: V2FormFieldsProps) {
   const hintsPanelId = 'entity-type-hints';
 
@@ -480,18 +669,16 @@ function V2FormFields({
         />
       </div>
 
-      {/* Category field */}
+      {/* Category multi-select */}
       <div className="space-y-2">
-        <Label htmlFor="category">Category</Label>
-        <Input
-          id="category"
-          {...register('category')}
-          placeholder="e.g., api, frontend, debugging"
+        <Label htmlFor="categories">Categories</Label>
+        <CategoryMultiSelect
+          value={selectedCategoryIds}
+          onChange={onCategoryIdsChange}
           disabled={isLoading}
-          aria-describedby="category-help"
         />
         <p id="category-help" className="text-xs text-muted-foreground">
-          For progressive disclosure grouping
+          For progressive disclosure grouping. Type a new name and press Enter to create.
         </p>
       </div>
 
@@ -655,6 +842,7 @@ export function ContextEntityEditor({
 
   // V2-specific state
   const [platforms, setPlatforms] = useState<string[]>([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [selectedConfig, setSelectedConfig] = useState<EntityTypeConfig | null>(null);
   const [pathPatternDerived, setPathPatternDerived] = useState(false);
   // Track whether the user has manually edited content (to avoid overwriting on template inject)
@@ -695,7 +883,6 @@ export function ContextEntityEditor({
       entity_type: entity?.entity_type || 'context_file',
       path_pattern: entity?.path_pattern || '.claude/',
       description: entity?.description || '',
-      category: entity?.category || '',
       auto_load: entity?.auto_load || false,
       version: entity?.version || '',
       content: initialContent,
@@ -718,6 +905,7 @@ export function ContextEntityEditor({
       setContentInitialized(false);
       setMarkdownContent(initialContent);
       setPlatforms([]);
+      setSelectedCategoryIds([]);
       setSelectedConfig(null);
       setPathPatternDerived(false);
       contentManuallyEdited.current = false;
@@ -769,6 +957,13 @@ export function ContextEntityEditor({
     }
   }, [watchedEntityType, entityTypeConfigs, selectedConfig]);
 
+  // V2: Populate selectedCategoryIds from entity in edit mode when dialog opens
+  useEffect(() => {
+    if (CREATION_FORM_V2 && open && isEditMode && entity?.category_ids) {
+      setSelectedCategoryIds(entity.category_ids);
+    }
+  }, [open, isEditMode, entity?.category_ids]);
+
   const handleMarkdownChange = useCallback(
     (content: string) => {
       setMarkdownContent(content);
@@ -815,12 +1010,12 @@ export function ContextEntityEditor({
         content: markdownContent,
         path_pattern: data.path_pattern,
         description: data.description || undefined,
-        category: data.category || undefined,
         auto_load: data.auto_load,
         version: data.version || undefined,
         ...(CREATION_FORM_V2 && platforms.length > 0
           ? { target_platforms: platforms as Platform[] }
           : {}),
+        ...(CREATION_FORM_V2 ? { category_ids: selectedCategoryIds } : {}),
       };
 
       // Call appropriate mutation
@@ -876,6 +1071,8 @@ export function ContextEntityEditor({
                   onPlatformsChange={handlePlatformsChange}
                   pathPatternDerived={pathPatternDerived}
                   onPathPatternEdit={() => setPathPatternDerived(false)}
+                  selectedCategoryIds={selectedCategoryIds}
+                  onCategoryIdsChange={setSelectedCategoryIds}
                 />
               ) : (
                 <>
@@ -984,12 +1181,12 @@ export function ContextEntityEditor({
                     />
                   </div>
 
-                  {/* Category field */}
+                  {/* Category field (V1 legacy — plain text, not multi-select) */}
                   <div className="space-y-2">
                     <Label htmlFor="category">Category</Label>
                     <Input
                       id="category"
-                      {...register('category')}
+                      defaultValue={entity?.category || ''}
                       placeholder="e.g., api, frontend, debugging"
                       disabled={isLoading}
                       aria-describedby="category-help"
