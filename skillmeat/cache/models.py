@@ -4266,6 +4266,9 @@ class EntityTypeConfig(Base):
     # Path configuration
     path_prefix: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
+    # Example path illustrating this entity type
+    example_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
     # Frontmatter schema — stored as JSON arrays/objects
     required_frontmatter_keys: Mapped[Optional[Any]] = mapped_column(
         JSON, nullable=True
@@ -4340,6 +4343,7 @@ class EntityTypeConfig(Base):
             "description": self.description,
             "icon": self.icon,
             "path_prefix": self.path_prefix,
+            "example_path": self.example_path,
             "required_frontmatter_keys": self.required_frontmatter_keys,
             "optional_frontmatter_keys": self.optional_frontmatter_keys,
             "validation_rules": self.validation_rules,
