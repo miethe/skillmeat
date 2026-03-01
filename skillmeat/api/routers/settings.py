@@ -931,6 +931,24 @@ async def create_entity_type_config(
     """
     session = get_session()
     try:
+        # Reject reserved built-in slugs at the router level so the 400 error
+        # is explicit even if schema validation is bypassed (e.g. direct DB
+        # writes or future schema evolution).
+        from skillmeat.api.schemas.entity_type_config import RESERVED_BUILTIN_SLUGS  # noqa: PLC0415
+
+        if request.slug in RESERVED_BUILTIN_SLUGS:
+            logger.warning(
+                f"create_entity_type_config: attempted use of reserved slug={request.slug!r}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"slug '{request.slug}' is reserved for a built-in entity type "
+                    f"and cannot be used for custom types. "
+                    f"Reserved slugs: {sorted(RESERVED_BUILTIN_SLUGS)}"
+                ),
+            )
+
         # Enforce slug uniqueness
         existing = (
             session.query(EntityTypeConfig)
@@ -963,6 +981,8 @@ async def create_entity_type_config(
             required_frontmatter_keys=request.required_frontmatter_keys,
             example_path=request.example_path,
             content_template=request.content_template,
+            applicable_platforms=request.applicable_platforms,
+            frontmatter_schema=request.frontmatter_schema,
             is_builtin=False,
             sort_order=next_sort_order,
         )

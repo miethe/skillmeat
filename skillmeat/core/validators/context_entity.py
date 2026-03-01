@@ -38,6 +38,13 @@ ValidationErrorDict = Dict[str, str]
 
 import yaml
 
+try:
+    import jsonschema as _jsonschema  # noqa: PLC0415
+    _JSONSCHEMA_AVAILABLE = True
+except ImportError:  # pragma: no cover — jsonschema is in pyproject.toml
+    _jsonschema = None  # type: ignore[assignment]
+    _JSONSCHEMA_AVAILABLE = False
+
 from skillmeat.core.path_resolver import DEFAULT_PROFILE_ROOTS
 from skillmeat.core.validators.context_path_validator import validate_context_path
 
@@ -101,10 +108,13 @@ def _load_entity_type_cache() -> Optional[Dict[str, Any]]:
                 cache[row.slug] = {
                     "slug": row.slug,
                     "display_name": row.display_name,
+                    "is_builtin": row.is_builtin,
                     "path_prefix": row.path_prefix,
                     "required_frontmatter_keys": row.required_frontmatter_keys or [],
                     "optional_frontmatter_keys": row.optional_frontmatter_keys or [],
                     "validation_rules": row.validation_rules or {},
+                    "applicable_platforms": row.applicable_platforms,
+                    "frontmatter_schema": row.frontmatter_schema,
                 }
             _entity_type_cache = cache
             _entity_type_cache_loaded_at = time.time()
@@ -356,6 +366,36 @@ def _validate_from_db_config(
                     "field": "type",
                     "hint": f"Frontmatter 'type' field must be '{type_must_equal}'",
                 })
+
+        # JSON Schema validation for custom (non-built-in) types.
+        # Built-in types rely exclusively on hardcoded logic above; custom
+        # types may supply a ``frontmatter_schema`` JSON Schema subset.
+        is_builtin: bool = bool(config.get("is_builtin", True))
+        frontmatter_schema: Optional[Dict[str, Any]] = config.get("frontmatter_schema")
+        if (
+            not is_builtin
+            and frontmatter_schema
+            and _JSONSCHEMA_AVAILABLE
+        ):
+            try:
+                _jsonschema.validate(instance=frontmatter, schema=frontmatter_schema)
+            except _jsonschema.ValidationError as exc:
+                # Convert jsonschema path to a dotted field name for display.
+                field_path = ".".join(str(p) for p in exc.absolute_path) or "frontmatter"
+                errors.append({
+                    "field": "frontmatter",
+                    "hint": (
+                        f"Frontmatter field '{field_path}' failed schema validation: "
+                        f"{exc.message}"
+                    ),
+                })
+            except _jsonschema.SchemaError as exc:
+                # The stored schema itself is malformed — log and skip.
+                logger.warning(
+                    "_validate_from_db_config: invalid frontmatter_schema for slug=%r: %s",
+                    config.get("slug"),
+                    exc.message,
+                )
 
     # Check content after frontmatter is not empty (when frontmatter was present)
     if frontmatter is not None and not remaining.strip():
@@ -733,7 +773,9 @@ def validate_context_entity(
 
     Args:
         entity_type: Type of entity ("project_config", "spec_file", "rule_file",
-                     "context_file", "progress_template")
+                     "context_file", "progress_template", or any custom slug
+                     present in the ``entity_type_configs`` table when
+                     ``ENTITY_TYPE_CONFIG_ENABLED`` is True).
         content: File content to validate
         path: File path (for path validation and type checking)
         allowed_prefixes: Optional sequence of allowed path prefixes
@@ -743,8 +785,15 @@ def validate_context_entity(
         (empty if valid).  Valid ``field`` values are: ``content``,
         ``path_pattern``, ``frontmatter``, ``type``.
 
+        For custom types that have a ``frontmatter_schema`` defined, additional
+        errors from ``jsonschema.validate()`` are included with the
+        ``frontmatter`` field and a descriptive ``hint``.
+
     Raises:
-        ValueError: If entity_type is not recognized
+        ValueError: If entity_type is not recognized (hardcoded fallback path only;
+                    DB-backed path returns an empty error list for unknown types
+                    that have a DB row, and falls through to raise ValueError
+                    for types not in either the DB or the hardcoded map).
     """
     # ------------------------------------------------------------------
     # DB-backed path

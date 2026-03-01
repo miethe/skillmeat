@@ -2,58 +2,75 @@
 type: progress
 schema_version: 2
 doc_type: progress
-prd: "context-entity-creation-overhaul"
-feature_slug: "context-entity-creation-overhaul"
-prd_ref: "docs/project_plans/PRDs/features/context-entity-creation-overhaul-v1.md"
-plan_ref: "docs/project_plans/implementation_plans/features/context-entity-creation-overhaul-v1.md"
+prd: context-entity-creation-overhaul
+feature_slug: context-entity-creation-overhaul
+prd_ref: docs/project_plans/PRDs/features/context-entity-creation-overhaul-v1.md
+plan_ref: docs/project_plans/implementation_plans/features/context-entity-creation-overhaul-v1.md
 phase: 4
-title: "Modular Content Architecture"
-status: "planning"
+title: Modular Content Architecture
+status: in_progress
 started: null
 completed: null
 commit_refs: []
 pr_refs: []
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 1
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 1
 at_risk_tasks: 0
-
-owners: ["python-backend-engineer", "data-layer-expert"]
+owners:
+- python-backend-engineer
+- data-layer-expert
 contributors: []
-
 tasks:
-  - id: "CECO-4.1"
-    description: "Add core_content nullable Text column to Artifact via additive Alembic migration; write skillmeat/core/content_assembly.py with assemble_content(core_content, entity_type_config, platform); modify deploy endpoint to call assembly engine when core_content present (flag-gated); modify POST/PUT /context-entities to store core_content separately when flag enabled"
-    status: "pending"
-    assigned_to: ["python-backend-engineer", "data-layer-expert"]
-    dependencies: ["CECO-3.3"]
-    estimated_effort: "5 pts"
-    priority: "high"
-
+- id: CECO-4.1
+  description: Add core_content nullable Text column to Artifact via additive Alembic
+    migration; write skillmeat/core/content_assembly.py with assemble_content(core_content,
+    entity_type_config, platform); modify deploy endpoint to call assembly engine
+    when core_content present (flag-gated); modify POST/PUT /context-entities to store
+    core_content separately when flag enabled
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  - data-layer-expert
+  dependencies:
+  - CECO-3.3
+  estimated_effort: 5 pts
+  priority: high
 parallelization:
-  batch_1: ["CECO-4.1"]
-  critical_path: ["CECO-4.1"]
-  estimated_total_time: "5-7 days"
-
+  batch_1:
+  - CECO-4.1
+  critical_path:
+  - CECO-4.1
+  estimated_total_time: 5-7 days
 blockers: []
-
 success_criteria:
-  - { id: "SC-4.1", description: "core_content column added; existing Artifact rows unaffected", status: "pending" }
-  - { id: "SC-4.2", description: "assemble_content() produces platform-correct output for all 5 built-in types", status: "pending" }
-  - { id: "SC-4.3", description: "Deploy endpoint uses assembled content when flag enabled; raw content when disabled", status: "pending" }
-  - { id: "SC-4.4", description: "Stored core_content is platform-agnostic (no platform-specific wrappers in DB)", status: "pending" }
-  - { id: "SC-4.5", description: "Unit tests: assembly for all built-in types × all 5 platforms", status: "pending" }
-
+- id: SC-4.1
+  description: core_content column added; existing Artifact rows unaffected
+  status: pending
+- id: SC-4.2
+  description: assemble_content() produces platform-correct output for all 5 built-in
+    types
+  status: pending
+- id: SC-4.3
+  description: Deploy endpoint uses assembled content when flag enabled; raw content
+    when disabled
+  status: pending
+- id: SC-4.4
+  description: Stored core_content is platform-agnostic (no platform-specific wrappers
+    in DB)
+  status: pending
+- id: SC-4.5
+  description: "Unit tests: assembly for all built-in types \xD7 all 5 platforms"
+  status: pending
 files_modified:
-  - "skillmeat/cache/models.py"
-  - "skillmeat/cache/migrations/versions/"
-  - "skillmeat/core/content_assembly.py"
-  - "skillmeat/api/routers/context_entities.py"
+- skillmeat/cache/models.py
+- skillmeat/cache/migrations/versions/
+- skillmeat/core/content_assembly.py
+- skillmeat/api/routers/context_entities.py
+updated: '2026-03-01'
 ---
 
 # Context Entity Creation Overhaul - Phase 4: Modular Content Architecture

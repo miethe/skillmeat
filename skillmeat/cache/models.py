@@ -4267,6 +4267,26 @@ class EntityTypeConfig(Base):
     # Content template
     content_template: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Platform applicability — JSON list of platform slugs (None means all platforms)
+    applicable_platforms: Mapped[Optional[Any]] = mapped_column(
+        JSON,
+        nullable=True,
+        comment=(
+            "JSON list of platform slugs this type applies to. "
+            "None means applicable to all platforms."
+        ),
+    )
+
+    # Frontmatter JSON Schema subset for custom type validation
+    frontmatter_schema: Mapped[Optional[Any]] = mapped_column(
+        JSON,
+        nullable=True,
+        comment=(
+            "JSON Schema subset for validating custom type frontmatter. "
+            "Structure: {\"required\": [\"key1\"], \"properties\": {\"key1\": {\"type\": \"string\"}}}"
+        ),
+    )
+
     # Metadata
     is_builtin: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="1"
@@ -4313,6 +4333,8 @@ class EntityTypeConfig(Base):
             "optional_frontmatter_keys": self.optional_frontmatter_keys,
             "validation_rules": self.validation_rules,
             "content_template": self.content_template,
+            "applicable_platforms": self.applicable_platforms,
+            "frontmatter_schema": self.frontmatter_schema,
             "is_builtin": self.is_builtin,
             "sort_order": self.sort_order,
             "created_at": self.created_at.isoformat() if self.created_at else None,
