@@ -11,6 +11,12 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, status
 
 from skillmeat.api.dependencies import ConfigManagerDep
+from skillmeat.api.schemas.category import (
+    ContextEntityCategoryCreateRequest,
+    ContextEntityCategoryResponse,
+    ContextEntityCategoryUpdateRequest,
+    _slugify,
+)
 from skillmeat.api.schemas.entity_type_config import (
     EntityTypeConfigCreateRequest,
     EntityTypeConfigResponse,
@@ -35,7 +41,7 @@ from skillmeat.api.schemas.settings import (
     SimilarityThresholdsResponse,
     SimilarityThresholdsUpdateRequest,
 )
-from skillmeat.cache.models import EntityTypeConfig, get_session
+from skillmeat.cache.models import ArtifactCategoryAssociation, ContextEntityCategory, EntityTypeConfig, get_session
 from skillmeat.core.validators.context_entity import invalidate_entity_type_cache
 from skillmeat.core.github_client import (
     GitHubAuthError,
@@ -1116,4 +1122,294 @@ async def delete_entity_type_config(slug: str) -> None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete entity type configuration.",
+        ) from exc
+
+
+# ---------------------------------------------------------------------------
+# Entity Category endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/entity-categories",
+    response_model=List[ContextEntityCategoryResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List entity categories",
+    description="""
+    Returns all ``ContextEntityCategory`` rows ordered by ``sort_order``.
+
+    Optionally filter by ``entity_type_slug`` and/or ``platform``.
+    """,
+)
+async def list_entity_categories(
+    entity_type_slug: Optional[str] = None,
+    platform: Optional[str] = None,
+) -> List[ContextEntityCategoryResponse]:
+    """Return entity categories, with optional filtering.
+
+    Args:
+        entity_type_slug: When provided, return only categories scoped to
+                          this entity type slug.
+        platform: When provided, return only categories scoped to this
+                  platform.
+
+    Returns:
+        List of entity category records, ascending by sort_order.
+
+    Raises:
+        HTTPException 500: If the database query fails unexpectedly.
+    """
+    session = get_session()
+    try:
+        query = session.query(ContextEntityCategory)
+        if entity_type_slug is not None:
+            query = query.filter(
+                ContextEntityCategory.entity_type_slug == entity_type_slug
+            )
+        if platform is not None:
+            query = query.filter(ContextEntityCategory.platform == platform)
+        categories = query.order_by(ContextEntityCategory.sort_order).all()
+        logger.debug(f"Retrieved {len(categories)} entity categories")
+        return [ContextEntityCategoryResponse.model_validate(c) for c in categories]
+    except Exception as exc:
+        logger.exception(f"Failed to list entity categories: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve entity categories.",
+        ) from exc
+
+
+@router.post(
+    "/entity-categories",
+    response_model=ContextEntityCategoryResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new entity category",
+    description="""
+    Create a new ``ContextEntityCategory``.
+
+    If ``slug`` is omitted it is auto-generated from ``name`` using
+    a simple slugification rule (lowercase, hyphens).
+
+    Returns 409 Conflict if a category with the same slug already exists.
+    """,
+)
+async def create_entity_category(
+    request: ContextEntityCategoryCreateRequest,
+) -> ContextEntityCategoryResponse:
+    """Create a new entity category.
+
+    Args:
+        request: Creation request with name and optional metadata.
+
+    Returns:
+        The newly created entity category row.
+
+    Raises:
+        HTTPException 409: If a category with the resolved slug already
+                           exists.
+        HTTPException 500: If the database write fails unexpectedly.
+    """
+    resolved_slug = request.slug if request.slug else _slugify(request.name)
+
+    session = get_session()
+    try:
+        existing = (
+            session.query(ContextEntityCategory)
+            .filter(ContextEntityCategory.slug == resolved_slug)
+            .first()
+        )
+        if existing is not None:
+            logger.warning(
+                f"create_entity_category: slug={resolved_slug!r} already exists"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"An entity category with slug '{resolved_slug}' already exists.",
+            )
+
+        category = ContextEntityCategory(
+            name=request.name,
+            slug=resolved_slug,
+            description=request.description,
+            color=request.color,
+            entity_type_slug=request.entity_type_slug,
+            platform=request.platform,
+            sort_order=request.sort_order,
+            is_builtin=False,
+        )
+        session.add(category)
+        session.commit()
+        session.refresh(category)
+
+        logger.info(f"create_entity_category: created slug={resolved_slug!r}")
+        return ContextEntityCategoryResponse.model_validate(category)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        session.rollback()
+        logger.exception(f"Failed to create entity category: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create entity category.",
+        ) from exc
+
+
+@router.put(
+    "/entity-categories/{category_id}",
+    response_model=ContextEntityCategoryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update an entity category",
+    description="""
+    Update one or more fields on an existing ``ContextEntityCategory``.
+
+    Only supplied (non-``null``) fields are updated; others remain unchanged.
+
+    Returns 409 Conflict if the new slug collides with an existing row.
+    """,
+)
+async def update_entity_category(
+    category_id: int,
+    request: ContextEntityCategoryUpdateRequest,
+) -> ContextEntityCategoryResponse:
+    """Update an existing entity category.
+
+    Args:
+        category_id: Integer primary key of the category to update.
+        request: Partial update request; omitted fields are left unchanged.
+
+    Returns:
+        The updated entity category row.
+
+    Raises:
+        HTTPException 404: If no category with the given ID exists.
+        HTTPException 409: If the requested new slug is already taken.
+        HTTPException 500: If the database write fails unexpectedly.
+    """
+    session = get_session()
+    try:
+        category = (
+            session.query(ContextEntityCategory)
+            .filter(ContextEntityCategory.id == category_id)
+            .first()
+        )
+        if category is None:
+            logger.warning(
+                f"update_entity_category: id={category_id!r} not found"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Entity category with id '{category_id}' not found.",
+            )
+
+        updates = request.model_dump(exclude_none=True)
+
+        # Check slug uniqueness when slug is being changed
+        new_slug = updates.get("slug")
+        if new_slug is not None and new_slug != category.slug:
+            collision = (
+                session.query(ContextEntityCategory)
+                .filter(ContextEntityCategory.slug == new_slug)
+                .first()
+            )
+            if collision is not None:
+                logger.warning(
+                    f"update_entity_category: slug={new_slug!r} already exists"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"An entity category with slug '{new_slug}' already exists.",
+                )
+
+        for field, value in updates.items():
+            setattr(category, field, value)
+
+        session.commit()
+        session.refresh(category)
+
+        logger.info(
+            f"update_entity_category: updated id={category_id!r} fields={list(updates)!r}"
+        )
+        return ContextEntityCategoryResponse.model_validate(category)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        session.rollback()
+        logger.exception(f"Failed to update entity category {category_id!r}: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update entity category.",
+        ) from exc
+
+
+@router.delete(
+    "/entity-categories/{category_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete an entity category",
+    description="""
+    Delete an entity category by integer ID.
+
+    Returns 409 Conflict if the category has one or more artifact
+    associations (i.e. artifacts are still tagged with this category).
+    Disassociate all artifacts first, then retry.
+    """,
+)
+async def delete_entity_category(category_id: int) -> None:
+    """Delete an entity category.
+
+    Args:
+        category_id: Integer primary key of the category to delete.
+
+    Raises:
+        HTTPException 404: If no category with the given ID exists.
+        HTTPException 409: If the category has artifact associations.
+        HTTPException 500: If the database write fails unexpectedly.
+    """
+    session = get_session()
+    try:
+        category = (
+            session.query(ContextEntityCategory)
+            .filter(ContextEntityCategory.id == category_id)
+            .first()
+        )
+        if category is None:
+            logger.warning(
+                f"delete_entity_category: id={category_id!r} not found"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Entity category with id '{category_id}' not found.",
+            )
+
+        # Guard against orphaning artifact associations
+        association_count = (
+            session.query(ArtifactCategoryAssociation)
+            .filter(ArtifactCategoryAssociation.category_id == category_id)
+            .count()
+        )
+        if association_count > 0:
+            logger.warning(
+                f"delete_entity_category: id={category_id!r} has "
+                f"{association_count} artifact association(s); refusing deletion"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Entity category '{category.slug}' has {association_count} "
+                    "artifact association(s) and cannot be deleted. "
+                    "Remove all artifact associations first."
+                ),
+            )
+
+        session.delete(category)
+        session.commit()
+
+        logger.info(f"delete_entity_category: deleted id={category_id!r} slug={category.slug!r}")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        session.rollback()
+        logger.exception(f"Failed to delete entity category {category_id!r}: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete entity category.",
         ) from exc
