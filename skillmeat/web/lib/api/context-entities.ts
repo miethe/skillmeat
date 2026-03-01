@@ -351,3 +351,54 @@ export async function createEntityCategory(
 
   return response.json();
 }
+
+export interface EntityCategoryUpdateRequest {
+  name?: string;
+  slug?: string;
+  description?: string;
+  color?: string;
+  entity_type_slug?: string;
+  platform?: string;
+  sort_order?: number;
+}
+
+/**
+ * Update an existing entity category by slug
+ */
+export async function updateEntityCategory(
+  slug: string,
+  data: EntityCategoryUpdateRequest
+): Promise<EntityCategory> {
+  const response = await fetch(buildUrl(`/settings/entity-categories/${slug}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to update entity category: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete an entity category by slug
+ */
+export async function deleteEntityCategory(slug: string): Promise<void> {
+  const response = await fetch(buildUrl(`/settings/entity-categories/${slug}`), {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.detail || `Failed to delete entity category: ${response.statusText}`
+    );
+  }
+
+  // DELETE returns 204 No Content
+}

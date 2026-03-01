@@ -99,3 +99,47 @@ export function getEntityTypeConfig(entityType: string | undefined | null): Cont
 
   return DEFAULT_ENTITY_TYPE_CONFIG;
 }
+
+/**
+ * Dynamic color style properties derived from a custom hex color.
+ * Apply these via `style` prop when a custom color is present.
+ * Returns `null` when no valid color is supplied so callers can fall back to Tailwind classes.
+ */
+export interface EntityTypeColorStyles {
+  /** Card left-border accent color */
+  borderColor: string;
+  /** Subtle card background tint (2% opacity) */
+  backgroundColor: string;
+  /** Badge background color (10% opacity) */
+  badgeBgColor: string;
+  /** Badge text / icon color */
+  badgeTextColor: string;
+}
+
+/**
+ * Converts a hex color string into inline CSS color values for entity type styling.
+ * Returns `null` when `color` is falsy so consumers can safely fall back to static
+ * Tailwind classes (`config.borderClass`, `config.cardBgClass`, etc.).
+ *
+ * @example
+ * ```tsx
+ * const colorStyles = getEntityTypeColorStyles(config.color);
+ * <Card
+ *   className={cn('border-l-4', !colorStyles && config.borderClass, !colorStyles && config.cardBgClass)}
+ *   style={colorStyles ? { borderColor: colorStyles.borderColor, backgroundColor: colorStyles.backgroundColor } : undefined}
+ * />
+ * ```
+ */
+export function getEntityTypeColorStyles(color?: string | null): EntityTypeColorStyles | null {
+  if (!color) return null;
+
+  const hex = color.trim();
+  if (!hex.startsWith('#') || (hex.length !== 4 && hex.length !== 7)) return null;
+
+  return {
+    borderColor: hex,
+    backgroundColor: `${hex}05`, // ~2% opacity tint for card background
+    badgeBgColor: `${hex}1a`,    // ~10% opacity for badge background
+    badgeTextColor: hex,
+  };
+}

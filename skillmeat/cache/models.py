@@ -4231,6 +4231,8 @@ class EntityTypeConfig(Base):
         display_name: Human-readable name shown in the UI.
         description: Optional long-form description of this entity type.
         icon: Optional icon identifier for UI rendering.
+        color: Optional hex color code for UI card indicators
+               (e.g. ``'#3B82F6'``).  ``None`` uses default theme colors.
         path_prefix: Default filesystem path prefix for this type
                      (e.g. ".claude/skills").
         required_frontmatter_keys: JSON list of frontmatter keys that MUST be
@@ -4262,6 +4264,11 @@ class EntityTypeConfig(Base):
     display_name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     icon: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    color: Mapped[Optional[str]] = mapped_column(
+        String(7),
+        nullable=True,
+        comment="Optional hex color code for UI card indicators (e.g. '#3B82F6')",
+    )
 
     # Path configuration
     path_prefix: Mapped[Optional[str]] = mapped_column(String, nullable=True)
@@ -4342,6 +4349,7 @@ class EntityTypeConfig(Base):
             "display_name": self.display_name,
             "description": self.description,
             "icon": self.icon,
+            "color": self.color,
             "path_prefix": self.path_prefix,
             "example_path": self.example_path,
             "required_frontmatter_keys": self.required_frontmatter_keys,

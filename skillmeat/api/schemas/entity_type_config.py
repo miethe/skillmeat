@@ -9,7 +9,7 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Slug pattern: lowercase letter, then up to 63 lowercase letters, digits, or underscores.
 _SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
@@ -96,6 +96,8 @@ class EntityTypeConfigCreateRequest(BaseModel):
         label: Human-readable display name shown in the UI.
         description: Optional long-form description of this entity type.
         icon: Optional icon identifier for UI rendering.
+        color: Optional hex color code for card indicators
+               (e.g. ``'#3B82F6'``).  ``None`` uses default theme colors.
         path_prefix: Default filesystem path prefix for this type.
         required_frontmatter_keys: Frontmatter keys that MUST be present.
         example_path: An example path illustrating this entity type.
@@ -111,6 +113,11 @@ class EntityTypeConfigCreateRequest(BaseModel):
     label: str
     description: Optional[str] = None
     icon: Optional[str] = None
+    color: Optional[str] = Field(
+        None,
+        description="Optional hex color code for card indicators (e.g. '#3B82F6')",
+        max_length=7,
+    )
     path_prefix: Optional[str] = None
     required_frontmatter_keys: Optional[List[str]] = None
     example_path: Optional[str] = None
@@ -153,6 +160,9 @@ class EntityTypeConfigUpdateRequest(BaseModel):
         label: Human-readable display name shown in the UI.
         description: Optional long-form description of this entity type.
         icon: Optional icon identifier for UI rendering.
+        color: Optional hex color code for card indicators
+               (e.g. ``'#3B82F6'``).  ``None`` leaves the existing value
+               unchanged.
         path_prefix: Default filesystem path prefix for this type.
         required_frontmatter_keys: Frontmatter keys that MUST be present.
         example_path: An example path illustrating this entity type.
@@ -167,6 +177,11 @@ class EntityTypeConfigUpdateRequest(BaseModel):
     label: Optional[str] = None
     description: Optional[str] = None
     icon: Optional[str] = None
+    color: Optional[str] = Field(
+        None,
+        description="Optional hex color code for card indicators (e.g. '#3B82F6')",
+        max_length=7,
+    )
     path_prefix: Optional[str] = None
     required_frontmatter_keys: Optional[List[str]] = None
     example_path: Optional[str] = None
@@ -195,6 +210,8 @@ class EntityTypeConfigResponse(BaseModel):
         display_name: Human-readable name shown in the UI.
         description: Optional long-form description of this entity type.
         icon: Optional icon identifier for UI rendering.
+        color: Optional hex color code for card indicators
+               (e.g. ``'#3B82F6'``).  ``None`` means default theme colors.
         path_prefix: Default filesystem path prefix for this type
                      (e.g. ".claude/skills").
         required_frontmatter_keys: JSON list of frontmatter keys that MUST be
@@ -222,6 +239,11 @@ class EntityTypeConfigResponse(BaseModel):
     display_name: str
     description: Optional[str] = None
     icon: Optional[str] = None
+    color: Optional[str] = Field(
+        None,
+        description="Optional hex color code for card indicators (e.g. '#3B82F6')",
+        max_length=7,
+    )
     path_prefix: Optional[str] = None
     required_frontmatter_keys: Optional[List[str]] = None
     optional_frontmatter_keys: Optional[List[str]] = None

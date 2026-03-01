@@ -19,6 +19,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateEntityTypeConfig, useUpdateEntityTypeConfig } from '@/hooks';
 import { useToast } from '@/hooks';
 import type { EntityTypeConfig, EntityTypeConfigCreate, EntityTypeConfigUpdate } from '@/types/context-entity';
+import { IconPicker } from '@/components/shared/icon-picker';
+import { ColorSelector } from '@/components/shared/color-selector';
 
 // ---------------------------------------------------------------------------
 // Platform constants
@@ -164,6 +166,7 @@ interface FormState {
   label: string;
   description: string;
   icon: string;
+  color: string;
   path_prefix: string;
   required_frontmatter_keys: string[];
   example_path: string;
@@ -179,6 +182,7 @@ function buildInitialState(config: EntityTypeConfig | null): FormState {
       label: config.display_name,
       description: config.description ?? '',
       icon: config.icon ?? '',
+      color: config.color ?? '',
       path_prefix: config.path_prefix ?? '',
       required_frontmatter_keys: config.required_frontmatter_keys ?? [],
       example_path: '',
@@ -194,6 +198,7 @@ function buildInitialState(config: EntityTypeConfig | null): FormState {
     label: '',
     description: '',
     icon: '',
+    color: '',
     path_prefix: '',
     required_frontmatter_keys: [],
     example_path: '',
@@ -310,6 +315,7 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
             label: form.label || undefined,
             description: form.description || undefined,
             icon: form.icon || undefined,
+            color: form.color || null,
             path_prefix: form.path_prefix || undefined,
             required_frontmatter_keys:
               form.required_frontmatter_keys.length > 0
@@ -331,6 +337,7 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
             label: form.label,
             description: form.description || undefined,
             icon: form.icon || undefined,
+            color: form.color || null,
             path_prefix: form.path_prefix || undefined,
             required_frontmatter_keys:
               form.required_frontmatter_keys.length > 0
@@ -443,11 +450,9 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="etc-icon">Icon</Label>
-              <Input
-                id="etc-icon"
+              <IconPicker
                 value={form.icon}
-                onChange={(e) => setField('icon', e.target.value)}
-                placeholder="e.g. 📄 or icon-name"
+                onChange={(iconName) => setField('icon', iconName)}
                 disabled={fieldsReadOnly}
               />
             </div>
@@ -462,6 +467,21 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
               />
             </div>
           </div>
+
+          {/* Color */}
+          {!isBuiltin && (
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <ColorSelector
+                value={form.color || '#3B82F6'}
+                onChange={(hex) => setField('color', hex)}
+                disabled={fieldsReadOnly}
+              />
+              <p className="text-xs text-muted-foreground">
+                Color for entity type indicators on cards. Leave at default to use the built-in palette.
+              </p>
+            </div>
+          )}
 
           {/* Required frontmatter keys */}
           <div className="space-y-1.5">

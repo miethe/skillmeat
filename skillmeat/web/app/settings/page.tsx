@@ -17,6 +17,7 @@ import { PlatformDefaultsSettings } from '@/components/settings/platform-default
 import { CustomContextSettings } from '@/components/settings/custom-context-settings';
 import { AppearanceSettings } from '@/app/settings/components/appearance-settings';
 import { EntityTypeConfigList } from '@/app/settings/components/entity-type-config-list';
+import { ContextCategoriesSettings } from '@/app/settings/components/context-categories-settings';
 import { CreateProfileForm } from '@/components/profiles';
 import { useCreateDeploymentProfile } from '@/hooks';
 import { useToast } from '@/hooks';
@@ -90,9 +91,9 @@ export default function SettingsPage() {
             Appearance
           </TabsTrigger>
           {ENTITY_TYPES_TAB_ENABLED && (
-            <TabsTrigger value="entity-types" className="flex items-center gap-2">
+            <TabsTrigger value="context-entities" className="flex items-center gap-2">
               <ListTree className="h-4 w-4" />
-              Entity Types
+              Context Entities
             </TabsTrigger>
           )}
         </TabsList>
@@ -180,24 +181,46 @@ export default function SettingsPage() {
           <AppearanceSettings />
         </TabsContent>
 
-        {/* Entity Types Tab */}
+        {/* Context Entities Tab */}
         {ENTITY_TYPES_TAB_ENABLED && (
-          <TabsContent value="entity-types" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <ListTree className="h-5 w-5" />
-                  <CardTitle>Entity Types</CardTitle>
-                </div>
-                <CardDescription>
-                  Manage built-in and custom context entity type configurations. Built-in types
-                  cannot be deleted; you may only edit their content template.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <EntityTypeConfigList />
-              </CardContent>
-            </Card>
+          <TabsContent value="context-entities" className="space-y-4">
+            <Tabs defaultValue="entity-types" className="w-full">
+              <TabsList className="mb-4">
+                <TabsTrigger value="entity-types">Entity Types</TabsTrigger>
+                <TabsTrigger value="categories">Context Categories</TabsTrigger>
+              </TabsList>
+              <TabsContent value="entity-types">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <ListTree className="h-5 w-5" />
+                      <CardTitle>Entity Types</CardTitle>
+                    </div>
+                    <CardDescription>
+                      Manage built-in and custom context entity type configurations. Built-in types
+                      cannot be deleted; you may only edit their content template.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <EntityTypeConfigList />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              <TabsContent value="categories">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Context Categories</CardTitle>
+                    <CardDescription>
+                      Manage categories for organizing context entities. Categories can be scoped to
+                      a specific entity type or apply globally.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ContextCategoriesSettings />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         )}
       </Tabs>

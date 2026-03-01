@@ -222,6 +222,8 @@ export interface EntityTypeConfig {
   description?: string;
   /** Optional icon identifier for UI rendering */
   icon?: string;
+  /** Optional hex color for entity type indicators (e.g. "#3B82F6") */
+  color?: string | null;
   /** Default filesystem path prefix (e.g. ".claude/skills") */
   path_prefix?: string;
   /** Frontmatter keys that MUST be present */
@@ -260,6 +262,8 @@ export interface EntityTypeConfigCreate {
   description?: string;
   /** Optional icon identifier */
   icon?: string;
+  /** Optional hex color for entity type indicators (e.g. "#3B82F6") */
+  color?: string | null;
   /** Default filesystem path prefix */
   path_prefix?: string;
   /** Frontmatter keys that MUST be present */
@@ -285,6 +289,8 @@ export interface EntityTypeConfigUpdate {
   description?: string;
   /** Updated icon identifier */
   icon?: string;
+  /** Updated hex color for entity type indicators (e.g. "#3B82F6") */
+  color?: string | null;
   /** Updated filesystem path prefix */
   path_prefix?: string;
   /** Updated required frontmatter keys */

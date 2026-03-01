@@ -33,9 +33,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import {
   getEntityTypeConfig,
+  getEntityTypeColorStyles,
   type ContextEntityTypeConfig,
 } from '@/lib/context-entity-config';
-import type { ContextEntity } from '@/types/context-entity';
+import type { ContextEntity, EntityTypeConfig } from '@/types/context-entity';
 
 // ============================================================================
 // Icon resolver
@@ -66,9 +67,11 @@ function resolveIcon(iconName: ContextEntityTypeConfig['icon']): React.ElementTy
 
 interface TypeBadgeProps {
   config: ContextEntityTypeConfig;
+  /** Optional inline color styles derived from a custom hex color */
+  colorStyles?: ReturnType<typeof getEntityTypeColorStyles>;
 }
 
-function TypeBadge({ config }: TypeBadgeProps) {
+function TypeBadge({ config, colorStyles }: TypeBadgeProps) {
   const Icon = resolveIcon(config.icon);
 
   return (
@@ -79,9 +82,14 @@ function TypeBadge({ config }: TypeBadgeProps) {
             variant="outline"
             className={cn(
               'gap-1 rounded-full text-xs font-medium border-transparent',
-              config.bgClass,
-              config.textClass
+              !colorStyles && config.bgClass,
+              !colorStyles && config.textClass
             )}
+            style={
+              colorStyles
+                ? { backgroundColor: colorStyles.badgeBgColor, color: colorStyles.badgeTextColor }
+                : undefined
+            }
           >
             <Icon className="h-3 w-3" aria-hidden="true" />
             {config.label}
@@ -134,6 +142,12 @@ function AutoLoadIndicator({ autoLoad }: AutoLoadIndicatorProps) {
 export interface ContextEntityCardProps {
   /** The context entity to display */
   entity: ContextEntity;
+  /**
+   * Optional API entity type config for this entity's type.
+   * When provided and the config has a `color` field, dynamic inline styles
+   * override the static Tailwind colour classes from `context-entity-config.ts`.
+   */
+  entityTypeConfig?: EntityTypeConfig | null;
   /** Callback when preview button is clicked */
   onPreview?: (entity: ContextEntity) => void;
   /** Callback when deploy button is clicked */
@@ -175,6 +189,7 @@ export interface ContextEntityCardProps {
  */
 export function ContextEntityCard({
   entity,
+  entityTypeConfig,
   onPreview,
   onDeploy,
   onEdit,
@@ -185,6 +200,10 @@ export function ContextEntityCard({
 }: ContextEntityCardProps) {
   // Look up display config from the central map (handles null/casing internally).
   const config = getEntityTypeConfig(entity.entity_type);
+
+  // Compute dynamic color styles from the API entity type config when available.
+  // These override the static Tailwind classes when a custom color is set.
+  const colorStyles = getEntityTypeColorStyles(entityTypeConfig?.color);
 
   const Icon = resolveIcon(config.icon);
 
@@ -215,10 +234,15 @@ export function ContextEntityCard({
     <Card
       className={cn(
         'group relative flex min-h-[220px] cursor-pointer flex-col border-l-4',
-        config.borderClass,
-        config.cardBgClass,
+        !colorStyles && config.borderClass,
+        !colorStyles && config.cardBgClass,
         'transition-shadow duration-200 hover:shadow-md hover:ring-1 hover:ring-border'
       )}
+      style={
+        colorStyles
+          ? { borderLeftColor: colorStyles.borderColor, backgroundColor: colorStyles.backgroundColor }
+          : undefined
+      }
       role="article"
       aria-label={`Context entity: ${entity.name}. Click to preview.`}
       onClick={() => onPreview?.(entity)}
@@ -244,7 +268,7 @@ export function ContextEntityCard({
             </div>
           </div>
           <div className="flex flex-shrink-0 items-center gap-1">
-            <TypeBadge config={config} />
+            <TypeBadge config={config} colorStyles={colorStyles} />
             <AutoLoadIndicator autoLoad={entity.auto_load} />
           </div>
         </div>

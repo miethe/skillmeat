@@ -1,7 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { Plus, Pencil, Trash2, Lock } from 'lucide-react';
+import { Plus, Pencil, Trash2, Lock, FileText } from 'lucide-react';
+import { DynamicIcon } from 'lucide-react/dynamic';
+import type { IconName } from 'lucide-react/dynamic';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -27,6 +29,55 @@ import { useEntityTypeConfigs, useDeleteEntityTypeConfig } from '@/hooks';
 import { useToast } from '@/hooks';
 import type { EntityTypeConfig } from '@/types/context-entity';
 import { EntityTypeConfigForm } from './entity-type-config-form';
+
+// ---------------------------------------------------------------------------
+// EntityTypeIcon — renders a Lucide icon by name with a fallback
+// ---------------------------------------------------------------------------
+
+function EntityTypeIcon({ iconName }: { iconName: string | null | undefined }) {
+  if (!iconName) {
+    return <FileText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />;
+  }
+
+  return (
+    <React.Suspense
+      fallback={<FileText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}
+    >
+      <DynamicIconWithFallback name={iconName} />
+    </React.Suspense>
+  );
+}
+
+function DynamicIconWithFallback({ name }: { name: string }) {
+  // lucide-react/dynamic accepts IconName (kebab-case). If the name is invalid
+  // the DynamicIcon renders nothing — the ErrorBoundary below catches thrown errors.
+  return (
+    <ErrorBoundary fallback={<FileText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}>
+      <DynamicIcon name={name as IconName} className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+    </ErrorBoundary>
+  );
+}
+
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; fallback: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // EntityTypeConfigList
@@ -197,8 +248,8 @@ function EntityTypeConfigRow({ config, onEdit, onDelete }: EntityTypeConfigRowPr
   return (
     <TableRow>
       {/* Icon */}
-      <TableCell className="text-lg" aria-label={`Icon for ${config.display_name}`}>
-        {config.icon ?? '📄'}
+      <TableCell aria-label={`Icon for ${config.display_name}`}>
+        <EntityTypeIcon iconName={config.icon} />
       </TableCell>
 
       {/* Name */}

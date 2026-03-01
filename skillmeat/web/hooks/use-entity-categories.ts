@@ -9,13 +9,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchEntityCategories,
   createEntityCategory,
+  updateEntityCategory,
+  deleteEntityCategory,
   type EntityCategory,
   type EntityCategoryFilters,
   type EntityCategoryCreateRequest,
+  type EntityCategoryUpdateRequest,
 } from '@/lib/api/context-entities';
 
 // Re-export types for consumers
-export type { EntityCategory, EntityCategoryCreateRequest };
+export type { EntityCategory, EntityCategoryCreateRequest, EntityCategoryUpdateRequest };
 
 /**
  * Query key factory for entity category cache management.
@@ -51,6 +54,37 @@ export function useCreateEntityCategory() {
 
   return useMutation({
     mutationFn: (data: EntityCategoryCreateRequest) => createEntityCategory(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: entityCategoryKeys.all });
+    },
+  });
+}
+
+/**
+ * Update an existing entity category by slug.
+ * Invalidates the categories list on success.
+ */
+export function useUpdateEntityCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ slug, data }: { slug: string; data: EntityCategoryUpdateRequest }) =>
+      updateEntityCategory(slug, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: entityCategoryKeys.all });
+    },
+  });
+}
+
+/**
+ * Delete an entity category by slug.
+ * Invalidates the categories list on success.
+ */
+export function useDeleteEntityCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (slug: string) => deleteEntityCategory(slug),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: entityCategoryKeys.all });
     },

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, Pencil, HardDriveDownload, X } from 'lucide-react';
+import Sketch from '@uiw/react-color-sketch';
 import { useCustomColors, useCreateCustomColor, useDeleteCustomColor, useUpdateCustomColor } from '@/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -235,24 +236,14 @@ interface AddColorPopoverProps {
 
 function AddColorPopover({ onAdd, isPending }: AddColorPopoverProps) {
   const [open, setOpen] = useState(false);
-  const [hexInput, setHexInput] = useState('#');
-
-  const normalizedHex = hexInput.trim().startsWith('#') ? hexInput.trim() : `#${hexInput.trim()}`;
-  const isValid = isValidHex(normalizedHex);
-  const previewColor = isValid ? normalizedHex : undefined;
+  const [sketchColor, setSketchColor] = useState('#6366f1');
 
   const handleSubmit = async () => {
-    if (!isValid) return;
-    await onAdd(normalizedHex.toLowerCase());
-    setHexInput('#');
+    const normalized = sketchColor.trim().toLowerCase();
+    if (!isValidHex(normalized)) return;
+    await onAdd(normalized);
+    setSketchColor('#6366f1');
     setOpen(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      void handleSubmit();
-    }
   };
 
   return (
@@ -263,52 +254,34 @@ function AddColorPopover({ onAdd, isPending }: AddColorPopoverProps) {
           Add Color
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-4" align="end">
-        <p className="mb-3 text-sm font-medium">Add a custom color</p>
-        <div className="flex items-center gap-2">
-          {/* Color preview swatch */}
-          <div
-            className={cn(
-              'h-9 w-9 shrink-0 rounded-md border transition-colors',
-              previewColor ? 'border-border' : 'border-dashed border-muted-foreground/40 bg-muted'
-            )}
-            style={previewColor ? { backgroundColor: previewColor } : undefined}
-            aria-hidden="true"
+      <PopoverContent className="w-auto p-3" align="end" sideOffset={8}>
+        <div className="flex flex-col gap-3">
+          <Sketch
+            color={sketchColor}
+            onChange={(nextColor) => setSketchColor(nextColor.hex)}
+            disableAlpha
+            style={{ width: 220 }}
           />
-          <Input
-            autoFocus
-            placeholder="#ff6b6b"
-            value={hexInput}
-            onChange={(e) => setHexInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="font-mono text-sm"
-            aria-label="Hex color value"
-          />
-        </div>
-        {hexInput.length > 1 && !isValid && (
-          <p className="mt-1.5 text-xs text-destructive" role="alert">
-            Enter a valid hex color (e.g. #ff6b6b)
-          </p>
-        )}
-        <div className="mt-3 flex gap-2">
-          <Button
-            size="sm"
-            className="flex-1"
-            onClick={() => void handleSubmit()}
-            disabled={!isValid || isPending}
-          >
-            {isPending ? 'Adding…' : 'Add Color'}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setHexInput('#');
-              setOpen(false);
-            }}
-          >
-            Cancel
-          </Button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleSubmit()}
+              disabled={isPending}
+              className="flex-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isPending ? 'Adding…' : 'Add Color'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSketchColor('#6366f1');
+                setOpen(false);
+              }}
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </PopoverContent>
     </Popover>

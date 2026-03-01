@@ -491,15 +491,18 @@ export {
 } from './use-entity-type-configs';
 
 // ============================================================================
-// ENTITY CATEGORIES (2 hooks)
+// ENTITY CATEGORIES (4 hooks)
 // ============================================================================
 // Entity category CRUD for multi-select categorisation in the creation form
 export {
   entityCategoryKeys,
   useEntityCategories,
   useCreateEntityCategory,
+  useUpdateEntityCategory,
+  useDeleteEntityCategory,
   type EntityCategory,
   type EntityCategoryCreateRequest,
+  type EntityCategoryUpdateRequest,
 } from './use-entity-categories';
 
 // ============================================================================

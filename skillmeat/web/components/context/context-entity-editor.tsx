@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { Loader2, Info, X, ChevronDown, Check } from 'lucide-react';
+import { Loader2, Info, X, ChevronDown, Check, HelpCircle } from 'lucide-react';
 import {
   ContextEntity,
   CreateContextEntityRequest,
@@ -35,6 +35,12 @@ import {
 } from '@/components/ui/command';
 import { MarkdownEditor } from '@/components/editor/markdown-editor';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   useCreateContextEntity,
   useUpdateContextEntity,
@@ -179,11 +185,24 @@ function derivePathPattern(config: EntityTypeConfig | null, platforms: string[])
       // Strip the token placeholder gracefully
       return `${prefix.replace(/\/?\{PLATFORM\}/g, '')}/`;
     }
+    if (platforms.length > 1) {
+      // Multi-platform: show parameterized pattern
+      return `{PLATFORM_PATTERN}/`;
+    }
     return `${prefix.replace('{PLATFORM}', firstPlatform)}/`;
   }
 
   if (platforms.length === 0) {
     return `${prefix}/`;
+  }
+
+  // When multiple platforms are selected, show a parameterized template pattern
+  if (platforms.length > 1) {
+    // Derive the sub-path after the root dir (e.g. "rules" from ".claude/rules")
+    const prefixParts = prefix.split('/');
+    const subPath = prefixParts.length > 1 ? prefixParts.slice(1).join('/') : null;
+    const pathSegment = subPath ? `${subPath}/{filename}` : '{filename}';
+    return `{PLATFORM_PATTERN}/${pathSegment}`;
   }
 
   // Use the first platform to build a concrete suggestion
@@ -200,6 +219,40 @@ function derivePathPattern(config: EntityTypeConfig | null, platforms: string[])
   }
 
   return `${platformOpt.rootDir}/`;
+}
+
+/**
+ * For a given config and platform list, compute the resolved path prefix per platform.
+ * Used to populate the tooltip breakdown when multiple platforms are selected.
+ */
+function resolvePerPlatformPaths(
+  config: EntityTypeConfig | null,
+  platforms: string[],
+): Array<{ label: string; path: string }> {
+  if (!config || platforms.length <= 1) return [];
+
+  const prefix = config.path_prefix?.replace(/\/$/, '') || '.claude';
+
+  return platforms.flatMap((platform) => {
+    const platformOpt = PLATFORM_OPTIONS.find((p) => p.value === platform);
+    if (!platformOpt) return [];
+
+    let resolvedPath: string;
+    if (prefix.includes('{PLATFORM}')) {
+      resolvedPath = `${prefix.replace('{PLATFORM}', platform)}/`;
+    } else {
+      const prefixParts = prefix.split('/');
+      if (prefixParts.length > 1) {
+        const parts = [...prefixParts];
+        parts[0] = platformOpt.rootDir;
+        resolvedPath = `${parts.join('/')}/`;
+      } else {
+        resolvedPath = `${platformOpt.rootDir}/`;
+      }
+    }
+
+    return [{ label: platformOpt.label, path: resolvedPath }];
+  });
 }
 
 // ============================================================================
@@ -742,52 +795,108 @@ function V2FormFields({
       </div>
 
       {/* Path pattern — auto-derived or manual */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="path_pattern">
-            Path Pattern <span className="text-destructive" aria-hidden="true">*</span>
-          </Label>
-          {pathPatternDerived && (
-            <span className="text-xs text-muted-foreground italic">auto-derived</span>
-          )}
-        </div>
-        <Input
-          id="path_pattern"
-          {...register('path_pattern', {
-            required: 'Path pattern is required',
-            pattern: {
-              value: /^\.claude\//,
-              message: "Path pattern must start with '.claude/'",
-            },
-            validate: (value) => {
-              if (value.includes('..')) {
-                return "Path pattern cannot contain '..' for security reasons";
+      {(() => {
+        const perPlatformPaths = resolvePerPlatformPaths(selectedConfig, platforms);
+        const isMultiPlatform = platforms.length > 1;
+        // Build dynamic example based on selected entity type and first platform
+        const firstPlatformOpt = platforms.length > 0
+          ? PLATFORM_OPTIONS.find((p) => p.value === platforms[0])
+          : null;
+        const exampleRoot = firstPlatformOpt?.rootDir ?? '.claude';
+        const exampleSubPath = selectedConfig?.path_prefix
+          ? selectedConfig.path_prefix.replace(/\/$/, '').split('/').slice(1).join('/')
+          : 'context';
+        const examplePath = exampleSubPath
+          ? `${exampleRoot}/${exampleSubPath}/my-entity.md`
+          : `${exampleRoot}/context/my-entity.md`;
+
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="path_pattern">
+                Path Pattern <span className="text-destructive" aria-hidden="true">*</span>
+              </Label>
+              {pathPatternDerived && (
+                <span className="text-xs text-muted-foreground italic">auto-derived</span>
+              )}
+            </div>
+            <div className="relative">
+              <Input
+                id="path_pattern"
+                {...register('path_pattern', {
+                  required: 'Path pattern is required',
+                  pattern: {
+                    value: /^\.claude\//,
+                    message: "Path pattern must start with '.claude/'",
+                  },
+                  validate: (value) => {
+                    if (value.includes('..')) {
+                      return "Path pattern cannot contain '..' for security reasons";
+                    }
+                    return true;
+                  },
+                })}
+                placeholder="e.g., .claude/rules/web/hooks.md"
+                disabled={isLoading}
+                aria-required="true"
+                aria-invalid={!!errors.path_pattern}
+                aria-describedby={errors.path_pattern ? 'path-pattern-error path_pattern-help' : 'path_pattern-help'}
+                className={isMultiPlatform ? 'pr-8' : undefined}
+                onChange={(e) => {
+                  // Detect manual edit — mark as no longer auto-derived
+                  onPathPatternEdit();
+                  // Let react-hook-form handle the value update via register's onChange
+                  register('path_pattern').onChange(e);
+                }}
+              />
+              {isMultiPlatform && perPlatformPaths.length > 0 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-label="View per-platform resolved paths"
+                        tabIndex={0}
+                      >
+                        <HelpCircle className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" align="end" className="max-w-xs">
+                      <p className="mb-1.5 text-xs font-medium">Resolved per platform:</p>
+                      <ul className="space-y-1" role="list">
+                        {perPlatformPaths.map(({ label, path }) => (
+                          <li key={label} className="flex items-baseline gap-1.5" role="listitem">
+                            <span className="shrink-0 text-xs font-medium">{label}:</span>
+                            <code className="break-all text-xs">{path}</code>
+                          </li>
+                        ))}
+                      </ul>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+            <p id="path_pattern-help" className="text-xs text-muted-foreground">
+              {isMultiPlatform
+                ? <>
+                    Pattern applies across platforms. Hover the <HelpCircle className="inline h-3 w-3 align-middle" aria-hidden="true" /> icon to see each resolved path.
+                  </>
+                : <>
+                    Example:{' '}
+                    <code className="rounded bg-muted px-1 py-0.5">{examplePath}</code>
+                    {pathPatternDerived && '. Edit to override the auto-derived value.'}
+                  </>
               }
-              return true;
-            },
-          })}
-          placeholder="e.g., .claude/rules/web/hooks.md"
-          disabled={isLoading}
-          aria-required="true"
-          aria-invalid={!!errors.path_pattern}
-          aria-describedby={errors.path_pattern ? 'path-pattern-error path_pattern-help' : 'path_pattern-help'}
-          onChange={(e) => {
-            // Detect manual edit — mark as no longer auto-derived
-            onPathPatternEdit();
-            // Let react-hook-form handle the value update via register's onChange
-            register('path_pattern').onChange(e);
-          }}
-        />
-        <p id="path_pattern-help" className="text-xs text-muted-foreground">
-          Must start with <code className="rounded bg-muted px-1 py-0.5">.claude/</code>
-          {pathPatternDerived && '. Edit to override the auto-derived value.'}
-        </p>
-        {errors.path_pattern && (
-          <p id="path-pattern-error" className="text-sm text-destructive" role="alert">
-            {errors.path_pattern.message}
-          </p>
-        )}
-      </div>
+            </p>
+            {errors.path_pattern && (
+              <p id="path-pattern-error" className="text-sm text-destructive" role="alert">
+                {errors.path_pattern.message}
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Description field */}
       <div className="space-y-2">
