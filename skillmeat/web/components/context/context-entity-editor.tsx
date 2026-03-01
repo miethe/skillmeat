@@ -247,21 +247,29 @@ function PlatformMultiSelect({ value, onChange, disabled, availableOptions, id, 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
+        <div
           id={id}
           role="combobox"
+          tabIndex={disabled ? -1 : 0}
           aria-expanded={open}
           aria-label={value.length === 0 ? 'Select platforms' : `${value.length} platform${value.length === 1 ? '' : 's'} selected`}
           aria-haspopup="listbox"
           aria-controls={open ? listboxId : undefined}
           aria-describedby={ariaDescribedby}
-          disabled={disabled}
+          aria-disabled={disabled}
+          onClick={() => !disabled && setOpen(!open)}
+          onKeyDown={(e) => {
+            if (disabled) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setOpen(!open);
+            }
+          }}
           className={[
-            'flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
+            'flex min-h-9 w-full cursor-pointer flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
             'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-          ].join(' ')}
+            disabled ? 'cursor-not-allowed opacity-50' : '',
+          ].filter(Boolean).join(' ')}
         >
           {selectedEntries.length === 0 ? (
             <span className="text-muted-foreground">Select platforms…</span>
@@ -281,7 +289,7 @@ function PlatformMultiSelect({ value, onChange, disabled, availableOptions, id, 
             ))
           )}
           <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
-        </button>
+        </div>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="start">
         <Command>
@@ -385,21 +393,29 @@ function CategoryMultiSelect({ value, onChange, disabled, id, 'aria-describedby'
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
+        <div
           id={id}
           role="combobox"
+          tabIndex={disabled ? -1 : 0}
           aria-expanded={open}
           aria-label={value.length === 0 ? 'Select categories' : `${value.length} categor${value.length === 1 ? 'y' : 'ies'} selected`}
           aria-haspopup="listbox"
           aria-controls={open ? listboxId : undefined}
           aria-describedby={ariaDescribedby}
-          disabled={disabled}
+          aria-disabled={disabled}
+          onClick={() => !disabled && setOpen(!open)}
+          onKeyDown={(e) => {
+            if (disabled) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setOpen(!open);
+            }
+          }}
           className={[
-            'flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
+            'flex min-h-9 w-full cursor-pointer flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
             'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-          ].join(' ')}
+            disabled ? 'cursor-not-allowed opacity-50' : '',
+          ].filter(Boolean).join(' ')}
         >
           {selectedCategories.length === 0 ? (
             <span className="text-muted-foreground">Select or create categories…</span>
@@ -424,7 +440,7 @@ function CategoryMultiSelect({ value, onChange, disabled, id, 'aria-describedby'
             ))
           )}
           <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
-        </button>
+        </div>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-0" align="start">
         <Command>
@@ -663,6 +679,7 @@ function V2FormFields({
                     .filter(Boolean)
                     .join(' ') || undefined
                 }
+                className="[&_[data-description]]:hidden"
               >
                 <SelectValue placeholder="Select entity type…" />
               </SelectTrigger>
@@ -687,7 +704,7 @@ function V2FormFields({
                           )}
                         </div>
                         {cfg.description && (
-                          <div className="text-xs text-muted-foreground">{cfg.description}</div>
+                          <div data-description className="text-xs text-muted-foreground">{cfg.description}</div>
                         )}
                       </div>
                     </div>
@@ -974,6 +991,8 @@ export function ContextEntityEditor({
   const [pathPatternDerived, setPathPatternDerived] = useState(false);
   // Track whether the user has manually edited content (to avoid overwriting on template inject)
   const contentManuallyEdited = useRef(false);
+  // Track the previous type's template so we can detect unedited template content on type switch
+  const previousTemplateRef = useRef<string>('');
 
   // Determine if we're in edit mode
   const isEditMode = !!entity;
@@ -1036,6 +1055,7 @@ export function ContextEntityEditor({
       setSelectedConfig(null);
       setPathPatternDerived(false);
       contentManuallyEdited.current = false;
+      previousTemplateRef.current = '';
     }
   }, [open, initialContent]);
 
@@ -1047,11 +1067,20 @@ export function ContextEntityEditor({
       const config = entityTypeConfigs.find((c) => c.slug === typeSlug) ?? null;
       setSelectedConfig(config);
 
-      // Inject content template if content is empty or untouched
-      if (CREATION_FORM_V2 && !isEditMode && config?.content_template) {
-        if (!contentManuallyEdited.current && !markdownContent.trim()) {
-          setMarkdownContent(config.content_template);
+      // Inject content template when switching types
+      if (CREATION_FORM_V2 && !isEditMode) {
+        // Content is "safe to replace" if it's empty or still matches the previous type's template
+        const currentContentMatchesPreviousTemplate =
+          !markdownContent.trim() ||
+          markdownContent.trim() === previousTemplateRef.current.trim();
+
+        if (currentContentMatchesPreviousTemplate) {
+          const newTemplate = config?.content_template || '';
+          setMarkdownContent(newTemplate);
+          previousTemplateRef.current = newTemplate;
+          contentManuallyEdited.current = false;
         }
+        // If content doesn't match previous template, user has edited it — preserve their changes
       }
 
       // If the new type restricts applicable platforms, clear any incompatible selections
@@ -1100,9 +1129,10 @@ export function ContextEntityEditor({
   const handleMarkdownChange = useCallback(
     (content: string) => {
       setMarkdownContent(content);
-      // Mark as manually edited only if user typed something different from template
+      // Mark as manually edited only if content diverges from the current template
       if (CREATION_FORM_V2 && !isEditMode) {
-        contentManuallyEdited.current = true;
+        contentManuallyEdited.current =
+          content.trim() !== previousTemplateRef.current.trim();
       }
     },
     [isEditMode]
@@ -1254,6 +1284,7 @@ export function ContextEntityEditor({
                             aria-required="true"
                             aria-invalid={!!errors.entity_type}
                             aria-describedby={errors.entity_type ? 'entity-type-error' : undefined}
+                            className="[&_[data-description]]:hidden"
                           >
                             <SelectValue placeholder="Select entity type..." />
                           </SelectTrigger>
@@ -1262,7 +1293,7 @@ export function ContextEntityEditor({
                               <SelectItem key={option.value} value={option.value}>
                                 <div>
                                   <div className="font-medium">{option.label}</div>
-                                  <div className="text-xs text-muted-foreground">
+                                  <div data-description className="text-xs text-muted-foreground">
                                     {option.description}
                                   </div>
                                 </div>
