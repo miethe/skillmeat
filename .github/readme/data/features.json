@@ -491,6 +491,47 @@
           "shortDescription": "Budgeted context packs",
           "webPage": "/projects/[id]/memory",
           "since": "0.4.0"
+        },
+        {
+          "id": "entity-type-configuration",
+          "name": "Entity Type Configuration",
+          "description": "Configure entity types in Settings with customizable path patterns, required frontmatter, and content templates",
+          "shortDescription": "Configurable entity types",
+          "webPage": "/settings/entity-types",
+          "since": "0.4.0",
+          "highlight": true
+        },
+        {
+          "id": "custom-entity-types",
+          "name": "Custom Entity Types",
+          "description": "Create custom entity types without code changes—define path patterns, frontmatter requirements, and content templates in Settings",
+          "shortDescription": "User-defined types",
+          "webPage": "/settings/entity-types",
+          "since": "0.4.0"
+        },
+        {
+          "id": "enhanced-creation-form",
+          "name": "Enhanced Creation Form",
+          "description": "Create context entities with platform-aware path patterns, inline validation hints, auto-injected templates, and multi-select categories",
+          "shortDescription": "Smart entity creation",
+          "webPage": "/context-entities",
+          "since": "0.4.0",
+          "highlight": true
+        },
+        {
+          "id": "multi-select-categories",
+          "name": "Multi-Select Categories",
+          "description": "Assign multiple categories to entities with inline category creation for flexible organization and discovery",
+          "shortDescription": "Flexible categorization",
+          "webPage": "/context-entities",
+          "since": "0.4.0"
+        },
+        {
+          "id": "platform-aware-deployment",
+          "name": "Platform-Aware Deployment",
+          "description": "Deploy context entities to multiple platforms with automatic path and frontmatter adaptation per platform",
+          "shortDescription": "Multi-platform assembly",
+          "since": "0.4.0"
         }
       ]
     },
