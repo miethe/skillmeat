@@ -137,11 +137,50 @@ const PLATFORM_OPTIONS: PlatformOption[] = [
   { value: Platform.OTHER, label: 'Generic / Other', rootDir: '.custom' },
 ];
 
+/**
+ * Filter PLATFORM_OPTIONS to only those allowed by the entity type config.
+ * When applicable_platforms is null, all platforms are allowed.
+ */
+function getFilteredPlatformOptions(config: EntityTypeConfig | null): PlatformOption[] {
+  if (!config || config.applicable_platforms === null) {
+    return PLATFORM_OPTIONS;
+  }
+  return PLATFORM_OPTIONS.filter((p) => config.applicable_platforms!.includes(p.value));
+}
+
+/**
+ * Extract required frontmatter keys from a JSON Schema subset.
+ * Supports the standard `required` array at the top level of the schema.
+ */
+function extractSchemaRequiredKeys(schema: Record<string, unknown> | null): string[] {
+  if (!schema) return [];
+  const required = schema['required'];
+  if (Array.isArray(required)) {
+    return required.filter((k): k is string => typeof k === 'string');
+  }
+  return [];
+}
+
 /** Derive a suggested path from entity type config + first selected platform */
 function derivePathPattern(config: EntityTypeConfig | null, platforms: string[]): string {
   if (!config) return '.claude/';
 
+  // For custom types with no path_prefix set, leave the path field empty
+  if (!config.is_builtin && !config.path_prefix) {
+    return '';
+  }
+
   const prefix = config.path_prefix?.replace(/\/$/, '') || '.claude';
+
+  // Support {PLATFORM} token in path_prefix — replace with platform slug
+  if (prefix.includes('{PLATFORM}')) {
+    const firstPlatform = platforms.length > 0 ? platforms[0] : undefined;
+    if (!firstPlatform) {
+      // Strip the token placeholder gracefully
+      return `${prefix.replace(/\/?\{PLATFORM\}/g, '')}/`;
+    }
+    return `${prefix.replace('{PLATFORM}', firstPlatform)}/`;
+  }
 
   if (platforms.length === 0) {
     return `${prefix}/`;
@@ -172,10 +211,14 @@ interface PlatformMultiSelectProps {
   value: string[];
   onChange: (value: string[]) => void;
   disabled?: boolean;
+  /** Restrict visible platform options. Defaults to all PLATFORM_OPTIONS when not provided. */
+  availableOptions?: PlatformOption[];
 }
 
-function PlatformMultiSelect({ value, onChange, disabled }: PlatformMultiSelectProps) {
+function PlatformMultiSelect({ value, onChange, disabled, availableOptions }: PlatformMultiSelectProps) {
   const [open, setOpen] = useState(false);
+
+  const options = availableOptions ?? PLATFORM_OPTIONS;
 
   const toggle = (platform: string) => {
     if (value.includes(platform)) {
@@ -237,7 +280,7 @@ function PlatformMultiSelect({ value, onChange, disabled }: PlatformMultiSelectP
           <CommandList>
             <CommandEmpty>No platform found.</CommandEmpty>
             <CommandGroup>
-              {PLATFORM_OPTIONS.map((platform) => {
+              {options.map((platform) => {
                 const selected = value.includes(platform.value);
                 return (
                   <CommandItem
@@ -458,11 +501,16 @@ interface EntityTypeHintsPanelProps {
 function EntityTypeHintsPanel({ config, id }: EntityTypeHintsPanelProps) {
   if (!config) return null;
 
-  const requiredKeys = config.required_frontmatter_keys ?? [];
+  // Merge required_frontmatter_keys + frontmatter_schema.required (deduplicated)
+  const explicitKeys = config.required_frontmatter_keys ?? [];
+  const schemaKeys = extractSchemaRequiredKeys(config.frontmatter_schema);
+  const requiredKeys = Array.from(new Set([...explicitKeys, ...schemaKeys]));
+
   const hasRequiredKeys = requiredKeys.length > 0;
   const hasDescription = !!config.description;
+  const isCustomType = !config.is_builtin;
 
-  if (!hasRequiredKeys && !hasDescription) return null;
+  if (!hasRequiredKeys && !hasDescription && !isCustomType) return null;
 
   return (
     <div
@@ -519,6 +567,8 @@ interface V2FormFieldsProps {
   onPathPatternEdit: () => void;
   selectedCategoryIds: number[];
   onCategoryIdsChange: (ids: number[]) => void;
+  /** Filtered platform options based on the selected entity type's applicable_platforms */
+  availablePlatformOptions: PlatformOption[];
 }
 
 function V2FormFields({
@@ -535,6 +585,7 @@ function V2FormFields({
   onPathPatternEdit,
   selectedCategoryIds,
   onCategoryIdsChange,
+  availablePlatformOptions,
 }: V2FormFieldsProps) {
   const hintsPanelId = 'entity-type-hints';
 
@@ -577,13 +628,29 @@ function V2FormFields({
                 <SelectValue placeholder="Select entity type…" />
               </SelectTrigger>
               <SelectContent>
-                {entityTypeConfigs.map((cfg) => (
+                {/* Built-in types first, then custom types */}
+                {[
+                  ...entityTypeConfigs.filter((c) => c.is_builtin),
+                  ...entityTypeConfigs.filter((c) => !c.is_builtin),
+                ].map((cfg) => (
                   <SelectItem key={cfg.slug} value={cfg.slug}>
-                    <div>
-                      <div className="font-medium">{cfg.display_name}</div>
-                      {cfg.description && (
-                        <div className="text-xs text-muted-foreground">{cfg.description}</div>
-                      )}
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium">{cfg.display_name}</span>
+                          {!cfg.is_builtin && (
+                            <Badge
+                              variant="outline"
+                              className="h-4 shrink-0 px-1 py-0 text-[10px] font-normal text-muted-foreground"
+                            >
+                              custom
+                            </Badge>
+                          )}
+                        </div>
+                        {cfg.description && (
+                          <div className="text-xs text-muted-foreground">{cfg.description}</div>
+                        )}
+                      </div>
                     </div>
                   </SelectItem>
                 ))}
@@ -605,9 +672,12 @@ function V2FormFields({
           value={platforms}
           onChange={onPlatformsChange}
           disabled={isLoading}
+          availableOptions={availablePlatformOptions}
         />
         <p id="platforms-help" className="text-xs text-muted-foreground">
-          Optional. Restricts deployment to selected platforms.
+          {availablePlatformOptions.length < PLATFORM_OPTIONS.length
+            ? `This type supports ${availablePlatformOptions.length} platform${availablePlatformOptions.length === 1 ? '' : 's'}. Restricts deployment to selected platforms.`
+            : 'Optional. Restricts deployment to selected platforms.'}
         </p>
       </div>
 
@@ -937,6 +1007,12 @@ export function ContextEntityEditor({
         }
       }
 
+      // If the new type restricts applicable platforms, clear any incompatible selections
+      if (CREATION_FORM_V2 && config?.applicable_platforms !== null && config?.applicable_platforms !== undefined) {
+        const allowed = config.applicable_platforms;
+        setPlatforms((prev) => prev.filter((p) => allowed.includes(p)));
+      }
+
       // Auto-derive path pattern
       if (CREATION_FORM_V2 && !isEditMode) {
         const derived = derivePathPattern(config, platforms);
@@ -1083,6 +1159,7 @@ export function ContextEntityEditor({
                   onPathPatternEdit={() => setPathPatternDerived(false)}
                   selectedCategoryIds={selectedCategoryIds}
                   onCategoryIdsChange={setSelectedCategoryIds}
+                  availablePlatformOptions={getFilteredPlatformOptions(selectedConfig)}
                 />
               ) : (
                 <>
