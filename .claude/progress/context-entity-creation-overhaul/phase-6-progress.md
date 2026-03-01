@@ -16,7 +16,7 @@ pr_refs: []
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 2
-completed_tasks: 0
+completed_tasks: 1
 in_progress_tasks: 1
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -34,7 +34,7 @@ tasks:
     registry; regenerate openapi.json for all new endpoints; update skillmeat/api/CLAUDE.md
     router table; update skillmeat/web/CLAUDE.md with new hook and component patterns;
     update validator module docstring
-  status: in_progress
+  status: completed
   assigned_to:
   - python-backend-engineer
   - documentation-writer
@@ -56,13 +56,12 @@ tasks:
   estimated_effort: 3 pts
   priority: high
 - id: CECO-6.2
-  description: "Write Playwright/pytest E2E tests for 3 critical paths: (1) spec_file\
-    \ first-attempt success with template pre-populated, (2) custom type lifecycle\
-    \ (Settings \u2192 creation form \u2192 save), (3) multi-platform deploy with\
-    \ correct path derivation; accessibility audit on creation form; performance test\
-    \ POST /context-entities latency with DB validator (target \u226420ms added at\
-    \ p95)"
-  status: pending
+  description: 'Write Playwright/pytest E2E tests for 3 critical paths: (1) spec_file
+    first-attempt success with template pre-populated, (2) custom type lifecycle (Settings
+    → creation form → save), (3) multi-platform deploy with correct path derivation;
+    accessibility audit on creation form; performance test POST /context-entities
+    latency with DB validator (target ≤20ms added at p95)'
+  status: in_progress
   assigned_to:
   - ui-engineer-enhanced
   - python-backend-engineer
@@ -99,7 +98,7 @@ success_criteria:
     verified'
   status: pending
 - id: SC-6.6
-  description: "Performance: DB-backed validator adds \u226420ms at p95 vs baseline"
+  description: 'Performance: DB-backed validator adds ≤20ms at p95 vs baseline'
   status: pending
 files_modified:
 - skillmeat/core/validators/context_entity.py
@@ -108,7 +107,7 @@ files_modified:
 - skillmeat/web/CLAUDE.md
 - .claude/context/key-context/deprecation-and-sunset-registry.md
 - tests/e2e/
-progress: 0
+progress: 50
 updated: '2026-03-01'
 ---
 

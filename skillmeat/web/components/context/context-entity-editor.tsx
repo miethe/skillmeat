@@ -213,9 +213,13 @@ interface PlatformMultiSelectProps {
   disabled?: boolean;
   /** Restrict visible platform options. Defaults to all PLATFORM_OPTIONS when not provided. */
   availableOptions?: PlatformOption[];
+  /** id for the trigger button, used to associate with a <Label htmlFor> */
+  id?: string;
+  /** aria-describedby for the trigger button */
+  'aria-describedby'?: string;
 }
 
-function PlatformMultiSelect({ value, onChange, disabled, availableOptions }: PlatformMultiSelectProps) {
+function PlatformMultiSelect({ value, onChange, disabled, availableOptions, id, 'aria-describedby': ariaDescribedby }: PlatformMultiSelectProps) {
   const [open, setOpen] = useState(false);
 
   const options = availableOptions ?? PLATFORM_OPTIONS;
@@ -238,15 +242,20 @@ function PlatformMultiSelect({ value, onChange, disabled, availableOptions }: Pl
     label: PLATFORM_OPTIONS.find((p) => p.value === v)?.label ?? v,
   }));
 
+  const listboxId = `${id ?? 'platform-multiselect'}-listbox`;
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
+          id={id}
           role="combobox"
           aria-expanded={open}
-          aria-label="Select platforms"
+          aria-label={value.length === 0 ? 'Select platforms' : `${value.length} platform${value.length === 1 ? '' : 's'} selected`}
           aria-haspopup="listbox"
+          aria-controls={open ? listboxId : undefined}
+          aria-describedby={ariaDescribedby}
           disabled={disabled}
           className={[
             'flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
@@ -276,8 +285,8 @@ function PlatformMultiSelect({ value, onChange, disabled, availableOptions }: Pl
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="start">
         <Command>
-          <CommandInput placeholder="Search platforms…" />
-          <CommandList>
+          <CommandInput placeholder="Search platforms…" aria-label="Search platforms" />
+          <CommandList id={listboxId} role="listbox" aria-label="Available platforms" aria-multiselectable="true">
             <CommandEmpty>No platform found.</CommandEmpty>
             <CommandGroup>
               {options.map((platform) => {
@@ -287,6 +296,8 @@ function PlatformMultiSelect({ value, onChange, disabled, availableOptions }: Pl
                     key={platform.value}
                     value={platform.value}
                     onSelect={() => toggle(platform.value)}
+                    role="option"
+                    aria-selected={selected}
                   >
                     <Check
                       className={['mr-2 h-4 w-4', selected ? 'opacity-100' : 'opacity-0'].join(
@@ -317,9 +328,13 @@ interface CategoryMultiSelectProps {
   value: number[];
   onChange: (value: number[]) => void;
   disabled?: boolean;
+  /** id for the trigger button, used to associate with a <Label htmlFor> */
+  id?: string;
+  /** aria-describedby for the trigger button */
+  'aria-describedby'?: string;
 }
 
-function CategoryMultiSelect({ value, onChange, disabled }: CategoryMultiSelectProps) {
+function CategoryMultiSelect({ value, onChange, disabled, id, 'aria-describedby': ariaDescribedby }: CategoryMultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
 
@@ -365,15 +380,20 @@ function CategoryMultiSelect({ value, onChange, disabled }: CategoryMultiSelectP
     }
   };
 
+  const listboxId = `${id ?? 'category-multiselect'}-listbox`;
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
+          id={id}
           role="combobox"
           aria-expanded={open}
-          aria-label="Select categories"
+          aria-label={value.length === 0 ? 'Select categories' : `${value.length} categor${value.length === 1 ? 'y' : 'ies'} selected`}
           aria-haspopup="listbox"
+          aria-controls={open ? listboxId : undefined}
+          aria-describedby={ariaDescribedby}
           disabled={disabled}
           className={[
             'flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
@@ -410,11 +430,12 @@ function CategoryMultiSelect({ value, onChange, disabled }: CategoryMultiSelectP
         <Command>
           <CommandInput
             placeholder="Search or create category…"
+            aria-label="Search or create category"
             value={inputValue}
             onValueChange={setInputValue}
             onKeyDown={handleKeyDown}
           />
-          <CommandList>
+          <CommandList id={listboxId} role="listbox" aria-label="Available categories" aria-multiselectable="true">
             {filteredCategories.length === 0 && !inputValue && (
               <CommandEmpty>No categories yet. Type to create one.</CommandEmpty>
             )}
@@ -441,6 +462,8 @@ function CategoryMultiSelect({ value, onChange, disabled }: CategoryMultiSelectP
                       key={cat.id}
                       value={cat.name}
                       onSelect={() => toggle(cat.id)}
+                      role="option"
+                      aria-selected={selected}
                     >
                       <Check
                         className={['mr-2 h-4 w-4', selected ? 'opacity-100' : 'opacity-0'].join(' ')}
@@ -594,7 +617,7 @@ function V2FormFields({
       {/* Name field */}
       <div className="space-y-2">
         <Label htmlFor="name">
-          Name <span className="text-destructive">*</span>
+          Name <span className="text-destructive" aria-hidden="true">*</span>
         </Label>
         <Input
           id="name"
@@ -605,14 +628,21 @@ function V2FormFields({
           })}
           placeholder="e.g., web-hooks-rules"
           disabled={isLoading}
+          aria-required="true"
+          aria-invalid={!!errors.name}
+          aria-describedby={errors.name ? 'name-error' : undefined}
         />
-        {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+        {errors.name && (
+          <p id="name-error" className="text-sm text-destructive" role="alert">
+            {errors.name.message}
+          </p>
+        )}
       </div>
 
       {/* Entity type field — v2 uses dynamic configs from API */}
       <div className="space-y-2">
         <Label htmlFor="entity_type">
-          Entity Type <span className="text-destructive">*</span>
+          Entity Type <span className="text-destructive" aria-hidden="true">*</span>
         </Label>
         <Controller
           name="entity_type"
@@ -624,7 +654,16 @@ function V2FormFields({
               onValueChange={onEntityTypeChange}
               disabled={isLoading}
             >
-              <SelectTrigger id="entity_type" aria-describedby={hintsPanelId}>
+              <SelectTrigger
+                id="entity_type"
+                aria-required="true"
+                aria-invalid={!!errors.entity_type}
+                aria-describedby={
+                  [errors.entity_type ? 'entity-type-error' : '', hintsPanelId]
+                    .filter(Boolean)
+                    .join(' ') || undefined
+                }
+              >
                 <SelectValue placeholder="Select entity type…" />
               </SelectTrigger>
               <SelectContent>
@@ -659,7 +698,9 @@ function V2FormFields({
           )}
         />
         {errors.entity_type && (
-          <p className="text-sm text-destructive">{errors.entity_type.message}</p>
+          <p id="entity-type-error" className="text-sm text-destructive" role="alert">
+            {errors.entity_type.message}
+          </p>
         )}
         {/* Inline validation hints */}
         <EntityTypeHintsPanel config={selectedConfig} id={hintsPanelId} />
@@ -669,10 +710,12 @@ function V2FormFields({
       <div className="space-y-2">
         <Label htmlFor="platforms">Target Platforms</Label>
         <PlatformMultiSelect
+          id="platforms"
           value={platforms}
           onChange={onPlatformsChange}
           disabled={isLoading}
           availableOptions={availablePlatformOptions}
+          aria-describedby="platforms-help"
         />
         <p id="platforms-help" className="text-xs text-muted-foreground">
           {availablePlatformOptions.length < PLATFORM_OPTIONS.length
@@ -685,7 +728,7 @@ function V2FormFields({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="path_pattern">
-            Path Pattern <span className="text-destructive">*</span>
+            Path Pattern <span className="text-destructive" aria-hidden="true">*</span>
           </Label>
           {pathPatternDerived && (
             <span className="text-xs text-muted-foreground italic">auto-derived</span>
@@ -708,7 +751,9 @@ function V2FormFields({
           })}
           placeholder="e.g., .claude/rules/web/hooks.md"
           disabled={isLoading}
-          aria-describedby="path_pattern-help"
+          aria-required="true"
+          aria-invalid={!!errors.path_pattern}
+          aria-describedby={errors.path_pattern ? 'path-pattern-error path_pattern-help' : 'path_pattern-help'}
           onChange={(e) => {
             // Detect manual edit — mark as no longer auto-derived
             onPathPatternEdit();
@@ -721,7 +766,7 @@ function V2FormFields({
           {pathPatternDerived && '. Edit to override the auto-derived value.'}
         </p>
         {errors.path_pattern && (
-          <p className="text-sm text-destructive" role="alert">
+          <p id="path-pattern-error" className="text-sm text-destructive" role="alert">
             {errors.path_pattern.message}
           </p>
         )}
@@ -743,9 +788,11 @@ function V2FormFields({
       <div className="space-y-2">
         <Label htmlFor="categories">Categories</Label>
         <CategoryMultiSelect
+          id="categories"
           value={selectedCategoryIds}
           onChange={onCategoryIdsChange}
           disabled={isLoading}
+          aria-describedby="category-help"
         />
         <p id="category-help" className="text-xs text-muted-foreground">
           For progressive disclosure grouping. Type a new name and press Enter to create.
@@ -1168,7 +1215,7 @@ export function ContextEntityEditor({
                   <div className="space-y-2">
                     <Label htmlFor="name">
                       Name
-                      <span className="ml-1 text-destructive">*</span>
+                      <span className="ml-1 text-destructive" aria-hidden="true">*</span>
                     </Label>
                     <Input
                       id="name"
@@ -1179,9 +1226,14 @@ export function ContextEntityEditor({
                       })}
                       placeholder="e.g., web-hooks-rules"
                       disabled={isLoading}
+                      aria-required="true"
+                      aria-invalid={!!errors.name}
+                      aria-describedby={errors.name ? 'name-error' : undefined}
                     />
                     {errors.name && (
-                      <p className="text-sm text-destructive">{errors.name.message}</p>
+                      <p id="name-error" className="text-sm text-destructive" role="alert">
+                        {errors.name.message}
+                      </p>
                     )}
                   </div>
 
@@ -1189,7 +1241,7 @@ export function ContextEntityEditor({
                   <div className="space-y-2">
                     <Label htmlFor="entity_type">
                       Entity Type
-                      <span className="ml-1 text-destructive">*</span>
+                      <span className="ml-1 text-destructive" aria-hidden="true">*</span>
                     </Label>
                     <Controller
                       name="entity_type"
@@ -1197,7 +1249,12 @@ export function ContextEntityEditor({
                       rules={{ required: 'Entity type is required' }}
                       render={({ field: { onChange, value } }) => (
                         <Select value={value} onValueChange={onChange} disabled={isLoading}>
-                          <SelectTrigger id="entity_type">
+                          <SelectTrigger
+                            id="entity_type"
+                            aria-required="true"
+                            aria-invalid={!!errors.entity_type}
+                            aria-describedby={errors.entity_type ? 'entity-type-error' : undefined}
+                          >
                             <SelectValue placeholder="Select entity type..." />
                           </SelectTrigger>
                           <SelectContent>
@@ -1216,7 +1273,9 @@ export function ContextEntityEditor({
                       )}
                     />
                     {errors.entity_type && (
-                      <p className="text-sm text-destructive">{errors.entity_type.message}</p>
+                      <p id="entity-type-error" className="text-sm text-destructive" role="alert">
+                        {errors.entity_type.message}
+                      </p>
                     )}
                   </div>
 
@@ -1224,7 +1283,7 @@ export function ContextEntityEditor({
                   <div className="space-y-2">
                     <Label htmlFor="path_pattern">
                       Path Pattern
-                      <span className="ml-1 text-destructive">*</span>
+                      <span className="ml-1 text-destructive" aria-hidden="true">*</span>
                     </Label>
                     <Input
                       id="path_pattern"
@@ -1243,14 +1302,16 @@ export function ContextEntityEditor({
                       })}
                       placeholder="e.g., .claude/rules/web/hooks.md"
                       disabled={isLoading}
-                      aria-describedby="path_pattern-help"
+                      aria-required="true"
+                      aria-invalid={!!errors.path_pattern}
+                      aria-describedby={errors.path_pattern ? 'path-pattern-error path_pattern-help' : 'path_pattern-help'}
                     />
                     <p id="path_pattern-help" className="text-xs text-muted-foreground">
                       Must start with{' '}
                       <code className="rounded bg-muted px-1 py-0.5">.claude/</code>
                     </p>
                     {errors.path_pattern && (
-                      <p className="text-sm text-destructive" role="alert">
+                      <p id="path-pattern-error" className="text-sm text-destructive" role="alert">
                         {errors.path_pattern.message}
                       </p>
                     )}
@@ -1328,11 +1389,22 @@ export function ContextEntityEditor({
 
             {/* Right column: Markdown editor */}
             <div className="flex flex-1 flex-col space-y-2 overflow-hidden lg:w-2/3">
-              <Label htmlFor="content">
+              {/* Use a <p> as a label since CodeMirror renders a contenteditable div, not a native input */}
+              <p
+                id="content-label"
+                className="text-sm font-medium leading-none"
+                aria-hidden="true"
+              >
                 Content
-                <span className="ml-1 text-destructive">*</span>
-              </Label>
-              <div className="flex-1 overflow-hidden">
+                <span className="ml-1 text-destructive" aria-hidden="true">*</span>
+              </p>
+              <div
+                className="flex-1 overflow-hidden"
+                role="group"
+                aria-labelledby="content-label"
+                aria-describedby="content-help"
+                aria-required="true"
+              >
                 {isEditMode && isContentLoading ? (
                   <div
                     className="flex h-full items-center justify-center rounded-md border bg-muted/50"
