@@ -202,6 +202,7 @@ class EntityTypeConfigResponse(BaseModel):
         optional_frontmatter_keys: JSON list of frontmatter keys that MAY be
                                    present.
         validation_rules: JSON object of additional validation configuration.
+        example_path: An example path illustrating this entity type.
         content_template: Default Markdown template used when creating a new
                           entity of this type.
         applicable_platforms: List of platform slugs this type applies to.
@@ -225,6 +226,7 @@ class EntityTypeConfigResponse(BaseModel):
     required_frontmatter_keys: Optional[List[str]] = None
     optional_frontmatter_keys: Optional[List[str]] = None
     validation_rules: Optional[Dict[str, Any]] = None
+    example_path: Optional[str] = None
     content_template: Optional[str] = None
     applicable_platforms: Optional[List[str]] = None
     frontmatter_schema: Optional[Dict[str, Any]] = None
