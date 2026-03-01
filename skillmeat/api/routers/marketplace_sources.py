@@ -26,6 +26,7 @@ API Endpoints:
     POST /marketplace/sources/bulk-refresh-auto-tags - Bulk refresh auto-tags
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -1616,7 +1617,8 @@ async def _perform_scan(
             # Get database session for cross-source deduplication
             session = catalog_repo._get_session()
 
-            scan_result = scanner.scan_repository(
+            scan_result = await asyncio.to_thread(
+                scanner.scan_repository,
                 owner=source.owner,
                 repo=source.repo_name,
                 ref=source.ref,
