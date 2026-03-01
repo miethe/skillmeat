@@ -117,4 +117,5 @@ async def get_feature_flags(settings: SettingsDep) -> FeatureFlagsResponse:
         deployment_sets_enabled=settings.deployment_sets_enabled,
         memory_context_enabled=settings.memory_context_enabled,
         workflow_engine_enabled=settings.workflow_engine_enabled,
+        modular_content_architecture=settings.modular_content_architecture,
     )

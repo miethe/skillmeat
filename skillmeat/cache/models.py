@@ -292,6 +292,16 @@ class Artifact(Base):
     category: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     content_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    core_content: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment=(
+            "Platform-agnostic content before assembly. "
+            "When modular_content_architecture is enabled, this stores the raw "
+            "author-supplied content and `content` holds the assembled/cached output "
+            "for the default target platform."
+        ),
+    )
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     target_platforms: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
 
@@ -403,6 +413,7 @@ class Artifact(Base):
             "category": self.category,
             "content_hash": self.content_hash,
             "content": self.content,
+            "core_content": self.core_content,
             "description": self.description,
             "target_platforms": self.target_platforms,
             "created_at": self.created_at.isoformat() if self.created_at else None,

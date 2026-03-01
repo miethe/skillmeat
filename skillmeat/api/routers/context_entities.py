@@ -25,11 +25,12 @@ import hashlib
 import logging
 import uuid
 from pathlib import Path
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 
+from skillmeat.api.config import APISettings, get_settings
 from skillmeat.api.schemas.context_entity import (
     ContextEntityCreateRequest,
     ContextEntityDeployRequest,
@@ -40,6 +41,7 @@ from skillmeat.api.schemas.context_entity import (
     ContextEntityUpdateRequest,
 )
 from skillmeat.api.schemas.common import PageInfo
+from skillmeat.core.content_assembly import assemble_content
 from skillmeat.core.path_resolver import default_project_config_filenames
 from skillmeat.core.validators.context_entity import validate_context_entity
 from skillmeat.core.validators.context_path_validator import (
@@ -51,6 +53,9 @@ from skillmeat.core.validators.context_path_validator import (
 
 from skillmeat.cache.models import Artifact, ArtifactCategoryAssociation, Project, get_session
 from skillmeat.cache.repositories import DeploymentProfileRepository
+
+# Type alias for injected settings dependency
+SettingsDep = Annotated[APISettings, Depends(get_settings)]
 
 logger = logging.getLogger(__name__)
 
@@ -425,6 +430,7 @@ async def list_context_entities(
 )
 async def create_context_entity(
     request: ContextEntityCreateRequest,
+    settings: SettingsDep,
 ) -> ContextEntityResponse:
     """Create a new context entity.
 
@@ -467,8 +473,36 @@ async def create_context_entity(
             detail=validation_errors,
         )
 
-    # Compute content hash
-    content_hash = compute_content_hash(request.content)
+    # Determine stored content values.
+    # When modular_content_architecture is enabled we split the incoming
+    # content into core_content (platform-agnostic) and content (assembled
+    # for the default/first target platform).  The assembled value is used
+    # for backward-compatible reads; the deploy endpoint re-assembles at
+    # deploy time.
+    stored_core_content: Optional[str] = None
+    assembled_content: str = request.content
+
+    if settings.modular_content_architecture:
+        stored_core_content = request.content
+        # Determine the default platform for initial assembly
+        entity_type_config = {"slug": request.entity_type.value}
+        default_platform: str = "claude-code"
+        if request.target_platforms:
+            default_platform = request.target_platforms[0].value
+        assembled_content = assemble_content(
+            core_content=stored_core_content,
+            entity_type_config=entity_type_config,
+            platform=default_platform,
+        )
+        logger.debug(
+            "modular_content_architecture: assembled content for platform=%r "
+            "(entity_type=%r)",
+            default_platform,
+            request.entity_type.value,
+        )
+
+    # Compute content hash from assembled content (used for change detection)
+    content_hash = compute_content_hash(assembled_content)
 
     session = get_session()
     try:
@@ -481,7 +515,8 @@ async def create_context_entity(
             project_id=CONTEXT_ENTITIES_PROJECT_ID,
             name=request.name,
             type=request.entity_type.value,
-            content=request.content,
+            content=assembled_content,
+            core_content=stored_core_content,
             path_pattern=request.path_pattern,
             description=request.description,
             category=request.category,
@@ -649,7 +684,9 @@ async def get_context_entity(entity_id: str) -> ContextEntityResponse:
     },
 )
 async def update_context_entity(
-    entity_id: str, request: ContextEntityUpdateRequest
+    entity_id: str,
+    request: ContextEntityUpdateRequest,
+    settings: SettingsDep,
 ) -> ContextEntityResponse:
     """Update a context entity's metadata and/or content.
 
@@ -691,7 +728,27 @@ async def update_context_entity(
         if request.entity_type is not None:
             artifact.type = request.entity_type.value
         if request.content is not None:
-            artifact.content = request.content
+            if settings.modular_content_architecture:
+                # Store the raw author-supplied content as core_content and
+                # assemble the default platform-specific version into content.
+                artifact.core_content = request.content
+                entity_type_config = {"slug": artifact.type}
+                platforms = _as_target_platforms(artifact.target_platforms)
+                default_platform = platforms[0] if platforms else "claude-code"
+                artifact.content = assemble_content(
+                    core_content=request.content,
+                    entity_type_config=entity_type_config,
+                    platform=default_platform,
+                )
+                logger.debug(
+                    "modular_content_architecture: re-assembled content for "
+                    "platform=%r (entity_type=%r, entity_id=%r)",
+                    default_platform,
+                    artifact.type,
+                    entity_id,
+                )
+            else:
+                artifact.content = request.content
             content_changed = True
         if request.path_pattern is not None:
             try:
@@ -861,7 +918,9 @@ async def delete_context_entity(entity_id: str) -> None:
     },
 )
 async def deploy_context_entity(
-    entity_id: str, request: ContextEntityDeployRequest
+    entity_id: str,
+    request: ContextEntityDeployRequest,
+    settings: SettingsDep,
 ) -> ContextEntityDeployResponse:
     if request.all_profiles and request.deployment_profile_id:
         raise HTTPException(
@@ -903,8 +962,10 @@ async def deploy_context_entity(
         )
 
         target_platforms = _as_target_platforms(artifact.target_platforms)
-        content = artifact.content or ""
-        deployment_targets: List[tuple[str, Path]] = []
+        # Base content used when no per-profile assembly is needed.
+        # The per-profile assembly (below) may override this for each profile.
+        _base_content = artifact.content or ""
+        deployment_targets: List[tuple[str, str, Path]] = []
 
         # Validate all targets before writing files to avoid partial multi-profile deploys.
         for profile in profiles:
@@ -950,11 +1011,31 @@ async def deploy_context_entity(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Failed to resolve deployment target path",
                 )
-            deployment_targets.append((profile_id, validated.resolved_path))
+            deployment_targets.append((profile_id, profile_platform, validated.resolved_path))
 
         deployed_paths: List[str] = []
         deployed_profiles: List[str] = []
-        for profile_id, target_path in deployment_targets:
+        for profile_id, profile_platform, target_path in deployment_targets:
+            # Assemble platform-specific content when the flag is enabled and
+            # core_content is available; fall back to the pre-assembled content
+            # stored in artifact.content for backward compatibility.
+            if settings.modular_content_architecture and artifact.core_content is not None:
+                entity_type_config = {"slug": artifact.type}
+                content = assemble_content(
+                    core_content=artifact.core_content,
+                    entity_type_config=entity_type_config,
+                    platform=profile_platform,
+                )
+                logger.debug(
+                    "modular_content_architecture: assembled deploy content for "
+                    "platform=%r (entity_type=%r, entity_id=%r)",
+                    profile_platform,
+                    artifact.type,
+                    entity_id,
+                )
+            else:
+                content = _base_content
+
             should_write = True
             if target_path.exists():
                 existing_content = target_path.read_text(encoding="utf-8")

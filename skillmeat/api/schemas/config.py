@@ -144,6 +144,14 @@ class FeatureFlagsResponse(BaseModel):
             "endpoints return 404 and CLI workflow commands display a coming-soon message."
         )
     )
+    modular_content_architecture: bool = Field(
+        default=False,
+        description=(
+            "Whether the Modular Content Architecture is enabled (CECO-4.1). "
+            "When True, context entity create/update endpoints store platform-agnostic "
+            "core_content separately and assemble platform-specific content at deploy time."
+        ),
+    )
 
     class Config:
         """Pydantic model configuration."""

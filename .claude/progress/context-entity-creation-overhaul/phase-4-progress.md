@@ -17,8 +17,8 @@ overall_progress: 0
 completion_estimate: on-track
 total_tasks: 1
 completed_tasks: 0
-in_progress_tasks: 0
-blocked_tasks: 1
+in_progress_tasks: 1
+blocked_tasks: 0
 at_risk_tasks: 0
 owners:
 - python-backend-engineer
@@ -31,7 +31,7 @@ tasks:
     entity_type_config, platform); modify deploy endpoint to call assembly engine
     when core_content present (flag-gated); modify POST/PUT /context-entities to store
     core_content separately when flag enabled
-  status: pending
+  status: in_progress
   assigned_to:
   - python-backend-engineer
   - data-layer-expert
@@ -63,7 +63,7 @@ success_criteria:
     in DB)
   status: pending
 - id: SC-4.5
-  description: "Unit tests: assembly for all built-in types \xD7 all 5 platforms"
+  description: 'Unit tests: assembly for all built-in types × all 5 platforms'
   status: pending
 files_modified:
 - skillmeat/cache/models.py
@@ -71,6 +71,7 @@ files_modified:
 - skillmeat/core/content_assembly.py
 - skillmeat/api/routers/context_entities.py
 updated: '2026-03-01'
+progress: 0
 ---
 
 # Context Entity Creation Overhaul - Phase 4: Modular Content Architecture
