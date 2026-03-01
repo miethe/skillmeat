@@ -353,6 +353,16 @@ class Artifact(Base):
         foreign_keys="[GroupArtifact.artifact_uuid]",
         lazy="select",
     )
+    # Category membership — artifacts may belong to zero or more structured
+    # ContextEntityCategory buckets via the entity_category_associations join table.
+    categories: Mapped[List["ContextEntityCategory"]] = relationship(
+        "ContextEntityCategory",
+        secondary="entity_category_associations",
+        primaryjoin="Artifact.uuid == foreign(ArtifactCategoryAssociation.artifact_uuid)",
+        secondaryjoin="foreign(ArtifactCategoryAssociation.category_id) == ContextEntityCategory.id",
+        back_populates="artifacts",
+        lazy="selectin",
+    )
 
     # Constraints
     __table_args__ = (
@@ -402,6 +412,9 @@ class Artifact(Base):
         # Include metadata if loaded
         if self.artifact_metadata:
             result["metadata"] = self.artifact_metadata.to_dict()
+
+        # Include categories if loaded (avoids N+1 when lazy="selectin" fires)
+        result["categories"] = [c.name for c in self.categories]
 
         return result
 
@@ -4302,6 +4315,191 @@ class EntityTypeConfig(Base):
             "content_template": self.content_template,
             "is_builtin": self.is_builtin,
             "sort_order": self.sort_order,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class ArtifactCategoryAssociation(Base):
+    """Association between Artifact and ContextEntityCategory (many-to-many).
+
+    Links artifacts to structured categories for browsing and filtering. Each
+    artifact can belong to multiple categories, and each category can contain
+    multiple artifacts.
+
+    Attributes:
+        artifact_uuid: FK to artifacts.uuid (part of composite PK; CASCADE
+            delete so removing an artifact purges its category associations)
+        category_id: Foreign key to entity_categories.id (part of composite PK)
+        created_at: Timestamp when category was applied to artifact
+
+    Indexes:
+        - idx_artifact_category_assoc_artifact_uuid: Fast lookup by artifact UUID
+        - idx_artifact_category_assoc_category_id: Fast lookup by category
+    """
+
+    __tablename__ = "entity_category_associations"
+
+    # Composite primary key — uses artifacts.uuid (stable cross-context identity)
+    artifact_uuid: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.uuid", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    category_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("entity_categories.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_artifact_category_assoc_artifact_uuid", "artifact_uuid"),
+        Index("idx_artifact_category_assoc_category_id", "category_id"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of ArtifactCategoryAssociation."""
+        return (
+            f"<ArtifactCategoryAssociation(artifact_uuid={self.artifact_uuid!r}, "
+            f"category_id={self.category_id!r})>"
+        )
+
+
+class ContextEntityCategory(Base):
+    """A structured category for grouping context entity artifacts.
+
+    Categories allow users to organise artifacts (skills, rules, specs, etc.)
+    into named buckets that can optionally be scoped to a specific entity type
+    or platform.  The five built-in entity types use ``is_builtin=False`` for
+    categories; categories themselves are always user-manageable.
+
+    Attributes:
+        id: Auto-incrementing integer primary key.
+        name: Human-readable label shown in the UI (e.g. "Testing Utilities").
+        slug: URL-safe machine identifier (e.g. "testing-utilities").
+        description: Optional longer description of the category's purpose.
+        color: Optional hex colour code for UI badge rendering (e.g. "#3B82F6").
+        entity_type_slug: Optional FK-style filter; when set, this category
+                          only applies to artifacts whose type matches this slug
+                          (e.g. "skill", "rule_file").
+        platform: Optional platform filter (e.g. "github-actions", "cursor").
+        sort_order: Ascending display order in the UI; defaults to 0.
+        is_builtin: True for system-seeded categories that should be protected
+                    from deletion.
+        created_at: Row creation timestamp (UTC).
+        updated_at: Row last-modified timestamp (UTC).
+        artifacts: Artifacts associated with this category via the join table.
+
+    Indexes:
+        - uq_entity_categories_slug (UNIQUE): fast lookup by slug.
+        - idx_entity_categories_entity_type_platform: composite filter.
+        - idx_entity_categories_sort_order: ordered listing.
+        - idx_entity_categories_is_builtin: filter built-in vs. custom.
+    """
+
+    __tablename__ = "entity_categories"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # Identity fields
+    name: Mapped[str] = mapped_column(
+        String(100), nullable=False, comment="Human-readable label shown in the UI"
+    )
+    slug: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        unique=True,
+        index=True,
+        comment="URL-safe machine identifier, e.g. 'testing-utilities'",
+    )
+    description: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, comment="Optional longer description of the category"
+    )
+
+    # Display hints
+    color: Mapped[Optional[str]] = mapped_column(
+        String(7),
+        nullable=True,
+        comment="Hex colour code for UI badge rendering, e.g. '#3B82F6'",
+    )
+
+    # Optional scope filters
+    entity_type_slug: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="When set, restrict this category to artifacts of this entity type",
+    )
+    platform: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="When set, restrict this category to artifacts targeting this platform",
+    )
+
+    # Metadata
+    sort_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    is_builtin: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    artifacts: Mapped[List["Artifact"]] = relationship(
+        "Artifact",
+        secondary="entity_category_associations",
+        primaryjoin="ContextEntityCategory.id == foreign(ArtifactCategoryAssociation.category_id)",
+        secondaryjoin="foreign(ArtifactCategoryAssociation.artifact_uuid) == Artifact.uuid",
+        back_populates="categories",
+        lazy="selectin",
+    )
+
+    # Table-level constraints and extra indexes
+    __table_args__ = (
+        Index(
+            "idx_entity_categories_entity_type_platform",
+            "entity_type_slug",
+            "platform",
+        ),
+        Index("idx_entity_categories_sort_order", "sort_order"),
+        Index("idx_entity_categories_is_builtin", "is_builtin"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of ContextEntityCategory."""
+        return (
+            f"<ContextEntityCategory(id={self.id!r}, slug={self.slug!r}, "
+            f"name={self.name!r}, is_builtin={self.is_builtin!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert ContextEntityCategory to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the category.
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "slug": self.slug,
+            "description": self.description,
+            "color": self.color,
+            "entity_type_slug": self.entity_type_slug,
+            "platform": self.platform,
+            "sort_order": self.sort_order,
+            "is_builtin": self.is_builtin,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
