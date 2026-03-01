@@ -15,9 +15,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateEntityTypeConfig, useUpdateEntityTypeConfig } from '@/hooks';
 import { useToast } from '@/hooks';
 import type { EntityTypeConfig, EntityTypeConfigCreate, EntityTypeConfigUpdate } from '@/types/context-entity';
+
+// ---------------------------------------------------------------------------
+// Platform constants
+// ---------------------------------------------------------------------------
+
+const APPLICABLE_PLATFORMS = [
+  { slug: 'claude-code', label: 'Claude Code' },
+  { slug: 'claude-desktop', label: 'Claude Desktop' },
+  { slug: 'windsurf', label: 'Windsurf' },
+  { slug: 'cursor', label: 'Cursor' },
+  { slug: 'cline', label: 'Cline' },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Slug validation
@@ -30,6 +43,34 @@ function validateSlug(value: string): string | undefined {
   if (!SLUG_RE.test(value))
     return 'Slug must start with a lowercase letter and contain only lowercase letters, digits, and underscores (max 64 chars)';
   return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// JSON validation for frontmatter_schema
+// ---------------------------------------------------------------------------
+
+function validateFrontmatterSchema(value: string): string | undefined {
+  if (!value.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(value);
+    if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) {
+      return 'Schema must be a JSON object';
+    }
+    const allowedKeys = new Set(['required', 'properties']);
+    const extraKeys = Object.keys(parsed).filter((k) => !allowedKeys.has(k));
+    if (extraKeys.length > 0) {
+      return `Only "required" and "properties" keys are allowed. Unexpected: ${extraKeys.join(', ')}`;
+    }
+    if ('required' in parsed && !Array.isArray(parsed.required)) {
+      return '"required" must be an array of strings';
+    }
+    if ('properties' in parsed && (typeof parsed.properties !== 'object' || Array.isArray(parsed.properties))) {
+      return '"properties" must be an object';
+    }
+    return undefined;
+  } catch {
+    return 'Invalid JSON — check for syntax errors';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -127,6 +168,8 @@ interface FormState {
   required_frontmatter_keys: string[];
   example_path: string;
   content_template: string;
+  applicable_platforms: string[];
+  frontmatter_schema_text: string;
 }
 
 function buildInitialState(config: EntityTypeConfig | null): FormState {
@@ -140,6 +183,10 @@ function buildInitialState(config: EntityTypeConfig | null): FormState {
       required_frontmatter_keys: config.required_frontmatter_keys ?? [],
       example_path: '',
       content_template: config.content_template ?? '',
+      applicable_platforms: config.applicable_platforms ?? [],
+      frontmatter_schema_text: config.frontmatter_schema
+        ? JSON.stringify(config.frontmatter_schema, null, 2)
+        : '',
     };
   }
   return {
@@ -151,6 +198,8 @@ function buildInitialState(config: EntityTypeConfig | null): FormState {
     required_frontmatter_keys: [],
     example_path: '',
     content_template: '',
+    applicable_platforms: [],
+    frontmatter_schema_text: '',
   };
 }
 
@@ -182,6 +231,7 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
 
   const [form, setForm] = React.useState<FormState>(() => buildInitialState(editingConfig));
   const [slugError, setSlugError] = React.useState<string | undefined>();
+  const [schemaError, setSchemaError] = React.useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   // Reinitialise form when the dialog opens with a different config
@@ -189,6 +239,7 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
     if (open) {
       setForm(buildInitialState(editingConfig));
       setSlugError(undefined);
+      setSchemaError(undefined);
     }
   }, [open, editingConfig]);
 
@@ -204,6 +255,29 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
     setSlugError(validateSlug(value));
   }, [setField]);
 
+  const handleSchemaBlur = React.useCallback(() => {
+    setSchemaError(validateFrontmatterSchema(form.frontmatter_schema_text));
+  }, [form.frontmatter_schema_text]);
+
+  const handlePlatformToggle = React.useCallback((slug: string, checked: boolean) => {
+    setForm((prev) => ({
+      ...prev,
+      applicable_platforms: checked
+        ? [...prev.applicable_platforms, slug]
+        : prev.applicable_platforms.filter((p) => p !== slug),
+    }));
+  }, []);
+
+  const parseFrontmatterSchema = React.useCallback((): Record<string, unknown> | null => {
+    const text = form.frontmatter_schema_text.trim();
+    if (!text) return null;
+    try {
+      return JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }, [form.frontmatter_schema_text]);
+
   const handleSubmit = React.useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -218,8 +292,19 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
 
       if (!form.label.trim()) return;
 
+      // Validate schema before submit
+      const schemaErr = validateFrontmatterSchema(form.frontmatter_schema_text);
+      if (schemaErr) {
+        setSchemaError(schemaErr);
+        return;
+      }
+
       setIsSubmitting(true);
       try {
+        const parsedSchema = parseFrontmatterSchema();
+        const applicablePlatforms =
+          form.applicable_platforms.length > 0 ? form.applicable_platforms : null;
+
         if (isEdit && editingConfig) {
           const updateData: EntityTypeConfigUpdate = {
             label: form.label || undefined,
@@ -232,6 +317,8 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
                 : undefined,
             example_path: form.example_path || undefined,
             content_template: form.content_template || undefined,
+            applicable_platforms: applicablePlatforms,
+            frontmatter_schema: parsedSchema,
           };
           await updateConfig.mutateAsync({ slug: editingConfig.slug, data: updateData });
           toast({
@@ -251,6 +338,8 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
                 : undefined,
             example_path: form.example_path || undefined,
             content_template: form.content_template || undefined,
+            applicable_platforms: applicablePlatforms,
+            frontmatter_schema: parsedSchema,
           };
           await createConfig.mutateAsync(createData);
           toast({
@@ -269,7 +358,7 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
         setIsSubmitting(false);
       }
     },
-    [form, isEdit, editingConfig, createConfig, updateConfig, toast, onClose]
+    [form, isEdit, editingConfig, createConfig, updateConfig, toast, onClose, parseFrontmatterSchema]
   );
 
   const dialogTitle = isEdit
@@ -398,6 +487,81 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
             />
           </div>
 
+          {/* Applicable Platforms — hidden for built-in types */}
+          {!isBuiltin && (
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium leading-none">Applicable Platforms</legend>
+              <p id="etc-platforms-hint" className="text-xs text-muted-foreground">
+                Leave empty to apply to all platforms.
+              </p>
+              <div
+                className="flex flex-wrap gap-x-6 gap-y-2 pt-1"
+                role="group"
+                aria-describedby="etc-platforms-hint"
+                aria-label="Applicable platforms"
+              >
+                {APPLICABLE_PLATFORMS.map(({ slug, label }) => {
+                  const checkboxId = `etc-platform-${slug}`;
+                  const isChecked = form.applicable_platforms.includes(slug);
+                  return (
+                    <div key={slug} className="flex items-center gap-2">
+                      <Checkbox
+                        id={checkboxId}
+                        checked={isChecked}
+                        onCheckedChange={(checked) =>
+                          handlePlatformToggle(slug, checked === true)
+                        }
+                        aria-label={label}
+                      />
+                      <Label htmlFor={checkboxId} className="cursor-pointer font-normal">
+                        {label}
+                      </Label>
+                    </div>
+                  );
+                })}
+              </div>
+            </fieldset>
+          )}
+
+          {/* Frontmatter Schema — hidden for built-in types */}
+          {!isBuiltin && (
+            <div className="space-y-1.5">
+              <Label htmlFor="etc-frontmatter-schema">Frontmatter Schema (JSON)</Label>
+              <Textarea
+                id="etc-frontmatter-schema"
+                value={form.frontmatter_schema_text}
+                onChange={(e) => {
+                  setField('frontmatter_schema_text', e.target.value);
+                  // Clear error while user is editing
+                  if (schemaError) setSchemaError(undefined);
+                }}
+                onBlur={handleSchemaBlur}
+                placeholder={'{\n  "required": ["key1"],\n  "properties": {\n    "key1": { "type": "string" }\n  }\n}'}
+                rows={6}
+                className="font-mono text-sm"
+                aria-describedby={schemaError ? 'etc-schema-error' : 'etc-schema-hint'}
+                aria-invalid={!!schemaError}
+              />
+              {schemaError ? (
+                <p id="etc-schema-error" className="text-xs text-destructive" role="alert">
+                  {schemaError}
+                </p>
+              ) : (
+                <p id="etc-schema-hint" className="text-xs text-muted-foreground">
+                  Optional JSON Schema subset for frontmatter validation. Supported keys:{' '}
+                  <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">required</code>{' '}
+                  (array of strings) and{' '}
+                  <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">properties</code>{' '}
+                  (map of key to type descriptor, e.g.{' '}
+                  <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
+                    {`{"type": "string"}`}
+                  </code>
+                  ).
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Content template */}
           <div className="space-y-1.5">
             <Label htmlFor="etc-content-template">Content Template</Label>
@@ -419,7 +583,7 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting || (!isEdit && !!slugError)}>
+            <Button type="submit" disabled={isSubmitting || (!isEdit && !!slugError) || !!schemaError}>
               {isSubmitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Create'}
             </Button>
           </DialogFooter>

@@ -740,6 +740,8 @@ const BUILTIN_ENTITY_TYPE_CONFIGS: EntityTypeConfig[] = [
     sort_order: 0,
     created_at: '',
     updated_at: '',
+    applicable_platforms: null,
+    frontmatter_schema: null,
   },
   {
     id: 2,
@@ -751,6 +753,8 @@ const BUILTIN_ENTITY_TYPE_CONFIGS: EntityTypeConfig[] = [
     sort_order: 1,
     created_at: '',
     updated_at: '',
+    applicable_platforms: null,
+    frontmatter_schema: null,
   },
   {
     id: 3,
@@ -762,6 +766,8 @@ const BUILTIN_ENTITY_TYPE_CONFIGS: EntityTypeConfig[] = [
     sort_order: 2,
     created_at: '',
     updated_at: '',
+    applicable_platforms: null,
+    frontmatter_schema: null,
   },
   {
     id: 4,
@@ -773,6 +779,8 @@ const BUILTIN_ENTITY_TYPE_CONFIGS: EntityTypeConfig[] = [
     sort_order: 3,
     created_at: '',
     updated_at: '',
+    applicable_platforms: null,
+    frontmatter_schema: null,
   },
   {
     id: 5,
@@ -784,6 +792,8 @@ const BUILTIN_ENTITY_TYPE_CONFIGS: EntityTypeConfig[] = [
     sort_order: 4,
     created_at: '',
     updated_at: '',
+    applicable_platforms: null,
+    frontmatter_schema: null,
   },
 ];
 

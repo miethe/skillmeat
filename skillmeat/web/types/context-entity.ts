@@ -232,6 +232,10 @@ export interface EntityTypeConfig {
   validation_rules?: Record<string, unknown>;
   /** Default Markdown template used when creating a new entity */
   content_template?: string;
+  /** Platform slugs this type applies to. null means all platforms. */
+  applicable_platforms: string[] | null;
+  /** JSON Schema subset for custom type frontmatter validation. null means no schema validation. */
+  frontmatter_schema: Record<string, unknown> | null;
   /** True for the five shipped types; false for user-created types */
   is_builtin: boolean;
   /** Display ordering in the UI (ascending) */
@@ -264,6 +268,10 @@ export interface EntityTypeConfigCreate {
   example_path?: string;
   /** Default Markdown content template */
   content_template?: string;
+  /** Platform slugs this type applies to. Omit or null for all platforms. */
+  applicable_platforms?: string[] | null;
+  /** JSON Schema subset for custom type frontmatter validation. */
+  frontmatter_schema?: Record<string, unknown> | null;
 }
 
 /**
@@ -285,4 +293,8 @@ export interface EntityTypeConfigUpdate {
   example_path?: string;
   /** Updated content template */
   content_template?: string;
+  /** Platform slugs this type applies to. Omit or null for all platforms. */
+  applicable_platforms?: string[] | null;
+  /** JSON Schema subset for custom type frontmatter validation. */
+  frontmatter_schema?: Record<string, unknown> | null;
 }
