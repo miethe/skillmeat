@@ -481,7 +481,7 @@ export function EntityTypeConfigForm({ open, onClose, editingConfig }: EntityTyp
               <IconPicker
                 value={form.icon}
                 onChange={(iconName) => setField('icon', iconName)}
-                disabled={fieldsReadOnly}
+                disabled={false}
               />
             </div>
             <div className="space-y-1.5">
