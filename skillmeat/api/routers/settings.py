@@ -955,6 +955,8 @@ async def create_entity_type_config(
             icon=request.icon,
             path_prefix=request.path_prefix,
             required_frontmatter_keys=request.required_frontmatter_keys,
+            example_path=request.example_path,
+            content_template=request.content_template,
             is_builtin=False,
             sort_order=next_sort_order,
         )

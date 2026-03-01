@@ -36,6 +36,7 @@ class EntityTypeConfigCreateRequest(BaseModel):
     path_prefix: Optional[str] = None
     required_frontmatter_keys: Optional[List[str]] = None
     example_path: Optional[str] = None
+    content_template: Optional[str] = None
 
     @field_validator("slug")
     @classmethod
@@ -69,6 +70,7 @@ class EntityTypeConfigUpdateRequest(BaseModel):
     path_prefix: Optional[str] = None
     required_frontmatter_keys: Optional[List[str]] = None
     example_path: Optional[str] = None
+    content_template: Optional[str] = None
 
 
 class EntityTypeConfigResponse(BaseModel):
