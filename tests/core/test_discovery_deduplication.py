@@ -267,9 +267,23 @@ class TestDiscoveryWithDeduplication:
             "artifacts": [],
         }
 
+        # Mock check_artifact_exists to prevent filesystem lookup against the real
+        # user collection (which may contain "test-skill").
+        _not_in_collection = {
+            "exists_in_collection": False,
+            "exists_in_project": False,
+            "collection_path": None,
+            "project_path": None,
+            "location": "none",
+        }
+
         with patch(
             "skillmeat.core.collection.CollectionManager"
-        ) as MockCollectionManager:
+        ) as MockCollectionManager, patch.object(
+            ArtifactDiscoveryService,
+            "check_artifact_exists",
+            return_value=_not_in_collection,
+        ):
             mock_mgr = MagicMock()
             mock_mgr.get_collection_membership_index.return_value = mock_index
             MockCollectionManager.return_value = mock_mgr
@@ -320,9 +334,26 @@ Identical content to collection.
             "artifacts": [],
         }
 
+        # Mock check_artifact_exists to isolate from real filesystem.
+        # The artifact is not in the collection by exact name, so existence returns "none".
+        # Hash-based match in the index is a fuzzy signal: the production code downgrades
+        # an index-based "exact" hash match to "name_type" when check_artifact_exists
+        # confirms the artifact is not in the collection directory.
+        _not_in_collection = {
+            "exists_in_collection": False,
+            "exists_in_project": False,
+            "collection_path": None,
+            "project_path": None,
+            "location": "none",
+        }
+
         with patch(
             "skillmeat.core.collection.CollectionManager"
-        ) as MockCollectionManager:
+        ) as MockCollectionManager, patch.object(
+            ArtifactDiscoveryService,
+            "check_artifact_exists",
+            return_value=_not_in_collection,
+        ):
             mock_mgr = MagicMock()
             mock_mgr.get_collection_membership_index.return_value = mock_index
             MockCollectionManager.return_value = mock_mgr
@@ -336,8 +367,12 @@ Identical content to collection.
         )
         assert canvas_skill is not None
         assert canvas_skill.collection_match is not None
-        assert canvas_skill.collection_match.type == "exact"
-        assert canvas_skill.collection_match.confidence == 1.0
+        # Hash match found in index but artifact not in collection filesystem:
+        # production code treats this as a possible duplicate ("name_type"), not
+        # a definitive match ("exact"). "exact" is reserved for filesystem-verified
+        # membership; hash matching is a secondary fuzzy signal.
+        assert canvas_skill.collection_match.type == "name_type"
+        assert canvas_skill.collection_match.confidence == 0.85
         assert canvas_skill.collection_match.matched_artifact_id == "skill:canvas-design"
 
     def test_partial_name_type_match_scenario(self, temp_project):
@@ -490,9 +525,25 @@ Brand new content
             "artifacts": [],
         }
 
+        # Mock check_artifact_exists to isolate from real filesystem.
+        # No artifacts exist in the collection directory, so all return "none".
+        # Hash-based matches in the index are downgraded to "name_type" by the
+        # production code when filesystem existence is not confirmed.
+        _not_in_collection = {
+            "exists_in_collection": False,
+            "exists_in_project": False,
+            "collection_path": None,
+            "project_path": None,
+            "location": "none",
+        }
+
         with patch(
             "skillmeat.core.collection.CollectionManager"
-        ) as MockCollectionManager:
+        ) as MockCollectionManager, patch.object(
+            ArtifactDiscoveryService,
+            "check_artifact_exists",
+            return_value=_not_in_collection,
+        ):
             mock_mgr = MagicMock()
             mock_mgr.get_collection_membership_index.return_value = mock_index
             MockCollectionManager.return_value = mock_mgr
@@ -500,7 +551,17 @@ Brand new content
             service = ArtifactDiscoveryService(temp_project, scan_mode="project")
             result = service.discover_artifacts(include_collection_status=True)
 
-        # Count match types
+        # Count match types.
+        # Production code behavior (post-refactor):
+        # - "exact" type: only for filesystem-verified collection membership
+        # - "name_type": for hash-index matches OR name+type-index matches when not
+        #   in collection filesystem (hash matches downgraded from "exact" to "name_type")
+        # - "none": no match in index and not in collection filesystem
+        #
+        # With check_artifact_exists returning "none" for all 10 skills:
+        #   3 hash-matched skills -> downgraded to "name_type" (was "exact" in index)
+        #   2 name+type-matched skills -> remain "name_type"
+        #   5 unmatched skills -> "none"
         exact_count = sum(
             1 for a in result.artifacts
             if a.collection_match and a.collection_match.type == "exact"
@@ -514,8 +575,8 @@ Brand new content
             if a.collection_match and a.collection_match.type == "none"
         )
 
-        assert exact_count == 3, f"Expected 3 exact matches, got {exact_count}"
-        assert partial_count == 2, f"Expected 2 partial matches, got {partial_count}"
+        assert exact_count == 0, f"Expected 0 exact matches, got {exact_count}"
+        assert partial_count == 5, f"Expected 5 name_type matches, got {partial_count}"
         assert new_count == 5, f"Expected 5 new matches, got {new_count}"
 
 

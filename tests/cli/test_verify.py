@@ -114,7 +114,7 @@ class TestVerifyCommand:
         """Test verifying GitHub artifact spec."""
         runner = isolated_cli_runner
 
-        from skillmeat.models.metadata import ArtifactMetadata
+        from skillmeat.core.artifact import ArtifactMetadata
         import shutil
 
         def mock_fetch_impl(spec, artifact_type, dest_dir):
@@ -320,14 +320,16 @@ class TestVerifyWorkflows:
             result = runner.invoke(main, ["verify", str(skill), "--type", "skill"])
             assert result.exit_code == 0
 
+    @patch("skillmeat.cli.ArtifactManager.add_from_github")
     @patch("skillmeat.sources.github.GitHubSource.fetch")
     def test_verify_github_before_add(
-        self, mock_fetch, isolated_cli_runner, sample_skill_dir, tmp_path
+        self, mock_fetch, mock_add_from_github, isolated_cli_runner, sample_skill_dir, tmp_path
     ):
         """Test workflow: verify GitHub spec → add."""
         runner = isolated_cli_runner
 
-        from skillmeat.models.metadata import ArtifactMetadata
+        from skillmeat.core.artifact import Artifact, ArtifactMetadata, ArtifactType
+        from datetime import datetime, timezone
         import shutil
 
         def mock_fetch_impl(spec, artifact_type, dest_dir):
@@ -340,6 +342,19 @@ class TestVerifyWorkflows:
             )
 
         mock_fetch.side_effect = mock_fetch_impl
+
+        mock_add_from_github.return_value = Artifact(
+            name="test-skill",
+            type=ArtifactType.SKILL,
+            path="skills/test-skill/",
+            origin="github",
+            metadata=ArtifactMetadata(
+                title="Test Skill",
+                description="A test skill",
+                version="1.0.0",
+            ),
+            added=datetime.now(timezone.utc),
+        )
 
         # Verify GitHub spec
         verify_result = runner.invoke(

@@ -625,11 +625,41 @@ def show(
         type_filter = ArtifactType(artifact_type) if artifact_type else None
 
         # Show artifact
-        artifact_mgr.show(
+        artifact = artifact_mgr.show(
             artifact_name=name,
             artifact_type=type_filter,
             collection_name=collection,
         )
+
+        # Display artifact details
+        version = getattr(artifact, "resolved_version", None) or getattr(
+            artifact, "version_spec", None
+        )
+        source = getattr(artifact, "source", None) or getattr(
+            artifact, "origin_source", None
+        )
+        desc = getattr(artifact.metadata, "description", None) if getattr(artifact, "metadata", None) else None
+        if as_json:
+            console.print(
+                json.dumps(
+                    {
+                        "name": artifact.name,
+                        "type": artifact.type.value,
+                        "version": version,
+                        "source": source,
+                        "description": desc,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            console.print(f"[bold]{artifact.name}[/bold] ({artifact.type.value})")
+            if version:
+                console.print(f"  Version: {version}")
+            if source:
+                console.print(f"  Source:  {source}")
+            if desc:
+                console.print(f"  {desc}")
 
         # Show scores if requested
         if scores:
@@ -876,12 +906,21 @@ def remove(
         # Convert type string to enum
         type_filter = ArtifactType(artifact_type) if artifact_type else None
 
+        # Resolve artifact type if not specified — find_artifact raises ValueError on ambiguity
+        if type_filter is None:
+            collection_obj = artifact_mgr.collection_mgr.load_collection(
+                params.get("collection")
+            )
+            resolved = collection_obj.find_artifact(name, None)
+            if not resolved:
+                raise ValueError(f"Artifact '{name}' not found")
+            type_filter = resolved.type
+
         # Remove artifact
         artifact_mgr.remove(
-            name=name,
+            artifact_name=name,
             artifact_type=type_filter,
             collection_name=params.get("collection"),
-            keep_files=keep_files,
         )
 
         # Invalidate cache after successful remove
@@ -4350,16 +4389,21 @@ def verify(spec: str, artifact_type: str):
 
                 # Validate
                 validator = ArtifactValidator()
-                is_valid, error_msg, extracted_metadata = validator.validate(
-                    artifact_path=fetched_path,
+                validation_result = validator.validate(
+                    path=fetched_path,
                     artifact_type=type_enum,
                 )
 
-                if is_valid:
+                if validation_result.is_valid:
                     console.print("[green]Valid artifact[/green]")
                     console.print(f"  Spec: {spec}")
                     console.print(f"  Type: {type_enum.value}")
 
+                    # Extract and display metadata from fetched artifact
+                    from skillmeat.utils.metadata import extract_artifact_metadata
+                    extracted_metadata = extract_artifact_metadata(
+                        fetched_path, type_enum
+                    )
                     if extracted_metadata:
                         if extracted_metadata.title:
                             console.print(f"  Title: {extracted_metadata.title}")
@@ -4376,7 +4420,9 @@ def verify(spec: str, artifact_type: str):
                                 f"  Tags: {', '.join(extracted_metadata.tags)}"
                             )
                 else:
-                    console.print(f"[red]Invalid: {error_msg}[/red]")
+                    console.print(
+                        f"[red]Invalid: {validation_result.error_message}[/red]"
+                    )
                     sys.exit(1)
 
         else:
@@ -4389,16 +4435,19 @@ def verify(spec: str, artifact_type: str):
             console.print(f"[cyan]Verifying local artifact: {local_path}...[/cyan]")
 
             validator = ArtifactValidator()
-            is_valid, error_msg, metadata = validator.validate(
-                artifact_path=local_path,
+            validation_result = validator.validate(
+                path=local_path,
                 artifact_type=type_enum,
             )
 
-            if is_valid:
+            if validation_result.is_valid:
                 console.print("[green]Valid artifact[/green]")
                 console.print(f"  Path: {local_path}")
                 console.print(f"  Type: {type_enum.value}")
 
+                # Extract and display metadata from local artifact
+                from skillmeat.utils.metadata import extract_artifact_metadata
+                metadata = extract_artifact_metadata(local_path, type_enum)
                 if metadata:
                     if metadata.title:
                         console.print(f"  Title: {metadata.title}")
@@ -4411,7 +4460,9 @@ def verify(spec: str, artifact_type: str):
                     if metadata.tags:
                         console.print(f"  Tags: {', '.join(metadata.tags)}")
             else:
-                console.print(f"[red]Invalid: {error_msg}[/red]")
+                console.print(
+                    f"[red]Invalid: {validation_result.error_message}[/red]"
+                )
                 sys.exit(1)
 
     except Exception as e:
@@ -7094,14 +7145,9 @@ def clear(older_than_days, confirm):
                 console.print("[yellow]Operation cancelled.[/yellow]")
                 sys.exit(0)
 
-        # Calculate cutoff date
-        from datetime import datetime, timedelta
-
-        cutoff_date = datetime.now() - timedelta(days=older_than_days)
-
-        # Delete old events
+        # Delete old events using the retention-based cleanup method
         with console.status("[cyan]Clearing old analytics data...[/cyan]"):
-            deleted_count = manager.db.delete_events_before(cutoff_date)
+            deleted_count = manager.db.cleanup_old_events(days=older_than_days)
 
         if deleted_count > 0:
             console.print(f"[green]Deleted {deleted_count:,} events[/green]")

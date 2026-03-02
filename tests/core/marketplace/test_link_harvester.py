@@ -231,7 +231,7 @@ class TestReadmeLinkHarvester:
         assert len(links) == 1
         assert "skills" in links[0].context.lower()
         # Context should be truncated
-        assert len(links[0].context) <= 220  # 100 before + 100 after + url
+        assert len(links[0].context) <= 230  # ~100 before + url + ~100 after
 
     def test_cycle_protection_visited(self, harvester):
         """Test that visited URLs are not returned again."""

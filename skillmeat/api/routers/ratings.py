@@ -15,12 +15,12 @@ from skillmeat.api.schemas.scoring import (
     UserRatingRequest,
     UserRatingResponse,
 )
-from skillmeat.core.scoring import QualityScorer
 from skillmeat.observability.tracing import trace_operation
-from skillmeat.storage.rating_store import (
-    RatingManager,
-    RateLimitExceededError,
-)
+
+# Deferred imports to break circular import chain:
+# ratings.py → rating_store → cache.models → cache.__init__ → marketplace → api schemas → api.__init__ → server → routers → ratings.py
+# RatingManager, RateLimitExceededError, and QualityScorer are imported inside
+# the functions that use them.
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,11 @@ async def submit_rating(
         shared=request.share_with_community,
     ) as span:
         try:
+            from skillmeat.storage.rating_store import (  # deferred to break circular import
+                RatingManager,
+                RateLimitExceededError,
+            )
+
             manager = RatingManager()
 
             user_rating = manager.add_rating(
@@ -160,6 +165,8 @@ async def get_artifact_scores(
         has_match_score=match_score is not None,
     ) as span:
         try:
+            from skillmeat.core.scoring import QualityScorer  # deferred to break circular import
+
             scorer = QualityScorer()
 
             result = scorer.calculate_confidence_score(
@@ -219,6 +226,8 @@ async def list_artifact_ratings(
         limit=limit,
     ) as span:
         try:
+            from skillmeat.storage.rating_store import RatingManager  # deferred to break circular import
+
             manager = RatingManager()
 
             ratings = manager.get_ratings(artifact_id)

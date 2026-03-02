@@ -12,9 +12,6 @@ Where:
 - count: Number of real ratings
 """
 
-from skillmeat.storage.rating_store import RatingManager
-
-
 # Default priors based on SPIKE research
 DEFAULT_QUALITY_PRIOR = 50.0  # Neutral quality assumption
 DEFAULT_PRIOR_WEIGHT = 5  # Weight of prior (virtual ratings count)
@@ -45,7 +42,7 @@ class QualityScorer:
 
     def __init__(
         self,
-        rating_manager: RatingManager | None = None,
+        rating_manager=None,
         prior: float = DEFAULT_QUALITY_PRIOR,
         prior_weight: int = DEFAULT_PRIOR_WEIGHT,
     ):
@@ -56,7 +53,11 @@ class QualityScorer:
             prior: Default quality prior (0-100)
             prior_weight: Weight of prior in Bayesian formula
         """
-        self.rating_manager = rating_manager or RatingManager()
+        if rating_manager is None:
+            from skillmeat.storage.rating_store import RatingManager
+
+            rating_manager = RatingManager()
+        self.rating_manager = rating_manager
         self.prior = prior
         self.prior_weight = prior_weight
 

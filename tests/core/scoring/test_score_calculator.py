@@ -54,8 +54,12 @@ class TestScoreCalculatorInit:
     """Test ScoreCalculator initialization."""
 
     def test_init_with_defaults(self, match_analyzer):
-        """Test initialization with default weights."""
-        calculator = ScoreCalculator(match_analyzer=match_analyzer)
+        """Test initialization with default weights when config is unavailable."""
+        with patch(
+            "skillmeat.config.ConfigManager"
+        ) as mock_config_cls:
+            mock_config_cls.side_effect = Exception("No config available")
+            calculator = ScoreCalculator(match_analyzer=match_analyzer)
 
         assert calculator.match_analyzer is match_analyzer
         assert calculator.semantic_scorer is None
